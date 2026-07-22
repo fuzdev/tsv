@@ -13,6 +13,26 @@ use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
+/// Which blank-line rule a comma-separated list's separator follows.
+///
+/// Prettier asks two different questions here, and a list belongs to exactly one of them —
+/// so the caller names its kind rather than passing a bare "preserve?" bool that cannot say
+/// which rule it meant. The split is not cosmetic: the two disagree precisely when the comma
+/// and the blank line sit on different lines.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum BlankRule {
+    /// The list has no blank-preservation rule; the separator is a plain hardline.
+    None,
+    /// Prettier's `isNextLineEmpty` — measured from the **element's end**, so the blank must
+    /// begin on the line that element ends on. Params, call arguments, object properties:
+    /// prettier emits a `hardline` there, so a blank also forces the list to break.
+    NextLineEmpty,
+    /// Prettier's `isLineAfterElementEmpty` — advance to the **comma** first, then measure.
+    /// Arrays and tuples: prettier emits a `softline`, so a blank never forces a break, and a
+    /// blank before the comma is not preserved.
+    AfterComma,
+}
+
 impl<'a> Printer<'a> {
     /// Emit the comments in `[start, end)` between a class/interface header
     /// (after the last heritage item or type params) and the body `{`, preserving
@@ -183,16 +203,12 @@ impl<'a> Printer<'a> {
     /// # Arguments
     /// * `start` - Start position (e.g., end of previous chain element)
     /// * `end` - End position (e.g., start of next chain element)
-    /// * `same_line` - If true, returns comments on same line as start; if false, returns comments on their own lines
-    pub(crate) fn filter_block_comments(
-        &self,
-        start: u32,
-        end: u32,
-        same_line: bool,
-    ) -> CommentVec<'_> {
+    ///
+    /// Returns the block comments on the same source line as `start`.
+    pub(crate) fn filter_block_comments(&self, start: u32, end: u32) -> CommentVec<'_> {
         comments_to_emit_in_range(self.comments, start, end)
             .filter(|c| c.is_block)
-            .filter(|c| same_line == self.is_same_line(start, c.span.start))
+            .filter(|c| self.is_same_line(start, c.span.start))
             .collect()
     }
 
@@ -309,21 +325,22 @@ impl<'a> Printer<'a> {
     ///
     /// Used by: class body members, interface/enum members, block statement bodies,
     /// type literals, expanded object patterns. The orphaned-comment sibling is
-    /// [`Self::build_orphaned_comment_run`].
-    pub(crate) fn build_leading_comments_before(
+    /// [`Self::push_orphaned_comment_run`]. Pushes into the caller's buffer
+    /// (usually pooled) rather than returning a fresh `DocBuf` — a long run
+    /// would spill the intermediate on every call just to be `extend`ed away.
+    pub(crate) fn push_leading_comments_before(
         &self,
+        parts: &mut DocBuf,
         comments: &[&internal::Comment],
         target_start: u32,
-    ) -> DocBuf {
-        let mut parts = DocBuf::new();
+    ) {
         self.push_leading_comment_run(
-            &mut parts,
+            parts,
             comments.iter().copied(),
             target_start,
             LeadingGlue::Adjacent,
             self.d().empty(),
         );
-        parts
     }
 
     /// Build the run for comments **orphaned by a dropped statement** — a bare `;`
@@ -340,19 +357,19 @@ impl<'a> Printer<'a> {
     /// leading run — so it routes through the shared emitter unchanged, and only the
     /// last comment is special-cased here.
     ///
-    /// A sibling of [`Self::build_leading_comments_before`] rather than a flag on it:
+    /// A sibling of [`Self::push_leading_comments_before`] rather than a flag on it:
     /// what differs is not a separator policy but whether the run has a target at all.
-    pub(crate) fn build_orphaned_comment_run(
+    pub(crate) fn push_orphaned_comment_run(
         &self,
+        parts: &mut DocBuf,
         comments: &[&internal::Comment],
         gap_end: u32,
-    ) -> DocBuf {
-        let mut parts = DocBuf::new();
+    ) {
         let Some((last, leading)) = comments.split_last() else {
-            return parts;
+            return;
         };
         self.push_leading_comment_run(
-            &mut parts,
+            parts,
             leading.iter().copied(),
             last.span.start,
             LeadingGlue::Adjacent,
@@ -362,7 +379,6 @@ impl<'a> Printer<'a> {
         if self.has_blank_line_between(last.span.end, gap_end) {
             parts.push(self.d().literalline());
         }
-        parts
     }
 
     /// Build docs for trailing comments at the end of a body (before closing `}`).
@@ -1125,7 +1141,7 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         elem_end: u32,
         next_start: u32,
-        preserve_blank_before: bool,
+        blank_rule: BlankRule,
     ) -> u32 {
         let d = self.d();
         let comma_pos = self.find_list_comma(elem_end, next_start);
@@ -1152,9 +1168,10 @@ impl<'a> Printer<'a> {
             }
         }
 
-        // Hardline to separate from next element, optionally preserving an author
-        // blank line before the next own-line leading comment (tuple only).
-        if preserve_blank_before {
+        // Hardline to separate from next element, optionally preserving an author blank line
+        // before the next own-line leading comment. WHICH blank counts is the caller's list
+        // kind, not this emitter's business — see [`BlankRule`].
+        if blank_rule != BlankRule::None {
             // **in source**: `next_lead` bounds a raw blank-line scan, which cannot tell a
             // comment's own newlines from an author's blank line — so it must stop at every
             // comment in the gap, not just the ones this caller emits.
@@ -1162,7 +1179,17 @@ impl<'a> Printer<'a> {
                 .comments_in_source_between(after_comma_end, next_start)
                 .find(|c| !self.is_same_line(elem_end, c.span.start))
                 .map_or(next_start, |c| c.span.start);
-            if self.has_blank_line_between(after_comma_end, next_lead) {
+            let has_blank = match blank_rule {
+                // Measured from the ELEMENT's end, so a blank the author put before the
+                // comma still counts — and one after a comma pushed onto its own line
+                // does not.
+                BlankRule::NextLineEmpty => self.is_next_line_empty(elem_end, next_lead),
+                // Measured from past the comma, prettier's array/tuple rule.
+                BlankRule::AfterComma => self.has_blank_line_between(after_comma_end, next_lead),
+                // Bailed out above; spelled here so the match stays total.
+                BlankRule::None => false,
+            };
+            if has_blank {
                 parts.push(d.literalline());
             }
         }

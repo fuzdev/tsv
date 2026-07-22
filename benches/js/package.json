@@ -17,6 +17,8 @@
 		"prettier-plugin-svelte": "4.1.1",
 		"@biomejs/js-api": "6.0.0",
 		"@biomejs/wasm-bundler": "2.5.4",
+		"@dprint/formatter": "0.5.1",
+		"@dprint/typescript": "0.96.1",
 		"oxc-parser": "0.140.0",
 		"oxfmt": "0.59.0",
 		"zod": "^4.4.3",
@@ -24,7 +26,7 @@
 	},
 	"//types": "@types/node is types-only and dev-only (never ships, no runtime cost). It lets the shared harness's `node:` builtins type-check under `deno check` (and editors) when an npm package's .d.ts pulls in node types in npm-resolution mode — the portable-node:-builtins architecture's one new dev dep. NOT needed by the gated `deno task test:deno` (that's the dependency-free divergence suite — `node:assert` + relative imports, no node_modules).",
 	"devDependencies": {
-		"@types/node": "^26"
+		"@types/node": "^24"
 	},
 	"//oxc-wasi": "The oxc-parser WASM bench row needs @oxc-parser/binding-wasm32-wasi — pure-wasm (runtime-portable) but its metadata declares `cpu: wasm32`, so npm skips it on any non-wasm host. It is NOT listed as a dep here: declaring it errors on x64, and as an optionalDependency npm records it as known-skipped so a later `--force` reinstall no-ops. Instead `deno task bench:install` (install_deps.ts) force-fetches it at the oxc-parser version (oxc ships all bindings in lockstep), so the `oxc-parser` pin above is its single source of truth too."
 }

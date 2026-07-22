@@ -7,7 +7,7 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::doc::swallow::{self, SwallowReport};
 
-use super::profile::resolve_files;
+use super::profile::{is_input_invalid_fixture, resolve_files};
 
 /// Audit for line comments that swallow the following token.
 ///
@@ -71,11 +71,7 @@ impl SwallowAuditCommand {
 
         for path in &files {
             // Skip fixtures expected to fail parsing.
-            if path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with("input_invalid"))
-            {
+            if is_input_invalid_fixture(path) {
                 continue;
             }
             let Ok(source) = std::fs::read_to_string(path) else {

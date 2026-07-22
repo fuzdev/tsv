@@ -7,7 +7,7 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::comment_ledger::{self, CommentFinding, CommentFindingKind};
 
-use super::profile::resolve_files;
+use super::profile::{is_input_invalid_fixture, resolve_files};
 
 /// Audit that every parsed comment is printed exactly once.
 ///
@@ -40,7 +40,7 @@ struct Violation {
 /// check` must not fail per added fixture); shrinkage/collapse fails. Re-pin to current
 /// when it trips. Same ritual as `swallow_audit`'s `FORMATTED_MIN` and
 /// `benches/js/lib/gate_counts.ts`.
-const REGISTERED_MIN: usize = 19_971;
+const REGISTERED_MIN: usize = 24_042;
 
 impl CommentAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
@@ -71,11 +71,7 @@ impl CommentAuditCommand {
 
         for path in &files {
             // Skip fixtures expected to fail parsing.
-            if path
-                .file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with("input_invalid"))
-            {
+            if is_input_invalid_fixture(path) {
                 continue;
             }
             let Ok(source) = std::fs::read_to_string(path) else {
@@ -168,7 +164,7 @@ fn print_report(violations: &[Violation], stats: &Stats) {
     if violations.is_empty() {
         println!(
             "✓ every comment printed exactly once — {registered} comments across {formatted} \
-             files ({parse_errors} parse-skipped, {unregistered_emits} out-of-scope emits)"
+             files ({parse_errors} parse-skipped, {unregistered_emits} unregistered emits)"
         );
         return;
     }
@@ -180,7 +176,7 @@ fn print_report(violations: &[Violation], stats: &Stats) {
     println!(
         "✗ {} finding(s) across {} file(s) — {dropped} dropped, {} double-printed \
          ({registered} comments, {formatted} formatted, {parse_errors} parse-skipped, \
-         {unregistered_emits} out-of-scope emits)\n",
+         {unregistered_emits} unregistered emits)\n",
         violations.len(),
         violations
             .iter()

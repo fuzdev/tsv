@@ -50,6 +50,22 @@ fn is_paren_union_member(ts_type: &TSType<'_>) -> bool {
     matches!(unwrap_parenthesized(ts_type), TSType::Union(_))
 }
 
+/// Whether a parenthesized member is an object-trailing intersection
+/// (`(A & { … })`) — the shape `build_parenthesized_intersection_trailing_object_doc`
+/// builds via `build_aligned_object_literal_doc`, which supplies the member's
+/// `align(2)` offset itself (on its own closing `})`). Such a member must NOT be
+/// wrapped in the offset again, or its body and closing double-shift. Mirrors the
+/// detection in `build_type_doc_maybe_parens_impl`.
+fn is_object_trailing_intersection_member(ts_type: &TSType<'_>) -> bool {
+    if let TSType::Intersection(intersection) = unwrap_parenthesized(ts_type)
+        && let Some(last) = intersection.types.last()
+    {
+        matches!(unwrap_parenthesized(last), TSType::TypeLiteral(_))
+    } else {
+        false
+    }
+}
+
 impl<'a> Printer<'a> {
     //
     // Union Types
@@ -139,8 +155,9 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a union member's type doc with Prettier's per-member `align(2, …)`
-    /// offset (`union-type.js`) rendered as one indent level (a whole tab,
-    /// tabs-only — see `docs/conformance_prettier.md`).
+    /// offset (`union-type.js`), rendered as a sub-tab alignment — literal spaces
+    /// at a trailing closing delimiter, rounding up to a whole tab wherever a
+    /// member's own internal indent stacks on it (`docs/conformance_prettier.md`).
     ///
     /// The offset applies to bare members (plain types, generics whose args wrap)
     /// and to pure paren-unions (`| (A | B)`), whose `build_parenthesized_union_doc`
@@ -158,11 +175,25 @@ impl<'a> Printer<'a> {
         if let TSType::TypeLiteral(obj) = t {
             return self.build_union_member_object_literal_doc(obj);
         }
-        let member_doc = self.build_type_doc_maybe_parens(t, member_parens);
         if member_parens(t) && !is_paren_union_member(t) {
-            member_doc
+            if is_object_trailing_intersection_member(t) {
+                // `(A & { … })` supplies its own `align(2)` inside
+                // `build_aligned_object_literal_doc` (its closing `})`), so it opts
+                // out of the wrapper here — wrapping again double-shifts it.
+                self.build_type_doc_maybe_parens(t, member_parens)
+            } else {
+                // Function / constructor / conditional paren member. Prettier's
+                // needs-parens wrapping is a bare `["(", doc, ")"]` (no inner
+                // indent); the member's whole `(…)` takes the `align(2)` offset, so
+                // the content rounds up to a tab and the closing `) => …)` line
+                // trails at 2 spaces. Use the intersection-member variant
+                // (`indent_default_paren = false`) for the bare paren, then apply
+                // the offset — the old inner `d.indent` faked the offset as a whole
+                // tab and stranded the closing.
+                d.align(2, self.build_intersection_member_type_doc(t, member_parens))
+            }
         } else {
-            d.indent(member_doc)
+            d.align(2, self.build_type_doc_maybe_parens(t, member_parens))
         }
     }
 
@@ -331,24 +362,28 @@ impl<'a> Printer<'a> {
                 // Extract leading block comments before the first type
                 // (e.g., `| /* c */ A | B` — comment between leading `|` and first member).
                 //
-                // `indent` for the same reason as the line-comment path's run: when this
-                // run ends in a break — an own-line multi-line block, or its soft `line`
-                // breaking as the union expands — it is the run that places the member's
-                // own first line, which then belongs at the per-member offset rather than
-                // flush under the `|`. Unconditional because `indent` binds only the
-                // breaks inside it, so a run that hugs its member is unaffected.
+                // `align(2)` for the same reason as the line-comment path's run: when
+                // this run ends in a break — an own-line multi-line block, or its soft
+                // `line` breaking as the union expands — it is the run that places the
+                // member's own first line, which then belongs at the per-member offset
+                // rather than flush under the `|`. It takes the SAME `align(2)` sub-tab
+                // offset as the member (below) so the run's lines and the member's align
+                // consistently; splitting the offset across the two siblings is sound
+                // because `align` is a per-line property. Unconditional because it binds
+                // only the breaks inside it, so a run that hugs its member is unaffected.
                 if has_comments {
-                    parts.push(d.indent(
+                    parts.push(d.align(
+                        2,
                         self.build_member_leading_block_comments(union.span.start, type_start),
                     ));
                 }
             }
 
-            // Apply Prettier's per-member `align(2, …)` offset (rendered as one
-            // whole tab) — see `build_union_member_offset_doc`. The first member's
-            // leading run takes that offset separately, above: the run is indented, never
-            // this call's result, so the object-literal and default-paren members that
-            // supply their own indent keep declining it.
+            // Apply Prettier's per-member `align(2, …)` offset (a sub-tab alignment —
+            // see `build_union_member_offset_doc`). The first member's leading run takes
+            // that offset separately, above: the run is aligned, never this call's
+            // result, so the object-literal and default-paren members that supply their
+            // own indent keep declining it.
             parts.push(self.build_union_member_offset_doc(t, member_parens));
 
             // Add trailing block comments after this type (before the next `|` separator)
@@ -595,19 +630,21 @@ impl<'a> Printer<'a> {
                     // `build_parenthesized_union_doc` lays out `(`/`)` on their own
                     // lines and only emits block comments in the paren gaps (the
                     // leading line comment was already relocated above, so pass
-                    // `false`). A paren-union takes the per-member offset (see
-                    // `build_union_member_offset_doc`).
-                    parts.push(d.indent(self.build_parenthesized_union_doc(union, Some(p), false)));
+                    // `false`). A paren-union takes the per-member `align(2)` offset
+                    // (see `build_union_member_offset_doc`).
+                    parts.push(
+                        d.align(2, self.build_parenthesized_union_doc(union, Some(p), false)),
+                    );
                 } else if type_needs_parens_in_union_or_intersection(inner) {
-                    // Default-paren (function / conditional / intersection) supplies
-                    // its own indent — no extra offset.
-                    parts.push(d.concat(&[
-                        d.text("("),
-                        d.indent(self.build_type_doc(inner)),
-                        d.text(")"),
-                    ]));
+                    // Default-paren (function / conditional / intersection): the whole
+                    // `(…)` takes the `align(2)` offset with no inner indent (Prettier's
+                    // bare needs-parens wrapping), matching the main path.
+                    parts.push(d.align(
+                        2,
+                        d.concat(&[d.text("("), self.build_type_doc(inner), d.text(")")]),
+                    ));
                 } else {
-                    parts.push(d.indent(self.build_type_doc(inner)));
+                    parts.push(d.align(2, self.build_type_doc(inner)));
                 }
             } else if i == 0
                 && let TSType::Parenthesized(p) = t
@@ -619,14 +656,14 @@ impl<'a> Printer<'a> {
                 // the previous member above), there is no previous member, so keep the
                 // comment inside the parens leading the inner union — passing `true`
                 // to `build_parenthesized_union_doc` so it is not dropped. Take the
-                // per-member offset like any other paren-union member (matching the
-                // `is_paren_union_member` arm of `build_union_member_offset_doc`).
+                // per-member `align(2)` offset like any other paren-union member
+                // (matching the `is_paren_union_member` arm of
+                // `build_union_member_offset_doc`).
                 parts.extend(first_leading);
-                parts.push(d.indent(self.build_parenthesized_union_doc(
-                    inner_union,
-                    Some(p),
-                    true,
-                )));
+                parts.push(d.align(
+                    2,
+                    self.build_parenthesized_union_doc(inner_union, Some(p), true),
+                ));
             } else {
                 // The leading run takes the member's per-member offset. Whenever the run
                 // ends in a break it is the run — not the `| ` prefix — that places the
@@ -642,16 +679,16 @@ impl<'a> Printer<'a> {
                 // the doc structure already answers — asking it again with a predicate
                 // would be a second gate that can drift from this one.
                 //
-                // Indent the RUN, never `build_union_member_offset_doc`'s result: that
+                // Align the RUN, never `build_union_member_offset_doc`'s result: that
                 // function owns the opt-outs (an object literal and a default-paren
                 // member supply their own indent and decline the offset), so wrapping
-                // its result would double-indent exactly those two — the member's body
+                // its result would double-offset exactly those two — the member's body
                 // two columns past prettier, its closing delimiter out of line with its
-                // opener. Sound because `indent` is a per-line property, so
-                // `indent(concat([run, member]))` and `concat([indent(run), member])`
+                // opener. Sound because `align` is a per-line property, so
+                // `align(concat([run, member]))` and `concat([align(run), member])`
                 // agree wherever the member does take the offset.
                 if !first_leading.is_empty() {
-                    parts.push(d.indent(d.concat(&first_leading)));
+                    parts.push(d.align(2, d.concat(&first_leading)));
                 }
                 parts.push(self.build_union_member_offset_doc(t, member_parens));
             }
@@ -997,7 +1034,7 @@ impl<'a> Printer<'a> {
             first_parts.push(leading);
         }
 
-        first_parts.push(self.build_type_doc_maybe_parens(first_type, member_parens));
+        first_parts.push(self.build_intersection_member_type_doc(first_type, member_parens));
 
         // Add trailing block comments after first type
         if intersection.types.len() > 1 {
@@ -1307,7 +1344,7 @@ impl<'a> Printer<'a> {
         {
             self.build_parenthesized_union_doc(inner_union, Some(p), true)
         } else {
-            self.build_type_doc_maybe_parens(t, member_parens)
+            self.build_intersection_member_type_doc(t, member_parens)
         }
     }
 
@@ -1329,13 +1366,10 @@ impl<'a> Printer<'a> {
                 // `false` to keep `build_parenthesized_union_doc` block-comment-only.
                 self.build_parenthesized_union_doc(union, Some(first_paren), false)
             } else {
-                // Matches the default parenthesization in `build_type_doc_maybe_parens`:
-                // the closing `)` sits at the base indent, no sub-tab alignment.
-                d.concat(&[
-                    d.text("("),
-                    d.indent(self.build_type_doc(inner)),
-                    d.text(")"),
-                ])
+                // Matches the bare intersection-member parenthesization in
+                // `build_intersection_member_type_doc`: no inner `d.indent`, the
+                // level comes from the intersection printer's own `& `-line indent.
+                d.concat(&[d.text("("), self.build_type_doc(inner), d.text(")")])
             }
         } else {
             self.build_type_doc(inner)
@@ -1390,7 +1424,7 @@ impl<'a> Printer<'a> {
                 ));
             }
             parts.push(d.text(" "));
-            parts.push(self.build_type_doc_maybe_parens(t, member_parens));
+            parts.push(self.build_intersection_member_type_doc(t, member_parens));
         }
         d.concat(&parts)
     }
@@ -1421,7 +1455,9 @@ impl<'a> Printer<'a> {
             self.push_post_separator_block_comments(&mut parts, prev_type_end, type_start, b'&');
         }
 
-        parts.push(self.build_type_doc_maybe_parens(t, type_needs_parens_in_union_or_intersection));
+        parts.push(
+            self.build_intersection_member_type_doc(t, type_needs_parens_in_union_or_intersection),
+        );
 
         // Trailing block comments + `&` separator (or end-of-intersection comments)
         if !is_last {

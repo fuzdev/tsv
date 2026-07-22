@@ -300,8 +300,7 @@ impl<'a> Printer<'a> {
                     } else if has_leading {
                         body_parts.push(d.hardline());
                     }
-                    body_parts
-                        .extend(self.build_orphaned_comment_run(&leading_comments, search_end));
+                    self.push_orphaned_comment_run(body_parts, &leading_comments, search_end);
                     prev_stmt_end = Some(stmt_end);
                 }
 
@@ -353,7 +352,7 @@ impl<'a> Printer<'a> {
             }
 
             // Print leading comments before this statement (with blank line preservation)
-            body_parts.extend(self.build_leading_comments_before(&leading_comments, stmt_start));
+            self.push_leading_comments_before(body_parts, &leading_comments, stmt_start);
 
             // format-ignore: emit raw source instead of formatting
             if body_has_comments && self.has_format_ignore_in_range(prev_end, stmt_start) {
@@ -394,16 +393,16 @@ impl<'a> Printer<'a> {
         stmt_start: u32,
         prev_stmt_end: Option<u32>,
     ) -> CommentVec<'_> {
-        let comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, prev_end, stmt_start).collect();
-        if let Some(prev_stmt) = prev_stmt_end {
-            comments
-                .into_iter()
-                .filter(|c| !self.is_same_line(prev_stmt, c.span.start))
-                .collect()
-        } else {
-            comments
-        }
+        let collected: CommentVec<'_> =
+            comments_to_emit_in_range(self.comments, prev_end, stmt_start)
+                .filter(|c| {
+                    prev_stmt_end
+                        .is_none_or(|prev_stmt| !self.is_same_line(prev_stmt, c.span.start))
+                })
+                .collect();
+        #[cfg(feature = "buffer_stats")]
+        crate::printer::buffer_stats::record_leading_comments(collected.len());
+        collected
     }
 
     /// Build a Doc for a block statement with outer comments moved inside

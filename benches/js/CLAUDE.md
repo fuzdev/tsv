@@ -19,10 +19,12 @@ Uses [@fuzdev/fuz_util](https://github.com/fuzdev/fuz_util) benchmarking library
 
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
-| **`deno task check`** | `cargo fmt --check` · `pins:audit` · `typecheck` · `conformance:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `authoring:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `swallow:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle | every commit; the CI `check` job |
-| **`deno task conformance:all`** | `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all`) **+** `conformance:test262` (pure Rust; JS parser vs test262 positives) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
+| **`deno task check`** | `cargo fmt --check` · `pins:audit` · `typecheck` · `conformance:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `binding:audit` · `authoring:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle | every commit; the CI `check` job |
+| **`deno task conformance:all`** | `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all` — plus `render:audit` over the pinned checkouts, the one leg that runs as a subprocess) **+** `conformance:test262` (pure Rust; JS parser vs test262 positives) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,200; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`perf`** view (real code; absent checkouts skipped with a warning) | after a printer change; conformance cadence |
+| **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `fuzz --iterations 0` (the idempotency:sweep leg) | **`perf`** view + the pinned `../prettier` format suites (absent dev repos skipped with a warning; floor = `../svelte` src) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
+| **`deno task render:audit <paths>`** | `render_audit --gate` — per `.svelte` file, does `tsv format` change what it RENDERS? Compares the browser-visible render key of the source vs of `format(source)`. The corpus-scale arm of the fixture **R** rules (which gate only the curated `tests/fixtures`). **Needs the Deno sidecar** (`svelte compile`), so it is deliberately NOT a leg of the pure-Rust `audit:corpus` — it rides `conformance` instead, as its one subprocess leg | standalone: any `.svelte` corpus, given explicitly (e.g. the dev repos). As a `conformance` leg: the version-pinned `framework` + `suite` checkouts (`../svelte` src + tests, svelte.dev, kit) — so a live working tree can't move a release verdict | release (in `conformance`); standalone after a printer change |
 
 **JS parser (test262) IS release-gated** via `conformance:test262` (pure Rust,
 `tsv_debug test262 --gate`), folded into `conformance:all` which `publish.ts` Step
@@ -36,9 +38,21 @@ partly caught by `corpus:compare:parse` (CSS AST vs `parseCss`).
 pins, checkout alignment, oracle presence, corpus entries, build artifacts)
 ahead of time; Step 3b re-probes the three parser checkouts + `node_modules` and
 **fails a `--wetrun`** on any miss (`--no-check` is the only release-without-gates
-path). CI runs `deno task check` only — it has no sibling checkouts, so of the
-pinned counts only the committed-tree ones (`fixtures_validate`, `swallow_audit`)
-execute there (see §Pinned gate counts).
+path). Step 3c (`audit:corpus`) re-probes `../svelte` src (its reproducible floor)
+with the same posture — a `--wetrun` without it BLOCKS, a dry-run warn-skips; the
+audit itself warn-skips any absent dev-repo checkout. CI runs `deno task check`
+only — it has no sibling checkouts, so of the pinned counts only the committed-tree
+ones (`fixtures_validate`, `swallow_audit`) execute there (see §Pinned gate counts).
+
+**`deno task check` cannot prove real-code robustness** (`tests/fixtures` is
+format-stable by construction, so it never exercises a content-loss / panic /
+reflow bug on real source), so the extension-robustness bar is two release-cadence
+gates over real code: **Step 3b**'s `corpus:compare:format --all` SAFETY (content
+loss vs prettier — needs the FFI + prettier sidecar) and **Step 3c**'s
+`audit:corpus` (the pure-Rust half: reparse-corruption, dropped/double comments,
+comment re-binding, boundary-whitespace + F1 idempotency, no-panic). Every
+content-loss / non-idempotency bug this release cycle was found by one of these,
+never by `check`.
 
 Corpus **views** are defined in §Corpus; the pinned counts every graded gate
 enforces are in §Pinned gate counts.
@@ -130,6 +144,12 @@ one per runtime (`current_runtime()`). Under Bun the `node:wasi` entry fails to
 load, so the Bun report has no oxc-parser-wasm row (same class as the biome-wasm
 Bun-load issue). (Node also has oxc-parser **native**, the more relevant Node
 number, regardless.)
+
+**dprint-wasm runs under all three.** Unlike `biome-wasm` and `oxc-parser-wasm`, the
+`@dprint/formatter` host loads its plugin from a plain buffer (`createFromBuffer` over
+`node:fs`) with no wasm-bindgen `start` hook and no `node:wasi` dependency — verified
+byte-identical output under Deno, Node, and Bun — so it contributes a row to every
+runtime's report.
 
 ## Corpus Comparison
 
@@ -499,24 +519,33 @@ every real move in a number is a deliberate, visible edit.
   are deterministic — a drop is a regression or gutted input, a rise is a suite
   refresh or behavior change; both must be re-pinned deliberately. No slack:
   slack lets small regressions creep and silently widens after every refresh.
-- **Minimums at the exact measured value** (shrink fails, growth passes — with
-  one carve-out: `SVELTE_STYLES_BLOCKS_MIN` warns on a small shrink and fails
-  only on a >10% collapse, since it counts pure input material off
-  daily-churning repos): the
-  two non-deterministic-growth cases. (1) The `corpus:compare:* --all` corpus is
-  LIVE dev repos that grow with ordinary work — re-pin to current when touching
-  the corpus (e.g. at release) so the minimum stays tight. (2) The
-  committed-fixtures audits (`fixtures_validate`, `swallow_audit`): additions
-  are ordinary reviewed diffs (a per-fixture-PR counter bump in `deno task
-  check` would be pure ceremony), while shrinkage is the discovery regression
-  the pin guards.
-- **Failure-bucket pins** (exact `!==`, but on the live corpus rather than a
-  deterministic input): the `corpus:compare:* --all` triage buckets —
-  per-language `unknown`/`partial` divergences and tsv-side parse failures. A
-  rise fails until triaged (fix it, add a divergence detector/sanction, or
-  consciously re-pin a legitimately-unsupported new corpus file); a drop also
-  fails, so a fixed divergence ratchets the pin DOWN deliberately and the win
-  stays recorded.
+- **Minimums** (shrink fails, growth passes — with one carve-out:
+  `SVELTE_STYLES_BLOCKS_MIN` warns on a small shrink and fails only on a >10%
+  collapse, since it counts pure input material off daily-churning repos). Two
+  cases, and they differ in WHY a minimum is right: (1) `CORPUS_FORMAT_MATCH_MIN`
+  is over the **reproducible** subset (pinned framework + prettier), so it's
+  really exact-on-aligned-checkouts — the minimum is there only so a fixed win
+  needn't re-pin; over pinned inputs a `match` DROP is always a real regression.
+  ⚠️ It is NOT a live-growth minimum: the old framing — "the corpus is LIVE dev
+  repos that GROW with ordinary work, so a minimum stays tight" — was the FALSE
+  premise behind the re-pin treadmill. A minimum is only sound if the metric can't
+  decrease, but `match` **shrinks** the moment a live edit adds a divergence, so
+  live-corpus `match` was never a safe minimum — which is exactly why the format
+  pins moved to the reproducible subset. (2) `CORPUS_PARSE_COMPARED_MIN` and the
+  committed-fixtures audits (`fixtures_validate`, `swallow_audit`) ARE genuine
+  growth minimums — `compared`/fixture counts only grow with reviewed additions,
+  and shrinkage is the discovery regression the pin guards.
+- **Failure-bucket pins** (exact `!==`): the `corpus:compare:* --all` triage
+  buckets. The **format** `unknown`/`partial` pins are over the **reproducible**
+  subset (deterministic on aligned checkouts — live dev-repo divergences are a
+  non-gating WARN, reported not gated); the **parse** tsv-side parse-failure pin
+  stays over the live corpus (a tsv over-rejection of real code is a regression
+  wherever it occurs). A rise fails until triaged (fix it, add a divergence
+  detector/sanction, or consciously re-pin a legitimately-unsupported new file); a
+  drop also fails, so a fixed divergence ratchets the pin DOWN deliberately.
+- **SAFETY always gates** — content loss fails `corpus:compare:format --all`
+  over EVERY file, reproducible or live. Data loss is never churn; the
+  reproducibility split is only about the layout/count pins.
 
 Pins apply only to FULL runs (default suite root, `--all`, default harvest
 source) — subtree and filtered runs legitimately grade a slice. Harvest pins
@@ -564,7 +593,10 @@ Patterns are ordered specific to broad. Each links to `conformance_sections` and
 ### Divergence Audit & Testing
 
 ```bash
-# Static check: cross-references pattern fixtures arrays vs conformance_prettier.md
+# Detection audit: runs every pattern against every documented fixture's committed
+# prettier forms (coverage is COMPUTED, not read out of the fixtures[] arrays — those
+# are explicit assertions, gated by test:deno, and drift from what the detectors
+# actually see). Exits 1 on a genuine gap; listing drift is reported as bookkeeping.
 deno task divergence:audit        # Human-readable report
 deno task divergence:audit --json # Machine-readable JSON
 
@@ -589,23 +621,28 @@ deno task test:deno:canonical
 deno task corpus:compare:format --all --audit-patterns
 ```
 
-Output shows coverage gaps (numbers illustrative — the live run prints
-current counts). "Documented" = every `*_prettier_divergence`-suffixed
-fixture linked from `conformance_prettier.md` in any of its three anchor
-formats (table rows, list items, prose paragraphs); non-divergence fixture
-links (match/contrast anchors) don't count. Coverage is partial by design —
-see `docs/divergence_detector.md` §Traceability.
+Output shows the measured detection rate and the real gaps (numbers
+illustrative — the live run prints current counts). "Documented" = every
+`*_prettier_divergence`-suffixed fixture linked from `conformance_prettier.md`
+in any of its three anchor formats (table rows, list items, prose paragraphs);
+non-divergence fixture links (match/contrast anchors) don't count. Coverage is
+partial by design — see `docs/divergence_detector.md` §Traceability.
 
 ```
 Divergence Detection Audit Report
 ==================================================
 
-Documented divergences: 209
-Covered by patterns:    125
-Uncovered:              84
-Coverage:               60%
+Documented divergences: 526
+Fully explained:        436
+Partial (hunks left):   25
+Undetected (real gaps): 50
+Ungradeable:            15  (pin no prettier form to test)
+Detection:              83%  (85% of gradeable)
 
-Uncovered Fixtures (no pattern detects these):
+Listed in fixtures[]:   156
+Explained but unlisted: 291  (bookkeeping, not a gap)
+
+Undetected Fixtures (pin a prettier form, no pattern explains it):
 --------------------------------------------------
   CSS: At-Rules:
     - container_spacing (Spec violation)
@@ -613,10 +650,32 @@ Uncovered Fixtures (no pattern detects these):
     ...
 ```
 
+The headline numbers answer different questions and must not be conflated:
+**detection** is measured (the audit runs `detect_divergences`, the same
+classifier the corpus comparison uses — so the language filter and the
+three-level hunk coverage are identical), **listed** is bookkeeping (what the
+`fixtures[]` arrays say). The old audit reported only the latter and called it
+coverage, which read as 26%.
+
+`partial` is counted apart from `explained` for the same reason the corpus
+classifies it apart from `known`: a pattern IS attached, so a binary
+detected/undetected metric would read it as covered while hunks go unexplained —
+re-introducing at the audit level exactly the masking hunk-aware detection
+exists to prevent.
+
+**The report is the work-list** — undetected, partial, ungradeable, and the
+(deliberately non-backlog) unlisted bookkeeping. Read the counts live rather than
+from any doc. `docs/divergence_detector.md` §Pending work explains what each
+bucket means and which are worth closing. The subset of partial fixtures that a
+pattern also *lists* is ratcheted by `KNOWN_PARTIAL` in `fixture_coverage_test.ts`
+and gated in `deno task check`: a listed fixture going partial fails, and a stale
+entry fails too, so it mirrors the live set and can only shrink.
+
 Every pattern in `patterns.ts` includes:
 
 - `conformance_sections` - Which doc sections it covers
-- `fixtures` - Which `*_prettier_divergence` fixtures it detects
+- `fixtures` - An explicit assertion that this pattern detects these
+  `*_prettier_divergence` fixtures (gated by `test:deno`)
 
 ## Benchmark Commands
 
@@ -737,14 +796,14 @@ deno task bench:deno:run -- --compare-baseline  # Compare against saved baseline
 deno task bench:clean
 
 # Environment variables (apply to any runtime's :run)
-BENCH_LIMIT=5 deno task bench:deno:run
-BENCH_FILTER=zzz deno task bench:deno:run
-BENCH_DURATION=10000 deno task bench:deno:run
-BENCH_WARMUP=10 deno task bench:deno:run
-BENCH_MODE=union deno task bench:deno:run
-BENCH_CORPUS=conformance deno task bench:deno:run
-BENCH_STALE_OK=1 deno task bench:deno:run
-BENCH_FORCED_ASYNC=1 deno task bench:deno:run
+BENCH_LIMIT=5 deno task bench:deno:run         # Limit files per language (default: all)
+BENCH_FILTER=zzz deno task bench:deno:run      # Filter by path pattern (default: none)
+BENCH_DURATION=10000 deno task bench:deno:run  # Duration per benchmark in ms (default: 5000; conformance mode: 15000)
+BENCH_WARMUP=10 deno task bench:deno:run       # Warmup iterations (default: 3; slow >5s-per-sweep tasks tier to 1 unless set explicitly)
+BENCH_MODE=union deno task bench:deno:run      # Per-impl iteration (default: intersection)
+BENCH_CORPUS=conformance deno task bench:deno:run  # Corpus/surface selector (default: perf)
+BENCH_STALE_OK=1 deno task bench:deno:run      # Run despite stale artifacts (default: off)
+BENCH_FORCED_ASYNC=1 deno task bench:deno:run  # Add tsv-forced-async control row (diagnostic; default: off)
 ```
 
 ## Artifact Freshness Guard
@@ -833,7 +892,10 @@ Things the published numbers measure that aren't quite what they look like:
   Every formatter IS configured to the same layout targets to the extent its
   options allow — printWidth/lineWidth 100, tabs, single quotes, no trailing
   commas — for prettier (`canonical.ts` `PRETTIER_OPTIONS`), oxfmt
-  (`oxc.ts` `format_async`), and biome (`biome.ts` `applyConfiguration`),
+  (`oxc.ts` `format_async`), biome (`biome.ts` `applyConfiguration`), and dprint
+  (`dprint.ts` `setConfig` — `quoteStyle: preferSingle` is the faithful analogue of
+  prettier's `singleQuote: true`, which likewise switches quotes to avoid escaping;
+  `trailingCommas: never` fans out to dprint's 12 per-construct keys),
   matching tsv's fixed config; unmatched defaults (biome's width is 80; oxfmt
   and biome default to double quotes) would make the rows wrap/rewrite
   different amounts of code, conflating config with engine speed. (oxfmt's own
@@ -855,9 +917,36 @@ Things the published numbers measure that aren't quite what they look like:
   baseline is `prettier` (JS) and the flagship `tsv` row is the native FFI
   binary (AOT Rust). That's a fair "what you get replacing prettier with tsv"
   number, not a language-neutral algorithm comparison. The same-tier reads are
-  WASM-vs-WASM (`tsv_wasm` vs `biome-wasm` vs `oxc-parser-wasm`) and
+  WASM-vs-WASM (`tsv_wasm` vs `biome-wasm` vs `dprint-wasm` vs `oxc-parser-wasm`) and
   native-vs-native (`tsv` vs `oxfmt`/`oxc-parser`); compare within a tier before
   attributing a gap to the formatter rather than the runtime.
+- **PGO native flagship (forthcoming — policy; no such row ships today).** The
+  standalone native flagship (the bare `@fuzdev/tsv` binary) is planned to ship
+  with profile-guided optimization (PGO) — native-only, a measured ~17–19%
+  wall-time win, **byte-identical** output. PGO lands **Linux-only first**, on
+  that single-target standalone build; the cross-platform prebuilt `.node`
+  binaries built on GitHub (the N-API matrix) stay standard-release until matrix
+  PGO is a later step — so the PGO row represents the Linux standalone flagship,
+  not what a cross-platform npm/N-API consumer gets yet. When that row lands the
+  policy is: **(1) both rows** — a standard-release native row *and* a PGO native
+  row, never PGO silently folded into the single native number, so the win stays
+  legible; **(2) measure what ships** — publish PGO numbers only once a shipped
+  native artifact actually carries the PGO recipe, and label which one (the Linux
+  standalone flagship for now); until then the standard-release row is the honest
+  native number; **(3)
+  disjoint training corpus** — the PGO profile is trained on a corpus disjoint
+  from the benchmark measurement corpus, so a published number is never
+  train-on-test (the profile generalizes to held-out code, so disjointness costs
+  nothing); **(4) byte-identical** — PGO changes only code layout, not output, so
+  it touches neither correctness nor the output-shape caveat above. Fairness
+  framing: PGO is a standard toolchain optimization. Against the JS reference
+  tools (`prettier`, `svelte/compiler`) it partly *closes a gap* — V8's JIT
+  already does profile-guided runtime optimization for them for free. Against the
+  native AOT competitors (`oxc-parser`, `oxfmt`, `biome`), which ship standard
+  release builds, PGO is a build-config advantage they don't take in their
+  published artifacts — fair to report as "what tsv ships vs what they ship," but
+  disclosed here so a native-vs-native read isn't mistaken for same-build-config.
+  Never mix a PGO or instrumented binary into a regression anchor series.
 - **Self-corpus / representativeness.** The perf corpus is real-world code
   only (the fixture suites live in the `gates`/`conformance` views — see
   [Corpus](#corpus)), but it's still dominated by the author's own fuz
@@ -1025,10 +1114,21 @@ Things the published numbers measure that aren't quite what they look like:
 ## Corpus
 
 One tagged entry list (`lib/corpus.ts` `CORPUS_ENTRIES`, paths relative to the
-project root). Every entry carries a tier — `real`, `prettier_fixture`, or
-`suite` — and each consumer selects a **view**:
+project root). Every entry carries a tier — `real`, `framework`,
+`prettier_fixture`, or `suite` — and each consumer selects a **view**:
 
-- **`perf`** (~3,200 files) — `real` entries only: application & library
+**Reproducible vs live (the gate split).** `framework` + `prettier_fixture` are
+version-pinned checkouts (`GATE_CHECKOUT_COMMITS`, verified by `pins:audit`) — the
+loader tags their files `reproducible: true` (`REPRODUCIBLE_TIERS`). The `real` tier
+is the author's LIVE dev repos (zzz, fuz\_\*, gro, the personal sites), unversioned
+working trees. The **format count pins (match/unknown/partial) gate on the
+reproducible subset only**, so a `pins:audit`-aligned machine measures them exactly;
+live-repo divergences are a **non-gating WARN** in `corpus:compare:format --all`.
+**SAFETY (content loss) still gates over every file**, reproducible or live. This
+retired the re-pin treadmill (the old aggregate pins drifted with dev-repo churn —
+re-pinned 3× in 2 days, and the pin commit couldn't reproduce its own number).
+
+- **`perf`** (~3,200 files) — `real` + `framework` (all real code): application & library
   source (the fuz.dev repos' `src/` — zzz, the fuz ecosystem, gro,
   svelte-docinfo, tsv.fuz.dev — plus the author's public SvelteKit sites:
   ryanatkn.com, webdevladder.net) plus upstream framework source
@@ -1055,16 +1155,19 @@ project root). Every entry carries a tier — `real`, `prettier_fixture`, or
   invariant is what makes the perf/conformance split meaningful: perf is 100%
   by construction (modulo the reviewed omits), conformance is where sub-100%
   coverage is the metric.
-- **`gates`** (~6,200 files) — `real` + `prettier_fixture`, no perf prune:
-  adds Prettier's `tests/format/{typescript,js,css,html}` suites and
+- **`gates`** (~6,200 files) — `real` + `framework` + `prettier_fixture`, no perf
+  prune: adds Prettier's `tests/format/{typescript,js,css,html}` suites and
   prettier-plugin-svelte's `test/` (`.html` treated as Svelte, files with a
-  companion `options.json` skipped) — deliberately tricky edge cases.
-  Exactly the pre-split default corpus: the correctness gates
-  (`corpus:compare:*` `--all`, `skip_triage`, `wasm_json_probe`) keep this
-  scope, since their sanction lists and documented-divergence coverage were
-  reviewed against it. The `DevReposLoader` view is required at every
-  construction site — the view decides what a number or gate verdict means,
-  so there's no implicit default to inherit by accident.
+  companion `options.json` skipped) — deliberately tricky edge cases. Same file set
+  as before the framework/real split (the framework entries were just retiered out
+  of `real`); the reproducibility split is enforced downstream (the format count
+  pins gate on the reproducible subset, live `real` repos become a non-gating WARN —
+  see the "Reproducible vs live" note above), not by dropping files from the view.
+  The correctness gates (`corpus:compare:*` `--all`, `skip_triage`,
+  `wasm_json_probe`) keep this scope, since their sanction lists and
+  documented-divergence coverage were reviewed against it. The `DevReposLoader` view
+  is required at every construction site — the view decides what a number or gate
+  verdict means, so there's no implicit default to inherit by accident.
 - **`conformance`** — the hard parse cases only: the `prettier_fixture` suites +
   the parse-conformance `suite` entries — Svelte's compiler tests
   (`../svelte/packages/svelte/tests`, with the gate-aligned skips: `_`-prefixed
@@ -1153,6 +1256,7 @@ benches/js/
 │   ├── check_node_modules.ts # node_modules preflight: exists + not stale vs package.json (all entry points)
 │   ├── compare_cli.ts     # Shared scaffolding for the corpus_compare_* entry points
 │   ├── corpus.ts          # DevReposLoader + DirectoryLoader (load/stream; node: builtins)
+│   ├── dprint.ts          # dprint WASM wrapper (TypeScript/JS only; the engine `deno fmt` runs)
 │   ├── gate_counts.ts     # Pinned gate counts (exact pins + live-corpus minimums + negative-bucket pins) — see §Pinned gate counts
 │   ├── harvest_stamp.ts   # Harvest freshness stamps (source commit + pins) — skip unchanged re-harvests
 │   ├── prettier_cache.ts  # Content-addressed prettier-output cache for the format comparison
@@ -1201,8 +1305,8 @@ via `Cargo.lock`. Upgrading is always a deliberate, committed act. A plain
 cd benches/js && npm outdated   # shows current vs latest
 # bump the version in benches/js/package.json, then:
 deno task bench:install   # re-install at the new pins (+ re-fetch the oxc wasi binding)
-deno task smoke           # confirm every impl still loads + formats (36 checks)
-deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts  # catch type-surface breakage smoke can't (e.g. a major bump renaming an options field)
+deno task smoke           # confirm every impl still loads + formats (37 checks)
+deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts benches/js/lib/dprint.ts  # catch type-surface breakage smoke can't (e.g. a major bump renaming an options field)
 deno task bench           # regenerate report.{deno,node,bun}.* + combined report.{json,md}
 # commit package.json + package-lock.json + results/report.*
 ```
@@ -1275,6 +1379,21 @@ prettier. This is load-bearing, not cosmetic, on two axes:
   (Svelte via biome's experimental HTML-superset support — `html.experimentalFullSupportEnabled`;
   it formats the template **and** the embedded `<script>`/`<style>`, so it's comparable
   work to prettier-plugin-svelte / tsv, just on an experimental path)
+- dprint (WASM) — Formatter; languages: **TypeScript, JS only**. This is the engine
+  **`deno fmt` runs** for TS/JS (`dprint-plugin-typescript`), loaded in-process as its
+  Wasm plugin. Deliberately NOT a `deno fmt` subprocess row: that would exist only
+  under Deno (against this harness's three-runtime design) and would time process
+  spawn + IPC rather than format work, cold on every call against warm opponents. So
+  the row is named for what it measures — the engine — not the CLI, whose wrapping
+  (config discovery, file IO, its own CSS/HTML/markdown plugins) is out of scope.
+  `@dprint/typescript` matches `ts,tsx,js,jsx,mjs,cjs,mts,cts` and **rejects CSS and
+  Svelte outright** (verified), so unlike oxfmt/biome it contributes no css or svelte
+  row; dprint's CSS (malva) and HTML plugins are separate Wasm plugins, not wired up.
+  Config is asserted to LAND: `lib/dprint.ts` fails init if `getConfigDiagnostics()`
+  is non-empty, since dprint reports an unrecognized key as a diagnostic rather than
+  throwing — without that check a renamed key would silently leave an option at its
+  default and skew the row (the config-vs-engine conflation the fairness rules exist
+  to prevent).
 
 ### OXC Package Details
 
@@ -1357,6 +1476,9 @@ Benchmark output includes binary/WASM size comparison across implementations:
   so the row's mechanism is unambiguous. `deno task bench` builds all of them; the
   subset rows are omitted if those builds haven't been run.
 - **biome**: WASM (`.wasm`) from node_modules
+- **dprint**: WASM (`.wasm` — `@dprint/typescript`'s `plugin.wasm`) from node_modules.
+  TS/JS-only scope, so it size-compares against the format-only tsv builds
+  (`tsv_format_wasm` / `tsv format (ffi)`), not the full both-features bundle.
 - **oxc-parser**: N-API binding (`.node`) and WASM (`.wasm` from `binding-wasm32-wasi`) from node_modules
 - **oxfmt**: N-API binding (`.node`) from node_modules (no WASM variant)
 

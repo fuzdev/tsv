@@ -156,7 +156,7 @@ impl<'a> Printer<'a> {
             || has_own_line_trailing_comment
             || self
                 .comments_on_page_between(operator_end, argument_start)
-                .any(|c| self.comment_forces_own_line(c));
+                .any(|c| self.comment_cannot_glue_to_operator(c));
 
         let argument_doc = if has_leading_comments || has_trailing_comments {
             // Comments inside grouping parens — must wrap in parens to preserve them.
@@ -548,6 +548,17 @@ impl<'a> Printer<'a> {
             return (DocBuf::new(), DocBuf::new());
         }
 
+        // Whole-chain comment presence gate (idiom 8): one on-page lookup over the chain's
+        // whole span lets the per-gap emitters below skip their per-gap comment scans for the
+        // ~all chains that hold no comment anywhere. A *presence* flag (on-page counts owned),
+        // so it fails open — it can only add work on a commented chain, never suppress a
+        // comment (the perf80 hazard). Every operand→operator / operator→operand gap the
+        // emitters scan lies within `[first operand start, last operand end]`.
+        let chain_has_comments = self.has_comments_on_page_between(
+            operands[0].span.start,
+            operands[operands.len() - 1].span.end,
+        );
+
         // First operand + first operator (stays at base indent)
         let mut head_parts: DocBuf = smallvec![operands[0].doc];
 
@@ -564,6 +575,7 @@ impl<'a> Printer<'a> {
             operands[0].span.end,
             first_op_pos.start,
             first_op_str,
+            chain_has_comments,
         );
 
         // Build continuation parts
@@ -591,6 +603,7 @@ impl<'a> Printer<'a> {
                 operand,
                 allow_breaks,
                 prev_forced_break,
+                chain_has_comments,
             );
 
             // operand[i] → next operator (if not last operand)
@@ -607,6 +620,7 @@ impl<'a> Printer<'a> {
                     operand.span.end,
                     next_op_pos.start,
                     next_op_str,
+                    chain_has_comments,
                 );
 
                 // Carry this trailing gap forward as the next iteration's leading gap.
@@ -750,6 +764,7 @@ impl<'a> Printer<'a> {
         operand_end: u32,
         op_start: u32,
         op_str: &'static str,
+        chain_has_comments: bool,
     ) -> bool {
         let d = self.d();
 
@@ -758,7 +773,9 @@ impl<'a> Printer<'a> {
         // parts concat, and no per-gap comment scan at all. Byte-identical: the gap is
         // comment-free, so the general path below would build `empty()` here (renders to
         // nothing). The gap ⊆ the binary span, so this can only skip work, never a comment.
-        if !self.has_comments_to_emit_between(operand_end, op_start) {
+        // The whole-chain gate short-circuits the per-gap scan when the chain is
+        // comment-free (`chain_has_comments` false ⇒ this gap holds none to emit either).
+        if !chain_has_comments || !self.has_comments_to_emit_between(operand_end, op_start) {
             parts.push(d.text(" "));
             parts.push(d.text(op_str));
             return false;
@@ -804,6 +821,10 @@ impl<'a> Printer<'a> {
     ///
     /// Handles multiple consecutive comments by preserving their line structure:
     /// - `a && // comment1\n// comment2\nb` keeps each comment on its own line
+    // the operand plus the four layout flags are all load-bearing here
+    // TODO: fold op_end/operand/allow_breaks/lead_with_space/chain_has_comments into a
+    // small `PostOperatorCtx` struct to retire the allow (byte-identical output)
+    #[allow(clippy::too_many_arguments)]
     fn append_post_operator_parts(
         &self,
         parts: &mut DocBuf,
@@ -812,11 +833,20 @@ impl<'a> Printer<'a> {
         operand: &ChainOperand,
         allow_breaks: bool,
         lead_with_space: bool,
+        chain_has_comments: bool,
     ) {
         let d = self.d();
-        // Collect all comments in the range between operator and next operand
-        let comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, op_end, operand.span.start).collect();
+        // Collect all comments in the range between operator and next operand. The
+        // whole-chain gate skips this per-gap scan + collect for the ~all chains with no
+        // comment: `chain_has_comments` false ⇒ this gap (⊆ the chain span) holds none to
+        // emit, so the collect would be empty and the `is_empty()` path below runs — the
+        // gate reaches it without the scan. Byte-identical (a *presence* flag: on-page ⊇
+        // to-emit, so a false gate proves this gap emits nothing).
+        let comments: CommentVec<'_> = if chain_has_comments {
+            comments_to_emit_in_range(self.comments, op_end, operand.span.start).collect()
+        } else {
+            CommentVec::new()
+        };
 
         if comments.is_empty() {
             // No comments - simple case
@@ -835,7 +865,7 @@ impl<'a> Printer<'a> {
         // *after* (not before) is what makes this idempotent: prettier's own
         // width-broken output puts an inline-leading block at line start (newline
         // before, none after — `&&⏎/* c */ b`), which must stay inline, not re-break.
-        let forces_own_line = self.comment_forces_following_own_line(op_end, operand.span.start);
+        let forces_own_line = self.comment_hangs_binary_operand(op_end, operand.span.start);
 
         if !forces_own_line {
             // Only inline-leading block comments - place as leading on RHS operand.
@@ -1055,7 +1085,7 @@ impl<'a> Printer<'a> {
         let keyword_end = await_expr.span.start + "await".len() as u32;
         let argument_start = await_expr.argument.span().start;
         let argument_end = await_expr.argument.span().end;
-        let comments_opt = self.build_rhs_comments_opt(keyword_end, argument_start);
+        let comments_opt = self.build_keyword_operand_comments_opt(keyword_end, argument_start);
 
         // Trailing comments from stripped grouping parens: `await (x /* c */)` → `await x /* c */`
         let has_trailing_comments =
@@ -1101,46 +1131,63 @@ impl<'a> Printer<'a> {
         yield_expr: &internal::YieldExpression<'_>,
     ) -> DocId {
         let d = self.d();
-        let mut parts = DocBuf::new();
-
-        if yield_expr.delegate {
-            parts.push(d.text("yield*"));
+        let keyword = if yield_expr.delegate {
+            "yield*"
         } else {
-            parts.push(d.text("yield"));
+            "yield"
+        };
+        let Some(arg) = yield_expr.argument else {
+            return d.text(keyword);
+        };
+
+        let keyword_end = yield_expr.span.start + keyword.len() as u32;
+        let argument_start = arg.span().start;
+        let argument_end = arg.span().end;
+
+        // Trailing comments from stripped grouping parens: `yield (x /* c */)` → `yield x /* c */`
+        let has_trailing_comments =
+            self.has_comments_to_emit_between(argument_end, yield_expr.span.end);
+
+        // A comment that forces the break takes the parenthesized form. `yield` is a
+        // restricted production (`yield [no LineTerminator here] AssignmentExpression`,
+        // ECMA-262 §15.5), so without the parens ASI ends the `yield` at the newline and
+        // the operand becomes a separate expression statement — the `yield` silently
+        // loses its argument. Same gate and same layout as its `return`/`throw` siblings;
+        // see `build_hanging_paren_doc` for the shared rule, and
+        // docs/conformance_prettier.md §Comment relocation for why prettier (whose own
+        // retention is scoped to those two) diverges here.
+        if self.argument_has_own_line_comment(yield_expr.span.start, arg) {
+            let mut body = DocBuf::new();
+            if let Some(comments) = self.build_rhs_comments_opt(keyword_end, argument_start) {
+                body.push(comments);
+            }
+            body.push(self.build_expression_doc(arg));
+            // The trailing comment stays INSIDE the parens, where it was written.
+            if has_trailing_comments {
+                self.append_trailing_paren_comments(&mut body, argument_end, yield_expr.span.end);
+            }
+            return self.build_hanging_paren_doc(keyword, d.concat(&body));
         }
 
-        if let Some(arg) = yield_expr.argument {
-            parts.push(d.text(" "));
-            // Preserve comments from stripped grouping parens: `yield (/** @type {T} */ expr)`
-            let keyword_end = yield_expr.span.start
-                + if yield_expr.delegate {
-                    "yield*"
-                } else {
-                    "yield"
-                }
-                .len() as u32;
-            let argument_start = arg.span().start;
-            let argument_end = arg.span().end;
-            let leading_comments_opt = self.build_rhs_comments_opt(keyword_end, argument_start);
+        let mut parts: DocBuf = smallvec![d.text(keyword), d.text(" ")];
+        // Every remaining comment is glued to the keyword with the operand after it on
+        // some line, so the operand is pulled up onto the comment's line rather than
+        // keeping the author's break — the break would be ASI, not layout.
+        let leading_comments_opt = self.build_rhs_comments_glued_opt(keyword_end, argument_start);
 
-            // Trailing comments from stripped grouping parens: `yield (x /* c */)` → `yield x /* c */`
-            let has_trailing_comments =
-                self.has_comments_to_emit_between(argument_end, yield_expr.span.end);
-
-            if leading_comments_opt.is_some() || has_trailing_comments {
-                if let Some(comments) = leading_comments_opt {
-                    parts.push(comments);
-                }
-                parts.push(self.build_expression_doc(arg));
-                self.append_trailing_paren_comments(&mut parts, argument_end, yield_expr.span.end);
-            } else if self.needs_parens(arg, ParenContext::YieldArgument) {
-                // Assignment needs parens: `yield (x ??= y)`
-                parts.push(d.text("("));
-                parts.push(self.build_expression_doc(arg));
-                parts.push(d.text(")"));
-            } else {
-                parts.push(self.build_expression_doc(arg));
+        if leading_comments_opt.is_some() || has_trailing_comments {
+            if let Some(comments) = leading_comments_opt {
+                parts.push(comments);
             }
+            parts.push(self.build_expression_doc(arg));
+            self.append_trailing_paren_comments(&mut parts, argument_end, yield_expr.span.end);
+        } else if self.needs_parens(arg, ParenContext::YieldArgument) {
+            // Assignment needs parens: `yield (x ??= y)`
+            parts.push(d.text("("));
+            parts.push(self.build_expression_doc(arg));
+            parts.push(d.text(")"));
+        } else {
+            parts.push(self.build_expression_doc(arg));
         }
 
         d.concat(&parts)
@@ -1444,15 +1491,11 @@ impl<'a> Printer<'a> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use std::cell::RefCell;
-    use std::rc::Rc;
-    use string_interner::DefaultStringInterner;
 
     /// Run `should_group_binary_continuation` on a parsed binary expression.
     fn group(src: &str) -> bool {
         let arena = bumpalo::Bump::new();
-        let interner = Rc::new(RefCell::new(DefaultStringInterner::new()));
-        let expr = crate::parse_expression_with_comments(src, 0, interner, &arena)
+        let expr = crate::parse_expression_with_comments(src, 0, &arena)
             .expect("expression should parse")
             .0;
         match expr {

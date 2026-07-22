@@ -1,0 +1,101 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 476,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 467,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 94,
+							"end": 107,
+							"property": "content",
+							"value": "'z'"
+						},
+						{
+							"type": "Declaration",
+							"start": 199,
+							"end": 214,
+							"property": "font-family",
+							"value": "q"
+						},
+						{
+							"type": "Declaration",
+							"start": 279,
+							"end": 291,
+							"property": "quotes",
+							"value": "'a'"
+						},
+						{
+							"type": "Declaration",
+							"start": 374,
+							"end": 389,
+							"property": "font-family",
+							"value": "q"
+						},
+						{
+							"type": "Declaration",
+							"start": 450,
+							"end": 463,
+							"property": "content",
+							"value": "'z'"
+						}
+					]
+				},
+				"start": 9,
+				"end": 467
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 468,
+			"styles": "\n\ta {\n\t\t/* Single string value led by a non-breaking space (U+00A0) — kept glued. */\n\t\tcontent:  'z';\n\t\t/* Single ident value led by a non-breaking space — kept glued (matches prettier). */\n\t\tfont-family:  q;\n\t\t/* Single string value trailed by a non-breaking space. */\n\t\tquotes: 'a' ;\n\t\t/* Single ident value trailed by a non-breaking space (matches prettier). */\n\t\tfont-family: q ;\n\t\t/* Single string value led by an em space (U+2003). */\n\t\tcontent:  'z';\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 477,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

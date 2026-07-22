@@ -460,8 +460,8 @@ impl<'a> Printer<'a> {
     /// (type / class / id / pseudo-without-args) extracted verbatim from source so
     /// escapes are preserved.
     ///
-    /// A CSS hex escape consumes one following whitespace as its terminator, which
-    /// the lexer captures into the selector's span (`.\1F600 ` before `{`). When
+    /// A CSS **hex** escape consumes one following whitespace as its *terminator*,
+    /// which the lexer captures into the selector's span (`.\1F600 ` before `{`). When
     /// this is the last simple selector in its compound, whatever follows is a
     /// structural separator (a combinator's space, `,`, `)`, or the block `{`) that
     /// terminates the escape on its own, so the captured terminator is dropped to
@@ -469,10 +469,19 @@ impl<'a> Printer<'a> {
     /// compound, or the first of `:\41 :\42`) is kept — it separates the escape from
     /// the next simple selector. This single leaf rule replaces the old
     /// buffer-popping `pop_selector_terminator`.
+    ///
+    /// A **literal** escape's whitespace is the opposite case and must NOT be trimmed:
+    /// in `.a\ ` the space is the escape's *payload* (the class is named `a `), not a
+    /// terminator, so dropping it strands the backslash — which then escapes the
+    /// separator that follows, silently **merging a descendant combinator into the
+    /// compound** (`.a\␣␣.b` would print as `.a\␣.b`, which re-parses as one compound,
+    /// losing the `Combinator`). `trim_end_preserving_escape` draws exactly that line:
+    /// a whitespace preceded by an odd-length backslash run is a payload and stays;
+    /// anything else (a hex terminator, ordinary padding) still goes.
     fn span_leaf_doc(&self, span: Span, is_last_in_compound: bool) -> DocId {
         let raw = span.extract(self.source);
         let text = if is_last_in_compound {
-            raw.trim_end()
+            crate::escapes::trim_end_preserving_escape(raw)
         } else {
             raw
         };
@@ -523,29 +532,35 @@ impl<'a> Printer<'a> {
     /// name, folds only up to the escape's terminator whitespace (`:\4A b` →
     /// `:\4a b`, keeping the literal `B` in `::\41 B`). With `has_args`, only the
     /// part before `(` is the name.
-    fn pseudo_name_text(&self, span: Span, has_args: bool) -> String {
+    fn pseudo_name_text(&self, span: Span, has_args: bool) -> Cow<'a, str> {
         let raw = span.extract(self.source);
         let name = if has_args {
             raw.split_once('(').map_or(raw, |(before, _)| before)
         } else {
             raw
         };
+        // A custom pseudo (`::--foo`) is emitted verbatim. Otherwise only the head
+        // (up to the first whitespace) case-folds; a name whose head carries no
+        // ASCII uppercase already IS its canonical form, so borrow the source slice
+        // and skip the allocation — the overwhelmingly common case (`:where`,
+        // `:hover`, `:root`, `:is`, `:not`). Every pseudo hits this path, so the
+        // owned-String-then-pool-copy was the top CSS format-churn site.
         let after_colons = name.trim_start_matches(':');
         if after_colons.starts_with("--") {
-            return name.to_string();
+            return Cow::Borrowed(name);
         }
-        let (head, tail) = match name.find(|c: char| c.is_ascii_whitespace()) {
-            Some(i) => name.split_at(i),
-            None => (name, ""),
-        };
-        let mut out = String::with_capacity(name.len());
-        if head.bytes().any(|b| b.is_ascii_uppercase()) {
-            out.push_str(&head.to_ascii_lowercase());
+        let head_end = name
+            .find(|c: char| c.is_ascii_whitespace())
+            .unwrap_or(name.len());
+        if name[..head_end].bytes().any(|b| b.is_ascii_uppercase()) {
+            // Fold only the head; the tail (from the first whitespace on) is verbatim.
+            let mut out = String::with_capacity(name.len());
+            out.push_str(&name[..head_end].to_ascii_lowercase());
+            out.push_str(&name[head_end..]);
+            Cow::Owned(out)
         } else {
-            out.push_str(head);
+            Cow::Borrowed(name)
         }
-        out.push_str(tail);
-        out
     }
 
     /// Build a doc for a simple selector, dispatched by kind.
@@ -638,13 +653,19 @@ impl<'a> Printer<'a> {
                 // selector-argument position gets, and what prettier does inside a
                 // selector.
                 //
+                // The OUTER trim is escape-aware for the same reason the collapse inside
+                // is: `:is(.a > . > .b\ )` ends in an escape whose payload is that space,
+                // and trimming it strands the backslash onto the `)` that closes the
+                // pseudo — output tsv's own parser then rejects.
+                //
                 // The parser registers whatever comments it read before the parse error,
                 // and they ride out inside this slice — see `tsv_lang::comment_ledger`.
                 #[cfg(feature = "comment_check")]
                 tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
-                d.text_pooled(&value_normalization::collapse_whitespace_runs(
-                    span.extract(self.source).trim(),
-                ))
+                let raw = span.extract(self.source);
+                let item =
+                    crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(raw));
+                d.text_pooled(&value_normalization::collapse_whitespace_runs(item))
             }
         }
     }
@@ -666,8 +687,12 @@ impl<'a> Printer<'a> {
                 d.concat(&[d.text_pooled(&name), self.build_pseudo_args_doc(args)])
             }
             None => {
-                // No args: the whole span is the name; drop its escape terminator
-                // when it ends the compound.
+                // No args: the whole span is the name. Drop a hex escape's whitespace
+                // TERMINATOR when it ends the compound (the separator that follows
+                // re-terminates it), but never a literal escape's PAYLOAD — the exact
+                // rule `span_leaf_doc` applies to type/class/id leaves, on the pseudo
+                // path. `:hover\ ` is a pseudo named `hover `; stranding its backslash
+                // would escape the `,` or `{` that follows and destroy the selector list.
                 //
                 // The span also covers an *unreadable* argument list (`:state(/* c */ "x")`,
                 // whose args the parser skipped to `)` after registering the gap comment) —
@@ -677,9 +702,9 @@ impl<'a> Printer<'a> {
                 tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
                 let name = self.pseudo_name_text(span, false);
                 let text = if is_last_in_compound {
-                    name.trim_end()
+                    crate::escapes::trim_end_preserving_escape(&name)
                 } else {
-                    &name
+                    name.as_ref()
                 };
                 d.text_pooled(text)
             }
@@ -713,7 +738,7 @@ impl<'a> Printer<'a> {
                 // (`/* a-b */` → `/* a - b */`). Prettier also skips An+B
                 // normalization when a comment is present, so verbatim matches.
                 let normalized = if value.contains("/*") {
-                    (*value).to_string()
+                    Cow::Borrowed(*value)
                 } else {
                     Self::normalize_an_plus_b(value)
                 };
@@ -881,55 +906,58 @@ impl<'a> Printer<'a> {
     /// - `2n  +  1` → `2n + 1` (collapse multiple spaces)
     /// - `  n  ` → `n` (trim outer spaces)
     /// - `odd`, `even`, `3` → unchanged
-    fn normalize_an_plus_b(value: &str) -> String {
+    fn normalize_an_plus_b(value: &str) -> Cow<'_, str> {
         // Lowercase the `n` variable when it carries a numeric coefficient
         // (`2N`→`2n`), matching prettier — a bare `N`/`-N` keeps its case (prettier
         // preserves it), as do the `even`/`odd` keywords (their `n` isn't
         // digit-preceded). Applied before the early return so `2N` (no operator)
         // is cased too.
         let cased = lowercase_an_plus_b_n(value.trim());
-        let trimmed = cased.as_ref();
 
-        // Simple cases: keywords and plain numbers (no operators)
-        if !trimmed.contains('+') && !trimmed.contains('-') {
-            return trimmed.to_string();
+        // Simple cases: keywords and plain numbers (no operators) need no spacing
+        // work — return the cased form as-is (borrowed when no `n` was recased).
+        if !cased.contains('+') && !cased.contains('-') {
+            return cased;
         }
 
-        // Normalize spacing around + and - operators
-        let mut result = String::with_capacity(trimmed.len() + 4);
-        let chars: Vec<char> = trimmed.chars().collect();
-        let mut i = 0;
+        // Normalize spacing around + and - operators. Walk the chars directly (no
+        // `Vec<char>` materialization) and build the result already-trimmed, so the
+        // single `result` String is the only allocation — `cased` is `value.trim()`d
+        // and the loop never emits a leading/trailing space, so no final trim copy
+        // is needed.
+        let mut result = String::with_capacity(cased.len() + 4);
+        let mut chars = cased.chars().peekable();
+        let mut prev_exists = false;
 
-        while i < chars.len() {
-            let ch = chars[i];
-
+        while let Some(ch) = chars.next() {
             // Handle + and - operators: always normalize to ` op `
-            if (ch == '+' || ch == '-') && i > 0 {
-                // Check if this is an operator (has content before it)
-                let trimmed_result = result.trim_end();
-                if !trimmed_result.is_empty() {
-                    // This is an operator - normalize spacing
-                    result.truncate(trimmed_result.len());
+            if (ch == '+' || ch == '-') && prev_exists {
+                // Operator only when there is content before it (compute the trimmed
+                // length before mutating so the immutable borrow is released first).
+                let trimmed_len = result.trim_end().len();
+                if trimmed_len != 0 {
+                    result.truncate(trimmed_len);
                     result.push(' ');
                     result.push(ch);
 
-                    // Skip any spaces after operator and add single space
-                    i += 1;
-                    while i < chars.len() && chars[i].is_whitespace() {
-                        i += 1;
+                    // Skip any spaces after the operator and add a single space
+                    // only when more content follows.
+                    while matches!(chars.peek(), Some(c) if c.is_whitespace()) {
+                        chars.next();
                     }
-                    if i < chars.len() {
+                    if chars.peek().is_some() {
                         result.push(' ');
                     }
+                    prev_exists = true;
                     continue;
                 }
             }
 
             result.push(ch);
-            i += 1;
+            prev_exists = true;
         }
 
-        result.trim().to_string()
+        Cow::Owned(result)
     }
 }
 

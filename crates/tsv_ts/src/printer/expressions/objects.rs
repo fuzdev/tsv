@@ -66,14 +66,16 @@ impl<'a> Printer<'a> {
 
         // Check if any property value has multiline content (e.g., line continuation strings)
         // Prettier expands objects containing multiline strings (recursively)
-        let has_multiline = obj.properties.iter().any(|prop| match prop {
-            internal::ObjectProperty::Property(p) => {
-                crate::printer::has_multiline_content(&p.value, self.source)
-            }
-            internal::ObjectProperty::SpreadElement(s) => {
-                crate::printer::has_multiline_content(s.argument, self.source)
-            }
-        });
+        let has_multiline =
+            crate::printer::container_may_have_multiline_content(obj.span, self.source)
+                && obj.properties.iter().any(|prop| match prop {
+                    internal::ObjectProperty::Property(p) => {
+                        crate::printer::has_multiline_content(&p.value, self.source)
+                    }
+                    internal::ObjectProperty::SpreadElement(s) => {
+                        crate::printer::has_multiline_content(s.argument, self.source)
+                    }
+                });
 
         // Decide the formatting strategy
         // must_break: conditions that require hardlines (comments, multiline content)
@@ -288,16 +290,20 @@ impl<'a> Printer<'a> {
             // No comments, no forced multiline: use width-based wrapping with soft lines
             let mut parts = d.pooled_docbuf();
 
+            // Whether each gap between consecutive properties carries an author blank line.
+            // Derived ONCE per gap: the loop below asks the same question from both sides —
+            // "is there a blank before me?" at property `i`, and "before the next one?" when
+            // emitting `i`'s separator — which is the same gap, and computing it twice invites
+            // the two answers to drift apart.
+            let gap_blank: SmallVec<[bool; 8]> = obj
+                .properties
+                .windows(2)
+                .map(|pair| self.is_next_line_empty(pair[0].value_end(), pair[1].span().start))
+                .collect();
+
             for (i, prop) in obj.properties.iter().enumerate() {
                 // Check for blank line before this property (preserved in multiline).
-                let has_blank_before = if i > 0 {
-                    let prev_prop = &obj.properties[i - 1];
-                    let prev_end = prev_prop.value_end();
-                    let prop_start = prop.span().start;
-                    self.has_blank_line_after_comma(prev_end, prop_start)
-                } else {
-                    false
-                };
+                let has_blank_before = i > 0 && gap_blank[i - 1];
 
                 if has_blank_before {
                     // Blank line preservation
@@ -312,13 +318,9 @@ impl<'a> Printer<'a> {
                 // Add comma and line break
                 if i < obj.properties.len() - 1 {
                     parts.push(d.text(","));
-                    // Only add line break if next property doesn't have blank line before it
-                    let next_prop = &obj.properties[i + 1];
-                    let curr_end = prop.value_end();
-                    let next_start = next_prop.span().start;
-                    let next_has_blank = self.has_blank_line_after_comma(curr_end, next_start);
-
-                    if !next_has_blank {
+                    // Only add a line break when the next property has no blank line before
+                    // it — the blank's own `literalline` + `hardline` already separates them.
+                    if !gap_blank[i] {
                         parts.push(d.line());
                     }
                 }
@@ -643,7 +645,7 @@ impl<'a> Printer<'a> {
 
                     // Build RHS: comments (with proper separators) + value
                     let comments_doc = self
-                        .build_rhs_comments_opt(colon_pos + 1, value_start)
+                        .build_value_gap_comments_opt(colon_pos + 1, value_start)
                         .unwrap_or_else(|| d.empty());
                     let mut value_parts: DocBuf = smallvec![comments_doc];
                     if needs_parens {
@@ -826,27 +828,21 @@ impl<'a> Printer<'a> {
     /// past the key — after the `]` for computed keys — used to anchor the search
     /// for following comments/modifiers.
     ///
-    /// `unquote` drops quotes from an identifier-valid string-literal key: `true`
-    /// for property signatures (`'plain': T` → `plain: T`) and method signatures
-    /// (`'foo'(): void` → `foo(): void` — prettier 3.9 unquotes these too).
-    /// Computed keys are always emitted verbatim inside their brackets.
+    /// Drops quotes from an identifier-valid string-literal key for property
+    /// signatures (`'plain': T` → `plain: T`) and method signatures (`'foo'(): void`
+    /// → `foo(): void` — prettier 3.9 unquotes these too). Computed keys are always
+    /// emitted verbatim inside their brackets.
     pub(in crate::printer) fn build_type_member_key_doc(
         &self,
         search_start: u32,
         key: &Expression<'_>,
         computed: bool,
-        unquote: bool,
     ) -> (DocId, u32) {
         if computed {
             let key_doc = self.build_expression_doc(key);
             self.build_computed_key_bracket_doc(search_start, key, key_doc)
         } else {
-            let doc = if unquote {
-                self.build_property_key_doc(key)
-            } else {
-                self.build_expression_doc(key)
-            };
-            (doc, key.span().end)
+            (self.build_property_key_doc(key), key.span().end)
         }
     }
 

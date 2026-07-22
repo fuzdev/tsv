@@ -17,8 +17,17 @@ use unicode_width::UnicodeWidthChar;
 /// output equals the verbatim source literal — no allocation needed).
 #[inline]
 pub fn optimal_string_quote(raw_content: &str) -> char {
-    let single_count = raw_content.matches('\'').count();
-    let double_count = raw_content.matches('"').count();
+    // One fused byte pass counting both quote kinds. Both quotes are ASCII and
+    // UTF-8 continuation bytes are >= 0x80, so a byte compare cannot match
+    // inside a multi-byte sequence. String contents are typically short, where
+    // a per-pattern searcher setup dominates a plain counting loop; the
+    // branchless sums auto-vectorize for long contents.
+    let mut single_count = 0usize;
+    let mut double_count = 0usize;
+    for &b in raw_content.as_bytes() {
+        single_count += usize::from(b == b'\'');
+        double_count += usize::from(b == b'"');
+    }
     // Double quotes only when they're strictly rarer (fewer escapes); otherwise
     // single — which also covers the tie, the hardcoded single-quote tie-breaker.
     if double_count < single_count {
@@ -516,54 +525,6 @@ pub fn build_line_breaks_into(source: &str, breaks: &mut Vec<u32>) {
     }
 }
 
-/// Check if a line ends with a JS/TypeScript string line continuation
-///
-/// A line continuation is a backslash (`\`) at the end of a line inside a string literal.
-/// This causes the newline to be escaped, allowing the string to span multiple lines
-/// in the source code without including the newline in the string value.
-///
-/// Example:
-/// ```javascript
-/// const s = 'hello \
-/// world';  // value is "hello world"
-/// ```
-///
-/// # Algorithm
-///
-/// Counts trailing backslashes - an odd number means line continuation,
-/// an even number means escaped backslashes (not a continuation).
-///
-/// # Returns
-///
-/// `true` if the line ends with a line continuation (odd number of trailing backslashes).
-///
-/// # Examples
-///
-/// ```
-/// use tsv_lang::printing::is_line_continuation_ending;
-///
-/// assert!(is_line_continuation_ending("'hello \\"));      // Line continuation
-/// assert!(is_line_continuation_ending("const x = 'a \\")); // Line continuation
-/// assert!(!is_line_continuation_ending("'hello'"));       // Normal string end
-/// assert!(!is_line_continuation_ending("'hello\\\\'"));   // Escaped backslash
-/// assert!(!is_line_continuation_ending(""));              // Empty line
-/// ```
-pub fn is_line_continuation_ending(line: &str) -> bool {
-    // Count trailing backslashes
-    let mut backslash_count = 0;
-    for c in line.chars().rev() {
-        if c == '\\' {
-            backslash_count += 1;
-        } else {
-            break;
-        }
-    }
-
-    // Odd number of trailing backslashes = line continuation
-    // Even number = escaped backslashes (\\) which is not a continuation
-    backslash_count > 0 && backslash_count % 2 == 1
-}
-
 /// Strip common indentation from comment content based on its position in source
 ///
 /// Detects the indentation level at the comment's position and removes that
@@ -643,37 +604,43 @@ pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32
 /// context indent is supplied separately by the layout). Non-indentable block
 /// comments are preserved verbatim instead.
 ///
-/// `lines` is the comment body *without* the `/*` / `*/` delimiters, already
-/// split on `'\n'` — the caller splits once and feeds the same lines to the
-/// indentable-comment builder, so the body isn't re-scanned per pass. Returns
+/// `lines` iterates the comment body *without* the `/*` / `*/` delimiters,
+/// split on `'\n'` (typically `content.split('\n')` fed directly) — no line
+/// buffer is materialized, so classification never heap-allocates. Returns
 /// `false` for single-line content. Mirrors prettier's `isIndentableBlockComment`.
 ///
 /// # Example
 /// ```
 /// use tsv_lang::printing::is_indentable_block_comment;
 ///
-/// let lines = |s: &'static str| s.split('\n').collect::<Vec<_>>();
-/// assert!(is_indentable_block_comment(&lines("*\n * text\n ")));     // /** … */
-/// assert!(is_indentable_block_comment(&lines("\n * text\n ")));      // /* * … */
-/// assert!(is_indentable_block_comment(&lines("*\n *\n * text\n "))); // blank `*` line
-/// assert!(!is_indentable_block_comment(&lines(" a\n   b "))); // a line lacks `*`
-/// assert!(!is_indentable_block_comment(&lines(" single line ")));    // single-line
+/// let lines = |s: &'static str| s.split('\n');
+/// assert!(is_indentable_block_comment(lines("*\n * text\n ")));     // /** … */
+/// assert!(is_indentable_block_comment(lines("\n * text\n ")));      // /* * … */
+/// assert!(is_indentable_block_comment(lines("*\n *\n * text\n "))); // blank `*` line
+/// assert!(!is_indentable_block_comment(lines(" a\n   b "))); // a line lacks `*`
+/// assert!(!is_indentable_block_comment(lines(" single line ")));    // single-line
 /// ```
-pub fn is_indentable_block_comment(lines: &[&str]) -> bool {
+pub fn is_indentable_block_comment<'s>(mut lines: impl Iterator<Item = &'s str>) -> bool {
     // The `*` of the `/*` opener attaches to the first line and the `*` of the
     // `*/` closer attaches to the last line, so the first line always qualifies
     // and an all-whitespace last line qualifies. Every other line must start
-    // with `*`. (Pattern fails for single-line content → `false`.)
-    let [_first, middle @ .., last] = lines else {
+    // with `*`.
+    if lines.next().is_none() {
+        return false;
+    }
+    // Lag one line behind so the final line gets the last-line rule.
+    let Some(mut prev) = lines.next() else {
         return false; // fewer than 2 lines → not a multi-line indentable comment
     };
-    for line in middle {
-        if !line.trim_start().starts_with('*') {
+    for next in lines {
+        // A successor exists, so `prev` is a middle line: it must be `*`-prefixed.
+        if !prev.trim_start().starts_with('*') {
             return false;
         }
+        prev = next;
     }
     // The last line qualifies when empty or `*`-prefixed.
-    let last = last.trim_start();
+    let last = prev.trim_start();
     last.is_empty() || last.starts_with('*')
 }
 
@@ -822,6 +789,40 @@ mod tests {
     fn test_no_quotes_uses_preferred() {
         let result = format_string_literal("hello", '"');
         assert_eq!(result, "'hello'");
+    }
+
+    #[test]
+    fn optimal_string_quote_matches_searcher_reference_exhaustively() {
+        // No corpus can grade a counting bug here: a miscount only changes
+        // output when it flips the quote choice, so this exhaustive equivalence
+        // check against the two-searcher shape is the load-bearing gate for the
+        // fused byte count.
+        fn reference(raw_content: &str) -> char {
+            let single_count = raw_content.matches('\'').count();
+            let double_count = raw_content.matches('"').count();
+            if double_count < single_count {
+                '"'
+            } else {
+                '\''
+            }
+        }
+        // Alphabet covers each arm: both quote kinds, plain ASCII, a control
+        // char, a two-byte and a three-byte UTF-8 sequence (continuation bytes
+        // must never read as a quote byte), and a backslash.
+        const ALPHABET: [char; 7] = ['\'', '"', 'a', '\n', 'é', '✓', '\\'];
+        let mut cases = vec![String::new()];
+        for c1 in ALPHABET {
+            cases.push(c1.to_string());
+            for c2 in ALPHABET {
+                cases.push(format!("{c1}{c2}"));
+                for c3 in ALPHABET {
+                    cases.push(format!("{c1}{c2}{c3}"));
+                }
+            }
+        }
+        for s in &cases {
+            assert_eq!(optimal_string_quote(s), reference(s), "content {s:?}");
+        }
     }
 
     #[test]

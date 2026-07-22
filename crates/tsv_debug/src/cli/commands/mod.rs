@@ -2,6 +2,9 @@ pub mod arena_stats;
 pub mod ast_diff;
 pub mod authoring_audit;
 pub mod binding_audit;
+// Requires the `comment_check` feature — it drives the print-once ledger (invariant 5).
+#[cfg(feature = "comment_check")]
+pub mod blank_audit;
 pub mod buffer_sizes;
 pub mod build_fanout_audit;
 pub mod canonical_parse;
@@ -26,6 +29,7 @@ pub mod line_width;
 pub mod metrics;
 pub mod neutrality_audit;
 pub mod profile;
+pub mod render_audit;
 pub mod roundtrip_audit;
 pub mod scan_audit;
 #[cfg(feature = "swallow_check")]

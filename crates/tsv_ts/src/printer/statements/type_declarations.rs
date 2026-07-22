@@ -3,11 +3,11 @@
 
 use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 use crate::ast::internal::{self, TSType};
-use crate::printer::layout::hang_after_operator;
+use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue};
 use smallvec::smallvec;
-use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Span, comments_to_emit_in_range};
 
@@ -233,15 +233,17 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = smallvec![d.text(if lead_space { " =" } else { "=" })];
 
         // A leading comment between `=` and the RHS forces the value onto its own
-        // line when it can't share the `=` line: a line comment or multiline block
-        // (`comments_force_own_line_between`), OR a single-line block comment that
-        // was *authored* on its own line (`type X =⏎/* c */⏎Y`). Prettier breaks
-        // after `=` and keeps such a comment on its own line rather than hugging it
-        // up to `=` — the union/intersection RHS then renders below it.
+        // line when it can't share the RHS's line: a line comment or multiline block
+        // (`comments_force_own_line_between`), OR a single-line block comment sitting
+        // *alone* on its own line (`type X =⏎/* c */⏎Y`). Prettier keeps such a
+        // comment on its own line and renders the RHS below it. A single-line block
+        // merely *glued to the RHS* across the `=`-break (`type X =⏎/* c */ Y`) is NOT
+        // forced here — it leads the RHS and rides with it (the else branch's
+        // `make_rhs`), so keying on the newline *before* the comment alone would
+        // spuriously re-break already-broken output (`block_comment_isolated_own_line_between`
+        // requires the newline *after* it too — the idempotency key).
         let force_break = self.comments_force_own_line_between(eq_pos + 1, type_start)
-            || self
-                .comments_on_page_between(eq_pos + 1, type_start)
-                .any(|c| c.is_block && self.is_own_line_comment(c));
+            || self.block_comment_isolated_own_line_between(eq_pos + 1, type_start);
 
         if force_break {
             // Line/multiline block comments force type to next line with indent.
@@ -289,15 +291,29 @@ impl<'a> Printer<'a> {
             indent_content.push(type_doc);
             parts.push(d.indent(d.concat(&indent_content)));
         } else {
-            // Single-line block comments (or no comments): inline after `=`
-            if let Some(comment_doc) = self.build_comments_between_filtered_opt(
+            // A single-line block comment glued after `=` (`type A = /* c */ B`) leads
+            // the RHS, so it rides *inside* the RHS doc rather than sitting on the `=`
+            // head: on the `=` line while the RHS head hugs there, and down onto the
+            // RHS's own line when the whole RHS relocates below `=`. `Trailing` spacing
+            // (`/* c */ `) omits the leading space — every arm supplies its own (the
+            // hug arms a literal `" "`, the hang/fluid arms their break `line`). Mirrors
+            // the declarator's `make_init_doc` (`statements/variable.rs`); the type-alias
+            // printer used to hoist it onto the `=` head, which stranded it there when
+            // the RHS broke below (a break-after-`=` union/reference/conditional).
+            let lead_comment = self.build_comments_between_filtered_opt(
                 eq_pos + 1,
                 type_start,
-                CommentSpacing::Leading,
+                CommentSpacing::Trailing,
                 CommentFilter::BlockOnly,
-            ) {
-                parts.push(comment_doc); // " /* comment */"
-            }
+            );
+            let make_rhs = |rhs: DocId| -> DocId {
+                match lead_comment {
+                    Some(comment_doc) => d.concat(&[comment_doc, rhs]),
+                    None => rhs,
+                }
+            };
+            // Every `fluid` marker in this function ties to the one assignment group.
+            let fluid = |rhs: DocId| fluid_after_operator(d, rhs, GroupId::Assignment);
 
             // Check the type kind for different formatting rules. Redundant
             // comment-free parens around the RHS are stripped (prettier does the
@@ -318,32 +334,56 @@ impl<'a> Printer<'a> {
                     // Hugged unions (e.g., `{ ... } | null`): the object type handles its own
                     // expansion, so keep `= {` together like other internally-breaking types
                     parts.push(d.text(" "));
-                    parts.push(type_doc);
+                    parts.push(make_rhs(type_doc));
                 } else {
                     // Normal unions: break after `=` with leading `| `
-                    parts.push(hang_after_operator(d, type_doc));
+                    parts.push(hang_after_operator(d, make_rhs(type_doc)));
                 }
             } else if let TSType::Intersection(i) = value_type {
-                // Intersection types: first element stays inline, continuation types
-                // wrap with a hanging indent (skipped when a boundary TypeLiteral/Mapped
-                // owns its own expansion — see `intersection_hanging_with_indent`).
-                parts.push(d.text(" "));
-                parts.push(self.intersection_hanging_with_indent(i));
+                // Intersection types (prettier's `fluid`): the first member hugs the
+                // `=` line when it fits and the intersection breaks after `=` when it
+                // doesn't — continuation members then wrap with a hanging indent (the
+                // boundary TypeLiteral/Mapped that owns its own expansion opts out; see
+                // `intersection_hanging_with_indent`). The `fluid` marker's `line` is what
+                // gives the LHS `<…>` group an early `fits()` exit at the `=`, so a
+                // constrained-param header that fits stays inline instead of breaking the
+                // type-param list when the first member overflows.
+                //
+                // A comment inside the intersection forces it to break; there the marker
+                // must stay flat so the first member keeps hugging the `=` line (prettier's
+                // behavior — `type B = a & // c⏎\tb`). The over-break this arm fixes is
+                // always comment-free (a fit-driven break), so gate the marker on the
+                // absence of a forced break and glue the comment case as before.
+                let inter_doc = self.intersection_hanging_with_indent(i);
+                if d.will_break(inter_doc) {
+                    parts.push(d.text(" "));
+                    parts.push(make_rhs(inter_doc));
+                } else {
+                    parts.push(fluid(make_rhs(inter_doc)));
+                }
             } else if let TSType::Conditional(cond) = value_type {
-                // Conditional types: break after `=` only if check/extends has type parameters
+                // Conditional types: break after `=` only if check/extends has type
+                // parameters (prettier's `shouldBreakBeforeConditionalType` →
+                // break-after-operator); otherwise `fluid`, which keeps the ternary on the
+                // `=` line while its head fits and breaks after `=` once the head
+                // overflows. The `fluid` marker keeps the LHS `<…>` inline (see the
+                // intersection arm) rather than breaking the type-param list.
                 let type_doc = self.build_type_doc(value_type);
                 if should_break_before_conditional_type(cond) {
-                    parts.push(hang_after_operator(d, type_doc));
+                    parts.push(hang_after_operator(d, make_rhs(type_doc)));
                 } else {
-                    parts.push(d.text(" "));
-                    parts.push(type_doc);
+                    parts.push(fluid(make_rhs(type_doc)));
                 }
             } else if type_has_internal_breaking(value_type) {
-                // Types with internal breaking (braces, brackets, parens, angle brackets) stay hugged
-                // Use wrapping version so TypeReference type args break internally when too long
+                // Types with internal breaking (braces, brackets, parens, angle brackets):
+                // prettier's `fluid`. The marker hugs the `=` line when the value's first
+                // break point is reachable within the width (`= {`, `= [`, `= Foo<`) — the
+                // object/tuple/type-argument cases — and breaks after `=` when it is not
+                // (a function type whose header pushes `(` past the width). Either way the
+                // marker's `line` keeps the LHS `<…>` inline instead of breaking the
+                // type-param list.
                 let type_doc = self.build_type_doc(value_type);
-                parts.push(d.text(" "));
-                parts.push(type_doc);
+                parts.push(fluid(make_rhs(type_doc)));
             } else if has_complex_params {
                 // Complex type parameters: use break-lhs layout
                 // Type params break, `=` stays on same line, RHS stays inline
@@ -355,7 +395,7 @@ impl<'a> Printer<'a> {
                 //   > = SomeLongType;
                 let type_doc = self.build_type_doc(value_type);
                 parts.push(d.text(" "));
-                parts.push(type_doc);
+                parts.push(make_rhs(type_doc));
             } else {
                 // Remaining types break after `=` with a hanging indent when too
                 // long — unless a comment keeps the value on the `=` line, in which
@@ -375,19 +415,48 @@ impl<'a> Printer<'a> {
                 // A comment-free value that doesn't `will_break` hangs (long case).
                 let type_doc = self.build_type_doc(value_type);
                 let value_span = value_type.span();
+                let value_has_comments = tsv_lang::has_comments_to_emit_in_range(
+                    self.comments,
+                    value_span.start,
+                    value_span.end,
+                );
                 let hug = self.value_owns_its_comment_break(value_type)
                     || (d.will_break(type_doc)
-                        && tsv_lang::has_comments_to_emit_in_range(
-                            self.comments,
-                            value_span.start,
-                            value_span.end,
-                        )
+                        && value_has_comments
                         && !self.comments_force_own_line_between(value_span.start, value_span.end));
                 if hug {
                     parts.push(d.text(" "));
-                    parts.push(type_doc);
+                    parts.push(make_rhs(type_doc));
+                } else if value_has_comments
+                    || matches!(
+                        value_type,
+                        TSType::Literal(internal::TSLiteralType::TemplateLiteral(_))
+                    )
+                {
+                    // Break after `=` with a hanging indent, for two kinds:
+                    //   - a non-hugging comment-bearing value, preserving comment
+                    //     placement (e.g. a `[`→index own-line comment hangs the index —
+                    //     indexed_access_line_comment); and
+                    //   - a template-literal type, whose `${…}` printer force-breaks: on
+                    //     the `fluid` path the value would hug `= \`prefix_${` and break
+                    //     the interpolation instead of breaking after `=` first (tsv's
+                    //     template layout is already a deliberate divergence — see
+                    //     template_literal_type_long; `is_simple_type_arg` excludes them
+                    //     from atomic inlining for the same reason).
+                    parts.push(hang_after_operator(d, make_rhs(type_doc)));
                 } else {
-                    parts.push(hang_after_operator(d, type_doc));
+                    // The comment-free remainder is prettier's `fluid` default
+                    // (`chooseLayout`'s fallthrough): the value hugs the `=` line and
+                    // breaks INSIDE its own delimiter when it can, and the marker's `line`
+                    // keeps the LHS `<…>` inline instead of breaking the type-param list.
+                    // A postfix wrapper (`(cond)[]`, `(cond)[K]`), a prefix operator
+                    // (`keyof`/`readonly`/`typeof`) over a breakable operand, and an atomic
+                    // reference all route here; an unbreakable value (a bare reference, a
+                    // string-literal type) makes `fluid` and break-after-`=` render
+                    // identically. `shouldBreakAfterOperator` has no case for these kinds,
+                    // so prettier falls through to `fluid` — see
+                    // `prettier/src/language-js/print/assignment.js`.
+                    parts.push(fluid(make_rhs(type_doc)));
                 }
             }
         }
@@ -750,7 +819,7 @@ impl<'a> Printer<'a> {
             parts.push(d.hardline());
 
             // Print leading comments with blank line preservation
-            parts.extend(self.build_leading_comments_before(&leading_comments, member_start));
+            self.push_leading_comments_before(&mut parts, &leading_comments, member_start);
 
             // A preceding format-ignore directive keeps the member's source verbatim.
             // The member span includes its trailing `;`.
@@ -1045,10 +1114,7 @@ impl<'a> Printer<'a> {
             let init_doc = self.build_expression_doc(init);
 
             // Extract comments between `=` and initializer value
-            let id_end = match &member.id {
-                internal::TSEnumMemberId::Identifier(id) => id.span.end,
-                internal::TSEnumMemberId::String(lit) => lit.span.end,
-            };
+            let id_end = member.id.span().end;
             let init_start = init.span().start;
             let eq_pos = self.find_equals_position(id_end, init_start);
 
@@ -1056,15 +1122,12 @@ impl<'a> Printer<'a> {
             // continuation forms). For binary expressions, indent so wrapped
             // continuations align under the value; any `=`→value block comment
             // leads it.
-            let value_doc = {
-                let init_with_indent = if matches!(init, internal::Expression::BinaryExpression(_))
-                {
-                    d.indent(init_doc)
-                } else {
-                    init_doc
-                };
-                self.prepend_rhs_comments(init_with_indent, eq_pos + 1, init_start)
+            let init_with_indent = if matches!(init, internal::Expression::BinaryExpression(_)) {
+                d.indent(init_doc)
+            } else {
+                init_doc
             };
+            let value_doc = self.prepend_rhs_comments(init_with_indent, eq_pos + 1, init_start);
 
             // A line comment between the name and `=` keeps the comment after the
             // name and drops `= value` to a continuation line indented one level
@@ -1085,7 +1148,37 @@ impl<'a> Printer<'a> {
                 } else {
                     id_doc
                 };
-                d.concat(&[id_doc, d.text(" = "), value_doc])
+                // The `=`→value gap shares the initializer comment layout with variable
+                // declarators and for-loop init clauses. A **line** comment partitions
+                // (trailing on the `=` line, the rest leading the value); an **own-line
+                // or multiline block** hangs after the operator, keeping the comment on
+                // its own line; a **glued single-line block** returns `None` and falls
+                // through to the inline `= /* c */ value` form below.
+                //
+                // Sharing the helper is what makes this gap agree with every other
+                // initializer. Emitting the run positionally instead (`prepend_rhs_comments`
+                // alone) both preserved a break the siblings reflow AND relocated an
+                // own-line comment up onto the `=` line — and that relocation is not
+                // idempotent, since the moved comment reads as glued on the next pass and
+                // then collapses. The helper cannot drift that way: it decides the layout
+                // from the comment's authored position and emits the matching shape.
+                if let Some(rhs) =
+                    self.build_eq_comment_break_rhs(eq_pos, init_start, || init_with_indent)
+                {
+                    d.concat(&[id_doc, rhs])
+                } else {
+                    // Only a glued single-line block (or no comment) reaches here — the
+                    // helper claimed every authoring that hangs. The value gets its own
+                    // `group` so the leading run's soft `line` is measured against the
+                    // value rather than the enum body, which is hardline-joined and so
+                    // always broken; without it the `line` rendered as a newline and
+                    // preserved a break every sibling initializer reflows. This is the
+                    // array-family/params-family distinction: an element in its own group
+                    // collapses, an unwrapped one inherits the broken parent. Safe only
+                    // because the own-line authoring no longer passes through here — when
+                    // it did, this group made the format non-idempotent.
+                    d.concat(&[id_doc, d.text(" = "), d.group(value_doc)])
+                }
             }
         } else {
             id_doc
@@ -1131,10 +1224,7 @@ impl<'a> Printer<'a> {
                 // and name here, so there is no later name to relocate it onto (the
                 // non-global branch handles its keyword→name gap below). For a bare
                 // `global {}` the span starts at `global`, so the range is empty.
-                let global_start = match &decl.id {
-                    internal::TSModuleName::Identifier(id) => id.span.start,
-                    internal::TSModuleName::Literal(lit) => lit.span.start,
-                };
+                let global_start = decl.id.span().start;
                 parts.push(self.build_inline_comments_between_doc_trailing_space(
                     decl.span.start,
                     global_start,
@@ -1156,10 +1246,7 @@ impl<'a> Printer<'a> {
         // Module/namespace name (if not global)
         if !decl.global {
             // Comments between keywords and name: `declare namespace /* c */ A {}`
-            let name_start = match &decl.id {
-                internal::TSModuleName::Identifier(id) => id.span.start,
-                internal::TSModuleName::Literal(lit) => lit.span.start,
-            };
+            let name_start = decl.id.span().start;
             if is_root {
                 parts.push(
                     self.build_inline_comments_between_doc_trailing_space(
@@ -1179,10 +1266,7 @@ impl<'a> Printer<'a> {
             // Pushing name + `d.text(".")` scans neither gap and drops what's in it.
             match &decl.body {
                 Some(internal::TSModuleDeclarationBody::TSModuleDeclaration(nested)) => {
-                    let name_end = match &decl.id {
-                        internal::TSModuleName::Identifier(id) => id.span.end,
-                        internal::TSModuleName::Literal(lit) => lit.span.end,
-                    };
+                    let name_end = decl.id.span().end;
                     parts.push(self.build_dotted_pair_doc(
                         name_doc,
                         self.build_module_declaration_doc_inner(nested, false),
@@ -1198,10 +1282,7 @@ impl<'a> Printer<'a> {
         match &decl.body {
             Some(internal::TSModuleDeclarationBody::TSModuleBlock(block)) => {
                 // Handle comments between name and body: namespace D /* comment */ {
-                let name_end = match &decl.id {
-                    internal::TSModuleName::Identifier(id) => id.span.end,
-                    internal::TSModuleName::Literal(lit) => lit.span.end,
-                };
+                let name_end = decl.id.span().end;
                 if self.has_comments_to_emit_between(name_end, block.span.start) {
                     parts.push(self.build_inline_comments_between_doc(name_end, block.span.start));
                 }

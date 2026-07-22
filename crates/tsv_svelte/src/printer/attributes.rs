@@ -12,10 +12,10 @@
 use crate::ast::internal;
 use crate::printer::Printer;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Span, SymbolResolver, SymbolToU32};
 use tsv_ts::ast::internal::Expression;
 
 // Opening prefixes for brace-wrapped attribute expressions. `build_braced_expression_doc`
@@ -92,10 +92,26 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for a leading JS comment (before content)
     ///
-    /// Block comments: `/*content*/ ` (with trailing space)
-    /// Line comments: `// content\n` (with hardline)
+    /// Multi-line block comments: routed through tsv_ts's comment builder — the *same*
+    /// rendering the owned path uses (`prepend_owned_leading_comment`) — so they reindent
+    /// to context and propagate their break via a `MultilineText`, forcing the surrounding
+    /// value/head/attribute to expand; a trailing space matches the single-line block form.
+    /// This is what keeps a **non-owned** leading multi-line block idempotent: the bare
+    /// authoring glues it to its operand (owned, so tsv_ts prints it and forces the break),
+    /// but stripping a redundant grouping paren leaves it positional (a discarded `(` owns
+    /// nothing) — and a verbatim source span emits it inline with no break, so a
+    /// paren-stripped value stayed inline on pass 1 and expanded only on pass 2 (an F1
+    /// non-idempotency). `build_comment_doc` already tags the print-once ledger, so this
+    /// branch must **not** tag again.
+    ///
+    /// Single-line block comments: `/*content*/ ` (with trailing space).
+    /// Line comments: `// content\n` (with hardline).
     pub(super) fn build_leading_js_comment_doc(&self, comment: &tsv_lang::Comment) -> DocId {
         let d = self.d();
+        if comment.is_block && comment.multiline {
+            let doc = tsv_ts::build_comment_doc(d, comment, &self.ts_inputs());
+            return d.concat(&[doc, d.text(" ")]);
+        }
         let doc = if comment.is_block {
             d.concat(&[
                 d.text("/*"),
@@ -198,39 +214,39 @@ impl<'a> Printer<'a> {
         is_html: bool,
     ) -> DocId {
         let d = self.d();
-        let name_sym = attr.name.to_u32();
+        // Span-identity attribute name (`source[name_render_span]`, trimmed for a
+        // padded `{ shorthand }`), reused across the branches below.
+        let name_doc = d.source_span_ident(attr.name_render_span(self.source));
 
         if let Some(value_parts) = &attr.value {
             // Check for shorthand: {name}
-            if self.is_shorthand_attribute(attr.name, value_parts) {
-                let sym = d.symbol(name_sym);
-                return d.braces(sym);
+            if self.is_shorthand_attribute(attr, value_parts) {
+                return d.braces(name_doc);
             }
 
             // Normalize whitespace in class attributes on HTML elements
-            let normalize_class = is_html && self.with_resolved_symbol(attr.name, |s| s == "class");
+            let normalize_class = is_html && attr.name(self.source) == "class";
 
             // Fast path: a single value part (the common `name="x"` / `name={x}`).
             // Build with a stack array instead of the per-attribute `parts` buffer.
             if value_parts.len() == 1 {
-                let sym = d.symbol(name_sym);
                 let value_doc = if normalize_class {
                     self.build_class_attribute_value_doc(&value_parts[0], true)
                 } else {
                     self.build_attribute_value_doc(&value_parts[0])
                 };
                 return if matches!(value_parts[0], internal::AttributeValue::ExpressionTag(_)) {
-                    d.concat(&[sym, d.text("="), value_doc])
+                    d.concat(&[name_doc, d.text("="), value_doc])
                 } else {
                     let (open, close) = self.attribute_value_delims(value_parts);
-                    d.concat(&[sym, d.text(open), value_doc, d.text(close)])
+                    d.concat(&[name_doc, d.text(open), value_doc, d.text(close)])
                 };
             }
 
             // General path: a multi-part value is always a quoted string (a pure
             // `{expr}` value is single-part and handled by the fast path above).
             let (open, close) = self.attribute_value_delims(value_parts);
-            let mut parts: DocBuf = smallvec![d.symbol(name_sym), d.text(open)];
+            let mut parts: DocBuf = smallvec![name_doc, d.text(open)];
             let last_idx = value_parts.len().saturating_sub(1);
             for (i, part) in value_parts.iter().enumerate() {
                 if normalize_class {
@@ -244,7 +260,7 @@ impl<'a> Printer<'a> {
             d.concat(&parts)
         } else {
             // Boolean attribute
-            d.symbol(name_sym)
+            name_doc
         }
     }
 
@@ -377,9 +393,7 @@ impl<'a> Printer<'a> {
 
         // Leading comments (between prefix and expression)
         let expr_start = expr.span().start;
-        for comment in comments_to_emit_in_range(self.comments, comment_start, expr_start) {
-            parts.push(self.build_leading_js_comment_doc(comment));
-        }
+        parts.extend(self.leading_comment_docs(comment_start, expr_start));
 
         // Expression doc with any nested comments
         parts.push(self.build_ts_expression_doc(expr));
@@ -655,13 +669,10 @@ impl<'a> Printer<'a> {
         tag_span: Option<Span>,
     ) -> DocBuf {
         // Collect leading comments
-        let mut leading_comments: DocBuf = DocBuf::new();
-        if let Some(span) = tag_span {
-            let expr_start = expr.span().start;
-            for comment in comments_to_emit_in_range(self.comments, span.start + 1, expr_start) {
-                leading_comments.push(self.build_leading_js_comment_doc(comment));
-            }
-        }
+        let leading_comments: DocBuf = match tag_span {
+            Some(span) => self.leading_comment_docs(span.start + 1, expr.span().start),
+            None => DocBuf::new(),
+        };
 
         let expr_doc = self.build_expression_doc_for_attribute(expr);
 
@@ -688,8 +699,7 @@ impl<'a> Printer<'a> {
         let softline = d.softline();
         let inner = d.concat(&[softline, content]);
         let indented = d.indent(inner);
-        let softline2 = d.softline();
-        let concat = d.concat(&[d.text("{"), indented, softline2, d.text("}")]);
+        let concat = d.concat(&[d.text("{"), indented, softline, d.text("}")]);
         d.group(concat)
     }
 
@@ -811,17 +821,12 @@ impl<'a> Printer<'a> {
         let first_start = seq.expressions[0].span().start;
         for comment in comments_to_emit_in_range(self.comments, tag_span.start + 1, first_start) {
             if comment.is_block && comment.multiline {
-                // Multi-line block: own line(s), forcing the broken layout. Emitted
-                // without the inline trailing space so the line ends at `*/` — the one
-                // comment emission in this crate that doesn't route through the shared
-                // leading/trailing builders, so it tags its own ledger node.
-                let body = d.source_span(comment.content_span, self.source);
-                #[cfg(feature = "comment_check")]
-                d.tag_comment_doc(body, comment.span, self.source);
-
-                content.push(d.text("/*"));
-                content.push(body);
-                content.push(d.text("*/"));
+                // Multi-line block: reindent-to-context through the shared comment
+                // builder (matching `build_leading_js_comment_doc`), then a hardline
+                // instead of the inline trailing space — the sequence's first operand
+                // starts a fresh line, forcing the broken layout. `build_comment_doc`
+                // tags the ledger itself.
+                content.push(tsv_ts::build_comment_doc(d, comment, &self.ts_inputs()));
                 content.push(d.hardline());
             } else {
                 // Single-line block: `/*…*/ ` inline. Line comment: `//…` + hardline.
@@ -909,11 +914,9 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts: DocBuf = smallvec![d.text("{")];
 
-        // Add leading comments between { and expression (block inline, line + hardline)
-        let expr_start = tag.expression.span().start;
-        for comment in comments_to_emit_in_range(self.comments, tag.span.start + 1, expr_start) {
-            parts.push(self.build_leading_js_comment_doc(comment));
-        }
+        // Add leading comments between { and expression (block inline, line + hardline;
+        // a multi-line block reindents + forces the break — see `build_leading_js_comment_doc`).
+        parts.extend(self.leading_comment_docs(tag.span.start + 1, tag.expression.span().start));
 
         parts.push(self.build_expression_doc_for_attribute(&tag.expression));
 
@@ -931,7 +934,7 @@ impl<'a> Printer<'a> {
     /// Check if an attribute is a shorthand: {name} where value is ExpressionTag(Identifier(name))
     fn is_shorthand_attribute(
         &self,
-        attr_name: string_interner::DefaultSymbol,
+        attr: &internal::Attribute<'_>,
         value_parts: &[internal::AttributeValue<'_>],
     ) -> bool {
         // Must be exactly one value part
@@ -949,21 +952,15 @@ impl<'a> Printer<'a> {
             return false;
         };
 
-        // The identifier name must match the attribute name. TS identifiers are
-        // span-identity (no shared symbol space with the Svelte attribute-name
-        // interner), so compare the resolved names.
-        let interner = self.interner.borrow();
-        let Some(attr_str) = interner.resolve(attr_name) else {
-            return false;
-        };
-        ident.name(self.source, &interner) == attr_str
+        // The identifier name must match the attribute name. Both are
+        // span-identity source slices now.
+        ident.name(self.source) == attr.name(self.source)
     }
 
     /// Check if expression is an identifier with the given name
     fn is_identifier_with_name(&self, expr: &Expression<'_>, name: &str) -> bool {
         if let Expression::Identifier(id) = expr {
-            let interner = self.interner.borrow();
-            id.name(self.source, &interner) == name
+            id.name(self.source) == name
         } else {
             false
         }

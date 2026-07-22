@@ -30,10 +30,7 @@ pub mod swallow;
 mod types;
 
 // Types
-pub use types::{
-    CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan, SourceTextResolver,
-    TextResolver,
-};
+pub use types::{CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan};
 
 /// Stack buffer for assembling a node's doc parts before handing them to
 /// `DocArena::concat` / `fill`. Language printers build one such `Vec<DocId>` per
@@ -49,35 +46,12 @@ pub use swallow::{SwallowReport, set_swallow_check, swallow_check_enabled, take_
 
 // Arena render
 pub use arena_render::{
-    arena_measure_doc_flat_resolved, arena_print_doc, arena_print_doc_at_column,
-    arena_print_doc_with_indent, arena_print_doc_with_indent_resolved,
-    arena_print_doc_with_indent_resolved_into,
-    arena_print_doc_with_indent_resolved_preserve_whitespace,
+    arena_measure_doc_flat_resolved, arena_print_doc, arena_print_doc_with_indent_resolved_into,
     arena_print_doc_with_indent_resolved_preserve_whitespace_into,
 };
 
 // Arena fits
 pub use arena_fits::arena_fits;
-
-use crate::{PRINT_WIDTH, TAB_WIDTH};
-
-/// Calculate available width for fitting check
-///
-/// This centralizes the width calculation logic used across TypeScript, CSS, and Svelte
-/// formatters. It accounts for indentation and any trailing characters that will follow
-/// the content being checked.
-///
-/// Uses the hardcoded [`PRINT_WIDTH`] and [`TAB_WIDTH`].
-///
-/// # Arguments
-/// * `indent_level` - Current indentation level
-/// * `current_column` - Position on current line (0 if start of line)
-/// * `trailing_chars` - Space to reserve for trailing punctuation (e.g., 1 for ";")
-pub fn available_width(indent_level: usize, current_column: usize, trailing_chars: usize) -> usize {
-    let indent_width = indent_level * TAB_WIDTH;
-    let used = indent_width.max(current_column) + trailing_chars;
-    PRINT_WIDTH.saturating_sub(used)
-}
 
 #[cfg(test)]
 mod arena_tests {
@@ -136,18 +110,6 @@ mod arena_tests {
             ..RenderConfig::default()
         };
         render_test(arena, doc, &render, 0)
-    }
-
-    #[test]
-    fn test_available_width() {
-        // PRINT_WIDTH = 100, TAB_WIDTH = 2.
-        assert_eq!(available_width(0, 0, 0), 100);
-        // indent 2 levels (2*2=4) + 1 trailing char reserved.
-        assert_eq!(available_width(2, 0, 1), 100 - 4 - 1);
-        // current_column (50) dominates the indent width (1*2=2).
-        assert_eq!(available_width(1, 50, 0), 50);
-        // saturating floor: never underflows below 0.
-        assert_eq!(available_width(0, 200, 0), 0);
     }
 
     #[test]
@@ -323,29 +285,6 @@ mod arena_tests {
         assert_eq!(a.line(), normal_2);
         assert_eq!(a.line_suffix_boundary(), lsb_2);
         assert_eq!(a.break_parent(), bp_2);
-    }
-
-    #[test]
-    fn test_symbol_node_interned_per_document() {
-        let mut a = DocArena::new();
-
-        // Repeated symbol ids within one document share one node; distinct
-        // ids stay distinct (including sparse ids beyond the table's growth).
-        let sym_5 = a.symbol(5);
-        assert_eq!(a.symbol(5), sym_5);
-        let sym_0 = a.symbol(0);
-        assert_ne!(sym_5, sym_0);
-        assert_eq!(a.symbol(0), sym_0);
-        assert_eq!(a.borrow_nodes().len(), 2); // ids 5 and 0
-
-        // reset() invalidates every interned symbol node (ids restart at 0):
-        // the next document re-allocs rather than returning a prior
-        // document's id, and interning resumes within it.
-        a.reset();
-        let sym_5_2 = a.symbol(5);
-        assert_eq!(sym_5_2.index(), 0);
-        assert_eq!(a.symbol(5), sym_5_2);
-        assert_ne!(a.symbol(9), sym_5_2);
     }
 
     #[test]
@@ -531,6 +470,129 @@ mod arena_tests {
         assert_eq!(render_default(&a, a.remove_lines(hard)), "a\nb");
         let literal = a.concat(&[a.text("a"), a.literalline(), a.text("b")]);
         assert_eq!(render_default(&a, a.remove_lines(literal)), "a\nb");
+    }
+
+    /// Atomizing a `conditional_group` must yield its *least*-expanded state — what
+    /// prettier's re-render at `printWidth: Infinity` would pick.
+    ///
+    /// The states are dead once every line is flattened. Keeping them let render fall
+    /// through to the most-expanded one at the real width and emit its separators as
+    /// literal spaces (`fn( a, b )`) — the template-interpolation bug this guards.
+    #[test]
+    fn test_arena_atomize_collapses_conditional_group() {
+        let a = DocArena::new();
+        let flat = a.concat(&[
+            a.text("fn("),
+            a.text("a"),
+            a.text(", "),
+            a.text("b"),
+            a.text(")"),
+        ]);
+        let expanded = a.concat(&[
+            a.text("fn("),
+            a.indent(a.concat(&[a.line(), a.text("a"), a.text(","), a.line(), a.text("b")])),
+            a.line(),
+            a.text(")"),
+        ]);
+        let cg = a.conditional_group(&[flat, expanded]);
+
+        // Far too narrow for any state to fit — without the collapse, render picks the
+        // most-expanded state and its flattened `line`s surface as spaces.
+        assert_eq!(render_pw_tab(&a, a.atomize(cg), 5), "fn(a, b)");
+    }
+
+    /// **The contract of `atomize`, asserted directly: the result renders
+    /// identically at every width.**
+    ///
+    /// It emulates prettier's re-render at `printWidth: Infinity`, so width must stop
+    /// being an input. Any node where flattening disagrees with "what would infinite width
+    /// print?" shows up here as a width-dependent string — which is precisely how the
+    /// `conditional_group` bug behaved (`fn(a, b)` wide, `fn( a, b )` narrow) while every
+    /// external gate stayed green: the output was still idempotent, still reparsed, and
+    /// still dropped no comment, so only a prettier diff could see it.
+    ///
+    /// Prefer extending this over adding another single-width case — a new doc shape gets
+    /// graded at every width for free.
+    #[test]
+    fn test_arena_atomize_is_width_invariant() {
+        let a = DocArena::new();
+        let inner_cg = a.conditional_group(&[
+            a.concat(&[a.text("g("), a.text("x"), a.text(")")]),
+            a.concat(&[
+                a.text("g("),
+                a.indent(a.concat(&[a.line(), a.text("x")])),
+                a.line(),
+                a.text(")"),
+            ]),
+        ]);
+        let shapes: &[(&str, DocId)] = &[
+            ("conditional_group", {
+                let flat = a.concat(&[
+                    a.text("fn("),
+                    a.text("a"),
+                    a.text(", "),
+                    a.text("b"),
+                    a.text(")"),
+                ]);
+                let expanded = a.concat(&[
+                    a.text("fn("),
+                    a.indent(a.concat(&[
+                        a.line(),
+                        a.text("a"),
+                        a.text(","),
+                        a.line(),
+                        a.text("b"),
+                    ])),
+                    a.line(),
+                    a.text(")"),
+                ]);
+                a.conditional_group(&[flat, expanded])
+            }),
+            (
+                "nested conditional_group",
+                a.concat(&[a.text("outer("), inner_cg, a.text(")")]),
+            ),
+            (
+                "plain group",
+                a.group(a.concat(&[a.text("a"), a.line(), a.text("b")])),
+            ),
+            (
+                "group_break",
+                a.group_break(a.concat(&[a.text("a"), a.line(), a.text("b")])),
+            ),
+            (
+                "if_break",
+                a.group(a.concat(&[a.text("a"), a.if_break(a.text("B"), a.text("F"))])),
+            ),
+            (
+                "fill",
+                a.fill(&[a.text("a"), a.line(), a.text("b"), a.line(), a.text("c")]),
+            ),
+            (
+                "hardline",
+                a.concat(&[a.text("a"), a.hardline(), a.text("b")]),
+            ),
+            (
+                "indent + softline",
+                a.indent(a.concat(&[a.softline(), a.text("a"), a.softline(), a.text("b")])),
+            ),
+        ];
+
+        for &(label, doc) in shapes {
+            let flat = a.atomize(doc);
+            let wide = render_pw_tab(&a, flat, 10_000);
+            for width in [1, 2, 5, 13, 40, 100] {
+                assert_eq!(
+                    render_pw_tab(&a, flat, width),
+                    wide,
+                    "{label}: atomized doc rendered differently at width {width} than at infinite width"
+                );
+            }
+            assert!(
+                !wide.contains('\n'),
+                "{label}: atomized doc kept a newline: {wide:?}"
+            );
+        }
     }
 
     #[test]
@@ -971,10 +1033,10 @@ mod arena_tests {
     // that shortcuts a subtree that actually breaks) flips one of these assertions
     // rather than silently producing wrong layout.
 
-    /// Fit `doc` in `width` columns in Flat mode, with no resolver (the docs here
-    /// use only `Static`/`Pooled` text, never `Symbol`).
+    /// Fit `doc` in `width` columns in Flat mode, with no source (the docs here
+    /// use only `Static`/`Pooled` text, never `SourceSpan`).
     fn fits_flat(a: &DocArena, doc: DocId, width: usize) -> bool {
-        arena_fits(a, doc, width, Mode::Flat, None::<&dyn TextResolver>)
+        arena_fits(a, doc, width, Mode::Flat, None)
     }
 
     /// Assert the memoized flat width of `doc` is exactly `w`: it fits in `w` but

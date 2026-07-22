@@ -81,7 +81,7 @@ impl<'a> Printer<'a> {
             docs.push(d.literalline());
         }
         docs.push(d.hardline());
-        docs.extend(self.build_leading_comments_before(&leading_comments, member_start));
+        self.push_leading_comments_before(&mut docs, &leading_comments, member_start);
         docs
     }
 
@@ -169,10 +169,9 @@ impl<'a> Printer<'a> {
     /// Build type doc, wrapping in parentheses if the predicate returns true.
     ///
     /// Object-bearing members align via `build_aligned_object_literal_doc`:
-    /// properties are double-indented and the closing `})` is single-indented.
-    /// The plain default case only indents the inner type. (Prettier offsets
-    /// these closings by a 2-space sub-tab alignment; tsv uses whole tabs — see
-    /// `docs/conformance_prettier.md`.)
+    /// properties are double-indented and the closing `})` takes the member's
+    /// `align(2)` sub-tab offset (2 literal spaces), matching Prettier's
+    /// `align(2, …)`. The plain default case only indents the inner type.
     ///
     /// Special case: intersection with trailing object type builds a custom doc
     /// so that `})` can be aligned properly (one indent level past the base).
@@ -180,6 +179,44 @@ impl<'a> Printer<'a> {
         &self,
         ts_type: &TSType<'_>,
         needs_parens: fn(&TSType<'_>) -> bool,
+    ) -> DocId {
+        self.build_type_doc_maybe_parens_impl(ts_type, needs_parens, true)
+    }
+
+    /// Intersection-member variant of `build_type_doc_maybe_parens`: the default
+    /// parenthesization emits a **bare** `("(" inner ")")` with no inner `d.indent`.
+    ///
+    /// Prettier never indents parenthesized-type content in the general
+    /// `needsParens` case (`["(", doc, ")"]`); an intersection member's level comes
+    /// entirely from `printIntersectionType`'s own `indent([" &", line, …])` wrapper
+    /// (or, for the first / object-adjacent member, none). So a parenthesized
+    /// function / constructor / conditional member sits at the member indent, not one
+    /// level deeper. tsv's shared default `d.indent` (kept for other callers) matches
+    /// the depth in a conditional check/extends paren — but for an **intersection**
+    /// member it is a spurious extra level. (Union members take their `align(2)` offset
+    /// from `build_union_member_offset_doc`, which uses *this* bare variant and applies
+    /// the offset itself — so they don't route through the shared `d.indent` either.)
+    /// Hence this dedicated entry point for the intersection member sites only. Fixes bug141
+    /// §Bug 2 case 3; guarded by `intersection_paren_constructor` /
+    /// `intersection_paren_conditional`.
+    pub(super) fn build_intersection_member_type_doc(
+        &self,
+        ts_type: &TSType<'_>,
+        needs_parens: fn(&TSType<'_>) -> bool,
+    ) -> DocId {
+        self.build_type_doc_maybe_parens_impl(ts_type, needs_parens, false)
+    }
+
+    /// Shared implementation of `build_type_doc_maybe_parens` /
+    /// `build_intersection_member_type_doc`. `indent_default_paren` gates only the
+    /// default (non-union, non-trailing-object-intersection) paren case: `true`
+    /// wraps the inner type in `d.indent` (union-member offset / conditional
+    /// check-extends depth), `false` leaves it bare (intersection members).
+    fn build_type_doc_maybe_parens_impl(
+        &self,
+        ts_type: &TSType<'_>,
+        needs_parens: fn(&TSType<'_>) -> bool,
+        indent_default_paren: bool,
     ) -> DocId {
         let d = self.d();
         if needs_parens(ts_type) {
@@ -203,12 +240,19 @@ impl<'a> Printer<'a> {
                 return self.build_parenthesized_union_doc(union, immediate_paren(ts_type), false);
             }
 
-            // Default case: parenthesize and indent the inner type. The closing
-            // `)` sits at the base indent; the object/intersection cases above
-            // handle their own aligned (one-level-deeper) closings.
+            // Default case: parenthesize the inner type. The inner `d.indent`
+            // (union-member offset / conditional check-extends depth) is dropped
+            // for intersection members, which take their level from the
+            // intersection printer's own `& `-line indent — see
+            // `build_intersection_member_type_doc`.
+            let inner = self.build_type_doc(ts_type);
             d.concat(&[
                 d.text("("),
-                d.indent(self.build_type_doc(ts_type)),
+                if indent_default_paren {
+                    d.indent(inner)
+                } else {
+                    inner
+                },
                 d.text(")"),
             ])
         } else {
@@ -219,6 +263,27 @@ impl<'a> Printer<'a> {
             // `Outer<Inner<...>>` wraps the outer `Outer<>` instead of force-inlining
             // the single arg and breaking only the inner `Inner<>`.
             self.build_type_doc(ts_type)
+        }
+    }
+
+    /// A comment-free parenthesized union in element/object position that would
+    /// break EXPANDS its parens (`(⏎\t| A⏎\t| B⏎)`, prettier's `printUnionType`
+    /// needs-parens branch) instead of gluing the leading `|` to the `(`. Returns
+    /// `None` for any other type — the caller keeps its existing layout — and for a
+    /// *commented* union, so comment placement stays untouched. `ty` is the element /
+    /// object as authored (parens included): it is unwrapped to reach the union, and
+    /// its own span (parens and all) is the comment window. Shared by the
+    /// array-element (`build_array_type_doc`) and indexed-access-object arms; the
+    /// indexed-access *index* uses bracket delimiters, not parens, so it expands
+    /// inline rather than through here. See `type_param_fits_rhs_long`.
+    pub(super) fn build_expanded_parenthesized_union_opt(&self, ty: &TSType<'_>) -> Option<DocId> {
+        if let TSType::Union(u) = unwrap_parenthesized(ty)
+            && !self.union_prints_hugged(u)
+            && !self.has_comments_to_emit_between(ty.span().start, ty.span().end)
+        {
+            Some(self.build_parenthesized_union_doc(u, None, false))
+        } else {
+            None
         }
     }
 
@@ -320,11 +385,9 @@ impl<'a> Printer<'a> {
     ///
     /// This requires separating `{` and `}` from the TypeLiteral so we can:
     /// - Print `{` inline with `(A &`
-    /// - Print members with double indent (4-tab alignment)
-    /// - Print `})` at base indent + one level (when breaking)
-    ///
-    /// (Prettier offsets `})` by a 2-space sub-tab alignment; tsv uses whole
-    /// tabs — see `docs/conformance_prettier.md`.)
+    /// - Print members with double indent (whole tabs)
+    /// - Print `})` at the base + the member's `align(2)` sub-tab offset (2 literal
+    ///   spaces) when breaking, matching Prettier's `align(2, …)`.
     fn build_parenthesized_intersection_trailing_object_doc(
         &self,
         intersection: &TSIntersectionType<'_>,
@@ -594,10 +657,10 @@ impl<'a> Printer<'a> {
     /// Build aligned object literal doc with custom opening/closing.
     ///
     /// Used for object literals in union types and parenthesized intersections.
-    /// Members are double-indented (aligning with the content after `{`) and the
-    /// closing delimiter is single-indented (aligning with `{`). Prettier offsets
-    /// the closing by a 2-space sub-tab alignment instead; tsv renders that
-    /// half-step as a whole tab — see `docs/conformance_prettier.md`.
+    /// Members are double-indented in whole tabs (aligning with the content after
+    /// `{`), and the closing delimiter takes the member's `align(2)` sub-tab offset —
+    /// 2 literal spaces under `{`, tab-width independent — matching Prettier's
+    /// `align(2, …)`.
     fn build_aligned_object_literal_doc(
         &self,
         obj: &TSTypeLiteral<'_>,
@@ -642,7 +705,12 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&[
             opening,
             d.indent(d.indent(members_doc)),
-            d.indent(d.concat(&[line_doc, d.text(closing)])),
+            // The closing delimiter takes the union member's `align(2)` sub-tab
+            // offset (2 literal spaces), so it lands under its opener at any tab
+            // width — matching Prettier's `align(2, …)`. The members keep whole
+            // tabs (`align(2)` + `indent` rounds up), so only the closing line's
+            // representation changes.
+            d.align(2, d.concat(&[line_doc, d.text(closing)])),
         ]))
     }
 
@@ -652,8 +720,8 @@ impl<'a> Printer<'a> {
     /// ```text
     /// type T =
     ///   | {
-    ///       prop: A;  // double indent (aligns with content after "{ ")
-    ///     }           // single indent (aligns with "{")
+    ///       prop: A;  // double indent, whole tabs (aligns with content after "{ ")
+    ///     }           // align(2): base + 2 spaces (aligns under "{", any tab width)
     ///   | B;
     /// ```
     pub(super) fn build_union_member_object_literal_doc(&self, obj: &TSTypeLiteral<'_>) -> DocId {

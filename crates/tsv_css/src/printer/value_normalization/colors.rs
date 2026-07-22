@@ -1,6 +1,7 @@
 // Color formatting: semantic color rendering and source-preserving color syntax.
 
 use std::borrow::Cow;
+use std::fmt::Write;
 
 use super::numbers::canonical_unit;
 use crate::ast::internal::{AngleUnit, Color, ColorChannel};
@@ -11,6 +12,7 @@ use tsv_lang::Span;
 /// `Named`/`Hex` are not handled here — they carry no text and are rendered from
 /// source by `format_color_from_source`.
 pub(crate) fn format_color_value(color: &Color) -> String {
+    let mut out = String::new();
     match color {
         // `Named`/`Hex` carry no text — callers with a span use
         // `format_color_from_source`; this source-free path only handles the
@@ -19,91 +21,126 @@ pub(crate) fn format_color_value(color: &Color) -> String {
         Color::Named | Color::Hex => {
             unreachable!("named/hex colors are rendered from source via format_color_from_source")
         }
-        Color::Rgb { r, g, b, alpha } => {
-            let r_str = format_color_channel(r);
-            let g_str = format_color_channel(g);
-            let b_str = format_color_channel(b);
-
-            if let Some(a) = alpha {
-                let a_str = format_color_channel(a);
-                format!("rgba({r_str}, {g_str}, {b_str}, {a_str})")
-            } else {
-                format!("rgb({r_str}, {g_str}, {b_str})")
-            }
-        }
+        // The source-free semantic form is always the legacy comma syntax with the
+        // alpha-suffixed name (`rgba`/`hsla`); `write_color_syntax` with `has_comma`
+        // and no slash renders exactly that.
+        Color::Rgb { r, g, b, alpha } => write_color_syntax(
+            &mut out,
+            &ColorSyntax {
+                func_name: if alpha.is_some() { "rgba" } else { "rgb" },
+                has_slash: false,
+                has_comma: true,
+            },
+            |o| write_color_channel(o, r),
+            g,
+            b,
+            alpha.as_ref(),
+        ),
         Color::Hsl {
             hue,
             hue_unit,
             saturation,
             lightness,
             alpha,
-        } => {
-            let hue_str = format_hue(hue, hue_unit.as_ref());
-            let sat_str = format_color_channel(saturation);
-            let light_str = format_color_channel(lightness);
-
-            if let Some(a) = alpha {
-                let a_str = format_color_channel(a);
-                format!("hsla({hue_str}, {sat_str}, {light_str}, {a_str})")
-            } else {
-                format!("hsl({hue_str}, {sat_str}, {light_str})")
-            }
-        }
+        } => write_color_syntax(
+            &mut out,
+            &ColorSyntax {
+                func_name: if alpha.is_some() { "hsla" } else { "hsl" },
+                has_slash: false,
+                has_comma: true,
+            },
+            |o| write_hue(o, hue, hue_unit.as_ref()),
+            saturation,
+            lightness,
+            alpha.as_ref(),
+        ),
     }
+    out
 }
 
-/// Format a computed `f64` for CSS output: a whole number drops its fraction
+/// Append a *computed* `f64` for CSS output: a whole number drops its fraction
 /// (`1.0` → `1`), otherwise the default float rendering. (Distinct from
-/// `normalize_css_number`, which canonicalizes a number's *source text*.)
-fn format_css_f64(v: f64) -> String {
+/// `normalize_css_number`, which canonicalizes a number's *source text*.) Writes into
+/// `out` rather than returning a `String`, so a color reconstruction allocates one buffer
+/// for the whole function instead of one temporary per channel — the top CSS format-churn
+/// cluster on real (color-heavy) stylesheets.
+fn write_css_f64(out: &mut String, v: f64) {
+    // `write!` to a `String` is infallible; the `Result` only satisfies `fmt::Write`.
     if v.fract() == 0.0 {
-        (v as i64).to_string()
+        let _ = write!(out, "{}", v as i64);
     } else {
-        v.to_string()
+        let _ = write!(out, "{v}");
     }
 }
 
-/// Format a ColorChannel value
-fn format_color_channel(channel: &ColorChannel) -> String {
+/// Append a `ColorChannel` value.
+fn write_color_channel(out: &mut String, channel: &ColorChannel) {
     match channel {
-        ColorChannel::Number(n) => format_css_f64(*n),
-        ColorChannel::Percentage(p) => format!("{}%", format_css_f64(*p)),
-        ColorChannel::None => "none".to_string(),
+        ColorChannel::Number(n) => write_css_f64(out, *n),
+        ColorChannel::Percentage(p) => {
+            write_css_f64(out, *p);
+            out.push('%');
+        }
+        ColorChannel::None => out.push_str("none"),
     }
 }
 
-/// Format an hsl hue, appending its canonicalized angle unit when present
+/// Append an hsl hue, with its canonicalized angle unit when present
 /// (`180DEG` → `180deg`; a bare hue → just the number). Shared by the semantic
 /// (`format_color_value`) and source-preserving (`format_color_from_source`) paths.
-fn format_hue(hue: &ColorChannel, hue_unit: Option<&AngleUnit>) -> String {
-    match hue_unit {
-        Some(unit) => format!(
-            "{}{}",
-            format_color_channel(hue),
-            canonical_unit(unit.as_str())
-        ),
-        None => format_color_channel(hue),
+fn write_hue(out: &mut String, hue: &ColorChannel, hue_unit: Option<&AngleUnit>) {
+    write_color_channel(out, hue);
+    if let Some(unit) = hue_unit {
+        out.push_str(&canonical_unit(unit.as_str()));
     }
 }
 
-/// Reassemble `name(c1 c2 c3)` in the source's separator syntax, detected on the raw
-/// text: modern slash-alpha (`c1 c2 c3 / a`) and legacy comma (`c1, c2, c3[, a]`) are
-/// the only ways an alpha is written, so a channel-only value keeps its space-or-comma
-/// separator. Shared by `format_color_from_source`'s rgb and hsl arms, which differ
-/// only in how they render their three channels.
-fn format_color_syntax(
-    func_name: &str,
-    [c1, c2, c3]: [String; 3],
-    alpha: Option<String>,
+/// How a color function is written in source: its name plus the separator style
+/// (`has_slash` / `has_comma`), grouped so `write_color_syntax` takes one descriptor
+/// rather than three positional flags. `format_color_value`'s source-free form builds one
+/// with `has_comma` set (the legacy `rgba(…, …, …)` syntax).
+struct ColorSyntax<'a> {
+    func_name: &'a str,
     has_slash: bool,
     has_comma: bool,
-) -> String {
-    match (alpha, has_slash) {
-        (Some(a), true) => format!("{func_name}({c1} {c2} {c3} / {a})"),
-        (Some(a), false) => format!("{func_name}({c1}, {c2}, {c3}, {a})"),
-        (None, _) if has_comma => format!("{func_name}({c1}, {c2}, {c3})"),
-        (None, _) => format!("{func_name}({c1} {c2} {c3})"),
+}
+
+/// Append `name(c1 c2 c3)` in the source's separator syntax, detected on the raw text:
+/// modern slash-alpha (`c1 c2 c3 / a`) and legacy comma (`c1, c2, c3[, a]`) are the only
+/// ways an alpha is written, so a channel-only value keeps its space-or-comma separator.
+/// `write_c1` writes the first channel — rgb's plain `r`, or hsl's hue-with-unit — while
+/// `c2`/`c3`/`alpha` are plain channels; the rgb and hsl arms differ only there. Building
+/// straight into `out` avoids the per-channel `String`s the old `[String; 3]` form built.
+fn write_color_syntax(
+    out: &mut String,
+    syntax: &ColorSyntax<'_>,
+    write_c1: impl FnOnce(&mut String),
+    c2: &ColorChannel,
+    c3: &ColorChannel,
+    alpha: Option<&ColorChannel>,
+) {
+    // Comma separators for legacy comma syntax and comma-alpha; space for the
+    // channel-only-space and modern slash-alpha forms (mirrors the old match arms:
+    // slash-alpha keeps space channels, comma-alpha uses commas, and with no alpha the
+    // source's own comma-or-space choice is preserved).
+    let comma = match (alpha.is_some(), syntax.has_slash) {
+        (true, true) => false,
+        (true, false) => true,
+        (false, _) => syntax.has_comma,
+    };
+    let sep = if comma { ", " } else { " " };
+    out.push_str(syntax.func_name);
+    out.push('(');
+    write_c1(out);
+    out.push_str(sep);
+    write_color_channel(out, c2);
+    out.push_str(sep);
+    write_color_channel(out, c3);
+    if let Some(a) = alpha {
+        out.push_str(if syntax.has_slash { " / " } else { ", " });
+        write_color_channel(out, a);
     }
+    out.push(')');
 }
 
 /// Format a color value with syntax preservation
@@ -152,36 +189,48 @@ pub(crate) fn format_color_from_source<'s>(
         let has_comma = raw.contains(',');
 
         // The rgb and hsl arms differ only in how they render their three channels;
-        // `format_color_syntax` owns the shared separator logic (preserving the source's
-        // slash / comma / space choice).
-        Cow::Owned(match color {
-            Color::Rgb { r, g, b, alpha } => format_color_syntax(
-                func_name,
-                [r, g, b].map(format_color_channel),
-                alpha.as_ref().map(format_color_channel),
-                has_slash,
-                has_comma,
-            ),
+        // `write_color_syntax` owns the shared separator logic (preserving the source's
+        // slash / comma / space choice) and builds straight into one buffer sized from the
+        // raw slice — no per-channel `String`s.
+        let syntax = ColorSyntax {
+            func_name,
+            has_slash,
+            has_comma,
+        };
+        match color {
+            Color::Rgb { r, g, b, alpha } => {
+                let mut out = String::with_capacity(raw.len());
+                write_color_syntax(
+                    &mut out,
+                    &syntax,
+                    |o| write_color_channel(o, r),
+                    g,
+                    b,
+                    alpha.as_ref(),
+                );
+                Cow::Owned(out)
+            }
             Color::Hsl {
                 hue,
                 hue_unit,
                 saturation,
                 lightness,
                 alpha,
-            } => format_color_syntax(
-                func_name,
-                [
-                    format_hue(hue, hue_unit.as_ref()),
-                    format_color_channel(saturation),
-                    format_color_channel(lightness),
-                ],
-                alpha.as_ref().map(format_color_channel),
-                has_slash,
-                has_comma,
-            ),
+            } => {
+                let mut out = String::with_capacity(raw.len());
+                write_color_syntax(
+                    &mut out,
+                    &syntax,
+                    |o| write_hue(o, hue, hue_unit.as_ref()),
+                    saturation,
+                    lightness,
+                    alpha.as_ref(),
+                );
+                Cow::Owned(out)
+            }
             // Fallback for any other color types (future-proofing)
-            _ => format_color_value(color),
-        })
+            _ => Cow::Owned(format_color_value(color)),
+        }
     } else {
         // Fallback to basic formatting
         Cow::Owned(format_color_value(color))

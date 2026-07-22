@@ -109,9 +109,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// ordinary elements rather than `SlotElement`s — mirrors Svelte's
     /// `parent_is_shadowroot_template` (`1-parse/state/element.js`).
     fn attrs_have_shadowrootmode(&self, attributes: &[AttributeNode<'arena>]) -> bool {
-        let interner = self.interner.borrow();
         attributes.iter().any(|attr| {
-            matches!(attr, AttributeNode::Attribute(a) if interner.resolve(a.name) == Some("shadowrootmode"))
+            matches!(attr, AttributeNode::Attribute(a) if a.name(self.source) == "shadowrootmode")
         })
     }
 
@@ -156,15 +155,15 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             return self.parse_special_element_body(start, name_span, special_tag);
         }
 
-        // Regular element or component
-        let tag_symbol = self.intern(tag_name);
+        // Regular element or component. The tag name is span-identity
+        // (`source[name_span]`), so nothing to intern here.
         let kind = if is_component_name(tag_name) {
             ElementKind::Component
         } else {
             ElementKind::Html
         };
 
-        self.parse_regular_element_body(start, tag_name, tag_symbol, kind, name_span)
+        self.parse_regular_element_body(start, tag_name, kind, name_span)
     }
 
     /// Parse a regular element (HTML or component)
@@ -172,7 +171,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         &mut self,
         start: usize,
         tag_name: &'a str,
-        tag_symbol: string_interner::DefaultSymbol,
         kind: ElementKind,
         name_span: Span,
     ) -> Result<ParsedElement<'arena>, ParseError> {
@@ -237,7 +235,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             };
 
         Ok(ParsedElement::Element(Element {
-            name: tag_symbol,
             kind,
             facts: TagFacts::compute(tag_name),
             attributes: attributes.into_bump_slice(),
@@ -391,8 +388,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             match &attr {
                 AttributeNode::Attribute(a) => {
                     // Check for `this` attribute on svelte:element and svelte:component.
-                    // Compare the resolved name by borrow — no per-attribute `String`.
-                    if self.interner.borrow().resolve(a.name) == Some("this") {
+                    // Compare the span-identity name directly — no per-attribute `String`.
+                    if a.name(self.source) == "this" {
                         if tag == SpecialElementTag::SvelteElement {
                             // Extract expression from the attribute value
                             if let Some(values) = a.value {
@@ -636,9 +633,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     self.error_msg_at(&format!("Unterminated <{tag_name}> element"), element_start)
                 })?;
 
-        // Reposition the lexer to the closing tag. We resume at `<`, which lexes to
-        // `LeftAngle` in either mode; `inside_tag` is `false` here (after the opening
-        // tag's `>`), which `advance_to_position` preserves.
+        // Reposition the lexer to the closing tag. We resume AT the `<`, which lexes to
+        // `LeftAngle` in either mode, so the (stale, content-dependent) `inside_tag` here
+        // doesn't matter — `parse_closing_tag` consumes the close and its `>` returns the
+        // lexer to template mode. Contrast `parse_rcdata_content`, which resumes PAST the
+        // close's `>` and so must force template mode itself.
         self.advance_to_position(content_end)?;
 
         // Create a Text node (Svelte always emits one, even if empty)
@@ -708,6 +707,15 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         };
 
         let end = close_gt + 1;
+        // After `</textarea>` we're back in template mode, but `inside_tag` is stale: the
+        // manual scan above jumped the cursor forward, so it still reflects the token the
+        // lexer stopped on when the opening `>` was consumed — the close's `<` for
+        // empty/`<`-first content, which set tag mode (`{`-first content leaves it false,
+        // so the pre-fix bug was content-dependent). Left as-is, `advance_to_position`
+        // preserves that stale tag mode and a bare-text sibling (`</textarea>x`) lexes `x`
+        // as an Identifier the markup loop rejects (`{expr}`/`<el>` siblings survive —
+        // `{`/`<` are special in both modes). Force template mode before resuming.
+        self.lexer.inside_tag = false;
         self.advance_to_position(end)?;
         Ok((nodes, end as u32))
     }

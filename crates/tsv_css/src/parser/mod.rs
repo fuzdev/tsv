@@ -13,7 +13,8 @@ use crate::ast::internal::{Comment, CssNode, CssStyleSheet};
 use crate::lexer::{Lexer, Token, TokenKind};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use decl_scan::TerminatorKind;
+use decl_scan::{TerminatorKind, ValueFacts};
+use std::cell::Cell;
 use tsv_lang::{ParseError, Span};
 
 pub(crate) struct CssParser<'a, 'arena> {
@@ -22,10 +23,14 @@ pub(crate) struct CssParser<'a, 'arena> {
     pub(crate) current_kind: TokenKind,
     pub(crate) current_start: usize,
     pub(crate) current_end: usize,
-    current_decoded: Option<String>, // Decoded value for current token (only set for escaped identifiers)
+    /// Decoded value for the current token (only set for escaped identifiers),
+    /// copied into the AST arena at receipt so it is a `Copy` `&'arena str` rather
+    /// than an owned `String` — the lexer decodes into a reused scratch buffer and
+    /// the parser arena-copies it immediately, so no per-identifier `String` survives.
+    current_decoded: Option<&'arena str>,
     /// One-token lookahead. Holds the raw lexer token; the decoded value of an
-    /// escaped peeked identifier stays **parked on the lexer** (claimed at consume
-    /// time in `advance`), so this slot carries no `String`.
+    /// escaped peeked identifier stays **parked on the lexer scratch** (claimed at
+    /// consume time in `advance`), so this slot carries no decode.
     peek: Option<Token>,
     base_offset: usize, // Offset in full source (when parsing embedded CSS)
     /// True while parsing inside functional pseudo-class arguments (`:is(...)`,
@@ -41,6 +46,13 @@ pub(crate) struct CssParser<'a, 'arena> {
     /// `self.bvec()` and strings via `self.alloc_str_in()` (CSS has no single-node
     /// `alloc` — every node lands in a child slice).
     pub(crate) arena: &'arena Bump,
+    /// Value facts computed speculatively by the rule/declaration disambiguation scan, for
+    /// the `parse_declaration` that immediately follows to reuse instead of re-walking the
+    /// value. Set (or cleared) at every `scan_rule_or_declaration`; keyed on the value's
+    /// start offset so a stale entry — e.g. from a custom-property declaration that bypasses
+    /// the scan — can never be mistaken for the current value's facts. `Cell` because the
+    /// scan runs behind `&CssParser` (the disambiguation is a read-only lookahead).
+    speculative_value_facts: Cell<Option<(usize, ValueFacts)>>,
 }
 
 impl<'a, 'arena> CssParser<'a, 'arena> {
@@ -51,7 +63,9 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     ) -> Result<Self, ParseError> {
         let mut lexer = Lexer::new(source);
         let token = lexer.next_token()?;
-        let decoded = lexer.take_decoded().map(|b| *b);
+        let decoded = lexer
+            .decoded_str()
+            .map(|s| -> &'arena str { arena.alloc_str(s) });
         Ok(Self {
             source,
             lexer,
@@ -64,7 +78,25 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
             in_pseudo_args: false,
             comments: Vec::new(),
             arena,
+            speculative_value_facts: Cell::new(None),
         })
+    }
+
+    /// Record (or clear) the value facts the disambiguation scan produced for the
+    /// declaration it just settled — see [`take_value_facts`](Self::take_value_facts).
+    pub(in crate::parser) fn stash_value_facts(&self, facts: Option<(usize, ValueFacts)>) {
+        self.speculative_value_facts.set(facts);
+    }
+
+    /// Take the stashed value facts, but only if they were computed for the value starting at
+    /// `value_start` — the guard that makes reuse safe. Offsets increase monotonically
+    /// through the parse, so a stale entry (a smaller start) never matches; a match means the
+    /// disambiguation scan and this declaration are looking at the same value.
+    pub(in crate::parser) fn take_value_facts(&self, value_start: usize) -> Option<ValueFacts> {
+        match self.speculative_value_facts.take() {
+            Some((start, facts)) if start == value_start => Some(facts),
+            _ => None,
+        }
     }
 
     /// Create an empty `BumpVec` whose backing buffer lives in the **arena** —
@@ -83,6 +115,19 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     #[inline]
     pub(crate) fn alloc_str_in(&self, s: &str) -> &'arena str {
         self.arena.alloc_str(s)
+    }
+
+    /// Copy the lexer's just-produced decoded value (escaped identifiers only) into
+    /// the AST arena, yielding a `Copy` `&'arena str`. The lexer decodes into a
+    /// reused scratch that the next lex overwrites, so this runs immediately after
+    /// each lex; `None` for the common escape-free token. One copy into the arena —
+    /// the same copy the old owned-`String` path made, now the only allocation the
+    /// parser retains on the escape path.
+    #[inline]
+    fn decoded_to_arena(&self) -> Option<&'arena str> {
+        self.lexer
+            .decoded_str()
+            .map(|s| -> &'arena str { self.arena.alloc_str(s) })
     }
 
     /// Add a comment to the comments Vec
@@ -125,12 +170,12 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     pub(crate) fn advance(&mut self) -> Result<(), ParseError> {
         // The token comes either from the lookahead slot (lexed during a prior
         // `peek_kind()`) or fresh from the lexer. In both cases the decoded escape
-        // value of the most-recently-lexed token is parked on the lexer and claimed
-        // below — for the peeked token nothing re-lexes between the peek and this
-        // consume, so it's still parked. Without this claim a peeked-then-consumed
-        // escaped identifier would silently lose its decode and fall back to the
-        // verbatim slice. Near-free: `take_decoded` is `None` for the common
-        // no-escape token.
+        // value of the most-recently-lexed token is parked on the lexer's scratch and
+        // arena-copied below — for the peeked token nothing re-lexes between the peek
+        // and this consume, so the scratch is still intact. Without this copy a
+        // peeked-then-consumed escaped identifier would silently lose its decode and
+        // fall back to the verbatim slice. Near-free: `decoded_str` is `None` for the
+        // common no-escape token, so `decoded_to_arena` allocates nothing.
         let token = match self.peek.take() {
             Some(token) => token,
             None => self.lexer.next_token()?,
@@ -138,7 +183,7 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         self.current_kind = token.kind;
         self.current_start = token.start as usize;
         self.current_end = token.end as usize;
-        self.current_decoded = self.lexer.take_decoded().map(|b| *b);
+        self.current_decoded = self.decoded_to_arena();
         Ok(())
     }
 
@@ -364,9 +409,19 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
     /// slice, so callers gate on the kind first (as they already did).
     #[inline]
     pub(crate) fn current_identifier(&self) -> &str {
+        self.current_decoded.unwrap_or_else(|| self.current_value())
+    }
+
+    /// The current identifier's resolved text as an `&'arena str`, for callers that
+    /// store it as an owned node field. When the identifier was escaped the decoded
+    /// value already lives in the arena (`current_decoded`), so it is returned
+    /// directly — no second copy; otherwise the verbatim source slice is copied in.
+    /// Prefer over `alloc_str_in(current_identifier())`, which re-copies the decoded
+    /// value on the escape path.
+    #[inline]
+    pub(crate) fn current_identifier_in_arena(&self) -> &'arena str {
         self.current_decoded
-            .as_deref()
-            .unwrap_or_else(|| self.current_value())
+            .unwrap_or_else(|| self.arena.alloc_str(self.current_value()))
     }
 
     pub(crate) fn current_start(&self) -> usize {

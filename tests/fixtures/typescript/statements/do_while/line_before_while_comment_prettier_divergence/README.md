@@ -5,9 +5,11 @@ An own-line line comment between a do-while's `}` and its `while`
 relocates it inside the `while` condition parens, breaking the condition across
 lines.
 
-A blank line the author leaves *above* the comment is dropped — a body/keyword
-never sits below a blank (see §"No blank above a body block's `{`" in the
-conformance doc); the `unformatted_ours_*` variants pin that normalization.
+A blank line the author leaves *above* the comment is preserved — the `}`→`while`
+gap has no body `{` to sit below it, so the blank separates the block from the
+continuation keyword and is authoring intent (see §"No blank above a body block's
+`{`" in the conformance doc). Prettier is no oracle for it here: it relocates the
+comment into the condition parens and the blank goes with it.
 `variant_comment_before_while.svelte` pins prettier's relocated form (comment
 inside the condition parens), which is dual-stable. `divergent_variant_spaces.svelte`
 pins prettier's stable blank-line-*inside*-parens form: prettier keeps *that* blank,

@@ -18,9 +18,10 @@ tsv has no config that changes its formatting style behavior, and none will be a
 - feat: adopt Svelte's Prettier settings,
   `bracketSpacing: true` and `trailingComma: 'none'`
   [#78](https://github.com/fuzdev/tsv/pull/78)
-- feat: rework to block style wrapping using Svelte 5 whitespace changes
+- feat: collapse render-insignificant spaces and
+  converge on block style wrapping using Svelte 5 whitespace changes
   ([#76](https://github.com/fuzdev/tsv/pull/76), [#447](https://github.com/fuzdev/tsv/pull/447),
-  [#449](https://github.com/fuzdev/tsv/pull/449))
+  [#449](https://github.com/fuzdev/tsv/pull/449), [#515](https://github.com/fuzdev/tsv/pull/515))
 - feat: `tsv format` directory discovery now honors `.gitignore` and the tsv-native
   `.formatignore` hierarchically (one per directory, repo-rooted like git —
   unlike Prettier, which reads only one `.gitignore` and one `.prettierignore`
@@ -58,7 +59,10 @@ tsv has no config that changes its formatting style behavior, and none will be a
   [#250](https://github.com/fuzdev/tsv/pull/250), [#254](https://github.com/fuzdev/tsv/pull/254),
   [#290](https://github.com/fuzdev/tsv/pull/290), [#292](https://github.com/fuzdev/tsv/pull/292),
   [#300](https://github.com/fuzdev/tsv/pull/300), [#305](https://github.com/fuzdev/tsv/pull/305),
-  [#308](https://github.com/fuzdev/tsv/pull/308), [#309](https://github.com/fuzdev/tsv/pull/309))
+  [#308](https://github.com/fuzdev/tsv/pull/308), [#309](https://github.com/fuzdev/tsv/pull/309),
+  [#537](https://github.com/fuzdev/tsv/pull/537), [#539](https://github.com/fuzdev/tsv/pull/539),
+  [#540](https://github.com/fuzdev/tsv/pull/540), [#541](https://github.com/fuzdev/tsv/pull/541),
+  [#542](https://github.com/fuzdev/tsv/pull/542))
 
 ## 0.1.0
 

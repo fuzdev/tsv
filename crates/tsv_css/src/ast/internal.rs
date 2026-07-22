@@ -17,11 +17,11 @@ pub struct CssStyleSheet<'arena> {
     /// CSS nodes (rules, at-rules) - no longer includes Comment variant
     pub nodes: &'arena [CssNode<'arena>],
 
-    /// All comments sorted by span.start (top-level and value comments)
+    /// Top-level detached comments (between rules), sorted by span.start.
     ///
-    /// Includes:
-    /// - Top-level comments (between rules)
-    /// - Value comments (inside property values like `font-size: /* comment */ 12px;`)
+    /// Does **not** include value comments (inside property values like
+    /// `font-size: /* comment */ 12px;`): those are never lexed as `Comment`s — they're
+    /// re-derived from source at print time — so they're out of scope by construction.
     ///
     /// Use `tsv_lang::comments_to_emit_in_range()` for efficient range lookups.
     pub comments: Vec<Comment>,
@@ -362,6 +362,17 @@ pub struct CssDeclaration<'arena> {
 impl CssDeclaration<'_> {
     pub fn is_important(&self) -> bool {
         self.important_end.is_some()
+    }
+
+    /// Byte offset of the `property : value` colon **within `span.extract(source)`**
+    /// (equivalently `ctx.source[span.start..]`) — the absolute [`colon_offset`] rebased
+    /// to the declaration slice. Every source-extracting path indexes its slice by this
+    /// and finds the value at `colon_pos() + 1`; recorded at parse time, so no path
+    /// re-scans for the colon.
+    ///
+    /// [`colon_offset`]: Self::colon_offset
+    pub fn colon_pos(&self) -> usize {
+        (self.colon_offset - self.span.start) as usize
     }
 }
 
@@ -722,21 +733,6 @@ impl PreludeValue<'_> {
             PreludeValue::Media { span, .. } => *span,
         }
     }
-
-    pub fn is_empty(&self) -> bool {
-        match self {
-            PreludeValue::Values { values, .. } => values.is_empty(),
-            PreludeValue::Raw { content, .. } => content.is_empty(),
-            PreludeValue::Selectors { root, limit, .. } => {
-                root.as_ref().is_none_or(|r| r.list.selectors.is_empty()) && limit.is_none()
-            }
-            PreludeValue::Supports { condition, .. } => condition.parts.is_empty(),
-            PreludeValue::Container {
-                name, condition, ..
-            } => name.is_none() && condition.parts.is_empty(),
-            PreludeValue::Media { content, .. } => content.is_empty(),
-        }
-    }
 }
 
 /// At-rule (@media, @keyframes, @supports, @import, @layer, @font-face, etc.)
@@ -750,6 +746,15 @@ pub struct CssAtrule<'arena> {
     /// silently un-decode the name and diverge from Svelte/spec for escaped names. Same
     /// category as `CssDeclaration.property` / `Container.name`.
     pub name: &'arena str,
+
+    /// Source span of the name token (the `<ident>` after `@`, delimiter-excluded).
+    /// The **printer** emits the name from this span, not from decoded `name`: an
+    /// escaped name (`@m\A x`) decodes to a raw control char, and emitting that
+    /// verbatim injects it into the output (content loss on reparse). Emitting the
+    /// source slice preserves the escape, matching every other decoded-name site in
+    /// this crate (`CssDeclaration.property`, preludes). Unused by the wire writer,
+    /// which emits the decoded `name` to match parseCss.
+    pub name_span: Span,
 
     /// Prelude value (structured for @import, raw string for others)
     pub prelude: PreludeValue<'arena>,

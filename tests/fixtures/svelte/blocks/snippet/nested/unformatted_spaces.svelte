@@ -1,18 +1,18 @@
 {#snippet  outer(  )  }
 	{#snippet  inner(  )  }
 		<span  >nested</span>
-	{/snippet}
+	{/snippet }
 	{@render  inner(  )  }
-{/snippet}
+{/snippet }
 
 {#snippet  recursive(  n  )  }
 	{#if  n  >  0  }
 		<span  >{  n  }</span>
 		{@render  recursive(  n  -  1  )  }
-	{:else}
+	{:else  }
 		<span  >done</span>
-	{/if}
-{/snippet}
+	{/if }
+{/snippet }
 
 {@render  outer(  )  }
 {@render  recursive(  3  )  }

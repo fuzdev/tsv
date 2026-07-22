@@ -1,0 +1,165 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 565,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 176,
+				"data": "\n\tWide (CJK) tail after an expression tag. Each glyph is 2 columns, so the tail is 4 wide,\n\tnot 2 — the fill measures visual width, not chars. This line is exactly 100.\n"
+			},
+			{
+				"type": "Text",
+				"start": 176,
+				"end": 177,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 177,
+				"end": 285,
+				"name": "li",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 178
+					},
+					"end": {
+						"line": 5,
+						"column": 3,
+						"character": 180
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 181,
+							"end": 264,
+							"raw": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~",
+							"data": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 264,
+							"end": 276,
+							"expression": {
+								"type": "Identifier",
+								"start": 265,
+								"end": 275,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 83
+									},
+									"end": {
+										"line": 6,
+										"column": 93
+									}
+								},
+								"name": "xxxxxxxxxx"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 276,
+							"end": 280,
+							"raw": " 日本\n",
+							"data": " 日本\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 285,
+				"end": 287,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 287,
+				"end": 453,
+				"data": " One char more: 101 by visual width, so the wide tail breaks to its own line. A byte- or\n     char-based measure would see 99 here and wrongly keep it inline. "
+			},
+			{
+				"type": "Text",
+				"start": 453,
+				"end": 454,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 454,
+				"end": 564,
+				"name": "li",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 455
+					},
+					"end": {
+						"line": 11,
+						"column": 3,
+						"character": 457
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 458,
+							"end": 542,
+							"raw": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~",
+							"data": "\n\taaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 542,
+							"end": 554,
+							"expression": {
+								"type": "Identifier",
+								"start": 543,
+								"end": 553,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 84
+									},
+									"end": {
+										"line": 12,
+										"column": 94
+									}
+								},
+								"name": "xxxxxxxxxx"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 554,
+							"end": 559,
+							"raw": "\n\t日本\n",
+							"data": "\n\t日本\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

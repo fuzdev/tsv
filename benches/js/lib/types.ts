@@ -49,6 +49,15 @@ export interface SourceFile {
 	/** Size in bytes */
 	bytes: number;
 	/**
+	 * True when this file comes from a version-pinned, `pins:audit`-tracked
+	 * checkout (the `framework` + `prettier_fixture` tiers) rather than a live dev
+	 * repo. The format gate's count pins (match/unknown/partial) are enforced over
+	 * the reproducible subset only, so live-repo churn can't shift them; SAFETY
+	 * still gates over every file. Set by `DevReposLoader`; undefined for a
+	 * `DirectoryLoader` single-repo run (which isn't gated). See `lib/corpus.ts`.
+	 */
+	reproducible?: boolean;
+	/**
 	 * The declared parse goal (test262 only; undefined = `module`). The
 	 * conformance preflight parses each tool at this goal so a script-goal
 	 * `await`-identifier test isn't scored as a failure against a module parse.
@@ -64,7 +73,8 @@ export type ImplementationName =
 	| 'wasm'
 	| 'oxc'
 	| 'oxc-wasm'
-	| 'biome-wasm';
+	| 'biome-wasm'
+	| 'dprint-wasm';
 
 /** Common interface for parser/formatter implementations */
 export interface TsvImplementation {

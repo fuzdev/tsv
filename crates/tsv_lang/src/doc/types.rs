@@ -72,6 +72,13 @@ pub struct DocContext {
     /// the next line rather than hugging the dropped child's `>`. Off for every other fill (text
     /// word-wrap and CSS value lists pack greedily after a dropped item), so the flag never affects
     /// them.
+    ///
+    /// Exception: a *block-style* dropped element (its own content doesn't fit flat, so it wraps
+    /// intact and dangles its `>` low) with *terminal* trailing text yields to
+    /// [`Self::hug_terminal_after_break`] — the tail hugs the dangled `>` when it fits, the same as
+    /// the first-child case, since nothing follows the tail (the hug stays convergent). The render
+    /// loop skips this unconditional break in that case; the plain dropped-*whole* case (the element
+    /// stays flat on its own line) still owns its line.
     pub break_after_dropped_first: bool,
 
     /// When set, the fill's trailing separator (its terminal `line`, the only one reaching the
@@ -80,6 +87,12 @@ pub struct DocContext {
     /// break point short-circuit the fit check. A wide inline element that would not fit flat after
     /// the separator then forces the separator to break, dropping the element to its own line whole
     /// — rather than packing it onto the text line, where it would break its own tag in place.
+    ///
+    /// When that following node is an *after-element fold* (an inline element + its trailing text,
+    /// carrying [`Self::hug_wide_first`]), only the fold's **lead element** is measured, not the whole
+    /// element+tail unit — the tail can wrap, so a short element packs after the last word instead of
+    /// dropping (prettier's fill is pairwise: last word, separator, element — never the tail). See
+    /// [`crate::doc::DocArena::after_element_fold_lead`].
     ///
     /// Scoped to the Svelte text→flow-element boundary fill (a text run whose next sibling is a
     /// flowing inline element/component, ended with a trailing `line`). Off for every other fill, so
@@ -115,65 +128,6 @@ pub struct DocContext {
     pub hug_terminal_after_break: bool,
 }
 
-/// Trait for resolving symbol IDs to strings at print time
-///
-/// This enables deferred symbol resolution - Docs can store symbol IDs
-/// instead of allocated strings, and resolution happens during printing.
-/// This eliminates allocations for identifier text in the doc tree.
-///
-/// The resolver is language-agnostic (uses raw u32 IDs) so tsv_lang
-/// doesn't need to depend on string_interner.
-pub trait TextResolver {
-    /// Resolve a symbol ID to its string representation
-    ///
-    /// # Panics
-    /// May panic if the ID is invalid (not from this resolver's interner)
-    fn resolve(&self, id: u32) -> &str;
-
-    /// Resolve a [`DocText::SourceSpan`] to its verbatim source slice.
-    ///
-    /// The default implementation panics — a bare interner carries no source, so
-    /// docs containing `SourceSpan` nodes must be rendered through a source-aware
-    /// resolver ([`SourceTextResolver`]). Mirrors the `Symbol`-without-resolver
-    /// programming-error contract.
-    ///
-    /// # Panics
-    /// Panics if the resolver carries no source (the default).
-    fn resolve_source_span(&self, _span: Span) -> &str {
-        #[allow(clippy::unimplemented)]
-        {
-            unimplemented!("SourceSpan in Doc but resolver carries no source")
-        }
-    }
-}
-
-/// A [`TextResolver`] that wraps an inner resolver (the interner) and adds the
-/// document source, so [`DocText::SourceSpan`] nodes resolve to verbatim source
-/// slices. This is how `source` reaches the render path **without** putting a
-/// lifetime on `DocArena` (the span lives in the lifetime-less arena; the source
-/// is supplied transiently at render). A printer that emits `SourceSpan` builds
-/// one of these around its interner + source and passes it to the resolved
-/// render entry points in place of the bare interner.
-pub struct SourceTextResolver<'a, R: TextResolver + ?Sized> {
-    /// The underlying symbol resolver (typically the interner).
-    pub inner: &'a R,
-    /// The document source the spans index into (the host document — all spans
-    /// recorded by the printer are absolute into this string).
-    pub source: &'a str,
-}
-
-impl<R: TextResolver + ?Sized> TextResolver for SourceTextResolver<'_, R> {
-    #[inline]
-    fn resolve(&self, id: u32) -> &str {
-        self.inner.resolve(id)
-    }
-
-    #[inline]
-    fn resolve_source_span(&self, span: Span) -> &str {
-        span.extract(self.source)
-    }
-}
-
 /// Sentinel value for cached_width: text contains a newline.
 /// Used by fits to early-return without resolving the string.
 pub const TEXT_WIDTH_HAS_NEWLINE: u16 = u16::MAX;
@@ -206,7 +160,7 @@ impl PoolSpan {
     }
 }
 
-/// Text content in a Doc - static, owned, or a symbol to resolve at print time
+/// Text content in a Doc - a static string, a pooled owned string, or a source span resolved at print time
 #[derive(Debug, Clone)]
 pub enum DocText {
     /// Static string literal - no allocation, just stores pointer.
@@ -226,23 +180,19 @@ pub enum DocText {
     /// is rare (~1.4% of Text nodes), so the eager measure is off the hot
     /// path by construction.
     Pooled(PoolSpan, u16),
-    /// Verbatim source slice, resolved against `source` at print time — like
-    /// `Symbol` but keyed on a span instead of an interner id. Second field is
-    /// the precomputed visual width — always computed at build like `Pooled`
-    /// (a real width or [`TEXT_WIDTH_HAS_NEWLINE`]), except identifier names
-    /// (via `source_span_ident`), which defer to on-demand measurement
-    /// ([`TEXT_WIDTH_NOT_COMPUTED`]). Lets a printer emit verbatim source text
-    /// (comments, template chunks, already-canonical literals) with **no
-    /// allocation and no copy** — the lifetime-free alternative to a borrowed
-    /// `&'src str` (which would force `DocArena<'src>` and forfeit the
-    /// cross-file arena `reset()` reuse). The span is resolved by a
-    /// source-aware [`TextResolver`] (see [`SourceTextResolver`]); behaves
-    /// identically to the pooled text it replaces in every doc transform (a
-    /// `DocNode::Text` is matched generically).
+    /// Verbatim source slice, resolved against `source` at print time. Second
+    /// field is the precomputed visual width — always computed at build like
+    /// `Pooled` (a real width or [`TEXT_WIDTH_HAS_NEWLINE`]), except identifier
+    /// and element/attribute names (via `source_span_ident`), which defer to
+    /// on-demand measurement ([`TEXT_WIDTH_NOT_COMPUTED`]). Lets a printer emit
+    /// verbatim source text (identifier/tag/attribute names, comments, template
+    /// chunks, already-canonical literals) with **no allocation and no copy** —
+    /// the lifetime-free alternative to a borrowed `&'src str` (which would force
+    /// `DocArena<'src>` and forfeit the cross-file arena `reset()` reuse). The
+    /// span is resolved at render against the document source threaded through
+    /// [`resolve_text`]; behaves identically to the pooled text it replaces in
+    /// every doc transform (a `DocNode::Text` is matched generically).
     SourceSpan(Span, u16),
-    /// Symbol ID to be resolved at print time - no allocation during doc building.
-    /// No cached width — identifiers are ASCII, fast path handles them.
-    Symbol(u32),
 }
 
 impl DocText {
@@ -251,8 +201,7 @@ impl DocText {
     /// Decodes the stored `u16` (a real width or one of the two sentinel
     /// values) into [`CachedWidth`], so callers can't mistake
     /// [`TEXT_WIDTH_HAS_NEWLINE`] for an actual width — every consumer must
-    /// handle the newline case explicitly. `Symbol` is always
-    /// [`CachedWidth::NotComputed`] (identifiers are measured on demand).
+    /// handle the newline case explicitly.
     #[inline]
     pub const fn cached_width(&self) -> CachedWidth {
         match self {
@@ -261,7 +210,6 @@ impl DocText {
                 TEXT_WIDTH_HAS_NEWLINE => CachedWidth::HasNewline,
                 w => CachedWidth::Width(w),
             },
-            DocText::Symbol(_) => CachedWidth::NotComputed,
         }
     }
 }
@@ -274,37 +222,35 @@ pub enum CachedWidth {
     /// The text contains a newline — there is no single-line width; fits
     /// treats the line as ending inside this text.
     HasNewline,
-    /// Not precomputed (`source_span_ident` identifier names, or `Symbol`) —
-    /// measure on demand.
+    /// Not precomputed (`source_span_ident` identifier names) — measure on
+    /// demand.
     NotComputed,
 }
 
-/// Resolve DocText to a string, using resolver if provided
+/// Resolve DocText to a string, against the document source if provided.
 ///
 /// For Static text, returns directly. For Pooled text, slices the arena text
-/// pool the caller borrowed (render hoists it once per render). For Symbol
-/// text, uses the resolver (panics if resolver is None).
+/// pool the caller borrowed (render hoists it once per render). For a
+/// SourceSpan, slices the document `source` (panics if `source` is None).
 ///
 /// # Panics
 ///
-/// Panics if a Symbol is encountered but no resolver was provided.
-/// This indicates a bug - docs containing symbols must use resolved print functions.
+/// Panics if a SourceSpan is encountered but no `source` was provided. This
+/// indicates a bug — docs containing source spans must use resolved print
+/// functions (the ones threading the document source).
 #[inline]
-#[allow(clippy::expect_used)] // Intentional: Symbol without resolver is a programming error
-pub(super) fn resolve_text<'a, R: TextResolver + ?Sized>(
+#[allow(clippy::expect_used)] // Intentional: SourceSpan without source is a programming error
+pub(super) fn resolve_text<'a>(
     text: &'a DocText,
-    resolver: Option<&'a R>,
+    source: Option<&'a str>,
     pool: &'a str,
 ) -> &'a str {
     match text {
         DocText::Static(s, _) => s,
         DocText::Pooled(span, _) => span.slice(pool),
-        DocText::SourceSpan(span, _) => resolver
-            .expect("SourceSpan encountered in Doc but no TextResolver provided")
-            .resolve_source_span(*span),
-        DocText::Symbol(id) => resolver
-            .expect("Symbol encountered in Doc but no TextResolver provided")
-            .resolve(*id),
+        DocText::SourceSpan(span, _) => span.extract(
+            source.expect("SourceSpan encountered in Doc but no source provided for resolution"),
+        ),
     }
 }
 

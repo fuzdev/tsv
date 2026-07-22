@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 71,
+	"end": 69,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "RegularElement",
 				"start": 0,
-				"end": 70,
+				"end": 68,
 				"name": "button",
 				"name_loc": {
 					"start": {
@@ -86,9 +86,9 @@
 						{
 							"type": "Text",
 							"start": 48,
-							"end": 61,
-							"raw": " text1 text2 ",
-							"data": " text1 text2 "
+							"end": 59,
+							"raw": "text1 text2",
+							"data": "text1 text2"
 						}
 					]
 				}

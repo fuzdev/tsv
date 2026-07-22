@@ -3,11 +3,13 @@
 // Contains the primary `build_call_doc_with_wrapping` function that handles
 // all the special cases for call expression formatting.
 
-use super::super::{ParenContext, Printer, has_multiline_content};
+use super::super::{
+    ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
+};
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
-    first_arg_has_any_comments, has_blank_line_between_args, has_inter_argument_comments,
-    has_trailing_comments_on_args, last_arg_has_comments, should_force_expansion_for_comments,
+    first_arg_has_any_comments, has_inter_argument_comments, has_trailing_comments_on_args,
+    last_arg_has_comments, should_force_expansion_for_comments,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments,
@@ -116,7 +118,7 @@ pub(super) fn build_call_doc_with_wrapping(
     // even if they exceed print width
     if is_test_call(call, printer) {
         // Build callee as a flat doc (no conditionalGroup) straight from the
-        // interned chain parts — this prevents breaking at `.skip` etc. even when
+        // span-identity chain parts — this prevents breaking at `.skip` etc. even when
         // very long, without materializing a throwaway callee `String`.
         let flat_callee = build_test_callee_flat_doc(call.callee, printer).unwrap_or(callee);
 
@@ -237,10 +239,11 @@ pub(super) fn build_call_doc_with_wrapping(
 
     // Check if any argument has multiline content (e.g., line continuation strings)
     // Prettier expands calls containing multiline strings (recursively)
-    let has_multiline = call
-        .arguments
-        .iter()
-        .any(|arg| has_multiline_content(arg, printer.source));
+    let has_multiline = container_may_have_multiline_content(call.span, printer.source)
+        && call
+            .arguments
+            .iter()
+            .any(|arg| has_multiline_content(arg, printer.source));
 
     if has_multiline {
         // Force expansion with hardlines for multiline content
@@ -368,15 +371,13 @@ pub(super) fn build_call_doc_with_wrapping(
     // Check for blank lines between arguments (forces expansion and preservation).
     // NOTE: This path is only reached when has_inter_arg_comments is false (the
     // comment-handling path above returns early). No comment handling needed here.
-    // Uses has_blank_line_between_args to skip stripped grouping paren span gaps.
-    let has_blank_lines = call.arguments.windows(2).any(|window| {
-        has_blank_line_between_args(
-            printer.source,
-            printer.line_breaks,
-            window[0].span().end,
-            window[1].span().start,
-        )
-    });
+    // Coarse over-check: a raw scan of every gap (it must catch a blank that sits
+    // *past* a same-line trailing comment, which the emitter's per-gap `blank_scan_end`
+    // measure would clamp away — so the two intentionally differ and are not shared).
+    let has_blank_lines = call
+        .arguments
+        .windows(2)
+        .any(|window| printer.is_next_line_empty(window[0].span().end, window[1].span().start));
 
     if has_blank_lines {
         // Build arguments with blank line preservation (forced expansion).
@@ -1372,12 +1373,7 @@ fn build_call_with_arg_comments(
                 // (`C`), emitted inline with it.
                 pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
             } else {
-                let has_blank_line = has_blank_line_between_args(
-                    printer.source,
-                    printer.line_breaks,
-                    arg_end,
-                    next_arg_start,
-                );
+                let has_blank_line = printer.is_next_line_empty(arg_end, next_arg_start);
                 if has_blank_line {
                     // No comments but blank line between args
                     force_expansion = true;

@@ -30,7 +30,7 @@ use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::source_scan::{find_char_skipping_comments, rfind_char_skipping_comments};
 
 /// Strip only `as`/`satisfies` casts from the head of a statement expression,
 /// returning the innermost operand — but only if at least one cast was peeled.
@@ -377,16 +377,18 @@ impl<'a> Printer<'a> {
 
         let keyword_end = keyword_start + keyword.len() as u32;
 
+        // A comment that must break takes the parenthesized form, which is what makes the
+        // break legal; there the comment keeps the line the author gave it. That layout
+        // owns its own trailing gap (the parens are retained, so the `)` — not the span
+        // end — divides inside from outside), so it returns before the shared scan below.
+        if self.argument_has_own_line_comment(keyword_start, arg) {
+            let own_line_comments = self.build_rhs_comments_opt(keyword_end, arg.span().start);
+            return self.build_comment_paren_doc(keyword, arg, span_end, own_line_comments);
+        }
+
         // Trailing comments from stripped grouping parens: `return (x /* c */)` → `return x /* c */;`
         let argument_end = arg.span().end;
         let has_trailing_comments = self.has_comments_to_emit_between(argument_end, span_end);
-
-        // A comment that must break takes the parenthesized form, which is what makes the
-        // break legal; there the comment keeps the line the author gave it.
-        if self.argument_has_own_line_comment(keyword_start, arg) {
-            let own_line_comments = self.build_rhs_comments_opt(keyword_end, arg.span().start);
-            return self.build_comment_paren_doc(keyword, arg, own_line_comments);
-        }
 
         // Every remaining comment is glued to the keyword with the value after it on some
         // line, so the value is pulled up onto the comment's line (`return /* c */⏎(v)` →
@@ -509,7 +511,15 @@ impl<'a> Printer<'a> {
     /// unconditional paren wrapping.
     ///
     /// Matches Prettier's `returnArgumentHasLeadingComment` (function.js:290-318).
-    fn argument_has_own_line_comment(&self, keyword_start: u32, arg: &Expression<'_>) -> bool {
+    ///
+    /// Shared with `build_yield_doc`: `yield`/`yield*` are restricted productions
+    /// like `return`/`throw`, so they ask the same question and must not answer it
+    /// differently — one question, one predicate.
+    pub(in crate::printer) fn argument_has_own_line_comment(
+        &self,
+        keyword_start: u32,
+        arg: &Expression<'_>,
+    ) -> bool {
         // Own-line comment before the argument itself (`return (\n// c\nexpr)`).
         if self.has_leading_own_line_comment_in_range(
             GapStart::Keyword(keyword_start),
@@ -587,6 +597,7 @@ impl<'a> Printer<'a> {
         &self,
         keyword: &'static str,
         arg: &Expression<'_>,
+        span_end: u32,
         inline_comments: Option<DocId>,
     ) -> DocId {
         let d = self.d();
@@ -597,17 +608,92 @@ impl<'a> Printer<'a> {
         } else {
             raw_expr_doc
         };
-        let rhs_doc = if let Some(comments_doc) = inline_comments {
-            d.concat(&[comments_doc, expr_doc])
+        let mut body = DocBuf::new();
+        if let Some(comments_doc) = inline_comments {
+            body.push(comments_doc);
+        }
+        body.push(expr_doc);
+
+        // The grouping `)` — not the statement end — bounds what is *inside* the parens.
+        // These parens are not optional: they are what makes the comment-forced break
+        // legal, so a comment before the `)` stays inside them, where it was written
+        // (`build_yield_doc`'s hanging branch is the same rule for the third restricted
+        // production; omitting it here DROPPED the comment outright). A comment *past* the
+        // `)` is outside them and follows the ordinary terminator rule, trailing the `;`.
+        let argument_end = arg.span().end;
+        let boundary = self
+            .retained_grouping_close(argument_end, span_end)
+            .unwrap_or(argument_end);
+        if self.has_comments_to_emit_between(argument_end, boundary) {
+            self.append_trailing_paren_comments(&mut body, argument_end, boundary);
+        }
+
+        let mut parts: DocBuf = smallvec![self.build_hanging_paren_doc(keyword, d.concat(&body))];
+        let after = if self.has_comments_to_emit_between(boundary, span_end) {
+            self.split_terminator_gap_comments(&mut parts, boundary, span_end, false)
         } else {
-            expr_doc
+            DocBuf::new()
         };
+        parts.push(d.text(";"));
+        parts.extend(after);
+        d.concat(&parts)
+    }
+
+    /// Where a *retained* grouping paren around a statement's operand closes, if the
+    /// source has one at all — the boundary between what prints inside those parens and
+    /// what trails the `;`.
+    ///
+    /// It is the **last** `)` before the `;`, not the first. Everything between the
+    /// operand's end and the `;` is closing parens, comments and whitespace, so the
+    /// outermost wrapper is the one that closes last. Taking the first would misread a
+    /// paren *this printer itself adds*: the assignment clarity parens put a `)` before
+    /// the comment on the second pass (`return (⏎(x = y) /* t */⏎);`), the comment would
+    /// then read as outside the group, and it would float one line further out on every
+    /// pass. The scan skips comments because a `)` may sit inside one.
+    ///
+    /// `None` means no paren was authored — an own-line comment inside a chain forces the
+    /// break with none present — so there is no inside to speak of, and the caller uses the
+    /// operand's end as the boundary instead.
+    ///
+    /// The returned position doubles as both bounds: the `)` byte itself can't start a
+    /// comment, so the in-paren scan (end-inclusive) and the past-paren scan
+    /// (start-inclusive) split the gap at it without overlapping.
+    fn retained_grouping_close(&self, argument_end: u32, span_end: u32) -> Option<u32> {
+        rfind_char_skipping_comments(
+            self.source.as_bytes(),
+            argument_end as usize,
+            span_end as usize,
+            b')',
+        )
+        .map(|close| close as u32)
+    }
+
+    /// The paren-wrapped layout a comment-forced break takes: `kw (⏎\tbody⏎close`.
+    ///
+    /// Shared by the three **restricted productions** — `return`/`throw` (via
+    /// [`Self::build_comment_paren_doc`]) and `yield`/`yield*` (via
+    /// `build_yield_doc`). All three are `kw [no LineTerminator here] operand`, so a
+    /// break between the keyword and its operand is ASI, not layout; the parens are
+    /// what make the author's break legal.
+    ///
+    /// The layout closes at the `)`. A statement's `;` is appended by its caller rather
+    /// than folded in here, because a comment authored between the `)` and the `;` prints
+    /// in that gap and so has to be emitted between the two.
+    ///
+    /// `body` is the already-assembled operand doc, including any leading comment
+    /// run and any trailing comment that stays inside the parens.
+    pub(in crate::printer) fn build_hanging_paren_doc(
+        &self,
+        keyword: &'static str,
+        body: DocId,
+    ) -> DocId {
+        let d = self.d();
         d.concat(&[
             d.text(keyword),
             d.text(" ("),
-            d.indent(d.concat(&[d.hardline(), rhs_doc])),
+            d.indent(d.concat(&[d.hardline(), body])),
             d.hardline(),
-            d.text(");"),
+            d.text(")"),
         ])
     }
 

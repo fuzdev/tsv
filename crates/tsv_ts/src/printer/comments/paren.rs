@@ -57,11 +57,13 @@ impl<'a> Printer<'a> {
         (doc, force_break)
     }
 
-    /// Append trailing comments from stripped grouping parens to a parts vec.
+    /// Append the trailing comments in an operand's closing gap to a parts vec.
     ///
-    /// When the parser strips grouping parens (e.g., `await (x /* c */)` → arg is `x`),
-    /// comments between the argument end and the expression span end are orphaned.
-    /// This method emits them with appropriate layout:
+    /// The gap holds comments that belong to no node, so some caller has to place them.
+    /// It arises both ways round: the parser *strips* grouping parens (`await (x /* c */)`
+    /// → the arg is `x`, orphaning `/* c */` before the expression's span end), and the
+    /// restricted-production hanging layout *retains* them (the comment prints inside the
+    /// parens, bounded by the `)` rather than the span end). Layout by kind:
     /// - Same-line block comments: inline with leading space (`x /* c */`)
     /// - Line comments: deferred via `line_suffix` to appear after the semicolon (`x; // c`)
     /// - Own-line block comments: deferred via `line_suffix` with hardline (`x;\n/* c */`)
@@ -69,9 +71,12 @@ impl<'a> Printer<'a> {
     /// Keeps a same-line block comment with its operand (before any terminator) — the
     /// expression-level operand callers (await, yield, binary, sequence) where the
     /// comment is inside the stripped operand parens, plus `export =` (which, like
-    /// `import =`, keeps a same-line trailing block before the `;`). Statement
-    /// terminators that move the block *after* the `;` (return/throw, `export default`)
-    /// use `split_terminator_gap_comments` instead.
+    /// `import =`, keeps a same-line trailing block before the `;`).
+    ///
+    /// Statement terminators that move the block *after* the `;` — `export default`, and
+    /// return/throw's non-hanging paths — use `split_terminator_gap_comments` instead.
+    /// return/throw's hanging layout uses **both**: this method for the region inside the
+    /// retained parens, then that one for anything past the `)`.
     pub(crate) fn append_trailing_paren_comments(
         &self,
         parts: &mut DocBuf,
@@ -337,6 +342,52 @@ impl<'a> Printer<'a> {
         d.concat(&[inner, comments])
     }
 
+    /// The comments between an expression's end and a following `)`, as ready-to-append
+    /// separator+comment parts, plus whether they force the broken `(⏎\texpr // c⏎)` frame.
+    ///
+    /// **A printer that synthesizes its own `(`…`)` owns this gap** — no enclosing emitter
+    /// can see between those parens, so a comment left unclaimed here is DROPPED, not
+    /// relocated. Both such printers call this: the stripped-paren restorer below and
+    /// `build_jsdoc_cast_doc`, which lacked the gap entirely
+    /// (`parenthesized/jsdoc_cast_trailing_paren_comment`).
+    ///
+    /// The separator is newline-aware — a comment the author put on a new line relative to
+    /// the *previous item* (the expression, or the prior comment) breaks; otherwise it
+    /// trails inline. Tracking the previous item rather than `expr_end` keeps a same-line
+    /// group together (`x⏎ /* a */ // b`) while stopping a line comment that follows
+    /// another comment from being swallowed by it. In the inline case every comment is a
+    /// same-line block comment, so the rule collapses to a plain space.
+    ///
+    /// Returns `None` when the gap is empty, so callers keep their no-comment fast path.
+    pub(crate) fn trailing_paren_comment_parts(
+        &self,
+        expr_end: u32,
+        boundary_end: u32,
+    ) -> Option<(DocBuf, bool)> {
+        if !self.has_trailing_paren_comments(expr_end, boundary_end) {
+            return None;
+        }
+        let d = self.d();
+
+        // A line comment runs to end-of-line, and an own-line block comment was authored
+        // on its own line — either way the closing `)` can no longer share the line.
+        let needs_break = comments_to_emit_in_range(self.comments, expr_end, boundary_end)
+            .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start));
+
+        let mut parts = DocBuf::new();
+        let mut prev_end = expr_end;
+        for comment in comments_to_emit_in_range(self.comments, expr_end, boundary_end) {
+            if self.has_newline_between(prev_end, comment.span.start) {
+                parts.push(d.hardline());
+            } else {
+                parts.push(d.text(" "));
+            }
+            parts.push(self.build_comment_doc(comment));
+            prev_end = comment.span.end;
+        }
+        Some((parts, needs_break))
+    }
+
     /// Build expression doc re-adding the stripped grouping parens around trailing
     /// comments, producing `(expr /* c */)` or `(\n\texpr // c\n)`.
     ///
@@ -354,36 +405,17 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let expr_end = expr.span().end;
 
-        if !self.has_trailing_paren_comments(expr_end, boundary_end) {
+        let Some((comment_parts, needs_break)) =
+            self.trailing_paren_comment_parts(expr_end, boundary_end)
+        else {
             return self.build_expression_doc(expr);
-        }
+        };
 
         let inner = self.build_expression_doc(expr);
 
-        // Determine if multiline layout is needed
-        let has_multiline = comments_to_emit_in_range(self.comments, expr_end, boundary_end)
-            .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start));
-
-        if has_multiline {
-            let mut indent_parts: DocBuf = smallvec![d.hardline()];
-            indent_parts.push(inner);
-            // Break before a comment that starts on a new line relative to the
-            // previous item (the body or the prior comment); otherwise trail it
-            // inline. Tracking the previous item's end — not `expr_end` — keeps a
-            // same-line comment group together (`x⏎ /* a */ // b`) while forcing a
-            // line comment that follows another comment onto its own line. A line
-            // comment runs to end-of-line, so trailing a second comment after one
-            // (`x // a` then `// b`) would swallow it — this break prevents that.
-            let mut prev_end = expr_end;
-            for comment in comments_to_emit_in_range(self.comments, expr_end, boundary_end) {
-                if self.has_newline_between(prev_end, comment.span.start) {
-                    indent_parts.push(d.hardline());
-                } else {
-                    indent_parts.push(d.text(" "));
-                }
-                indent_parts.push(self.build_comment_doc(comment));
-                prev_end = comment.span.end;
-            }
+        if needs_break {
+            let mut indent_parts: DocBuf = smallvec![d.hardline(), inner];
+            indent_parts.extend(comment_parts);
             d.concat(&[
                 d.text("("),
                 d.indent(d.concat(&indent_parts)),
@@ -391,12 +423,8 @@ impl<'a> Printer<'a> {
                 d.text(")"),
             ])
         } else {
-            let mut parts: DocBuf = smallvec![d.text("(")];
-            parts.push(inner);
-            for comment in comments_to_emit_in_range(self.comments, expr_end, boundary_end) {
-                parts.push(d.text(" "));
-                parts.push(self.build_comment_doc(comment));
-            }
+            let mut parts: DocBuf = smallvec![d.text("("), inner];
+            parts.extend(comment_parts);
             parts.push(d.text(")"));
             d.concat(&parts)
         }
@@ -505,5 +533,28 @@ impl<'a> Printer<'a> {
         } else {
             doc
         }
+    }
+
+    /// [`Self::prepend_removed_paren_comments`] for a **keyword→operand** gap, routing
+    /// through [`Printer::build_keyword_operand_comments_opt`] so a single-line block
+    /// trails inline instead of keeping the author's break. Used for `new`→callee;
+    /// `await` calls the emitter directly. The other `prepend_removed_paren_comments`
+    /// callers (call/member chains, binary chains, conditionals, tagged templates) are
+    /// deliberately NOT routed here — each is its own gap with its own gate, and the
+    /// same cycle at those sites wants its own fixture first.
+    #[inline]
+    pub(crate) fn prepend_keyword_operand_comments(
+        &self,
+        outer_start: u32,
+        inner_start: u32,
+        doc: DocId,
+    ) -> DocId {
+        if outer_start < inner_start
+            && let Some(comments) =
+                self.build_keyword_operand_comments_opt(outer_start, inner_start)
+        {
+            return self.d().concat(&[comments, doc]);
+        }
+        doc
     }
 }

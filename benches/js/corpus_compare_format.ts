@@ -370,10 +370,17 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	// Initialize per-language tracking
 	const results: Map<Language, CompareResult[]> = new Map();
 	const stats: Map<Language, LanguageStats> = new Map();
+	// The reproducible subset (version-pinned framework + prettier suites; the
+	// `file.reproducible` files). The format count pins gate on THIS, not the
+	// aggregate `stats` — live dev-repo churn can't shift a pinned count. Only the
+	// gated fields (match/unknown_diff/partial_divergence) are meaningful here; the
+	// live divergences are reported as a non-gating WARN (aggregate minus repro).
+	const repro_stats: Map<Language, LanguageStats> = new Map();
 
 	for (const lang of LANGUAGES) {
 		results.set(lang, []);
 		stats.set(lang, empty_stats());
+		repro_stats.set(lang, empty_stats());
 	}
 
 	// Track divergence pattern counts
@@ -429,6 +436,12 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		lang_counts[lang]++;
 
 		const lang_stats = stats.get(lang)!;
+		// The reproducible-subset accumulator — non-null only for a version-pinned file.
+		// INVARIANT: mirror every GATED-count increment below (match / unknown_diff /
+		// partial_divergence) into `repro` too. The pins read `repro_stats`; the aggregate
+		// `stats` counts all files. (known/safety/errors are aggregate-only — SAFETY gates
+		// every file — so they deliberately don't mirror.)
+		const repro = file.reproducible ? repro_stats.get(lang)! : null;
 		const lang_results = results.get(lang)!;
 		lang_stats.total++;
 
@@ -477,12 +490,20 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 				//
 				// Safety guarantee: if we lose content that prettier preserves, the
 				// differential keeps it AND it surfaces as an unexplained diff hunk →
-				// classification stays SAFETY. Overmatching risk is low because
-				// patterns like comment_position require the comment text to exist
-				// in both outputs — a dropped comment won't match.
+				// classification stays SAFETY.
+				//
+				// The downgrade keys on `safety_vouched`, NOT `all_explained`. The latter is
+				// a set-cover over hunk indices, so it cannot distinguish the hunk that
+				// carried the flagged characters from one that merely sits in the same file:
+				// on `prettier/tests/format/html/tags/tags.html` the whole 9-char delta lives
+				// in a self-closing-tag hunk, yet two unrelated whitespace hunks were equally
+				// load-bearing for the downgrade — a change to the pattern claiming THOSE
+				// would have flipped the file into this gated bucket with no formatter change.
+				// `safety_vouched` requires every char-risky hunk to be claimed by a pattern
+				// that declares `may_alter_char_frequency`, restoring the causal link.
 				const { hunks, coverage } = run_detection(file.content, ours, prettier, lang);
 
-				if (coverage.classification === 'all_explained') {
+				if (coverage.safety_vouched) {
 					// Safety violations are fully explained by known divergence patterns
 					lang_stats.known_divergence++;
 					lang_results.push({
@@ -528,15 +549,18 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 			} else if (safety_only) {
 				// In safety-only mode, we're done after safety check passes
 				lang_stats.match++;
+				if (repro) repro.match++;
 			} else if (ours === prettier) {
 				// Exact match — only counted, not stored
 				lang_stats.match++;
+				if (repro) repro.match++;
 			} else {
 				// Difference detected
 				const rel = rel_path(file.path, base_path);
 				if (strict) {
 					// Strict mode: any difference is a failure
 					lang_stats.unknown_diff++;
+					if (repro) repro.unknown_diff++;
 					lang_results.push({
 						path: file.path,
 						bytes: file.bytes,
@@ -565,6 +589,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 					} else if (coverage.classification === 'partial') {
 						// Some hunks explained, some not
 						lang_stats.partial_divergence++;
+						if (repro) repro.partial_divergence++;
 						lang_results.push({
 							path: file.path,
 							bytes: file.bytes,
@@ -575,6 +600,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 					} else {
 						// No hunks explained - unknown difference
 						lang_stats.unknown_diff++;
+						if (repro) repro.unknown_diff++;
 						lang_results.push({
 							path: file.path,
 							bytes: file.bytes,
@@ -911,35 +937,51 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	// side is always live).
 	if (prettier_cache) console.log(`\n${prettier_cache.stats()}`);
 
-	// Pinned counts (--all only — see lib/gate_counts.ts): per-language MINIMUM
-	// exact-match count (live corpus: growth passes; a drop means a one-language
-	// formatter/oracle collapse hiding under the total or below the
-	// SAFETY/all-errored gates), and EXACT per-language `unknown`/`partial`
-	// counts (up = a new unexplained divergence — fix or catalog a detector;
-	// down = backlog shrank, re-pin to record it). A single-run trip can be the
-	// FFI/sidecar heisenbug — confirm on the single repo before treating as real.
+	// Pinned counts (--all only — see lib/gate_counts.ts). The count pins gate on
+	// the REPRODUCIBLE subset (`repro_stats` — version-pinned framework + prettier
+	// suites, tracked by GATE_CHECKOUT_COMMITS + pins:audit), so live dev-repo churn
+	// can't shift them: per-language MINIMUM `match` (a drop = a formatter/oracle
+	// collapse in pinned code) + EXACT `unknown`/`partial` (up = a new unexplained
+	// divergence to fix/catalog; down = backlog shrank, re-pin). The live `real`
+	// repos are a NON-GATING WARN below (their divergences are reported, never fail
+	// — unversioned working trees); SAFETY still gates over EVERY file (see below).
+	// A single-run trip can be the FFI/sidecar heisenbug — confirm on the single
+	// repo before treating as real.
 	if (use_all_repos) {
+		// Non-gating WARN: divergences in the live dev repos (aggregate − reproducible).
+		const live_warn = LANGUAGES.flatMap((lang) => {
+			const a = stats.get(lang)!;
+			const r = repro_stats.get(lang)!;
+			const u = a.unknown_diff - r.unknown_diff;
+			const p = a.partial_divergence - r.partial_divergence;
+			return u > 0 || p > 0 ? [`${lang} ${u} unknown / ${p} partial`] : [];
+		});
+		if (live_warn.length > 0) {
+			console.log(
+				`\n\x1b[33mWARN: live dev-repo divergences (non-gating) — ${live_warn.join('; ')}. ` +
+					`Unversioned working trees, so not pinned; triage a specific one with ` +
+					`\`corpus:compare:format <repo>\`. SAFETY still gates these.\x1b[0m`,
+			);
+		}
+
+		const pin = (lang: Language) => repro_stats.get(lang)!;
 		const pin_failures = [
-			...LANGUAGES.filter((lang) => stats.get(lang)!.match < CORPUS_FORMAT_MATCH_MIN[lang]).map(
-				(lang) =>
-					`${lang} match ${stats.get(lang)!.match} < pinned minimum ${CORPUS_FORMAT_MATCH_MIN[lang]}`,
+			...LANGUAGES.filter((lang) => pin(lang).match < CORPUS_FORMAT_MATCH_MIN[lang]).map(
+				(lang) => `${lang} match ${pin(lang).match} < pinned minimum ${CORPUS_FORMAT_MATCH_MIN[lang]}`,
+			),
+			...LANGUAGES.filter((lang) => pin(lang).unknown_diff !== CORPUS_FORMAT_UNKNOWN_PIN[lang]).map(
+				(lang) => `${lang} unknown ${pin(lang).unknown_diff} ≠ pinned ${CORPUS_FORMAT_UNKNOWN_PIN[lang]}`,
 			),
 			...LANGUAGES.filter(
-				(lang) => stats.get(lang)!.unknown_diff !== CORPUS_FORMAT_UNKNOWN_PIN[lang],
+				(lang) => pin(lang).partial_divergence !== CORPUS_FORMAT_PARTIAL_PIN[lang],
 			).map(
-				(lang) =>
-					`${lang} unknown ${stats.get(lang)!.unknown_diff} ≠ pinned ${CORPUS_FORMAT_UNKNOWN_PIN[lang]}`,
-			),
-			...LANGUAGES.filter(
-				(lang) => stats.get(lang)!.partial_divergence !== CORPUS_FORMAT_PARTIAL_PIN[lang],
-			).map(
-				(lang) =>
-					`${lang} partial ${stats.get(lang)!.partial_divergence} ≠ pinned ${CORPUS_FORMAT_PARTIAL_PIN[lang]}`,
+				(lang) => `${lang} partial ${pin(lang).partial_divergence} ≠ pinned ${CORPUS_FORMAT_PARTIAL_PIN[lang]}`,
 			),
 		];
 		if (pin_failures.length > 0) {
 			console.log(
-				`\n\x1b[31mFAIL: pinned counts — ${pin_failures.join('; ')}. If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`,
+				`\n\x1b[31mFAIL: pinned counts (reproducible subset) — ${pin_failures.join('; ')}. ` +
+					`If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`,
 			);
 			canonical.dispose();
 			native.dispose();

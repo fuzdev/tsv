@@ -262,10 +262,18 @@ impl<'a> Printer<'a> {
         let lead = d.concat(&[comment_doc, comment_gap]);
         let with_lead = |paren_doc: DocId| d.concat(&[lead, paren_doc]);
 
-        // A line comment in the gap before the inner must force a hardline layout —
+        // The cast synthesizes its own `(`…`)`, so the gap between the inner expression
+        // and the closing `)` is ITS gap to claim — nothing outside can see between those
+        // parens. Left unemitted, every comment there was silently DROPPED. Shares the
+        // emitter with the stripped-paren restorer (`trailing_paren_comment_parts`).
+        let (trailing_parts, trailing_needs_break) = self
+            .trailing_paren_comment_parts(cast.inner.span().end, cast.span.end)
+            .unwrap_or_else(|| (DocBuf::new(), false));
+
+        // A line comment on either side of the inner must force a hardline layout —
         // otherwise `(// c <inner>)` runs the inner and the `)` into the comment
         // (silent content loss). Mirrors `build_expression_doc_keep_paren_comments`.
-        if self.has_line_comments_between(open + 1, inner_start) {
+        if self.has_line_comments_between(open + 1, inner_start) || trailing_needs_break {
             let mut parts: DocBuf = smallvec![d.hardline()];
             for comment in comments_to_emit_in_range(self.comments, open + 1, inner_start) {
                 parts.push(self.build_comment_doc(comment));
@@ -278,6 +286,7 @@ impl<'a> Printer<'a> {
                 });
             }
             parts.push(inner_doc);
+            parts.extend(trailing_parts);
             return with_lead(d.concat(&[
                 d.text("("),
                 d.indent(d.concat(&parts)),
@@ -290,7 +299,9 @@ impl<'a> Printer<'a> {
         // block comments here, so they hug inline. A nested cast's own `@type` comment
         // is NOT among them: that cast owns it and prints it itself.
         let interior = self.build_comments_between(open + 1, inner_start, CommentSpacing::Trailing);
-        let body = d.concat(&[interior, inner_doc]);
+        let mut body_parts: DocBuf = smallvec![interior, inner_doc];
+        body_parts.extend(trailing_parts);
+        let body = d.concat(&body_parts);
 
         // Object/array literals hug the parens; the inner's own group breaks it.
         if matches!(
@@ -336,15 +347,16 @@ impl<'a> Printer<'a> {
     pub(super) fn build_arg_expression_doc(&self, expr: &Expression<'_>) -> DocId {
         // Member-chain arg-doc sharing: a chain builds the same group flat and expanded
         // across `conditional_group` candidates; reuse the one build instead of
-        // re-recursing (kills the O(4^depth) rebuild — see the `chain_arg_share` field
-        // doc). Eligibility guarantees a hit is byte-identical to a rebuild.
+        // re-recursing (kills the O(4^depth) rebuild — see the `chain_arg_share_active`
+        // field doc). Eligibility guarantees a hit is byte-identical to a rebuild.
         if self.chain_arg_share_eligible() {
             let key = std::ptr::from_ref(expr) as usize;
-            if let Some(&doc) = self.chain_arg_share.borrow().get(&key) {
+            let share_map = self.arena.share_map_scratch();
+            if let Some(&doc) = share_map.borrow().get(&key) {
                 return doc;
             }
             let doc = self.build_arg_expression_doc_uncached(expr);
-            self.chain_arg_share.borrow_mut().insert(key, doc);
+            share_map.borrow_mut().insert(key, doc);
             return doc;
         }
         self.build_arg_expression_doc_uncached(expr)

@@ -30,9 +30,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    pub(in crate::parser) fn parse_type_annotation(
-        &mut self,
-    ) -> Result<TSTypeAnnotation<'arena>, ParseError> {
+    /// Parse a type annotation (`: Type`) at the current position. Also the public entry
+    /// point for embedders (`tsv_svelte`'s `{:then pattern: T}` / `{#each … as x: T}`).
+    pub fn parse_type_annotation(&mut self) -> Result<TSTypeAnnotation<'arena>, ParseError> {
         let start = self.current_pos().0;
         self.expect(&TokenKind::Colon)?;
 
@@ -249,9 +249,31 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
 
         match self.current_kind() {
-            // `this` keyword in type context (for `this` type, e.g., `this is T`)
+            // `this` type — a bare `this` type, or a `this`-type predicate
+            // `this is T`. The predicate form is a primary type accepted anywhere
+            // a type is expected (parameter / variable annotations, type-alias
+            // RHS, type arguments), matching acorn-typescript; the identifier form
+            // `x is T` stays restricted to return position (parsed in
+            // `statement/type_declarations.rs`).
             TokenKind::Keyword(KeywordKind::This) => {
                 let (start, end) = self.current_pos();
+                if self.peek_predicate_is_ahead() {
+                    let this_name = self.current_raw_ident_name();
+                    self.advance()?; // past `this`
+                    self.advance()?; // past `is`
+                    let type_node = self.parse_type()?;
+                    let type_end = type_node.span().end;
+                    let predicate = TSTypePredicate {
+                        parameter_name: Identifier::simple(
+                            this_name,
+                            Span::new(start as u32, end as u32),
+                        ),
+                        type_annotation: Some(self.alloc(type_node)),
+                        asserts: false,
+                        span: Span::new(start as u32, type_end),
+                    };
+                    return Ok(TSType::TypePredicate(predicate));
+                }
                 self.advance()?;
                 Ok(TSType::ThisType(TSThisType {
                     span: Span::new(start as u32, end as u32),
@@ -922,6 +944,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::New) => true,
             // Import types: import("./a").B
             TokenKind::Keyword(KeywordKind::Import) => true,
+            // `this`-type predicate: `(this is T)` is a parenthesized predicate
+            // type, not a `this` parameter. Bare `this`, `(this: T)`, `(this,`
+            // stay on the function-param path (`this` is a valid parameter name).
+            TokenKind::Keyword(KeywordKind::This) => self.peek_predicate_is_ahead(),
             // Non-identifier tokens that start types
             TokenKind::BracketOpen => true, // tuple types
             TokenKind::BraceOpen => true,   // object types
@@ -1224,7 +1250,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         start: usize,
         param_start: usize,
-        param_name: IdentName,
+        param_name: IdentName<'arena>,
         readonly: Option<TSMappedTypeModifier>,
     ) -> Result<TSType<'arena>, ParseError> {
         let arena = self.arena;

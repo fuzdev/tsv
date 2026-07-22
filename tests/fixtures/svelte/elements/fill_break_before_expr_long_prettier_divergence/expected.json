@@ -1,0 +1,333 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 570,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 185,
+				"data": "\n\tOverflowing fill: tsv breaks before the {expression} tag to keep the line within printWidth,\n\tso the tag leads the continuation line with its trailing text (no leading space).\n"
+			},
+			{
+				"type": "Text",
+				"start": 185,
+				"end": 186,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 186,
+				"end": 301,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 187
+					},
+					"end": {
+						"line": 5,
+						"column": 2,
+						"character": 188
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 189,
+							"end": 191,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 191,
+							"end": 213,
+							"expression": {
+								"type": "Identifier",
+								"start": 192,
+								"end": 212,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 22
+									}
+								},
+								"name": "aaaaaaaaaaaaaaaaaaaa"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 213,
+							"end": 225,
+							"raw": " bbbb cccc, ",
+							"data": " bbbb cccc, "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 225,
+							"end": 247,
+							"expression": {
+								"type": "Identifier",
+								"start": 226,
+								"end": 246,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 36
+									},
+									"end": {
+										"line": 6,
+										"column": 56
+									}
+								},
+								"name": "dddddddddddddddddddd"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 247,
+							"end": 264,
+							"raw": " eeee ffff gggg (",
+							"data": " eeee ffff gggg ("
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 264,
+							"end": 272,
+							"expression": {
+								"type": "Identifier",
+								"start": 265,
+								"end": 271,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 75
+									},
+									"end": {
+										"line": 6,
+										"column": 81
+									}
+								},
+								"name": "hhhhhh"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 272,
+							"end": 281,
+							"raw": " iiii),\n\t",
+							"data": " iiii),\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 281,
+							"end": 291,
+							"expression": {
+								"type": "Identifier",
+								"start": 282,
+								"end": 290,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 10
+									}
+								},
+								"name": "jjjjjjjj"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 291,
+							"end": 297,
+							"raw": " kkkk\n",
+							"data": " kkkk\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 301,
+				"end": 303,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 303,
+				"end": 454,
+				"data": " One character shorter: prettier keeps the whole fill on one line (105), tsv breaks the\n     trailing word off to hold the line at exactly 100. "
+			},
+			{
+				"type": "Text",
+				"start": 454,
+				"end": 455,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 455,
+				"end": 569,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 456
+					},
+					"end": {
+						"line": 12,
+						"column": 2,
+						"character": 457
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 458,
+							"end": 460,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 460,
+							"end": 482,
+							"expression": {
+								"type": "Identifier",
+								"start": 461,
+								"end": 481,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 22
+									}
+								},
+								"name": "aaaaaaaaaaaaaaaaaaaa"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 482,
+							"end": 494,
+							"raw": " bbbb cccc, ",
+							"data": " bbbb cccc, "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 494,
+							"end": 516,
+							"expression": {
+								"type": "Identifier",
+								"start": 495,
+								"end": 515,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 36
+									},
+									"end": {
+										"line": 13,
+										"column": 56
+									}
+								},
+								"name": "dddddddddddddddddddd"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 516,
+							"end": 533,
+							"raw": " eeee ffff gggg (",
+							"data": " eeee ffff gggg ("
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 533,
+							"end": 541,
+							"expression": {
+								"type": "Identifier",
+								"start": 534,
+								"end": 540,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 75
+									},
+									"end": {
+										"line": 13,
+										"column": 81
+									}
+								},
+								"name": "hhhhhh"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 541,
+							"end": 548,
+							"raw": " iii), ",
+							"data": " iii), "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 548,
+							"end": 558,
+							"expression": {
+								"type": "Identifier",
+								"start": 549,
+								"end": 557,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 90
+									},
+									"end": {
+										"line": 13,
+										"column": 98
+									}
+								},
+								"name": "jjjjjjjj"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 558,
+							"end": 565,
+							"raw": "\n\tkkkk\n",
+							"data": "\n\tkkkk\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

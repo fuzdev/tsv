@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 290,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 11,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 11,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "a",
+											"start": 9,
+											"end": 11
+										}
+									],
+									"start": 9,
+									"end": 11
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 12,
+					"end": 281,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 94,
+							"end": 109,
+							"property": "content",
+							"value": "'a''b'"
+						},
+						{
+							"type": "Declaration",
+							"start": 179,
+							"end": 195,
+							"property": "content",
+							"value": "'a'x'b'"
+						},
+						{
+							"type": "Declaration",
+							"start": 261,
+							"end": 277,
+							"property": "content",
+							"value": "\"a\"x\"b\""
+						}
+					]
+				},
+				"start": 9,
+				"end": 281
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 282,
+			"styles": "\n\t.a {\n\t\t/* Two directly-adjacent quoted strings — one opaque run, kept verbatim. */\n\t\tcontent: 'a''b';\n\t\t/* String, ident, string glued into one run — kept verbatim. */\n\t\tcontent: 'a'x'b';\n\t\t/* Double-quoted run — not re-quoted to a single string. */\n\t\tcontent: \"a\"x\"b\";\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 291,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

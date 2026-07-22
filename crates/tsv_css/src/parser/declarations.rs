@@ -78,8 +78,9 @@ pub(crate) fn is_nested_rule_start(parser: &CssParser<'_, '_>) -> Result<bool, P
 ///
 /// Scans forward from after the identifier, skipping parenthesized groups, until it finds
 /// `{` (nested rule) or `;`/`}` (declaration). For a declaration that means walking the whole
-/// value — the same bytes `parse_declaration` then walks again — so `decl_scan` walks them as
-/// bytes, keeping an equivalent token walk as its fallback and its debug-time oracle.
+/// value — so `decl_scan` walks it as bytes (keeping an equivalent token walk as its fallback
+/// and its debug-time oracle) and, in that one pass, also collects the value facts, which it
+/// stashes on the parser for `parse_declaration` to reuse rather than re-scan.
 fn is_type_selector_with_pseudo(parser: &CssParser<'_, '_>) -> Result<bool, ParseError> {
     super::decl_scan::scan_rule_or_declaration(parser, parser.current_end)
 }
@@ -195,8 +196,7 @@ pub(crate) fn parse_declaration<'arena>(
     }
     // Internal AST: use decoded value (spec-compliant)
     // Svelte quirk (raw value) will be applied in conversion layer
-    let property_ident = parser.current_identifier();
-    let property = parser.alloc_str_in(property_ident);
+    let property = parser.current_identifier_in_arena();
     parser.advance()?;
 
     let property_gap_comment = parser.skip_whitespace_and_comments()?;
@@ -217,8 +217,30 @@ pub(crate) fn parse_declaration<'arena>(
     // bytes rather than tokens — a value's text is re-parsed from source below
     // (`parse_value_from_source`) anyway, so tokenizing it here only to find a `;` was
     // paying the lexer twice for the same bytes. See `decl_scan`.
+    //
+    // For a non-custom declaration the rule/declaration disambiguation already walked this
+    // value (to decide it was a declaration, not a nested rule) and stashed these facts, so
+    // reuse them rather than walk a second time. The stash is absent for a custom property
+    // (which bypasses the disambiguation) or when the byte scan declined; then scan now.
     let value_start_raw = parser.current_start;
-    let facts = super::decl_scan::scan_value(parser, value_start_raw)?;
+    let facts = match parser.take_value_facts(value_start_raw) {
+        Some(facts) => {
+            #[cfg(debug_assertions)]
+            {
+                // The reused facts must equal a fresh scan at the parser's own value start —
+                // proving the disambiguation located the value identically to the parser's
+                // positioning here.
+                let fresh = super::decl_scan::scan_value(parser, value_start_raw);
+                debug_assert!(
+                    fresh.as_ref().is_ok_and(|fresh| *fresh == facts),
+                    "reused value facts disagreed with a fresh scan at {value_start_raw}: \
+                     reused {facts:?}, fresh {fresh:?}"
+                );
+            }
+            facts
+        }
+        None => super::decl_scan::scan_value(parser, value_start_raw)?,
+    };
 
     // Land on the terminator the scan found — the lexer never tokenized the value, and it
     // does not tokenize the terminator either: the scan stopped *on* it, so it knows which

@@ -26,6 +26,8 @@
 // 3. **Modularity**: Each module has single responsibility for future maintainability
 
 mod analysis;
+#[cfg(feature = "buffer_stats")]
+pub mod buffer_stats;
 mod calls;
 mod chain;
 mod class_common;
@@ -42,11 +44,11 @@ mod types;
 // {@const} assignment layout reuses Prettier's break-after-operator rules).
 pub use analysis::conditional_should_break_after_op;
 pub(crate) use analysis::{
-    PatternContext, build_entity_name_doc, has_multiline_content, has_newline_before_position,
-    is_brace_block_multiline, is_effectively_empty_body, is_module_path_fluid_call,
-    is_multiline_string_literal, is_multiline_template_expression, is_pure_property_chain,
-    is_string_literal, next_printed_stmt_start, object_pattern_should_expand,
-    template_literal_has_newlines,
+    PatternContext, build_entity_name_doc, container_may_have_multiline_content,
+    has_multiline_content, has_newline_before_position, is_brace_block_multiline,
+    is_effectively_empty_body, is_module_path_fluid_call, is_multiline_string_literal,
+    is_multiline_template_expression, is_pure_property_chain, is_string_literal,
+    next_printed_stmt_start, object_pattern_should_expand, template_literal_has_newlines,
 };
 pub(crate) use comments::{
     CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
@@ -64,12 +66,9 @@ pub(crate) use types::unwrap_parenthesized;
 
 use crate::PrinterInputs;
 use crate::ast::internal;
-use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
-use std::rc::Rc;
+use std::cell::Cell;
 use tsv_lang::{
-    EmbedContext, OutputBuffer, SharedInterner, Span, SymbolResolver, SymbolToU32, TAB_WIDTH,
-    comments_to_emit_in_range,
+    EmbedContext, OutputBuffer, Span, TAB_WIDTH, comments_to_emit_in_range,
     doc::{
         self,
         arena::{DocArena, DocId},
@@ -113,12 +112,22 @@ pub struct Printer<'a> {
     pub(crate) embed: EmbedContext,
     /// Arena allocator for doc nodes (borrowed from caller or locally owned)
     pub(crate) arena: &'a DocArena,
-    /// Shared string interner for resolving symbols
-    interner: SharedInterner,
     /// Original source code (for extracting raw values, preserving escape sequences, etc.)
     pub(crate) source: &'a str,
     /// Comments from the program (for printing leading/trailing comments)
     pub(crate) comments: &'a [internal::Comment],
+    /// Whether any comment in this document is owned by a node (`owned_by_node`).
+    /// Document-level presence flag (from `PrinterInputs`), computed once per document
+    /// — never here, per that field's doc (the `.svelte` per-`{expr}` trap). Gates the
+    /// owned-leading-comment path so a document with no owned comment (~all of them)
+    /// skips its per-expression byte gate entirely.
+    pub(crate) has_owned_comments: bool,
+    /// Whether any comment in this document is a `format-ignore` directive.
+    /// Document-level presence flag (from `PrinterInputs`), computed once per document —
+    /// never here (the `.svelte` per-`{expr}` trap). Gates `has_format_ignore_in_range` so
+    /// a document with no format-ignore directive (~all of them) skips the per-node range
+    /// scan + directive-string match entirely.
+    pub(crate) has_format_ignore: bool,
     /// Precomputed line break positions for O(log n) line boundary lookups
     pub(crate) line_breaks: &'a [u32],
     /// Extra indent depth for declaration contexts (0 normally, 1+ in multi-declarator)
@@ -183,23 +192,27 @@ pub struct Printer<'a> {
     /// `needs_parens` check (assignment RHS, ternary branches/test).
     /// Uses Cell for interior mutability so doc builders (&self) can set this.
     pub(crate) in_for_init: Cell<bool>,
-    /// Scoped argument-doc share map for member-chain building: an argument
-    /// expression's pointer → its already-built [`Self::build_arg_expression_doc`]
-    /// `DocId`. A member chain renders the same group **flat** (`print_group`) and
-    /// **expanded** (`print_group_expanded`) across `conditional_group` candidates;
-    /// without sharing, the recursive arg build runs once per candidate and a nested
-    /// chain in a call arg compounds to O(4^depth) — the member-chain rebuild blowup.
-    /// The flat and expanded builds differ in
-    /// Printer state **only** via `skip_arrow_chain` / `expand_last_arg_flat_params`
-    /// (the sole `.set` sites in `calls/chain_args.rs`); every other flag is
-    /// statement-constant during a chain or set identically by the shared AST
-    /// traversal, so a given node is reached under identical state in both candidates.
-    /// Hence the cache is consulted only when [`Self::chain_arg_share_eligible`]
-    /// (active + both of those flags clear), making a hit byte-identical to a rebuild.
-    /// Active only between `enter_chain_arg_share`/`exit_chain_arg_share` (the outermost
-    /// `build_chain_doc`); keyed by node pointer (stable — the AST arena is immutable
-    /// during formatting).
-    pub(crate) chain_arg_share: RefCell<HashMap<usize, DocId>>,
+    /// Whether the scoped argument-doc share map for member-chain building is
+    /// active: an argument expression's pointer → its already-built
+    /// [`Self::build_arg_expression_doc`] `DocId`. A member chain renders the same
+    /// group **flat** (`print_group`) and **expanded** (`print_group_expanded`)
+    /// across `conditional_group` candidates; without sharing, the recursive arg
+    /// build runs once per candidate and a nested chain in a call arg compounds to
+    /// O(4^depth) — the member-chain rebuild blowup. The flat and expanded builds
+    /// differ in Printer state **only** via `skip_arrow_chain` /
+    /// `expand_last_arg_flat_params` (the sole `.set` sites in
+    /// `calls/chain_args.rs`); every other flag is statement-constant during a
+    /// chain or set identically by the shared AST traversal, so a given node is
+    /// reached under identical state in both candidates. Hence the cache is
+    /// consulted only when [`Self::chain_arg_share_eligible`] (active + both of
+    /// those flags clear), making a hit byte-identical to a rebuild. Active only
+    /// between `enter_chain_arg_share`/`exit_chain_arg_share` (the outermost
+    /// `build_chain_doc`); keyed by node pointer (stable — the AST arena is
+    /// immutable during formatting). The map's *storage* is the doc arena's
+    /// parked [`DocArena::share_map_scratch`] (cleared at both enter and exit, so
+    /// between chains — and across printers sharing one arena — it is logically
+    /// empty and only its table capacity persists, killing the per-printer
+    /// `HashMap` resize chain).
     pub(crate) chain_arg_share_active: Cell<bool>,
     /// Expand-last-arg body reuse: `(body-expr span start, pre-built body DocId)`.
     /// The call/new expand-last paths build an arrow's call body **once** up front
@@ -218,7 +231,7 @@ pub struct Printer<'a> {
     /// Whether the member chain currently being built has any comment anywhere in its
     /// span. Set once per `build_chain_doc` (save/restore, so a nested chain in a call
     /// arg / base restores the parent's value on exit — re-entrancy-safe like
-    /// [`Self::chain_arg_share`]). The chain print path reads it to skip per-member
+    /// [`Self::chain_arg_share_active`]). The chain print path reads it to skip per-member
     /// comment classification when the whole chain is comment-free (the common case).
     /// Safe by construction: the flag only *enables* a skip whose soundness is
     /// span-containment (a member's comment gap ⊆ the chain span), so a stale value can
@@ -245,9 +258,10 @@ impl<'a> Printer<'a> {
             indent_level: 0,
             embed,
             arena,
-            interner: Rc::clone(&inputs.interner),
             source: inputs.source,
             comments: inputs.comments,
+            has_owned_comments: inputs.has_owned_comments,
+            has_format_ignore: inputs.has_format_ignore,
             line_breaks: inputs.line_breaks,
             declaration_indent_depth: Cell::new(0),
             is_expression_statement: Cell::new(false),
@@ -259,7 +273,6 @@ impl<'a> Printer<'a> {
             expr_stmt_paren_target: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
-            chain_arg_share: RefCell::new(HashMap::new()),
             chain_arg_share_active: Cell::new(false),
             arrow_body_inject: Cell::new(None),
             chain_has_comments: Cell::new(true),
@@ -340,36 +353,24 @@ impl<'a> Printer<'a> {
         // file's renders (the whole program standalone; one per template
         // expression when Svelte-embedded) instead of an alloc/free per call.
         let mut output = self.arena.take_render_scratch();
-        {
-            let interner = self.interner.borrow();
-            // Source-aware resolver so `DocText::SourceSpan` nodes (verbatim
-            // comment/literal slices) resolve without a `DocArena` lifetime.
-            let resolver = doc::SourceTextResolver {
-                inner: &*interner,
-                source: self.source,
-            };
-            doc::arena_print_doc_with_indent_resolved_into(
-                self.arena,
-                d,
-                &self.embed,
-                current_col,
-                self.indent_level,
-                &resolver,
-                &mut output,
-            );
-        }
+        // Pass the document source so `DocText::SourceSpan` nodes (verbatim
+        // comment/literal slices) resolve at render without a `DocArena` lifetime.
+        doc::arena_print_doc_with_indent_resolved_into(
+            self.arena,
+            d,
+            &self.embed,
+            current_col,
+            self.indent_level,
+            self.source,
+            &mut output,
+        );
         self.write(&output);
         self.arena.park_render_scratch(output);
     }
 
     /// Render an arena DocId to a flat string with effectively infinite width.
     pub(crate) fn render_arena_doc_flat(&self, d: DocId) -> String {
-        let interner = self.interner.borrow();
-        let resolver = doc::SourceTextResolver {
-            inner: &*interner,
-            source: self.source,
-        };
-        doc::arena_measure_doc_flat_resolved(self.arena, d, &self.embed, &resolver)
+        doc::arena_measure_doc_flat_resolved(self.arena, d, &self.embed, self.source)
     }
 
     /// Get the formatted output
@@ -439,10 +440,10 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether `build_arg_expression_doc` may share its result via `chain_arg_share`.
+    /// Whether `build_arg_expression_doc` may share its result via the chain-arg share map.
     /// True only while a member chain is building (`chain_arg_share_active`) AND the two
     /// flags that make the flat vs expanded chain-group builds diverge are clear — see
-    /// the `chain_arg_share` field doc. When either is set we're building an arrow arg in
+    /// the `chain_arg_share_active` field doc. When either is set we're building an arrow arg in
     /// the expand-last / curried path, which the expanded candidate builds under different
     /// state, so it must not share.
     pub(crate) fn chain_arg_share_eligible(&self) -> bool {
@@ -451,24 +452,24 @@ impl<'a> Printer<'a> {
             && !self.expand_last_arg_flat_params.get()
     }
 
-    /// Activate `chain_arg_share` for the outermost `build_chain_doc` only. Returns the
+    /// Activate the chain-arg share map for the outermost `build_chain_doc` only. Returns the
     /// prior active state; nested chains observe `true` and become no-ops (the map
     /// persists across the whole top-level chain so every nesting level shares).
     pub(crate) fn enter_chain_arg_share(&self) -> bool {
         let was_active = self.chain_arg_share_active.get();
         if !was_active {
             self.chain_arg_share_active.set(true);
-            self.chain_arg_share.borrow_mut().clear();
+            self.arena.share_map_scratch().borrow_mut().clear();
         }
         was_active
     }
 
-    /// Deactivate + clear `chain_arg_share` when leaving the outermost `build_chain_doc`
+    /// Deactivate + clear the chain-arg share map when leaving the outermost `build_chain_doc`
     /// (`was_active` false). Nested exits are no-ops.
     pub(crate) fn exit_chain_arg_share(&self, was_active: bool) {
         if !was_active {
             self.chain_arg_share_active.set(false);
-            self.chain_arg_share.borrow_mut().clear();
+            self.arena.share_map_scratch().borrow_mut().clear();
         }
     }
 
@@ -730,15 +731,15 @@ impl<'a> Printer<'a> {
     ///
     /// This is the gate for the keyword→value gaps (as/satisfies,
     /// heritage/conditional `extends`, keyof/typeof/readonly, infer,
-    /// type-param constraint/default, predicate `is`, indexed access) and the
-    /// type-alias `=` layout. Keying the multiline case on the newline *after*
+    /// type-param constraint/default, predicate `is`, indexed access,
+    /// `export default`) and the type-alias `=` layout. Keying the multiline case on the newline *after*
     /// the comment (not before) keeps it idempotent: a block glued to the value
     /// stays inline even at line start in already-broken output, and only an
     /// authored break hangs it. Contrast
-    /// [`Self::comment_forces_following_own_line`], which *also* hangs a
+    /// [`Self::comment_hangs_binary_operand`], which *also* hangs a
     /// single-line own-line block — the two differ only in that `c.multiline`
-    /// guard; use that variant only at the two carve-out sites where prettier
-    /// *keeps* that break (binary/logical operands, `export default`).
+    /// guard; use that variant only at the one carve-out site where prettier
+    /// *keeps* that break (binary/logical operands).
     pub(crate) fn comments_force_own_line_between(&self, start: u32, end: u32) -> bool {
         self.any_comment_on_page_with_next(start, end, |c, next| self.comment_hangs_next(c, next))
     }
@@ -761,7 +762,7 @@ impl<'a> Printer<'a> {
     /// the authored newline is decided by a newline that very collapse destroys, so the
     /// format stops being idempotent on its own output.
     ///
-    /// Contrast [`Self::comment_forces_own_line`], the operator-glue rule, which keys on
+    /// Contrast [`Self::comment_cannot_glue_to_operator`], the operator-glue rule, which keys on
     /// the newline *before* a comment and hangs an own-line **single-line** block too.
     pub(crate) fn comment_hangs_next(&self, c: &internal::Comment, next: u32) -> bool {
         !c.is_block || (c.multiline && self.has_newline_between(c.span.end, next))
@@ -773,14 +774,21 @@ impl<'a> Printer<'a> {
     /// `hasLeadingOwnLineComment`). Keying on the newline *after* the comment (not
     /// before) keeps the layout idempotent: a block glued to the value (`/* c */ v`,
     /// even at line start in already-broken output) stays inline, only an authored
-    /// break (`/* c */⏎v`) forces the value down. Used only at the two carve-out
-    /// sites where prettier *keeps* the operand break — binary/logical operands
-    /// (`operators.rs`) and `export default` (`modules/mod.rs`) — so hanging is the
-    /// smaller (indent-only) divergence than collapsing. Contrast
+    /// break (`/* c */⏎v`) forces the value down.
+    ///
+    /// ⚠️ **Site-specific — the name says which.** This serves binary/logical
+    /// operands only (`operators.rs`), mirroring prettier's own
+    /// `hasLeadingOwnLineComment` for that layout, where prettier *keeps* the operand
+    /// break so hanging is the smaller divergence than collapsing. It is NOT a
+    /// general keyword→value gate: `export default` reached for it (under its old,
+    /// general-sounding name) and became the lone value gap preserving an unforced
+    /// break, disagreeing with its own twin `export =`. A keyword→value gap wants
+    /// [`Self::comments_force_own_line_between`]; an operator→value gap wants
+    /// [`Self::comment_cannot_glue_to_operator`]. Contrast
     /// [`Self::comments_force_own_line_between`], which collapses an authored
     /// own-line single-line block inline; that is the gate for every other
     /// keyword→value gap.
-    pub(crate) fn comment_forces_following_own_line(&self, start: u32, end: u32) -> bool {
+    pub(crate) fn comment_hangs_binary_operand(&self, start: u32, end: u32) -> bool {
         self.any_comment_on_page_with_next(start, end, |c, next| {
             !c.is_block || self.has_newline_between(c.span.end, next)
         })
@@ -835,13 +843,41 @@ impl<'a> Printer<'a> {
         !comment.is_block || has_newline_before_position(self.source, comment.span.start)
     }
 
+    /// Whether a block comment in `(start, end)` sits **alone on its own physical
+    /// line** — a newline both before it ([`Self::is_own_line_comment`]) *and* after
+    /// it (toward the next comment, or `end` for the last). This is the idempotent key
+    /// for "keep the comment on its own line and break the value below it" across a
+    /// keyword/operator that itself breaks (the type-alias `=`): prettier preserves an
+    /// isolated own-line block (`type X =⏎/* c */⏎Y`) but **collapses** a block merely
+    /// glued to the value across the `=`-break (`type X =⏎/* c */ Y` → inline, then
+    /// width decides). Keying on the newline *before* alone ([`Self::is_own_line_comment`])
+    /// would spuriously force the break on already-broken output and lose idempotency —
+    /// the same hazard [`Self::comment_hangs_next`] documents.
+    pub(crate) fn block_comment_isolated_own_line_between(&self, start: u32, end: u32) -> bool {
+        self.any_comment_on_page_with_next(start, end, |c, next| {
+            c.is_block && self.is_own_line_comment(c) && self.has_newline_between(c.span.end, next)
+        })
+    }
+
     /// Whether a comment must occupy its own line rather than gluing inline to the
     /// operator that precedes it: a line comment, a multiline block, or an own-line
     /// block (a newline precedes it). This is exactly the negation of the single-line
     /// glued block that
     /// [`build_rhs_comments_glued_opt`](Self::build_rhs_comments_glued_opt) hugs across
     /// a source newline, so the two stay in lockstep.
-    pub(crate) fn comment_forces_own_line(&self, comment: &internal::Comment) -> bool {
+    ///
+    /// The **operator→value** rule (assignment `=` and friends), as distinct from the
+    /// **keyword→value** rule ([`Self::comments_force_own_line_between`]): the two
+    /// differ on an own-line *single-line* block, which this hangs and that collapses.
+    /// Both are right for their family — assignment preserves it
+    /// (`assignment/rhs_block_comment_newline`), `as`/`keyof`/`export default` reflow
+    /// it, and prettier agrees with each.
+    ///
+    /// ⚠️ A **line** comment satisfies this via `is_own_line_comment`'s `!is_block`
+    /// disjunct, not via any newline scan — so this never collapses one, and reading
+    /// the name as "own line means a newline precedes it" is a mistake that has been
+    /// made. Open the definition before reasoning about a line comment here.
+    pub(crate) fn comment_cannot_glue_to_operator(&self, comment: &internal::Comment) -> bool {
         comment.multiline || self.is_own_line_comment(comment)
     }
 
@@ -1076,6 +1112,11 @@ impl<'a> Printer<'a> {
     /// and neither is a format-ignore directive — no owned comment can ever match this
     /// predicate, so skipping and counting give the same answer.
     fn has_format_ignore_in_range(&self, start: u32, end: u32) -> bool {
+        // Document-level short-circuit: no format-ignore directive anywhere in the
+        // document ⇒ none in any sub-range, so skip the range scan + directive match.
+        if !self.has_format_ignore {
+            return false;
+        }
         comments_to_emit_in_range(self.comments, start, end)
             .any(|c| is_format_ignore_directive(c.content(self.source)))
     }
@@ -1115,17 +1156,16 @@ impl<'a> Printer<'a> {
     /// Emit an identifier-name doc node — the doc-side name-emission seam.
     /// Span-identity names render as verbatim source (`DocText::SourceSpan`
     /// with deferred width — identifier names are newline-free, and the lazy
-    /// measure matches `Symbol`'s zero build-time cost); escaped names defer
-    /// to the interner (`DocText::Symbol`), resolved at render exactly as
-    /// before.
+    /// measure matches the zero build-time cost); the rare escaped name copies
+    /// its decoded `&str` into the doc text pool (`DocText::Pooled`).
     pub(in crate::printer) fn ident_name_doc(
         &self,
-        name: internal::IdentName,
+        name: internal::IdentName<'_>,
         name_start: u32,
     ) -> DocId {
         let d = self.d();
         match name.escaped {
-            Some(sym) => d.symbol(sym.to_u32()),
+            Some(s) => d.text_pooled(s),
             None => d.source_span_ident(Span::new(name_start, name_start + name.raw_len as u32)),
         }
     }
@@ -1137,16 +1177,16 @@ impl<'a> Printer<'a> {
     }
 
     /// Run `f` over a name channel resolved at `name_start` — the compare/width
-    /// seam. Span-identity names borrow the source slice; escaped names resolve
-    /// the interned decoded form (so an escaped name still compares decoded).
+    /// seam. Span-identity names borrow the source slice; an escaped name compares its
+    /// arena string (so an escaped name still compares decoded).
     pub(in crate::printer) fn with_ident_name_at<R>(
         &self,
-        name: internal::IdentName,
+        name: internal::IdentName<'_>,
         name_start: u32,
         f: impl FnOnce(&str) -> R,
     ) -> R {
         match name.escaped {
-            Some(sym) => self.with_resolved_symbol(sym, f),
+            Some(s) => f(s),
             None => {
                 f(&self.source[name_start as usize..name_start as usize + name.raw_len as usize])
             }
@@ -1160,12 +1200,5 @@ impl<'a> Printer<'a> {
         f: impl FnOnce(&str) -> R,
     ) -> R {
         self.with_ident_name_at(id.ident_name(), id.span.start, f)
-    }
-}
-
-// Implement SymbolResolver trait for shared symbol resolution utilities
-impl<'a> SymbolResolver for Printer<'a> {
-    fn interner(&self) -> &SharedInterner {
-        &self.interner
     }
 }

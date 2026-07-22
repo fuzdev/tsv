@@ -41,13 +41,19 @@
 //! this class; and `/* … */` is not a comment in Svelte markup under any reading, so
 //! injecting one there tests nothing while burying the report in shapes like `IDENT⟨⟩␣`.
 //!
-//! So sites come from [`code_regions`] — the spans the AST says are JS or CSS — and inside
-//! those two existing layers filter for free:
+//! So sites come from [`code_regions`](crate::audit::sites::code_regions) — the spans the
+//! AST says are JS or CSS — and inside those two existing layers filter for free:
 //!
 //! - **inside a word** (`fo/* c */o` → `fo o`) — the parser rejects it, so the site is
 //!   skipped. Correctly: that gap exists in no real document.
 //! - **inside a string literal** (`"fo/* c */o"`) — parses, but the injected text is never
 //!   *lexed* as a comment, so the ledger registers nothing and reports nothing.
+//!
+//! One class those two miss is an offset **inside an existing comment** (`/* c1 ⟨⟩*/`): it
+//! parses, lexes, and *does* register — but injecting there mutilates the author's comment
+//! rather than probing a gap, and reads as a false drop. That one is not free;
+//! [`injection_sites`](crate::audit::sites::injection_sites) excludes it explicitly from
+//! the seed's own parsed comment spans, under every mode.
 //!
 //! And because the ledger asks only "was each comment printed exactly once?" — never "did
 //! the layout change?" — an injection that legitimately reflows the file, or even changes
@@ -58,30 +64,73 @@
 //!
 //! Two limits compose, and neither is visible in a `✓`.
 //!
-//! The audit inherits **the ledger's scope** exactly: only the **detached** comments a
-//! format entry registers. A Svelte `<!-- … -->` and a CSS in-block comment are AST nodes
-//! carried by the tree, and a CSS declaration's *value* comments are never lexed as
-//! `Comment`s at all — all outside the model by construction (see [`comment_ledger`]'s
-//! module docs). So this speaks for the detached-comment model — the class that bit us
-//! eight times — and not for CSS values. CSS also has no line comments, so the `line`
-//! payload is inert in a `.css` file (harmless: it simply never registers).
+//! The audit inherits **the ledger's scope** exactly. That scope now covers both the
+//! **detached** comments a format entry registers AND the **AST-node** comments — a Svelte
+//! `<!-- … -->` and a CSS in-block `CssBlockChild::Comment`, which the ledger registers by
+//! span (see [`comment_ledger`]'s module docs). A CSS declaration's *value* comments are
+//! still never lexed as `Comment`s at all — outside the model by construction. So this
+//! speaks for both comment models — the detached class that bit us eight times and the
+//! tree-carried AST-node one — but not for CSS values. CSS also has no line comments, so the
+//! `line` payload is inert in a `.css` file (harmless: it simply never registers).
 //!
-//! It also inherits **[`code_regions`]' reach**: a gap the region walk doesn't name is a
-//! gap never probed. Today that means a `.svelte` file's `<style>` content is unprobed, so
-//! a Svelte file containing only a `<style>` block yields **zero sites** — see that
-//! function's TODO for why the ledger's scope, not difficulty, is what holds it back.
+//! It also inherits **[`code_regions`](crate::audit::sites::code_regions)' reach**: a gap
+//! the region walk doesn't name is a gap never probed. Today that means a `.svelte` file's
+//! `<style>` content is unprobed, so a Svelte file containing only a `<style>` block yields
+//! **zero sites** — now a yield/cost call rather than a scope one (the ledger guards CSS
+//! in-block comments), see that function's TODO.
+//!
+//! ## Structure
+//!
+//! Thin orchestration over the [`audit`](crate::audit) substrate: site enumeration and
+//! shape keying live in [`audit::sites`](crate::audit::sites), the panic-safe ledger format
+//! and verify verdicts in [`audit::properties`](crate::audit::properties), the snapshot
+//! ratchet in [`audit::ratchet`](crate::audit::ratchet), and the reporting envelope +
+//! printers in [`audit::report`](crate::audit::report). This module owns the command, the
+//! per-file inject loop, the finding aggregation, and the gate/exit decision.
+//!
+//! ## Attribution — where a bystander finding is filed
+//!
+//! Every injection perturbs one gap, but the ledger reports each finding by its comment's span
+//! in the **formatted input**. When the finding IS the injected comment (`injected`), that span
+//! starts at the injection offset and the two coincide. When it is a **bystander** — a
+//! pre-existing seed comment the injection knocked out — its span is somewhere else entirely,
+//! and after a width flip can be lines away. So a hit carries two seed offsets: the **injection
+//! offset** (what [`verify_example`] re-splices to reproduce the drop) and the **attribution
+//! offset** (the victim comment's own seed site, [`victim_seed_offset`]-mapped back across the
+//! splice). The shape, snippet, canonical sort, and `--by-node` emitter edge all key on the
+//! attribution offset — so a dropped bystander points at the emitter that dropped it, not at the
+//! perturbation site the payload went in at.
+
+mod by_node;
+mod snapshot;
+mod verify;
 
 use argh::FromArgs;
 use std::collections::{BTreeMap, BTreeSet};
-use std::path::PathBuf;
 
+use by_node::{by_node_json_sections, compute_by_node, report_by_node, report_rank, report_since};
+use snapshot::{
+    KnownKey, count_panics, count_soft, is_pinnable, known_shapes_path, ratchet, snapshot_keys,
+};
+use verify::{verify_example, victim_seed_offset};
+
+use crate::audit::node_edge::{NodeEdgeKey, node_edge_key_with_map};
+use crate::audit::parallel::run_pool;
+use crate::audit::properties::{
+    Formatted, Pristine, Utf16ToByte, Verdict, VerifyOutcome, VerifySummary, ledger_format,
+    pristine_format, tsv_parse_to_value,
+};
+use crate::audit::ratchet::{GateDiff, SnapshotKey};
+use crate::audit::report::{
+    self, Confidence, Detail, Finding, GapDetail, ReportExample, RunSummary, Severity,
+};
+use crate::audit::sites::{code_regions, injection_sites, site_shape, snippet};
 use crate::cli::CliError;
-use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
-use tsv_lang::comment_ledger::{self, CommentFinding, CommentFindingKind};
+use tsv_lang::comment_ledger::{self, CommentFindingKind};
+use tsv_lang::doc::swallow;
 
-use super::profile::resolve_files;
-use super::roundtrip_audit::tsv_parse_to_value;
+use super::profile::{is_input_invalid_fixture, resolve_files};
 
 /// Inject a comment into every gap and assert the print-once ledger still holds.
 ///
@@ -103,10 +152,36 @@ pub struct GapAuditCommand {
     #[argh(switch)]
     report: bool,
 
-    /// inject at EVERY char boundary, including positions strictly inside a word.
-    /// A diagnostic, not a stricter mode: it does surface extra shapes, but on the
-    /// corpus they are artifacts of mutilating an existing comment, not gap bugs
-    /// (see `injection_sites`)
+    /// after the run, also print a COARSE by-(node, edge) rollup of the finding shapes: a
+    /// ranked emitter work-list keyed on the enclosing AST node + child-role edge, folding
+    /// the ~700 fine token shapes into the few dozen printer clusters. A report-only view —
+    /// it never changes the ratchet grade or the exit code
+    #[argh(switch)]
+    by_node: bool,
+
+    /// print the top-N by-(node, edge) clusters as a paste-ready MARKDOWN table for
+    /// TODO_GAPS §Status — the ranked emitter work-list Phase 1 reads fattest-first, kept
+    /// current without a hand-transcribe. Report-only (implies the record-time keying
+    /// `--by-node` uses); never touches the ratchet grade or the exit code
+    #[argh(switch)]
+    rank: bool,
+
+    /// path to a prior `gap_audit --json` output; print the per-cluster ranking DELTA against
+    /// it (`(CallExpression, arguments→$) 2861 → 2790 (−71)`) so a slice can see whether it
+    /// moved its target cluster. Report-only (implies record-time keying)
+    #[argh(option)]
+    since: Option<String>,
+
+    /// with `--rank`, how many clusters the markdown table shows (default 12). A `--since` diff
+    /// always lists every changed cluster, so `--top` does not bound it
+    #[argh(option, default = "12")]
+    top: usize,
+
+    /// inject at EVERY char boundary, including positions strictly inside a WORD.
+    /// A diagnostic, not a stricter mode: it relaxes only the word-interior filter,
+    /// and the extra shapes are artifacts of splitting a word (`desc/* c */ribe`),
+    /// not gap bugs. Comment interiors stay excluded under every mode (see
+    /// `injection_sites`)
     #[argh(switch)]
     all_bytes: bool,
 
@@ -199,687 +274,25 @@ impl Payload {
     }
 }
 
-/// The committed snapshot of every finding shape `tests/fixtures` currently produces —
-/// the ratchet `deno task check` gates on.
-///
-/// **Machine-generated** (`deno task gaps:audit:update`), unlike
-/// [`scan_audit`](super::scan_audit)'s hand-curated `ALLOW`: at ~700 shapes a per-entry
-/// rationale is not a thing a human can keep honest, so this deliberately carries none. It
-/// is a ratchet, not a sanction — every line is a **known bug**, and the file shrinking is
-/// the goal.
-///
-/// What it buys: a shape that is not on the list fails the gate, so no *new* kind of drop
-/// lands silently. What it does not: a new drop at an **existing** shape is invisible (the
-/// key is the shape, not the count — counts churn with every ordinary fixture PR, and a
-/// gate that fails per added fixture would just be turned off). Fixing a shape must remove
-/// its line; a stale entry fails the gate too, so the list can't rot.
-const KNOWN_SHAPES: &str = include_str!("gap_audit_known.txt");
-
-/// Where [`KNOWN_SHAPES`] lives, for `--update` to rewrite.
-fn known_shapes_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/cli/commands/gap_audit_known.txt")
-}
-
-/// One snapshot line: what the ratchet actually pins.
-///
-/// The payload set is part of the key, not decoration. A shape that drops only a `line`
-/// comment today and starts dropping a `block` one tomorrow is a **new bug on a new
-/// ownership path** — keyed on the shape alone it would land inside an existing entry and
-/// never be seen. It is also stable in the way a count is not: it changes when the bug's
-/// character changes, not when a fixture is added.
-type KnownKey = (String, String, String);
-
-/// Render a payload set into its snapshot column.
-fn payload_column(payloads: &BTreeSet<&'static str>) -> String {
-    payloads.iter().copied().collect::<Vec<_>>().join(",")
-}
-
-/// Whether a shape is something the snapshot may pin — everything but a [`Kind::Panic`].
-///
-/// A panic is not a "known bug" to ratchet alongside the drops. The invariant it breaks is
-/// **absolute** (a comment in a gap must never crash the formatter), so it always fails the
-/// gate and is never pinnable — otherwise `--update` would quietly absorb a crash into the
-/// same list whose shrinking is the goal. [`render_known`] and [`found_keys`] share this
-/// filter so the two stay in lockstep: a panic can't be written, so it can never read back
-/// as stale.
-fn is_pinnable(kind: Kind) -> bool {
-    kind != Kind::Panic
-}
-
-/// How many of `shapes` crash the formatter — the shapes [`is_pinnable`] keeps out of the
-/// snapshot, and which therefore need their own accounting on every exit path.
-fn count_panics(shapes: &BTreeMap<(Kind, String), ShapeAgg>) -> usize {
-    shapes.keys().filter(|(k, _)| *k == Kind::Panic).count()
-}
-
-/// What the ratchet found, computed **before** anything prints.
-///
-/// Grading is split from reporting for one reason: a ratchet that holds has nothing to act
-/// on, so printing its ~700 known shapes is thousands of lines of noise inside
-/// `deno task check` — and whether it holds is only knowable after the diff. Deciding first
-/// lets a clean gate print a summary instead.
-struct GateDiff {
-    /// How many shapes the snapshot pins — the denominator in the ✓ line.
-    known: usize,
-    /// Shapes the snapshot has never seen: a new kind of drop.
-    new: Vec<KnownKey>,
-    /// Pinned shapes that no longer fire — a fixed bug, or a rotting list.
-    stale: Vec<KnownKey>,
-    /// Crashes. Never pinned (see [`is_pinnable`]), so they are graded on their own.
-    panics: usize,
-}
-
-impl GateDiff {
-    fn holds(&self) -> bool {
-        self.new.is_empty() && self.stale.is_empty() && self.panics == 0
-    }
-}
-
-/// Diff a run's shapes against the committed snapshot. Pure — it prints nothing and decides
-/// nothing; see [`GateDiff`].
-fn grade_against_snapshot(shapes: &BTreeMap<(Kind, String), ShapeAgg>) -> GateDiff {
-    let known = parse_known();
-    let found = found_keys(shapes);
-    GateDiff {
-        new: found.difference(&known).cloned().collect(),
-        stale: known.difference(&found).cloned().collect(),
-        panics: count_panics(shapes),
-        known: known.len(),
-    }
-}
-
-/// Parse the snapshot into its keys.
-fn parse_known() -> BTreeSet<KnownKey> {
-    KNOWN_SHAPES
-        .lines()
-        .map(str::trim_end)
-        .filter(|l| !l.is_empty() && !l.starts_with('#'))
-        .filter_map(|l| {
-            let mut cols = l.split('\t');
-            let kind = cols.next()?.to_string();
-            let shape = cols.next()?.to_string();
-            let payloads = cols.next()?.to_string();
-            Some((kind, shape, payloads))
-        })
-        .collect()
-}
-
-/// The keys a run's shapes produce — the pinnable ones (see [`is_pinnable`]).
-fn found_keys(shapes: &BTreeMap<(Kind, String), ShapeAgg>) -> BTreeSet<KnownKey> {
-    shapes
-        .iter()
-        .filter(|((kind, _), _)| is_pinnable(*kind))
-        .map(|((kind, shape), agg)| {
-            (
-                kind.label().to_string(),
-                shape.clone(),
-                payload_column(&agg.payloads),
-            )
-        })
-        .collect()
-}
-
-/// Render the snapshot file for `shapes`.
-fn render_known(shapes: &BTreeMap<(Kind, String), ShapeAgg>) -> String {
-    let mut out = String::new();
-    out.push_str(
-        "# Generated by `deno task gaps:audit:update` — do NOT hand-edit.\n\
-         #\n\
-         # Every line is a KNOWN BUG: a site shape where injecting a comment makes the\n\
-         # formatter drop or double-print one. The gate fails on a line that is NOT here\n\
-         # (a new kind of drop) and on a line here that no longer fires (a stale entry —\n\
-         # delete it when you fix one). Counts are deliberately not pinned: they churn with\n\
-         # every ordinary fixture PR, and a gate that fails per added fixture gets turned\n\
-         # off. The PAYLOAD set is pinned, though: a shape that starts dropping a comment\n\
-         # kind it used to survive is a new bug on a new ownership path.\n\
-         #\n\
-         # A PANIC is never listed here — that invariant is absolute, so it always fails\n\
-         # the gate rather than being pinned.\n\
-         #\n\
-         # Format: KIND<TAB>SHAPE<TAB>PAYLOADS\n",
-    );
-    for ((kind, shape), agg) in shapes.iter().filter(|((k, _), _)| is_pinnable(*k)) {
-        out.push_str(kind.label());
-        out.push('\t');
-        out.push_str(shape);
-        out.push('\t');
-        out.push_str(&payload_column(&agg.payloads));
-        out.push('\n');
-    }
-    out
-}
-
-/// Whether `c` can sit inside an identifier — the site filter's notion of "in a word".
-fn is_word(c: char) -> bool {
-    c.is_alphanumeric() || c == '_' || c == '$'
-}
-
-/// `(start, end)` of a wire node, when it carries a span — in the wire's own position
-/// space, **not** bytes. See [`Utf16ToByte`].
-fn span_of(node: &serde_json::Value) -> Option<(usize, usize)> {
-    let s = node.get("start")?.as_u64()? as usize;
-    let e = node.get("end")?.as_u64()? as usize;
-    (e >= s).then_some((s, e))
-}
-
-/// Translates the wire AST's positions into byte offsets.
-///
-/// The wire emits **UTF-16 code-unit** offsets (`tsv_lang::location::ByteToCharMap`), not
-/// byte offsets — they coincide on ASCII and diverge the moment a file holds a `é` or an
-/// emoji. Slicing `source` with a raw wire offset is then off by the multi-byte count:
-/// wrong regions, or a panic on a non-char-boundary. Nothing downstream can catch that —
-/// an ASCII-only corpus grades identical either way — so the map is unit-tested against a
-/// direct `char_indices` walk instead.
-struct Utf16ToByte {
-    /// `None` for an all-ASCII source, where the two spaces are identical and the table is
-    /// pure overhead (the overwhelmingly common case).
-    table: Option<Vec<usize>>,
-    len: usize,
-}
-
-impl Utf16ToByte {
-    fn new(source: &str) -> Self {
-        if source.is_ascii() {
-            return Self {
-                table: None,
-                len: source.len(),
-            };
-        }
-        // One entry per UTF-16 code unit; an astral char spans two units and both map to
-        // the char's byte start, so a boundary offset always lands on a char boundary.
-        let mut table = Vec::with_capacity(source.len() + 1);
-        for (byte, ch) in source.char_indices() {
-            for _ in 0..ch.len_utf16() {
-                table.push(byte);
-            }
-        }
-        table.push(source.len());
-        Self {
-            table: Some(table),
-            len: source.len(),
-        }
-    }
-
-    /// The byte offset for a wire offset, or `None` if it is out of range.
-    fn byte(&self, wire: usize) -> Option<usize> {
-        match &self.table {
-            None => (wire <= self.len).then_some(wire),
-            Some(t) => t.get(wire).copied(),
-        }
-    }
-}
-
-/// Collect the ranges the payload would actually be **lexed as a comment** in.
-///
-/// For a `.ts` / `.css` file that is the whole file. For `.svelte` it must be asked of the
-/// AST, because the markup around the code is *not* a comment context — see the module docs
-/// on why tsv's own acceptance can't be used for this.
-///
-/// Svelte regions come from **two walks**, because no one AST expresses them all:
-///
-/// - [`collect_regions`] over the **wire** shape names the two carriers a canonical node's
-///   own span already is: a `Script`'s `content` (the `Program` span is exactly the
-///   `>`-to-`</script>` region), and an `ExpressionTag`'s brace interior
-///   (`{ /* c */ x.y }` is legal). It finds them by recursive walk, so it cannot miss a
-///   path an `ExpressionTag` hides in (an attribute value, a `<svelte:element this={…}>`).
-/// - [`svelte_only_regions`] over tsv's **internal** AST names the rest, which exist only
-///   as tsv's own parse bookkeeping: a block's `opening_tag_span` and a directive's
-///   `head_span`. Svelte's AST carries neither, so the wire cannot express them — an
-///   `IfBlock`'s span covers the whole block (body included) and its `test` span is the
-///   expression alone, so the head is not derivable from either without a scan.
-///
-/// TODO: `<style>` content is still unnamed, so no comment is probed there. `Style` carries
-/// a `content_span` that names it in one line — the reason to hold off is **yield**, not
-/// difficulty: measured over `tests/fixtures` it is +154k sites (+20% gate runtime) for 3
-/// finding shapes, all `@import`-prelude double-prints. That thinness is structural, not
-/// incidental: the ledger only registers **detached** comments, while a CSS in-block comment
-/// is a `CssBlockChild::Comment` AST node and a declaration-VALUE comment is never lexed as
-/// a `Comment` at all. Probing `<style>` mostly tests the registration gap, so the honest
-/// prerequisite is extending the ledger to AST-node comments (see `comment_ledger`'s own
-/// TODO) — after which this region earns its cost.
-fn code_regions(source: &str, parser: ParserType) -> Vec<(usize, usize)> {
-    match parser {
-        ParserType::TypeScript | ParserType::Css => vec![(0, source.len())],
-        ParserType::Svelte => {
-            let Some(wire) = tsv_parse_to_value(source, parser) else {
-                return Vec::new();
-            };
-            let mut wire_spans = Vec::new();
-            collect_regions(&wire, &mut wire_spans);
-            let map = Utf16ToByte::new(source);
-            let mut byte_spans: Vec<(usize, usize)> = wire_spans
-                .into_iter()
-                .filter_map(|(s, e)| Some((map.byte(s)?, map.byte(e)?)))
-                .collect();
-            byte_spans.extend(svelte_only_regions(source));
-            merge_regions(byte_spans)
-        }
-    }
-}
-
-/// The Svelte regions the wire shape cannot express — read off tsv's internal AST.
-///
-/// Every one is a **head**: the run from a construct's opening delimiter to the code it
-/// introduces. Svelte's public AST records only the finished expression, so a head is not
-/// derivable from it; tsv's parser already keeps the two spans this needs
-/// (`opening_tag_span`, `head_span`) for its own comment lookup.
-///
-/// **Interiors only** — never the enclosing delimiter's outside. A tag's `}` is where the
-/// code region ends; the byte *after* it is markup (harmless, but noise), and for a
-/// directive it is the middle of an element tag, where tsv over-accepts a comment Svelte
-/// would reject (the `<script lang="ts"/* c */>` class the module docs name). So a block /
-/// tag contributes `span` minus its two delimiters, and a directive contributes
-/// `head_span.end ..= span.end - 1`, which stops on the closing `}`.
-///
-/// What this deliberately does **not** do is filter the positions within a head where a
-/// comment is illegal — `{#each list as ⟨⟩item}` and `{#await p then ⟨⟩v}` are Svelte's
-/// own hand-read pattern slots, not acorn's, and it rejects a comment in them. No
-/// whitelist is needed because **tsv rejects there too**, so `Formatted::Rejected` filters
-/// them exactly as it does a word interior. The same covers `{⟨⟩#if` and `{#⟨⟩if`.
-fn svelte_only_regions(source: &str) -> Vec<(usize, usize)> {
-    use tsv_svelte::ast::internal::{AttributeNode, Fragment, FragmentNode, SpecialElementKind};
-
-    /// A `{…}`-delimited construct: its interior, both delimiters excluded.
-    fn interior(span: tsv_lang::Span, out: &mut Vec<(usize, usize)>) {
-        let (s, e) = (span.start as usize, span.end as usize);
-        if e > s + 1 {
-            out.push((s + 1, e - 1));
-        }
-    }
-
-    /// A span taken as-is (a bare expression already bounded by its delimiters).
-    fn span_of(span: tsv_lang::Span, out: &mut Vec<(usize, usize)>) {
-        if span.end > span.start {
-            out.push((span.start as usize, span.end as usize));
-        }
-    }
-
-    fn attributes(attrs: &[AttributeNode<'_>], out: &mut Vec<(usize, usize)>) {
-        for a in attrs {
-            match a {
-                // `{...rest}` / `{@attach f()}` — brace-delimited, like an ExpressionTag.
-                AttributeNode::SpreadAttribute(x) => interior(x.span, out),
-                AttributeNode::AttachTag(x) => interior(x.span, out),
-                // A directive's value: `on:click⟨={handler}⟩`. Bounded below by the head
-                // (`on:click|once` is not a comment context) and above by the closing `}`.
-                AttributeNode::OnDirective(x) => directive_value(x.head_span, x.span, out),
-                AttributeNode::BindDirective(x) => directive_value(x.head_span, x.span, out),
-                AttributeNode::ClassDirective(x) => directive_value(x.head_span, x.span, out),
-                AttributeNode::StyleDirective(x) => directive_value(x.head_span, x.span, out),
-                AttributeNode::UseDirective(x) => directive_value(x.head_span, x.span, out),
-                AttributeNode::TransitionDirective(x) => directive_value(x.head_span, x.span, out),
-                AttributeNode::AnimateDirective(x) => directive_value(x.head_span, x.span, out),
-                AttributeNode::LetDirective(x) => directive_value(x.head_span, x.span, out),
-                // A plain attribute's expression value is an `ExpressionTag`, which the
-                // wire walk already names.
-                AttributeNode::Attribute(_) => {}
-            }
-        }
-    }
-
-    /// `head_span.end ..= span.end - 1` — the `={expr}` run, stopping on the `}`. Empty for
-    /// a shorthand directive (`bind:value`), which has no value to probe.
-    fn directive_value(head: tsv_lang::Span, span: tsv_lang::Span, out: &mut Vec<(usize, usize)>) {
-        let (s, e) = (head.end as usize, span.end as usize);
-        if e > s + 1 {
-            out.push((s, e - 1));
-        }
-    }
-
-    fn walk(frag: &Fragment<'_>, out: &mut Vec<(usize, usize)>) {
-        for node in frag.nodes {
-            match node {
-                FragmentNode::IfBlock(b) => {
-                    interior(b.opening_tag_span, out);
-                    walk(&b.consequent, out);
-                    if let Some(alt) = &b.alternate {
-                        walk(alt, out);
-                    }
-                }
-                FragmentNode::EachBlock(b) => {
-                    interior(b.opening_tag_span, out);
-                    walk(&b.body, out);
-                    if let Some(fallback) = &b.fallback {
-                        walk(fallback, out);
-                    }
-                }
-                FragmentNode::AwaitBlock(b) => {
-                    interior(b.opening_tag_span, out);
-                    for f in [&b.pending, &b.then, &b.catch].into_iter().flatten() {
-                        walk(f, out);
-                    }
-                }
-                FragmentNode::KeyBlock(b) => {
-                    interior(b.opening_tag_span, out);
-                    walk(&b.fragment, out);
-                }
-                FragmentNode::SnippetBlock(b) => {
-                    interior(b.opening_tag_span, out);
-                    walk(&b.body, out);
-                }
-                // `{@html x}` / `{@const a = b}` / `{@render f()}` / `{@debug a}` — the
-                // whole tag is one brace-delimited head, expression included.
-                FragmentNode::HtmlTag(t) => interior(t.span, out),
-                FragmentNode::ConstTag(t) => interior(t.span, out),
-                FragmentNode::DeclarationTag(t) => interior(t.span, out),
-                FragmentNode::DebugTag(t) => interior(t.span, out),
-                FragmentNode::RenderTag(t) => interior(t.span, out),
-                FragmentNode::Element(e) => {
-                    attributes(e.attributes, out);
-                    walk(&e.fragment, out);
-                }
-                FragmentNode::SpecialElement(e) => {
-                    // `<svelte:element this={tag}>` / `<svelte:component this={x}>` hold
-                    // their expression **bare**, not wrapped in an `ExpressionTag` — so the
-                    // wire walk does not name it and this is its only cover. The expression
-                    // span alone is the region: its ends already sit against the two
-                    // braces, so the brace-adjacent gaps come along.
-                    // Listed exhaustively rather than with a `_` arm, deliberately: a
-                    // future variant that carries an expression would otherwise go
-                    // unprobed **silently**, which is the exact failure this walk exists to
-                    // fix. Let it break the build instead.
-                    match &e.kind {
-                        SpecialElementKind::SvelteElement { tag } => span_of(tag.span(), out),
-                        SpecialElementKind::SvelteComponent { expression } => {
-                            span_of(expression.expression.span(), out);
-                        }
-                        SpecialElementKind::SvelteHead
-                        | SpecialElementKind::SvelteWindow
-                        | SpecialElementKind::SvelteBody
-                        | SpecialElementKind::SvelteDocument
-                        | SpecialElementKind::SvelteSelf
-                        | SpecialElementKind::SlotElement
-                        | SpecialElementKind::SvelteFragment
-                        | SpecialElementKind::SvelteBoundary
-                        | SpecialElementKind::TitleElement => {}
-                    }
-                    attributes(e.attributes, out);
-                    walk(&e.fragment, out);
-                }
-                FragmentNode::ExpressionTag(_)
-                | FragmentNode::Text(_)
-                | FragmentNode::Comment(_) => {}
-            }
-        }
-    }
-
-    let arena = bumpalo::Bump::new();
-    // A parse failure is not this function's business to report: the caller already skipped
-    // any seed file tsv rejects, and an injected source that stops parsing is a `Rejected`
-    // the inject loop drops on the floor.
-    let Ok(root) = tsv_svelte::parse(source, &arena) else {
-        return Vec::new();
-    };
-    let mut out = Vec::new();
-    walk(&root.fragment, &mut out);
-    out
-}
-
-/// Walk the wire AST accumulating [`code_regions`]' carriers.
-fn collect_regions(node: &serde_json::Value, out: &mut Vec<(usize, usize)>) {
-    match node {
-        serde_json::Value::Object(obj) => {
-            match obj.get("type").and_then(serde_json::Value::as_str) {
-                Some("Script") => {
-                    if let Some(span) = obj.get("content").and_then(span_of) {
-                        out.push(span);
-                    }
-                }
-                // The braces themselves aren't a comment context; their interior is.
-                Some("ExpressionTag") => {
-                    if let Some((s, e)) = span_of(node)
-                        && e > s + 1
-                    {
-                        out.push((s + 1, e - 1));
-                    }
-                }
-                _ => {}
-            }
-            for (k, v) in obj {
-                if k != "loc" {
-                    collect_regions(v, out);
-                }
-            }
-        }
-        serde_json::Value::Array(items) => {
-            for v in items {
-                collect_regions(v, out);
-            }
-        }
-        _ => {}
-    }
-}
-
-/// Sort and coalesce overlapping/adjacent ranges, so a site is never injected twice.
-fn merge_regions(mut regions: Vec<(usize, usize)>) -> Vec<(usize, usize)> {
-    regions.sort_unstable();
-    let mut merged: Vec<(usize, usize)> = Vec::with_capacity(regions.len());
-    for (s, e) in regions {
-        match merged.last_mut() {
-            Some(last) if s <= last.1 => last.1 = last.1.max(e),
-            _ => merged.push((s, e)),
-        }
-    }
-    merged
-}
-
-/// The byte offsets to inject at: every `char` boundary within a code region, minus the
-/// ones strictly **inside a word**.
-///
-/// The word filter keeps every punctuator- and whitespace-adjacent offset, so `describe`
-/// `.` `only` retains **both** dot gaps — the exact positions the class hides in — while the
-/// two word interiors go. Splitting `describe` into `desc/* c */ribe` probes a gap that
-/// exists in no real document. Worth ~2.2× on real source.
-///
-/// **It is a heuristic, not a proof, and `--all-bytes` disagrees with it.** On the corpus
-/// the extra sites yield a handful of extra shapes, and every one inspected was an artifact
-/// of injecting *into an existing comment's text* — `// after empty i⟨⟩nit` with the `line`
-/// payload terminates the author's comment early and turns `nit` into code, which then reads
-/// as that comment being dropped. Junk, correctly excluded, but by accident: the filter
-/// screens word interiors and comment prose is mostly words.
-///
-/// TODO: exclude sites inside an existing comment's span outright. The word filter misses
-/// the punctuator boundaries within one (`/* c1 ⟨⟩*/`), so that artifact class is only
-/// mostly suppressed. It needs the parsed comment list, which the ledger holds but does not
-/// expose.
-fn injection_sites(source: &str, regions: &[(usize, usize)], all_bytes: bool) -> Vec<usize> {
-    let mut sites = Vec::new();
-    for &(start, end) in regions {
-        let mut prev: Option<char> = source[..start].chars().next_back();
-        // Inclusive of `end`: the last offset of a region is a gap like any other (the
-        // position just before `</script>` is where a trailing comment goes).
-        for (i, ch) in source[start..end].char_indices() {
-            if all_bytes || !(prev.is_some_and(is_word) && is_word(ch)) {
-                sites.push(start + i);
-            }
-            prev = Some(ch);
-        }
-        let tail_is_word = source[end..].chars().next().is_some_and(is_word);
-        if all_bytes || !(prev.is_some_and(is_word) && tail_is_word) {
-            sites.push(end);
-        }
-    }
-    sites
-}
-
-/// Words kept verbatim in a [`site_shape`] rather than abstracted to `IDENT`.
-///
-/// Heuristic and deliberately generous: a shape is a **report/dedup key**, not a parse. The
-/// point is that `import⟨⟩.` and `IDENT⟨⟩.` name different bugs — the meta-property/import-
-/// phase header versus every member access in the corpus — so a keyword that heads a
-/// concatenated construct must survive. `source` / `defer` / `meta` / `target` are here for
-/// exactly that reason despite being contextual keywords.
-const SHAPE_KEYWORDS: &[&str] = &[
-    "abstract",
-    "as",
-    "async",
-    "await",
-    "break",
-    "case",
-    "catch",
-    "class",
-    "const",
-    "constructor",
-    "continue",
-    "declare",
-    "default",
-    "defer",
-    "delete",
-    "do",
-    "else",
-    "enum",
-    "export",
-    "extends",
-    "finally",
-    "for",
-    "from",
-    "function",
-    "get",
-    "global",
-    "if",
-    "implements",
-    "import",
-    "in",
-    "infer",
-    "instanceof",
-    "interface",
-    "is",
-    "keyof",
-    "let",
-    "meta",
-    "module",
-    "namespace",
-    "new",
-    "of",
-    "out",
-    "private",
-    "protected",
-    "public",
-    "readonly",
-    "require",
-    "return",
-    "satisfies",
-    "set",
-    "source",
-    "static",
-    "super",
-    "switch",
-    "target",
-    "this",
-    "throw",
-    "try",
-    "type",
-    "typeof",
-    "unique",
-    "var",
-    "void",
-    "while",
-    "yield",
-];
-
-/// The word ending at `end`, or `None` when the char before `end` isn't identifier-ish.
-fn word_before(source: &str, end: usize) -> Option<&str> {
-    let start = source[..end]
-        .char_indices()
-        .rev()
-        .take_while(|(_, c)| is_word(*c))
-        .map(|(i, _)| i)
-        .last()?;
-    Some(&source[start..end])
-}
-
-/// The word starting at `start`, or `None` when the char at `start` isn't identifier-ish.
-fn word_after(source: &str, start: usize) -> Option<&str> {
-    let len: usize = source[start..]
-        .chars()
-        .take_while(|c| is_word(*c))
-        .map(char::len_utf8)
-        .sum();
-    (len > 0).then(|| &source[start..start + len])
-}
-
-/// Render one side of a shape: a keyword verbatim, any other word as `IDENT`.
-fn shape_word(w: &str) -> String {
-    if SHAPE_KEYWORDS.contains(&w) {
-        w.to_string()
-    } else if w.chars().next().is_some_and(|c| c.is_ascii_digit()) {
-        "NUM".to_string()
-    } else {
-        "IDENT".to_string()
-    }
-}
-
-/// The non-word, non-whitespace run (a punctuator) ending at `end`, capped at 3 chars.
-fn punct_before(source: &str, end: usize) -> String {
-    let s: String = source[..end]
-        .chars()
-        .rev()
-        .take_while(|c| !is_word(*c) && !c.is_whitespace())
-        .take(3)
-        .collect();
-    s.chars().rev().collect()
-}
-
-/// The non-word, non-whitespace run (a punctuator) starting at `start`, capped at 3 chars.
-fn punct_after(source: &str, start: usize) -> String {
-    source[start..]
-        .chars()
-        .take_while(|c| !is_word(*c) && !c.is_whitespace())
-        .take(3)
-        .collect()
-}
-
-/// A compact, **file-independent** name for an injection position: the source token on
-/// each side, with identifiers abstracted.
-///
-/// This is the dedup key of the whole report. One bug fires at every site that reaches it —
-/// a member-access drop would land thousands of times across the corpus — so raw
-/// `(file, offset)` findings are unreadable and, as a ratchet key, would go stale on the
-/// next fixture edit. A shape collapses those to one line: `import⟨⟩.`, `IDENT⟨⟩=`,
-/// `.⟨⟩IDENT`. Whitespace is elided rather than represented, since a gap's *width* is not
-/// what distinguishes the position.
-fn site_shape(source: &str, offset: usize) -> String {
-    let before = word_before(source, offset).map_or_else(
-        || {
-            let p = punct_before(source, offset);
-            if p.is_empty() { "␣".to_string() } else { p }
-        },
-        shape_word,
-    );
-    let after = word_after(source, offset).map_or_else(
-        || {
-            let p = punct_after(source, offset);
-            if p.is_empty() { "␣".to_string() } else { p }
-        },
-        shape_word,
-    );
-    format!("{before}⟨⟩{after}")
-}
-
-/// A readable source window around an injection point — the eyeball companion to the
-/// abstracted [`site_shape`], so a finding can be reproduced by hand.
-fn snippet(source: &str, offset: usize) -> String {
-    let lo = (0..=offset)
-        .rev()
-        .find(|i| source.is_char_boundary(*i) && offset - i >= 28)
-        .unwrap_or(0);
-    let hi = (offset..=source.len())
-        .find(|i| source.is_char_boundary(*i) && i - offset >= 28)
-        .unwrap_or(source.len());
-    let one_line = |s: &str| s.replace('\n', "⏎").replace('\t', "→");
-    format!(
-        "{}⟨⟩{}",
-        one_line(&source[lo..offset]),
-        one_line(&source[offset..hi])
-    )
-}
-
 /// Why a site is a finding. `Dropped`/`DoublePrinted` mirror the ledger; `Panic` is this
 /// audit's own (a comment in a gap must never crash the formatter).
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
 enum Kind {
     Dropped,
     DoublePrinted,
+    /// A `//` line comment that swallows following content on the same output line —
+    /// [`swallow`](tsv_lang::doc::swallow)'s render-time finding, not the ledger's.
+    ///
+    /// The ledger is **structurally blind** to this class: a swallowing comment is printed
+    /// exactly once, so the print-once account balances and `comments:audit` reads CLEAN
+    /// while the swallowed token is silently lost. Arming the swallow check on the ledger's
+    /// existing format is what closes it — a second *detector* on one format, not a second
+    /// format (the reason this is affordable where a full `f1_check` was not).
+    ///
+    /// Held **report-only** ([`is_graded`](snapshot::is_graded)): the class is newly visible
+    /// here and its shapes have not been triaged, so it reports without grading rather than
+    /// pinning ~330 unreviewed claims into the ratchet.
+    Swallow,
     Panic,
 }
 
@@ -888,8 +301,20 @@ impl Kind {
         match self {
             Self::Dropped => "DROPPED",
             Self::DoublePrinted => "DOUBLE-PRINTED",
+            Self::Swallow => "SWALLOW",
             Self::Panic => "PANIC",
         }
+    }
+
+    fn from_label(s: &str) -> Option<Self> {
+        [
+            Self::Dropped,
+            Self::DoublePrinted,
+            Self::Swallow,
+            Self::Panic,
+        ]
+        .into_iter()
+        .find(|k| k.label() == s)
     }
 }
 
@@ -906,7 +331,16 @@ struct Example {
     /// this offset need not fire, or even parse.
     payload: &'static str,
     path: String,
-    offset: usize,
+    /// The byte offset in the seed the payload was **injected** at — the splice
+    /// [`verify_example`] must reproduce. Equals [`Self::attribution_offset`] for an injected
+    /// hit; for a bystander it is the perturbation site, a different position.
+    injection_offset: usize,
+    /// The byte offset the finding is **attributed** to: the victim comment's own site for a
+    /// bystander (mapped back across the splice by [`victim_seed_offset`]), the injection site
+    /// for the injected comment. The shape, snippet, by-node edge, and canonical sort all key
+    /// on this — so a dropped bystander points at the emitter that dropped it, not at wherever
+    /// the payload happened to go in.
+    attribution_offset: usize,
     snippet: String,
     /// The offending comment's text — the injected payload only when [`Self::injected`].
     text: String,
@@ -919,15 +353,32 @@ impl Example {
     /// The tie-break that makes the chosen example **thread-count independent**.
     ///
     /// Threads take files by stride, so which one first sees a shape depends on `--jobs`;
-    /// picking the smallest `(path, offset)` instead of "whoever merged first" keeps a
-    /// report (and any diff of one) stable across `--jobs 1` and `--jobs 12`.
+    /// picking the smallest `(path, attribution_offset)` instead of "whoever merged first"
+    /// keeps a report (and any diff of one) stable across `--jobs 1` and `--jobs 12`. The
+    /// **attribution** offset (not the injection offset) is the sort key so the canonical
+    /// example is the finding's own smallest *victim* site — the meaningful, shape-consistent
+    /// locus. Two examples can now tie on `(path, attribution_offset)` while differing in
+    /// injection offset (two injections dropping the same victim); ties only ever arise within
+    /// one file (one worker), so [`ShapeAgg::offer_example`]'s first-seen tie-break stays
+    /// deterministic across `--jobs`.
     fn sort_key(&self) -> (&str, usize) {
-        (&self.path, self.offset)
+        (&self.path, self.attribution_offset)
     }
 }
 
-/// Everything a shape accumulates. Counts stay exact; only one example is kept, so a
-/// corpus that fires a bug a million times still reports in constant memory.
+/// How many examples per shape the [`ShapeAgg`] keeps and the verify pass re-checks.
+///
+/// One example gives a single Confirmed/Unconfirmed bit, which cannot tell "uniformly an
+/// instrument gap" (every example unconfirmed) from "a mixed real drop" (some confirmed) —
+/// the distinction phase 0 of the gaps arc turns on. Keeping the N *smallest* by
+/// [`Example::sort_key`] samples the shape while staying bounded in memory and cheap to
+/// verify (each example is two extra formats, run once per shape — not per site). Five is
+/// enough to separate all-vs-none-vs-mixed without inflating the verify pass.
+const VERIFY_EXAMPLES: usize = 5;
+
+/// Everything a shape accumulates. Counts stay exact; only the [`VERIFY_EXAMPLES`] smallest
+/// examples are kept, so a corpus that fires a bug a million times still reports in bounded
+/// memory.
 #[derive(Clone)]
 struct ShapeAgg {
     count: usize,
@@ -942,23 +393,45 @@ struct ShapeAgg {
     /// Distinct seed files the shape fired in — separates "one weird fixture" from
     /// "everything with a dot in it". Bounded by the corpus, and shapes are few.
     files: BTreeSet<String>,
-    example: Example,
-    /// The in-run self-verification verdict — `None` until the verify pass runs.
-    verdict: Option<Verdict>,
+    /// The [`VERIFY_EXAMPLES`] smallest examples by [`Example::sort_key`], kept sorted
+    /// ascending, so `examples[0]` is the canonical (smallest) one every report shows.
+    examples: Vec<Example>,
+    /// The in-run self-verification outcome — `None` until the verify pass runs.
+    verify: Option<VerifyOutcome>,
 }
 
-/// Whether a shape's example survives an **observational** re-check, independent of the
-/// ledger that reported it.
-#[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum Verdict {
-    /// Re-formatting really does lose (or duplicate) a comment. The ledger's claim is
-    /// visible in the output.
-    Confirmed,
-    /// The ledger says a comment was never emitted, yet the output holds just as many
-    /// comments as its input. Something printed it without recording the emit — or printed
-    /// a *mangled* rebuild of it (`/* a⏎b */` → `/* ab */`, one comment either way). Real
-    /// either way, but not the plain drop it is filed as.
-    Unconfirmed,
+impl ShapeAgg {
+    /// The canonical example — the smallest by [`Example::sort_key`], shown in every report.
+    ///
+    /// A recorded shape always has at least one example (it is created *with* the hit that
+    /// recorded it, via `or_insert_with` + [`Self::offer_example`]), so this never sees an
+    /// empty set — an empty one is a construction bug.
+    #[allow(clippy::expect_used)] // invariant: a recorded shape is created with its first example
+    fn canonical(&self) -> &Example {
+        self.examples
+            .first()
+            .expect("a recorded shape always carries at least one example")
+    }
+
+    /// Offer `candidate` to the bounded min-N set, keeping it sorted ascending by
+    /// [`Example::sort_key`] and capped at [`VERIFY_EXAMPLES`].
+    ///
+    /// Thread-count independence rides on this keeping the N *smallest* by `(path, offset)`,
+    /// exactly the tie-break the old single-example version used. A later candidate that
+    /// *ties* an existing one on `sort_key` sorts **after** it (`<=` insertion point), so the
+    /// first-seen among equal keys stays canonical — `examples[0]` never regresses to a
+    /// later arrival. Ties only ever occur within one file (one worker/tally), so the final
+    /// merged set is deterministic regardless of `--jobs`.
+    fn offer_example(&mut self, candidate: Example) {
+        let pos = self
+            .examples
+            .partition_point(|e| e.sort_key() <= candidate.sort_key());
+        if pos >= VERIFY_EXAMPLES && self.examples.len() >= VERIFY_EXAMPLES {
+            return; // larger than every kept example, and the set is already full
+        }
+        self.examples.insert(pos, candidate);
+        self.examples.truncate(VERIFY_EXAMPLES);
+    }
 }
 
 /// One thread's slice of the work.
@@ -970,6 +443,17 @@ struct Tally {
     accepted: usize,
     files_done: usize,
     parse_skipped: usize,
+    /// Bystander findings whose victim span could not be mapped back to seed coordinates
+    /// across the splice (out of range / mid-`char`) — keyed on the injection offset as a
+    /// fallback. Expected to be zero; a nonzero count means a reflow the linear span-shift
+    /// can't place (see [`victim_seed_offset`]), surfaced rather than silently mis-keyed.
+    victim_map_fallbacks: usize,
+    /// Exact per-`(node, edge)` hit tallies, accumulated at record time. Empty on a plain gate
+    /// run (keying off); the `--by-node` / `--json` rollup reads it directly, no re-parse.
+    node_edge_hits: BTreeMap<NodeEdgeKey, NodeClusterAccum>,
+    /// Hits that were keyed (`key_by_node` on) but whose attribution offset resolved to no node
+    /// — the UNRESOLVED tail. Stays zero on a gate run, since keying is off there.
+    node_edge_unresolved: usize,
     /// Files already non-clean before injection — reported, never injected into (see
     /// [`audit_file`]).
     dirty_files: Vec<String>,
@@ -983,22 +467,70 @@ struct Hit<'a> {
     /// The seed source — the shape and snippet are derived from it, so the caller never
     /// computes them for a site that turns out not to fire.
     source: &'a str,
-    offset: usize,
+    /// The byte offset in `source` the payload was **injected** at — the splice the verify
+    /// pass reproduces.
+    injection_offset: usize,
+    /// The byte offset in `source` the finding is **attributed** to: the victim's own site for
+    /// a bystander (mapped back across the splice), the injection site for the injected
+    /// comment. The shape and snippet key on this.
+    attribution_offset: usize,
     /// The offending comment's text, which is the *injected* payload only when
     /// [`Self::injected`] holds.
     text: String,
     /// Whether the offending comment is the injected one rather than a bystander.
     injected: bool,
+    /// The `(node, edge)` this hit's [`Self::attribution_offset`] keys to — computed at record
+    /// time in [`audit_file`] against the seed's wire, exactly (never a post-hoc approximation).
+    /// `None` means either keying was off (the plain gate run, which reads no rollup) OR keying
+    /// ran and the offset resolved to no node; [`Tally::record`] tells the two apart via its
+    /// `key_by_node` argument.
+    node_edge: Option<NodeEdgeKey>,
+}
+
+/// One `(node, edge)` cluster's exact accumulation over the hits keyed to it at record time.
+///
+/// Replaces the post-hoc canonical approximation: every hit folds into the cluster its own
+/// attribution offset keys to, so [`Self::hits`] is an exact per-site tally, not a whole-shape
+/// count attributed to one canonical example.
+#[derive(Default)]
+struct NodeClusterAccum {
+    /// Exact number of hits keyed to this cluster.
+    hits: usize,
+    /// The distinct site shapes that landed here — sorted, so `.iter().next()` is the smallest.
+    shapes: BTreeSet<String>,
 }
 
 impl Tally {
-    fn record(&mut self, hit: Hit<'_>) {
-        let shape = site_shape(hit.source, hit.offset);
+    /// Record one finding. `key_by_node` states whether this run keys hits to `(node, edge)`
+    /// clusters (the `--by-node` / `--json` rollup consumers) — it is the ONLY thing that lets
+    /// `record` tell an unresolved offset (keying on, `hit.node_edge` is `None`) apart from a
+    /// plain gate run (keying off, every `node_edge` is `None`, and no rollup is ever read).
+    fn record(&mut self, hit: Hit<'_>, key_by_node: bool) {
+        // Both the shape and the snippet key on the ATTRIBUTION offset — the victim's own site
+        // for a bystander — so a bystander drop is filed under the emitter that dropped it,
+        // never the perturbation site the payload went in at.
+        let shape = site_shape(hit.source, hit.attribution_offset);
+        // Fold this hit into its `(node, edge)` cluster EXACTLY — keyed on its own attribution
+        // offset (already computed in `audit_file`), so a shape spanning several structural
+        // contexts splits across them per hit rather than landing wholly on one canonical
+        // example's cluster.
+        match &hit.node_edge {
+            Some(key) => {
+                let c = self.node_edge_hits.entry(key.clone()).or_default();
+                c.hits += 1;
+                c.shapes.insert(shape.clone());
+            }
+            // Keyed, but the offset resolved to no node — the UNRESOLVED tail. Counted only when
+            // keying ran, so a gate run (keying off, every `node_edge` `None`) stays at zero.
+            None if key_by_node => self.node_edge_unresolved += 1,
+            None => {}
+        }
         let candidate = Example {
             payload: hit.payload.label(),
             path: hit.path.to_string(),
-            offset: hit.offset,
-            snippet: snippet(hit.source, hit.offset),
+            injection_offset: hit.injection_offset,
+            attribution_offset: hit.attribution_offset,
+            snippet: snippet(hit.source, hit.attribution_offset),
             text: hit.text,
             injected: hit.injected,
         };
@@ -1010,8 +542,8 @@ impl Tally {
                 payloads: BTreeSet::new(),
                 bystander_hits: 0,
                 files: BTreeSet::new(),
-                example: candidate.clone(),
-                verdict: None,
+                examples: Vec::new(),
+                verify: None,
             });
         e.count += 1;
         if !hit.injected {
@@ -1019,9 +551,7 @@ impl Tally {
         }
         e.payloads.insert(hit.payload.label());
         e.files.insert(hit.path.to_string());
-        if candidate.sort_key() < e.example.sort_key() {
-            e.example = candidate;
-        }
+        e.offer_example(candidate);
     }
 
     fn merge(&mut self, other: Tally) {
@@ -1030,6 +560,13 @@ impl Tally {
         self.accepted += other.accepted;
         self.files_done += other.files_done;
         self.parse_skipped += other.parse_skipped;
+        self.victim_map_fallbacks += other.victim_map_fallbacks;
+        self.node_edge_unresolved += other.node_edge_unresolved;
+        for (k, v) in other.node_edge_hits {
+            let c = self.node_edge_hits.entry(k).or_default();
+            c.hits += v.hits;
+            c.shapes.extend(v.shapes);
+        }
         self.dirty_files.extend(other.dirty_files);
         for (k, v) in other.shapes {
             match self.shapes.get_mut(&k) {
@@ -1038,10 +575,11 @@ impl Tally {
                     e.bystander_hits += v.bystander_hits;
                     e.payloads.extend(v.payloads);
                     e.files.extend(v.files);
-                    // Smallest (path, offset) wins, NOT whoever merged first — see
-                    // `Example::sort_key`.
-                    if v.example.sort_key() < e.example.sort_key() {
-                        e.example = v.example;
+                    // Keep the N smallest across both, NOT whoever merged first — see
+                    // `Example::sort_key` / `ShapeAgg::offer_example`. Workers take disjoint
+                    // files, so the two example sets never share a path (no cross-tally ties).
+                    for ex in v.examples {
+                        e.offer_example(ex);
                     }
                 }
                 None => {
@@ -1052,148 +590,15 @@ impl Tally {
     }
 }
 
-/// What one ledger-armed format did.
-enum Formatted {
-    /// The parser or printer panicked — a finding in its own right (a comment in a gap
-    /// must never crash the formatter).
-    Panicked,
-    /// The source did not parse, so the injection is not a legal comment here. The
-    /// overwhelmingly common case, and **not** a finding: it means the offset names no gap.
-    Rejected,
-    /// Formatted.
-    Ok {
-        /// The ledger's findings — normally empty.
-        findings: Vec<CommentFinding>,
-        /// How many comments the document registered. Doubles as a needle-free "how many
-        /// comments are in this text" measure: `ledger_format(text).parsed` counts them
-        /// with the real lexer, so [`verify_example`] never has to string-match a comment
-        /// whose text the printer may legitimately re-indent.
-        parsed: usize,
-        /// The formatted text, already built by `format_source` — free to carry.
-        output: String,
-    },
-}
-
-/// Format `src` with the ledger armed and drain it.
+/// Key a seed byte `offset` to its `(node, edge)` cluster using the file's prebuilt wire + map.
 ///
-/// Drains on every path, including the failing ones: the ledger is thread-local and keyed
-/// on source identity, so a straggler left by a rejected parse could otherwise be attributed
-/// to the next injection.
-fn ledger_format(src: &str, parser: ParserType) -> Formatted {
-    let _ = comment_ledger::take_comment_ledger();
-    let result =
-        std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| format_source(src, parser)));
-    match result {
-        Err(_) => {
-            let _ = comment_ledger::take_comment_ledger();
-            Formatted::Panicked
-        }
-        Ok(Err(_)) => {
-            let _ = comment_ledger::take_comment_ledger();
-            Formatted::Rejected
-        }
-        Ok(Ok(output)) => {
-            let ledger = comment_ledger::take_comment_ledger();
-            Formatted::Ok {
-                findings: ledger.findings,
-                parsed: ledger.parsed,
-                output,
-            }
-        }
-    }
-}
-
-/// Re-derive a finding's **observable** claim, independently of the ledger that made it.
-///
-/// The ledger is an instrument, and an instrument that only ever agrees with itself is not
-/// evidence — every mistake found while building this audit was of exactly that shape (a
-/// stale needle, a char-vs-byte offset, checking the injected comment when the finding was
-/// about a bystander). So each shape's example is re-run and the ledger is made to *predict*
-/// something falsifiable: if it says this format drops `d` comments and double-prints `p`,
-/// then the output must reparse to exactly `parsed - d + p` comments. Anything else means
-/// the ledger's account and the actual output disagree.
-///
-/// Counting via a reparse rather than by matching the comment's text is what makes this
-/// sound: a printer may legitimately re-indent a multi-line comment, so text matching
-/// produces false alarms, while the count is exact. It is also what leaves the
-/// [`Verdict::Unconfirmed`] bucket meaningful — a *mangled* rebuild is still one comment, so
-/// it shows up as "the ledger says dropped but nothing is missing", which is precisely the
-/// signal wanted.
-///
-/// The residual blind spot, named rather than hidden: counts can balance. A format that
-/// drops one comment and duplicates another nets to zero and reads as confirmed-ish. No
-/// example in the corpus does this today, and the per-shape example is a sample of the
-/// shape's hits, never a proof about all of them.
-fn verify_example(agg: &ShapeAgg, kind: Kind, parser: ParserType) -> Verdict {
-    // A panic is self-evident: it either happens or it doesn't, and it was caught to get here.
-    if kind == Kind::Panic {
-        return Verdict::Confirmed;
-    }
-    let Ok(source) = std::fs::read_to_string(&agg.example.path) else {
-        return Verdict::Unconfirmed;
-    };
-    let Some(payload) = Payload::from_label(agg.example.payload) else {
-        return Verdict::Unconfirmed;
-    };
-    let offset = agg.example.offset;
-    if offset > source.len() || !source.is_char_boundary(offset) {
-        return Verdict::Unconfirmed;
-    }
-    let mut injected = String::with_capacity(source.len() + 24);
-    injected.push_str(&source[..offset]);
-    injected.push_str(payload.text());
-    injected.push_str(&source[offset..]);
-
-    let Formatted::Ok {
-        findings,
-        parsed,
-        output,
-    } = ledger_format(&injected, parser)
-    else {
-        return Verdict::Unconfirmed;
-    };
-    if findings.is_empty() {
-        // The example no longer fires at all — the ledger and the re-run disagree outright.
-        return Verdict::Unconfirmed;
-    }
-    let Formatted::Ok {
-        parsed: reparsed, ..
-    } = ledger_format(&output, parser)
-    else {
-        // The formatter's own output doesn't parse. A real bug, but `roundtrip_audit`'s.
-        return Verdict::Unconfirmed;
-    };
-
-    if reparsed == predict_comment_count(parsed, &findings) {
-        Verdict::Confirmed
-    } else {
-        Verdict::Unconfirmed
-    }
-}
-
-/// How many comments the output must hold, if the ledger's account of `findings` is true.
-///
-/// Each dropped comment removes one. Each double-printed one adds `emitted - 1` — **not**
-/// one: `CommentFinding::emitted` is documented as `>= 2`, so a comment printed three times
-/// adds two, and assuming "double" means exactly twice would mispredict it as
-/// [`Verdict::Unconfirmed`].
-///
-/// Split out and unit-tested because it is arithmetic: an off-by-one here changes a verdict
-/// and nothing else, and no corpus run would show it — the audit would simply file a
-/// confirmed finding under the wrong bucket.
-fn predict_comment_count(parsed: usize, findings: &[CommentFinding]) -> usize {
-    let dropped = findings
-        .iter()
-        .filter(|f| f.kind == CommentFindingKind::Dropped)
-        .count();
-    let extra: usize = findings
-        .iter()
-        .filter(|f| f.kind == CommentFindingKind::DoublePrinted)
-        .map(|f| f.emitted.saturating_sub(1))
-        .sum();
-    // `dropped` counts registered comments, so it can never exceed `parsed`; saturate
-    // rather than risk a panic on a ledger that ever breaks that invariant.
-    parsed.saturating_sub(dropped) + extra
+/// `None` when keying is off for this run (`node_map` is `None`) or the offset resolves to no
+/// node — [`Tally::record`]'s `key_by_node` argument tells the two apart for the unresolved tally.
+fn key_node_edge(
+    node_map: Option<&(serde_json::Value, Utf16ToByte)>,
+    offset: usize,
+) -> Option<NodeEdgeKey> {
+    node_map.and_then(|(wire, map)| node_edge_key_with_map(wire, map, offset))
 }
 
 /// Audit one file: verify it is clean **as authored**, then inject at every site.
@@ -1203,14 +608,16 @@ fn predict_comment_count(parsed: usize, findings: &[CommentFinding]) -> usize {
 /// signal — so such a file is reported once and skipped. Over `tests/fixtures` this never
 /// fires (`comments:audit` gates it green); over a real corpus it is the honest split
 /// between "you already knew" and "the injection found it".
-fn audit_file(path: &std::path::Path, payloads: &[Payload], all_bytes: bool, tally: &mut Tally) {
+fn audit_file(
+    path: &std::path::Path,
+    payloads: &[Payload],
+    all_bytes: bool,
+    key_by_node: bool,
+    tally: &mut Tally,
+) {
     let display = path.to_string_lossy().into_owned();
     // Intentionally-invalid fixtures don't parse — nothing to inject into.
-    if path
-        .file_name()
-        .and_then(|n| n.to_str())
-        .is_some_and(|n| n.starts_with("input_invalid"))
-    {
+    if is_input_invalid_fixture(path) {
         return;
     }
     let Ok(source) = std::fs::read_to_string(path) else {
@@ -1218,21 +625,30 @@ fn audit_file(path: &std::path::Path, payloads: &[Payload], all_bytes: bool, tal
     };
     let parser = ParserType::from_extension(&display);
 
-    match ledger_format(&source, parser) {
-        Formatted::Panicked | Formatted::Rejected => {
+    let comment_spans = match pristine_format(&source, parser) {
+        Pristine::Skip { dirty: false } => {
             tally.parse_skipped += 1;
             return;
         }
-        Formatted::Ok { findings, .. } if !findings.is_empty() => {
+        Pristine::Skip { dirty: true } => {
             tally.dirty_files.push(display);
             return;
         }
-        Formatted::Ok { .. } => {}
-    }
+        Pristine::Clean { comment_spans } => comment_spans,
+    };
     tally.files_done += 1;
 
+    // Only a rollup consumer (`--by-node` / `--json`) keys hits to `(node, edge)`. When it does,
+    // parse the seed's wire and build the UTF-16→byte map ONCE per file, reused across every hit;
+    // the plain gate run sets `key_by_node = false` and pays nothing here. (For Svelte,
+    // `code_regions` re-parses internally — a second parse on a report-only run is deliberate,
+    // sub-1%.) A parse failure leaves this `None`, so every hit keys unresolved.
+    let node_map: Option<(serde_json::Value, Utf16ToByte)> = key_by_node
+        .then(|| tsv_parse_to_value(&source, parser).map(|wire| (wire, Utf16ToByte::new(&source))))
+        .flatten();
+
     let regions = code_regions(&source, parser);
-    let sites = injection_sites(&source, &regions, all_bytes);
+    let sites = injection_sites(&source, &regions, &comment_spans, all_bytes);
     tally.sites += sites.len();
 
     let mut injected_src = String::with_capacity(source.len() + 24);
@@ -1247,37 +663,102 @@ fn audit_file(path: &std::path::Path, payloads: &[Payload], all_bytes: bool, tal
 
             let findings = match ledger_format(&injected_src, parser) {
                 Formatted::Panicked => {
-                    tally.record(Hit {
-                        kind: Kind::Panic,
-                        payload,
-                        path: &display,
-                        source: &source,
-                        offset,
-                        text: text.to_string(),
-                        injected: true,
-                    });
+                    tally.record(
+                        Hit {
+                            kind: Kind::Panic,
+                            payload,
+                            path: &display,
+                            source: &source,
+                            injection_offset: offset,
+                            attribution_offset: offset,
+                            text: text.to_string(),
+                            injected: true,
+                            node_edge: key_node_edge(node_map.as_ref(), offset),
+                        },
+                        key_by_node,
+                    );
                     continue;
                 }
                 // The injection isn't a legal comment here — the offset names no gap.
                 Formatted::Rejected => continue,
-                Formatted::Ok { findings, .. } => findings,
+                Formatted::Ok {
+                    findings, swallows, ..
+                } => {
+                    // A swallow is observed directly on the rendered output, so it is keyed at
+                    // the injection site — there is no bystander axis to map back (the ledger's
+                    // victim-span logic below has no analogue: the swallow tracker reports a
+                    // property of an output line, not of a registered comment).
+                    for report in swallows {
+                        tally.record(
+                            Hit {
+                                kind: Kind::Swallow,
+                                payload,
+                                path: &display,
+                                source: &source,
+                                injection_offset: offset,
+                                attribution_offset: offset,
+                                text: report.comment,
+                                injected: true,
+                                node_edge: key_node_edge(node_map.as_ref(), offset),
+                            },
+                            key_by_node,
+                        );
+                    }
+                    findings
+                }
             };
             tally.accepted += 1;
             for f in findings {
-                tally.record(Hit {
-                    kind: match f.kind {
-                        CommentFindingKind::Dropped => Kind::Dropped,
-                        CommentFindingKind::DoublePrinted => Kind::DoublePrinted,
+                // The injected comment starts exactly at the injection point; anything else is
+                // a bystander the injection knocked out. A bystander's finding span is in the
+                // INJECTED source's coordinates, so map it back across the splice to the seed —
+                // that seed offset is where the victim comment actually lived, and is what the
+                // shape / snippet / by-node must key on (not the perturbation site).
+                let victim_start = f.span.start as usize;
+                let injected = victim_start == offset;
+                let attribution_offset = if injected {
+                    offset
+                } else {
+                    // TODO: island-relative-span hazard. This maps `f.span` back as if it were
+                    // host-absolute over `source`, but a finding's span is in the coordinate space
+                    // of the DOCUMENT it was registered against. A nested <script>/<style> ELEMENT
+                    // is re-parsed against its own extracted content string, so an island finding's
+                    // span is ISLAND-relative — mapping it across the splice would yield a bogus
+                    // seed offset with `victim_map_fallbacks` staying 0, a SILENT mis-attribution.
+                    // Safe TODAY only because `code_regions` injects host-only, so no island
+                    // finding can arise. Naming <style>/nested-element raw content in
+                    // `code_regions` (see `audit::sites::code_regions`'s TODO) opens the hole and
+                    // MUST fix this first: thread the finding's `DocumentKey` (host source
+                    // identity) through `CommentFinding` so the mapping can scope to the host key —
+                    // as `comment_ledger::parsed_comment_spans` already does — or fall back.
+                    match victim_seed_offset(&source, offset, text.len(), victim_start) {
+                        Some(seed_offset) => seed_offset,
+                        None => {
+                            tally.victim_map_fallbacks += 1;
+                            offset
+                        }
+                    }
+                };
+                tally.record(
+                    Hit {
+                        kind: match f.kind {
+                            CommentFindingKind::Dropped => Kind::Dropped,
+                            CommentFindingKind::DoublePrinted => Kind::DoublePrinted,
+                        },
+                        payload,
+                        path: &display,
+                        source: &source,
+                        injection_offset: offset,
+                        attribution_offset,
+                        text: f.text,
+                        injected,
+                        // Key on the ATTRIBUTION offset — the victim's own site for a bystander,
+                        // the injection site otherwise — so the cluster is the emitter that
+                        // dropped the comment, matching the shape/snippet keying above.
+                        node_edge: key_node_edge(node_map.as_ref(), attribution_offset),
                     },
-                    payload,
-                    path: &display,
-                    source: &source,
-                    offset,
-                    text: f.text,
-                    // The injected comment starts exactly at the injection point; anything
-                    // else is a bystander the injection knocked out.
-                    injected: f.span.start as usize == offset,
-                });
+                    key_by_node,
+                );
             }
         }
     }
@@ -1365,98 +846,156 @@ impl GapAuditCommand {
         // Process-global; the per-thread ledgers below are thread-local, so arming once
         // here covers every worker.
         comment_ledger::set_comment_check(true);
+        // Armed on the SAME format the ledger rides — no extra format, no extra parse. Both
+        // flags are process-global and both report sets are thread-local, so arming once here
+        // covers every worker. See `Kind::Swallow` for why the ledger cannot see this class.
+        swallow::set_swallow_check(true);
 
         // The audit provokes panics on purpose (a formatter crash IS a finding), so keep
         // the default hook from printing each one.
         let prev_hook = std::panic::take_hook();
         std::panic::set_hook(Box::new(|_| {}));
 
-        let jobs = self
-            .jobs
-            .filter(|j| *j > 0)
-            .or_else(|| {
-                std::thread::available_parallelism()
-                    .ok()
-                    .map(std::num::NonZero::get)
-            })
-            .unwrap_or(1)
-            .min(files.len());
-
         let all_bytes = self.all_bytes;
-        let mut total = Tally::default();
-        // Chunk by stride rather than by block: fixture sizes cluster by directory, and
-        // the work is QUADRATIC in file size, so contiguous blocks would leave one thread
-        // holding every large file.
-        std::thread::scope(|scope| {
-            let handles: Vec<_> = (0..jobs)
-                .map(|worker| {
-                    let files = &files;
-                    let payloads = &payloads;
-                    scope.spawn(move || {
-                        let mut tally = Tally::default();
-                        for path in files.iter().skip(worker).step_by(jobs) {
-                            audit_file(path, payloads, all_bytes, &mut tally);
-                        }
-                        tally
-                    })
+        // Key each hit to its `(node, edge)` at record time only when a rollup consumer will read
+        // it — the same condition as `compute_by_node` below, so a graded gate run pays nothing.
+        // `--rank` (the markdown table) and `--since` (the ranking diff) are two more such consumers.
+        let key_by_node = self.json || self.by_node || self.rank || self.since.is_some();
+        // Stride-chunked worker pool (see `audit::parallel::run_pool`); a worker panic outside the
+        // per-injection catch fails the run rather than silently dropping a tally.
+        let mut total = run_pool(
+            &files,
+            self.jobs,
+            |path, tally| audit_file(path, &payloads, all_bytes, key_by_node, tally),
+            Tally::merge,
+        )?;
+
+        // A bystander whose victim span couldn't be placed back in seed coordinates was keyed
+        // on its injection offset instead — expected to be zero, so surface it rather than let
+        // it silently pollute a shape.
+        if total.victim_map_fallbacks > 0 {
+            eprintln!(
+                "warning: {} bystander finding(s) could not map a victim span back across the \
+                 splice and fell back to injection-offset keying — a reflow the linear \
+                 span-shift can't place (see `victim_seed_offset`). Expected zero.",
+                total.victim_map_fallbacks
+            );
+        }
+
+        // Grade first — a cheap snapshot read + set-diff with no formatting — so the verify pass
+        // below (up to `VERIFY_EXAMPLES` formats per shape) runs only when its confidence verdict
+        // is actually consumed. Safe to compute inside the still-armed-ledger / suppressed-panic
+        // window: grade touches neither, reading only the snapshot file and the shape set. The
+        // `!self.update` guard preserves the original ordering (grade used to sit after the
+        // `--update` early-return), so `gaps:audit:update` still regenerates a missing snapshot
+        // instead of failing to read it. Reused for the report/exit decision below.
+        let graded = if !self.update && default_paths && narrowed.is_empty() {
+            Some(ratchet().grade(&snapshot_keys(&total.shapes))?)
+        } else {
+            None
+        };
+        // The verify verdict is read only by `--update` (spends it), `--json`/`--report` (print
+        // it), and the per-shape report a non-holding / narrowed / off-corpus gate takes. The
+        // quiet passing gate (`holds && !report && !json`) calls `print_summary`, which ignores
+        // confidence — so the whole pass, thousands of discarded formats on every green CI run,
+        // is skipped there.
+        let need_verify = self.update
+            || self.json
+            || self.report
+            || !graded.as_ref().is_some_and(GateDiff::holds);
+
+        // Self-verify each shape's kept examples against the output (cheap: up to
+        // `VERIFY_EXAMPLES` per shape, not per site — a few thousand formats against
+        // millions). Single-threaded and after the join, so it can't interleave with a
+        // worker's thread-local ledger. Each example uses its own file's parser, since a
+        // shape can fire across `.svelte` / `.ts` / `.css` alike.
+        if need_verify {
+            let outcomes: Vec<((Kind, String), VerifyOutcome)> = total
+                .shapes
+                .iter()
+                // The verify pass's oracle is the multiset of comment CONTENTS, which answers
+                // the ledger's question ("was a comment lost?") and not the swallow check's
+                // ("did a `//` eat a following token?"). A swallowed token is not a comment, so
+                // the multiset is unchanged and every swallow shape would file a bogus
+                // UNCONFIRMED. It needs no verify anyway: a swallow is observed directly on the
+                // rendered output, like `blank_audit`'s F1/reparse kinds.
+                .filter(|((kind, _), _)| *kind != Kind::Swallow)
+                .map(|((kind, shape), agg)| {
+                    let confirmed = agg
+                        .examples
+                        .iter()
+                        .filter(|ex| {
+                            let parser = ParserType::from_extension(&ex.path);
+                            verify_example(ex, *kind, parser) == Verdict::Confirmed
+                        })
+                        .count();
+                    let outcome = VerifyOutcome {
+                        confirmed,
+                        total: agg.examples.len(),
+                    };
+                    ((*kind, shape.clone()), outcome)
                 })
                 .collect();
-            for h in handles {
-                match h.join() {
-                    Ok(t) => total.merge(t),
-                    Err(_) => eprintln!("warning: a worker thread panicked outside the audit loop"),
+            for (key, outcome) in outcomes {
+                if let Some(agg) = total.shapes.get_mut(&key) {
+                    agg.verify = Some(outcome);
                 }
-            }
-        });
-
-        // Self-verify each shape's example against the output (cheap: once per shape, not
-        // per site — ~700 formats against millions). Single-threaded and after the join, so
-        // it can't interleave with a worker's thread-local ledger.
-        let verdicts: Vec<((Kind, String), Verdict)> = total
-            .shapes
-            .iter()
-            .map(|((kind, shape), agg)| {
-                let parser = ParserType::from_extension(&agg.example.path);
-                ((*kind, shape.clone()), verify_example(agg, *kind, parser))
-            })
-            .collect();
-        for (key, verdict) in verdicts {
-            if let Some(agg) = total.shapes.get_mut(&key) {
-                agg.verdict = Some(verdict);
             }
         }
 
         std::panic::set_hook(prev_hook);
         comment_ledger::set_comment_check(false);
+        swallow::set_swallow_check(false);
 
         if self.update {
-            let path = known_shapes_path();
-            let rendered = render_known(&total.shapes);
-            if let Err(e) = std::fs::write(&path, &rendered) {
-                eprintln!("Error: cannot write {}: {e}", path.display());
-                return Err(CliError::Failed);
-            }
-            // Count what was actually written, not every shape — a panic is not pinned
-            // (see `is_pinnable`), so reporting `total.shapes.len()` would overstate the
-            // file by exactly the crashes it deliberately omits.
+            // Read the pre-write snapshot so the yield line can distinguish RETIRED (a bug a
+            // slice actually fixed, so its line is gone) from RE-PINNED (an unchanged known bug)
+            // — a split `git diff --stat` on the snapshot can't show. Guarded on existence so a
+            // first-ever/absent-file re-pin regenerates cleanly (the whole point of `--update`),
+            // without `parse_known`'s read-failure message. `unwrap_or_default()` also absorbs a
+            // corrupt-but-present file: the yield line then reads every shape as `+added` — a
+            // cosmetic degradation of a report line, never the gate, since `write` overwrites the
+            // file on the next line regardless.
+            let previous: BTreeSet<KnownKey> = if known_shapes_path().exists() {
+                ratchet().parse_known().unwrap_or_default()
+            } else {
+                BTreeSet::new()
+            };
+            let found = snapshot_keys(&total.shapes);
+            ratchet().write(&found)?;
+            // Count what was actually written (the pinnable keys), not every shape — a
+            // panic is not pinned (see `is_pinnable`), so reporting `total.shapes.len()`
+            // would overstate the file by exactly the crashes it deliberately omits.
+            let pinned: BTreeSet<KnownKey> =
+                found.iter().filter(|k| k.is_pinnable()).cloned().collect();
+            let written = pinned.len();
             println!(
                 "✓ wrote {} shape(s) to {}",
-                found_keys(&total.shapes).len(),
-                path.display()
+                written,
+                known_shapes_path().display()
             );
+            // Yield line: RETIRED = pinned before, gone now (the slice's win); ADDED = pinned now,
+            // absent before (a newly-reached or regressed shape). RE-PINNED (the intersection) is
+            // silent — it's the unchanged bulk. `net` is the file's change in size.
+            let retired = previous.difference(&pinned).count();
+            let added = pinned.difference(&previous).count();
+            let net = added as isize - retired as isize;
+            println!("  yield: gaps −{retired} +{added} (net {net:+})");
             // Spend the verify pass rather than discarding it. Pinning is the moment ~700
             // claims get frozen, so it is exactly when it's worth saying which ones the
             // audit could not reproduce. A WARNING, not a refusal: an unconfirmed shape is
             // still a real finding, and the verdict describes the shape's one sampled
             // example rather than the shape, so refusing on it would both block `--update`
             // and flip with which fixture happens to sort first.
-            let unconfirmed = count_unconfirmed(&total.shapes);
-            if unconfirmed > 0 {
+            let unconfirmed = count_by_summary(&total.shapes, VerifySummary::Unconfirmed);
+            let partial = count_by_summary(&total.shapes, VerifySummary::Partial);
+            if unconfirmed > 0 || partial > 0 {
                 println!(
-                    "  ⚠ {unconfirmed} of them UNCONFIRMED — filed as dropped/double-printed, \
-                     yet the output reparses to just as many comments as its input. Likely \
-                     MANGLES (a rebuilt comment) rather than plain drops; see \
-                     docs/gap_audit.md."
+                    "  ⚠ verify: {unconfirmed} shape(s) UNCONFIRMED (no kept example \
+                     reproduced) and {partial} PARTIAL (some did) — filed as \
+                     dropped/double-printed, yet the output reparses to just as many comments \
+                     as its input. Likely MANGLES (a rebuilt comment) rather than plain drops; \
+                     see docs/gap_audit.md."
                 );
             }
             let panics = count_panics(&total.shapes);
@@ -1471,30 +1010,64 @@ impl GapAuditCommand {
             return Ok(());
         }
 
-        // Grade BEFORE printing. Only a run that is actually graded can be quiet — a
-        // narrowed or off-corpus run has no verdict to be quiet about, so it always reports.
-        let graded = if default_paths && narrowed.is_empty() {
-            Some(grade_against_snapshot(&total.shapes))
-        } else {
-            None
-        };
-
+        // `graded` was computed above (before the verify pass) so the pass could be skipped when
+        // its verdict is unused; only a run that is actually graded can be quiet — a narrowed or
+        // off-corpus run has no verdict to be quiet about, so it always reports.
+        let (summary, findings) = build_report(&total, &payloads);
+        // The by-node rollup is report-only and reads the EXACT per-site tallies already
+        // accumulated at record time (no file I/O, no parse) — so compute it only when a consumer
+        // needs it: `--json` folds it in (per-slice tooling reads it to ask "did my fix move the
+        // cluster?"), and the human `--by-node` view renders it as text. Gated on the same
+        // `key_by_node` that armed the record-time keying, so the tallies it reads are complete.
+        let rollup = key_by_node.then(|| compute_by_node(&total));
         if self.json {
-            print_json(&total, &payloads);
+            let extra = rollup
+                .as_ref()
+                .map(by_node_json_sections)
+                .unwrap_or_default();
+            report::print_json(&summary, &findings, &extra);
         } else if graded.as_ref().is_some_and(GateDiff::holds) && !self.report {
             // Nothing to act on: every shape is one the snapshot already pins, so the
             // per-shape report is thousands of lines of noise in `deno task check`.
-            print_summary(&total, &payloads);
+            report::print_summary(&summary, &findings);
         } else {
-            print_report(&total, &payloads);
+            report::print_report(&summary, &findings);
         }
 
-        // Off the default corpus the snapshot doesn't apply — every finding is news.
+        // The human by-node views — printed on every path (default or narrowed), after the report
+        // and before the exit decision, so they never perturb the grade or exit.
+        if let Some(rollup) = &rollup {
+            if self.by_node {
+                report_by_node(rollup, self.json);
+            }
+            if self.rank {
+                report_rank(rollup, self.top, self.json);
+            }
+            if let Some(since_path) = &self.since {
+                report_since(rollup, since_path, self.json);
+            }
+        }
+
+        // The report-only class is never part of a grade — surface it on its own so a reader
+        // can't mistake a quiet ✓ for "no swallows".
+        let soft = count_soft(&total.shapes);
+        if soft > 0 {
+            eprintln!(
+                "\n○ {soft} SWALLOW shape(s) — a `//` comment swallowing following content on \
+                 its output line — reported, NOT gated. The print-once ledger is blind to this \
+                 class (the comment IS printed once), so these are invisible to \
+                 `comments:audit`. See docs/gap_audit.md."
+            );
+        }
+
+        // Off the default corpus the snapshot doesn't apply — every GRADED finding is news.
+        // The report-only class is excluded here for the same reason it is excluded from the
+        // ratchet: it reports, it never decides an exit status.
         if !default_paths {
-            return if total.shapes.is_empty() {
-                Ok(())
-            } else {
+            return if total.shapes.keys().any(|(k, _)| snapshot::is_graded(*k)) {
                 Err(CliError::Failed)
+            } else {
+                Ok(())
             };
         }
         // A narrowed default run reaches only part of the snapshot's shape set (or, under
@@ -1519,9 +1092,9 @@ impl GapAuditCommand {
         }
     }
 
-    /// Report a [`GateDiff`] and turn it into an exit status. See [`KNOWN_SHAPES`] for why
-    /// the key is the shape and not the count.
-    fn report_gate(&self, diff: &GateDiff, total: &Tally) -> Result<(), CliError> {
+    /// Report a [`GateDiff`] and turn it into an exit status. See [`known_shapes_path`] for
+    /// why the key is the shape and not the count.
+    fn report_gate(&self, diff: &GateDiff<KnownKey>, total: &Tally) -> Result<(), CliError> {
         let GateDiff { new, stale, .. } = diff;
 
         // Panics are graded on their own, never against the snapshot: `is_pinnable` keeps
@@ -1539,9 +1112,12 @@ impl GapAuditCommand {
                 panics.len()
             );
             for ((_, shape), agg) in panics.iter().take(40) {
+                let ex = agg.canonical();
+                // A panic hit is always the injected comment (injection == attribution), so this
+                // "inject … at" line names the injection offset that reproduces the crash.
                 eprintln!(
                     "    {shape:<20} e.g. inject {} at {}:{}",
-                    agg.example.payload, agg.example.path, agg.example.offset
+                    ex.payload, ex.path, ex.injection_offset
                 );
             }
             if panics.len() > 40 {
@@ -1555,8 +1131,13 @@ impl GapAuditCommand {
                  double-printed, and the snapshot has never seen it:",
                 new.len()
             );
-            for (kind, shape, payloads) in new.iter().take(40) {
-                eprintln!("    {kind:<14} {shape:<20} [{payloads}]");
+            for k in new.iter().take(40) {
+                eprintln!(
+                    "    {:<14} {:<20} [{}]",
+                    k.kind.label(),
+                    k.shape,
+                    k.payloads
+                );
             }
             if new.len() > 40 {
                 eprintln!("    … and {} more", new.len() - 40);
@@ -1572,8 +1153,13 @@ impl GapAuditCommand {
                  them, drop the lines (`deno task gaps:audit:update`):",
                 stale.len()
             );
-            for (kind, shape, payloads) in stale.iter().take(40) {
-                eprintln!("    {kind:<14} {shape:<20} [{payloads}]");
+            for k in stale.iter().take(40) {
+                eprintln!(
+                    "    {:<14} {:<20} [{}]",
+                    k.kind.label(),
+                    k.shape,
+                    k.payloads
+                );
             }
             if stale.len() > 40 {
                 eprintln!("    … and {} more", stale.len() - 40);
@@ -1600,531 +1186,103 @@ impl GapAuditCommand {
     }
 }
 
-/// How many pinnable shapes carry [`Verdict::Unconfirmed`] — the ledger's account of them
-/// couldn't be reproduced against the output.
-fn count_unconfirmed(shapes: &BTreeMap<(Kind, String), ShapeAgg>) -> usize {
+/// How many pinnable shapes carry the given verify [`VerifySummary`] — `Unconfirmed` (no
+/// kept example reproduced) or `Partial` (some did). An unverified shape (`None`) matches
+/// neither.
+fn count_by_summary(shapes: &BTreeMap<(Kind, String), ShapeAgg>, want: VerifySummary) -> usize {
     shapes
         .iter()
-        .filter(|((kind, _), agg)| is_pinnable(*kind) && agg.verdict == Some(Verdict::Unconfirmed))
+        .filter(|((kind, _), agg)| {
+            is_pinnable(*kind) && agg.verify.map(VerifyOutcome::summary) == Some(want)
+        })
         .count()
 }
 
-/// The header every report opens with — totals, then any file that was **skipped**.
-///
-/// The skip notice lives here, not in [`print_report`], because it is a statement about
-/// COVERAGE, not a finding: a dirty file is one this audit never probed. Quiet modes may
-/// drop findings the snapshot already pins; they must never drop the fact that a file went
-/// unprobed, or a shrinking corpus reads as a passing gate.
-fn print_header(t: &Tally, payloads: &[Payload]) {
-    let labels: Vec<&str> = payloads.iter().map(|p| p.label()).collect();
-    println!(
-        "gap_audit — {} files · {} sites · {} injections ({} accepted) · payloads: {}\n",
-        t.files_done,
-        t.sites,
-        t.injections,
-        t.accepted,
-        labels.join(", ")
-    );
-
-    if !t.dirty_files.is_empty() {
-        println!(
-            "○ {} file(s) already had ledger findings AS AUTHORED — reported by \
-             `comments:audit`, not injected into here:",
-            t.dirty_files.len()
-        );
-        for p in t.dirty_files.iter().take(10) {
-            println!("    {p}");
-        }
-        if t.dirty_files.len() > 10 {
-            println!("    … and {} more", t.dirty_files.len() - 10);
-        }
-        println!();
-    }
-}
-
-/// What a run with nothing to act on prints: the header, the totals, and nothing else.
-///
-/// The per-shape report is for shapes you might *do* something about. When the ratchet
-/// holds, every one is already pinned — printing all ~700 buries the `✓` under thousands of
-/// lines in `deno task check`. `--report` brings them back.
-fn print_summary(t: &Tally, payloads: &[Payload]) {
-    print_header(t, payloads);
-    let findings: usize = t.shapes.values().map(|s| s.count).sum();
-    println!(
-        "○ {findings} finding(s) across {} known site shape(s) — all pinned; re-run with \
-         --report for the per-shape detail",
-        t.shapes.len()
-    );
-}
-
-fn print_report(t: &Tally, payloads: &[Payload]) {
-    print_header(t, payloads);
-
-    if t.shapes.is_empty() {
-        println!(
-            "✓ every injected comment printed exactly once — no gap drops a comment across \
-             {} injections",
-            t.accepted
-        );
-        return;
-    }
-
-    let total: usize = t.shapes.values().map(|s| s.count).sum();
-    println!(
-        "✗ {total} finding(s) across {} distinct site shape(s)\n",
-        t.shapes.len()
-    );
-
-    // Worst-first: a shape firing everywhere is one bug on a hot path, and fixing it
-    // collapses the whole list.
-    let mut rows: Vec<(&(Kind, String), &ShapeAgg)> = t.shapes.iter().collect();
-    rows.sort_by(|a, b| b.1.count.cmp(&a.1.count).then(a.0.cmp(b.0)));
-
-    for ((kind, shape), agg) in &rows {
-        let verdict = match agg.verdict {
-            Some(Verdict::Confirmed) | None => String::new(),
-            Some(Verdict::Unconfirmed) => "  ⚠ UNCONFIRMED".to_string(),
-        };
-        println!(
-            "  {:>7}×  {:<14} {}{}",
-            agg.count,
-            kind.label(),
-            shape,
-            verdict
-        );
-        println!(
-            "            {} file(s) · payloads: {}{}",
-            agg.files.len(),
-            agg.payloads.iter().copied().collect::<Vec<_>>().join(", "),
-            match agg.bystander_hits {
-                0 => String::new(),
-                n if n == agg.count => "  (ALL hits knock out a BYSTANDER comment)".to_string(),
-                n => format!("  ({n} of {} hits knock out a bystander)", agg.count),
-            }
-        );
-        println!(
-            "            e.g. inject {} at {}:{}  {}",
-            agg.example.payload, agg.example.path, agg.example.offset, agg.example.snippet
-        );
-        println!("            comment: {:?}", agg.example.text);
-        println!();
-    }
-
-    let unconfirmed = rows
-        .iter()
-        .filter(|(_, a)| a.verdict == Some(Verdict::Unconfirmed))
-        .count();
-    if unconfirmed > 0 {
-        println!(
-            "⚠ {unconfirmed} shape(s) UNCONFIRMED: the ledger says a comment was never emitted, \
-             yet the\n  output reparses to just as many comments as its input. Something printed \
-             it without\n  recording the emit — or printed a MANGLED rebuild (`/* a⏎b */` → \
-             `/* ab */`, one\n  comment either way). Real either way, but not the plain drop it \
-             is filed as.\n"
-        );
-    }
-}
-
-fn print_json(t: &Tally, payloads: &[Payload]) {
-    let shapes: Vec<serde_json::Value> = t
+/// Translate a run's [`Tally`] into the shared reporting envelope: the run totals and one
+/// [`Finding`] per shape, in the `shapes` map's `(Kind, shape)` order (so the printers'
+/// stable count-sort preserves the `(Kind, shape)` tie-break).
+fn build_report(total: &Tally, payloads: &[Payload]) -> (RunSummary, Vec<Finding>) {
+    let summary = RunSummary {
+        audit: "gap_audit",
+        files_done: total.files_done,
+        sites: total.sites,
+        injections: total.injections,
+        accepted: total.accepted,
+        parse_skipped: total.parse_skipped,
+        dirty_files: total.dirty_files.clone(),
+        payload_labels: payloads.iter().map(|p| p.label()).collect(),
+    };
+    let findings = total
         .shapes
         .iter()
         .map(|((kind, shape), agg)| {
-            serde_json::json!({
-                "kind": kind.label(),
-                "shape": shape,
-                "count": agg.count,
-                "files": agg.files.len(),
-                "payloads": agg.payloads.iter().copied().collect::<Vec<_>>(),
-                "bystander_hits": agg.bystander_hits,
-                "verdict": match agg.verdict {
-                    Some(Verdict::Confirmed) => "confirmed",
-                    Some(Verdict::Unconfirmed) => "unconfirmed",
-                    None => "unverified",
+            let ex = agg.canonical();
+            Finding {
+                audit: "gap_audit",
+                severity: severity_of(*kind),
+                confidence: agg.verify.map(|v| confidence_of(v.summary())),
+                site: shape.clone(),
+                verdict_string: agg
+                    .verify
+                    .map(VerifyOutcome::report_label)
+                    .unwrap_or_default(),
+                example: ReportExample {
+                    payload: ex.payload,
+                    path: ex.path.clone(),
+                    injection_offset: ex.injection_offset,
+                    attribution_offset: ex.attribution_offset,
+                    snippet: ex.snippet.clone(),
+                    text: ex.text.clone(),
+                    injected: ex.injected,
                 },
-                "example_payload": agg.example.payload,
-                "example_path": agg.example.path,
-                "example_offset": agg.example.offset,
-                "example_snippet": agg.example.snippet,
-                "example_text": agg.example.text,
-                "example_injected": agg.example.injected,
-            })
+                detail: Detail::Gap(GapDetail {
+                    kind_label: kind.label(),
+                    count: agg.count,
+                    files: agg.files.len(),
+                    payloads: agg.payloads.iter().copied().collect(),
+                    bystander_hits: agg.bystander_hits,
+                    verify_confirmed: agg.verify.map(|v| v.confirmed),
+                    verify_total: agg.verify.map(|v| v.total),
+                    gated: snapshot::is_graded(*kind),
+                }),
+            }
         })
         .collect();
-    let out = serde_json::json!({
-        "files": t.files_done,
-        "sites": t.sites,
-        "injections": t.injections,
-        "accepted": t.accepted,
-        "parse_skipped": t.parse_skipped,
-        "dirty_files": t.dirty_files,
-        "payloads": payloads.iter().map(|p| p.label()).collect::<Vec<_>>(),
-        "findings": t.shapes.values().map(|s| s.count).sum::<usize>(),
-        "shapes": shapes,
-    });
-    println!("{}", serde_json::to_string_pretty(&out).unwrap_or_default());
+    (summary, findings)
+}
+
+/// A finding's [`Severity`]: a `PANIC` is an absolute break (gate-failing on its own); a
+/// drop / double-print is informational, its fatality decided by the ratchet; a `SWALLOW` is
+/// informational and never fatal at all (report-only, see [`snapshot::is_graded`]).
+fn severity_of(kind: Kind) -> Severity {
+    match kind {
+        Kind::Panic => Severity::GateFailing,
+        Kind::Dropped | Kind::DoublePrinted | Kind::Swallow => Severity::Informational,
+    }
+}
+
+/// Map the verify pass's [`VerifySummary`] onto the envelope's [`Confidence`] axis.
+fn confidence_of(summary: VerifySummary) -> Confidence {
+    match summary {
+        VerifySummary::Clean => Confidence::Confirmed,
+        VerifySummary::Partial => Confidence::Partial,
+        VerifySummary::Unconfirmed => Confidence::Unconfirmed,
+    }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
 
-    /// The wire→byte map, graded against a direct walk on every prefix of strings covering
-    /// each width class: ASCII (1 byte / 1 unit), 2- and 3-byte BMP (n bytes / 1 unit), and
-    /// astral (4 bytes / **2** units — the arm an "offset == char index" reading gets wrong).
-    ///
-    /// This is the only thing that can fail on a bad map: the corpus is ~all ASCII, where
-    /// every arm is the identity, so a broken translation formats byte-identically.
-    #[test]
-    fn utf16_to_byte_matches_a_direct_walk() {
-        for src in [
-            "",
-            "abc",
-            "é",
-            "aéb",
-            "日本語",
-            "a😀b",
-            "😀😀",
-            "const é = 1; // 日本\nx😀y",
-        ] {
-            let map = Utf16ToByte::new(src);
-
-            // Every char boundary must round-trip: the char's UTF-16 offset maps back to
-            // exactly its byte offset.
-            let mut units = 0usize;
-            for (byte, ch) in src.char_indices() {
-                assert_eq!(
-                    map.byte(units),
-                    Some(byte),
-                    "src {src:?}: utf16 offset {units} should be byte {byte}"
-                );
-                units += ch.len_utf16();
-            }
-            // The end offset maps to the source length, and one past it is out of range.
-            assert_eq!(map.byte(units), Some(src.len()), "src {src:?}: end offset");
-            assert_eq!(map.byte(units + 1), None, "src {src:?}: past the end");
-
-            // Every produced offset is a char boundary — the property that keeps slicing
-            // from panicking.
-            for u in 0..=units {
-                let b = map.byte(u).expect("in range");
-                assert!(src.is_char_boundary(b), "src {src:?}: byte {b} mid-char");
-            }
-        }
-    }
-
-    /// The ASCII fast path must be indistinguishable from the table, not merely close.
-    #[test]
-    fn utf16_to_byte_ascii_fast_path_matches_the_table() {
-        let src = "const a = 1;\n\tb();";
-        let fast = Utf16ToByte::new(src);
-        assert!(fast.table.is_none(), "ASCII source should skip the table");
-        for u in 0..=src.len() + 1 {
-            let table_answer = if u <= src.len() { Some(u) } else { None };
-            assert_eq!(fast.byte(u), table_answer, "offset {u}");
-        }
-    }
-
-    /// A region is only useful if it names a spot a comment can actually go: the `Program`
-    /// span must start after `>` and end before `</script>`.
-    #[test]
-    fn code_regions_name_the_script_body_only() {
-        let src = "<script lang=\"ts\">\n\tconst a = 1;\n</script>\n";
-        let regions = code_regions(src, ParserType::Svelte);
-        assert_eq!(regions.len(), 1, "one script body: {regions:?}");
-        let (s, e) = regions[0];
-        assert_eq!(&src[s..e], "\n\tconst a = 1;\n");
-    }
-
-    /// Every region as a source slice, for tests that care about *what* was named rather
-    /// than where it sits.
-    fn named(src: &str) -> Vec<&str> {
-        code_regions(src, ParserType::Svelte)
-            .into_iter()
-            .map(|(s, e)| &src[s..e])
-            .collect()
-    }
-
-    /// A block's head is the region the wire shape cannot express: `IfBlock`'s own span
-    /// covers the whole block (body included) and its `test` span is the expression alone,
-    /// so neither names `#if cond`. The head is where the `{#if ⟨here⟩ a.b}` class lives.
-    #[test]
-    fn code_regions_name_a_block_head_without_its_body() {
-        // One region, and it stops at the head's `}` — the body is markup, not a comment
-        // context, and `x` must not appear in it.
-        assert_eq!(named("{#if a.b}x{/if}"), ["#if a.b"]);
-        // `{:else if}` is a nested IfBlock and gets its own head.
-        assert_eq!(named("{#if a}x{:else if b}y{/if}"), ["#if a", ":else if b"]);
-    }
-
-    /// Each head kind, plus the tags — one case per construct, because each carries its
-    /// span on a different field and a typo in the walk would silently name nothing.
-    #[test]
-    fn code_regions_name_every_head_kind() {
-        assert_eq!(named("{#each xs as x}{/each}"), ["#each xs as x"]);
-        assert_eq!(named("{#await p}{/await}"), ["#await p"]);
-        assert_eq!(named("{#key k}{/key}"), ["#key k"]);
-        assert_eq!(named("{#snippet f(a)}{/snippet}"), ["#snippet f(a)"]);
-        assert_eq!(named("{@html x}"), ["@html x"]);
-        assert_eq!(named("{@render f()}"), ["@render f()"]);
-        assert_eq!(named("{@const a = b}"), ["@const a = b"]);
-        assert_eq!(named("{@debug a}"), ["@debug a"]);
-    }
-
-    /// A directive's value is named from `head_span.end` to the closing `}` — never the
-    /// head itself (`on:click|once` is not a comment context) and never the byte *after*
-    /// the `}`, which is the middle of an element tag: tsv over-accepts a comment there
-    /// while Svelte rejects it, so naming it would manufacture the junk shapes the module
-    /// docs warn about. A shorthand directive has no value and contributes nothing.
-    #[test]
-    fn code_regions_name_a_directive_value_not_its_head() {
-        // The slice stops *before* the `}` because a range's end is exclusive — but a
-        // region's end is an injection site (see `injection_sites`), so the closing `}` is
-        // still probed. That inclusive end is what reaches `on:click={h/* c */}`; the byte
-        // after it — inside the element tag — is what stays out.
-        let src = "<div on:click={h}></div>";
-        let regions = code_regions(src, ParserType::Svelte);
-        assert_eq!(regions.len(), 1, "one directive value: {regions:?}");
-        let (s, e) = regions[0];
-        assert_eq!(&src[s..e], "={h", "the head `on:click` is not named");
-        assert_eq!(
-            &src[e..=e],
-            "}",
-            "the last site is the closing brace, not past it"
-        );
-
-        assert_eq!(named("<div on:click|once={h}></div>"), ["={h"]);
-        assert!(
-            named("<input bind:value />").is_empty(),
-            "a shorthand directive has no value to probe"
-        );
-        // A plain attribute's value is an `ExpressionTag`, which the wire walk names —
-        // the interior only, so the braces stay out.
-        assert_eq!(named("<div class={c}></div>"), ["c"]);
-        // `{...rest}` is brace-delimited like an ExpressionTag.
-        assert_eq!(named("<div {...rest}></div>"), ["...rest"]);
-    }
-
-    /// `<svelte:element this={tag}>` holds its expression **bare** — Svelte's AST has no
-    /// `ExpressionTag` around it — so the wire walk never names it and this is its only
-    /// cover. Regression guard for a real drop: the comment survives in `{'a' + 'b'}` and
-    /// vanished in `this={'a' + 'b'}`.
-    #[test]
-    fn code_regions_name_a_bare_special_element_expression() {
-        assert_eq!(named("<svelte:element this={tag} />"), ["tag"]);
-        assert_eq!(named("<svelte:component this={C} />"), ["C"]);
-    }
-
-    /// The walk names a head **whole**, including the slots where Svelte hand-reads a
-    /// pattern and rejects a comment (`{#each xs as ⟨here⟩ x}`). That is deliberate: tsv
-    /// rejects in exactly those slots too, so `Formatted::Rejected` filters them the same
-    /// way it filters a word interior — no whitelist to keep in sync with Svelte's parser.
-    #[test]
-    fn a_head_region_covers_slots_the_parser_filters() {
-        let src = "{#each xs as x}{/each}";
-        let (s, e) = code_regions(src, ParserType::Svelte)[0];
-        let as_slot = src.find(" x}").expect("the pattern slot") + 1;
-        assert!(
-            (s..=e).contains(&as_slot),
-            "the `as` pattern slot is inside the named head"
-        );
-        // ...and tsv rejects a comment there, so no site survives to a finding.
-        let injected = format!("{}/* c */{}", &src[..as_slot], &src[as_slot..]);
-        assert!(
-            matches!(
-                ledger_format(&injected, ParserType::Svelte),
-                Formatted::Rejected
-            ),
-            "tsv must reject a comment in Svelte's pattern slot, as Svelte does"
-        );
-    }
-
-    /// The shape is the **ratchet key** — the thing the gate diffs against the snapshot —
-    /// so what it abstracts and what it keeps is a contract, not a formatting choice.
-    #[test]
-    fn site_shape_keeps_keywords_and_abstracts_identifiers() {
-        // A keyword must survive verbatim on both sides: `import⟨⟩.` names the
-        // meta-property/import-phase header, while `IDENT⟨⟩.` names every member access in
-        // the corpus. Collapsing the two would hide one bug inside the other's entry.
-        assert_eq!(site_shape("import.meta", 6), "import⟨⟩.");
-        assert_eq!(site_shape("import.meta", 7), ".⟨⟩meta");
-        assert_eq!(site_shape("new.target", 3), "new⟨⟩.");
-
-        // A non-keyword word abstracts, so one bug is one line however many identifiers
-        // reach it.
-        assert_eq!(site_shape("foo.bar", 3), "IDENT⟨⟩.");
-        assert_eq!(site_shape("foo.bar", 4), ".⟨⟩IDENT");
-        assert_eq!(site_shape("x9.y", 2), "IDENT⟨⟩.");
-
-        // Digits are their own class — `1⟨⟩.` (a float's point) is not `IDENT⟨⟩.`.
-        assert_eq!(site_shape("1.5", 1), "NUM⟨⟩.");
-
-        // Whitespace is elided rather than represented: a gap's WIDTH doesn't distinguish
-        // the position, so `a  =` and `a =` must land on one shape.
-        assert_eq!(site_shape("a = 1", 2), "␣⟨⟩=");
-        assert_eq!(site_shape("a  = 1", 2), "␣⟨⟩␣");
-
-        // Punctuator runs are kept literally, capped, and read in source order.
-        assert_eq!(site_shape("a);", 1), "IDENT⟨⟩);");
-        assert_eq!(site_shape("f(x)", 2), "(⟨⟩IDENT");
-
-        // The ends of a file are gaps too and must not panic.
-        assert_eq!(site_shape("ab", 0), "␣⟨⟩IDENT");
-        assert_eq!(site_shape("ab", 2), "IDENT⟨⟩␣");
-
-        // Non-ASCII must not panic or slice mid-char.
-        assert_eq!(site_shape("é.b", 2), "IDENT⟨⟩.");
-    }
-
-    /// A minimal shape carrying `payloads` — only the snapshot columns matter here, so the
-    /// example is filler.
-    fn mk_agg(payloads: &[&'static str]) -> ShapeAgg {
-        ShapeAgg {
-            count: 1,
-            payloads: payloads.iter().copied().collect(),
-            bystander_hits: 0,
-            files: BTreeSet::new(),
-            example: Example {
-                payload: "block",
-                path: "p.svelte".to_string(),
-                offset: 0,
-                snippet: String::new(),
-                text: "/* c */".to_string(),
-                injected: true,
-            },
-            verdict: None,
-        }
-    }
-
-    /// The snapshot is the gate's on-disk contract: whatever `--update` writes, the gate
-    /// must read back as the identical key set, or a green run means nothing.
-    #[test]
-    fn snapshot_render_and_parse_round_trip() {
-        let mut shapes: BTreeMap<(Kind, String), ShapeAgg> = BTreeMap::new();
-        shapes.insert((Kind::Dropped, "import⟨⟩.".to_string()), mk_agg(&["block"]));
-        shapes.insert(
-            (Kind::DoublePrinted, "IDENT⟨⟩=".to_string()),
-            mk_agg(&["line", "block"]),
-        );
-
-        let rendered = render_known(&shapes);
-        // Every non-comment line must be a complete key — a dropped column would make the
-        // gate silently compare fewer fields than it pins.
-        let parsed: BTreeSet<KnownKey> = rendered
-            .lines()
-            .filter(|l| !l.is_empty() && !l.starts_with('#'))
-            .map(|l| {
-                let mut c = l.split('\t');
-                (
-                    c.next().unwrap().to_string(),
-                    c.next().unwrap().to_string(),
-                    c.next().unwrap().to_string(),
-                )
-            })
-            .collect();
-
-        assert_eq!(
-            parsed,
-            found_keys(&shapes),
-            "render → parse must round-trip"
-        );
-        // The payload column is part of the key: same shape, different payload set ⇒
-        // different entry, so a shape that starts dropping a new comment kind fails the gate.
-        assert!(rendered.contains("DROPPED\timport⟨⟩.\tblock\n"));
-        assert!(rendered.contains("DOUBLE-PRINTED\tIDENT⟨⟩=\tblock,line\n"));
-    }
-
-    /// A panic must never reach the snapshot — not via `--update`, and not as a key the
-    /// gate diffs. The corpus cannot grade this: `tests/fixtures` panics nowhere today, so
-    /// both arms are vacuously green there and would stay green if the filter were dropped.
-    #[test]
-    fn a_panic_is_never_pinned() {
-        let mut shapes: BTreeMap<(Kind, String), ShapeAgg> = BTreeMap::new();
-        shapes.insert((Kind::Dropped, "import⟨⟩.".to_string()), mk_agg(&["block"]));
-        shapes.insert((Kind::Panic, "IDENT⟨⟩(".to_string()), mk_agg(&["block"]));
-
-        // Not written: a crash must not land in the list whose shrinking is the goal.
-        // Checked over the DATA lines, not the whole file — the header explains the panic
-        // rule in prose, so a substring search over it matches that and proves nothing.
-        let rendered = render_known(&shapes);
-        let data: Vec<&str> = rendered
-            .lines()
-            .filter(|l| !l.is_empty() && !l.starts_with('#'))
-            .collect();
-        assert_eq!(
-            data,
-            vec!["DROPPED\timport⟨⟩.\tblock"],
-            "only the pinnable shape is written"
-        );
-
-        // Nor diffed: were it a found key it would read as NEW, and `--update` would then
-        // "fix" the gate by pinning it — the exact laundering this prevents.
-        let keys = found_keys(&shapes);
-        assert_eq!(keys.len(), 1, "only the pinnable shape is a key: {keys:?}");
-        assert!(keys.iter().all(|(kind, _, _)| kind != "PANIC"));
-
-        assert_eq!(
-            count_panics(&shapes),
-            1,
-            "but it is still counted, and fails"
-        );
-    }
-
-    /// The ledger's falsifiable prediction. Arithmetic, so the corpus cannot grade it.
-    #[test]
-    fn predicted_comment_count_accounts_for_each_finding() {
-        let f = |kind, emitted| CommentFinding {
-            kind,
-            text: "/* c */".to_string(),
-            span: tsv_lang::Span { start: 0, end: 7 },
-            emitted,
-        };
-        // No findings ⇒ the output keeps every comment.
-        assert_eq!(predict_comment_count(5, &[]), 5);
-        // A drop removes exactly one.
-        assert_eq!(
-            predict_comment_count(5, &[f(CommentFindingKind::Dropped, 0)]),
-            4
-        );
-        // A comment printed TWICE adds one — but one printed THREE times adds two. This is
-        // the case a "double means 2" reading gets wrong.
-        assert_eq!(
-            predict_comment_count(5, &[f(CommentFindingKind::DoublePrinted, 2)]),
-            6
-        );
-        assert_eq!(
-            predict_comment_count(5, &[f(CommentFindingKind::DoublePrinted, 3)]),
-            7
-        );
-        // Mixed findings compose.
-        assert_eq!(
-            predict_comment_count(
-                5,
-                &[
-                    f(CommentFindingKind::Dropped, 0),
-                    f(CommentFindingKind::DoublePrinted, 2)
-                ]
-            ),
-            5
-        );
-        // A ledger that broke its own invariant must not panic the audit.
-        assert_eq!(
-            predict_comment_count(
-                0,
-                &[
-                    f(CommentFindingKind::Dropped, 0),
-                    f(CommentFindingKind::Dropped, 0)
-                ]
-            ),
-            0
-        );
-    }
-
     /// A full default run, as a baseline for the narrowing cases below.
     fn full_run() -> GapAuditCommand {
         GapAuditCommand {
             json: false,
             report: false,
+            by_node: false,
+            rank: false,
+            since: None,
+            top: 12,
             all_bytes: false,
             payload: None,
             jobs: None,
@@ -2173,18 +1331,22 @@ mod tests {
         };
         assert_eq!(all_bytes.narrowing_flags(), vec!["--all-bytes"]);
 
-        // `--json` / `--report` / `--jobs` change how a run is REPORTED and scheduled, never
-        // which sites it reaches, so they must not disqualify one — a gate you can't run
-        // under --json, or on a fixed thread count, would just get bypassed.
+        // `--json` / `--report` / `--by-node` / `--rank` / `--since` / `--jobs` change how a run
+        // is REPORTED and scheduled, never which sites it reaches, so they must not disqualify one
+        // — a gate you can't run under --json, with the by-node/rank views, a ranking diff, or on a
+        // fixed thread count, would just get bypassed.
         let reporting_only = GapAuditCommand {
             json: true,
             report: true,
+            by_node: true,
+            rank: true,
+            since: Some("baseline.json".to_string()),
             jobs: Some(1),
             ..full_run()
         };
         assert!(
             reporting_only.narrowing_flags().is_empty(),
-            "--json / --report / --jobs don't change the shape set"
+            "--json / --report / --by-node / --rank / --since / --jobs don't change the shape set"
         );
 
         // They compose, so the error message can name every offender at once.
@@ -2196,18 +1358,183 @@ mod tests {
         assert_eq!(both.narrowing_flags(), vec!["--limit", "--payload"]);
     }
 
-    /// The word filter must keep both dot gaps of a punctuator-joined header — the exact
-    /// positions the whole audit exists to probe — while dropping word interiors.
-    #[test]
-    fn injection_sites_keep_dot_gaps_and_drop_word_interiors() {
-        let src = "a.b";
-        let sites = injection_sites(src, &[(0, src.len())], false);
-        assert_eq!(sites, vec![0, 1, 2, 3], "every gap around `.` is a site");
+    /// An [`Example`] at `(path, offset)`, only the fields [`Example::sort_key`] reads matter.
+    fn mk_example(path: &str, offset: usize) -> Example {
+        Example {
+            payload: "block",
+            path: path.to_string(),
+            injection_offset: offset,
+            attribution_offset: offset,
+            snippet: String::new(),
+            text: "/* c */".to_string(),
+            injected: true,
+        }
+    }
 
-        let src = "ab";
-        let sites = injection_sites(src, &[(0, src.len())], false);
-        assert_eq!(sites, vec![0, 2], "the interior of `ab` is not a gap");
-        let all = injection_sites(src, &[(0, src.len())], true);
-        assert_eq!(all, vec![0, 1, 2], "--all-bytes keeps the interior");
+    fn empty_agg() -> ShapeAgg {
+        ShapeAgg {
+            count: 0,
+            payloads: BTreeSet::new(),
+            bystander_hits: 0,
+            files: BTreeSet::new(),
+            examples: Vec::new(),
+            verify: None,
+        }
+    }
+
+    /// The bounded set keeps the `VERIFY_EXAMPLES` smallest by `sort_key`, whatever the
+    /// arrival order — the property that makes the kept set (and any diff of it) independent
+    /// of `--jobs`.
+    #[test]
+    fn offer_example_keeps_the_n_smallest_by_sort_key() {
+        let mut agg = empty_agg();
+        for off in [9, 3, 7, 1, 5, 8, 2, 6, 0, 4] {
+            agg.offer_example(mk_example("a.svelte", off));
+        }
+        let offsets: Vec<usize> = agg.examples.iter().map(|e| e.attribution_offset).collect();
+        assert_eq!(offsets, (0..VERIFY_EXAMPLES).collect::<Vec<_>>());
+        assert_eq!(
+            agg.canonical().attribution_offset,
+            0,
+            "canonical is the smallest"
+        );
+    }
+
+    /// A later candidate that TIES an existing one on `sort_key` (same path + offset,
+    /// different payload) sorts AFTER it, so the first-seen stays canonical — `examples[0]`
+    /// never regresses to a later arrival, matching the old single-example tie-break.
+    #[test]
+    fn offer_example_ties_keep_the_first_seen_canonical() {
+        let mut agg = empty_agg();
+        let mut first = mk_example("a.svelte", 0);
+        first.payload = "block";
+        let mut second = mk_example("a.svelte", 0);
+        second.payload = "line";
+        agg.offer_example(first);
+        agg.offer_example(second);
+        assert_eq!(
+            agg.examples.len(),
+            2,
+            "both ties are distinct examples, both kept"
+        );
+        assert_eq!(
+            agg.canonical().payload,
+            "block",
+            "first-seen stays canonical"
+        );
+    }
+
+    /// Merging two tallies keeps the `VERIFY_EXAMPLES` smallest across both. Workers take
+    /// disjoint files, so the two example sets never share a path — the merged min-N is
+    /// determined purely by the global `(path, offset)` set, independent of merge order.
+    #[test]
+    fn merge_keeps_the_n_smallest_examples_across_tallies() {
+        let key = (Kind::Dropped, "IDENT⟨⟩.".to_string());
+        let mut a = Tally::default();
+        let mut b = Tally::default();
+        {
+            let mut agg = empty_agg();
+            for off in [0, 2, 4, 6, 8] {
+                agg.offer_example(mk_example("a.svelte", off));
+            }
+            a.shapes.insert(key.clone(), agg);
+        }
+        {
+            let mut agg = empty_agg();
+            for off in [1, 3, 5, 7, 9] {
+                agg.offer_example(mk_example("b.svelte", off));
+            }
+            b.shapes.insert(key.clone(), agg);
+        }
+        a.merge(b);
+        // `a.svelte` sorts before `b.svelte`, so the five smallest `(path, offset)` keys are
+        // all of a's — a deterministic result no thread count changes.
+        let got: Vec<(&str, usize)> = a.shapes[&key]
+            .examples
+            .iter()
+            .map(|e| (e.path.as_str(), e.attribution_offset))
+            .collect();
+        assert_eq!(
+            got,
+            vec![
+                ("a.svelte", 0),
+                ("a.svelte", 2),
+                ("a.svelte", 4),
+                ("a.svelte", 6),
+                ("a.svelte", 8),
+            ]
+        );
+    }
+
+    /// A bystander hit keys on the VICTIM's site, not the perturbation site. Record two hits
+    /// from one injection over `import.x = y.z`: the injected comment (attribution == injection
+    /// at the `import.` dot) and a bystander whose victim sits at the `y.z` dot — a DIFFERENT
+    /// shape. The bystander must be filed under the victim site's shape, carrying its own
+    /// attribution offset while the injection offset survives for reproduction. The corpus
+    /// can't grade this: a `record` that keyed on `injection_offset` would land the bystander
+    /// under `import⟨⟩.` and the gate would still be green (a shape it already pins).
+    #[test]
+    fn record_keys_a_bystander_on_the_victim_site() {
+        let src = "import.x = y.z";
+        let import_dot = src.find(".x").expect("first dot"); // offset 6
+        let member_dot = src.rfind(".z").expect("second dot"); // offset 12
+        assert_eq!(site_shape(src, import_dot), "import⟨⟩.");
+        assert_eq!(site_shape(src, member_dot), "IDENT⟨⟩.");
+
+        let mut tally = Tally::default();
+        // Keying off here (`node_edge: None`, `key_by_node: false`): this test is about site-shape
+        // keying, not the `(node, edge)` rollup.
+        // The injected comment: attribution == injection at the `import.` dot.
+        tally.record(
+            Hit {
+                kind: Kind::Dropped,
+                payload: Payload::Block,
+                path: "p.ts",
+                source: src,
+                injection_offset: import_dot,
+                attribution_offset: import_dot,
+                text: "/* c */".to_string(),
+                injected: true,
+                node_edge: None,
+            },
+            false,
+        );
+        // A bystander the SAME injection knocked out, whose victim lived at the `y.z` dot.
+        tally.record(
+            Hit {
+                kind: Kind::Dropped,
+                payload: Payload::Block,
+                path: "p.ts",
+                source: src,
+                injection_offset: import_dot,
+                attribution_offset: member_dot,
+                text: "/* pre-existing */".to_string(),
+                injected: false,
+                node_edge: None,
+            },
+            false,
+        );
+
+        assert!(
+            tally
+                .shapes
+                .contains_key(&(Kind::Dropped, "import⟨⟩.".to_string())),
+            "the injected hit keys on the injection site"
+        );
+        let victim = tally
+            .shapes
+            .get(&(Kind::Dropped, "IDENT⟨⟩.".to_string()))
+            .expect("the bystander keys on the VICTIM site, not the injection site");
+        assert_eq!(victim.bystander_hits, 1, "recorded as a bystander");
+        assert_eq!(
+            victim.canonical().attribution_offset,
+            member_dot,
+            "the attribution offset is the victim's own site"
+        );
+        assert_eq!(
+            victim.canonical().injection_offset,
+            import_dot,
+            "the injection offset survives for reproduction"
+        );
     }
 }

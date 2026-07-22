@@ -1,5 +1,6 @@
 //! CSS escape sequence decoding.
 
+use crate::whitespace::is_css_whitespace;
 use std::borrow::Cow;
 
 /// Decode CSS escape sequences in a string.
@@ -25,26 +26,29 @@ pub fn decode_escape_sequences(source: &str) -> Cow<'_, str> {
         if ch == '\\' {
             if let Some(&next_ch) = chars.peek() {
                 if next_ch.is_ascii_hexdigit() {
-                    // Unicode escape sequence
-                    let mut hex_digits = String::new();
+                    // Unicode escape sequence — accumulate the 1-6 hex digits directly
+                    // into a `u32` (no throwaway `String` + `from_str_radix`). Six
+                    // digits max (0xFFFFFF), so `code_point` never overflows. The outer
+                    // `is_ascii_hexdigit` guard guarantees at least one digit is read.
+                    let mut code_point: u32 = 0;
                     for _ in 0..6 {
-                        match chars.peek() {
-                            Some(&digit) if digit.is_ascii_hexdigit() => {
-                                hex_digits.push(digit);
+                        match chars.peek().and_then(|d| d.to_digit(16)) {
+                            Some(d) => {
+                                code_point = code_point * 16 + d;
                                 chars.next();
                             }
-                            _ => break,
+                            None => break,
                         }
                     }
-                    // Optional whitespace terminator
+                    // Optional whitespace terminator — the same CSS whitespace set
+                    // `escape_len` uses (a hand-rolled subset here once omitted `\r`
+                    // and form feed, disagreeing with every other escape scanner).
                     if let Some(&ws) = chars.peek()
-                        && (ws == ' ' || ws == '\t' || ws == '\n')
+                        && is_css_whitespace(ws)
                     {
                         chars.next();
                     }
-                    if let Ok(code_point) = u32::from_str_radix(&hex_digits, 16)
-                        && let Some(c) = char::from_u32(code_point)
-                    {
+                    if let Some(c) = char::from_u32(code_point) {
                         result.push(c);
                     }
                 } else {
@@ -62,6 +66,127 @@ pub fn decode_escape_sequences(source: &str) -> Cow<'_, str> {
     }
 
     Cow::Owned(result)
+}
+
+/// Whether the `\` immediately before `text`'s end starts a valid escape — i.e. the
+/// run of backslashes ending `text` has **odd** length, so the last one is itself
+/// unescaped and escapes whatever comes next. An even run is a completed `\\`.
+fn ends_with_open_escape(text: &str) -> bool {
+    text.bytes().rev().take_while(|&b| b == b'\\').count() % 2 == 1
+}
+
+/// Whether `c` is a character [`trim_end_preserving_escape`] must hand back to an escape
+/// as its **payload**.
+///
+/// §4.3.7's final branch escapes *any* code point, so an escape's payload is not restricted
+/// to whitespace at all — `\<NBSP>` is a perfectly good escape. But this predicate only ever
+/// sees a character the trim was about to *eat*, and that trim removes **CSS** whitespace
+/// only (§4.2). Of those five, a newline is the one shape §4.3.4 excludes from starting an
+/// escape — leaving exactly the space and the tab.
+///
+/// So an NBSP payload needs no rescue here: it is content the trim never touches.
+fn is_escapable_whitespace(c: char) -> bool {
+    matches!(c, ' ' | '\t')
+}
+
+/// The byte length of the CSS escape starting at `s[i]` (which must be a `\`), or
+/// `None` when that `\` does not start a valid escape.
+///
+/// Per CSS Syntax 3 §4.3.7 "Consume an escaped code point":
+///
+/// - a **hex** escape takes up to **six** hex digits and then, optionally, **one**
+///   whitespace character — the *terminator*, which belongs to the escape rather than
+///   separating it from what follows. So `\41 2px` is the single ident `A2px`, not
+///   `\41` followed by `2px`, and a splitter that treats that space as a separator
+///   tears one token in half;
+/// - any other code point is escaped literally (`\ ` is a space, `\,` is a comma),
+///   consuming exactly that one code point;
+/// - a `\` before a newline is **not** an escape at all (§4.3.4) — `None`.
+///
+/// The single definition of "how far does this escape reach", so every scanner that walks
+/// a CSS value — the whitespace normalizer, the top-level splitter, the value cursor —
+/// steps over escapes identically and none of them can mistake an escape's interior for
+/// structure.
+///
+/// A CRLF terminator is taken as the `\r` only, leaving the `\n` outside the escape. That
+/// is one code point short of §4.2's preprocessing (which folds CRLF to a single newline),
+/// but harmless rather than merely tolerable: the leftover `\n` is then ordinary
+/// whitespace, and every consumer of this function normalizes a whitespace run to one
+/// space, so `\41<CR><LF>2px` still emits `\41 2px` — the same ident `A2px`, which
+/// re-parses identically. The safety comes from that downstream join, not from this arm.
+pub(crate) fn escape_len(s: &str, i: usize) -> Option<usize> {
+    debug_assert_eq!(s.as_bytes().get(i), Some(&b'\\'));
+    let rest = s.get(i + 1..)?;
+    let first = rest.chars().next()?;
+    if matches!(first, '\n' | '\r' | '\x0C') {
+        return None;
+    }
+    if !first.is_ascii_hexdigit() {
+        return Some(1 + first.len_utf8());
+    }
+    let hex = rest
+        .bytes()
+        .take(6)
+        .take_while(u8::is_ascii_hexdigit)
+        .count();
+    let terminator = rest[hex..]
+        .chars()
+        .next()
+        .filter(|&c| is_css_whitespace(c))
+        .map_or(0, char::len_utf8);
+    Some(1 + hex + terminator)
+}
+
+/// Trim trailing **CSS** whitespace, but never the whitespace a CSS **escape** owns.
+///
+/// Two rules, and the first is the one that makes the second small.
+///
+/// **Trim only CSS whitespace** (§4.2: tab, newline, form feed, carriage return, space —
+/// ASCII, and exactly what [`is_css_whitespace`] answers). `str::trim_end` follows Unicode
+/// `White_Space`, which would also strip NBSP, U+3000 and friends — and those are ordinary
+/// **content** to CSS: `parseCss` and prettier both keep them inside the token, so eating
+/// one silently renames a class (`.a<NBSP>, .b` → `.a,`) or rewrites a value
+/// (`translate(a<NBSP>)` → `translate(a)`).
+///
+/// **Never take an escape's payload.** `\` + whitespace is a valid escape whose escaped
+/// code point *is* that whitespace (§4.3.4, and §4.3.7 "Consume an escaped code point",
+/// whose final branch returns the code point itself), so the trailing space in
+/// `width: 50px\ ;` is content too. Trimming it strands the backslash, which then escapes
+/// whatever follows — the declaration's `;`, a function's `)`, a selector's `,` — and the
+/// output no longer parses. Exactly one character is therefore kept when an odd-length
+/// backslash run precedes it (an even run is a completed `\\`); anything past the escaped
+/// one is ordinary padding and still goes.
+///
+/// Because the trim is CSS-only, the payload can only ever be a space or a tab: a newline
+/// is the one shape §4.3.4 excludes from being an escape at all, and every *other*
+/// whitespace character is never eaten in the first place. There is no "restore what the
+/// Unicode trim took" case, because nothing takes it.
+///
+/// The single definition of this rule. The parser's value/argument spans, the printer's
+/// whitespace normalizer and top-level splitter, the selector leaf/pseudo printers, the
+/// at-rule prelude, and `url()` trimming all route through it, so they cannot drift.
+///
+/// This is **not** the lexer's escape-terminator rule (`lexer::identifiers`), which is
+/// Unicode-wide because its oracle is `parseCss`'s `\s`-based regex. Different question,
+/// different oracle — see [`escape_len`] and the comment there.
+pub(crate) fn trim_end_preserving_escape(s: &str) -> &str {
+    let trimmed = s.trim_end_matches(is_css_whitespace);
+    if trimmed.len() == s.len() || !ends_with_open_escape(trimmed) {
+        return trimmed;
+    }
+    // Give the escape back its one payload character.
+    match s[trimmed.len()..].chars().next() {
+        Some(c) if is_escapable_whitespace(c) => &s[..trimmed.len() + c.len_utf8()],
+        _ => trimmed,
+    }
+}
+
+/// Trim leading **CSS** whitespace — the leading-side counterpart of
+/// [`trim_end_preserving_escape`], and needed for the same reason: `str::trim_start` is
+/// Unicode-wide and would eat an NBSP that is content. No escape can own a *leading*
+/// whitespace (an escape's payload always follows its `\`), so there is nothing to restore.
+pub(crate) fn trim_start_css(s: &str) -> &str {
+    s.trim_start_matches(is_css_whitespace)
 }
 
 #[cfg(test)]
@@ -85,5 +210,103 @@ mod tests {
 
         // With ONE leading zero (6 hex digits - CSS maximum)
         assert_eq!(decode_escape_sequences(r"\01F4A9"), "💩");
+    }
+}
+
+#[cfg(test)]
+mod escape_scan_tests {
+    use super::{escape_len, trim_end_preserving_escape, trim_start_css};
+
+    #[test]
+    fn trim_keeps_an_escaped_space() {
+        // The escape's payload survives; ordinary padding past it does not.
+        assert_eq!(trim_end_preserving_escape(r"50px\ "), r"50px\ ");
+        assert_eq!(trim_end_preserving_escape("50px\\ \t  "), r"50px\ ");
+        assert_eq!(trim_end_preserving_escape("a\\\t"), "a\\\t");
+    }
+
+    #[test]
+    fn trim_drops_ordinary_whitespace() {
+        assert_eq!(trim_end_preserving_escape("50px   "), "50px");
+        assert_eq!(trim_end_preserving_escape("50px"), "50px");
+        // A hex escape's terminator is not a payload — it is trimmable here (whatever
+        // follows a trimmed value re-terminates the escape).
+        assert_eq!(trim_end_preserving_escape(r"\41 "), r"\41");
+    }
+
+    #[test]
+    fn trim_counts_the_backslash_run_parity() {
+        // Even run = a completed `\\`, so the space after it is ordinary padding.
+        assert_eq!(trim_end_preserving_escape(r"a\\ "), r"a\\");
+        // Odd run = the last `\` is unescaped and owns the space.
+        assert_eq!(trim_end_preserving_escape(r"a\\\ "), r"a\\\ ");
+        assert_eq!(trim_end_preserving_escape(r"a\\\\ "), r"a\\\\");
+    }
+
+    #[test]
+    fn trim_edges() {
+        assert_eq!(trim_end_preserving_escape(""), "");
+        assert_eq!(trim_end_preserving_escape("   "), "");
+        // The backslash run starts at index 0 — nothing precedes it.
+        assert_eq!(trim_end_preserving_escape(r"\ "), r"\ ");
+        assert_eq!(trim_end_preserving_escape(r"\\ "), r"\\");
+        // A lone trailing backslash has no payload to keep.
+        assert_eq!(trim_end_preserving_escape(r"a\"), r"a\");
+    }
+
+    #[test]
+    fn trim_never_keeps_a_newline() {
+        // `\` + newline is NOT a valid escape (§4.3.4), so the backslash owns nothing.
+        assert_eq!(trim_end_preserving_escape("a\\\n"), "a\\");
+        assert_eq!(trim_end_preserving_escape("a\\\r\n"), "a\\");
+    }
+
+    #[test]
+    fn trim_leaves_non_css_whitespace_alone() {
+        // NBSP / ideographic space are CSS *content*, not whitespace (§4.2) — `parseCss`
+        // and prettier keep them inside the token, so the trim must never eat one. This is
+        // what collapses the payload rule: an escaped NBSP needs no rescue, because nothing
+        // takes it in the first place.
+        assert_eq!(trim_end_preserving_escape("a\u{a0}"), "a\u{a0}");
+        assert_eq!(trim_end_preserving_escape("a\u{3000}"), "a\u{3000}");
+        assert_eq!(trim_end_preserving_escape("a\\\u{a0}"), "a\\\u{a0}");
+        // …and ordinary CSS whitespace after it still goes.
+        assert_eq!(trim_end_preserving_escape("a\u{a0}  "), "a\u{a0}");
+    }
+
+    #[test]
+    fn trim_start_css_leaves_non_css_whitespace_alone() {
+        assert_eq!(trim_start_css("  a"), "a");
+        assert_eq!(trim_start_css("\u{a0}a"), "\u{a0}a");
+        assert_eq!(trim_start_css(" \u{a0}a"), "\u{a0}a");
+    }
+
+    #[test]
+    fn escape_len_identity_escapes() {
+        assert_eq!(escape_len(r"\ x", 0), Some(2)); // `\ `
+        assert_eq!(escape_len(r"\,y", 0), Some(2)); // `\,`
+        assert_eq!(escape_len(r"\)b", 0), Some(2)); // `\)`
+        // A multi-byte escaped code point is consumed whole.
+        assert_eq!(escape_len("\\\u{a0}b", 0), Some(3));
+    }
+
+    #[test]
+    fn escape_len_hex_escapes_swallow_one_terminator() {
+        // Up to SIX hex digits, then optionally ONE whitespace terminator.
+        assert_eq!(escape_len(r"\41 2px", 0), Some(4)); // `\41 ` — the space belongs to it
+        assert_eq!(escape_len(r"\41b", 0), Some(4)); // `\41b` — `b` is a hex digit
+        assert_eq!(escape_len(r"\41z", 0), Some(3)); // `\41` — `z` is not
+        assert_eq!(escape_len(r"\0000411", 0), Some(7)); // six digits max, then `1` stops it
+        assert_eq!(escape_len(r"\41  x", 0), Some(4)); // only the FIRST space is the terminator
+        // A newline can terminate a hex escape (it is CSS whitespace), unlike being a
+        // payload.
+        assert_eq!(escape_len("\\41\n", 0), Some(4));
+    }
+
+    #[test]
+    fn escape_len_rejects_a_non_escape() {
+        assert_eq!(escape_len("\\\n", 0), None); // `\` + newline is not an escape
+        assert_eq!(escape_len("\\\r", 0), None);
+        assert_eq!(escape_len(r"\", 0), None); // a lone trailing backslash
     }
 }

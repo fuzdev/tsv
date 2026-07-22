@@ -186,7 +186,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // (`any => …`), or `await` as a `BindingIdentifier` at Script `[~Await]`
         // (`await => …`) — the dispatcher gates every reachable case through the
         // `try_binding_name` binding-name predicate.
-        debug_assert!(self.try_binding_name().is_some());
+        debug_assert!(self.at_binding_name());
         let (id_start, id_end) = self.current_pos();
         let name = self.current_ident_name_or_await();
         self.advance()?;

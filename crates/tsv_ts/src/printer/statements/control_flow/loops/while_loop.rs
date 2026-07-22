@@ -88,23 +88,27 @@ impl<'a> Printer<'a> {
         let do_end = stmt.span.start + "do".len() as u32;
         let body_start = stmt.body.span().start;
         let mut parts = if self.has_comments_to_emit_between(do_end, body_start) {
-            let has_line = self.has_line_comments_between(do_end, body_start);
-            let comment_doc =
-                self.build_inline_comments_between_doc_no_leading_space(do_end, body_start);
+            let gap_breaks = self.header_to_body_gap_breaks(do_end, body_start);
             let mut p = smallvec![d.text("do")];
-            if has_line && !is_block {
-                // Line comment with non-block body: indent comment + body
-                // do\n\t// c\n\texpr;
-                p.push(d.indent(d.concat(&[d.hardline(), comment_doc, d.hardline(), body_doc])));
-            } else if has_line {
-                // Line comment with block body: keep flat
-                p.push(d.text(" "));
-                p.push(comment_doc);
-                p.push(d.hardline());
+            if gap_breaks && !is_block {
+                // Non-block body: the comment run shares the body's indent, with a `//`
+                // normalized onto its own line — prettier does the same here, so there
+                // is nothing to preserve.
+                self.push_indented_header_to_body_gap(&mut p, do_end, body_start, body_doc);
+            } else if gap_breaks {
+                // Block body — the shared header→body gap, exactly as `try`/`catch`/
+                // `finally` use it: a comment trailing `do` stays trailing, one on its own
+                // line keeps it. Emitting the run inline after a bare space relocated an
+                // own-line comment up onto the `do` line (`do // c⏎{`), the same defect
+                // the `try` family had; prettier preserves here, so it is a clean oracle
+                // rather than a stance.
+                self.push_header_to_body_gap(&mut p, do_end, body_start);
                 p.push(body_doc);
             } else {
+                // Block comment(s) only — built here so the line-comment paths above
+                // don't compute a doc they discard.
                 p.push(d.text(" "));
-                p.push(comment_doc);
+                p.push(self.build_inline_comments_between_doc_no_leading_space(do_end, body_start));
                 p.push(d.text(" "));
                 p.push(body_doc);
             }
@@ -123,28 +127,14 @@ impl<'a> Printer<'a> {
         let test_start = stmt.test.span().start;
         let while_pos = self.find_keyword_in_range(body_end, test_start, "while");
 
-        // Check for comments between } and while, determine if while stays on same line
-        let while_on_same_line = if let Some(while_start) = while_pos
-            && self.has_comments_to_emit_between(body_end, while_start)
-        {
-            let (inline_prev, own_line, inline_next) =
-                self.partition_comments_by_line(body_end, while_start);
-
-            // Merge inline_next (comments on same line as `while`) into own_line
-            // so they're emitted before the `while` keyword rather than dropped.
-            // e.g. `} \n /* c */ while (cond);` → `}\n/* c */\nwhile (cond);`
-            let mut all_own_line = own_line;
-            all_own_line.extend(inline_next);
-
-            // Add comments preserving their position.
-            self.build_comments_between_parts(&mut parts, &inline_prev, &all_own_line, body_end);
-
-            // While stays on same line only if: block body, no own-line comments, all inline are block comments
-            let has_inline_line_comment = inline_prev.iter().any(|c| !c.is_block);
-            is_block && all_own_line.is_empty() && !has_inline_line_comment
+        // The `}`→`while` gap: its comments and the separator before the keyword.
+        // Emitted here, ahead of the paren bookkeeping below, which computes without
+        // pushing; the `while` keyword itself follows it.
+        if let Some(while_start) = while_pos {
+            self.push_block_to_keyword_gap(&mut parts, body_end, while_start, is_block);
         } else {
-            is_block
-        };
+            parts.push(if is_block { d.text(" ") } else { d.hardline() });
+        }
 
         // Find paren positions for comment handling
         let open_paren = while_pos.and_then(|p| self.find_open_paren_after(p));
@@ -159,12 +149,7 @@ impl<'a> Printer<'a> {
             None
         };
 
-        if while_on_same_line {
-            parts.push(d.text(" while"));
-        } else {
-            parts.push(d.hardline());
-            parts.push(d.text("while"));
-        }
+        parts.push(d.text("while"));
         if let Some(kc) = keyword_comments {
             parts.push(kc);
             parts.push(d.text("("));

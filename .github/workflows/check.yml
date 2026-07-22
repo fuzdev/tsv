@@ -1,12 +1,13 @@
 # Two jobs run on every push to main and every PR:
 #
-#   check     — mirrors the local `deno task check` gate exactly (typecheck,
-#               cargo test + fixtures, deno tests, conformance + pins audits,
-#               scan/fanout/swallow audits, rustfmt --check, AST-type drift,
-#               clippy with -D warnings). pins:audit's checkout-alignment half
-#               self-skips here (CI has no sibling checkouts); the pinned-count
-#               guards that run in CI are the committed-tree ones
-#               (fixtures_validate via cargo test, swallow_audit).
+#   check     — runs the local `deno task check` gate verbatim, so the two cannot
+#               drift: rustfmt, typecheck, the audit suite, cargo + deno tests,
+#               AST-type drift, clippy with -D warnings. The authoritative list is
+#               the `check` task in deno.json — deliberately NOT re-enumerated here,
+#               because a hand-copied list goes stale every time an audit is added.
+#               pins:audit's checkout-alignment half self-skips here (CI has no
+#               sibling checkouts); the pinned-count guards that run in CI are the
+#               committed-tree ones (fixtures_validate via cargo test, swallow_audit).
 #   artifacts — publish-parity: builds the WASM/npm packages, checks size
 #               bounds, runs the Node package tests (see the job comment).
 #

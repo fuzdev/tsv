@@ -6,6 +6,7 @@
 use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::{CommentVec, LeadingGlue, Printer};
 use smallvec::smallvec;
+use tsv_lang::Comment;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -71,41 +72,62 @@ impl<'a> Printer<'a> {
         let (inline_prev, own_line, inline_next) =
             self.partition_comments_by_line(paren_end, body_start);
 
-        // Check if any line comment forces a break
-        let has_line =
-            inline_prev.iter().any(|c| !c.is_block) || own_line.iter().any(|c| !c.is_block);
-
         parts.push(d.text(")"));
 
-        if has_line {
+        if self.header_to_body_gap_breaks(paren_end, body_start) {
             // Emit trailing comments on the `)` line
             for comment in &inline_prev {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             }
 
-            // Remaining comments (own_line + inline_next) go indented before body
-            let mut inner: DocBuf = smallvec![d.hardline()];
-            for comment in own_line.into_iter().chain(inline_next) {
-                inner.push(self.build_comment_doc(comment));
-                if comment.is_block {
-                    inner.push(d.text(" "));
+            // Remaining comments (own_line + inline_next) go indented before body.
+            //
+            // Separator-BEFORE form: the separator ahead of each comment is keyed on the
+            // PREVIOUS comment, and the one before the body on the last — identical to
+            // keying each separator on the comment it follows, but it leaves a seam for
+            // the blank line an author put between two own-line comments
+            // (`push_gap_blank_before`, the one place that rule lives).
+            //
+            // The separator preserves the authored line: what the author wrote on one
+            // line stays on one line. A line comment is the one override — it must end
+            // its line or the `//` swallows the next comment / the body. That rule
+            // applies both between comments and before the body, so it is written once.
+            let sep_after = |p: &Comment, next_start: u32| {
+                if !p.is_block || !self.is_same_line(p.span.end, next_start) {
+                    d.hardline()
                 } else {
-                    inner.push(d.hardline());
+                    d.text(" ")
                 }
+            };
+            let mut inner = DocBuf::new();
+            let mut prev: Option<&Comment> = None;
+            for comment in own_line.into_iter().chain(inline_next) {
+                match prev {
+                    None => inner.push(d.hardline()),
+                    Some(p) => {
+                        self.push_gap_blank_before(
+                            &mut inner,
+                            Some(p.span.end),
+                            comment.span.start,
+                        );
+                        inner.push(sep_after(p, comment.span.start));
+                    }
+                }
+                inner.push(self.build_comment_doc(comment));
+                prev = Some(comment);
             }
+            inner.push(prev.map_or_else(|| d.hardline(), |p| sep_after(p, body_start)));
             inner.push(body_doc);
             parts.push(d.indent(d.concat(&inner)));
         } else {
-            // Block comments only: adjustClause — `) /* a */ body` stays flat but the
-            // comment(s) + body drop to their own indented line when the enclosing
-            // for-in/for-of group breaks (overflow). Matches Prettier.
+            // Nothing forces a break, so by `header_to_body_gap_breaks` every comment is
+            // a block comment already trailing `)` — `own_line` and `inline_next` are
+            // empty here and iterating them would be dead. adjustClause: `) /* a */ body`
+            // stays flat, but the comment(s) + body drop to their own indented line when
+            // the enclosing for-in/for-of group breaks (overflow). Matches Prettier.
             let mut inner = DocBuf::new();
-            for comment in inline_prev
-                .iter()
-                .chain(own_line.iter())
-                .chain(inline_next.iter())
-            {
+            for comment in &inline_prev {
                 inner.push(self.build_comment_doc(comment));
                 inner.push(d.text(" "));
             }
@@ -204,7 +226,7 @@ impl<'a> Printer<'a> {
         let Some(close) = self.matching_close_paren(open) else {
             return d.concat(&[for_open, d.text(";;)")]);
         };
-        let (Some(s1), Some(s2)) = self.find_for_semicolons(open) else {
+        let (Some(s1), Some(s2)) = self.find_for_semicolons(stmt, open, Some(close)) else {
             return d.concat(&[for_open, d.text(";;)")]);
         };
 
@@ -336,8 +358,7 @@ impl<'a> Printer<'a> {
         }
 
         // Determine spans for each part
-        let init_end = stmt.init.as_ref().map(|i| self.get_for_init_span_end(i));
-        let test_end = stmt.test.as_ref().map(|t| t.span().end);
+        let (init_end, test_end) = self.for_clause_ends(stmt);
         let update_end = stmt.update.as_ref().map(|u| u.span().end);
 
         let spans = ForHeaderSpans {
@@ -398,7 +419,11 @@ impl<'a> Printer<'a> {
 
         // Find semicolon positions for proper comment boundary detection
         // The semicolons in `for (init; test; update)` are at specific positions in source
-        let (first_semi, second_semi) = self.find_for_semicolons(stmt.span.start);
+        // Anchored at the clause ends, not `stmt.span.start` — see `find_for_semicolons`.
+        // `open_paren` is only the fallback for an absent init, so a header with no open
+        // paren to find (already degenerate) keeps the previous keyword-relative behavior.
+        let (first_semi, second_semi) =
+            self.find_for_semicolons(stmt, open_paren.unwrap_or(stmt.span.start), close_paren);
 
         // Init part
         if let Some(init) = &stmt.init {
@@ -603,32 +628,51 @@ impl<'a> Printer<'a> {
         parts.extend(after);
     }
 
-    /// Find the two `;` separators in a for-header, scanning forward from
-    /// `scan_start`. Returns `(first_semi, second_semi)`; the second is only sought
-    /// once the first is found.
-    fn find_for_semicolons(&self, scan_start: u32) -> (Option<u32>, Option<u32>) {
-        // Skip any `;` inside a comment in a clause (`for (let i = 0 /* ; */; …)`).
+    /// Find the two `;` separators in a for-header. Returns `(first_semi,
+    /// second_semi)`; the second is only sought once the first is found.
+    ///
+    /// Each scan is anchored at the **end of the clause its separator follows**, taken
+    /// from the AST — never at the `for` keyword or the open paren. That is what makes
+    /// first-match correct: from a clause's own end, only trivia and closing parens can
+    /// precede the `;`, so the first hit is the separator. A scan anchored ahead of the
+    /// clause instead walks *through* its source, and `TriviaProfile::JS` skips comments
+    /// and strings but tracks **no brace depth** — so a `;` inside a nested block
+    /// (`for (let f = () => { a(); b(); } /* c */; …)`) reads as the header separator,
+    /// mis-binding that clause's trailing comments. It double-printed one. The anchor
+    /// does this work, not the profile; widening the profile would not help.
+    ///
+    /// A clause that is absent falls back to just past the preceding delimiter, where
+    /// the same adjacency holds (nothing but trivia sits between them).
+    ///
+    /// The search is bounded by `close_paren`, so a separator can never be picked up from
+    /// a *later statement*: both separators are inside the header by definition, and a
+    /// header missing one is degenerate, which every caller already handles. That also
+    /// keeps the scan O(header) rather than O(rest of file).
+    fn find_for_semicolons(
+        &self,
+        stmt: &internal::ForStatement<'_>,
+        open_paren: u32,
+        close_paren: Option<u32>,
+    ) -> (Option<u32>, Option<u32>) {
         let bytes = self.source.as_bytes();
-        let first_semi = find_char(
-            bytes,
-            scan_start as usize,
-            bytes.len(),
-            b';',
-            TriviaProfile::JS,
-        )
-        .map(|p| p as u32);
-        let second_semi = first_semi
-            .and_then(|p| {
-                find_char(
-                    bytes,
-                    (p + 1) as usize,
-                    bytes.len(),
-                    b';',
-                    TriviaProfile::JS,
-                )
-            })
-            .map(|p| p as u32);
+        let end = close_paren.map_or(bytes.len(), |c| c as usize);
+        let (init_end, test_end) = self.for_clause_ends(stmt);
+        let scan = |from: u32| {
+            find_char(bytes, from as usize, end, b';', TriviaProfile::JS).map(|p| p as u32)
+        };
+        let first_semi = scan(init_end.unwrap_or(open_paren + 1));
+        let second_semi = first_semi.and_then(|first| scan(test_end.unwrap_or(first + 1)));
         (first_semi, second_semi)
+    }
+
+    /// The end positions of the `init` and `test` clauses — the AST anchors the header's
+    /// `;` separators are located from (see [`Self::find_for_semicolons`]). Derived in one
+    /// place so the two scan call sites and the `ForHeaderSpans` build cannot disagree.
+    fn for_clause_ends(&self, stmt: &internal::ForStatement<'_>) -> (Option<u32>, Option<u32>) {
+        (
+            stmt.init.as_ref().map(|i| self.get_for_init_span_end(i)),
+            stmt.test.as_ref().map(|t| t.span().end),
+        )
     }
 
     /// Resolve where to start searching for a for-clause's leading comments: just
@@ -1200,9 +1244,6 @@ impl<'a> Printer<'a> {
         let body_start = stmt.body.span().start;
 
         if has_pre_paren_comments || self.has_comments_to_emit_between(header_end, body_start) {
-            // Check if we have line comments (need special handling)
-            let has_line_comment = self.has_line_comments_between(header_end, body_start);
-
             // Build parts with proper comment handling. A comment between `)` and the
             // body does NOT force the header to break — the header decides its own
             // flat/break on its own width (prettier 3.9 collapses `for (i; c; u)` and
@@ -1220,59 +1261,31 @@ impl<'a> Printer<'a> {
             // A C-style `for` collapses its empty block body (`for (…) {}`).
             let body_doc = self.build_collapsing_body_doc(stmt.body);
 
+            let gap_breaks = self.header_to_body_gap_breaks(header_end, body_start);
             let (tail, group_it) = if self.has_comments_to_emit_between(header_end, body_start) {
-                if has_line_comment && !is_block_body {
-                    // Line comment(s), non-block body: each comment on its own
-                    // indented line, then the body — break-safe so a `//` can't
-                    // swallow the next comment or the body (matches Prettier's
-                    // adjustClause; multiple comments previously collapsed inline).
-                    let mut inner = DocBuf::new();
-                    let mut prev = header_end;
-                    for comment in comments_to_emit_in_range(self.comments, header_end, body_start)
-                    {
-                        if prev != header_end
-                            && self.has_blank_line_between(prev, comment.span.start)
-                        {
-                            inner.push(d.literalline());
-                        }
-                        inner.push(d.hardline());
-                        inner.push(self.build_comment_doc(comment));
-                        prev = comment.span.end;
-                    }
-                    inner.push(d.hardline());
-                    inner.push(body_doc);
-                    (d.indent(d.concat(&inner)), false)
-                } else if has_line_comment {
-                    // Line comment(s), block body. Preserve each comment's position
-                    // (no inline collapse → no swallow): a comment trailing `)`
-                    // stays on the `)` line, own-line comments each keep their own
-                    // line; then the block drops to the next line. Mirrors the
-                    // shared `append_close_paren_with_comments` (which the C-style
-                    // for can't call directly — its `)` is already in the header).
-                    let (mut inline_prev, own_line, inline_next) =
-                        self.partition_comments_by_line(header_end, body_start);
-                    let mut own_line_lines: CommentVec<'_> = smallvec![];
-                    for comment in own_line.into_iter().chain(inline_next) {
-                        if comment.is_block {
-                            inline_prev.push(comment);
-                        } else {
-                            own_line_lines.push(comment);
-                        }
-                    }
+                if gap_breaks && !is_block_body {
+                    // Non-block body, and something in the gap forces the break: the
+                    // shared indented emitter — each own-line comment on its own
+                    // indented line, then the body — break-safe so a `//` can't swallow
+                    // the next comment or the body (Prettier's `adjustClause`).
                     let mut tail = DocBuf::new();
-                    let effective_prev_end = inline_prev.last().map_or(header_end, |c| c.span.end);
-                    self.build_comments_between_parts(
-                        &mut tail,
-                        &inline_prev,
-                        &own_line_lines,
-                        effective_prev_end,
+                    self.push_indented_header_to_body_gap(
+                        &mut tail, header_end, body_start, body_doc,
                     );
-                    tail.push(d.hardline());
+                    (d.concat(&tail), false)
+                } else if gap_breaks {
+                    // Block body, and something in the gap forces the break — the shared
+                    // header→body gap. The C-style `for` pushes no anchor of its own: its
+                    // `)` is already inside the header doc. Given this branch's guard, the
+                    // gap's separator is the hardline that drops the block to the next line.
+                    let mut tail = DocBuf::new();
+                    self.push_header_to_body_gap(&mut tail, header_end, body_start);
                     tail.push(body_doc);
                     (d.concat(&tail), false)
                 } else {
-                    // Block comment(s) only — built here so the line-comment paths
-                    // above don't compute an unused doc.
+                    // Nothing in the gap forces a break, so every comment is a block
+                    // comment already trailing the `)` — built here so the breaking
+                    // paths above don't compute a doc they discard.
                     let comment_doc = self
                         .build_inline_comments_between_doc_no_leading_space(header_end, body_start);
                     if is_block_body {

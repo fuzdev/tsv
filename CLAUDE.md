@@ -171,23 +171,31 @@ All `fixtures:*` tasks accept positional patterns (multiple = OR), `--list`, and
 
 ```bash
 deno task fixtures:list              # list all fixtures (read-only)
+deno task fixtures:init <dir>        # create/reinit a fixture (alias of `tsv_debug fixture_init`; --content/--stdin/--force)
 deno task fixtures:validate          # validate (use during fixture work; --prettier-only skips our parser/formatter)
 deno task fixtures:update            # regenerate expected.json + output_prettier.svelte (source of truth)
 deno task fixtures:update:parsed     # regenerate expected.json only (run when parser changes)
 deno task fixtures:update:formatted  # regenerate output_prettier.svelte only
 deno task fixtures:audit             # audit _prettier_divergence fixtures (diagnostic; --all for every fixture)
-deno task conformance:audit          # doc/fixture integrity: divergence fixtures cataloged + every doc/README link resolves + each divergence README back-links its sanctioning doc + no stray READMEs on matching fixtures (gated in `deno task check`)
+deno task fixtures:ts-audit          # which input.ts fixtures genuinely need .ts vs could be .svelte (alias of `ts_fixture_audit`)
+deno task conformance:audit          # doc/fixture integrity: divergences cataloged + every docs/*.md + README link resolves + divergence READMEs back-link their sanctioning doc + no stray READMEs (gated in `deno task check`; ./docs/audits.md)
 deno task pins:audit                 # canonical-oracle version sync (gated in `deno task check`): (1) pin agreement — sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical; (2) checkout alignment — a PRESENT ../svelte or ../acorn-typescript checkout must match its pin (absent → skipped, so clean machines pass)
-deno task scan:audit                 # guard against new raw find/rfind/match_indices substring scans over source (gated in `deno task check`); see Debug Tooling
-deno task fanout:audit               # guard against super-linear doc-node fanout (the per-layout-candidate rebuild blowup); gated in `deno task check`; see Debug Tooling
-deno task roundtrip:audit            # cheap tripwire that format(tests/fixtures) reparses (pure-Rust phase 1, no *_unreparseable output; gated in `deno task check`) — real yield is external corpora; see Debug Tooling
-deno task binding:audit              # comment↔token binding audit: does format re-bind a forward-binding glued block comment (a plain comment, a bundler annotation, or a JSDoc cast — all owned) to a different subtree — the class invisible to ast_diff/roundtrip/SAFETY because the characters only MOVE (pure Rust, no sidecar; gated in `deno task check`) — HARD (a parser-owned glued comment) fails the gate, SOFT (an unowned glued block comment, now rare) is informational; TS-family files only; real yield on external corpora; see Debug Tooling
-deno task authoring:audit            # authoring-independence over Svelte boundary whitespace: every render-equivalent authoring of one document (hug ↔ space ↔ newline at a tag's content boundary; space ↔ newline between siblings) must reach ONE tsv fixed point (pure Rust, no sidecar; gated in `deno task check`) — exits 1 on any non-idempotency, site-level or a base-non-idempotent FILE; see Debug Tooling
-deno task fuzz:audit                 # seeded mutational fuzzer over tests/fixtures (fixed --seed 0 --iterations 5000; pure Rust, no sidecar; gated in `deno task check`) — asserts no-panic + idempotency + structural-reparse, on every seed file AS AUTHORED and then on mutated input; see Debug Tooling
-deno task comments:audit             # print-once comment ledger: every comment a document PARSES must be EMITTED exactly once (pure Rust, no sidecar; gated in `deno task check`) — reports DROPPED (silent content loss) and DOUBLE-PRINTED; the structural guard on the detached comment model, tsv's `ensureAllCommentsPrinted`; see Debug Tooling
-deno task gaps:audit                 # gap-injection audit: inject a comment into EVERY gap (five payloads, one per ownership path) and re-run the ledger — the discovery arm `comments:audit` can't be, since it only formats each file AS AUTHORED and no fixture covers most positions (eight such drops were found BY HAND, all green on every gate). Pure Rust, no sidecar; gated in `deno task check` as a RATCHET over a generated shape snapshot (`gap_audit_known.txt`): every line is a known bug and the file shrinking is the goal, so a shape not on the list, one on it that no longer fires, or any PANIC, FAILS. ~17 s. Full reference: ./docs/gap_audit.md
+deno task scan:audit                 # no new raw find/rfind/match_indices substring scans over source (gated in `deno task check`; ./docs/audits.md)
+deno task fanout:audit               # no super-linear doc-node fanout — the per-layout-candidate rebuild blowup (gated in `deno task check`; ./docs/audits.md)
+deno task roundtrip:audit            # format(tests/fixtures) must reparse — pure-Rust tripwire, real yield on external corpora (gated in `deno task check`; ./docs/audits.md)
+deno task binding:audit              # comment↔token re-binding audit — HARD fails the gate, SOFT informational (gated in `deno task check`; ./docs/audits.md)
+deno task authoring:audit            # authoring-independence over Svelte boundary whitespace — one fixed point per document, exit 1 on any non-idempotency (gated in `deno task check`; ./docs/audits.md)
+deno task fuzz:audit                 # seeded mutational fuzzer (fixed --seed 0 --iterations 5000): no-panic + idempotency + structural-reparse (gated in `deno task check`; ./docs/audits.md)
+deno task swallow:audit              # `//` line-comment swallow check — a line comment swallowing following output-line content (gated in `deno task check`; ./docs/audits.md)
+deno task comments:audit             # print-once comment ledger: DROPPED / DOUBLE-PRINTED comments (gated in `deno task check`; ./docs/audits.md)
+deno task gaps:audit                 # gap-injection audit — RATCHET over `gap_audit_known.txt` (every line a known bug), ~17 s (gated in `deno task check`; ./docs/gap_audit.md)
 deno task gaps:audit:update          # regenerate that snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); refuses a narrowed run
-deno task idempotency:sweep          # F1 (idempotency) sweep over the real-code corpus (the `perf` view — sibling dev repos + upstream framework source). NOT in `deno task check`: machine-dependent corpus, minutes not seconds. Run at conformance cadence or after a printer change; see Debug Tooling
+deno task gaps:audit:rank            # rank the pinned shapes for triage (also --since; see ./docs/gap_audit.md)
+deno task blanks:audit               # blank-line injection audit — RATCHET over `blank_audit_known.txt`, ~24 s (gated in `deno task check`; ./docs/blank_audit.md)
+deno task blanks:audit:update        # regenerate that snapshot after fixing a shape; refuses a narrowed run
+deno task render:audit <paths>       # render-equivalence over REAL Svelte code (needs the sidecar — NOT in `deno task check`; release-gated as a leg of `deno task conformance`; ./docs/audits.md)
+deno task idempotency:sweep          # F1 (idempotency) sweep over the real-code corpus (minutes, machine-dependent — NOT in `deno task check`; conformance cadence; ./docs/audits.md)
+deno task audit:corpus               # the standing content-loss/robustness bundle over REAL code (publish Step 3c; NOT in `deno task check`; ./docs/audits.md)
 ```
 
 For direct `cargo run -p tsv_debug` usage, see [Debug Tooling](#debug-tooling).
@@ -208,7 +216,7 @@ Three binding crates for different use cases:
 
 - `tsv_ffi` (C ABI) — target: Any FFI (Deno, Python, etc.); output: `libtsv_ffi.so` / `.dylib` / `.dll`
 - `tsv_wasm` (wasm-bindgen) — target: Browser, Deno, Node; output: `.wasm` module (format / parse / all variants via cargo features)
-- `tsv_napi` (napi-rs) — target: Node.js / Bun native addon; output: `libtsv_napi.{so,dylib,dll}` (loaded via `process.dlopen`). Currently a **measurement-only** binding for the Node benchmark runner (single-platform local build: `deno task build:napi`; boundary tests: `deno task test:napi`); the cross-platform publish matrix as `@fuzdev/tsv_napi` is targeted for 0.2. See ./crates/tsv_napi/CLAUDE.md.
+- `tsv_napi` (napi-rs) — target: Node.js / Bun native addon; output: `libtsv_napi.{so,dylib,dll}` (loaded via `process.dlopen`). Currently a **measurement-only** binding for the Node benchmark runner (single-platform local build: `deno task build:napi`; boundary tests: `deno task test:napi`); the cross-platform publish matrix as `@fuzdev/tsv_napi` is a fast-follow after 0.2 — it needs GitHub release infrastructure, so it doesn't block WASM/VS Code publishing (may land as 0.3), and is expected to eventually subsume the WASM native path. See ./crates/tsv_napi/CLAUDE.md.
 
 `tsv_wasm` produces three npm packages from one crate via the `format` + `parse` cargo features (default = both): `@fuzdev/tsv_format_wasm` (format only), `@fuzdev/tsv_parse_wasm` (parse only), and `@fuzdev/tsv_wasm` (everything + the `tsv` CLI). Each variant has its own output directory.
 
@@ -267,9 +275,12 @@ See ./crates/tsv_wasm/CLAUDE.md §TS type maintenance for the per-field checklis
 
 Compare formatting against Prettier, and parse output against the canonical
 parsers, on real codebases. The gates, corpus tools, and harvests enforce
-**pinned expected counts** on full runs (exact for pinned-checkout suites,
-minimums for the live corpus + committed fixtures; the Rust-side
-test262/fixtures/swallow gates carry their own) — see
+**pinned expected counts** on full runs. The format `corpus:compare:format --all`
+counts are enforced over the **reproducible subset** (the version-pinned
+framework + prettier checkouts), so they hold on any `pins:audit`-aligned machine;
+the live dev repos are a non-gating WARN (SAFETY still gates every file). Parse
+`compared` counts + committed fixtures stay live-growth minimums; the Rust-side
+test262/fixtures/swallow gates carry their own — see
 `benches/js/lib/gate_counts.ts` and ./benches/js/CLAUDE.md §Pinned gate counts:
 
 ```bash
@@ -300,7 +311,8 @@ deno task conformance:ts-repo          # tsv's TS parser vs the tsc corpus (../t
 
 deno task conformance                  # the pre-release aggregate: the three gates above + corpus:compare:parse
 # --all + corpus:compare:format --all, in ONE process (benches/js/conformance.ts; oracle modules load
-# once, fail-fast, corpus FFI built once). The external-oracle correctness gates that can't live in
+# once, fail-fast, corpus FFI built once), then render:audit over the version-pinned checkouts (a
+# subprocess — it drives its own sidecar). The external-oracle correctness gates that can't live in
 # `deno task check`. The format leg's prettier calls ride a content-addressed cache
 # (benches/js/lib/prettier_cache.ts; TSV_PRETTIER_CACHE=0 disables).
 
@@ -310,40 +322,33 @@ deno task conformance:all              # the full drop-in conformance gate = `co
 # `conformance:test262` (pure Rust). What publish Step 3b runs. CSS-WPT harvest stays manual.
 
 deno task divergence:audit         # audit divergence pattern coverage (--json for machine-readable)
+deno task corpus:stats             # corpus/candidate-dir sizes + language + degenerate-case stats (diagnostic; ./benches/js/CLAUDE.md)
 ```
 
-The corpus comparison builds with `--profile corpus` (release + `panic = "unwind"`) so panics in our code are caught and reported as errors instead of crashing the process. Benchmarks use `--release` (with `panic = "abort"`) for maximum performance.
+The corpus comparison builds with `--profile corpus` (optimized + `panic = "unwind"`, no LTO) so panics in our code are caught and reported as errors instead of crashing the process. `corpus` is also the single build world every `deno task check` audit runs under, so it trades LTO for build time — measurably free at runtime, see the profile's own comment in `Cargo.toml`. Benchmarks use `--release` (with `panic = "abort"`, LTO on) for maximum performance.
 
 Divergence detection identifies known differences documented in `conformance_prettier.md` (safety checks, pattern detection, traceability). See ./benches/js/CLAUDE.md and ./docs/divergence_detector.md.
 
 ### Benchmarks
 
-**Cross-runtime.** The same harness runs under **Deno, Node, and Bun** — each emits its
-own runtime-labeled sibling report (`report.{deno,node,bun}.{json,md}`), never merged;
-`deno task bench:compose` folds them into a compact combined `report.{json,md}` (the
-cross-runtime view tsv.fuz.dev consumes). The native row differs by runtime: Deno loads the
-**FFI** library via `Deno.dlopen`, Node/Bun load the **N-API** addon (`tsv_napi`) via
-`process.dlopen`. Everything else (corpus, registry, timing, report) is runtime-neutral
-shared code using `node:` builtins.
+**Cross-runtime.** One harness runs under **Deno, Node, and Bun** — each emits its own
+runtime-labeled report (`report.{deno,node,bun}.{json,md}`), never merged; `deno task
+bench:compose` folds them into the combined `report.{json,md}` (the cross-runtime view
+tsv.fuz.dev consumes). The native row differs by runtime — Deno loads the **FFI** library,
+Node/Bun the **N-API** addon (`tsv_napi`); everything else is runtime-neutral shared code.
+Full detail: ./benches/js/CLAUDE.md §Cross-Runtime.
 
-**Perf vs conformance surfaces.** The perf surface (`deno task bench:perf`) measures a
-**real-world-only** corpus (app + framework source; fixture suites excluded) — the
-throughput headline. Hard invariant: every in-scope tool must fully process every file or
-the run fails (see `benches/js/lib/perf_omit.ts`), so coverage is 100% by construction.
-The conformance surface (`deno task bench:conformance`) measures per-tool **parse
-coverage** over a **disjoint, fixtures-only** corpus (prettier suites + svelte compiler
-tests + the wpt-css/test262 harvests), writing `report.conformance.node.{json,md}`. Its
-Svelte set excludes the files `svelte/compiler` rejects (the
-`bench:harvest:svelte-rejects` cache) so coverage measures fidelity on *valid* Svelte,
-not permissiveness over deliberately-invalid error fixtures — svelte-only, since
-svelte/compiler is the one canonical parser tsv is a strict drop-in for. It's
-**coverage-only and node-only by design**: coverage is a pre-flight product (no timed
-phase) and runtime-invariant, so one node run is the whole surface. (A timed run over
-this corpus is ad-hoc only — `BENCH_CORPUS=conformance node benches/js/bench.ts` — and
-overwrites the report; re-run `bench:conformance:run` after.) `deno task bench` is the
-full publish-cadence refresh: perf across all three runtimes + compose, then the node
-conformance coverage run. The correctness gates (`deno task conformance`, corpus:compare)
-keep their own unchanged corpus scope. See ./benches/js/CLAUDE.md §Corpus for the three views.
+**Perf vs conformance surfaces.** `deno task bench:perf` measures a **real-world-only**
+corpus (app + framework source) — the throughput headline; every in-scope tool must fully
+process every file or the run fails (`benches/js/lib/perf_omit.ts`), so coverage is 100%
+by construction. `deno task bench:conformance` measures per-tool **parse coverage** over a
+**disjoint, fixtures-only** corpus (prettier suites + svelte compiler tests + the
+wpt-css/test262 harvests; the Svelte set excludes files `svelte/compiler` rejects, so
+coverage measures fidelity on *valid* Svelte) — **coverage-only and node-only by design**
+(coverage is a pre-flight product with no timed phase, and runtime-invariant). `deno task
+bench` is the full publish-cadence refresh: perf across all three runtimes + compose, then
+the node coverage run. The correctness gates (`deno task conformance`, corpus:compare)
+keep their own unchanged corpus scope. Full detail: ./benches/js/CLAUDE.md §Corpus.
 
 ```bash
 # One-time: install the harness's npm deps (package.json is the source of truth;
@@ -351,7 +356,7 @@ keep their own unchanged corpus scope. See ./benches/js/CLAUDE.md §Corpus for t
 # `npm install` (which prunes the oxc-parser-wasm binding — see benches/js/CLAUDE.md).
 deno task bench:install
 
-# Smoke test (Deno; fast sanity check that every formatter+parser produces output)
+# Smoke test (fast sanity check that every formatter+parser produces output; also smoke:node / smoke:bun)
 deno task smoke
 
 # Run benchmarks (builds the runtime's bench artifacts automatically).
@@ -379,15 +384,10 @@ deno task bench:harvest            # regenerate the wpt-css + test262 + svelte-r
 # Per-file skip detail (off by default — counts always shown, paths/errors opt-in)
 deno task bench:deno:run -- --verbose
 
-# Environment variables (apply to any runtime)
-BENCH_LIMIT=10 deno task bench:deno:run        # Limit files per language (default: all)
-BENCH_FILTER=zzz deno task bench:deno:run      # Filter by path pattern (default: none)
-BENCH_DURATION=10000 deno task bench:deno:run  # Duration per benchmark in ms (default: 5000; conformance mode: 15000)
-BENCH_WARMUP=10 deno task bench:deno:run       # Set warmup iterations (default: 3; slow >5s-per-sweep tasks tier to 1 unless set explicitly)
-BENCH_MODE=union deno task bench:deno:run      # Per-impl iteration (default: intersection)
-BENCH_CORPUS=conformance deno task bench:deno:run  # Corpus/surface selector (default: perf)
-BENCH_STALE_OK=1 deno task bench:deno:run      # Run despite stale artifacts (default: off)
-BENCH_FORCED_ASYNC=1 deno task bench:deno:run  # Add tsv-forced-async control row (diagnostic; default: off)
+# Environment variables (any runtime): BENCH_LIMIT, BENCH_FILTER, BENCH_DURATION,
+# BENCH_WARMUP, BENCH_MODE, BENCH_CORPUS, BENCH_STALE_OK, BENCH_FORCED_ASYNC —
+# semantics + defaults in ./benches/js/CLAUDE.md
+BENCH_FILTER=zzz BENCH_LIMIT=10 deno task bench:deno:run
 ```
 
 **Prerequisites**: `cargo install wasm-pack` and `deno task bench:install` once
@@ -398,9 +398,10 @@ install); Bun for `bench:bun`. The aggregate `deno task bench` needs both and
 fails fast if either is missing; run the per-runtime tasks for the ones you have.
 
 Compares: canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node
-and Bun), WASM, and alternatives (oxc-parser, oxfmt, biome-wasm). Each runtime's results save
-to `benches/js/results/report.<runtime>.{json,md}` (committed; every row carries a `runtime`
-field), plus the combined `report.{json,md}`. To publish to tsv.fuz.dev: `npm run update-benchmarks` in ~/dev/tsv.fuz.dev. See
+and Bun), WASM, and alternatives (oxc-parser, oxfmt, biome-wasm, and dprint-wasm —
+`dprint-plugin-typescript`, the engine `deno fmt` runs, TS/JS only). Each runtime's
+results save to `benches/js/results/report.<runtime>.{json,md}` (committed; every row
+carries a `runtime` field), plus the combined `report.{json,md}`. To publish to tsv.fuz.dev: `npm run update-benchmarks` in ~/dev/tsv.fuz.dev. See
 ./benches/js/CLAUDE.md.
 
 ### Performance Profiling
@@ -428,9 +429,25 @@ See ./docs/performance.md.
 
 **Non-configurable by design.** Formatting options are fixed at Prettier's defaults, except where noted below, and cannot be changed — there are no config files, CLI flags, or runtime options, and none are planned. tsv is opinionated like `gofmt` and Black: one canonical style, always. A narrower user-facing option set may be revisited far down the road, but the 0.x contract is no configuration at all.
 
-**The one carve-out is file *scope*, not style.** `tsv format`'s directory discovery is gitignore-aware, with two regimes keyed on `.git`. The **format root** (the scope boundary, derived from the argument — the cwd never participates) is, inside a git repo, the repo root (a hard stop for the upward walk, so `tsv format --check` is reproducible across machines when the ignore files are committed); outside one, the filesystem root. Inside a repo, discovery honors — relative to the repo root — **`.gitignore`** (hierarchically, exactly like git), then **`.formatignore`** (tsv's native file; hierarchical, deeper wins; applied after `.gitignore`, so its `!` can re-include a gitignore'd path subject to git's parent-directory rule), then **`.prettierignore`** (drop-in compat; hierarchical; the tsv-layer fallback in any directory with no sibling `.formatignore` — a sibling shadows it with a non-fatal warning), plus the always-skipped **safety nets** (`.git`, `node_modules`, `.sl`, `.hg`, `.svn`, `.jj`). Outside a repo, only `.formatignore` is read, hierarchically from the filesystem root down (so `~/.formatignore` acts as global config for loose files). Because the boundary is found by walking up, formatting a subdirectory gives the same result as formatting it via an ancestor.
-
-When a `.gitignore` is in scope it is authoritative and the built-in **heuristic is off**; with none, the heuristic — hidden directories plus `dist`/`build`/`target` — is the fallback "not source" guess (an explicit tsv-layer `!` re-include overrides it). This is *only* about which files are reformatted, never how; an explicitly named file argument is always formatted. The matcher lives in the `tsv_ignore` crate (`IgnoreStack`); the per-directory prune *decision* (heuristic, safety nets, shadow warning) lives in `tsv_discover`. Both are shared with the JS CLI and the VS Code extension via the `IgnoreStack` WASM export (`classify_dir`/`should_format_file`/`heuristic_shadow_warning`, plus per-file `is_path_pruned` for the extension) — so all three surfaces agree by construction. Full rules and edge cases (unreadable ignore files, re-include idiom, warnings): ./docs/cli.md §Multi-File Formatting.
+**The one carve-out is file *scope*, not style.** `tsv format`'s directory discovery is
+gitignore-aware, with two regimes keyed on `.git`. Inside a git repo the **format root**
+(the scope boundary — derived from the argument, never the cwd) is the repo root, a hard
+stop for the upward walk, and discovery honors `.gitignore`, then `.formatignore` (tsv's
+native file; its `!` can re-include a gitignore'd path), then `.prettierignore` (drop-in
+compat; the fallback in any directory with no sibling `.formatignore`), all hierarchical,
+plus the always-skipped safety nets (`.git`, `node_modules`, `.sl`, `.hg`, `.svn`, `.jj`).
+Outside a repo only `.formatignore` is read, from the filesystem root down (so
+`~/.formatignore` acts as global config for loose files). Because the boundary is found by
+walking up, formatting a subdirectory gives the same result as formatting it via an
+ancestor. A `.gitignore` in scope turns the built-in heuristic (hidden dirs +
+`dist`/`build`/`target`) **off**. This is *only* about which files are reformatted, never
+how; an explicitly named file argument is always formatted. The matcher is the
+`tsv_ignore` crate (`IgnoreStack`); the per-directory prune *decision* (heuristic, safety
+nets, shadow warning) is `tsv_discover` — both shared with the JS CLI and the VS Code
+extension via WASM (`classify_dir` / `should_format_file` / `heuristic_shadow_warning` /
+`is_path_pruned`), so all three surfaces agree by construction. Authoritative rules +
+edge cases (parent-directory rule, re-include idiom, unreadable ignore files, warnings):
+./docs/cli.md §Multi-File Formatting.
 
 The list below covers the settings that diverge from Prettier's defaults; everything else (e.g. tabWidth=2) matches Prettier.
 
@@ -476,7 +493,7 @@ tsv/
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
 │   ├── tsv_wasm/    # WebAssembly bindings (published as @fuzdev/tsv_format_wasm + @fuzdev/tsv_parse_wasm + @fuzdev/tsv_wasm; bundles hand-maintained types/tsv_ast.d.ts + npm/locations.js no-loc reconstruction helper; npm/cli.js is the tsv bin)
-│   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only for the Node bench, 0.2 publish target)
+│   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only for the Node bench, publish is a fast-follow after 0.2)
 ├── scripts/         # Publish orchestrator, npm package patcher, Node artifact + N-API addon tests, AST type drift check
 ├── tests/           # Integration tests (parser, formatter, CLI)
 │   └── fixtures/    # Test fixtures organized by language/feature
@@ -492,7 +509,7 @@ tsv/
 - `printer/` - Code formatting (uses doc builder from tsv_lang)
 - `escapes/` - Language-specific escape handling (tsv_ts, tsv_css only; Svelte delegates to TS/CSS)
 
-`tsv_ts` and `tsv_css` also export embedding APIs for `tsv_svelte`: `parse_with_interner`, `parse_embedded`, expression formatting variants, `build_*_doc` functions.
+`tsv_ts` and `tsv_css` also export embedding APIs for `tsv_svelte`: `parse_embedded`, expression formatting variants, `build_*_doc` functions.
 
 ### Conformance
 
@@ -589,33 +606,19 @@ See [Development Philosophy](#development-philosophy-test-driven-development-wit
 
 ⚠️ **Prefer `.svelte`**: For CSS, it's the only path with an external canonical source. See ./docs/fixture_overview.md#why-svelte-is-the-default-canonical-source.
 
-**Fixture File Structure:**
-
-```
-tests/fixtures/example_fixture/
-├── input.svelte                    # Canonical source (ALWAYS formats to itself)
-├── expected.json                   # AST from parsing input.svelte
-├── expected_ours.json              # OPTIONAL: Our parser's AST (when intentionally different)
-├── expected_svelte.json            # OPTIONAL: Svelte's AST (documents the difference)
-├── output_prettier.svelte          # OPTIONAL: Prettier's output (when different from input)
-├── prettier_variant_*.svelte         # OPTIONAL: Prettier's stable variants our formatter normalizes to input
-├── variant_*.svelte        # OPTIONAL: Dual-stable forms (both formatters keep stable, NOT input)
-├── divergent_variant_*.svelte      # OPTIONAL: Divergent variant (prettier keeps stable, ours rewrites to a distinct third stable form)
-├── prettier_intermediate_*.svelte  # OPTIONAL: Prettier's unstable first-pass output (converges to input)
-├── prettier_intermediate_to_variant_*.svelte  # OPTIONAL: Prettier's unstable first-pass output (converges to a variant_*/prettier_variant_*)
-├── audit_signature.txt             # OPTIONAL: Auto-generated; pins prettier's multi-pass chain from output_prettier.* (F4)
-├── prettier_nonconvergent.txt      # OPTIONAL: Prettier never reaches a fixed point on input — no oracle; claim live-verified (F5)
-├── prettier_rejects.txt            # OPTIONAL: Prettier throws on input (parse rejection / printer crash) — no oracle; trimmed content is the expected-error substring, claim live-verified (F6)
-├── tsv_rejects.txt                 # OPTIONAL: tsv over-rejects an input the canonical parser accepts — trimmed content is the expected tsv-error substring; pairs with expected_svelte.json (the canonical AST), no tsv-side expected/format files; claim live-verified (F7/S20)
-├── unformatted_*.svelte            # OPTIONAL: Variants that normalize to input.svelte (both formatters)
-├── unformatted_ours_*.svelte       # OPTIONAL: Variants that normalize to input.svelte (our formatter only)
-├── unformatted_prettier_*.svelte   # OPTIONAL: Variants that normalize to output_prettier.svelte (prettier only)
-└── input_invalid_*.svelte          # OPTIONAL: Invalid syntax that must fail to parse (both parsers)
-```
+**Fixture File Structure:** `input.*` + `expected.json` at minimum. Every optional
+sibling makes a precise, validated claim — `expected_ours.json` / `expected_svelte.json`
+(parser divergence), `output_prettier.*` / `prettier_variant_*` / `variant_*` /
+`divergent_variant_*` / `prettier_intermediate_*` / `prettier_intermediate_to_variant_*` /
+`audit_signature.txt` (formatter divergence + prettier multi-pass pins),
+`prettier_nonconvergent.txt` / `prettier_rejects.txt` / `tsv_rejects.txt` (no-oracle
+markers), `unformatted_*` / `unformatted_ours_*` / `unformatted_prettier_*`
+(normalization variants), `input_invalid_*` (must fail both parsers). Per-file semantics
+and validation rules (F/S/R/D): ./docs/fixture_overview.md.
 
 **Other file types** (same structure): `.ts`/`.svelte.ts` use acorn-typescript for parsing; `.css` uses Svelte's `parseCss`. All use prettier for formatting.
 
-**Unformatted variant rules:** Same content structure as input, only whitespace differs. Both formatters must normalize to exactly match input.
+**Unformatted variant rules:** Same content structure as input, only whitespace differs. Both formatters must normalize to exactly match input. For `.svelte` fixtures this is **enforced**, not just convention: the render-equivalence check (R rules, see ./docs/fixture_overview.md) asserts the variant and `input` produce the same browser-visible render via `svelte compile` — so a formatter bug that changed the render *and* happened to land on `input` can no longer pass green.
 
 **Invalid syntax rules (`input_invalid_*`):** Must fail BOTH parsers. One syntax error per file.
 
@@ -634,17 +637,6 @@ tests/fixtures/example_fixture/
 - **Prettier rejects/throws on input (no oracle)**: Add `prettier_rejects.txt` (trimmed content = expected-error substring) + README (requires `_prettier_divergence` suffix; excludes all prettier-claim files; mutually exclusive with `prettier_nonconvergent.txt`)
 - **tsv over-rejects but canonical accepts**: Add `tsv_rejects.txt` (trimmed content = expected tsv-error substring) + `expected_svelte.json` + README (requires `_svelte_divergence` suffix; no `expected.json`/`expected_ours.json`; excludes all format-claim files, `input_invalid_*`, and the prettier no-oracle markers)
 - **Both differ**: Use `_svelte_prettier_divergence` suffix
-
-**Example Workflow: Handling a Prettier Difference**
-
-```bash
-cargo run -p tsv_debug compare <fixture>/input.svelte  # 1. Discover difference
-mkdir <fixture>_prettier_divergence && cp input.svelte # 2. Create divergence dir
-deno task fixtures:update:formatted <pattern>          # 3. Generate output_prettier.svelte
-# 4. Add prettier_variant_*.svelte and unformatted_ours_*.svelte as needed
-deno task fixtures:update:parsed <pattern>             # 5. Generate expected.json
-deno task fixtures:validate <pattern>                  # 6. Validate
-```
 
 ## Debug Tooling
 
@@ -728,18 +720,11 @@ cargo run -p tsv_debug fixtures_audit [pattern...]
 cargo run -p tsv_debug ts_fixture_audit [pattern...]
 # Also: --verbose (show the TS-vs-Svelte diff on 'formats differently' fixtures)
 
-# conformance_audit - doc/fixture integrity in one fixture walk. Four checks:
-#  (1) Orphans - every divergence-suffixed fixture must be linked in its conformance doc
-#      (_prettier_divergence → docs/conformance_prettier.md, _svelte_divergence →
-#      docs/conformance_svelte.md, _svelte_prettier_divergence in both).
-#  (2) Dead links - every Markdown link (relative path + #anchor) in both conformance docs and
-#      every fixture README must resolve on disk (catches renamed/deleted fixtures, wrong ../
-#      depth, stale anchors).
-#  (3) Missing back-links - every divergence fixture's README must contain a link resolving to
-#      its sanctioning doc. (A missing README entirely is the validator's D1 rule.)
-#  (4) Stray READMEs - a non-divergence fixture shouldn't carry a README; exceptions live in
-#      the in-code ALLOWED_NONDIVERGENCE_READMES allowlist.
-# Pure Rust (no Deno). Exits non-zero on any finding. Gated in `deno task check`.
+# conformance_audit - doc/fixture integrity in one fixture walk: divergence fixtures
+# cataloged in their conformance doc, every docs/*.md + fixture-README link resolves,
+# divergence READMEs back-link their sanctioning doc, no stray READMEs (exceptions live
+# in the in-code ALLOWED_NONDIVERGENCE_READMES allowlist). Pure Rust (no Deno); exits
+# non-zero on any finding. Gated in `deno task check`. Full detail: ./docs/audits.md
 cargo run -p tsv_debug conformance_audit
 # Also: --json (machine-readable: {orphans, dead_links, missing_backlinks, stray_readmes})
 ```
@@ -755,63 +740,21 @@ cargo run -p tsv_debug test262 language/expressions  # filter by path pattern
 # Options: --path <dir>, --list, --verbose (show all failures), --negative-only, --positive-only,
 #          --gate (the release gate: fail ONLY on a positive-parse regression or a shift in the pinned
 #           positive count; negatives — the deferred early-error frontier — are reported, not gated.
-#           A bare run exits non-zero because negatives fail by design, so it's a diagnostic, not a gate.)
-
-# Differential conformance (tsv vs oxc-parser) — emit a JSON manifest of the
-# graded strict subset, then run the Deno consumer to bucket the agreement and
-# triage tsv's failures (real bug vs shared limitation). See ./docs/conformance_test262.md §Differential.
-cargo run -p tsv_debug test262 --emit-manifest /tmp/t262.json   # path/expected/tsv verdict per graded test
-deno run --allow-read --allow-env --allow-ffi --allow-net --allow-sys \
-  --config benches/js/deno.json \
-  benches/js/diagnostics/test262_compare.ts --manifest /tmp/t262.json
+#           A bare run exits non-zero because negatives fail by design, so it's a diagnostic, not a gate.),
+#          --emit-manifest <path> (JSON manifest of the graded strict subset — feeds the tsv-vs-oxc
+#           differential consumer, benches/js/diagnostics/test262_compare.ts)
 ```
 
-See ./docs/conformance_test262.md.
+See ./docs/conformance_test262.md (command interface; §Differential for the tsv-vs-oxc comparison).
 
-**Performance Profiling Commands:**
+**Performance Profiling Commands** (all pure Rust, no Deno — full reference: ./docs/performance.md):
 
 ```bash
-# profile - measure parse vs format phase timing (pure Rust, no Deno needed)
-cargo run -p tsv_debug profile ~/dev/zzz/src/lib      # profile a directory
-cargo run -p tsv_debug profile file1.ts file2.svelte  # profile specific files
-# Options: --iterations <n> (default: 10), --json
-
-# json_profile - time the FFI parse path per file: parse vs the wire-JSON write.
-# Pure Rust, no Deno; run with --release. Full detail: ./docs/performance.md §2.
-cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib
-# Options: --iterations <n> (default: 5), --json (adds per-file data)
-
-# buffer_sizes - AST histograms for tuning the TS printer's SmallVec inline
-# capacities (named_specs, CommentLines) + the line-count distribution behind the
-# `MultilineText` doc node: named-import-specifier count per import, and line count
-# per multi-line block comment. Covers .ts/.svelte.ts AND .svelte (the <script>/{expr}
-# feed the same TS-printer buffers). Prints percentiles + spill rate at candidate
-# inline N. For sizing, exclude the prettier/svelte test suites (edge-case skew).
-# Pure Rust, no Deno.
-cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src
-# Options: --json
-
-# arena_stats - DocArena node-population + memory audit over a corpus (the data
-# behind the doc-IR memory/node-count levers): nodes/byte density, capacity fill %,
-# output-String/AST-bump pre-size audits, DocNode variant + DocText sub-histograms,
-# container degeneracy. Covers .ts/.svelte.ts/.svelte/.css. Pure Rust, no Deno.
-# Full detail: ./docs/performance.md §7.
-cargo run -p tsv_debug arena_stats ~/dev/zzz/src/lib ~/dev/fuz_css/src/lib
-# Options: --json, --reuse (reset()-reuse high-water, as the CLI/FFI/WASM batch
-#   drivers use), --list-errors (path + parse error per skipped file — the fast
-#   first pass for finding tsv parse over-rejections; canonical-accepted ones are real gaps)
-
-# lex_diff - differential lexer harness: snapshot the raw token stream over a
-# corpus and diff against a golden to prove token-stream identity (kind, start, end,
-# decoded per token) after a lexer change — stronger than format byte-identity.
-# Covers the context-free next_token dispatch for .ts/.mts/.cts/.svelte.ts/.css.
-# Pure Rust, no Deno.
-cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden --write  # capture golden
-cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden          # check against it
-# Options: --write (capture instead of check), --verbose (first divergent line per file)
+cargo run -p tsv_debug profile ~/dev/zzz/src/lib                    # parse vs format phase timing (--iterations, --json)
+cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib  # FFI parse path: parse vs the wire-JSON write (§2)
+cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src     # printer SmallVec sizing histograms (§8)
+cargo run -p tsv_debug arena_stats ~/dev/zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
 ```
-
-See ./docs/performance.md.
 
 **Codebase Metrics Commands:**
 
@@ -822,285 +765,14 @@ cargo run -p tsv_debug metrics --json      # JSON output for scripting
 deno task metrics                          # shorthand
 ```
 
-**Line-Comment Swallow Audit:**
-
-```bash
-# swallow_audit - format files with the render-time swallow check on and report
-# any `//` line comment followed by content on the same output line (silent
-# content loss). Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files
-# to audit real code. Exits 1 on any finding.
-cargo run -p tsv_debug --features swallow_check swallow_audit                 # audit all fixtures
-cargo run -p tsv_debug --features swallow_check swallow_audit ~/dev/zzz/src   # audit a real codebase
-# Also: --json. The check lives in tsv_lang::doc::swallow behind the `swallow_check`
-# cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND
-# default tsv_debug builds (profile/perf sessions measure production-shaped render
-# code); only the `swallow:audit` deno task needs the feature. Gated in
-# `deno task check` (via `swallow:audit`) over tests/fixtures.
-#
-# Coverage is every render that appends to the output buffer — the main loop AND
-# its sub-renders (fill segments, the line-suffix flush), all driving one
-# per-thread state machine. A `line_suffix` comment is NOT exempt: two of them
-# flushed at the same line break land back-to-back on one line (`x; // c2 // c1`)
-# and the first `//` swallows the second. Comments written straight to the output
-# buffer (the Svelte template buffer path) bypass the doc renderer and stay out
-# of scope.
-```
-
-**Comment Ledger Audit (print-once: dropped / double-printed comments):**
-
-```bash
-# comment_audit - format files with the print-once comment ledger on and report every
-# comment the format DROPPED (parsed, never emitted — silent content loss) or
-# DOUBLE-PRINTED. tsv's answer to prettier's `ensureAllCommentsPrinted`, and the
-# structural guard on the detached comment model: nothing else forces a comment that the
-# parser produced to actually reach the output. Pure Rust, no Deno. Defaults to
-# tests/fixtures; pass dirs/files to audit real code. Exits 1 on any finding.
-cargo run -p tsv_debug --features comment_check comment_audit                 # audit all fixtures
-cargo run -p tsv_debug --features comment_check comment_audit ~/dev/zzz/src   # audit a real codebase
-# Also: --json. The ledger lives in tsv_lang::comment_ledger behind the `comment_check`
-# cargo feature — off by default, so it's compiled out of prod wasm/cli/ffi AND default
-# tsv_debug builds (profile/perf sessions measure production-shaped code); only the
-# `comments:audit` deno task needs the feature. Gated in `deno task check` (via
-# `comments:audit`) over tests/fixtures.
-#
-# Model. A format entry point (`tsv_ts::format_in`, `tsv_css`'s `format_css*`,
-# `tsv_svelte`'s `format_svelte*`) REGISTERS the comment list it is about to print — that
-# is the expectation. A doc-based printer (tsv_ts, tsv_svelte) TAGS each comment's doc
-# node (`DocArena::tag_comment_doc`) and the RENDERER records the emit when it reaches
-# the node; tsv_css, which writes comments straight to its buffer, records at the write.
-# The render-time seam is load-bearing: a builder may assemble the same subtree into two
-# `conditional_group` candidates of which one renders, so counting at build time reads as
-# a double-print (and a comment built only into a LOSING candidate would read as printed
-# while being lost). A `format-ignore` region — and any other raw source slice that
-# carries comments out verbatim (a raw at-rule prelude, a glued CSS compound selector) —
-# records a VERBATIM RANGE that counts as one emit per comment it covers; keep those
-# ranges tight, a too-wide carve-out silently re-opens the hole.
-#
-# Scope. Only the DETACHED comments (the flat `Vec<Comment>` on the language root). A
-# comment modeled as an AST node — a Svelte `<!-- … -->`, a CSS in-block
-# `CssBlockChild::Comment` — is carried by the tree and can't be lost the same way; its
-# emits land in the report's `out-of-scope emits` count, not in a finding. CSS
-# declaration-VALUE comments are never lexed as `Comment`s at all (re-derived from
-# source), so they are outside the model by construction.
-```
-
-**Gap-Injection Audit (dropped-comment discovery):**
-
-```bash
-# gap_audit - inject a comment into EVERY gap and re-run the print-once ledger. The
-# DISCOVERY arm `comments:audit` can't be: the ledger only ever sees a document AS
-# AUTHORED, so a gap no fixture puts a comment in is one it never checks (eight such
-# drops were found BY HAND, all green on every gate). Pure Rust, no sidecar.
-cargo run --profile corpus -p tsv_debug --features comment_check gap_audit   # tests/fixtures
-cargo run --profile corpus -p tsv_debug --features comment_check gap_audit ~/dev/zzz/src
-# Also: --json, --jobs N, --limit N, --payload <one>, --all-bytes, --update.
-# Build with `--profile corpus` (release + panic=unwind): plain `--release` is
-# panic=abort, so a formatter panic kills the process instead of being caught + reported.
-#
-# GATED as a RATCHET, not a green gate: `gap_audit_known.txt` is a machine-generated
-# snapshot of the ~717 shapes tests/fixtures produces, every line a KNOWN BUG, the file
-# shrinking is the goal. A shape not on the list, one on it that no longer fires, or any
-# PANIC, FAILS. `--limit`/`--payload`/`--all-bytes`/a path narrow a run, so they skip the
-# ratchet and refuse `--update`. ~17 s.
-```
-
-Full reference — flags, the ratchet, reading a finding, triage + re-pin workflow,
-scope: ./docs/gap_audit.md. Design rationale (why byte offsets and not tokens, why the
-ledger is the oracle, why five payloads) lives in the `gap_audit` module docs.
-
-**Build-Fanout Audit (exponential-rebuild regression guard):**
-
-```bash
-# build_fanout_audit - guard the O(1)-doc-builds-per-source-node invariant. A
-# builder that assembles `conditional_group` candidates by RE-INVOKING the recursive
-# builder on the same nodes — instead of building the subtree once and reusing the
-# DocId — grows the doc-node count exponentially in nesting depth (hang/OOM on a
-# deeply-nested but ordinary file). Builds synthetic nested inputs across six axes
-# (svelte elements / {#if} / {#each} / {#await} / sibling-`>` dangle, ts member
-# chains) at increasing depth and fails if the doc-node count grows faster than
-# ~depth^3. Deterministic, pure Rust, no Deno. Exits 1 on any super-linear case.
-cargo run -p tsv_debug build_fanout_audit
-# Also: --json. Gated in `deno task check` via the `fanout:audit` task.
-```
-
-**Raw-Find Scan Audit (delimiter-scan regression guard):**
-
-```bash
-# scan_audit - guard against new raw position-anchoring substring scans over
-# source. A raw `self.source[..].find(delim)` can match the glyph inside an
-# enclosed comment/string and drop content (the "Comment-Aware Delimiter Scans"
-# bug class); the fix is the trivia-aware cursor (`tsv_lang::source_scan`).
-# Flags every `find`/`rfind`/`match_indices`/`rmatch_indices` (non-closure pattern)
-# in the four language crates and fails on any not in the reviewed, categorized
-# in-code allow-list (ALLOW). A new scan must move onto the cursor or be consciously
-# allow-listed; a migrated/reformatted scan must drop its now-stale entry (the list
-# mirrors the live sites exactly). Pure Rust, no Deno.
-cargo run -p tsv_debug scan_audit            # audit (exit 1 on any violation/stale)
-cargo run -p tsv_debug scan_audit --list     # enumerate every scan site
-# Also: --json. Gated in `deno task check` via the `scan:audit` task. Out of scope:
-# closure `.find(|…|)` (iterator/predicate), counting/existence checks, and hand
-# byte-loops (the cursor is their sanctioned home).
-```
-
-**Authoring-Independence Audit (Svelte boundary whitespace):**
-
-```bash
-# authoring_audit - probe whether the SAME logical document, authored with
-# different boundary whitespace, formats to ONE tsv fixed point. Stronger than the
-# corpus idempotency sweep: a formatter can be idempotent yet authoring-DEPENDENT
-# (two authorings settling on two different stable outputs). Two mutation families,
-# never a blank line (Tier-1 significant) and never inside <pre>/<textarea>:
-#   - BETWEEN siblings — space↔single-newline only. Inter-node whitespace is
-#     render-SIGNIFICANT (it collapses to one space, it doesn't vanish), so the run is
-#     reshaped, never created or destroyed. Both forms collapse identically ⇒ safe.
-#   - At a tag's CONTENT BOUNDARY — hug↔space↔newline, i.e. the run IS created and
-#     destroyed. Svelte 5 removes start/end-of-content whitespace at compile, so all
-#     three authorings render identically. This is the family that catches a formatter
-#     letting a render-free character pick the layout (the delimiter-dangle class); it
-#     probes only elements whose content already spans lines, where layout is at stake.
-#     Note what that skips: for content that FITS on one line tsv preserves an authored
-#     boundary space (`<span> text </span>` and `<span>text</span>` are BOTH stable), so a
-#     clean run means no render-free character picks a LAYOUT — not that none survives in
-#     the output. That preservation is deliberate and prettier-matching (fixture
-#     `inline_boundary_whitespace`); see conformance_prettier.md §Svelte: Inline content
-#     block-style.
-# The element expansion a mutation may trigger is the property under test. Svelte only.
-# Gated in `deno task check` via the `authoring:audit` task — which scans tests/fixtures
-# ONLY, so point it at a real codebase too: findings live there (a non-idempotent fill
-# 2-cycle was green on fixtures while failing on ~/dev/zzz).
-cargo run -p tsv_debug authoring_audit                  # audit tests/fixtures (pure Rust)
-cargo run -p tsv_debug authoring_audit ~/dev/zzz/src    # audit a real codebase
-# Pure-Rust verdict per site: converge / diverge (dual-stable) / diverge
-# (NON-IDEMPOTENT); exits 1 on any non-idempotency — site-level, and also a
-# base-non-idempotent FILE (one whose own format isn't a fixed point). Such a file
-# is excluded from the authoring analysis (its fixed point is undefined, so the
-# converge/diverge verdict would be meaningless), but the exclusion is not a reason
-# to pass the run — that is how a whole-file reflow could sit here reported-but-green.
-#
-# --prettier adds sidecar triage:
-# (a) tsv diverges where prettier converges (bug); (b) tsv converges where prettier
-# diverges (a _prettier_divergence to pin, the space_after_block class); (c) both
-# diverge (sanctioned, e.g. Tier-2 element expansion). --dump-dir writes byte-exact
-# repro artifacts per hard finding — the basis for a fixtures-first fix.
-# Also: --json, --verbose, --limit N (sites/file), --examples N.
-cargo run -p tsv_debug authoring_audit ~/dev/zzz/src --prettier --dump-dir /tmp/audit
-```
-
-**Format→Reparse Round-Trip Audit (delimiter/structure-corruption gate):**
-
-```bash
-# roundtrip_audit - corpus-scale "does format(src) reparse to the SAME document?".
-# Catches the class the other gates can't see: output that mis-delimits but loses no
-# characters (attr='a"b' → attr="a"b", `+(+x)` → `++x`) — corpus:compare:format's
-# SAFETY is char-frequency, BLIND to delimiter/structure corruption. Two phases
-# (tsv-self pre-filter → canonical confirm via sidecar): parse input and formatted
-# output, reduce each to a STRUCTURAL SKELETON (node-tree shape + `type`, erasing
-# reformattable leaf scalars + acorn `extra`), compare — so legit reformatting
-# doesn't read as corruption. Buckets: {tsv,canonical}_unreparseable (the prize —
-# output the parser rejects) and {tsv,canonical}_divergent (structural change).
-# Zero false positives on real formatted code; point it at the delimiter-dense
-# prettier suites for the work-list.
-cargo run -p tsv_debug roundtrip_audit                              # audit tests/fixtures
-cargo run -p tsv_debug roundtrip_audit ../prettier/tests/format/js ../zzz/src
-# --gate fails ONLY on the *_unreparseable buckets (the reliable half — divergent is
-# render-model noise over tests/fixtures). Bare --gate runs phase 1 only via a
-# reparse-only fast path (pure Rust, no sidecar) — the `deno task roundtrip:audit`
-# check gate; a cheap tripwire over tests/fixtures, real yield on external corpora.
-# --canonical-all confirms every file (also guards canonical_unreparseable: tsv's
-# parser accepting output the real parser rejects).
-cargo run -p tsv_debug roundtrip_audit --gate                       # the check gate (pure Rust, tests/fixtures)
-cargo run -p tsv_debug roundtrip_audit --gate --canonical-all ../prettier/tests/format  # thorough
-# Also: --no-render, --verbose (AST diff per finding), --limit N, --json. The full
-# (non-gate) run is a diagnostic — the divergent bucket over tests/fixtures is
-# Svelte-reflow-noisy vs render_normalize's simpler whitespace model.
-cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tests/format/typescript
-```
-
-**Comment↔Token Binding Audit (re-binding gate):**
-
-```bash
-# binding_audit - does format re-bind a FORWARD-binding comment to a different
-# subtree? Two comment kinds bind to the token AFTER them: a JSDoc type cast
-# (`/** @type {T} */ (x)` — the parens + comment ARE the cast) and a bundler
-# annotation (`/* @__PURE__ */ f()` — marks the call side-effect-free). A paren
-# migrating across such a comment under formatting silently re-binds it (a cast
-# annotating a wider node, an annotation gone inert). This class is INVISIBLE to
-# every other gate — neither a cast, a grouping paren, nor an annotation is a
-# public-AST node, so both forms serialize to byte-identical wire JSON: ast_diff
-# says "equivalent", roundtrip_audit's skeleton can't see it, corpus SAFETY is
-# char-frequency (the characters only MOVE). Pure Rust, no sidecar.
-#
-# Signal: reparse input + tsv-formatted output with `preserve_parens` (grouping
-# parens become ParenthesizedExpression nodes), and per glued comment compare the
-# bound subtree. A cast stays invisible even so (its JsdocCast node emits its bare
-# inner), so the audit anchors INSIDE the cast's `(`. And since the only structural
-# delta formatting can add under preserve_parens is a clarity-paren (roundtrip_audit
-# gates the rest), the skeleton is compared with ParenthesizedExpression STRIPPED —
-# the binding-paren signal rides a separate `anchor_is_paren` flag. So a clarity
-# paren deep inside is not a finding; a paren at the anchor is.
-#
-# HARD (a parser-owned glued comment re-binds) fails --gate — every glued block
-# comment is owned, so a cast, an annotation, and a plain glued comment alike; SOFT
-# (an unowned glued block comment, now rare) is informational. TS-family files
-# only (.ts/.js/.mts/.cts/…); casts/annotations concentrate in JSDoc-typed JS.
-cargo run -p tsv_debug binding_audit                                  # audit tests/fixtures
-cargo run -p tsv_debug binding_audit ../svelte/packages/svelte/src ../prettier/tests/format/js
-cargo run -p tsv_debug binding_audit --gate                          # the check gate (HARD only)
-# Also: --verbose (in→out bound-subtree per finding), --limit N, --json. A bare
-# --gate over tests/fixtures is a cheap tripwire (fixtures are format-stable); the
-# real yield is external corpora, where JSDoc casts + annotations are dense.
-cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
-```
-
-**Seeded Mutational Fuzzer (panic / idempotency / structural-reparse safety):**
-
-```bash
-# fuzz - dep-free seeded mutational fuzzer (the coverage-trifecta fuzzing leg). A
-# SplitMix64 PRNG + byte-level mutation operators over a seed corpus (default
-# tests/fixtures); every valid-UTF-8 mutant is driven through parse+format+reparse
-# under catch_unwind. Asserts three properties nothing else guards on ARBITRARY
-# input: (1) no panic — the parser must never crash (prod WASM is panic=abort → a
-# panic is a DoS; the corpus profile only catches panics on real code); (2) format
-# idempotency (the F1 fixed point); (3) structural reparse (reusing roundtrip_audit's
-# skeleton compare). Deterministic per --seed + corpus, so a finding reproduces
-# exactly. Pure Rust, no sidecar. Not the differential (tsv-vs-canonical) leg.
-# The `fuzz:audit` deno task (fixed --seed 0 --iterations 5000 over tests/fixtures) is
-# gated in `deno task check` — a cheap standing tripwire for the three invariants.
-#
-# TWO passes. Pass 1 drives every seed file AS AUTHORED (unmutated), pass 2 the
-# mutants. The pristine pass matters because the corpus is the richest source of
-# real, formatter-reachable inputs — and over tests/fixtures it is the ONLY gate
-# that drives the non-`input.*` fixture files: the validator claims F1 on `input.*`
-# alone, so `output_prettier.*` / `variant_*` / `unformatted_*` (all real code)
-# were never themselves formatted twice. A pristine seed's *soft* verdict does not
-# FAIL the run (the corpus deliberately holds mis-formatted `unformatted_*` files whose
-# reflow is the point) but IS reported, with paths — over a real-code corpus there are
-# no such files, so each wants triage, and the seed path is itself the repro (an
-# unmutated file on disk), so it is listed rather than dumped. HARD verdicts fail.
-cargo run -p tsv_debug fuzz                                    # 2000 iters over tests/fixtures
-cargo run -p tsv_debug fuzz --seed 7 --iterations 20000 --dump-dir /tmp/fz  # discovery
-cargo run -p tsv_debug fuzz --iterations 0 ~/dev/zzz/src       # pristine pass only = an F1 sweep
-# HARD findings (exit 1): panic / unreparseable / non_idempotent / format_error —
-# always real bugs. SOFT findings (reported, non-fatal): structural_divergence — the
-# render-model-noisy bucket that needs canonical confirmation (roundtrip_audit
-# --canonical-all), like roundtrip_audit --gate. --strict fails on soft too.
-# Also: --parser not applicable (per-file extension), --max-mutations N, --limit N,
-# --max-findings N (HARD only), --json.
-```
-
-**F1 Idempotency Sweep (real-code corpus):**
-
-```bash
-# The pristine pass above, pointed at the `perf` corpus view (the sibling dev repos
-# + upstream framework source) — `format(format(x)) == format(x)` on every real file.
-# NOT in `deno task check`: the corpus is machine-dependent checkouts and the sweep
-# is minutes. It is a different risk surface from the fixtures — a formatter can be
-# idempotent on every curated fixture and still reflow a real component on pass 2.
-# Run at conformance cadence, or after any printer change.
-deno task idempotency:sweep
-# Absent corpus checkouts are skipped with a warning (not a failure); builds with
-# `--profile corpus` (release + panic=unwind) because the fuzzer needs catch_unwind.
-```
+**Audits** — the standing correctness gates and discovery harnesses: line-comment swallow,
+the print-once comment ledger, gap/blank injection, build-fanout, raw-find scan,
+authoring-independence, format→reparse round-trip, comment↔token binding,
+render-equivalence, layout-neutrality, the seeded mutational fuzzer, the F1 idempotency
+sweep, the `audit:corpus` bundle, and the `lex_diff` differential lexer harness. Each is
+cataloged in ./docs/audits.md — what it proves, what it is blind to, flags, and where it
+gates; the `deno task` entry points are indexed in [Fixtures](#fixtures-rust--deno-based).
+Read the relevant section there before running or modifying an audit.
 
 ## Architectural Notes
 
@@ -1172,25 +844,7 @@ acorn-typescript / Svelte / `parseCss`), NOT their internal implementation.
   parse the bytes (`convert_ast_json` is a thin `serde_json::from_slice(&bytes)`
   wrapper over the writer).
 
-**Example**:
-
-```rust
-// Internal - clean and semantic
-struct Literal {
-    value: LiteralValue,  // Fully decoded: "test\n" → "test<newline>"
-    span: Span,
-}
-
-// The writer emits the wire JSON straight from the internal node, applying the
-// quirks (here, `raw` reconstructed from source) — no intermediate typed tree:
-fn write_literal(w: &mut JsonWriter, lit: &Literal, ctx: &Ctx) {
-    node_header(w, "Literal", lit.span, ctx);   // "type"/"start"/"end"/"loc"
-    // … "value" emitted from lit.value …
-    w.raw(",\"raw\":");
-    w.string(lit.span.extract(ctx.source));      // reconstruct from source
-    w.raw("}");
-}
-```
+Worked example + full design: ./docs/architecture.md §Two-AST Design.
 
 **Key Rules**:
 
@@ -1202,60 +856,32 @@ fn write_literal(w: &mut JsonWriter, lit: &Literal, ctx: &Ctx) {
 ### Position Types: u32 vs usize
 
 - **Span**: `u32` for start/end (8 bytes total, 50% memory savings vs usize)
-- **`Token`**: `u32` for start/end — `Token` is a 16-byte `Copy`-free POD (`{kind, start: u32, end: u32}`) returned from `next_token` in registers; the decoded value (escapes only) lives out-of-band on the lexer (`Lexer::take_decoded`). A `const _: () = assert!(size_of::<Token>() == 16)` guards the size. See [docs/performance.md] and the lexer's byte cursor (`bytes: &[u8]` + `position: usize`).
+- **`Token`**: `u32` for start/end — `Token` is a 16-byte `Copy`-free POD (`{kind, start: u32, end: u32}`) returned from `next_token` in registers; the decoded value (escapes only) lives out-of-band on the lexer (a reused `Lexer::decode_scratch` buffer, borrowed via `decoded_str`). A `const _: () = assert!(size_of::<Token>() == 16)` guards the size. See [docs/performance.md] and the lexer's byte cursor (`bytes: &[u8]` + `position: usize`).
 - **Lexer/Parser positions**: `usize` (natural for `source[pos]` indexing); the lexer dispatches on raw bytes (`cur_byte`) and decodes a `char` only at non-ASCII branches.
 - **Conversions**: At boundaries only - `as u32` when creating Spans / `Token` fields, `as usize` when extracting
 - **Helpers**: Use `span.extract(source)` or `span.range()` instead of manual casts
 
 ### Comment Handling: Detached Model
 
-Comments are stored **separately from AST nodes** in a flat `Vec<Comment>` at the root level (`Program.comments`, `CssStyleSheet.comments`, `Root.comments`). The printer finds comments via O(log n) binary search on span positions.
+Comments are stored **separately from AST nodes** in a flat `Vec<Comment>` at the root
+level (`Program.comments`, `CssStyleSheet.comments`, `Root.comments`); the printer finds
+them via O(log n) binary search on span positions. `Comment` (`tsv_lang/src/comment.rs`)
+is a `Copy` POD of spans + flags — text is recovered on demand via
+`Comment::content(source)`, never stored owned. The full model — the `Comment` fields,
+ownership doctrine, the hazards, and the leading-comment emitter rules — lives in
+./docs/comments.md. **Read it before touching comment handling in any printer.** The
+always-loaded core:
 
-**Core type** (`tsv_lang/src/comment.rs`):
+**Owned comments** (`owned_by_node`, set by the parser): **every glued block comment is
+owned** — bound to the token after it and printed by that node's doc rather than by the
+enclosing gap, so a synthesized paren can never land between them. A bundler annotation
+(`/* @__PURE__ */`), a JSDoc cast (`/** @type {T} */ (x)` — handed to the `JsdocCast`
+node), and a plain glued comment bind identically; `owned ⇒ is_block`, so no line comment
+is ever owned. **Ownership is a fact about who PRINTS a comment, never about whether it
+EXISTS** — every bug in this class has been a violation of that sentence.
 
-```rust
-pub struct Comment {
-    pub content_span: Span,        // content WITHOUT delimiters; text via content(source)
-    pub is_block: bool,
-    pub multiline: bool,           // content contains '\n' (precomputed; block-only in practice)
-    pub span: Span,                // full comment span, delimiters included
-    pub emit_character_field: bool, // Serializer hint: include `character` in JSON loc
-    pub bump_pattern_columns: bool, // Serializer hint: +1 loc columns (Svelte block-pattern parse)
-    pub owned_by_node: bool,        // Printed by the node it's bound to, not by the enclosing gap
-}
-```
-
-**Owned comments — the one crack in the detached model.** A comment that is *bound to
-the token after it* can't be located positionally at print time, because a paren the
-printer synthesizes around an enclosing expression lands between the two and re-binds it.
-**Every glued block comment is owned** (`owned_by_node`, set by the parser): the position
-is an authoring choice that binds the comment to the operand it leads, so the operand's own
-doc prints it and no synthesized paren can land between them. There is no content sniff — a
-plain `/* c */` and a bundler annotation `/* @__PURE__ */` bind their token identically. Two
-shapes are worth naming:
-
-- the **glued block comment** (the general case) — printed by the innermost node its token
-  begins (`printer/comments/owned.rs`, via `build_expression_doc`'s
-  `prepend_owned_leading_comment`). Covers an ordinary leading comment and a **bundler
-  annotation** alike (`/* @__PURE__ */` and friends mark the call *after* them as
-  side-effect-free; a paren between the two would leave the annotation leading a paren, so the
-  marked call is no longer droppable). No AST node is involved.
-- the **JSDoc cast** — `/** @type {T} */` plus the `(` it glues to **are** the cast, so the
-  comment is handed to the `JsdocCast` node, which prints it. `is_jsdoc_type_cast_comment` is
-  the **only** remaining content sniff, and it governs the cast's **paren-retention** (building
-  the `JsdocCast`), *not* ownership — ownership flows to a cast the same as to any other glued
-  comment.
-
-An owned comment is always a **block** comment (`owned ⇒ is_block`), and always **glued** to
-its token — a comment the author left on its own line leads the *line*, not the token. The one
-exception is the JSDoc cast, whose comment may sit a newline above its `(` and still be the
-cast; that difference is load-bearing and named at the shared scan
-(`source_scan::CommentGlue`).
-
-**Ownership is a fact about who PRINTS a comment, never about whether it EXISTS.** That one
-sentence is the whole rule, and every bug in this class has been a violation of it. A comment
-can be asked about along exactly **three** axes, and the lookup API (`tsv_lang::comment`) makes
-the caller name which:
+A comment can be asked about along exactly **three** axes, and the lookup API
+(`tsv_lang::comment`) makes the caller name which:
 
 | axis | question | owned comments | who asks |
 | --- | --- | --- | --- |
@@ -1266,77 +892,37 @@ the caller name which:
 `comments_to_emit_in_range` / `has_comments_to_emit_in_range` / `comments_to_emit_after` ·
 `comments_on_page_in_range` / `has_comments_on_page_in_range` /
 `has_multiline_block_comments_on_page_in_range` · `comments_in_source_range` /
-`comments_in_source_after`. Every name states its axis, so a miswire reads as a category error
-at the call site rather than as plausible code. Two facts about the shape:
+`comments_in_source_after`. Every name states its axis, so a miswire reads as a category
+error at the call site. Two standing corollaries: a **zero-comment fast gate** guarding a
+whole builder is an **on-page** question (an emit-keyed one blinds every layout gate it
+guards); a **blank-line scan** is an **in-source** question (step over every comment in
+the gap via `blank_scan_start` / `blank_scan_end`, not just the ones this caller emits).
 
-- **Three questions, but only two membership sets.** *On page* and *in source* both count an
-  owned comment (it is in the output, and its bytes are in the file); only *to emit* skips it.
-  The two names exist because the *question* differs — and naming the wrong one is the bug.
-- `has_line_comments_in_range` carries **no** axis, provably: `owned ⇒ is_block`, so no line
-  comment is ever owned and skip ≡ count. If that ever changes, it must grow an axis.
+⚠️ **Three hazards, all of which have bitten** (full text + war stories in
+./docs/comments.md): (1) an owned comment nothing prints is a DROPPED comment — a builder
+that *reassembles* a node instead of routing through `build_expression_doc` must claim it
+on its own seam (`prepend_owned_leading_comment_at`); (2) an owned comment travels
+*inside* its node's doc, so the gap around it can't see it — ask the node instead
+(`owned_leading_comment_hangs_value`, the single seam for that question); (3) a region the
+parser *lifts out* of its container is still inside the container's gap, so two emitters
+print it (`AttrGaps::claimed` is that seam) — and ownership masks it: only a line comment
+(never owned) exposes the double-print. The **print-once comment ledger**
+(`deno task comments:audit`, gated in `deno task check`; see ./docs/audits.md) is the
+structural guard on all three.
 
-Two corollaries worth naming, because each was a whole family of bugs:
+⚠️ **Leading comments have one rule and one emitter** — `Printer::push_leading_comment_run`
+(prettier's `printLeadingComment`), with `Printer::comment_hugs_next` as the single glue
+test and `Printer::push_leading_run_separator` for the three hand-rolled always-broken
+sites. Do not hand-roll `is_block && is_same_line(c.span.end, X)` at a new site, and don't
+re-derive the anchor+separator inline — keying the hug on the *item* rather than on *what
+follows the comment* was a whole bug family. Whether the soft `line` after a leading run
+collapses is decided by per-element grouping — the array family groups each element (run
+collapses), the params family doesn't (run breaks) — mirrored from prettier; the full rule
+is in ./docs/comments.md.
 
-- A **zero-comment fast gate** (`let has_comments = …` guarding a whole builder) is an
-  **on-page** question. It short-circuits the layout gates it guards, so an emit-keyed one makes
-  every one of them blind.
-- A **blank-line scan** is an **in-source** question. `has_blank_line_between*` is a raw newline
-  count — it cannot tell a comment's own newlines from an author's blank line, so the scan must
-  step over every comment in the gap (`blank_scan_start` / `blank_scan_end`), not just the ones
-  this caller emits.
-
-⚠️ **Three hazards, all of which have bitten.** Ownership is a sharp tool: it takes a comment out
-of the positional model, so every consumer of that model has to be re-examined.
-
-1. **An owned comment nothing prints is a DROPPED comment.** Ownership assumes the owning node
-   prints it, so any builder that **reassembles** a node instead of routing it through
-   `build_expression_doc` must claim it on its own seam (`prepend_owned_leading_comment_at`).
-   Two do: `build_arrow_sig_doc` (every call-argument state) and `build_arrow_chain_doc`'s inner
-   arrows. Adding a third reassembly path means adding a third claim.
-2. **An owned comment travels *inside* its node's doc, so the gap around it can't see it.** The
-   assignment layout inspects the operator→value gap (`rhs_comments`), which is empty for an
-   owned comment — yet the comment still hangs the value. The node has to be asked instead:
-   `owned_leading_comment_hangs_value`. It is the single seam for that question (the declarator,
-   the class property, the object value, and the `is_poorly_breakable_chain` invariant all route
-   through it).
-3. **A region the parser LIFTS OUT of its container is still inside the container's gap** — so two
-   emitters print it, where hazard 1 has none. `<svelte:element this={…}>` keeps its `this` out of
-   `Element::attributes` (it rides in the kind), yet the braces still sit in the name→`>` gap the
-   attribute scan probes: the tag's own doc prints the comment, then the scan prints it again.
-   `AttrGaps::claimed` is that seam — the region whose comments the scan must skip. What makes this
-   one nasty is that **ownership masks it**: a glued *block* comment is owned, so the gap skips it
-   and the double-print never appears; only a **line** comment (never owned — `owned ⇒ is_block`)
-   exposes it. A lifted region needs a claim on *both* axes, and testing with block comments alone
-   will tell you it is fine.
-
-All three hazards are what the **print-once comment ledger** exists to catch — the structural
-guard on this model: every comment a document parses must be emitted exactly once, or the
-audit reports it as DROPPED or DOUBLE-PRINTED (`deno task comments:audit`, gated in
-`deno task check`; see [Comment Ledger Audit](#debug-tooling)). Nothing else in the
-detached model forces a parsed comment to reach the output. Hazard 3 was found by it, not by
-review — the block-comment repro looked clean.
-
-Prettier, oxfmt and biome all get the paren binding wrong — see
-[conformance_prettier.md §Comment relocation](docs/conformance_prettier.md#comment-relocation)
-and [§JSDoc / paren semantics](docs/conformance_prettier.md).
-
-The content is **not stored owned** — comment text is a pure delimiter-stripped
-sub-slice of source, so `Comment` holds a `content_span` and recovers the text on
-demand via `Comment::content(source) -> &str` (`source` must be the host document the
-spans were recorded against); every field is `Copy`, no `String` per comment.
-`multiline` is precomputed so the multi-line-block expansion checks
-(`has_multiline_block_comments_on_page_in_range` and the printers) read an O(1), source-free
-flag instead of re-scanning content. The full comment span includes its delimiters
-(`//` / `/* */` / a `#!` hashbang, whose content includes the `#!`); the lexer is the
-single owner of those widths.
-
-**Printer strategy**: Range-based lookup via `comments_to_emit_in_range(prev_end, node_start)` (and its on-page / in-source siblings above). Source string for context (same-line detection, blank line preservation). Tradeoff: simple/efficient AST matching Prettier's model, but printer must manually track `prev_end` positions; edge cases (e.g., arrow function comments) require careful span math.
-
-**Leading comments have one rule and one emitter.** A comment run *before* an item (a value, member, list element, or comma-separated item) is emitted by `Printer::push_leading_comment_run` (`printer/comments/mod.rs`), which implements prettier's `printLeadingComment` and picks the separator after each comment from the source around **that comment only**, never from where the item starts: **space** when nothing but spaces follow its `*/` (so a run the author glued stays glued — `/* a */ /* b */⏎X`), a soft **`line`** when a newline follows but none precedes, and a blank-preserving **`hardline`** for an own-line block or any line comment. The glue test alone is `Printer::comment_hugs_next` — the single statement of the rule, called even by the few sites whose surrounding loop must differ (a separator policy of their own). ⚠️ Do not hand-roll `is_block && is_same_line(c.span.end, X)` at a new site: keying the hug on the *item* rather than on *what follows the comment* splits an author-glued run, and was a whole bug family (unglue / block-run merge). A site that also owns a comma emits the gap via `push_inter_item_line_comment_gap`, which owns the break too — that is what lets the last comment hug the next item.
-
-**Whether that soft `line` collapses is decided by one fact, and it predicts every list site.** The **array family** — array literals, array patterns, and tuple types — wraps each element's run *plus* the element in a per-element `group` (`Printer::build_list_element_group`), so the `line` is measured against that element alone and collapses (`/* c1 */ /* c2 */ a`) even while the list itself is broken. The **params family** — function / type-parameter / type-argument / call-argument lists — gives an element **no group of its own** (the width path is a bare `join([",", line])`; the comment-forced-multiline path is a hardline-joined list), so the identical `line` has nothing to be measured against but the enclosing broken group, and breaks (`/* c1 */ /* c2 */⏎a`). This mirrors prettier exactly: `printArrayElements` pushes `group(print())` per element and `print()` carries the leading comments (`print/array.js`), while `printFunctionParameters` / `printTypeParameters` / `print/call-arguments.js` do not. Don't re-derive it per site — and don't "fix" a params-family break by adding a group, or an array-family collapse by removing one.
-
-Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/linter use cases.
+Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/linter use
+cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — see
+[conformance_prettier.md §Comment relocation](docs/conformance_prettier.md#comment-relocation).
 
 ## Dependencies
 
@@ -1344,7 +930,6 @@ Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/
 
 - `serde_json` — wire-JSON emission: the writer's exact string-escape / `f64` formatting, and reparsing bytes to a `Value` (CLI `--pretty`, tests). The language crates no longer depend on `serde` directly (only transitively, without its `derive`); `serde`'s derive is dev-tooling only (`tsv_debug` / `tsv_cli`)
 - `smallvec` — Stack-allocated vectors
-- `string-interner` — String interning for the residual symbol tenants (Svelte element/attribute names, escaped identifiers); identifier names are span-identity (`IdentName`)
 - `thiserror` — Error type derivation
 - `phf` — Compile-time perfect hash maps (keywords, entities)
 - `unicode-ident` — Unicode XID_Start/XID_Continue for identifiers
@@ -1392,6 +977,8 @@ formatting behavior. Key files: `src/language-js/print/assignment.js` (assignmen
 ### Implementation Guides
 
 - ./docs/cli.md - CLI architecture and command patterns
+- ./docs/audits.md - the standing audit gates: what each proves, blind spots, flags, gating
+- ./docs/comments.md - the detached comment model: ownership, the three axes, hazards, emitters
 - ./docs/performance.md - profiling methodology, tooling, and results tracking
 - ./docs/workflow_corpus.md - corpus-driven formatting conformance workflow
 - ./docs/workflow_test262.md - test262 conformance workflow

@@ -38,15 +38,34 @@
 //! tsv-self `Divergent` (a tsv wire-shape quirk, not a real corruption), but never
 //! a tsv-self `Unreparseable` (that is a genuine tsv-parser-on-own-output bug).
 //!
-//! The four finding buckets (`{tsv,canonical}_unreparseable`,
-//! `{tsv,canonical}_divergent`) are the work-list; `format_error` (tsv rejects the
-//! input — a parse-gap for other gates) and `canonical_rejects_input` (an invalid /
-//! error fixture) are counted and skipped, not findings.
+//! The six finding buckets (`{tsv,canonical}_unreparseable`,
+//! `{tsv,canonical}_leaf_corruption`, `{tsv,canonical}_divergent`) are the
+//! work-list; `format_error` (tsv rejects the input — a parse-gap for other gates)
+//! and `canonical_rejects_input` (an invalid / error fixture) are counted and
+//! skipped, not findings.
+//!
+//! **Leaf-value corruption** is the class the structural skeleton is blind to:
+//! `structural_skeleton` erases every scalar leaf, so output that reparses to an
+//! **equal shape** but with a changed decode-invariant value (a mis-decoded string,
+//! a miscanonicalized number, a mangled multi-line comment) reads as Clean. The
+//! [`leaf_conservation_diff`](crate::audit::properties::leaf_conservation_diff)
+//! check compares the multiset of conserved leaves (values / names / cooked chunks
+//! / regex body+flags, never `raw`) input-vs-output and, **when the skeleton is
+//! otherwise equal**, files a `*_leaf_corruption` finding — gate-fatal like
+//! `*_unreparseable`. It is a refinement of Clean, not a competitor to the
+//! divergent bucket: a shape change stays a Divergence (the skeleton owns it), so a
+//! corruption that also changes shape (an ASI merge, a comment swallow) is reported
+//! as divergent, and leaf-corruption is reserved for the genuinely skeleton-blind
+//! same-shape value change.
 //!
 //! ## `--gate` (the `deno task check` guard)
 //!
-//! `--gate` fails on the `*_unreparseable` buckets only (the divergent buckets
-//! are render-model noise over `tests/fixtures`). Over `tests/fixtures` that guard
+//! `--gate` fails on the `*_unreparseable` and `*_leaf_corruption` buckets (the
+//! divergent buckets are render-model noise over `tests/fixtures`). A **bare**
+//! `--gate` runs phase 1 only via the reparse-only fast path, which classifies
+//! neither divergence nor leaf corruption (only `tsv_unreparseable`); the leaf
+//! check rides `--gate --canonical-all` and every non-gate run, the same tier as
+//! divergence. Over `tests/fixtures` that guard
 //! is a **cheap tripwire**: the fixture idempotency/normalization invariants
 //! (`fixtures_validate` F1/N, also in `deno task check`) already make every
 //! formatted output reparse, so the bucket is ~always 0 there and a regression
@@ -66,12 +85,13 @@ use futures_util::{StreamExt, stream};
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
+use crate::audit::properties::{
+    leaf_conservation_diff, structurally_equivalent, tsv_parse_to_value,
+};
 use crate::cli::CliError;
 use crate::deno;
-use crate::diff::{DiffOptions, diff_to_string};
-use crate::render_normalize::{normalize_pair, structural_skeleton};
 
-use super::profile::resolve_files;
+use super::profile::{is_input_invalid_fixture, resolve_files};
 
 /// Audit whether every file's formatted output reparses to the same document.
 ///
@@ -138,7 +158,11 @@ enum TsvVerdict {
     FormatError,
     /// tsv's own parser rejects tsv's own formatted output.
     Unreparseable,
-    /// Output reparses but the AST diverges.
+    /// Output reparses with an **equal skeleton** but a decode-invariant leaf value changed
+    /// (a mis-decoded string, a miscanonicalized number, a mangled comment). The skeleton-blind
+    /// class — a refinement of Clean, distinct from Divergent (a shape change). Gate-fatal.
+    LeafCorruption,
+    /// Output reparses but the AST diverges (a shape change — the skeleton catches it).
     Divergent,
 }
 
@@ -151,7 +175,10 @@ enum CanVerdict {
     RejectsInput,
     /// The canonical parser throws on tsv's *output* (invalid per the real language).
     Unreparseable,
-    /// Output reparses but the AST diverges.
+    /// A decode-invariant leaf value changed under the canonical parser with the skeleton
+    /// otherwise equal (the drop-in-oracle confirmation of a skeleton-blind leaf corruption).
+    LeafCorruption,
+    /// Output reparses but the AST diverges (a shape change).
     Divergent,
 }
 
@@ -165,6 +192,8 @@ enum Bucket {
     CanonicalRejectsInput,
     CanonicalUnreparseable,
     TsvUnreparseable,
+    CanonicalLeafCorruption,
+    TsvLeafCorruption,
     CanonicalDivergent,
     TsvDivergent,
 }
@@ -176,16 +205,25 @@ impl Bucket {
             self,
             Self::CanonicalUnreparseable
                 | Self::TsvUnreparseable
+                | Self::CanonicalLeafCorruption
+                | Self::TsvLeafCorruption
                 | Self::CanonicalDivergent
                 | Self::TsvDivergent
         )
     }
 
-    /// The reliable half — output the parser rejects. These are the only
-    /// buckets `--gate` mode fails on (the divergent buckets are the noisy
-    /// render-model half, reported but non-fatal there).
-    fn is_unreparseable(self) -> bool {
-        matches!(self, Self::CanonicalUnreparseable | Self::TsvUnreparseable)
+    /// The reliable half — output the parser rejects, plus leaf-value corruption (a
+    /// still-parses value change the skeleton is blind to). These are the buckets `--gate`
+    /// mode fails on; the divergent buckets are the noisy render-model half, reported but
+    /// non-fatal there.
+    fn is_gate_fatal(self) -> bool {
+        matches!(
+            self,
+            Self::CanonicalUnreparseable
+                | Self::TsvUnreparseable
+                | Self::CanonicalLeafCorruption
+                | Self::TsvLeafCorruption
+        )
     }
 
     fn label(self) -> &'static str {
@@ -195,6 +233,8 @@ impl Bucket {
             Self::CanonicalRejectsInput => "canonical_rejects_input",
             Self::CanonicalUnreparseable => "canonical_unreparseable",
             Self::TsvUnreparseable => "tsv_unreparseable",
+            Self::CanonicalLeafCorruption => "canonical_leaf_corruption",
+            Self::TsvLeafCorruption => "tsv_leaf_corruption",
             Self::CanonicalDivergent => "canonical_divergent",
             Self::TsvDivergent => "tsv_divergent",
         }
@@ -205,8 +245,10 @@ impl Bucket {
         match self {
             Self::CanonicalUnreparseable => 0,
             Self::TsvUnreparseable => 1,
-            Self::CanonicalDivergent => 2,
-            Self::TsvDivergent => 3,
+            Self::CanonicalLeafCorruption => 2,
+            Self::TsvLeafCorruption => 3,
+            Self::CanonicalDivergent => 4,
+            Self::TsvDivergent => 5,
             _ => 9,
         }
     }
@@ -233,6 +275,15 @@ impl FileResult {
         // tsv rejecting its own output is always a real bug (never masked).
         if self.tsv == TsvVerdict::Unreparseable {
             return Bucket::TsvUnreparseable;
+        }
+        // Leaf-value corruption — a still-parses value change. Like unreparseable, a tsv-self
+        // leaf change is never masked by a canonical-Clean (tsv's own formatter changed a
+        // value tsv's own parser reads), so both leaf verdicts outrank the divergent ones.
+        if self.canonical == Some(CanVerdict::LeafCorruption) {
+            return Bucket::CanonicalLeafCorruption;
+        }
+        if self.tsv == TsvVerdict::LeafCorruption {
+            return Bucket::TsvLeafCorruption;
         }
         if self.canonical == Some(CanVerdict::Divergent) {
             return Bucket::CanonicalDivergent;
@@ -264,12 +315,15 @@ impl RoundtripAuditCommand {
     }
 
     /// The phase-1 fast path — check only that the output *reparses*, skipping
-    /// the wire-JSON convert + skeleton compare. Sound **exactly when** the
-    /// canonical phase won't run (`!runs_canonical`): then the divergent verdict
-    /// is never consumed (a bare `--gate` fails on `tsv_unreparseable` alone), so
-    /// computing it is dead weight. Deriving it from `runs_canonical` keeps that
-    /// invariant in one place — the fast path can never outlive its safety
-    /// condition.
+    /// the wire-JSON convert + skeleton compare + leaf-value check. Sound
+    /// **exactly when** the canonical phase won't run (`!runs_canonical`): then
+    /// neither the divergent nor the leaf-corruption verdict is consumed (a bare
+    /// `--gate` fails on `tsv_unreparseable` alone — the only verdict this fast
+    /// path produces), so computing them is dead weight. Deriving it from
+    /// `runs_canonical` keeps that invariant in one place — the fast path can
+    /// never outlive its safety condition. Leaf conservation therefore rides the
+    /// same tier as divergence: caught by `--gate --canonical-all` and non-gate
+    /// runs, not by the bare phase-1 `--gate`.
     fn reparse_only(&self) -> bool {
         !self.runs_canonical()
     }
@@ -288,11 +342,15 @@ impl RoundtripAuditCommand {
             }
         };
         // Intentionally-invalid fixture inputs aren't round-trip subjects.
-        files.retain(|p| {
-            !p.file_name()
-                .and_then(|n| n.to_str())
-                .is_some_and(|n| n.starts_with("input_invalid"))
-        });
+        files.retain(|p| !is_input_invalid_fixture(p));
+        // A scan with nothing in it must not read as a pass: `--gate` reports
+        // "no round-trip findings" and exits 0 on an empty set, so a typo'd path or
+        // a corpus that silently stopped resolving would look identical to a clean
+        // run. Fail loud instead, matching `gap_audit`/`blank_audit`/`fuzz`/`render_audit`.
+        if files.is_empty() {
+            eprintln!("Error: no round-trip subjects found (searched {paths:?})");
+            return Err(CliError::Failed);
+        }
         if self.limit > 0 {
             files.truncate(self.limit);
         }
@@ -321,11 +379,12 @@ impl RoundtripAuditCommand {
     }
 
     fn report(&self, results: &[FileResult]) -> Result<(), CliError> {
-        // In `--gate` mode only the unreparseable buckets fail the run; the
-        // divergent buckets are counted but non-fatal (render-model noise).
+        // In `--gate` mode only the gate-fatal buckets fail the run (the unreparseable +
+        // leaf-corruption half); the divergent buckets are counted but non-fatal (render-model
+        // noise).
         let is_fail = |b: Bucket| {
             if self.gate {
-                b.is_unreparseable()
+                b.is_gate_fatal()
             } else {
                 b.is_finding()
             }
@@ -384,7 +443,7 @@ impl RoundtripAuditCommand {
             );
         } else if self.gate {
             println!(
-                "(gate mode: only *_unreparseable buckets fail; divergent counts are informational)\n"
+                "(gate mode: only *_unreparseable + *_leaf_corruption buckets fail; divergent counts are informational)\n"
             );
         }
 
@@ -452,12 +511,21 @@ fn tsv_self_roundtrip(path: &Path, render: bool, verbose: bool, reparse_only: bo
         return mk(TsvVerdict::Unreparseable, None);
     };
 
+    // Leaf-value conservation is the skeleton-BLIND class: a *same-shape* output whose decoded
+    // leaf changed (a mis-decoded string, a miscanonicalized number, a mangled comment). So it
+    // refines the skeleton-Clean verdict rather than competing with Divergent — a shape change
+    // is a Divergence (which the skeleton owns), and only a shape-EQUAL output with a changed
+    // leaf is a LeafCorruption. Computed before the move-consuming structural compare. (Not run
+    // under a bare `--gate`, which takes the `reparse_only` fast path above.)
+    let leaf_diff = leaf_conservation_diff(&wire_in, &wire_out);
     let (equal, diff) = structurally_equivalent(wire_in, wire_out, render, verbose);
-    if equal {
-        mk(TsvVerdict::Clean, None)
-    } else {
-        mk(TsvVerdict::Divergent, diff)
+    if !equal {
+        return mk(TsvVerdict::Divergent, diff);
     }
+    if let Some(detail) = leaf_diff {
+        return mk(TsvVerdict::LeafCorruption, verbose.then_some(detail));
+    }
+    mk(TsvVerdict::Clean, None)
 }
 
 /// Whether tsv's own parser accepts `source` (parse only — no wire-JSON
@@ -468,28 +536,6 @@ fn tsv_reparses(source: &str, parser: ParserType) -> bool {
         ParserType::TypeScript => tsv_ts::parse(source, &arena).is_ok(),
         ParserType::Svelte => tsv_svelte::parse(source, &arena).is_ok(),
         ParserType::Css => tsv_css::parse(source, &arena).is_ok(),
-    }
-}
-
-/// Parse `source` with tsv's own parser and convert to the wire-JSON `Value`
-/// (the same shape the canonical ASTs use). `None` on a tsv parse error.
-///
-/// Shared with the `fuzz` command (mutated-input round-tripping).
-pub(crate) fn tsv_parse_to_value(source: &str, parser: ParserType) -> Option<Value> {
-    let arena = bumpalo::Bump::new();
-    match parser {
-        ParserType::TypeScript => {
-            let ast = tsv_ts::parse(source, &arena).ok()?;
-            Some(tsv_ts::convert_ast_json(&ast, source))
-        }
-        ParserType::Svelte => {
-            let ast = tsv_svelte::parse(source, &arena).ok()?;
-            Some(tsv_svelte::convert_ast_json(&ast, source))
-        }
-        ParserType::Css => {
-            let ast = tsv_css::parse(source, &arena).ok()?;
-            Some(tsv_css::convert_ast_json(&ast, source))
-        }
     }
 }
 
@@ -509,7 +555,12 @@ async fn canonical_phase(
         .filter(|(_, r)| {
             r.tsv != TsvVerdict::FormatError
                 && (canonical_all
-                    || matches!(r.tsv, TsvVerdict::Unreparseable | TsvVerdict::Divergent))
+                    || matches!(
+                        r.tsv,
+                        TsvVerdict::Unreparseable
+                            | TsvVerdict::LeafCorruption
+                            | TsvVerdict::Divergent
+                    ))
         })
         .map(|(i, r)| (i, r.path.clone(), r.parser))
         .collect();
@@ -560,48 +611,16 @@ async fn canonical_roundtrip(
         return (CanVerdict::Unreparseable, None);
     };
 
+    // Leaf-value conservation under the canonical parser — the skeleton-blind class (a
+    // shape-equal output with a changed leaf), the drop-in-oracle confirmation. A shape change
+    // is a Divergence; only a shape-equal leaf change is a LeafCorruption.
+    let leaf_diff = leaf_conservation_diff(&canon_in, &canon_out);
     let (equal, diff) = structurally_equivalent(canon_in, canon_out, render, verbose);
-    if equal {
-        (CanVerdict::Clean, None)
-    } else {
-        (CanVerdict::Divergent, diff)
+    if !equal {
+        return (CanVerdict::Divergent, diff);
     }
-}
-
-/// Compare two ASTs for **structural** equivalence — the corruption-hunt basis.
-///
-/// Both are [`normalize_pair`]'d (render-normalized when `render`, then
-/// location-stripped) and compared as [`structural_skeleton`]s, so legitimate
-/// leaf reformatting doesn't read as corruption while an injected / dropped /
-/// re-typed node still does (see `structural_skeleton` for what the skeleton
-/// keeps vs erases). Char-dropping *value* corruption stays covered by the
-/// complementary `corpus:compare:format` SAFETY (differential char-frequency),
-/// which this deliberately does not duplicate.
-///
-/// Returns `(structurally_equal, diff)` — the diff (only with `verbose`) shows the
-/// full location-stripped values, not the skeleton, so it's readable for triage.
-///
-/// Shared with the `fuzz` command (mutated-input round-tripping).
-pub(crate) fn structurally_equivalent(
-    a: Value,
-    b: Value,
-    render: bool,
-    verbose: bool,
-) -> (bool, Option<String>) {
-    let (a, b) = normalize_pair(a, b, render);
-    if structural_skeleton(&a) == structural_skeleton(&b) {
-        return (true, None);
+    if let Some(detail) = leaf_diff {
+        return (CanVerdict::LeafCorruption, verbose.then_some(detail));
     }
-    let diff = if verbose {
-        match (
-            serde_json::to_string_pretty(&a),
-            serde_json::to_string_pretty(&b),
-        ) {
-            (Ok(pa), Ok(pb)) => Some(diff_to_string(&pa, &pb, &DiffOptions::ast_diff())),
-            _ => None,
-        }
-    } else {
-        None
-    };
-    (false, diff)
+    (CanVerdict::Clean, None)
 }

@@ -88,7 +88,7 @@ cargo run --release -p tsv_debug -- profile ~/dev/zzz/src/lib
 # Profile specific files
 cargo run --release -p tsv_debug -- profile file1.ts file2.svelte
 
-# More iterations for stability
+# More iterations for stability (default: 10)
 cargo run --release -p tsv_debug -- profile ~/dev/zzz/src/lib --iterations 20
 
 # JSON output for scripting
@@ -141,6 +141,7 @@ cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib
 
 # JSON output with per-file data (e.g. to split costs by multibyte flag)
 cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib --json
+# Also: --iterations <n> (default: 5)
 ```
 
 Output shows, per language: file/byte/wire-byte/multibyte counts and the
@@ -188,7 +189,7 @@ grep fits_with_lookahead stacks.txt | head
 `perf annotate -s` matches the **exact demangled name** as shown in
 `perf report` — a substring silently annotates nothing. It also comes up
 empty for functions with multiple monomorphizations sharing one demangled
-name (e.g. `arena_fits_with_lookahead`, instantiated per `TextResolver`).
+name (e.g. `render_doc_core`, instantiated per `RenderPolicy`).
 For those, dump everything and search by source line instead:
 
 ```bash
@@ -387,7 +388,7 @@ memory shape of the doc IR: **nodes/byte** (actual vs the `with_source_size_hint
 safe hint must clear), **capacity fill %** (used vs reserved node slots), the **DocNode
 variant histogram** (which node kind dominates the `Vec` the render/`fits`/build
 loops linearly scan), and the **DocText sub-histogram** (`Static` / `Pooled` /
-`SourceSpan` / `Symbol` share of `Text`). `--reuse` instead reports the
+`SourceSpan` share of `Text`). `--reuse` instead reports the
 **`reset()`-reuse high-water** — the peak retained node/children capacity across one
 shared arena (as the CLI/FFI/WASM batch drivers use), the number that shows a lower
 pre-size hint doesn't grow the batch footprint (it's bounded by actual max-file usage,
@@ -413,6 +414,29 @@ cargo run -p tsv_debug arena_stats ~/dev/zzz/src/lib ~/dev/fuz_css/src/lib
 cargo run -p tsv_debug arena_stats <paths> --json
 cargo run -p tsv_debug arena_stats <paths> --reuse         # reset()-reuse high-water
 cargo run -p tsv_debug arena_stats <paths> --list-errors   # list parse-skipped files
+```
+
+### 8. `tsv_debug buffer_sizes` — printer buffer sizing
+
+Histograms for tuning the TS printer's SmallVec inline capacities. Two parse-time
+metrics (static AST properties): named-import-specifier count per import
+(`named_specs`), and line count per multi-line block comment (the population the
+parked line-offset scratch iterates). With `--features buffer_stats` (off by
+default — the record hooks sit in the chain printer's hot path), each file is also
+*formatted* and four printer-buffer populations are sampled at their construction
+chokepoints (`tsv_ts::printer::buffer_stats`), so inline-`N` claims are measured
+data, not doc-comment prose: `ChainNodeVec` (nodes per linearized chain),
+`ChainGroupVec` (groups per `group_chain_nodes` call), `ChainGroup.nodes` (nodes
+per built group), and the leading-comment `CommentVec`
+(per `collect_leading_comments` call — the type's dominant site). Covers
+`.ts`/`.svelte.ts` AND `.svelte` (the `<script>`/`{expr}` feed the same TS-printer
+buffers). Prints percentiles + spill rate at candidate inline N. For sizing,
+exclude the prettier/svelte test suites (edge-case skew). Pure Rust, no Deno.
+
+```bash
+cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src
+cargo run -p tsv_debug --features buffer_stats buffer_sizes <paths>  # + chain/comment histograms
+cargo run -p tsv_debug buffer_sizes <paths> --json
 ```
 
 ## Measurement Process

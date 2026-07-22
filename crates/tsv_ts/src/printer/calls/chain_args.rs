@@ -7,9 +7,9 @@ use super::super::comments::CommentSpacing;
 use super::super::{Printer, has_newline_before_position, is_multiline_template_expression};
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
-    build_before_comma_trailing_comments, first_arg_has_any_comments, has_blank_line_between_args,
-    has_inter_argument_comments, has_trailing_comments_on_args, is_comment_inline_with_next,
-    last_arg_has_comments, push_empty_args,
+    build_before_comma_trailing_comments, first_arg_has_any_comments, has_inter_argument_comments,
+    has_trailing_comments_on_args, is_comment_inline_with_next, last_arg_has_comments,
+    push_empty_args,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments, is_block_function,
@@ -221,16 +221,14 @@ fn build_call_args_doc_for_chain_impl(
     let type_args = get_call_type_arguments(call);
     let type_args_doc = type_args.map(|ta| printer.build_type_parameter_instantiation_doc(ta));
 
-    // Check for blank lines between arguments (forces expansion)
-    // Uses has_blank_line_between_args to skip stripped grouping paren span gaps.
-    let has_blank_lines = call.arguments.windows(2).any(|window| {
-        has_blank_line_between_args(
-            printer.source,
-            printer.line_breaks,
-            window[0].span().end,
-            window[1].span().start,
-        )
-    });
+    // Check for blank lines between arguments (forces expansion). Coarse over-check: a
+    // raw scan of every gap (it must catch a blank that sits *past* a same-line trailing
+    // comment, which the emitter's per-gap `blank_scan_end` measure would clamp away — so
+    // the two intentionally differ and are not shared).
+    let has_blank_lines = call
+        .arguments
+        .windows(2)
+        .any(|window| printer.is_next_line_empty(window[0].span().end, window[1].span().start));
 
     // Multiple arrow function arguments: always expand to multiple lines
     // Prettier always expands 2+ arrow function arguments, regardless of source formatting.
@@ -487,6 +485,11 @@ fn build_chain_args_force_expand(
     // (divergence from prettier, which relocates them to their own line).
     // Injected after the `(` in the wrap below.
     let mut paren_line_prefix_parts: DocBuf = DocBuf::new();
+    // Whether the gap just closed — between `arguments[i - 1]` and `arguments[i]` —
+    // carries an author blank line. Computed once at the bottom of the previous
+    // iteration (the no-comment branch) and reused here, since the top of this
+    // iteration and that bottom look at the same gap under the same no-comment guard.
+    let mut prev_gap_has_blank = false;
 
     for (i, arg) in call.arguments.iter().enumerate() {
         let arg_start = arg.span().start;
@@ -524,16 +527,9 @@ fn build_chain_args_force_expand(
             let prev_end = call.arguments[i - 1].span().end;
             let has_comments_before = printer.has_comments_to_emit_between(prev_end, arg_start);
             // Nothing to emit in the gap, but an owned annotation can still physically be
-            // there — stop the raw newline scan at the comment, so its own newlines don't
-            // read as a blank line yet an authored blank *before* it is kept (`blank_scan_end`).
-            if !has_comments_before
-                && has_blank_line_between_args(
-                    printer.source,
-                    printer.line_breaks,
-                    prev_end,
-                    printer.blank_scan_end(prev_end, arg_start),
-                )
-            {
+            // there — `prev_gap_has_blank` was measured with `blank_scan_end`, so its own
+            // newlines don't read as a blank line yet an authored blank *before* it is kept.
+            if !has_comments_before && prev_gap_has_blank {
                 arg_parts.push(d.literalline());
                 arg_parts.push(d.hardline());
             }
@@ -565,13 +561,13 @@ fn build_chain_args_force_expand(
             let next_has_blank = if has_comments_before_next {
                 pc.has_blank_line_in_gap(printer.source, printer.line_breaks)
             } else {
-                has_blank_line_between_args(
-                    printer.source,
-                    printer.line_breaks,
-                    arg_end,
-                    printer.blank_scan_end(arg_end, next_arg_start),
-                )
+                // Measure the no-comment gap's blank once; the top of the next iteration
+                // reuses it (same gap, same guard) instead of re-scanning the window.
+                printer.is_next_line_empty(arg_end, printer.blank_scan_end(arg_end, next_arg_start))
             };
+            // Carry the no-comment gap's blank forward; a comment gap's blank is emitted
+            // here, and the next iteration's top guard skips the reuse, so leave it false.
+            prev_gap_has_blank = next_has_blank && !has_comments_before_next;
             if next_has_blank && has_comments_before_next {
                 // Blank line before next arg's leading comments — emit literalline
                 // before the hardline separator. When there are no comments, the

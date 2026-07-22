@@ -19,13 +19,15 @@ use crate::printer::calls::{
     PartitionedComments, build_args_joined_with_comments, build_args_split_last,
     build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
     build_expand_all_args, build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
-    emit_first_arg_leading_comments, has_blank_line_between_args,
-    has_inter_argument_comments_slice, has_trailing_comments_slice,
-    has_trailing_line_comments_slice, last_two_args_same_type, prebuild_expand_last_break_body,
-    prepend_arrow_body_comments, should_force_expansion_for_comments, wrap_call_with_hard_breaks,
+    emit_first_arg_leading_comments, has_inter_argument_comments_slice,
+    has_trailing_comments_slice, has_trailing_line_comments_slice, last_two_args_same_type,
+    prebuild_expand_last_break_body, prepend_arrow_body_comments,
+    should_force_expansion_for_comments, wrap_call_with_hard_breaks,
     wrap_call_with_will_break_guard,
 };
-use crate::printer::{CommentVec, ParenContext, Printer, has_multiline_content};
+use crate::printer::{
+    CommentVec, ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
+};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -71,7 +73,9 @@ impl<'a> Printer<'a> {
 
         // Check for comments between removed parentheses and callee
         // e.g., new (/* comment */ Foo)() has comments in the gap between 'new ' and 'Foo'
-        let callee = self.prepend_removed_paren_comments(
+        // The keyword→operand gap, shared with `await` — see
+        // `prepend_keyword_operand_comments`.
+        let callee = self.prepend_keyword_operand_comments(
             new_expr.span.start,
             new_expr.callee.span().start,
             callee,
@@ -339,10 +343,11 @@ impl<'a> Printer<'a> {
         }
 
         // Check if any argument has multiline content
-        let has_multiline = new_expr
-            .arguments
-            .iter()
-            .any(|arg| has_multiline_content(arg, self.source));
+        let has_multiline = container_may_have_multiline_content(new_expr.span, self.source)
+            && new_expr
+                .arguments
+                .iter()
+                .any(|arg| has_multiline_content(arg, self.source));
 
         if has_multiline {
             // Force expansion with hardlines for multiline content
@@ -357,15 +362,14 @@ impl<'a> Printer<'a> {
             return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
         }
 
-        // Check for blank lines between arguments (forces expansion and preservation)
-        let has_blank_lines = new_expr.arguments.windows(2).any(|window| {
-            has_blank_line_between_args(
-                self.source,
-                self.line_breaks,
-                window[0].span().end,
-                window[1].span().start,
-            )
-        });
+        // Check for blank lines between arguments (forces expansion and preservation).
+        // Coarse over-check: a raw scan of every gap (it must catch a blank that sits
+        // *past* a same-line trailing comment, which the emitter's per-gap `blank_scan_end`
+        // measure would clamp away — so the two intentionally differ and are not shared).
+        let has_blank_lines = new_expr
+            .arguments
+            .windows(2)
+            .any(|window| self.is_next_line_empty(window[0].span().end, window[1].span().start));
 
         if has_blank_lines {
             let arg_doc = build_args_with_blank_lines(self, new_expr.arguments);

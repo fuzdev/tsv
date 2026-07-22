@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 216,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 207,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 77,
+							"end": 100,
+							"property": "border-image",
+							"value": "url(a\\ b)"
+						},
+						{
+							"type": "Declaration",
+							"start": 183,
+							"end": 203,
+							"property": "background",
+							"value": "url(x\\ )"
+						}
+					]
+				},
+				"start": 9,
+				"end": 207
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 208,
+			"styles": "\n\tdiv {\n\t\t/* an escape INSIDE the url content: prettier keeps it */\n\t\tborder-image: url(a\\ b);\n\n\t\t/* the same escape at the END, where the payload abuts the closing paren */\n\t\tbackground: url(x\\ );\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 217,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

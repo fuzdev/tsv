@@ -23,7 +23,7 @@ use tsv_lang::estimated_ast_arena_capacity;
 ///   the render/`fits`/build loops linearly scan (so shrinking the dominant
 ///   variant's size is what would move cache density).
 /// - **DocText sub-histogram** — for `Text` nodes, the `Static` / `Pooled` /
-///   `SourceSpan` / `Symbol` split (which text representation to target).
+///   `SourceSpan` split (which text representation to target).
 ///
 /// Covers `.ts` / `.svelte.ts` / `.svelte` / `.css` (each formatted by its own
 /// printer into the shared doc arena). Pure Rust, no Deno.
@@ -69,7 +69,7 @@ const NODE_KINDS: &[&str] = &[
     "BreakParent",
     "Align",
 ];
-const TEXT_KINDS: &[&str] = &["Static", "Pooled", "SourceSpan", "Symbol"];
+const TEXT_KINDS: &[&str] = &["Static", "Pooled", "SourceSpan"];
 
 #[derive(Default)]
 struct Stats {
@@ -352,6 +352,7 @@ fn classify_node(n: &DocNode) -> &'static str {
         DocNode::Line(_) => "Line",
         DocNode::Indent(_) => "Indent",
         DocNode::Dedent(_) => "Dedent",
+        DocNode::AlignRoot { .. } => "AlignRoot",
         DocNode::Align { .. } => "Align",
         DocNode::Group { .. } => "Group",
         DocNode::IfBreak { .. } => "IfBreak",
@@ -370,7 +371,6 @@ fn classify_text(t: &DocText) -> &'static str {
         DocText::Static(..) => "Static",
         DocText::Pooled(..) => "Pooled",
         DocText::SourceSpan(..) => "SourceSpan",
-        DocText::Symbol(..) => "Symbol",
     }
 }
 

@@ -270,7 +270,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 if self.current_value() == "namespace" || self.current_value() == "module" =>
             {
                 // declare namespace/module
-                self.parse_module_declaration_with_start(true, false, start)
+                self.parse_module_declaration_with_start(true, start)
             }
             TokenKind::Identifier if self.current_value() == "interface" => {
                 // declare interface
@@ -399,12 +399,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             .or_else(|| self.this_as_name());
         if let Some(param_name) = param_name {
             // Type predicate: `identifier is Type` or `asserts identifier is Type`.
-            // The `is` must not be preceded by a line terminator (TS
-            // `parameterName [no LineTerminator here] is Type`): a newline before it
-            // makes it not a predicate, leaving `is` a stray token (acorn-typescript's
-            // `hasPrecedingLineBreak` guard). Same rule as the arrow `=>` / conditional
-            // `extends`.
-            if self.peek_is_contextual_keyword("is") && !self.peek_preceded_by_line_terminator() {
+            // The `is` must not be preceded by a line terminator
+            // (`parameterName [no LineTerminator here] is Type`); see
+            // `peek_predicate_is_ahead`.
+            if self.peek_predicate_is_ahead() {
                 let (id_start, id_end) = self.current_pos();
                 self.advance()?;
 
@@ -493,18 +491,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse enum declaration: `enum Foo { A, B }`, `const enum Foo { A = 1 }`, etc.
     ///
-    /// This handles all enum variants:
-    /// - Regular: `enum Foo { A, B }`
-    /// - Const: `const enum Foo { A, B }`
-    /// - Declare: `declare enum Foo { A, B }`
-    /// - Declare const: `declare const enum Foo { A, B }`
+    /// This wrapper handles the non-ambient forms (`enum`, `const enum`); the
+    /// `declare` forms are parsed via `parse_enum_declaration_with_start` from
+    /// `parse_declare_statement_kind`.
     pub(super) fn parse_enum_declaration(
         &mut self,
         is_const: bool,
-        is_declare: bool,
     ) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0;
-        self.parse_enum_declaration_with_start(is_const, is_declare, start)
+        self.parse_enum_declaration_with_start(is_const, false, start)
     }
 
     fn parse_enum_declaration_with_start(
@@ -614,26 +609,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a namespace/module declaration: `namespace Utils { ... }` or `module Utils { ... }`
     ///
-    /// Handles:
+    /// Handles the non-ambient forms:
     /// - `namespace Name { statements }`
     /// - `namespace Outer.Inner { statements }` (nested)
-    /// - `declare namespace Name { statements }` (ambient)
-    /// - `declare module 'name' { statements }` (ambient module augmentation)
-    /// - `declare module 'name';` (shorthand ambient module)
     /// - `module Name { statements }` (old syntax)
-    pub(super) fn parse_module_declaration(
-        &mut self,
-        declare: bool,
-        global: bool,
-    ) -> Result<Statement<'arena>, ParseError> {
+    ///
+    /// The `declare` forms are parsed via `parse_module_declaration_with_start`
+    /// from `parse_declare_statement_kind`.
+    pub(super) fn parse_module_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let start = self.current_pos().0;
-        self.parse_module_declaration_with_start(declare, global, start)
+        self.parse_module_declaration_with_start(false, start)
     }
 
     fn parse_module_declaration_with_start(
         &mut self,
         declare: bool,
-        global: bool,
         start: usize,
     ) -> Result<Statement<'arena>, ParseError> {
         // Capture which keyword was used: 'namespace' or 'module'
@@ -687,7 +677,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             body,
             declare,
             kind,
-            global,
+            global: false,
             span: Span::new(start as u32, end),
         }))
     }
@@ -744,7 +734,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Parse the inner declaration recursively
         let nested_start = self.current_pos().0;
-        let nested = self.parse_module_declaration_inner(nested_start as u32, false, kind)?;
+        let nested = self.parse_module_declaration_inner(nested_start as u32, kind)?;
         let body = TSModuleDeclarationBody::TSModuleDeclaration(self.alloc(nested));
         let end = module_body_end(&body);
 
@@ -762,7 +752,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_module_declaration_inner(
         &mut self,
         start: u32,
-        declare: bool,
         kind: TSModuleDeclarationKind,
     ) -> Result<TSModuleDeclaration<'arena>, ParseError> {
         // Parse namespace name (identifier or contextual type keyword for nested
@@ -778,12 +767,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // Parse nested declaration (recursively)
             // Nested parts inherit the same kind (namespace vs module)
             let nested_start = self.current_pos().0;
-            let nested = self.parse_module_declaration_inner(nested_start as u32, false, kind)?;
+            let nested = self.parse_module_declaration_inner(nested_start as u32, kind)?;
             TSModuleDeclarationBody::TSModuleDeclaration(self.alloc(nested))
         } else {
             // Parse block body: `{ statements }`
-            // For `declare namespace`, we're in ambient context
-            self.parse_module_block(declare)?
+            // A nested part is never itself `declare`; it inherits any enclosing
+            // ambient context via `parse_module_block`.
+            self.parse_module_block(false)?
         };
 
         // Calculate end position based on body
@@ -792,7 +782,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok(TSModuleDeclaration {
             id: TSModuleName::Identifier(id),
             body: Some(body),
-            declare,
+            declare: false,
             kind,
             global: false,
             span: Span::new(start, end),

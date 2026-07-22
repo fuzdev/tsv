@@ -1,50 +1,30 @@
-// Adapter binding the main Printer to the chain renderer
+// Chain helpers on the main Printer for the chain renderer.
 //
-// Implements the chain module's ChainPrinter and SymbolLookup traits
-// to enable the chain printer to delegate back to the main Printer
-// for expression building and comment handling.
+// These let the chain builder/printer delegate back to the main Printer for
+// expression building and comment handling. Formerly the `ChainPrinter` /
+// `SymbolLookup` traits — collapsed to inherent methods, since `Printer` was
+// their only implementor.
 
-use super::{ChainPrinter, SymbolLookup};
 use crate::ast::internal;
 use crate::printer::{CommentSpacing, Printer, comments_to_emit_in_range};
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{ClassifiedComments, Comment, Span};
 
-impl<'a> SymbolLookup for Printer<'a> {
-    fn with_name<R>(
-        &self,
-        name: internal::IdentName,
-        name_start: u32,
-        f: impl FnOnce(&str) -> R,
-    ) -> Option<R> {
-        match name.escaped {
-            Some(sym) => self.interner.borrow().resolve(sym).map(f),
-            None => Some(f(
-                &self.source[name_start as usize..name_start as usize + name.raw_len as usize]
-            )),
-        }
-    }
-}
-
-impl<'a> ChainPrinter for Printer<'a> {
-    fn arena(&self) -> &DocArena {
+impl<'a> Printer<'a> {
+    pub(crate) fn arena(&self) -> &DocArena {
         self.arena
     }
 
-    fn ident_doc(&self, name: internal::IdentName, name_start: u32) -> DocId {
+    pub(crate) fn ident_doc(&self, name: internal::IdentName<'_>, name_start: u32) -> DocId {
         self.ident_name_doc(name, name_start)
     }
 
-    fn print_expression(&self, expr: &internal::Expression<'_>) -> DocId {
-        self.build_expression_doc(expr)
-    }
-
-    fn in_for_init(&self) -> bool {
+    pub(crate) fn in_for_init(&self) -> bool {
         self.in_for_init.get()
     }
 
-    fn build_parenthesized_base_inner_logical(
+    pub(crate) fn build_parenthesized_base_inner_logical(
         &self,
         binary: &internal::BinaryExpression<'_>,
     ) -> DocId {
@@ -53,18 +33,22 @@ impl<'a> ChainPrinter for Printer<'a> {
         d.group(inner)
     }
 
-    fn build_parenthesized_base_inner_binary(
+    pub(crate) fn build_parenthesized_base_inner_binary(
         &self,
         binary: &internal::BinaryExpression<'_>,
     ) -> DocId {
         self.build_binary_chain_for_parens(binary)
     }
 
-    fn print_call_args(&self, call: &internal::CallExpression<'_>, optional: bool) -> DocId {
+    pub(crate) fn print_call_args(
+        &self,
+        call: &internal::CallExpression<'_>,
+        optional: bool,
+    ) -> DocId {
         self.build_call_args_doc_for_chain(call, optional)
     }
 
-    fn print_call_args_expanded(
+    pub(crate) fn print_call_args_expanded(
         &self,
         call: &internal::CallExpression<'_>,
         optional: bool,
@@ -72,7 +56,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.build_call_args_doc_for_chain_expanded(call, optional)
     }
 
-    fn print_call_args_standard_expanded(
+    pub(crate) fn print_call_args_standard_expanded(
         &self,
         call: &internal::CallExpression<'_>,
         optional: bool,
@@ -80,7 +64,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.build_call_args_doc_for_chain_standard_expanded(call, optional)
     }
 
-    fn build_block_comments_doc(
+    pub(crate) fn build_chain_block_comments_doc(
         &self,
         start: u32,
         end: u32,
@@ -88,7 +72,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         same_line_only: bool,
     ) -> DocId {
         let block_comments = if same_line_only {
-            self.filter_block_comments(start, end, true)
+            self.filter_block_comments(start, end)
         } else {
             comments_to_emit_in_range(self.comments, start, end)
                 .filter(|c| c.is_block)
@@ -97,7 +81,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         self.format_block_comments(&block_comments, spacing)
     }
 
-    fn build_computed_member_line_comment_bracket(
+    pub(crate) fn build_computed_member_line_comment_bracket(
         &self,
         open: &'static str,
         inside_start: u32,
@@ -140,59 +124,41 @@ impl<'a> ChainPrinter for Printer<'a> {
         ))
     }
 
-    fn get_property_span(&self, expr: &internal::Expression<'_>) -> Span {
+    pub(crate) fn get_property_span(&self, expr: &internal::Expression<'_>) -> Span {
         expr.span()
     }
 
-    fn is_expression_statement(&self) -> bool {
+    pub(crate) fn is_expression_statement(&self) -> bool {
         self.is_expression_statement.get()
     }
 
-    fn clear_expression_statement(&self) {
+    pub(crate) fn clear_expression_statement(&self) {
         self.is_expression_statement.set(false);
     }
 
-    fn enter_chain_arg_share(&self) -> bool {
-        Printer::enter_chain_arg_share(self)
-    }
-
-    fn exit_chain_arg_share(&self, was_active: bool) {
-        Printer::exit_chain_arg_share(self, was_active);
-    }
-
-    fn get_line_breaks(&self) -> &[u32] {
+    pub(crate) fn get_line_breaks(&self) -> &[u32] {
         self.line_breaks
     }
 
-    fn has_comments_to_emit_between(&self, start: u32, end: u32) -> bool {
-        comments_to_emit_in_range(self.comments, start, end)
-            .next()
-            .is_some()
-    }
-
-    fn has_comments_on_page_between(&self, start: u32, end: u32) -> bool {
-        tsv_lang::has_comments_on_page_in_range(self.comments, start, end)
-    }
-
-    fn chain_has_comments(&self) -> bool {
+    pub(crate) fn chain_has_comments(&self) -> bool {
         self.chain_has_comments.get()
     }
 
-    fn set_chain_has_comments(&self, has_comments: bool) -> bool {
+    pub(crate) fn set_chain_has_comments(&self, has_comments: bool) -> bool {
         let prev = self.chain_has_comments.get();
         self.chain_has_comments.set(has_comments);
         prev
     }
 
-    fn restore_chain_has_comments(&self, prev: bool) {
+    pub(crate) fn restore_chain_has_comments(&self, prev: bool) {
         self.chain_has_comments.set(prev);
     }
 
-    fn classify_comments(&self, start: u32, end: u32) -> ClassifiedComments<'_> {
+    pub(crate) fn classify_comments(&self, start: u32, end: u32) -> ClassifiedComments<'_> {
         ClassifiedComments::from_range(self.comments, start, end, self.line_breaks)
     }
 
-    fn build_trailing_block_doc(&self, comments: &[&Comment]) -> DocId {
+    pub(crate) fn build_trailing_block_doc(&self, comments: &[&Comment]) -> DocId {
         let d = self.d();
         if comments.is_empty() {
             return d.empty();
@@ -207,7 +173,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         d.concat(&parts)
     }
 
-    fn build_trailing_line_doc(&self, comments: &[&Comment]) -> DocId {
+    pub(crate) fn build_trailing_line_doc(&self, comments: &[&Comment]) -> DocId {
         let d = self.d();
         if comments.is_empty() {
             return d.empty();
@@ -225,7 +191,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         d.concat(&parts)
     }
 
-    fn build_leading_comments_doc(&self, comments: &[&Comment]) -> DocId {
+    pub(crate) fn build_chain_leading_comments_doc(&self, comments: &[&Comment]) -> DocId {
         let d = self.d();
         if comments.is_empty() {
             return d.empty();
@@ -240,7 +206,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         d.concat(&parts)
     }
 
-    fn build_line_comments_no_boundary(&self, comments: &[&Comment]) -> DocId {
+    pub(crate) fn build_line_comments_no_boundary(&self, comments: &[&Comment]) -> DocId {
         let d = self.d();
         if comments.is_empty() {
             return d.empty();
@@ -255,7 +221,7 @@ impl<'a> ChainPrinter for Printer<'a> {
         d.concat(&parts)
     }
 
-    fn get_source(&self) -> &str {
+    pub(crate) fn get_source(&self) -> &str {
         self.source
     }
 }
@@ -264,7 +230,11 @@ impl<'a> Printer<'a> {
     /// Format a slice of block comments with the given spacing style.
     ///
     /// Shared formatting for block comments with the given spacing style.
-    fn format_block_comments(&self, block_comments: &[&Comment], spacing: CommentSpacing) -> DocId {
+    pub(crate) fn format_block_comments(
+        &self,
+        block_comments: &[&Comment],
+        spacing: CommentSpacing,
+    ) -> DocId {
         let d = self.d();
         if block_comments.is_empty() {
             return d.empty();

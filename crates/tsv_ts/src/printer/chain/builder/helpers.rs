@@ -4,29 +4,27 @@
 // - ChainPartsBuilder: Builder for constructing chain parts with comments
 
 use super::super::printing::{
-    ChainPrinter, group_comment_gap, print_group, print_group_expanded,
-    print_group_expanded_skip_first_comments, print_group_skip_first_comments,
-    push_gap_comments_and_break,
+    group_comment_gap, print_group, print_group_expanded, print_group_expanded_skip_first_comments,
+    print_group_skip_first_comments, push_gap_comments_and_break,
 };
 use super::super::types::ChainGroup;
+use crate::printer::Printer;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 /// Builder for constructing chain parts with proper comment handling.
 ///
 /// Encapsulates the logic for interleaving comments, line breaks, and groups
 /// when building the rest of a chain (everything after the first group).
-pub(crate) struct ChainPartsBuilder<'a, 'p, P: ChainPrinter> {
+pub(crate) struct ChainPartsBuilder<'a, 'p, 'pr> {
     parts: &'p mut DocBuf,
-    printer: &'a P,
-    use_hardline: bool,
+    printer: &'a Printer<'pr>,
     use_expanded: bool,
 }
 
-impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
+impl<'a, 'p, 'pr> ChainPartsBuilder<'a, 'p, 'pr> {
     pub(crate) fn new(
         parts: &'p mut DocBuf,
-        printer: &'a P,
-        use_hardline: bool,
+        printer: &'a Printer<'pr>,
         use_expanded: bool,
         group_count: usize,
     ) -> Self {
@@ -37,7 +35,6 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
         Self {
             parts,
             printer,
-            use_hardline,
             use_expanded,
         }
     }
@@ -96,21 +93,11 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
     /// and the member-only breaking path render gap comments identically.
     fn add_comments_and_break(&mut self, group: &ChainGroup<'_>) {
         if let Some((object_end, property_start)) = group_comment_gap(group, self.printer) {
-            push_gap_comments_and_break(
-                self.parts,
-                self.printer,
-                object_end,
-                property_start,
-                self.use_hardline,
-            );
+            push_gap_comments_and_break(self.parts, self.printer, object_end, property_start);
         } else {
             // No member range - just add line break
             let d = self.printer.arena();
-            self.parts.push(if self.use_hardline {
-                d.hardline()
-            } else {
-                d.softline()
-            });
+            self.parts.push(d.hardline());
         }
     }
 
@@ -130,11 +117,10 @@ impl<'a, 'p, P: ChainPrinter> ChainPartsBuilder<'a, 'p, P> {
 /// Build rest parts with comments and blank line preservation
 /// Handles both trailing line comments (same line) and leading line comments (own line)
 /// Emits: [trailing_comments?, line_break, leading_comments?, group] for each rest group
-pub(crate) fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
+pub(crate) fn build_rest_parts_with_comments<'a>(
     parts: &mut DocBuf,
     rest_groups: &[ChainGroup<'a>],
-    printer: &P,
-    use_hardline: bool,
+    printer: &Printer<'_>,
     use_expanded: bool,
 ) {
     // Check if last group is a simple member (no calls) - it should stay on same line as `})`
@@ -160,18 +146,12 @@ pub(crate) fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
             }
         });
 
-    let mut builder = ChainPartsBuilder::new(
-        parts,
-        printer,
-        use_hardline,
-        use_expanded,
-        rest_groups.len(),
-    );
+    let mut builder = ChainPartsBuilder::new(parts, printer, use_expanded, rest_groups.len());
     for (i, group) in rest_groups.iter().enumerate() {
         // Don't add hardline before last group if it's a simple member WITHOUT
         // comments that force a break
         let is_last = i == rest_groups.len() - 1;
-        if is_last && last_is_simple_member && use_hardline && !last_has_break_forcing_comments {
+        if is_last && last_is_simple_member && !last_has_break_forcing_comments {
             builder.add_group_no_break(group);
         } else {
             builder.add_group(group);
@@ -182,10 +162,10 @@ pub(crate) fn build_rest_parts_with_comments<'a, P: ChainPrinter>(
 /// Build an expanded chain doc with first group(s) inline and rest indented
 ///
 /// Common pattern for expanded chains: first group(s) + hardline + indent(rest)
-pub(super) fn build_expanded_chain_doc<'a, P: ChainPrinter>(
+pub(super) fn build_expanded_chain_doc<'a>(
     groups: &[ChainGroup<'a>],
     split_at: usize,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     if groups.is_empty() {
@@ -207,25 +187,25 @@ pub(super) fn build_expanded_chain_doc<'a, P: ChainPrinter>(
 
     // Print rest with hardlines and indent (including trailing comments and blank line preservation)
     let mut rest_parts = d.pooled_docbuf();
-    build_rest_parts_with_comments(&mut rest_parts, rest, printer, true, false);
+    build_rest_parts_with_comments(&mut rest_parts, rest, printer, false);
 
     d.concat(&[first_doc, d.indent(d.concat(&rest_parts))])
 }
 
 /// Build the expanded doc variant (first group(s) + indented rest)
-pub(super) fn build_expanded_doc<'a, P: ChainPrinter>(
+pub(super) fn build_expanded_doc<'a>(
     groups: &[ChainGroup<'a>],
     should_merge: bool,
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let split_at = if should_merge { 2 } else { 1 };
     build_expanded_chain_doc(groups, split_at, printer)
 }
 
 /// Build first groups doc (merged when should_merge)
-pub(super) fn build_first_groups_doc<'a, P: ChainPrinter>(
+pub(super) fn build_first_groups_doc<'a>(
     first_groups: &[ChainGroup<'a>],
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     let first_docs: DocBuf = first_groups
@@ -236,9 +216,9 @@ pub(super) fn build_first_groups_doc<'a, P: ChainPrinter>(
 }
 
 /// Build first groups doc with expanded calls
-pub(super) fn build_first_groups_expanded_doc<'a, P: ChainPrinter>(
+pub(super) fn build_first_groups_expanded_doc<'a>(
     first_groups: &[ChainGroup<'a>],
-    printer: &P,
+    printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
     let first_docs: DocBuf = first_groups

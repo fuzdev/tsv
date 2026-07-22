@@ -32,6 +32,7 @@ mod union_intersection;
 pub use helpers::unwrap_parenthesized;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
+pub(super) use super::comments::BlankRule;
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
 use crate::ast::internal::{TSImportType, TSParenthesizedType, TSType};
@@ -221,7 +222,6 @@ impl<'a> Printer<'a> {
                     );
                     return d.concat(&parts);
                 }
-                let operand_doc = self.build_type_doc(o.type_annotation);
                 // `None` on the comment-free `keyof T` / `readonly T[]` — no empty child.
                 let comments_doc = self.build_inline_comments_between_doc_trailing_space_opt(
                     keyword_end,
@@ -231,12 +231,24 @@ impl<'a> Printer<'a> {
                 if let Some(comments) = comments_doc {
                     parts.push(comments);
                 }
-                if needs_parens {
-                    parts.push(d.text("("));
-                    parts.push(operand_doc);
-                    parts.push(d.text(")"));
+                // A comment-free parenthesized union operand EXPANDS its (required) parens
+                // when it breaks — `keyof (⏎\t'a' | 'b'⏎)` — instead of gluing the leading
+                // `|` to the `(`, like the array-element / indexed-access-object arms. A
+                // union under a prefix operator always needs parens, so the helper's parens
+                // are exactly the required ones.
+                if let Some(union_doc) =
+                    self.build_expanded_parenthesized_union_opt(o.type_annotation)
+                {
+                    parts.push(union_doc);
                 } else {
-                    parts.push(operand_doc);
+                    let operand_doc = self.build_type_doc(o.type_annotation);
+                    if needs_parens {
+                        parts.push(d.text("("));
+                        parts.push(operand_doc);
+                        parts.push(d.text(")"));
+                    } else {
+                        parts.push(operand_doc);
+                    }
                 }
                 d.concat(&parts)
             }
@@ -293,14 +305,27 @@ impl<'a> Printer<'a> {
                 d.concat(&parts)
             }
             TSType::IndexedAccess(i) => {
-                let object_doc = self.build_type_doc(i.object_type);
-                let needs_parens = type_needs_parens_for_indexed_access_object(i.object_type);
                 let index_type_start = i.index_type.span().start;
                 let bracket_area_start = i.object_type.span().end;
                 // The access `[`, located outside comments so a `[` glyph inside a
                 // comment before it (`A /* [ */[K]`) isn't mistaken for the bracket.
                 let bracket_open =
                     self.find_char_outside_comments(bracket_area_start, index_type_start, b'[');
+                // A comment-free parenthesized union OBJECT expands its parens when it
+                // breaks (`(⏎\t| A⏎\t| B⏎)[K]`); any other object keeps the existing
+                // layout. See the shared `build_expanded_parenthesized_union_opt`.
+                let object_doc = self
+                    .build_expanded_parenthesized_union_opt(i.object_type)
+                    .unwrap_or_else(|| {
+                        let needs_parens =
+                            type_needs_parens_for_indexed_access_object(i.object_type);
+                        let object_doc = self.build_type_doc(i.object_type);
+                        if needs_parens {
+                            d.concat(&[d.text("("), object_doc, d.text(")")])
+                        } else {
+                            object_doc
+                        }
+                    });
                 // Comments in the object→`[` gap (`A /* c */[K]`) trail the object
                 // in place; comments in the `[`→index gap (`A[/* c */ K]`) lead the
                 // index — both preserved where the user placed them.
@@ -326,12 +351,26 @@ impl<'a> Printer<'a> {
                         )
                     }
                 });
-                let index_doc = self.build_type_doc(i.index_type);
-                let mut parts: DocBuf = if needs_parens {
-                    smallvec![d.text("("), object_doc, d.text(")")]
+                // A comment-free union INDEX expands the bracket when it breaks:
+                // `Foo[⏎\t| A⏎\t| B]` — the `]` hugs the last member (prettier's
+                // `printUnionType` indent branch, `group(indent([softline, printed]))`,
+                // with no trailing softline). The brackets are the delimiter, so a
+                // parenthesized index union is unwrapped first — its (redundant) parens
+                // strip and the bare union expands, matching prettier (the object arm
+                // unwraps the same way). A comment anywhere in the `[`…`]` region keeps
+                // the existing hang layout so comment placement is untouched. See
+                // `type_param_fits_rhs_long`.
+                let index_inner = unwrap_parenthesized(i.index_type);
+                let index_expands = bracket_open.is_some_and(|bp| {
+                    matches!(index_inner, TSType::Union(u) if !self.union_prints_hugged(u))
+                        && !self.has_comments_to_emit_between(bp + 1, i.span.end)
+                });
+                let index_doc = if index_expands {
+                    d.group(d.indent(d.concat(&[d.softline(), self.build_type_doc(index_inner)])))
                 } else {
-                    smallvec![object_doc]
+                    self.build_type_doc(i.index_type)
                 };
+                let mut parts: DocBuf = smallvec![object_doc];
                 if let Some(c) = object_comments {
                     parts.push(c);
                 }

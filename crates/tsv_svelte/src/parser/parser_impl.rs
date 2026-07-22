@@ -4,16 +4,13 @@ use crate::ast::internal::FragmentNode;
 use crate::lexer::{Lexer, Token, TokenKind};
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
-use std::cell::RefCell;
-use std::rc::Rc;
-use string_interner::{DefaultStringInterner, DefaultSymbol};
-use tsv_lang::{Comment, ParseError, SharedInterner, Span};
+use tsv_lang::{Comment, ParseError, Span};
 use tsv_ts::Expression;
 
 /// Build an expression `Comment` from its already-shifted `span` / `content_span`.
 /// `content` is the comment body, read only to compute the `multiline` flag (whether
-/// it holds a line terminator). Centralizes the `Comment` shape shared by the
-/// source-scan (`extract_ts_comments`) and live-lexer (`try_read_js_comment`) paths.
+/// it holds a line terminator). Centralizes the `Comment` shape built by the
+/// live-lexer (`try_read_js_comment`) path.
 fn expression_comment(
     span: Span,
     content_span: Span,
@@ -51,7 +48,6 @@ pub(crate) struct SvelteParser<'a, 'arena> {
     /// **slice-relative** — `base_offset` is added when it's consumed, exactly
     /// as for a freshly lexed token); cleared whenever the lexer is re-seeked.
     pub(crate) peek: Option<Token>,
-    pub(crate) interner: SharedInterner,
     pub(crate) base_offset: usize, // Offset of lexer's source in full source
     /// TS comments collected from template expressions (e.g., {@debug /* comment */ a})
     pub(crate) expression_comments: Vec<Comment>,
@@ -75,13 +71,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             let token = lexer.next_token()?;
             (token.kind, token.start as usize, token.end as usize)
         };
-        // The Svelte parser owns the single interner shared with every embedded
-        // `<script>`/`{expr}`. Its tenants are element/attribute names plus the
-        // rare escaped TS identifier — tens of short strings, not the
-        // per-identifier population the retired source-proportional pre-size was
-        // tuned for. A small fixed capacity covers a typical component's distinct
-        // names in one up-front allocation instead of ~9 from-empty growth steps.
-        let interner = Rc::new(RefCell::new(DefaultStringInterner::with_capacity(32)));
         Ok(Self {
             arena,
             source,
@@ -90,7 +79,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             current_start: start,
             current_end: end,
             peek: None,
-            interner,
             base_offset: 0,
             expression_comments: Vec::new(),
             in_svelte_head: false,
@@ -138,10 +126,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.current_start = self.base_offset + token.start as usize;
         self.current_end = self.base_offset + token.end as usize;
         Ok(())
-    }
-
-    pub(crate) fn intern(&self, s: &str) -> DefaultSymbol {
-        self.interner.borrow_mut().get_or_intern(s)
     }
 
     pub(crate) fn current_pos(&self) -> (usize, usize) {
@@ -219,9 +203,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok(())
     }
 
-    /// Advance the lexer to a specific position in the source.
-    /// Used when we've manually scanned ahead (e.g., for {@attach} parsing).
-    /// Preserves the current `inside_tag` state for correct tokenization.
+    /// Advance the lexer to a specific position in the source, used after a manual byte
+    /// scan (e.g. `{@attach}` / RCDATA / raw-text parsing).
+    ///
+    /// Preserves the current `inside_tag` state. ⚠️ After a scan that jumped the cursor
+    /// forward, that state is a **stale** artifact of wherever the lexer's last token
+    /// happened to land (the scan ignored it), so "preserve" gives the right mode only
+    /// when `pos` resumes adjacent to that token, or when the mode genuinely carries (an
+    /// `{expr}` tag, a JS comment, a mid-tag attribute resync). A caller resuming into a
+    /// KNOWN mode past an unrelated token must set `self.lexer.inside_tag` explicitly
+    /// first — see `parse_rcdata_content`, which forces template mode after `</textarea>`.
     pub(crate) fn advance_to_position(&mut self, pos: usize) -> Result<(), ParseError> {
         // Save the inside_tag state before creating new lexer
         let was_inside_tag = self.lexer.inside_tag;
@@ -242,93 +233,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.current_end = self.base_offset + token.end as usize;
 
         Ok(())
-    }
-
-    /// Extract TS comments from content and add them to expression_comments.
-    ///
-    /// Scans for `/* ... */` block comments and `// ...` line comments.
-    /// Returns content with comments replaced by spaces (preserving positions).
-    ///
-    /// # Arguments
-    /// * `content` - The content to scan for comments
-    /// * `base_offset` - Offset in the full source where this content starts
-    ///
-    /// # Returns
-    /// Content with comments replaced by equivalent whitespace
-    pub(crate) fn extract_ts_comments(&mut self, content: &str, base_offset: usize) -> String {
-        let mut result = content.to_string();
-        let bytes = content.as_bytes();
-        let mut i = 0;
-
-        while i < bytes.len() {
-            if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'*' {
-                // Block comment: /* ... */
-                let start = i;
-                i += 2;
-                while i + 1 < bytes.len() && !(bytes[i] == b'*' && bytes[i + 1] == b'/') {
-                    i += 1;
-                }
-                if i + 1 < bytes.len() {
-                    i += 2; // Skip */
-                }
-                let end = i;
-
-                // Extract comment content (without /* */)
-                let comment_content = &content[start + 2..end.saturating_sub(2)];
-                self.expression_comments.push(expression_comment(
-                    Span::new((base_offset + start) as u32, (base_offset + end) as u32),
-                    Span::new(
-                        (base_offset + start + 2) as u32,
-                        (base_offset + end.saturating_sub(2)) as u32,
-                    ),
-                    true,
-                    comment_content,
-                    false,
-                ));
-
-                // Replace comment with spaces in result
-                result.replace_range(start..end, &" ".repeat(end - start));
-            } else if i + 1 < bytes.len() && bytes[i] == b'/' && bytes[i + 1] == b'/' {
-                // Line comment: // ...
-                let start = i;
-                i += 2;
-                while i < bytes.len() && bytes[i] != b'\n' {
-                    i += 1;
-                }
-                let end = i;
-
-                // Extract comment content (without //)
-                let comment_content = &content[start + 2..end];
-                self.expression_comments.push(expression_comment(
-                    Span::new((base_offset + start) as u32, (base_offset + end) as u32),
-                    Span::new((base_offset + start + 2) as u32, (base_offset + end) as u32),
-                    false,
-                    comment_content,
-                    false,
-                ));
-
-                // Replace comment with spaces in result
-                result.replace_range(start..end, &" ".repeat(end - start));
-            } else if bytes[i] == b'"' || bytes[i] == b'\'' || bytes[i] == b'`' {
-                // Skip strings to avoid matching // or /* inside them
-                let quote = bytes[i];
-                i += 1;
-                while i < bytes.len() && bytes[i] != quote {
-                    if bytes[i] == b'\\' && i + 1 < bytes.len() {
-                        i += 2; // Skip escaped char
-                    } else {
-                        i += 1;
-                    }
-                }
-                if i < bytes.len() {
-                    i += 1; // Skip closing quote
-                }
-            } else {
-                i += 1;
-            }
-        }
-
-        result
     }
 
     /// Try to read a JS-style comment (`//` or `/* */`) at the current position.
@@ -485,13 +389,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<Expression<'arena>, ParseError> {
-        let (expr, comments) = tsv_ts::parse_expression_with_comments(
-            source,
-            base_offset,
-            Rc::clone(&self.interner),
-            self.arena,
-        )?;
-        self.expression_comments.extend(comments);
+        let (expr, comments) =
+            tsv_ts::parse_expression_with_comments(source, base_offset, self.arena)?;
+        self.expression_comments.extend_from_slice(comments);
         Ok(expr)
     }
 
@@ -503,13 +403,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<(Expression<'arena>, usize), ParseError> {
-        let (expr, end_pos, comments) = tsv_ts::parse_expression_partial_with_comments(
-            source,
-            base_offset,
-            Rc::clone(&self.interner),
-            self.arena,
-        )?;
-        self.expression_comments.extend(comments);
+        let (expr, end_pos, comments) =
+            tsv_ts::parse_expression_partial_with_comments(source, base_offset, self.arena)?;
+        self.expression_comments.extend_from_slice(comments);
         Ok((expr, end_pos))
     }
 
@@ -520,12 +416,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<Expression<'arena>, ParseError> {
-        let (pattern, comments) = tsv_ts::parse_pattern_with_comments(
-            source,
-            base_offset,
-            Rc::clone(&self.interner),
-            self.arena,
-        )?;
+        let (pattern, comments) =
+            tsv_ts::parse_pattern_with_comments(source, base_offset, self.arena)?;
         // Canonical reads a destructure via a synthetic `(pattern = 1)` acorn
         // parse whose inserted `(` shifts the pattern's start line one column
         // right when that line is `> 1` — the same quirk the pattern nodes get
@@ -533,7 +425,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // that line, and the wire serializes them with the shifted columns.
         let pattern_on_first_line = !self.source[..base_offset].contains('\n');
         self.expression_comments
-            .extend(comments.into_iter().map(|mut c| {
+            .extend(comments.iter().copied().map(|mut c| {
                 if !pattern_on_first_line
                     && !self.source[base_offset..c.span.start as usize].contains('\n')
                 {
@@ -551,13 +443,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         source: &str,
         base_offset: usize,
     ) -> Result<tsv_ts::Statement<'arena>, ParseError> {
-        let (stmt, comments) = tsv_ts::parse_statement_with_comments(
-            source,
-            base_offset,
-            Rc::clone(&self.interner),
-            self.arena,
-        )?;
-        self.expression_comments.extend(comments);
+        let (stmt, comments) =
+            tsv_ts::parse_statement_with_comments(source, base_offset, self.arena)?;
+        self.expression_comments.extend_from_slice(comments);
         Ok(stmt)
     }
 }

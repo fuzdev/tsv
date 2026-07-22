@@ -1,6 +1,8 @@
-<!-- A then/catch shorthand with no name binding keeps the bare `then` / `catch` in the
-head — never demoted to {:then}/{:catch}. prettier normalizes an empty-pending full form
-to the shorthand. -->
+<!--
+	A then/catch shorthand with no name binding keeps the bare `then` / `catch` in the
+	head — never demoted to {:then}/{:catch}. prettier normalizes an empty-pending full form
+	to the shorthand.
+-->
 
 <!-- bare then-shorthand -->
 {#await promise then}text{/await}

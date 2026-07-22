@@ -25,6 +25,23 @@ comment_check = [
 	"tsv_css/comment_check",
 	"tsv_svelte/comment_check",
 ]
+# Opt-in: compiles tsv_ts's printer buffer-population sampling into this binary
+# so `buffer_sizes` reports the chain/comment SmallVec length histograms
+# (recorded during a real format run). Off by default for the same reason as
+# `swallow_check` — the record hooks sit in the chain printer's hot analysis
+# path. Without it, `buffer_sizes` reports its parse-time metrics only.
+buffer_stats = ["tsv_ts/buffer_stats"]
+# Umbrella that compiles both diagnostic seams into one binary and enables both
+# the `swallow_audit` and `comment_audit` subcommands. EVERY audit deno task passes
+# `--features audits` under `--profile corpus` — including the ones that need neither
+# seam (`scan:audit`, `fanout:audit`, `conformance:audit`, `render:audit`) — so all of
+# them share ONE `corpus+audits` build instead of splitting the workspace into a
+# feature-on and a feature-off world that each recompile `tsv_ts` and `tsv_debug`.
+# The instrumentation is inert unless armed (both seams are `AtomicBool` false by
+# default), so carrying it costs those commands nothing but the compile it saves.
+# Forwards to each member's fan-out (no need to also name `tsv_lang/audits` —
+# `swallow_check`+`comment_check` already cover its members).
+audits = ["swallow_check", "comment_check"]
 
 [dependencies]
 tsv_cli = { path = "../tsv_cli" }

@@ -25,30 +25,51 @@ mod lexer;
 mod parser;
 mod printer;
 
-use std::rc::Rc;
-
 use tsv_lang::EmbedContext;
 use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::is_format_ignore_directive;
 use tsv_lang::printing::build_line_breaks_into;
-pub use tsv_lang::{ParseError, Result, SharedInterner};
+pub use tsv_lang::{ParseError, Result};
 
 pub use goal::Goal;
 
 /// The per-document environment shared by every formatting entry point: the
-/// source the AST's spans index into, the shared interner, the comment buffer,
-/// and the precomputed line breaks. Bundling these keeps the printer
-/// constructor — and the `tsv_svelte` embedding call sites — from re-threading
-/// the same values. The [`EmbedContext`] and the expression/program being
-/// printed vary per call, so they stay separate args.
+/// source the AST's spans index into, the comment buffer, and the precomputed
+/// line breaks. Bundling these keeps the printer constructor — and the
+/// `tsv_svelte` embedding call sites — from re-threading the same values. The
+/// [`EmbedContext`] and the expression/program being printed vary per call, so
+/// they stay separate args.
 pub struct PrinterInputs<'a> {
     /// Full source the AST's spans index into.
     pub source: &'a str,
-    /// Interner shared with the parse phase (cloned per printer).
-    pub interner: SharedInterner,
     /// Detached comment buffer for the document.
     pub comments: &'a [ast::Comment],
     /// Precomputed newline offsets for O(log n) line/column lookup.
     pub line_breaks: &'a [u32],
+    /// Whether any comment in this document is owned by a node (`owned_by_node`).
+    /// A document-level presence flag that short-circuits the owned-leading-comment
+    /// path (`prepend_owned_leading_comment` & siblings), which otherwise runs a byte
+    /// gate once per expression node — the highest-frequency comment path — to conclude
+    /// "no owned comment" for the ~all documents that have none.
+    ///
+    /// **Compute this once per document, from the parsed comment list** (e.g.
+    /// `comments.iter().any(|c| c.owned_by_node)`), and pass it in. It must NOT be
+    /// derived inside `Printer::with_context` or `tsv_svelte`'s `ts_inputs()`: the latter
+    /// is called per template `{expr}`, so an `any()` scan there is O(islands × comments)
+    /// and regresses `.svelte`. `owned_by_node` is set at parse time (including for
+    /// Svelte-embedded TS, parsed eagerly), so the flag is stable before any printing.
+    pub has_owned_comments: bool,
+    /// Whether any comment in this document is a `format-ignore` directive.
+    /// A document-level presence flag that short-circuits `has_format_ignore_in_range`,
+    /// which otherwise runs a range binary search + directive-string match once per
+    /// top-level statement / member expression / object property — concluding "no
+    /// format-ignore" for the ~all documents that have none.
+    ///
+    /// **Compute this once per document, from the parsed comment list** (e.g.
+    /// `comments.iter().any(|c| is_format_ignore_directive(c.content(source)))`), and pass
+    /// it in — never inside `Printer::with_context` or `tsv_svelte`'s `ts_inputs()` (the
+    /// per-`{expr}` O(islands × comments) trap the sibling `has_owned_comments` documents).
+    pub has_format_ignore: bool,
 }
 
 /// Build an *output* printer — pre-sizes the output buffer to the source
@@ -115,7 +136,7 @@ pub fn parse_with_goal<'arena>(
 /// Parse standalone TypeScript with grouping parens preserved.
 ///
 /// Like [`parse`] but keeps `(expr)` as a `ParenthesizedExpression` node (acorn's
-/// `preserveParens: true`) against a fresh interner, so the paren structure is
+/// `preserveParens: true`), so the paren structure is
 /// present in the AST and its wire JSON. The binding audit uses this to reparse
 /// formatted output and see which parenthesized subtree a glued comment binds to
 /// — a re-binding is invisible in the paren-free public AST.
@@ -161,6 +182,19 @@ pub fn format(program: &Program<'_>, source: &str) -> String {
     format_in(program, source, &arena)
 }
 
+/// Parse (`Goal::Module`) and format `source` in one call.
+///
+/// The fully-fused one-shot convenience for callers that just want the
+/// formatted string and never touch the AST (the primitive/convenience split
+/// `format`/`format_in` already applies to the `DocArena`, extended here to the
+/// parse). Batch drivers that reuse arenas across files thread the primitives
+/// ([`parse`] + [`format_in`]) instead.
+pub fn format_str(source: &str) -> Result<String> {
+    let arena = bumpalo::Bump::new();
+    let program = parse(source, &arena)?;
+    Ok(format(&program, source))
+}
+
 /// Format into a caller-provided doc arena.
 ///
 /// Identical output to [`format`], but the doc IR is built into `arena` instead
@@ -173,7 +207,7 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
     // `tsv_lang::comment_ledger`). A Svelte host registers its own `Root.comments`, so
     // an embedded `<script>` never reaches here.
     #[cfg(feature = "comment_check")]
-    tsv_lang::comment_ledger::register_parsed(source, &program.comments);
+    tsv_lang::comment_ledger::register_parsed(source, program.comments);
 
     // Fill the arena-parked line-break table (one warm table across a
     // multi-file driver's files instead of a fresh Vec per file).
@@ -181,9 +215,13 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
     build_line_breaks_into(source, &mut line_breaks);
     let inputs = PrinterInputs {
         source,
-        interner: Rc::clone(&program.interner),
-        comments: &program.comments,
+        comments: program.comments,
         line_breaks: &line_breaks,
+        has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
+        has_format_ignore: program
+            .comments
+            .iter()
+            .any(|c| is_format_ignore_directive(c.content(source))),
     };
     let mut printer = make_printer(arena, &inputs, EmbedContext::default());
     printer.print_program(program);
@@ -204,6 +242,19 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
 pub fn convert_ast_json(program: &Program<'_>, source: &str) -> serde_json::Value {
     serde_json::from_slice(&convert_ast_json_bytes(program, source))
         .expect("writer emits valid JSON")
+}
+
+/// Parse (`Goal::Module`) and emit the compact wire-JSON string in one call.
+///
+/// The parse analogue of [`format_str`] — the fully-fused one-shot convenience
+/// for callers that want the JSON string and never touch the AST directly.
+/// Batch/byte-oriented consumers thread [`parse`] + [`convert_ast_json_bytes`]
+/// instead.
+#[cfg(feature = "convert")]
+pub fn parse_to_json(source: &str) -> Result<String> {
+    let arena = bumpalo::Bump::new();
+    let program = parse(source, &arena)?;
+    Ok(convert_ast_json_string(&program, source))
 }
 
 /// Convert internal AST to compact JSON wire bytes with character-based positions
@@ -286,7 +337,7 @@ pub fn convert_ast_json_string_no_locations(program: &Program<'_>, source: &str)
         .expect("writer emits valid UTF-8 (source slices + ASCII fragments)")
 }
 
-/// Parse TypeScript with a shared string interner and base offset
+/// Parse embedded TypeScript at a base offset into the full source
 ///
 /// This is used when parsing embedded TypeScript in Svelte files.
 ///
@@ -294,40 +345,54 @@ pub fn convert_ast_json_string_no_locations(program: &Program<'_>, source: &str)
 ///
 /// * `source` - The TypeScript source code to parse
 /// * `base_offset` - Offset in the full source file
-/// * `interner` - Shared string interner
 ///
 /// # Returns
 ///
 /// * `Ok(Program)` - The parsed AST
 /// * `Err(ParseError)` - If parsing fails
-pub fn parse_with_interner<'arena>(
+// The `Parser::parse` method-path form clippy suggests for the bare `parser.parse()`
+// closure fails the higher-ranked lifetime check on `with_embedding_parser`'s `f`
+// bound (the closure lets the compiler infer it), so allow the closure here.
+#[allow(clippy::redundant_closure_for_method_calls)]
+pub fn parse_embedded<'arena>(
     source: &str,
     base_offset: usize,
-    interner: SharedInterner,
     arena: &'arena bumpalo::Bump,
 ) -> Result<Program<'arena>> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
-    parser.parse().map_err(|e| e.with_context(source))
+    with_embedding_parser(source, base_offset, arena, |parser| parser.parse())
+}
+
+/// Build an embedding [`parser::Parser`] at `base_offset`, run `f` over it. What
+/// `f` returns borrows only `arena`; `source` error context is applied once
+/// here, so `f`'s body stays context-free.
+fn with_embedding_parser<'arena, T>(
+    source: &str,
+    base_offset: usize,
+    arena: &'arena bumpalo::Bump,
+    f: impl FnOnce(&mut parser::Parser<'_, 'arena>) -> std::result::Result<T, ParseError>,
+) -> Result<T> {
+    let mut parser = parser::Parser::with_base_offset(source, base_offset, arena)?;
+    f(&mut parser).map_err(|e| e.with_context(source))
 }
 
 /// Parse embedded TypeScript with grouping parens preserved.
 ///
-/// Like [`parse_with_interner`] but keeps `(expr)` as an internal
+/// Like [`parse_embedded`] but keeps `(expr)` as an internal
 /// `ParenthesizedExpression` node instead of discarding it. Used for the
 /// `{#snippet}`-parameter sub-parse (`function f(PARAMS) {}`), where Svelte
 /// parses with acorn's `preserveParens: true` and — unlike every other template
 /// expression — skips `remove_parens`, so its public AST keeps the parens. All
-/// other embedded parses ([`parse_with_interner`], expression/pattern parses)
+/// other embedded parses ([`parse_embedded`], expression/pattern parses)
 /// stay paren-free, matching acorn/Svelte.
-pub fn parse_with_interner_preserve_parens<'arena>(
+pub fn parse_embedded_preserve_parens<'arena>(
     source: &str,
     base_offset: usize,
-    interner: SharedInterner,
     arena: &'arena bumpalo::Bump,
 ) -> Result<Program<'arena>> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
-    parser.preserve_parens = true;
-    parser.parse().map_err(|e| e.with_context(source))
+    with_embedding_parser(source, base_offset, arena, |parser| {
+        parser.preserve_parens = true;
+        parser.parse()
+    })
 }
 
 /// Parse a single TypeScript expression and return it with any comments.
@@ -337,13 +402,11 @@ pub fn parse_with_interner_preserve_parens<'arena>(
 pub fn parse_expression_with_comments<'arena>(
     source: &str,
     base_offset: usize,
-    interner: SharedInterner,
     arena: &'arena bumpalo::Bump,
-) -> Result<(Expression<'arena>, Vec<ast::Comment>)> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
-    parser
-        .parse_expression_with_comments()
-        .map_err(|e| e.with_context(source))
+) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
+    with_embedding_parser(source, base_offset, arena, |parser| {
+        parser.parse_expression_with_comments()
+    })
 }
 
 /// Format a single TypeScript expression to a string.
@@ -380,7 +443,6 @@ pub fn format_expression(
 ///
 /// * `source` - The source code of the pattern
 /// * `base_offset` - Offset in the full source file
-/// * `interner` - Shared string interner
 ///
 /// # Returns
 ///
@@ -393,34 +455,32 @@ pub fn format_expression(
 pub fn parse_pattern_with_comments<'arena>(
     source: &str,
     base_offset: usize,
-    interner: SharedInterner,
     arena: &'arena bumpalo::Bump,
-) -> Result<(Expression<'arena>, Vec<ast::Comment>)> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
-    let expr = parser
-        .parse_expression_public()
-        .map_err(|e| e.with_context(source))?;
-    let mut pattern = parser
-        .expression_to_pattern(expr)
-        .map_err(|e| e.with_context(source))?;
-    // Check for type annotation (`: Type`) — used in Svelte block contexts
-    // like `{:then num: number}` and `{:catch error: Error}`
-    if parser.at_colon() {
-        let ta = parser
-            .parse_type_annotation_public()
-            .map_err(|e| e.with_context(source))?;
-        if let Expression::Identifier(id) = &mut pattern {
-            // Re-bind the identifier's binding extra with the parsed type
-            // annotation (preserving any decorators already present).
-            let decorators = id.decorators();
-            id.extra = Some(arena.alloc(ast::internal::IdentifierParamExtra {
-                type_annotation: Some(ta),
-                decorators,
-            }));
+) -> Result<(Expression<'arena>, &'arena [ast::Comment])> {
+    with_embedding_parser(source, base_offset, arena, |parser| {
+        let expr = parser.parse_expression_unbounded()?;
+        let mut pattern = parser.expression_to_pattern(expr)?;
+        // Check for type annotation (`: Type`) — used in Svelte block contexts
+        // like `{:then num: number}` and `{:catch error: Error}`
+        if parser.at_colon() {
+            let ta = parser.parse_type_annotation()?;
+            if let Expression::Identifier(id) = &mut pattern {
+                // Re-bind the identifier's binding extra with the parsed type
+                // annotation (preserving any decorators already present).
+                let decorators = id.decorators();
+                id.extra = Some(arena.alloc(ast::internal::IdentifierParamExtra {
+                    type_annotation: Some(ta),
+                    decorators,
+                }));
+            }
         }
-    }
-    let comments = parser.take_comments();
-    Ok((pattern, comments))
+        // The pattern (plus any type annotation) must fill the whole slice — the Svelte
+        // callers (`{@const id = …}`, `{:then pattern}`, `{:catch pattern}`) hand us a slice
+        // bounded by `=`/`}`. Without this a trailing token is silently dropped
+        // (`{@const x y = a}` → `{@const x = a}`), losing content.
+        parser.expect_end_of_input()?;
+        Ok((pattern, parser.take_comments()))
+    })
 }
 
 /// Parse a type annotation (`: Type`) and return it with the position where parsing stopped.
@@ -431,15 +491,12 @@ pub fn parse_pattern_with_comments<'arena>(
 pub fn parse_type_annotation_partial<'arena>(
     source: &str,
     base_offset: usize,
-    interner: SharedInterner,
     arena: &'arena bumpalo::Bump,
 ) -> Result<(TSTypeAnnotation<'arena>, usize)> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
-    let ta = parser
-        .parse_type_annotation_public()
-        .map_err(|e| e.with_context(source))?;
-    let pos = parser.current_absolute_position();
-    Ok((ta, pos))
+    with_embedding_parser(source, base_offset, arena, |parser| {
+        let ta = parser.parse_type_annotation()?;
+        Ok((ta, parser.current_absolute_position()))
+    })
 }
 
 /// Parse a partial expression, stopping at top-level commas, and return it
@@ -453,15 +510,12 @@ pub fn parse_type_annotation_partial<'arena>(
 pub fn parse_expression_partial_with_comments<'arena>(
     source: &str,
     base_offset: usize,
-    interner: SharedInterner,
     arena: &'arena bumpalo::Bump,
-) -> Result<(Expression<'arena>, usize, Vec<ast::Comment>)> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
-    let (expr, end_pos) = parser
-        .parse_assignment_expression_partial()
-        .map_err(|e| e.with_context(source))?;
-    let comments = parser.take_comments();
-    Ok((expr, end_pos, comments))
+) -> Result<(Expression<'arena>, usize, &'arena [ast::Comment])> {
+    with_embedding_parser(source, base_offset, arena, |parser| {
+        let (expr, end_pos) = parser.parse_assignment_expression_partial()?;
+        Ok((expr, end_pos, parser.take_comments()))
+    })
 }
 
 /// Parse a single statement and return it with any collected comments.
@@ -472,15 +526,12 @@ pub fn parse_expression_partial_with_comments<'arena>(
 pub fn parse_statement_with_comments<'arena>(
     source: &str,
     base_offset: usize,
-    interner: SharedInterner,
     arena: &'arena bumpalo::Bump,
-) -> Result<(Statement<'arena>, Vec<ast::Comment>)> {
-    let mut parser = parser::Parser::with_interner(source, base_offset, interner, arena)?;
-    let stmt = parser
-        .parse_statement()
-        .map_err(|e| e.with_context(source))?;
-    let comments = parser.take_comments();
-    Ok((stmt, comments))
+) -> Result<(Statement<'arena>, &'arena [ast::Comment])> {
+    with_embedding_parser(source, base_offset, arena, |parser| {
+        let stmt = parser.parse_statement()?;
+        Ok((stmt, parser.take_comments()))
+    })
 }
 
 /// Build a DocId for a variable declaration in the caller's arena.
@@ -510,6 +561,26 @@ pub fn build_expression_doc_with_comments(
 ) -> DocId {
     let printer = make_doc_printer(arena, inputs, *embed);
     printer.build_expression_doc(expression)
+}
+
+/// Build a DocId for a single comment (`/* … */` / `// …`) in the caller's arena,
+/// through the same rendering the standalone TS printer uses.
+///
+/// A multi-line block comment reindents to context and propagates its break via a
+/// `MultilineText` node, identically to an owned leading comment
+/// (`prepend_owned_leading_comment`). `tsv_svelte` uses it for a *non-owned* leading
+/// comment in a directive-value gap (`bind:value={/* c⏎*/ (a > b)}`): a discarded
+/// grouping `(` leaves the comment positional rather than owned, so the gap emits it —
+/// and a multi-line block there must force the same expansion the bare (owned)
+/// authoring takes, which the gap's plain source-span emitter cannot. `EmbedContext`
+/// is irrelevant to comment rendering, so it is not exposed (a default is used).
+pub fn build_comment_doc(
+    arena: &DocArena,
+    comment: &ast::Comment,
+    inputs: &PrinterInputs<'_>,
+) -> DocId {
+    let printer = make_doc_printer(arena, inputs, EmbedContext::default());
+    printer.build_comment_doc(comment)
 }
 
 /// Build a DocId for a function parameter list (`(…)`) with comments, in the caller's arena.
@@ -558,7 +629,7 @@ pub fn build_type_parameters_doc_with_comments(
 ///
 /// `line_breaks` must be the host document's whole-source newline table
 /// (spans are absolute, so a table built from an island slice is wrong);
-/// `comments`/`interner` stay island-local, taken from `program`.
+/// `comments` stay island-local (taken from `program`).
 pub fn build_program_doc(
     arena: &DocArena,
     program: &Program<'_>,
@@ -568,9 +639,13 @@ pub fn build_program_doc(
 ) -> DocId {
     let inputs = PrinterInputs {
         source,
-        interner: Rc::clone(&program.interner),
-        comments: &program.comments,
+        comments: program.comments,
         line_breaks,
+        has_owned_comments: program.comments.iter().any(|c| c.owned_by_node),
+        has_format_ignore: program
+            .comments
+            .iter()
+            .any(|c| is_format_ignore_directive(c.content(source))),
     };
     let printer = make_doc_printer(arena, &inputs, embed);
     printer.build_program_doc(program)
@@ -580,6 +655,13 @@ pub fn build_program_doc(
 // mirrors Prettier's assignment layout selection and must apply the same
 // break-after-operator rules as our own assignment printer.
 pub use printer::{conditional_should_break_after_op, should_inline_logical_expression};
+
+/// Printer buffer-population sampling for `tsv_debug buffer_sizes`. Behind the
+/// `buffer_stats` feature (off in production builds).
+#[cfg(feature = "buffer_stats")]
+pub use printer::buffer_stats::{
+    BufferInlineCapacities, BufferStats, inline_capacities, set_buffer_stats, take_buffer_stats,
+};
 
 // Re-exports of types that appear in this crate's public function signatures
 // (`Program`, `Expression`, `TSTypeAnnotation`) or are named via the short
@@ -612,8 +694,8 @@ pub fn debug_token_stream(source: &str) -> String {
         match lexer.next_token() {
             Ok(token) => {
                 let _ = write!(out, "{:?} {}..{}", token.kind, token.start, token.end);
-                if let Some(decoded) = lexer.take_decoded() {
-                    let _ = write!(out, " decoded={:?}", &*decoded);
+                if let Some(decoded) = lexer.decoded_str() {
+                    let _ = write!(out, " decoded={decoded:?}");
                 }
                 out.push('\n');
                 if matches!(token.kind, TokenKind::Eof) {
@@ -627,4 +709,66 @@ pub fn debug_token_stream(source: &str) -> String {
         }
     }
     out
+}
+
+/// The **reserved** control-flow and declaration keywords the lexer recognizes —
+/// the 38 words that head a statement or declaration, as distinct from the
+/// type-name and literal keywords the lexer also lexes. Behind the `debug_lex`
+/// feature (off in production builds), like `debug_token_stream`.
+///
+/// This is the independent oracle for `tsv_debug`'s `SHAPE_KEYWORDS` drift guard.
+/// A shape key keeps a keyword verbatim but abstracts an ordinary identifier to
+/// `IDENT`, so `return⟨⟩` and `IDENT⟨⟩` name different bugs. A reserved word that
+/// is missing from `SHAPE_KEYWORDS` degrades to `IDENT` and silently merges its
+/// bug into the generic-identifier entry — a quiet failure nothing else notices.
+/// The guard test asserts every word returned here is present in that table.
+///
+/// The set is the lexer's full keyword table (52 words) minus the 14 that are
+/// *not* control-flow/declaration reserved words: the 4 literals
+/// (`true`/`false`/`null`/`undefined`), the 9 primitive type-name keywords
+/// (`number`/`string`/`boolean`/`any`/`never`/`unknown`/`object`/`symbol`/`bigint`),
+/// and `debugger`. `void` stays in the set — it is the `void` unary operator, not
+/// a type name.
+#[cfg(feature = "debug_lex")]
+pub fn reserved_words() -> &'static [&'static str] {
+    &[
+        "const",
+        "let",
+        "var",
+        "void",
+        "new",
+        "instanceof",
+        "in",
+        "return",
+        "if",
+        "else",
+        "for",
+        "while",
+        "do",
+        "switch",
+        "case",
+        "default",
+        "break",
+        "continue",
+        "try",
+        "catch",
+        "finally",
+        "throw",
+        "function",
+        "class",
+        "enum",
+        "typeof",
+        "delete",
+        "async",
+        "await",
+        "this",
+        "super",
+        "extends",
+        "export",
+        "import",
+        "from",
+        "as",
+        "satisfies",
+        "yield",
+    ]
 }

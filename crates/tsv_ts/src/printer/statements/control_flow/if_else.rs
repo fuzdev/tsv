@@ -133,24 +133,22 @@ impl<'a> Printer<'a> {
         } else if let Some(else_end) = else_end
             && self.has_comments_to_emit_between(else_end, alt_start)
         {
-            // Comments between `else` and body
-            let has_line = self.has_line_comments_between(else_end, alt_start);
+            // The `else`→body gap is a header→body gap like `try`'s or `do`'s, so it
+            // routes through the shared emitter: a comment trailing `else` stays
+            // trailing, one on its own line keeps its own line, and a `//` forces the
+            // body down. Emitting the run inline relocated an own-line comment up onto
+            // the `else` line (`} else // c`) — the same defect the `try` family had.
+            // Prettier preserves here, so it is a clean oracle rather than a stance.
             let is_non_block_non_if = !matches!(
                 alternate,
                 Statement::BlockStatement(_) | Statement::IfStatement(_)
             );
             parts.push(d.text(" else"));
-            parts.push(self.build_inline_comments_between_doc(else_end, alt_start));
-            if has_line && is_non_block_non_if {
-                // Line comment + non-block body: comment stays on else line, body indented
-                // } else // c\n\texpr;
+            if is_non_block_non_if {
                 let body_doc = self.build_statement_doc(alternate, false);
-                parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
-            } else if has_line {
-                parts.push(d.hardline());
-                self.append_else_body_doc(parts, alternate);
+                self.push_indented_else_to_body_gap(parts, else_end, alt_start, body_doc);
             } else {
-                parts.push(d.text(" "));
+                self.push_header_to_body_gap(parts, else_end, alt_start);
                 self.append_else_body_doc(parts, alternate);
             }
         } else {
@@ -172,7 +170,11 @@ impl<'a> Printer<'a> {
                 i = new_i.min(end);
                 continue;
             }
-            if bytes[i] == b'e' && &self.source[i..i + "else".len()] == "else" {
+            // `str::get` (not `source[i..i + 4]`): `bytes[i] == b'e'` proves `i` is a char
+            // boundary, but `i + "else".len()` is not — an `e` followed within 3 bytes by a
+            // multibyte char lands the slice end mid-codepoint and panics. `get` returns
+            // `None` there, so a doomed scan over minted multibyte text simply finds no `else`.
+            if bytes[i] == b'e' && self.source.get(i..i + "else".len()) == Some("else") {
                 return Some((i + "else".len()) as u32);
             }
             i += 1;
@@ -327,19 +329,19 @@ impl<'a> Printer<'a> {
 
             if self.has_comments_to_emit_between(paren_end, body_start) {
                 let has_line = self.has_line_comments_between(paren_end, body_start);
-                let comment_doc =
-                    self.build_inline_comments_between_doc_no_leading_space(paren_end, body_start);
                 parts.push(d.text(")"));
                 if has_line {
                     // Line comment forces break: if (cond)\n\t// comment\n\tbody;
-                    parts.push(d.indent(d.concat(&[
-                        d.hardline(),
-                        comment_doc,
-                        d.hardline(),
+                    self.push_indented_header_to_body_gap(
+                        &mut parts,
+                        paren_end,
+                        body_start,
                         consequent_doc,
-                    ])));
+                    );
                 } else {
                     // Block comment stays inline: if (cond) /* c */ body;
+                    let comment_doc = self
+                        .build_inline_comments_between_doc_no_leading_space(paren_end, body_start);
                     parts.push(d.text(" "));
                     parts.push(comment_doc);
                     parts.push(d.text(" "));
@@ -365,37 +367,12 @@ impl<'a> Printer<'a> {
 
             // Comments between } and "else"
             let before_else_end = else_start.unwrap_or(alternate_start);
-            if self.has_comments_to_emit_between(consequent_end, before_else_end) {
-                let (inline_prev, own_line, inline_next) =
-                    self.partition_comments_by_line(consequent_end, before_else_end);
-
-                // Merge inline_next (comments on same line as `else`) into own_line
-                // so they're emitted before the `else` keyword rather than dropped.
-                // e.g. `} \n /* b */ else {` → `}\n/* b */\nelse {`
-                let mut all_own_line = own_line;
-                all_own_line.extend(inline_next);
-
-                self.build_comments_between_parts(
-                    &mut parts,
-                    &inline_prev,
-                    &all_own_line,
-                    consequent_end,
-                );
-
-                let has_inline_line_comment = inline_prev.iter().any(|c| !c.is_block);
-                let is_block_consequent = matches!(stmt.consequent, Statement::BlockStatement(_));
-                if is_block_consequent && all_own_line.is_empty() && !has_inline_line_comment {
-                    parts.push(d.text(" "));
-                } else {
-                    parts.push(d.hardline());
-                }
-            } else if matches!(stmt.consequent, Statement::BlockStatement(_)) {
-                // Block body: `} else` on same line
-                parts.push(d.text(" "));
-            } else {
-                // Empty statement or non-block body: `else` on new line
-                parts.push(d.hardline());
-            }
+            self.push_block_to_keyword_gap(
+                &mut parts,
+                consequent_end,
+                before_else_end,
+                matches!(stmt.consequent, Statement::BlockStatement(_)),
+            );
 
             // Comments between "else" and alternate body
             if matches!(alternate, Statement::EmptyStatement(_)) {
@@ -420,23 +397,24 @@ impl<'a> Printer<'a> {
             } else if let Some(else_e) = else_end
                 && self.has_comments_to_emit_between(else_e, alternate_start)
             {
-                let has_line = self.has_line_comments_between(else_e, alternate_start);
+                // The `else`→body gap — see the twin in `build_head_body_else_clause`.
+                // The two `if` paths differ only in the `}`→`else` gap that selects
+                // them, so this gap must answer identically in both.
                 let is_non_block_non_if = !matches!(
                     alternate,
                     Statement::BlockStatement(_) | Statement::IfStatement(_)
                 );
                 parts.push(d.text("else"));
-                parts.push(self.build_inline_comments_between_doc(else_e, alternate_start));
-                if has_line && is_non_block_non_if {
-                    // Line comment + non-block body: comment stays on else line, body indented
-                    // else // c\n\texpr;
+                if is_non_block_non_if {
                     let body_doc = self.build_statement_doc(alternate, false);
-                    parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
-                } else if has_line {
-                    parts.push(d.hardline());
-                    self.append_else_body_doc(&mut parts, alternate);
+                    self.push_indented_else_to_body_gap(
+                        &mut parts,
+                        else_e,
+                        alternate_start,
+                        body_doc,
+                    );
                 } else {
-                    parts.push(d.text(" "));
+                    self.push_header_to_body_gap(&mut parts, else_e, alternate_start);
                     self.append_else_body_doc(&mut parts, alternate);
                 }
             } else {
@@ -445,5 +423,38 @@ impl<'a> Printer<'a> {
         }
 
         d.concat(&parts)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::PrinterInputs;
+    use tsv_lang::EmbedContext;
+    use tsv_lang::doc::arena::DocArena;
+
+    /// A synthetic if/else region (as `tsv_svelte_compile` mints) can bracket arbitrary
+    /// multibyte template text. Here an `e` byte is immediately followed by a multibyte
+    /// char whose bytes straddle `i + "else".len()`, so an unchecked `source[i..i + 4]`
+    /// slice would panic on a non-char-boundary. The `str::get` form must instead find no
+    /// `else` and return `None` without panicking (prod WASM is `panic = "abort"`).
+    #[test]
+    fn find_else_keyword_end_between_multibyte_is_panic_free() {
+        // bytes: `e`, `x`, then the 3-byte em-dash `—` at 2,3,4 — so index 4 (the slice
+        // end for an `e` at index 0) falls inside the em-dash.
+        let source = "ex—";
+        let arena = DocArena::new();
+        let inputs = PrinterInputs {
+            source,
+            comments: &[],
+            line_breaks: &[],
+            has_owned_comments: false,
+            has_format_ignore: false,
+        };
+        let printer = Printer::with_context(&arena, &inputs, EmbedContext::default(), 0);
+        assert_eq!(
+            printer.find_else_keyword_end_between(0, source.len() as u32),
+            None
+        );
     }
 }

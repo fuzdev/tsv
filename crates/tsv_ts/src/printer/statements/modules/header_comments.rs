@@ -42,18 +42,16 @@ pub(super) fn is_only_whitespace_and_comments(text: &str) -> bool {
 
 impl<'a> Printer<'a> {
     /// Emit the ` as <binding>` tail of a namespace binding (`* as ns`), starting
-    /// just past the `*`. Preserves a comment in the `*`→`as` gap and the `as`→binding
-    /// gap in place. `star_end` is the position just past `*`; `binding` is the
+    /// just past the `*`. `star_end` is the position just past `*`; `binding` is the
     /// namespace name (`exported` for a re-export — which may be a string,
     /// `export * as 'str' from` — or `local` for an import, always an identifier).
     ///
-    /// Both gaps route through the shared header-gap helper, so a *line* comment in
-    /// either indents its continuation one level and a block comment trails inline.
-    /// In the `*`→`as` gap that matches prettier's freedom (it relocates the comment
-    /// after `as`). In the `as`→binding gap it is a deliberate indent-only divergence:
-    /// prettier keeps the comment in place but flattens the binding (`* as // c\nns`),
-    /// while tsv indents it for uniformity with the sibling gaps — and the forced
-    /// hardline also avoids pulling the binding onto the comment line. See
+    /// Delegates to the shared [`Self::build_as_binding_continuation`]: a *line*
+    /// comment in the `*`→`as` gap or the `as`→binding gap stays in place and indents
+    /// its continuation one level, and a block comment trails inline. In the `*`→`as`
+    /// gap that matches prettier's freedom (it relocates the comment after `as`); in
+    /// the `as`→binding gap it is a deliberate indent-only divergence (prettier keeps
+    /// the comment in place but flattens the binding, `* as // c\nns`). See
     /// conformance_prettier.md §Comment relocation.
     pub(super) fn append_namespace_as_binding(
         &self,
@@ -61,11 +59,30 @@ impl<'a> Printer<'a> {
         star_end: u32,
         binding: &internal::ModuleExportName<'_>,
     ) {
+        parts.push(self.build_as_binding_continuation(star_end, binding));
+    }
+
+    /// Build the ` as <binding>` continuation shared by the namespace `*`→`as` binding
+    /// ([`Self::append_namespace_as_binding`]) and the renamed named-specifier `a as b`
+    /// rename ([`Self::build_renamed_specifier_doc`]) — the two differ only in what
+    /// precedes `as` (a `*`, or the `imported`/`local` name), so both route their
+    /// `as`-gap comments here. Starting just past `left_end`, locate `as`, then build
+    /// ` as ` + the `as`→binding gap continuation: a *line* comment in the `left`→`as`
+    /// gap or the `as`→binding gap stays where the author wrote it and drops its tail
+    /// one indent level (so a `//` can't swallow the `as` or the binding), while a block
+    /// comment trails inline. Both gaps route through the same preserve-in-place
+    /// header-gap helpers the rest of the module header uses. See conformance_prettier.md
+    /// §Uniform Forced-Continuation Indent and §Comment relocation.
+    pub(super) fn build_as_binding_continuation(
+        &self,
+        left_end: u32,
+        binding: &internal::ModuleExportName<'_>,
+    ) -> DocId {
         let d = self.d();
         let binding_start = binding.span().start;
-        let as_pos = self.find_keyword_in_range(star_end, binding_start, "as");
-        // `as` + the `as`→binding gap (line comment indents the binding, block trails
-        // inline) + the binding name. The `as ` token supplies the leading space.
+        let as_pos = self.find_keyword_in_range(left_end, binding_start, "as");
+        // `as ` + the `as`→binding gap (line comment indents the binding, block trails
+        // inline) + the binding name. The `as ` token supplies the trailing space.
         let as_end = as_pos.map_or(binding_start, |p| p + "as".len() as u32);
         let as_clause = d.concat(&[
             d.text("as "),
@@ -75,20 +92,23 @@ impl<'a> Printer<'a> {
                 self.build_module_export_name_doc(binding),
             ),
         ]);
-        // `*`→`as` gap, preserved in place; the leading space comes from the helper
-        // (the preceding `*` has no trailing space).
+        // `left`→`as` gap, preserved in place; the leading space comes from the helper
+        // (the preceding `*`/name has no trailing space).
         let gap_end = as_pos.unwrap_or(binding_start);
-        parts.push(self.gap_comment_indented_continuation(star_end, gap_end, as_clause));
+        self.gap_comment_indented_continuation(left_end, gap_end, as_clause)
     }
 
     /// The comment-and-continuation tail of a preserved header gap, *without* a
     /// leading space — for callers whose preceding token already ends in a space
     /// (`import `, `export `, `type `). A *line* comment in `[start, end)` ends
     /// with a hardline, so the continuation is wrapped in `indent` to read as a
-    /// statement continuation rather than a second statement; a block comment
-    /// trails inline (` /* c */ `); an empty range yields the continuation
-    /// unchanged. The forced hardline is the only thing the `indent` shifts —
-    /// the comment itself stays on the preceding token's line.
+    /// statement continuation rather than a second statement; a *multiline* block
+    /// keeps the author's layout; a *single-line* block trails inline
+    /// (` /* c */ `) from **any** authored position — glued, trailing the head, or
+    /// on its own line — because nothing forces it off the line, so the author's
+    /// break is ordinary layout and is reflowed. An empty range yields the
+    /// continuation unchanged. The forced hardline is the only thing the `indent`
+    /// shifts — the comment itself stays on the preceding token's line.
     ///
     /// Used for the keyword→`{`, `type`→`{`, keyword→`type`, `*`→`as`, and
     /// keyword→empty-`{}` header gaps (whose continuation rides the space already
@@ -101,12 +121,41 @@ impl<'a> Printer<'a> {
         continuation: DocId,
     ) -> DocId {
         let d = self.d();
-        match self.build_rhs_comments_opt(start, end) {
-            // Line comment: it ends with a hardline, so indent the continuation.
-            Some(c) if self.has_line_comments_between(start, end) => {
-                d.indent(d.concat(&[c, continuation]))
-            }
-            // Block comment: trails inline (its own trailing space), no break.
+        // Line comment: it ends with a hardline, so indent the continuation.
+        if self.has_line_comments_between(start, end) {
+            return match self.build_rhs_comments_opt(start, end) {
+                Some(c) => d.indent(d.concat(&[c, continuation])),
+                None => continuation,
+            };
+        }
+        // A multiline block breaks here rather than staying inline — this gap's
+        // deliberate difference from its `build_keyword_to_name_continuation` twin.
+        // The author broke after it and reflowing would swallow the `*/` line into
+        // the header, so the break is forced; the continuation is therefore indented
+        // one level, exactly as the line-comment branch above does and as every value
+        // gap does for a multiline block (`const x =⏎\t/* x⏎y */⏎\t1;`). See
+        // conformance_prettier.md §Uniform Forced-Continuation Indent. The comment's
+        // own interior lines stay flush — a comment body is never re-indented.
+        if self.has_multiline_block_comments_on_page_between(start, end) {
+            return match self.build_rhs_comments_opt(start, end) {
+                Some(c) => d.indent(d.concat(&[c, continuation])),
+                None => continuation,
+            };
+        }
+        // A single-line block, in ANY authored position — glued, trailing the head,
+        // or on its own line. Nothing forces it off the line, so it trails inline and
+        // the author's break is reflowed: the shared keyword→value rule
+        // (`comment_hangs_next`), which a module header gap follows like its
+        // `export default` / `export =` siblings. See conformance_prettier.md
+        // §Authored breaks in value position.
+        //
+        // ⚠️ Emitting this through `build_rhs_comments_opt` instead reads as the
+        // obvious code and is the bug it replaced: that builder picks each separator
+        // from the comment's AUTHORED position, so an own-line comment kept a
+        // hardline while the concat glued it to the head token. The result — comment
+        // pulled up, break kept — is the glued authoring, which reflows inline on the
+        // next pass, so the format was not idempotent on its own output.
+        match self.build_inline_comments_between_doc_trailing_space_opt(start, end) {
             Some(c) => d.concat(&[c, continuation]),
             None => continuation,
         }

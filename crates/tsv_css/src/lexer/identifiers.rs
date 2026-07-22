@@ -10,7 +10,7 @@ use tsv_lang::ParseError;
 /// excluded. Single source for the threshold shared by `is_identifier_start` and
 /// the continuation guard in `read_identifier`.
 #[inline]
-fn is_non_ascii_identifier_codepoint(ch: char) -> bool {
+pub(crate) fn is_non_ascii_identifier_codepoint(ch: char) -> bool {
     ch as u32 >= 0xA0
 }
 
@@ -73,12 +73,13 @@ pub(crate) fn is_ascii_identifier_start(b: u8) -> bool {
 /// Returns the token plus the **decoded value only when an escape was present**:
 /// the common no-escape identifier returns `None` (no allocation — its text is the
 /// verbatim source slice `source[start..end]`). The decoded buffer is materialized
-/// lazily from the verbatim run scanned so far the first time a `\` escape is seen.
-#[allow(clippy::box_collection)]
+/// lazily from the verbatim run scanned so far the first time a `\` escape is seen;
+/// the caller ([`Lexer::read_identifier`]) funnels it into the lexer's reused
+/// `decode_scratch`, so this owned `String` is the only allocation on the escape path.
 pub(crate) fn read_identifier(
     source: &str,
     pos: &mut usize,
-) -> Result<(Token, Option<Box<String>>), Box<ParseError>> {
+) -> Result<(Token, Option<String>), Box<ParseError>> {
     let start = *pos;
     // `None` until an escape forces a decoded buffer; then materialized from the
     // verbatim run `source[start..pos]` scanned so far and appended to per escape.
@@ -186,7 +187,7 @@ pub(crate) fn read_identifier(
         start: start as u32,
         end: *pos as u32,
     };
-    Ok((token, decoded.map(Box::new)))
+    Ok((token, decoded))
 }
 
 /// Decode a CSS unicode escape sequence: \XXXXXX (1-6 hex digits)
@@ -202,35 +203,54 @@ pub(crate) fn decode_unicode_escape(
     let start = *pos;
     *pos += 1; // skip \
 
-    let mut hex_str = String::new();
-
-    // Read 1-6 hex digits
+    // Read 1-6 hex digits, accumulating their value directly into a `u32` — no
+    // intermediate `String` + `from_str_radix` allocation. Six hex digits max
+    // (0xFFFFFF), so `code_point` never overflows. A hex digit is always one ASCII
+    // byte, so advancing by one byte per digit matches `ch.len_utf8()` exactly.
+    let mut code_point: u32 = 0;
+    let mut digits: usize = 0;
     for _ in 0..6 {
-        match source[*pos..].chars().next() {
-            Some(ch) if ch.is_ascii_hexdigit() => {
-                hex_str.push(ch);
-                *pos += ch.len_utf8();
-            }
-            _ => break,
-        }
+        let Some(ch) = source[*pos..].chars().next() else {
+            break;
+        };
+        let Some(d) = ch.to_digit(16) else {
+            break;
+        };
+        code_point = code_point * 16 + d;
+        *pos += 1;
+        digits += 1;
     }
 
-    if hex_str.is_empty() {
+    if digits == 0 {
         return Err(lex_err("Invalid unicode escape sequence", start));
     }
 
-    // Skip optional whitespace after unicode escape
+    // Skip the hex escape's optional whitespace terminator.
+    //
+    // **Unicode-wide, deliberately** — and NOT `whitespace::is_css_whitespace`. The oracle
+    // for the LEXER is Svelte's `parseCss`, whose `read_identifier` matches the terminator
+    // with `/\\[0-9a-fA-F]{1,6}(\r\n|\s)?/` (`1-parse/read/style.js`), and JS `\s` is the
+    // Unicode `White_Space` set — so a VT (U+000B) or NBSP after a hex escape terminates it
+    // there. `char::is_whitespace` is exactly that set; ASCII-only would leave the VT and
+    // NBSP inside the identifier, moving the **token boundary** and re-parsing
+    // `.a\41<VT>b` as `aA` + descendant + `b` (and over-rejecting `[a=b\41<VT>c]`).
+    //
+    // This is a different rule from `escapes::escape_len`, and deliberately so: that one is
+    // a *printer-side value scanner* whose job is "how far does this escape reach when I
+    // rewrite a value", answering to css-syntax-3; this one is *tokenization*, answering to
+    // `parseCss`, and its boundaries become wire spans the AST oracle compares. The rest of
+    // this lexer is Unicode-wide for the same reason (`skip_whitespace`, `consume_url_token`),
+    // as is the wire writer's `raw_selector_name`.
     if let Some(ch) = source[*pos..].chars().next()
         && ch.is_whitespace()
     {
         *pos += ch.len_utf8();
     }
 
-    // The 1–6 hex digits always fit a u32. Per CSS Syntax 3 §4.3.7, zero / a surrogate /
-    // an above-maximum code point decodes to U+FFFD REPLACEMENT CHARACTER rather than being
-    // a parse error: `char::from_u32` already returns `None` for the surrogate / above-maximum
-    // cases, and zero is a valid `char` (NUL) so it needs the explicit guard.
-    let code_point = u32::from_str_radix(&hex_str, 16).unwrap_or(0xFFFD);
+    // Per CSS Syntax 3 §4.3.7, zero / a surrogate / an above-maximum code point decodes to
+    // U+FFFD REPLACEMENT CHARACTER rather than being a parse error: `char::from_u32` already
+    // returns `None` for the surrogate / above-maximum cases, and zero is a valid `char`
+    // (NUL) so it needs the explicit guard.
     let decoded = if code_point == 0 {
         '\u{FFFD}'
     } else {

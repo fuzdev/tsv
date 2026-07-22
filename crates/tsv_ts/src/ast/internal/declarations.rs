@@ -96,6 +96,15 @@ pub enum TSEnumMemberId<'arena> {
     String(Literal<'arena>),
 }
 
+impl<'arena> TSEnumMemberId<'arena> {
+    pub fn span(&self) -> Span {
+        match self {
+            TSEnumMemberId::Identifier(id) => id.span,
+            TSEnumMemberId::String(lit) => lit.span,
+        }
+    }
+}
+
 /// TypeScript module/namespace declaration: `namespace Utils { ... }` or `module Utils { ... }`
 ///
 /// The `module` keyword is the older syntax, while `namespace` is the modern syntax.
@@ -124,6 +133,15 @@ pub enum TSModuleName<'arena> {
     Identifier(Identifier<'arena>),
     /// String literal for ambient modules: `declare module 'name' { }`
     Literal(Literal<'arena>),
+}
+
+impl<'arena> TSModuleName<'arena> {
+    pub fn span(&self) -> Span {
+        match self {
+            TSModuleName::Identifier(id) => id.span,
+            TSModuleName::Literal(lit) => lit.span,
+        }
+    }
 }
 
 /// The keyword used in a module/namespace declaration

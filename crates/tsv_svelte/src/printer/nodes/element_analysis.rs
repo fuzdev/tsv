@@ -13,25 +13,46 @@ use tsv_ts::ast::internal::Expression;
 
 use super::element_doc::{BoundaryMode, ElementContext, ElementKind, ElementLayout, ElementParts};
 
+/// Whether each edge of an element's content is newline-authored.
+///
+/// Two INDEPENDENT facts, both from the one boundary-authoring question
+/// ([`Printer::nodes_boundary_newline`]). They are kept apart because the layout
+/// rules read them differently — a block expands on the leading edge alone, while
+/// components and inline elements are both-or-neither ([`Self::both`]) — and
+/// folding them into a single "does it break" flag hides which rule is in play.
+#[derive(Clone, Copy)]
+struct BoundaryBreaks {
+    /// Source has a newline in the run at the opening boundary
+    leading: bool,
+    /// Source has a newline in the run at the closing boundary
+    trailing: bool,
+}
+
+impl BoundaryBreaks {
+    /// Both edges newline-authored — the both-or-neither expansion signal.
+    ///
+    /// A lone leading break is not an expansion signal on its own: it used to
+    /// harden the opening tag while leaving the children built inline, producing
+    /// a third stable form. See [`Printer::compute_element_layout`].
+    fn both(self) -> bool {
+        self.leading && self.trailing
+    }
+}
+
 /// Inputs to the [`Printer::compute_needs_multiline`] decision.
 ///
 /// Bundles the per-element flags the predicate reads so they pass by name
 /// rather than as positional bools that are easy to misorder at the call site.
 /// Mirrors the corresponding [`ElementContext`] fields — both are built from
 /// the same locals.
-#[allow(clippy::struct_excessive_bools)]
 #[derive(Clone, Copy)]
 struct MultilineInputs {
     /// Element type classification
     kind: ElementKind,
     /// Whether element has no meaningful content
     is_empty: bool,
-    /// Whether content should hug the closing tag
-    hug_end: bool,
-    /// Whether source has newline at opening boundary
-    source_has_leading_break: bool,
-    /// Whether source has newline at closing boundary
-    source_has_trailing_break: bool,
+    /// Whether each content boundary is newline-authored
+    boundary: BoundaryBreaks,
     /// Whether block-flow children force this element multiline (cached, mirrors
     /// [`ElementContext::block_flow_multiline`])
     block_flow_multiline: bool,
@@ -105,7 +126,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether any direct child expression tag (`{expr}`) can break internally
-    /// (ternary, binary, call, …). Mirrors the hug-both wrapper's hard-width
+    /// (ternary, binary, call, …). Mirrors the collapsible wrapper's hard-width
     /// divergence: when true, the children builder must keep those expression
     /// groups breakable, so boundary text adjacent to them is emitted as plain
     /// spaces rather than `fill` `line`s — otherwise a `line` in fits()-Break
@@ -137,22 +158,23 @@ impl<'a> Printer<'a> {
 
     /// Check if element content has source breaks (newlines) that should trigger multiline.
     ///
+    /// Only reached for content with a non-text child — the caller
+    /// (`compute_needs_multiline`) skips it for text-only content, where newlines are word
+    /// separators and width alone decides layout (`<p>\ntext\n</p>` glues when it fits).
+    ///
     /// The logic differs by element type:
-    /// - **Blocks**: Leading boundary break triggers multiline (preserves `<p>\ntext\n</p>`)
+    /// - **Blocks**: Leading boundary break triggers multiline (preserves `<div>\n<span>x</span>\n</div>`)
     /// - **Components**: Require BOTH leading AND trailing break (expressions hug when only leading)
     /// - **Inline**: Exclude boundary whitespace newlines (they normalize to spaces)
     fn has_source_breaks_in_content(
         &self,
         nodes: &[FragmentNode<'_>],
         kind: ElementKind,
-        source_has_leading_break: bool,
-        source_has_trailing_break: bool,
+        boundary: BoundaryBreaks,
     ) -> bool {
         // Blocks: leading break alone triggers multiline
         // Components: require both boundaries
-        if (kind.is_block() && source_has_leading_break)
-            || (kind.is_component() && source_has_leading_break && source_has_trailing_break)
-        {
+        if (kind.is_block() && boundary.leading) || (kind.is_component() && boundary.both()) {
             return true;
         }
 
@@ -166,22 +188,25 @@ impl<'a> Printer<'a> {
             return false;
         };
 
-        // Inline elements: preserve multiline when content starts with newline AND ends
-        // with any whitespace (space, tab, or newline), and has non-text children.
+        // Inline elements: preserve multiline only when BOTH boundaries are newline-authored
+        // (both-or-neither, same as components) and there are non-text children.
         // `<a>\n\t{expr}\n</a>` preserves (leading newline + trailing newline).
-        // `<a>\n\t{expr} </a>` preserves (leading newline + trailing space).
-        // `<a>\n\t{expr}</a>` collapses (leading newline but no trailing whitespace).
-        // `<a>\n  text<span>text</span></a>` collapses (no trailing whitespace).
-        // `<span>  \n  {expr}</span>` collapses (space before \n, not leading).
+        // `<a>\n\t{expr} </a>` collapses (trailing space is render-free — not a second break).
+        // `<a>\n\t{expr}</a>` collapses (leading newline but no trailing break).
+        // `<a>\n  text<span>text</span></a>` collapses (no trailing break).
+        // `<span>  \n  {expr}</span>` collapses — but because it has no TRAILING break, not
+        // because of the leading spaces: both boundaries route through the same run predicate.
         // Fill mode (`{a} {b}`) stays inline even with both breaks.
-        let first_text_starts_with_newline = nodes
-            .first()
-            .is_some_and(|n| matches!(n, FragmentNode::Text(t) if t.raw(source).starts_with('\n')));
-        let last_text_ends_with_whitespace = nodes.last().is_some_and(
-            |n| matches!(n, FragmentNode::Text(t) if t.raw(source).ends_with(|c: char| c.is_ascii_whitespace())),
-        );
-
-        if first_text_starts_with_newline && last_text_ends_with_whitespace {
+        //
+        // Both edges come from `nodes_boundary_newline` — the single boundary-authoring
+        // question. It is a RUN predicate (does the edge whitespace run contain a newline?),
+        // so horizontal whitespace before the newline is not authoring:
+        // `<span>␣␣\n␣␣{x}\n</span>` and its mirror `<span>\n{x}␣␣\n␣␣</span>` are the same
+        // document and must reach one form. A strict `starts_with('\n')` on the leading edge
+        // alone made them settle on two, which is also what prettier's own run-based
+        // `startsWithLinebreak`/`endsWithLinebreak` (`^([\t\f\r ]*\n)` / `(\n[\t\f\r ]*)$`)
+        // rules out. Pinned by `elements/boundary_newline_padded`.
+        if boundary.both() {
             let has_nontext_content = nodes[first..=last]
                 .iter()
                 .any(|n| !matches!(n, FragmentNode::Text(_)));
@@ -241,7 +266,6 @@ impl<'a> Printer<'a> {
         let ElementParts {
             kind,
             can_self_close,
-            attributes,
             nodes,
             span,
             ..
@@ -254,23 +278,24 @@ impl<'a> Printer<'a> {
         // Check if empty
         let is_empty = nodes.is_empty() || nodes.iter().all(FragmentNode::is_whitespace_only_text);
 
-        // Source boundary breaks
-        let source_has_leading_break = nodes.first().is_some_and(FragmentNode::is_boundary_break);
-        let source_has_trailing_break =
-            source_has_leading_break && nodes.last().is_some_and(FragmentNode::is_boundary_break);
-
-        // Hug modes
-        let hug_start = self.should_hug_start(nodes, kind.is_block());
-        let hug_end = self.should_hug_end(nodes, kind.is_block());
+        // Source boundary breaks — the same run predicate every other boundary question uses
+        // (`nodes_boundary_newline`), not the stricter whitespace-only-node test. The two agree
+        // wherever it matters (verified byte-identical over the fixture suite and 1200 real
+        // components), and one question wants one predicate. Each edge is asked on its own;
+        // the both-or-neither rules combine them via `BoundaryBreaks::both`.
+        let boundary = BoundaryBreaks {
+            leading: self.nodes_boundary_newline(nodes, true),
+            trailing: self.nodes_boundary_newline(nodes, false),
+        };
 
         // Block flow children → whether they force multiline. Computed once here (a non-trivial
-        // traversal) and cached, since `will_go_multiline`, `compute_needs_multiline`, and the
-        // hug-both `force` all read exactly this combination.
+        // traversal) and cached, since `will_go_multiline` and `compute_needs_multiline` both
+        // read exactly this combination.
         let has_block_flow_children = nodes.iter().any(super::helpers::is_control_flow_block);
         let block_flow_multiline =
             has_block_flow_children && self.block_flow_forces_multiline(nodes);
 
-        // Any attribute doc that will_break (forces attr group break + trim_boundaries)
+        // Any attribute doc that will_break (forces attr group break)
         let has_multiline_attr = attr_docs.iter().any(|&doc| self.d().will_break(doc));
 
         // Check if all content children are text nodes (no elements, expressions, blocks)
@@ -283,29 +308,17 @@ impl<'a> Printer<'a> {
             MultilineInputs {
                 kind,
                 is_empty,
-                hug_end,
-                source_has_leading_break,
-                source_has_trailing_break,
+                boundary,
                 block_flow_multiline,
                 only_text_content,
             },
         );
 
-        // Compute trim_boundaries
-        let will_go_multiline = attributes.len() > 1
-            || block_flow_multiline
-            || super::helpers::has_nested_block_flow(nodes)
-            || has_multiline_attr;
-        let trim_boundaries = !kind.is_inline() || will_go_multiline;
-
         ElementContext {
             is_self_closing,
             is_empty,
-            hug_both: hug_start && hug_end,
             needs_multiline,
-            trim_boundaries,
             has_multiline_attr,
-            only_text_content,
         }
     }
 
@@ -314,9 +327,7 @@ impl<'a> Printer<'a> {
         let MultilineInputs {
             kind,
             is_empty,
-            hug_end,
-            source_has_leading_break,
-            source_has_trailing_break,
+            boundary,
             block_flow_multiline,
             only_text_content,
         } = inputs;
@@ -357,32 +368,13 @@ impl<'a> Printer<'a> {
         // Skip for block elements with text-only content — whitespace newlines between
         // text words collapse to spaces, so the group mechanism should decide layout
         // based on whether the joined text fits inline.
-        if !only_text_content
-            && self.has_source_breaks_in_content(
-                nodes,
-                kind,
-                source_has_leading_break,
-                source_has_trailing_break,
-            )
-        {
-            return true;
-        }
-
-        // Expression splitting forces an element multiline when authored with a leading break,
-        // a non-hugged trailing boundary, and 2+ spaced `{expr}` siblings — a multiline-*entry*
-        // trigger (distinct from sibling separation, which `build_nodes_doc_multiline` handles).
-        // Load-bearing for the component case (`components/multi_expressions_multiline`): without
-        // it such a `<Comp>` would stay inline. The only remaining use of
-        // `should_split_expressions_in_nodes` now that the sibling-break caller is retired.
-        let should_split = self.should_split_expressions_in_nodes(nodes);
-        let has_trailing_ws = !hug_end;
-        if source_has_leading_break && has_trailing_ws && should_split {
+        if !only_text_content && self.has_source_breaks_in_content(nodes, kind, boundary) {
             return true;
         }
 
         // Elements with expanding blocks (if/each/key, or those inside await) always expand to
         // block-style multiline — inline elements too, not just block. The expanding block forces
-        // block-style layout in `build_hug_both_doc` regardless; matching `needs_multiline` here so
+        // block-style layout in `build_collapsible_element_doc` regardless; matching `needs_multiline` here so
         // the children are *built* multiline (one node per line) keeps the expanding block from
         // overshooting printWidth when authored compactly (it would otherwise flow inline).
         // Note: await blocks alone do NOT force expansion.
@@ -404,7 +396,7 @@ impl<'a> Printer<'a> {
 
         // Text with internal newlines
         // Skip for text-only content — newlines between words are just whitespace
-        if !only_text_content && self.text_has_internal_newlines(nodes, source_has_leading_break) {
+        if !only_text_content && self.text_has_internal_newlines(nodes, boundary.leading) {
             return true;
         }
 
@@ -480,33 +472,29 @@ impl<'a> Printer<'a> {
             return ElementLayout::Empty;
         }
 
-        // Determine boundary modes.
+        // Determine the boundary mode.
         //
         // Content that goes multiline lays out block-style — both tags intact, content on its own
         // indented lines — never with a dangled delimiter. Content-boundary whitespace is
         // render-free under Svelte 5 (start/end-of-tag whitespace is removed at compile), so it
         // must not decide that layout; if it did, the render-identical authorings of one document
-        // would each settle on a different stable form. Two rules follow:
+        // would each settle on a different stable form.
         //
-        // 1. Both boundaries move together. Hugging is all-or-nothing (`hug_both`): a ONE-SIDED
-        //    hug used to give prettier's dangle (`<tag⏎\t>content` / `content</tag⏎>`), so a lone
-        //    render-free boundary character selected the layout. A one-sided hug now falls through
-        //    to the same Soft boundaries as no hug at all, which break block-style. Output is
-        //    unchanged when the element fits inline (the Soft boundary reproduces the authored
-        //    space flat); only the broken form converges.
-        // 2. A boundary is Hard only when the content is multiline. A source break at just ONE
-        //    boundary is not an expansion signal on its own — the component rule is
-        //    both-or-neither (`has_source_breaks_in_content`), and a lone leading break used to
-        //    harden the opening while leaving the children built inline, producing a third stable
-        //    form (broken tags, children still flowing on one line).
+        // So the boundary run does not enter this decision at all: multiline-ness is the whole
+        // question. `Hard` is exactly the multiline case; every inline case is `Soft`, whose
+        // softlines reproduce the glued form flat and break block-style when the content doesn't
+        // fit. A glued authoring and a spaced one therefore build the identical doc — which is why
+        // there is no separate hug mode (the boundary run is trimmed either way), and why a source
+        // break at just ONE boundary is not an expansion signal on its own: the rule is
+        // both-or-neither (`has_source_breaks_in_content`). A lone leading break used to harden the
+        // opening while leaving the children built inline, producing a third stable form (broken
+        // tags, children still flowing on one line).
         //
         // `<pre>`/`<textarea>` are dispatched to `build_whitespace_sensitive_element_doc` before
         // any of this — there boundary whitespace IS render-significant and the dangle is
         // mandatory. See conformance_prettier.md §Svelte: Inline content block-style.
         let mode = if ctx.needs_multiline {
             BoundaryMode::Hard
-        } else if ctx.hug_both {
-            BoundaryMode::Hug
         } else {
             BoundaryMode::Soft
         };

@@ -32,10 +32,9 @@ mod test_patterns;
 
 // Re-export items needed by other printer modules
 pub(crate) use arg_comments::{
-    PartitionedComments, emit_first_arg_leading_comments, has_blank_line_between_args,
-    has_inter_argument_comments_slice, has_trailing_comments_slice,
-    has_trailing_line_comments_slice, should_force_expansion_for_comments,
-    skip_stripped_open_paren,
+    PartitionedComments, emit_first_arg_leading_comments, has_inter_argument_comments_slice,
+    has_trailing_comments_slice, has_trailing_line_comments_slice,
+    should_force_expansion_for_comments, skip_stripped_open_paren,
 };
 pub(crate) use arg_wrapping::{
     build_args_joined_with_comments, build_args_split_last, build_arrow_call_body_states,
@@ -108,14 +107,10 @@ impl<'a> Printer<'a> {
                         | internal::Expression::ObjectExpression(_)
                 )
             });
-            let has_blank_lines_between_args = call.arguments.windows(2).any(|w| {
-                has_blank_line_between_args(
-                    self.source,
-                    self.line_breaks,
-                    w[0].span().end,
-                    w[1].span().start,
-                )
-            });
+            let has_blank_lines_between_args = call
+                .arguments
+                .windows(2)
+                .any(|w| self.is_next_line_empty(w[0].span().end, w[1].span().start));
             let paren_open = call.callee.span().end;
             // Whole-call comment-presence gate (one binary search over the argument
             // window); short-circuits the comment predicates below and threads into

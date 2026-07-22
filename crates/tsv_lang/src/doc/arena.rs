@@ -14,6 +14,7 @@
 //! - Bulk deallocation
 
 use std::cell::{Cell, RefCell};
+use std::collections::HashMap;
 
 use smallvec::SmallVec;
 
@@ -32,19 +33,27 @@ use super::types::{
     TEXT_WIDTH_NOT_COMPUTED,
 };
 
-/// Whether a line-flattening walk may delete a **hard** line.
+/// Which **prettier operation** a line-flattening walk is emulating.
 ///
-/// The two answers are two different operations wearing one walk — see
-/// [`DocArena::remove_lines`] (prettier's `removeLines`, [`Self::Keep`]) versus
-/// [`DocArena::flatten_all_lines`] (atomize, [`Self::Drop`]). Naming the axis is the point:
-/// dropping a hard line deletes a newline the content required, so it is only ever sound
-/// where the caller has proved none is required.
+/// Two different operations wear one walk, and every behavioral difference between them
+/// follows from this choice — so name the operation, not any one of its symptoms:
+///
+/// | | [`Self::RemoveLines`] | [`Self::Atomize`] |
+/// | --- | --- | --- |
+/// | emulates | `removeLines` (`document/utilities`) | `printDocToString` at `printWidth: Infinity` |
+/// | entry point | [`DocArena::remove_lines`] | [`DocArena::atomize`] |
+/// | hard / literal lines, `MultilineText` | kept (prettier's `!doc.hard` gate) | deleted |
+/// | `conditional_group` | states kept | collapsed to the least-expanded state |
+///
+/// The hard-line axis is the dangerous one: deleting a hard line does not relayout
+/// anything, it deletes a newline the content **required**, so [`Self::Atomize`] is only
+/// sound where the caller has proved none is required.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
-enum HardLines {
-    /// Leave hard/literal lines (and `MultilineText`) alone — prettier's `!doc.hard` gate.
-    Keep,
-    /// Delete them, fusing whatever sat on either side.
-    Drop,
+enum FlattenMode {
+    /// Prettier's `removeLines`: statically flatten breakable lines only.
+    RemoveLines,
+    /// Force onto one line at any width — what a re-render at infinite width would print.
+    Atomize,
 }
 
 /// Index into `DocArena.nodes`.
@@ -88,7 +97,7 @@ impl ChildRange {
 /// Stores children as `DocId` indices and child lists as `ChildRange` ranges.
 #[derive(Debug, Clone)]
 pub enum DocNode {
-    /// Text content to output (static, pooled, source-span, or symbol)
+    /// Text content to output (static, pooled, or source-span)
     Text(DocText),
 
     /// Multi-line text rendered with per-line context indent.
@@ -120,8 +129,19 @@ pub enum DocNode {
     /// Decrease indentation level
     Dedent(DocId),
 
-    /// Set absolute indentation level for nested content
-    Align { n: usize, contents: DocId },
+    /// Reset to an absolute whole-tab indentation level (the template-literal
+    /// root reset — Prettier's `dedentToRoot`; the only production use is level
+    /// `0`). Distinct from [`Align`](DocNode::Align), the sub-tab space offset.
+    AlignRoot { n: usize, contents: DocId },
+
+    /// Sub-tab alignment offset of `n` literal spaces — Prettier's numeric
+    /// `align(n, …)` (`document/builders/align.js`). Under `useTabs` this is
+    /// rendered as *spaces*, not a whole tab — so alignment stays tab-width
+    /// independent — and it rounds up to a whole tab only when a further
+    /// [`Indent`](DocNode::Indent) is stacked on top of it (Prettier's
+    /// `generateIndent` flush). Distinct from [`AlignRoot`](DocNode::AlignRoot),
+    /// which sets an absolute *tab* level.
+    Align { n: u32, contents: DocId },
 
     /// Try to fit content on one line; if doesn't fit, break ALL lines in group.
     ///
@@ -148,11 +168,7 @@ pub enum DocNode {
     },
 
     /// Conditionally indent based on whether a specific group broke
-    IndentIfBreak {
-        contents: DocId,
-        group_id: GroupId,
-        negate: bool,
-    },
+    IndentIfBreak { contents: DocId, group_id: GroupId },
 
     /// Sequence of docs - rendered one after another
     Concat(ChildRange),
@@ -189,7 +205,7 @@ const _: () = assert!(!std::mem::needs_drop::<DocNode>());
 // refuted repeatedly (a smaller node loses on this traversal-bound engine — the bumpalo lesson).
 // A variant that bloats it would silently regress that locality with no other signal, so pin the
 // size — a change here is a deliberate decision, not an accident. The size is pointer-width
-// dependent (the `Align { n: usize }` and `DocText::Static(&str)` fat-pointer payloads), so it is
+// dependent (the `AlignRoot { n: usize }` and `DocText::Static(&str)` fat-pointer payloads), so it is
 // pinned per target: 32 B on 64-bit (the native flagship) and 16 B on wasm32 (the shipped WASM
 // bundles, where the locality/allocator budget matters most).
 #[cfg(target_pointer_width = "64")]
@@ -197,15 +213,148 @@ const _: () = assert!(size_of::<DocNode>() == 32);
 #[cfg(target_pointer_width = "32")]
 const _: () = assert!(size_of::<DocNode>() == 16);
 
+/// The render-time indentation state of a command — Prettier's `Indent`
+/// (`document/printer/indent.js`) specialized to tsv's usage.
+///
+/// Under `useTabs`, a whole indent level is a tab, while a sub-tab `align(n)`
+/// offset is `n` literal spaces — so alignment stays tab-width independent (a
+/// closing delimiter sits under its opener at *any* tab width). The one subtlety
+/// Prettier's `generateIndent` encodes: an `align(n)` that has a further
+/// [`Indent`](DocNode::Indent) stacked on top of it rounds up to a whole tab
+/// (its spaces are discarded, one tab takes their place); only a *trailing*
+/// align run — the state at a line that ends the aligned region, i.e. a closing
+/// delimiter — renders as literal spaces. `pending_aligns` tracks that pending
+/// run so the round-up is exact.
+///
+/// All three fields are `u16` — real indent depth and align width never
+/// approach 65535, and saturating arithmetic makes the cap fail safe rather than
+/// wrap. This makes `RenderIndent` 6 bytes, shrinking `ArenaCommand` to 12 bytes
+/// (from 16 with the prior `usize` level) on the native target and holding it
+/// there on wasm32, so the hot `CmdStack` inline footprint does not grow.
+///
+/// The representation is fully encapsulated — the render emitter reads it through
+/// [`tabs`](RenderIndent::tabs) / [`trailing_align_spaces`](RenderIndent::trailing_align_spaces)
+/// / [`column`](RenderIndent::column), never the raw fields.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq)]
+pub struct RenderIndent {
+    /// Committed whole indent levels (each rendered as one tab).
+    tabs: u16,
+    /// Number of `align(n)` offsets in the current trailing run — the count of
+    /// tabs they collapse to when flushed by a following `indent`.
+    pending_aligns: u16,
+    /// Sum of the trailing run's `align(n)` widths, in columns — rendered as
+    /// literal spaces when the run is not flushed by a following `indent`.
+    align_spaces: u16,
+}
+
+impl RenderIndent {
+    /// A pure whole-tab indent at `level`, with no pending sub-tab alignment.
+    #[inline]
+    pub fn level(level: usize) -> Self {
+        Self {
+            tabs: level.min(u16::MAX as usize) as u16,
+            pending_aligns: 0,
+            align_spaces: 0,
+        }
+    }
+
+    /// Push one indent level (Prettier's `makeIndent`). Any pending align run is
+    /// flushed to whole tabs first — one tab per `align` in the run, its spaces
+    /// discarded — then this level adds its own tab.
+    #[inline]
+    pub(super) fn indented(self) -> Self {
+        Self {
+            tabs: self
+                .tabs
+                .saturating_add(self.pending_aligns)
+                .saturating_add(1),
+            pending_aligns: 0,
+            align_spaces: 0,
+        }
+    }
+
+    /// Pop one indent level, purely on whole tabs.
+    ///
+    /// tsv never dedents across a pending align run, so `pending_aligns` is
+    /// always 0 here and the debug assert is a tripwire, not a live branch. This
+    /// is **structural, not incidental**: [`Align`](DocNode::Align) offsets are
+    /// emitted only by the TS union/intersection member printers, [`Dedent`]
+    /// nodes only by the Svelte element printers, and embedded TS renders under a
+    /// fresh command context — so the two node kinds never share a render stack.
+    /// (A Prettier-faithful dedent would be `queue.slice(0, -1)`; while the
+    /// invariant holds, popping a whole tab is exactly that.)
+    ///
+    /// [`Dedent`]: DocNode::Dedent
+    #[inline]
+    pub(super) fn dedented(self) -> Self {
+        debug_assert_eq!(
+            self.pending_aligns, 0,
+            "dedent across a sub-tab align run is unsupported"
+        );
+        Self {
+            tabs: self.tabs.saturating_sub(1),
+            ..self
+        }
+    }
+
+    /// Add a sub-tab `align(n)` offset (Prettier's numeric `makeAlign`): extend
+    /// the trailing align run by `n` columns of spaces.
+    #[inline]
+    pub(super) fn aligned(self, n: u32) -> Self {
+        Self {
+            pending_aligns: self.pending_aligns.saturating_add(1),
+            align_spaces: self
+                .align_spaces
+                .saturating_add(n.min(u32::from(u16::MAX)) as u16),
+            ..self
+        }
+    }
+
+    /// Set an absolute whole-tab level (Prettier's `align` root reset — tsv's
+    /// [`AlignRoot`](DocNode::AlignRoot) node, used only as level 0 in template
+    /// literals), clearing any pending align run.
+    #[inline]
+    pub(super) fn reset_to_level(self, level: usize) -> Self {
+        Self::level(level)
+    }
+
+    /// Committed whole indent levels (each one tab wide).
+    #[inline]
+    pub fn tabs(self) -> usize {
+        self.tabs as usize
+    }
+
+    /// Visual column at the start of a line at this indent (tabs at `tab_width`
+    /// columns each, plus the trailing align spaces).
+    #[inline]
+    pub fn column(self, tab_width: usize) -> usize {
+        self.tabs as usize * tab_width + self.align_spaces as usize
+    }
+
+    /// The trailing sub-tab alignment, in literal spaces (written after the
+    /// whole tabs by the render indentation emitter).
+    #[inline]
+    pub fn trailing_align_spaces(self) -> usize {
+        self.align_spaces as usize
+    }
+}
+
 /// A command in the printer's command stack.
 ///
 /// Holds a `DocId` index, making it `Copy` with no lifetime parameter.
 #[derive(Debug, Clone, Copy)]
 pub struct ArenaCommand {
-    pub indent: usize,
+    pub indent: RenderIndent,
     pub mode: Mode,
     pub doc: DocId,
 }
+
+// The hot `CmdStack` (`SmallVec<[ArenaCommand; 8]>`) is spun up per render; its
+// inline footprint is `8 × size_of::<ArenaCommand>()`, so the per-command size is
+// load-bearing. All fields are fixed-width (no pointers), so the size is
+// target-independent — pin it at 12 bytes (a 96-byte inline stack), which the
+// all-`u16` [`RenderIndent`] holds to on both native and wasm32.
+const _: () = assert!(size_of::<ArenaCommand>() == 12);
 
 impl ArenaCommand {
     /// Create a command with the same context but a different doc.
@@ -214,31 +363,43 @@ impl ArenaCommand {
         Self { doc, ..*self }
     }
 
-    /// Create a command with incremented indent.
+    /// Create a command with one more indent level.
     #[inline]
     pub fn indented(&self, doc: DocId) -> Self {
         Self {
-            indent: self.indent + 1,
+            indent: self.indent.indented(),
             doc,
             ..*self
         }
     }
 
-    /// Create a command with decremented indent.
+    /// Create a command with one fewer indent level.
     #[inline]
     pub fn dedented(&self, doc: DocId) -> Self {
         Self {
-            indent: self.indent.saturating_sub(1),
+            indent: self.indent.dedented(),
             doc,
             ..*self
         }
     }
 
-    /// Create a command with absolute indent level.
+    /// Create a command with an added sub-tab `align(n)` offset.
     #[inline]
-    pub fn with_indent(&self, indent: usize, doc: DocId) -> Self {
+    pub fn aligned(&self, n: u32, doc: DocId) -> Self {
         Self {
-            indent,
+            indent: self.indent.aligned(n),
+            doc,
+            ..*self
+        }
+    }
+
+    /// Create a command with the indent reset to an absolute whole-tab level
+    /// (Prettier's align root reset), clearing any sub-tab alignment. Mirrors
+    /// [`RenderIndent::reset_to_level`].
+    #[inline]
+    pub fn reset_to_level(&self, level: usize, doc: DocId) -> Self {
+        Self {
+            indent: self.indent.reset_to_level(level),
             doc,
             ..*self
         }
@@ -259,8 +420,9 @@ impl ArenaCommand {
 /// per-call high-water distribution (≈89% of CSS top-level renders and ≈99.7%
 /// of the high-frequency single-doc sub-renders stay inline — measured
 /// before the tail-continuation rewrite, which only lowered stack transit, so
-/// the knee holds a fortiori); its 128-byte inline footprint matches the fits
-/// stack and the `DocBuf` convention. Top-level renders additionally borrow
+/// the knee holds a fortiori); its 96-byte inline footprint (a 12-byte
+/// `ArenaCommand`) stays within the fits stack and `DocBuf` convention. Top-level
+/// renders additionally borrow
 /// the arena-pooled instance (`borrow_render_commands_scratch`) so their spill
 /// capacity warms once per arena instead of re-allocating per rendered piece.
 pub(super) type CmdStack = SmallVec<[ArenaCommand; 8]>;
@@ -307,8 +469,8 @@ const FUSED_WIDTH_SCAN_MAX: usize = 32;
 /// node) **always** cache a real width or the newline sentinel at build — so
 /// every width query (the fits walk, `render_text`'s column advance) answers
 /// from the node alone, the fits path never borrows the pool, and render's
-/// per-text byte scan is skipped. The one exception is identifier names
-/// ([`DocArena::source_span_ident`]) and interner `Symbol`s: high-frequency,
+/// per-text byte scan is skipped. The one exception is the name slices
+/// ([`DocArena::source_span_ident`]): high-frequency,
 /// newline-free, and rarely fits-measured, so for them a per-node build-time
 /// scan costs more than it saves (measured both ways — eager per-ident width
 /// was ~+1.1% on identifier-dense corpora; eager everything-else was
@@ -432,6 +594,12 @@ pub struct DocArena {
     /// borrow; capacity survives `reset()`.
     render_commands_scratch: RefCell<CmdStack>,
     line_suffix_scratch: RefCell<LineSuffixBuf>,
+    /// Parked line-offset scratch for the multi-line block-comment builders:
+    /// one `split('\n')` pass per comment fills it with each body line's
+    /// `(start, end)` byte range, so the classifier and builder iterate the
+    /// lines slice-cheap without materializing a per-comment line buffer.
+    /// Cleared at each borrow; capacity survives `reset()`.
+    line_spans_scratch: RefCell<Vec<(u32, u32)>>,
     /// Parked whole-source line-break table backing the per-file
     /// `build_line_breaks` in each `format_in` — taken (moved out), filled,
     /// and parked back cleared with capacity retained, like `render_scratch`.
@@ -441,19 +609,34 @@ pub struct DocArena {
     /// A builder assembling a variable-length parts list `acquire`s a cleared
     /// buffer (with retained heap capacity from a prior spill) and `release`s it
     /// on scope exit via the [`PooledDocBuf`] guard. A recursion-safe
-    /// pop-or-new / clear-and-push-on-release pool self-sizes to the max
-    /// concurrent-live buffers (~30 for real code), turning the per-spill
-    /// `SmallVec` malloc/free churn into a handful of long-lived reused
-    /// allocations. Retained across `reset()` (reused across files), like the
-    /// other scratches; only ever affects allocation, never output.
+    /// pop-or-new pool, holding **only spilled buffers** — a release drops a
+    /// never-spilled buffer instead of pooling it (nothing to retain, free to
+    /// re-construct), so every pooled entry carries real heap capacity and the
+    /// LIFO can't hand a virgin buffer to a big-need builder while a spilled
+    /// one sits deeper. Self-sizes to the max concurrent-live spilled buffers,
+    /// turning the per-spill `SmallVec` malloc/free churn into a handful of
+    /// long-lived reused allocations. Retained across `reset()` (reused across
+    /// files), like the other scratches; only ever affects allocation, never
+    /// output.
     docbuf_pool: RefCell<Vec<DocBuf>>,
+    /// Parked node-keyed doc-share map: an AST-node pointer (`usize`) → the
+    /// `DocId` already built for it. Storage for the TS printer's member-chain
+    /// argument sharing, parked here — on the reused per-thread arena — so the
+    /// table's capacity warms once instead of a fresh `HashMap` resize chain
+    /// per printer/file. The consumer owns the protocol: it clears the map at
+    /// every share-scope entry AND exit, so between scopes it is logically
+    /// empty (stale `DocId`s from a prior document are unreachable — cleared
+    /// before any read) and only capacity persists across `reset()`. Only ever
+    /// affects allocation, never output (a hit is byte-identical to a rebuild
+    /// by the consumer's eligibility rules).
+    share_map_scratch: RefCell<HashMap<usize, DocId>>,
     /// Memoized `will_break(id)` results, indexed by `DocId`. Lazily extended to
     /// match `nodes`; sound because nodes are append-only and the arena is
     /// per-format, so a node's `will_break` value never changes once it exists.
     will_break_cache: RefCell<Vec<Option<bool>>>,
     /// Memoized flat-mode subtree widths for the `arena_fits` fast-path, indexed
     /// by `DocId`. Lazily extended like `will_break_cache`; valid per-format
-    /// (depends only on the fixed `TAB_WIDTH` + the interner, both fixed for a
+    /// (depends only on the fixed `TAB_WIDTH` + the source, both fixed for a
     /// render).
     flat_width_cache: RefCell<Vec<u32>>,
     /// Direct-mapped cache for [`Self::text`] statics, carrying two halves per
@@ -485,9 +668,9 @@ pub struct DocArena {
     /// indirection.
     static_cache: [Cell<StaticSlot>; STATIC_CACHE_SLOTS],
     /// The current document's format generation, keying the validity of the
-    /// interned node halves in `static_cache`, the singleton cells
+    /// interned node halves in `static_cache` and the singleton cells
     /// (`empty_node`, `line_nodes`, `line_suffix_boundary_node`,
-    /// `break_parent_node`), and the `symbol_nodes` table. Starts
+    /// `break_parent_node`). Starts
     /// at 1 (0 marks a never-stamped slot) and is bumped by `reset()`, so a
     /// prior document's `node_id`s — invalidated by the reset — can never be
     /// returned for the new document.
@@ -514,17 +697,6 @@ pub struct DocArena {
     /// (generation, id) — stateless like `Line`, same dedicated-cell
     /// interning. Valid iff the generation matches `format_gen`.
     break_parent_node: Cell<(u32, DocId)>,
-    /// Per-document interned [`DocText::Symbol`] nodes, direct-indexed by the
-    /// symbol id — the Symbol analog of the static cache's node half. A Symbol
-    /// node is position-free at render (the id fully determines the resolved
-    /// text) and carries no per-use state, so every `symbol(id)` within one
-    /// document can return one shared node. Ids are small dense integers from
-    /// the per-document interner (vocabulary = element/attribute names,
-    /// typically tens), so a direct-indexed table needs no hash probe. Each
-    /// entry is `(generation, id)`, valid iff the generation matches
-    /// [`Self::format_gen`]; lazily grown to the document's max id + 1, with
-    /// capacity retained across `reset()` (the gen bump invalidates in O(1)).
-    symbol_nodes: RefCell<Vec<(u32, DocId)>>,
     /// Diagnostic side-set: indices of text nodes that are line comments,
     /// recorded by `line_comment_text_pooled` only while the swallow check is
     /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
@@ -600,8 +772,10 @@ impl DocArena {
             render_scratch: Cell::new(String::new()),
             render_commands_scratch: RefCell::new(SmallVec::new()),
             line_suffix_scratch: RefCell::new(SmallVec::new()),
+            line_spans_scratch: RefCell::new(Vec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
             docbuf_pool: RefCell::new(Vec::new()),
+            share_map_scratch: RefCell::new(HashMap::new()),
             will_break_cache: RefCell::new(Vec::new()),
             flat_width_cache: RefCell::new(Vec::new()),
             static_cache: [const { Cell::new(StaticSlot::EMPTY) }; STATIC_CACHE_SLOTS],
@@ -610,7 +784,6 @@ impl DocArena {
             line_nodes: [const { Cell::new((0, DocId(0))) }; 4],
             line_suffix_boundary_node: Cell::new((0, DocId(0))),
             break_parent_node: Cell::new((0, DocId(0))),
-            symbol_nodes: RefCell::new(Vec::new()),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -650,8 +823,10 @@ impl DocArena {
             render_scratch: Cell::new(String::new()),
             render_commands_scratch: RefCell::new(SmallVec::new()),
             line_suffix_scratch: RefCell::new(SmallVec::new()),
+            line_spans_scratch: RefCell::new(Vec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
             docbuf_pool: RefCell::new(Vec::new()),
+            share_map_scratch: RefCell::new(HashMap::new()),
             // The fitting memos top out at `nodes.len()` (~= `estimated_nodes`),
             // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
             // to absorb those reallocs. Only capacity changes — never values.
@@ -663,7 +838,6 @@ impl DocArena {
             line_nodes: [const { Cell::new((0, DocId(0))) }; 4],
             line_suffix_boundary_node: Cell::new((0, DocId(0))),
             break_parent_node: Cell::new((0, DocId(0))),
-            symbol_nodes: RefCell::new(Vec::new()),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -717,7 +891,6 @@ impl DocArena {
             }
             self.line_suffix_boundary_node.set((0, DocId(0)));
             self.break_parent_node.set((0, DocId(0)));
-            self.symbol_nodes.get_mut().clear();
             self.format_gen.set(1);
         } else {
             self.format_gen.set(next);
@@ -919,7 +1092,8 @@ impl DocArena {
     /// (the eager [`pooled_text_width`] policy: a real width or the newline
     /// sentinel, so fits and render never re-scan the text) and is **not**
     /// retained — the span lives in the lifetime-less arena and is re-resolved
-    /// at render via a [`super::SourceTextResolver`]. Identifier names use
+    /// at render against the document source threaded through the render entry
+    /// points (`resolve_text`). Identifier names use
     /// [`Self::source_span_ident`] instead (deferred width — the opposite
     /// tradeoff).
     #[inline]
@@ -931,7 +1105,7 @@ impl DocArena {
     /// [`Self::source_span`] for a slice the caller guarantees is newline-free
     /// (identifier names): skips the width precompute entirely — no source read
     /// at build. Width is measured on demand at the first `fits()` touch
-    /// (memoized) — the deferral kept only for identifier names and `Symbol`s
+    /// (memoized) — the deferral kept only for identifier names
     /// (high-frequency, rarely fits-measured); a non-ASCII name measures the
     /// same value lazily as eagerly, so output is unaffected. Do NOT use for
     /// text that can contain `\n` — the newline sentinel would be missed.
@@ -966,6 +1140,45 @@ impl DocArena {
     #[inline]
     pub(crate) fn is_line_comment(&self, id: DocId) -> bool {
         self.line_comment_ids.borrow().binary_search(&id.0).is_ok()
+    }
+
+    /// Whether `id` is a bare collapsible `Line` separator (`Normal`/`Soft`) — a fill
+    /// part that separates from what follows rather than being content itself. The fill
+    /// renderer uses it to recognize a *trailing* separator that a leading-separator
+    /// parity shift has stranded in the last-item position, so it renders it by fit
+    /// (space when it fits, newline when it doesn't) instead of the content path — which
+    /// would break to a new line and then render the `Line` flat, stranding a stray
+    /// leading space at the head of the continuation.
+    #[inline]
+    pub(crate) fn is_collapsible_line(&self, id: DocId) -> bool {
+        matches!(
+            self.nodes.borrow()[id.index()],
+            DocNode::Line(LineKind::Normal | LineKind::Soft)
+        )
+    }
+
+    /// If `id` is an after-element fold — a `Fill` wrapped in a `WithContext` carrying
+    /// [`DocContext::hug_wide_first`], the marker `build_after_element_fold` always sets —
+    /// return the fold's LEAD item: the inline element the trailing text packs after. `None`
+    /// for any other node.
+    ///
+    /// The preceding text's flow-boundary measurement (`break_before_wide_flow`) uses this to
+    /// decide the element's drop by whether the *element* fits, mirroring prettier's pairwise
+    /// fill (`text, separator, element` — never the trailing text). A short lead then packs
+    /// after the text rather than the whole element+tail fold forcing it to its own line.
+    #[inline]
+    pub(crate) fn after_element_fold_lead(&self, id: DocId) -> Option<DocId> {
+        let nodes = self.nodes.borrow();
+        let DocNode::WithContext { doc, context } = &nodes[id.index()] else {
+            return None;
+        };
+        if !context.hug_wide_first {
+            return None;
+        }
+        let DocNode::Fill(range) = &nodes[doc.index()] else {
+            return None;
+        };
+        range.resolve(&self.children.borrow()).first().copied()
     }
 
     /// Tag `id` as the doc node that emits the comment at `span` in `source`.
@@ -1010,6 +1223,42 @@ impl DocArena {
             .ok()?;
         let (_, span, key) = tags[idx];
         Some((span, key))
+    }
+
+    /// Carry `old`'s comment-doc tag (if any) onto the freshly-allocated `new`.
+    ///
+    /// A doc-tree *transform* — [`Self::remove_lines`] / [`Self::atomize`] — allocates
+    /// a new [`DocId`] for every non-leaf node it rebuilds, including a multi-line block
+    /// comment's `Concat` (and, when dropping hard lines, a `MultilineText`). The renderer
+    /// records a comment's emit when it reaches the *tagged* node, so a re-allocated comment
+    /// doc whose tag stayed on the discarded original would read as **DROPPED** even though it
+    /// prints verbatim (the instrument false-positive [`tag_comment_doc`] can't see, because
+    /// nothing walks the transform). This copies the tag across the rebuild.
+    ///
+    /// Sound for the binary-search invariant: the only nodes ever tagged are comment doc roots
+    /// (a `SourceSpan` text — left untouched by the transform, so it never reaches here — a
+    /// `MultilineText`, or a multi-child `Concat`), and both re-allocated kinds are replaced by
+    /// a **fresh** allocation, never an interned/short-circuited id — so whenever this pushes,
+    /// `new` is the highest id so far and `comment_docs` stays sorted ascending (see the field
+    /// doc + [`tag_comment_doc`]). Safe against double-counting: the transform returns the new
+    /// tree and discards the old, and the renderer only records emits for nodes it actually
+    /// reaches (a discarded/losing subtree never does), so the old tag left in place never
+    /// fires. A no-op unless the ledger is enabled and `old` was tagged; compiled out entirely
+    /// without the `comment_check` feature. See [`crate::comment_ledger`].
+    #[cfg(feature = "comment_check")]
+    #[inline]
+    pub(crate) fn retag_comment_doc(&self, new: DocId, old: DocId) {
+        if !comment_check_enabled() {
+            return;
+        }
+        if let Some((span, key)) = self.comment_doc_tag(old) {
+            let mut tags = self.comment_docs.borrow_mut();
+            debug_assert!(
+                tags.last().is_none_or(|&(last, ..)| new.0 > last),
+                "retag_comment_doc must keep comment_docs sorted ascending on the node id"
+            );
+            tags.push((new.0, span, key));
+        }
     }
 
     /// Return the per-document interned node held in `cell`, allocating it on
@@ -1065,42 +1314,6 @@ impl DocArena {
     #[inline]
     pub fn empty(&self) -> DocId {
         self.interned_singleton(&self.empty_node, || DocNode::Text(DocText::Static("", 0)))
-    }
-
-    /// Create a text doc from a symbol ID (deferred resolution), interned per
-    /// document — repeated `symbol(id)` calls within one format return one
-    /// shared node instead of allocating per call (Symbol nodes are
-    /// position-free at render and carry no per-use state, like `Static` text
-    /// and the `Line` singletons; measured ~65–80% of calls dedup on Svelte
-    /// corpora — Symbol is Svelte-only in practice).
-    #[inline]
-    pub fn symbol(&self, id: u32) -> DocId {
-        let format_gen = self.format_gen.get();
-        {
-            let slots = self.symbol_nodes.borrow();
-            if let Some(&(node_gen, node_id)) = slots.get(id as usize)
-                && node_gen == format_gen
-            {
-                return node_id;
-            }
-        }
-        self.symbol_miss(id, format_gen)
-    }
-
-    /// The cold half of [`Self::symbol`]: alloc this document's node for `id`,
-    /// grow the table to cover the id, and stamp the slot (once per distinct
-    /// symbol per document).
-    #[cold]
-    #[inline(never)]
-    fn symbol_miss(&self, id: u32, format_gen: u32) -> DocId {
-        let node_id = self.alloc(DocNode::Text(DocText::Symbol(id)));
-        let mut slots = self.symbol_nodes.borrow_mut();
-        let i = id as usize;
-        if i >= slots.len() {
-            slots.resize(i + 1, (0, DocId(0)));
-        }
-        slots[i] = (format_gen, node_id);
-        node_id
     }
 
     /// Create a normal line break (space if fits, newline if doesn't),
@@ -1201,8 +1414,17 @@ impl DocArena {
         self.alloc(DocNode::Dedent(doc))
     }
 
-    /// Set absolute indentation level for doc.
-    pub fn align(&self, n: usize, doc: DocId) -> DocId {
+    /// Reset `doc` to an absolute whole-tab indentation level (the
+    /// template-literal root reset — see [`DocNode::AlignRoot`]).
+    pub fn align_root(&self, n: usize, doc: DocId) -> DocId {
+        self.alloc(DocNode::AlignRoot { n, contents: doc })
+    }
+
+    /// Offset `doc` by a sub-tab alignment of `n` literal spaces — Prettier's
+    /// numeric `align(n, …)`. Under `useTabs` this renders as spaces at a
+    /// trailing (line-ending) position and rounds up to a whole tab when a
+    /// further `indent` is stacked on it — see [`DocNode::Align`].
+    pub fn align(&self, n: u32, doc: DocId) -> DocId {
         self.alloc(DocNode::Align { n, contents: doc })
     }
 
@@ -1232,11 +1454,10 @@ impl DocArena {
     }
 
     /// Conditionally indent based on whether a specific group broke.
-    pub fn indent_if_break(&self, doc: DocId, group_id: GroupId, negate: bool) -> DocId {
+    pub fn indent_if_break(&self, doc: DocId, group_id: GroupId) -> DocId {
         self.alloc(DocNode::IndentIfBreak {
             contents: doc,
             group_id,
-            negate,
         })
     }
 
@@ -1440,7 +1661,7 @@ impl DocArena {
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 Self::will_break_memo(*inner, nodes, children, cache)
             }
-            DocNode::Align { contents, .. } => {
+            DocNode::AlignRoot { contents, .. } | DocNode::Align { contents, .. } => {
                 Self::will_break_memo(*contents, nodes, children, cache)
             }
             DocNode::IndentIfBreak { contents, .. } => {
@@ -1479,7 +1700,9 @@ impl DocArena {
             DocNode::Indent(inner) | DocNode::Dedent(inner) => {
                 self.has_forced_break_inner(*inner, nodes)
             }
-            DocNode::Align { contents, .. } => self.has_forced_break_inner(*contents, nodes),
+            DocNode::AlignRoot { contents, .. } | DocNode::Align { contents, .. } => {
+                self.has_forced_break_inner(*contents, nodes)
+            }
             DocNode::IndentIfBreak { contents, .. } => {
                 self.has_forced_break_inner(*contents, nodes)
             }
@@ -1515,7 +1738,9 @@ impl DocArena {
         match &nodes[id.index()] {
             DocNode::Line(_) => true,
             DocNode::Indent(inner) | DocNode::Dedent(inner) => self.can_break_inner(*inner, nodes),
-            DocNode::Align { contents, .. } => self.can_break_inner(*contents, nodes),
+            DocNode::AlignRoot { contents, .. } | DocNode::Align { contents, .. } => {
+                self.can_break_inner(*contents, nodes)
+            }
             DocNode::IndentIfBreak { contents, .. } => self.can_break_inner(*contents, nodes),
             DocNode::Group {
                 contents,
@@ -1573,19 +1798,34 @@ impl DocArena {
     /// that contains a hard line gets a shorter doc, not a one-line one. That is prettier's
     /// contract too — `expandLastArg` flattens the signature so *breakable* params can't
     /// break, not to overrule content that must break. A caller that genuinely needs
-    /// one line no matter what wants [`Self::flatten_all_lines`] — a different question,
+    /// one line no matter what wants [`Self::atomize`] — a different question,
     /// and now a different name.
     pub fn remove_lines(&self, id: DocId) -> DocId {
-        self.remove_lines_impl(id, HardLines::Keep)
+        self.flatten_lines_impl(id, FlattenMode::RemoveLines)
     }
 
-    /// Flatten **every** line — hard ones included — onto a single line.
+    /// Force a doc onto **one line at any width** — every line flattened, hard ones
+    /// included.
     ///
     /// Not prettier's `removeLines` (that is [`Self::remove_lines`], which keeps hard
-    /// lines). This is the stronger, un-prettier-like *atomize*: force a doc onto one line
-    /// even past the print width. Prettier reaches the same place by re-rendering the doc
-    /// at `printWidth: Infinity` and substituting the resulting string
-    /// (`template-literal.js`); this achieves it as a doc transform.
+    /// lines and cannot promise one line). Prettier gets here by re-rendering the doc at
+    /// `printWidth: Infinity` and substituting the resulting string
+    /// (`template-literal.js`); this achieves the same as a doc transform, which is why it
+    /// is named for that contract rather than for the line-flattening mechanism.
+    ///
+    /// **Emulating a re-render, not a stronger `removeLines`** — the difference is
+    /// load-bearing at every node where "what would infinite width print?" and "what does
+    /// flattening this node yield?" disagree. A `conditional_group` is such a node: at
+    /// infinite width its least-expanded state always fits and wins, so this **collapses
+    /// it to that state**. Prettier's `removeLines` instead keeps the states (its `mapDoc`
+    /// re-derives `contents = expandedStates[0]`), which [`Self::remove_lines`] mirrors —
+    /// tsv's `contents` *is* state[0], so recursing both is the same thing. Keeping the
+    /// states here was a bug: render found none fitting at the real width, fell back to
+    /// the most-expanded one, and printed its already-flattened separators as literal
+    /// spaces (`xs.map( (i) => fn(i) )`).
+    ///
+    /// The invariant that falls out, and that the tests assert: **the result renders
+    /// identically at every width.**
     ///
     /// **Only sound where the content provably has no required newline.** Deleting a hard
     /// line does not relayout anything — it deletes a newline the content demanded, fusing
@@ -1597,11 +1837,11 @@ impl DocArena {
     /// The two used to be one function that kept prettier's name while quietly doing this,
     /// which is how a multi-line comment in a flattened arrow signature got its newline
     /// deleted. Two questions, two names.
-    pub fn flatten_all_lines(&self, id: DocId) -> DocId {
-        self.remove_lines_impl(id, HardLines::Drop)
+    pub fn atomize(&self, id: DocId) -> DocId {
+        self.flatten_lines_impl(id, FlattenMode::Atomize)
     }
 
-    fn remove_lines_impl(&self, id: DocId, hard: HardLines) -> DocId {
+    fn flatten_lines_impl(&self, id: DocId, mode: FlattenMode) -> DocId {
         // Extract node info while borrowing, then release borrow before allocating.
         // This pattern avoids RefCell conflicts since alloc() needs borrow_mut().
         enum Info {
@@ -1610,7 +1850,8 @@ impl DocArena {
             Line(LineKind),
             Indent(DocId),
             Dedent(DocId),
-            Align(usize, DocId),
+            AlignRoot(usize, DocId),
+            Align(u32, DocId),
             Group {
                 contents: DocId,
                 expanded_states: ChildRange,
@@ -1631,10 +1872,10 @@ impl DocArena {
             match &nodes[id.index()] {
                 DocNode::Text(_) | DocNode::LineSuffixBoundary => Info::Keep,
                 // `MultilineText`'s `\n`s are hard lines pre-joined into one body, so it
-                // follows `hard` for the same reason a `Line(Hard)` does — see the fn docs.
-                DocNode::MultilineText { span, .. } => match hard {
-                    HardLines::Keep => Info::Keep,
-                    HardLines::Drop => {
+                // follows `mode` for the same reason a `Line(Hard)` does — see the fn docs.
+                DocNode::MultilineText { span, .. } => match mode {
+                    FlattenMode::RemoveLines => Info::Keep,
+                    FlattenMode::Atomize => {
                         let pool = self.text_pool.borrow();
                         Info::FlattenedMultilineText(span.slice(&pool).replace('\n', ""))
                     }
@@ -1642,6 +1883,7 @@ impl DocArena {
                 DocNode::Line(kind) => Info::Line(*kind),
                 DocNode::Indent(inner) => Info::Indent(*inner),
                 DocNode::Dedent(inner) => Info::Dedent(*inner),
+                DocNode::AlignRoot { n, contents } => Info::AlignRoot(*n, *contents),
                 DocNode::Align { n, contents } => Info::Align(*n, *contents),
                 DocNode::Group {
                     contents,
@@ -1670,7 +1912,7 @@ impl DocArena {
             }
         }; // nodes borrow dropped here
 
-        match info {
+        let new_id = match info {
             Info::Keep => id,
             Info::FlattenedMultilineText(flat) => self.text_pooled(&flat),
             Info::Line(kind) => match kind {
@@ -1678,23 +1920,27 @@ impl DocArena {
                 LineKind::Soft => self.empty(),
                 // Prettier's `!doc.hard` gate: a hard line passes through untouched, because
                 // removing one deletes a required newline rather than relayouting anything.
-                // Only `flatten_all_lines`, whose content provably has no required newline,
+                // Only `atomize`, whose content provably has no required newline,
                 // drops them.
-                LineKind::Hard | LineKind::Literal => match hard {
-                    HardLines::Keep => id,
-                    HardLines::Drop => self.empty(),
+                LineKind::Hard | LineKind::Literal => match mode {
+                    FlattenMode::RemoveLines => id,
+                    FlattenMode::Atomize => self.empty(),
                 },
             },
             Info::Indent(inner) => {
-                let new_inner = self.remove_lines_impl(inner, hard);
+                let new_inner = self.flatten_lines_impl(inner, mode);
                 self.indent(new_inner)
             }
             Info::Dedent(inner) => {
-                let new_inner = self.remove_lines_impl(inner, hard);
+                let new_inner = self.flatten_lines_impl(inner, mode);
                 self.dedent(new_inner)
             }
+            Info::AlignRoot(n, contents) => {
+                let new_contents = self.flatten_lines_impl(contents, mode);
+                self.align_root(n, new_contents)
+            }
             Info::Align(n, contents) => {
-                let new_contents = self.remove_lines_impl(contents, hard);
+                let new_contents = self.flatten_lines_impl(contents, mode);
                 self.align(n, new_contents)
             }
             Info::Group {
@@ -1703,7 +1949,25 @@ impl DocArena {
                 id: group_id,
                 should_break,
             } => {
-                let flat_contents = self.remove_lines_impl(contents, hard);
+                let flat_contents = self.flatten_lines_impl(contents, mode);
+                if mode == FlattenMode::Atomize {
+                    // Atomize: emulate prettier's re-render at `printWidth: Infinity`, where a
+                    // conditional group's *least*-expanded state always fits and is chosen. So
+                    // the expanded states are dead here — drop them.
+                    //
+                    // Recursing into them instead (as the `remove_lines` arm below does) is a
+                    // bug: the states keep their `line` docs, which this transform has just
+                    // flattened to spaces / nothing. Render then finds no state fits at the
+                    // real width, falls back to the most-expanded one, and emits its separators
+                    // as literal spaces — `xs.map( (i) => fn(i) )` — or, when that state's
+                    // separator was a `softline`, deletes a required one: `(i) =>fn(i)`.
+                    return self.alloc(DocNode::Group {
+                        contents: flat_contents,
+                        expanded_states: ChildRange::EMPTY,
+                        id: group_id,
+                        should_break,
+                    });
+                }
                 if should_break {
                     self.alloc(DocNode::Group {
                         contents: flat_contents,
@@ -1721,7 +1985,7 @@ impl DocArena {
                         };
                         let new_kids: DocBuf = kids
                             .into_iter()
-                            .map(|kid| self.remove_lines_impl(kid, hard))
+                            .map(|kid| self.flatten_lines_impl(kid, mode))
                             .collect();
                         self.alloc_children(&new_kids)
                     };
@@ -1733,12 +1997,12 @@ impl DocArena {
                     })
                 }
             }
-            Info::IfBreakFlat(flat_doc) => self.remove_lines_impl(flat_doc, hard),
-            Info::IndentIfBreakContents(contents) => self.remove_lines_impl(contents, hard),
+            Info::IfBreakFlat(flat_doc) => self.flatten_lines_impl(flat_doc, mode),
+            Info::IndentIfBreakContents(contents) => self.flatten_lines_impl(contents, mode),
             Info::Concat(kids) => {
                 let flattened: DocBuf = kids
                     .into_iter()
-                    .map(|kid| self.remove_lines_impl(kid, hard))
+                    .map(|kid| self.flatten_lines_impl(kid, mode))
                     .collect();
                 self.concat(&flattened)
             }
@@ -1746,20 +2010,32 @@ impl DocArena {
                 // Fill becomes regular concat when flattened
                 let flattened: DocBuf = kids
                     .into_iter()
-                    .map(|kid| self.remove_lines_impl(kid, hard))
+                    .map(|kid| self.flatten_lines_impl(kid, mode))
                     .collect();
                 self.concat(&flattened)
             }
             Info::WithContext(doc, context) => {
-                let new_doc = self.remove_lines_impl(doc, hard);
+                let new_doc = self.flatten_lines_impl(doc, mode);
                 self.with_context(new_doc, context)
             }
             Info::LineSuffix(inner) => {
-                let new_inner = self.remove_lines_impl(inner, hard);
+                let new_inner = self.flatten_lines_impl(inner, mode);
                 self.line_suffix(new_inner)
             }
             Info::BreakParent => self.empty(),
+        };
+
+        // Rebuilding the tree strands a comment doc's ledger tag on the discarded original
+        // (a re-allocated node gets a fresh `DocId`), so the renderer never records the emit
+        // and the — verbatim-printed — comment reads as DROPPED. Carry the tag onto each
+        // rebuilt node. Every recursion routes through here, so a tagged comment anywhere in
+        // the subtree is covered. `comment_check`-only — production output is byte-identical.
+        #[cfg(feature = "comment_check")]
+        if new_id != id {
+            self.retag_comment_doc(new_id, id);
         }
+
+        new_id
     }
 
     //
@@ -1836,10 +2112,20 @@ impl DocArena {
 
     /// Return a [`DocBuf`] to the free-list, cleared (capacity retained), for a
     /// later builder to reuse. Only affects allocation, never output.
+    ///
+    /// Only *spilled* buffers are worth keeping: a never-spilled `DocBuf` has no
+    /// heap capacity to retain and costs nothing to construct fresh
+    /// (`acquire_docbuf`'s `unwrap_or_default`), so pooling it would only bury
+    /// the capacity-bearing buffers deeper in the LIFO — a big-need builder
+    /// popping a virgin buffer while a spilled one sits below it re-pays the
+    /// spill malloc. Dropping virgins keeps every pooled entry capacity-bearing,
+    /// so the pop always hands back real capacity when any is free.
     #[inline]
     pub fn release_docbuf(&self, mut buf: DocBuf) {
-        buf.clear();
-        self.docbuf_pool.borrow_mut().push(buf);
+        if buf.spilled() {
+            buf.clear();
+            self.docbuf_pool.borrow_mut().push(buf);
+        }
     }
 
     /// RAII form of [`Self::acquire_docbuf`]: a [`PooledDocBuf`] that derefs to
@@ -1851,6 +2137,28 @@ impl DocArena {
             buf: self.acquire_docbuf(),
             arena: self,
         }
+    }
+
+    /// The parked node-keyed doc-share map (see the field doc). Returned as the
+    /// `RefCell` itself — the consumer's share scope spans many interleaved
+    /// arena calls, so it borrows point-wise per lookup/insert/clear rather
+    /// than holding a `RefMut` open. The consumer owns the clear-at-scope-
+    /// entry/exit protocol; this accessor deliberately does NOT clear.
+    #[inline]
+    pub fn share_map_scratch(&self) -> &RefCell<HashMap<usize, DocId>> {
+        &self.share_map_scratch
+    }
+
+    /// Borrow the pooled line-offset scratch (cleared here) — a multi-line
+    /// block-comment builder fills it with each body line's `(start, end)`
+    /// byte range from one `split('\n')` pass and drops the borrow before the
+    /// next comment builds. Held only within one builder call; nothing
+    /// downstream of the fill re-borrows it.
+    #[inline]
+    pub fn borrow_line_spans_scratch(&self) -> std::cell::RefMut<'_, Vec<(u32, u32)>> {
+        let mut scratch = self.line_spans_scratch.borrow_mut();
+        scratch.clear();
+        scratch
     }
 
     /// Borrow the pooled top-level render command stack (cleared here). Held
@@ -2164,5 +2472,226 @@ mod pooled_text_width_tests {
             assert_agrees(&format!("{}\n{}", "x".repeat(len / 2), "y".repeat(len / 2)));
             assert_agrees(&format!("{}é{}", "x".repeat(len / 2), "y".repeat(len / 2)));
         }
+    }
+}
+
+#[cfg(test)]
+mod render_indent_tests {
+    //! Equivalence test for [`RenderIndent`] — its incremental `(tabs,
+    //! pending_aligns, align_spaces)` state must reproduce Prettier's queue-based
+    //! `generateIndent` (`document/printer/indent.js`) under `useTabs` exactly.
+    //!
+    //! **No corpus can grade this.** A sub-tab alignment only changes the output
+    //! at a trailing closing delimiter, and there only the tab-vs-space
+    //! *representation* (equal visual width at `tabWidth = 2`), so an arithmetic
+    //! slip in the round-up or the space count leaves every formatted file
+    //! byte-identical and sails through the fixtures and any size of diff. This
+    //! reference — Prettier's algorithm spelled out from scratch — is the only
+    //! gate with power over the fact. Corruption-verify any change to
+    //! [`RenderIndent`]'s ops by breaking one and watching an assertion fail.
+    use super::RenderIndent;
+    use crate::config::TAB_WIDTH;
+
+    #[derive(Clone, Copy, Debug)]
+    enum Op {
+        /// Prettier's `makeIndent` (queue `INDENT`).
+        Indent,
+        /// Prettier's numeric `makeAlign` (queue `WIDTH { width: n }`).
+        Align(u32),
+    }
+
+    /// Prettier's `generateIndent` for a queue of INDENT/WIDTH commands, in
+    /// `useTabs` mode — spelled out independently of [`RenderIndent`]. Returns
+    /// the whitespace `value` and its column `length`.
+    fn reference(queue: &[Op]) -> (String, usize) {
+        let mut value = String::new();
+        let mut length = 0usize;
+        let mut last_tabs = 0usize;
+        let mut last_spaces = 0usize;
+        for op in queue {
+            match *op {
+                Op::Indent => {
+                    // flush() -> flushTabs() (useTabs), then addTabs(1).
+                    if last_tabs > 0 {
+                        for _ in 0..last_tabs {
+                            value.push('\t');
+                        }
+                        length += TAB_WIDTH * last_tabs;
+                    }
+                    last_tabs = 0;
+                    last_spaces = 0;
+                    value.push('\t');
+                    length += TAB_WIDTH;
+                }
+                Op::Align(n) => {
+                    last_tabs += 1;
+                    last_spaces += n as usize;
+                }
+            }
+        }
+        // Final flushSpaces(): emit lastSpaces, discard lastTabs.
+        for _ in 0..last_spaces {
+            value.push(' ');
+        }
+        length += last_spaces;
+        (value, length)
+    }
+
+    fn apply(queue: &[Op]) -> RenderIndent {
+        let mut indent = RenderIndent::default();
+        for op in queue {
+            indent = match *op {
+                Op::Indent => indent.indented(),
+                Op::Align(n) => indent.aligned(n),
+            };
+        }
+        indent
+    }
+
+    fn whitespace(indent: RenderIndent) -> String {
+        let mut s = String::new();
+        for _ in 0..indent.tabs() {
+            s.push('\t');
+        }
+        for _ in 0..indent.trailing_align_spaces() {
+            s.push(' ');
+        }
+        s
+    }
+
+    fn assert_agrees(queue: &[Op]) {
+        let (value, length) = reference(queue);
+        let indent = apply(queue);
+        assert_eq!(
+            whitespace(indent),
+            value,
+            "RenderIndent whitespace disagrees with generateIndent on {queue:?}"
+        );
+        assert_eq!(
+            indent.column(TAB_WIDTH),
+            length,
+            "RenderIndent column disagrees with generateIndent length on {queue:?}"
+        );
+    }
+
+    /// Exhaustively grade every op sequence of length 0..=5 over
+    /// {Indent, align(1), align(2)} — 3^0 + … + 3^5 = 364 sequences. Covers the
+    /// two behaviors that matter: a trailing align run renders as literal spaces
+    /// (closing delimiter), and an align run flushed by a following indent rounds
+    /// up to whole tabs (content line).
+    #[test]
+    fn render_indent_matches_prettier_generate_indent() {
+        const OPS: [Op; 3] = [Op::Indent, Op::Align(1), Op::Align(2)];
+        let mut queue: Vec<Op> = Vec::new();
+        fn recurse(queue: &mut Vec<Op>, depth: usize, ops: &[Op], f: &dyn Fn(&[Op])) {
+            f(queue);
+            if depth == 0 {
+                return;
+            }
+            for &op in ops {
+                queue.push(op);
+                recurse(queue, depth - 1, ops, f);
+                queue.pop();
+            }
+        }
+        recurse(&mut queue, 5, &OPS, &assert_agrees);
+    }
+
+    /// The union-member closing-delimiter case, concretely: `level(1)` then a
+    /// trailing `align(2)` renders as `1 tab + 2 spaces` (the fix — Prettier's
+    /// output), never `2 tabs`.
+    #[test]
+    fn trailing_align_is_literal_spaces() {
+        let indent = RenderIndent::level(1).aligned(2);
+        assert_eq!(whitespace(indent), "\t  ");
+        assert_eq!(indent.column(TAB_WIDTH), TAB_WIDTH + 2);
+    }
+
+    /// An align followed by an indent rounds up to a whole tab (content line),
+    /// so member bodies stay byte-identical to the pre-fix whole-tab output.
+    #[test]
+    fn align_then_indent_rounds_up_to_tab() {
+        let indent = RenderIndent::level(1).aligned(2).indented();
+        assert_eq!(whitespace(indent), "\t\t\t");
+        assert_eq!(indent.column(TAB_WIDTH), 3 * TAB_WIDTH);
+    }
+
+    /// Grade `indented()` / `dedented()` on pure whole-tab queues against
+    /// Prettier's queue model: a dedent is `queue.slice(0, -1)`, which on a
+    /// pure-INDENT queue is exactly popping one tab (saturating at 0, since
+    /// slicing an empty queue leaves it empty). Exhaustive over every
+    /// {Indent, Dedent} sequence of length 0..=6 — no align, so tsv's
+    /// dedent-never-crosses-an-align-run invariant is respected.
+    #[test]
+    fn dedent_pops_one_tab_like_prettier_queue_slice() {
+        #[derive(Clone, Copy, Debug)]
+        enum TabOp {
+            Indent,
+            Dedent,
+        }
+        // Prettier queue depth: Indent pushes, Dedent slices off the last.
+        fn ref_depth(ops: &[TabOp]) -> usize {
+            let mut depth = 0usize;
+            for op in ops {
+                match op {
+                    TabOp::Indent => depth += 1,
+                    TabOp::Dedent => depth = depth.saturating_sub(1),
+                }
+            }
+            depth
+        }
+        fn apply_tabs(ops: &[TabOp]) -> RenderIndent {
+            let mut indent = RenderIndent::default();
+            for op in ops {
+                indent = match op {
+                    TabOp::Indent => indent.indented(),
+                    TabOp::Dedent => indent.dedented(),
+                };
+            }
+            indent
+        }
+        fn recurse(queue: &mut Vec<TabOp>, depth: usize, f: &dyn Fn(&[TabOp])) {
+            f(queue);
+            if depth == 0 {
+                return;
+            }
+            for op in [TabOp::Indent, TabOp::Dedent] {
+                queue.push(op);
+                recurse(queue, depth - 1, f);
+                queue.pop();
+            }
+        }
+        let mut queue: Vec<TabOp> = Vec::new();
+        recurse(&mut queue, 6, &|ops| {
+            let indent = apply_tabs(ops);
+            let depth = ref_depth(ops);
+            assert_eq!(
+                indent.tabs(),
+                depth,
+                "dedent tab depth disagrees on {ops:?}"
+            );
+            assert_eq!(indent.column(TAB_WIDTH), depth * TAB_WIDTH);
+            assert_eq!(indent.trailing_align_spaces(), 0);
+        });
+    }
+
+    /// `reset_to_level` (the `AlignRoot` node / template-literal root reset)
+    /// clears any pending align run and sets an absolute whole-tab level —
+    /// Prettier's root reset emptying the indent queue.
+    #[test]
+    fn reset_to_level_clears_pending_align_run() {
+        // A pending trailing align run, then reset to root (level 0) → empty.
+        let indent = RenderIndent::level(3)
+            .aligned(2)
+            .aligned(1)
+            .reset_to_level(0);
+        assert_eq!(indent, RenderIndent::default());
+        assert_eq!(whitespace(indent), "");
+        assert_eq!(indent.column(TAB_WIDTH), 0);
+        // Reset to a nonzero absolute level is pure tabs; the run is discarded.
+        let indent = RenderIndent::level(1).aligned(2).reset_to_level(2);
+        assert_eq!(whitespace(indent), "\t\t");
+        assert_eq!(indent.trailing_align_spaces(), 0);
+        assert_eq!(indent.column(TAB_WIDTH), 2 * TAB_WIDTH);
     }
 }

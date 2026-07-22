@@ -13,25 +13,23 @@
 
 use crate::ast::internal::{self, FragmentNode};
 use crate::printer::Printer;
-use crate::printer::text::TextAnalysis;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
-use tsv_lang::{Span, SymbolToU32};
 
 /// How content relates to an element boundary (opening or closing tag)
 ///
 /// This determines what separator (if any) appears between the tag and content.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(super) enum BoundaryMode {
-    /// Content touches tag directly, no separator
-    /// Example: `<span>text` or `text</span>`
-    Hug,
     /// Hardline separator - preserves source structure
     /// Example: `<p>\n  text` (source had newline, preserve it)
     Hard,
     /// Softline separator - collapses or breaks based on fit
-    /// Example: `<span> text` where space can collapse if needed
+    /// Example: `<span> text` and `<span>text` alike: the authored boundary run is
+    /// render-free, so both collapse onto the tag line when the content fits and break
+    /// block-style when it doesn't.
     Soft,
 }
 
@@ -95,8 +93,8 @@ impl ElementKind {
 /// went multiline for block children, and the special path still dangled its delimiters
 /// where regular elements had moved to block-style.
 ///
-/// `name` is the tag-name doc, reused by both the opening and the closing tag (a symbol for
-/// a regular element, static text for a `svelte:*` one).
+/// `name` is the tag-name doc, reused by both the opening and the closing tag (a span-identity
+/// `source_span` slice for a regular element, static text for a `svelte:*` one).
 #[derive(Clone, Copy)]
 pub(super) struct ElementParts<'arena> {
     pub(super) name: DocId,
@@ -105,7 +103,6 @@ pub(super) struct ElementParts<'arena> {
     pub(super) is_void: bool,
     /// Whether an empty element may print self-closing when the source wrote it that way
     pub(super) can_self_close: bool,
-    pub(super) attributes: &'arena [internal::AttributeNode<'arena>],
     pub(super) nodes: &'arena [FragmentNode<'arena>],
     pub(super) span: Span,
 }
@@ -113,8 +110,8 @@ pub(super) struct ElementParts<'arena> {
 /// Everything the printer derives from an element's tag NAME.
 ///
 /// Unpacked from the parse-time `Element::facts` ([`TagFacts`](internal::TagFacts)) by
-/// `classify_tag`, so the printer re-derives nothing per element — one field read, no interner
-/// borrow, no per-element `String`. Emission uses the symbol, never the string.
+/// `classify_tag`, so the printer re-derives nothing per element — one field read, no
+/// per-element `String`. Emission is a span-identity `source_span` slice of the tag name.
 ///
 /// A named struct rather than a tuple: these are seven independent bools that would otherwise
 /// be positional and silently misorderable at the call site (the same reason
@@ -169,34 +166,26 @@ pub(super) struct ElementContext {
     pub(super) is_self_closing: bool,
     /// Whether element has no meaningful content
     pub(super) is_empty: bool,
-    /// Whether content hugs BOTH tags — i.e. the source has no whitespace at either content
-    /// boundary. Hugging is all-or-nothing on purpose: content-boundary whitespace is
-    /// render-free under Svelte 5, so a lone boundary character must not select the layout.
-    /// See [`Printer::compute_element_layout`].
-    pub(super) hug_both: bool,
     /// Whether children need multiline formatting
     pub(super) needs_multiline: bool,
-    /// Whether to trim boundary whitespace from children
-    pub(super) trim_boundaries: bool,
     /// Whether any attribute source contains embedded newlines (forces attr group break)
     pub(super) has_multiline_attr: bool,
-    /// Whether all content children are text nodes (no elements, expressions, blocks)
-    pub(super) only_text_content: bool,
 }
 
 impl<'a> Printer<'a> {
     /// `<name>` — a start tag with no attributes (HTML spec "start tag").
+    /// `name` is a pre-built name doc (span-identity `source_span`).
     #[inline]
-    pub(super) fn start_tag(&self, name: u32) -> DocId {
+    pub(super) fn start_tag(&self, name: DocId) -> DocId {
         let d = self.d();
-        d.concat(&[d.text("<"), d.symbol(name), d.text(">")])
+        d.concat(&[d.text("<"), name, d.text(">")])
     }
 
     /// `</name>` — an end tag (HTML spec "end tag").
     #[inline]
-    pub(super) fn end_tag(&self, name: u32) -> DocId {
+    pub(super) fn end_tag(&self, name: DocId) -> DocId {
         let d = self.d();
-        d.concat(&[d.text("</"), d.symbol(name), d.text(">")])
+        d.concat(&[d.text("</"), name, d.text(">")])
     }
 
     /// Unpack an element's parse-time name facts (`Element::facts`) into the printer's per-tag
@@ -226,19 +215,18 @@ impl<'a> Printer<'a> {
     }
 
     /// Project a regular element onto the shared [`ElementParts`] view.
-    fn element_parts<'e>(
+    pub(super) fn element_parts<'e>(
         &self,
         element: &'e internal::Element<'e>,
         class: TagClass,
     ) -> ElementParts<'e> {
         ElementParts {
-            name: self.d().symbol(element.name.to_u32()),
+            name: self.d().source_span_ident(element.name_span),
             kind: class.kind,
             is_void: class.is_void,
             // Components, foreign (SVG/MathML), and namespaced (`foo:bar`) elements may print
             // self-closing (prettier's `didSelfClose`).
             can_self_close: class.kind.is_component() || class.is_foreign || class.is_namespaced,
-            attributes: element.attributes,
             nodes: element.fragment.nodes,
             span: element.span,
         }
@@ -347,15 +335,31 @@ impl<'a> Printer<'a> {
         );
         let parts = self.element_parts(element, class);
         let ctx = self.analyze_element(&parts, &attr_docs);
-        // Only the flat hug-both content layout has a single trailing `>` we can cleanly
-        // split off. Multiline children, boundary breaks, and the void/empty/self-closing
-        // and non-hug boundary forms all keep their `>` (return None → no dangle).
+        // Only a flat content layout has a single trailing `>` we can cleanly split off:
+        // Hug (glued boundaries), and Soft (a collapsing boundary — a one-sided newline or
+        // a render-free run — that trims to the same glued form; without the dangle here,
+        // format(one-sided-newline authoring) would emit the glued no-dangle form, which
+        // the next pass reads as Hug and dangles — a non-idempotent 2-cycle,
+        // `authoring_audit`'s hard bucket). Multiline children (Hard) and the
+        // void/empty/self-closing forms keep their `>` (return None → no dangle).
         match self.compute_element_layout(&parts, &ctx) {
-            ElementLayout::WithContent(BoundaryMode::Hug) => {
-                let trim_text = !class.kind.is_inline() && ctx.only_text_content;
-                let children_doc =
-                    self.build_nodes_doc_with_context(element.fragment.nodes, trim_text);
-                Some(self.build_hug_both_doc(&parts, &ctx, &attr_docs, children_doc, true))
+            ElementLayout::WithContent(BoundaryMode::Soft) => {
+                // Children built exactly as `build_content_element_doc`'s Hug arm builds
+                // them (trimmed), so the dangled element renders its content identically
+                // to its undangled form — incl. trimming a render-free boundary space
+                // (`<span>text </span>{#each…}` must dangle like the glued authoring).
+                let children_doc = self.build_nodes_doc_trimmed(
+                    element.fragment.nodes,
+                    Self::nodes_have_breakable_expression(element.fragment.nodes),
+                    false,
+                );
+                Some(self.build_collapsible_element_doc(
+                    &parts,
+                    &ctx,
+                    &attr_docs,
+                    children_doc,
+                    true,
+                ))
             }
             _ => None,
         }
@@ -449,124 +453,74 @@ impl<'a> Printer<'a> {
         boundary: BoundaryMode,
     ) -> DocId {
         let d = self.d();
-        let is_inline = parts.kind.is_inline();
         let nodes = parts.nodes;
 
         // Build the children doc EXACTLY ONCE, in the variant the resolved boundary arm
-        // actually uses. Every input to that decision (both boundary modes, `multiline_children`,
-        // `is_inline`, `trim_boundaries`) is already known here, so the final `(trim, breakable,
-        // multiline)` triple can be selected up front. Previously a "default" children doc was
-        // built eagerly and then several arms threw it away and rebuilt it (`trim=true` for a
-        // padded inline element, or the multiline form) — and because those rebuilds recurse into
-        // children that ALSO rebuild, deeply nested inline content was O(2^depth). Selecting the
-        // variant up front keeps output byte-identical (each arm ends up using exactly one of the
-        // builds either way) while building each subtree once. See the build-fanout audit.
+        // actually uses (rebuilding per arm recursed into children that ALSO rebuilt, making
+        // deeply nested inline content O(2^depth) — see the build-fanout audit). Boundary
+        // whitespace is always trimmed: it is render-free under Svelte 5 (`clean_nodes` trims
+        // every fragment edge at compile), so no element kind keeps it. Only the multiline-ness
+        // varies — `Hard` is exactly the multiline case.
         //
         // `breakable_exprs` (the fill-vs-hard-width divergence for long multi-expression runs,
-        // `fill_multiple_expr_long`) is only consulted by the multiline variants, so it is computed
-        // only where used.
-        let (child_trim, child_breakable, child_multiline) = match boundary {
-            BoundaryMode::Hug => {
-                // Hug both: the prettier-shaped trimmed builder (the convergence base). Hugging
-                // implies `!needs_multiline`, so the children are never the multiline shape here.
-                (
-                    ctx.trim_boundaries,
-                    Self::nodes_have_breakable_expression(nodes),
-                    false,
-                )
-            }
-            BoundaryMode::Hard => {
-                // Full multiline — always the `build_nodes_doc_multiline` shape.
-                (true, Self::nodes_have_breakable_expression(nodes), true)
-            }
-            BoundaryMode::Soft => {
-                // A padded inline element trims (the boundary line() supplies the space).
-                //
-                // `breakable_exprs` is read the same way as in the other two arms: it is a property
-                // of the CONTENT (does a child `{expr}` have internal break points?), not of the
-                // boundary, so it cannot depend on which boundary mode we landed in. Passing `false`
-                // here strands a breakable expression group flat under a fits()-Break `line` — which,
-                // on a fill whose text and ternaries compete for the same line, oscillates between
-                // two layouts (a non-idempotent 2-cycle, `authoring_audit`'s hard bucket).
-                let breakable = Self::nodes_have_breakable_expression(nodes);
-                if is_inline && !ctx.trim_boundaries {
-                    (true, breakable, false)
-                } else {
-                    (ctx.trim_boundaries, breakable, false)
-                }
-            }
-        };
-        let children_doc =
-            self.build_nodes_doc_trimmed(nodes, child_trim, child_breakable, child_multiline);
-
-        // Hug-both builds its own opening, so handle it before building `opening_tag` — both
-        // remaining arms use `opening_tag`, this one doesn't.
-        if boundary == BoundaryMode::Hug {
-            return self.build_hug_both_doc(parts, ctx, attr_docs, children_doc, false);
-        }
-
-        let opening_tag = self.build_opening_tag(parts.name, attr_docs, ctx.has_multiline_attr);
-
-        if boundary == BoundaryMode::Hard {
-            // Full multiline. `children_doc` was built once above as the multiline shape
-            // (`build_nodes_doc_multiline` == `build_nodes_doc_trimmed(nodes, true, breakable,
-            // true)`); rebuilding here per level is what made deeply-nested content O(2^depth).
-            let indent_inner = d.indent(d.concat(&[d.hardline(), children_doc]));
-            return d.concat(&[
-                opening_tag,
-                d.text(">"),
-                indent_inner,
-                d.hardline(),
-                d.text("</"),
-                parts.name,
-                d.text(">"),
-            ]);
-        }
+        // `fill_multiple_expr_long`) is a property of the CONTENT (does a child `{expr}` have
+        // internal break points?), not of the boundary, so it cannot depend on which boundary
+        // mode we landed in. Passing `false` strands a breakable expression group flat under a
+        // fits()-Break `line` — which, on a fill whose text and ternaries compete for the same
+        // line, oscillates between two layouts (a non-idempotent 2-cycle, `authoring_audit`'s
+        // hard bucket).
+        let children_doc = self.build_nodes_doc_trimmed(
+            nodes,
+            Self::nodes_have_breakable_expression(nodes),
+            boundary == BoundaryMode::Hard,
+        );
 
         // Soft boundaries: collapse when the element fits, break block-style when it doesn't.
         //
-        // For inline elements, use line() (space in flat, newline in break) when the boundary
-        // text has whitespace. This matches Prettier's printLineBeforeChildren (element.js:99-102),
-        // which returns `line` when hasLeadingSpaces && isLeadingSpaceSensitive — so an authored
-        // boundary space survives when the element fits inline, and becomes the block-style
-        // newline when it doesn't.
-        let leading_break = if is_inline && Self::first_child_has_leading_ws(nodes, self.source) {
-            d.line()
-        } else {
-            d.softline()
-        };
-        let trailing_break = if is_inline && Self::last_child_has_trailing_ws(nodes, self.source) {
-            d.line()
-        } else {
-            d.softline()
-        };
-        let inner_group = d.group(children_doc);
-        let indent_inner = d.indent(d.concat(&[leading_break, inner_group]));
-        d.group(d.concat(&[
+        // Always softlines: an authored boundary space is render-free (the compiler trims every
+        // fragment edge), so it neither survives inline — `<span> text </span>` collapses to
+        // `<span>text</span>` — nor selects the layout. Prettier instead keeps the space
+        // (`printLineBeforeChildren`'s `line` when hasLeadingSpaces && isLeadingSpaceSensitive,
+        // the HTML/CSS inline whitespace model Svelte 5 broke from) — see
+        // conformance_prettier.md §Svelte: Inline content block-style and the
+        // inline_boundary_whitespace fixture.
+        if boundary == BoundaryMode::Soft {
+            return self.build_collapsible_element_doc(parts, ctx, attr_docs, children_doc, false);
+        }
+
+        // Full multiline. `children_doc` was built once above as the multiline shape
+        // (`build_nodes_doc_multiline` == `build_nodes_doc_trimmed(nodes, true, breakable,
+        // true)`); rebuilding here per level is what made deeply-nested content O(2^depth).
+        let opening_tag = self.build_opening_tag(parts.name, attr_docs, ctx.has_multiline_attr);
+        let indent_inner = d.indent(d.concat(&[d.hardline(), children_doc]));
+        d.concat(&[
             opening_tag,
             d.text(">"),
             indent_inner,
-            trailing_break,
+            d.hardline(),
             d.text("</"),
             parts.name,
             d.text(">"),
-        ]))
+        ])
     }
 
-    /// Build doc for hug-both mode — content touches both tags in the source.
+    /// Build doc for the collapsible (`Soft`) content layout — the single inline shape, whatever
+    /// the author wrote at the boundary.
     ///
     /// Softline boundaries: the content collapses onto the tag line when it fits and drops to its
-    /// own indented line (block-style, both tags intact) when it doesn't. No hardline force is
-    /// needed — every multiline trigger (an expanding control-flow block, block-flow children,
-    /// any other `needs_multiline`) already resolves the boundary to `Hard` in
-    /// [`Printer::compute_element_layout`], so it never reaches this builder.
+    /// own indented line (block-style, both tags intact) when it doesn't. Since the boundary run
+    /// is render-free and always trimmed, a glued authoring and a spaced one reach this same
+    /// builder — that is what makes them converge. No hardline force is needed — every multiline
+    /// trigger (an expanding control-flow block, block-flow children, any other `needs_multiline`)
+    /// already resolves the boundary to `Hard` in [`Printer::compute_element_layout`], so it never
+    /// reaches this builder.
     ///
     /// When `external_close` is true the element's own trailing closing `>` (and the boundary
     /// break before it) is omitted — the caller emits the `>` elsewhere. This powers the axis-3
     /// sibling-`>` dangle: an inline element directly followed by an expanding block renders as
     /// `</tag` and hands its `>` to the block so it can dangle onto the block-head line. See
     /// [`Printer::build_inline_element_omit_close_gt`].
-    fn build_hug_both_doc(
+    fn build_collapsible_element_doc(
         &self,
         parts: &ElementParts<'_>,
         ctx: &ElementContext,
@@ -602,23 +556,13 @@ impl<'a> Printer<'a> {
         ]))
     }
 
-    fn first_child_has_leading_ws(nodes: &[FragmentNode<'_>], source: &str) -> bool {
-        nodes.first().is_some_and(
-            |n| matches!(n, FragmentNode::Text(t) if !t.raw(source).leading_whitespace().is_empty()),
-        )
-    }
-
-    fn last_child_has_trailing_ws(nodes: &[FragmentNode<'_>], source: &str) -> bool {
-        nodes.last().is_some_and(
-            |n| matches!(n, FragmentNode::Text(t) if !t.raw(source).trailing_whitespace().is_empty()),
-        )
-    }
-
     /// Build doc for empty element with no hugging
     ///
-    /// For inline elements with whitespace-only content (e.g., `<span> </span>`),
-    /// the space is preserved. When attrs force multiline, `>` and `</tag>` go
-    /// on separate lines (matching Prettier behavior).
+    /// A whitespace-only fragment counts as empty for every element kind — `<b> </b>`
+    /// collapses to `<b></b>` (Svelte renders nothing there: the boundary run is trimmed at
+    /// compile, so the space is render-free; prettier preserves it — see
+    /// conformance_prettier.md §Svelte: Inline content block-style). When attrs force
+    /// multiline, `>` and `</tag>` go on separate lines (matching Prettier behavior).
     fn build_empty_element_doc(
         &self,
         element: &internal::Element<'_>,
@@ -627,44 +571,11 @@ impl<'a> Printer<'a> {
         kind: ElementKind,
     ) -> DocId {
         let d = self.d();
-        let tag_sym = element.name.to_u32();
-        let is_inline = kind.is_inline();
+        let name_doc = d.source_span_ident(element.name_span);
         let is_html = element.kind == internal::ElementKind::Html;
+        let closing = d.concat(&[d.text("></"), name_doc, d.text(">")]);
 
-        // Inline elements with whitespace-only content preserve a space
-        // e.g., <span> </span> stays as-is, not collapsed to <span></span>
-        // Matches prettier-plugin-svelte: isInlineElement = !isBlockElement
-        let has_ws_content = is_inline
-            && !element.fragment.nodes.is_empty()
-            && element
-                .fragment
-                .nodes
-                .iter()
-                .all(FragmentNode::is_whitespace_only_text);
-
-        if has_attrs && (is_inline || kind.is_component()) {
-            // Closing for inline/hug states: "></tag>" or "> </tag>"
-            let closing = if has_ws_content {
-                d.concat(&[d.text("> </"), d.symbol(tag_sym), d.text(">")])
-            } else {
-                d.concat(&[d.text("></"), d.symbol(tag_sym), d.text(">")])
-            };
-
-            // Closing for full multiline state: with whitespace content,
-            // > and </tag> go on separate lines; without, same as inline (hugged)
-            let closing_multiline = if has_ws_content {
-                let hl = d.hardline();
-                d.concat(&[
-                    d.text(">"),
-                    hl,
-                    d.text("</"),
-                    d.symbol(tag_sym),
-                    d.text(">"),
-                ])
-            } else {
-                closing
-            };
-
+        if has_attrs && (kind.is_inline() || kind.is_component()) {
             // State 1: All inline
             let inline_state = d.concat(&[opening_tag, closing]);
 
@@ -678,7 +589,7 @@ impl<'a> Printer<'a> {
             );
             let hug_state = d.concat(&[
                 d.text("<"),
-                d.symbol(tag_sym),
+                name_doc,
                 d.concat(&hug_attrs),
                 d.hardline(),
                 closing,
@@ -696,19 +607,15 @@ impl<'a> Printer<'a> {
             let multiline_indent = d.indent(multiline_concat);
             let multiline_state = d.concat(&[
                 d.text("<"),
-                d.symbol(tag_sym),
+                name_doc,
                 multiline_indent,
                 d.hardline(),
-                closing_multiline,
+                closing,
             ]);
 
             d.conditional_group(&[inline_state, hug_state, multiline_state])
-        } else if has_ws_content {
-            // Inline element with whitespace content, no attrs: <span> </span>
-            d.concat(&[opening_tag, d.text("> </"), d.symbol(tag_sym), d.text(">")])
         } else {
-            // Block elements or truly empty - use simple structure
-            d.group(d.concat(&[opening_tag, d.text("></"), d.symbol(tag_sym), d.text(">")]))
+            d.group(d.concat(&[opening_tag, closing]))
         }
     }
 
@@ -717,7 +624,7 @@ impl<'a> Printer<'a> {
     /// Format: `<template lang="pug">\n{raw content}</template>`
     fn build_foreign_template_doc(&self, element: &internal::Element<'_>) -> DocId {
         let d = self.d();
-        let tag_sym = element.name.to_u32();
+        let name_doc = d.source_span_ident(element.name_span);
 
         // Opening tag: <template attrs> — use space-separated attrs (no wrapping)
         // Foreign template elements are always HTML, so is_html=true
@@ -728,7 +635,7 @@ impl<'a> Printer<'a> {
             element.open_tag_end,
             true,
         );
-        let mut parts: DocBuf = smallvec![d.text("<"), d.symbol(tag_sym)];
+        let mut parts: DocBuf = smallvec![d.text("<"), name_doc];
         parts.extend(space_attrs);
         parts.push(d.text(">"));
 
@@ -741,7 +648,7 @@ impl<'a> Printer<'a> {
 
         // Closing tag
         parts.push(d.text("</"));
-        parts.push(d.symbol(tag_sym));
+        parts.push(name_doc);
         parts.push(d.text(">"));
 
         d.concat(&parts)
@@ -758,17 +665,17 @@ impl<'a> Printer<'a> {
         attr_docs: DocBuf,
     ) -> DocId {
         let d = self.d();
-        let tag_sym = element.name.to_u32();
+        let name_doc = d.source_span_ident(element.name_span);
         // Build opening tag
         let opening_tag = if attr_docs.is_empty() {
-            self.start_tag(tag_sym)
+            self.start_tag(name_doc)
         } else {
             let sl = d.softline();
             let dedented = d.dedent(sl);
             let attr_concat = d.concat(&attr_docs);
             let inner = d.group(d.concat(&[attr_concat, dedented]));
             let indented = d.indent(inner);
-            d.group(d.concat(&[d.text("<"), d.symbol(tag_sym), indented, d.text(">")]))
+            d.group(d.concat(&[d.text("<"), name_doc, indented, d.text(">")]))
         };
 
         // Get raw content from the single Text child
@@ -779,7 +686,7 @@ impl<'a> Printer<'a> {
 
         // Empty element or whitespace-only content
         let Some(content) = content.filter(|c| !c.trim().is_empty()) else {
-            return d.concat(&[opening_tag, d.text("</"), d.symbol(tag_sym), d.text(">")]);
+            return d.concat(&[opening_tag, d.text("</"), name_doc, d.text(">")]);
         };
 
         // Parse and format content based on tag type
@@ -800,9 +707,8 @@ impl<'a> Printer<'a> {
                 .ok()
                 .map(|ast| tsv_css::format_in(&ast, &content, self.d()))
         } else {
-            tsv_ts::parse(&content, &arena)
-                .ok()
-                .map(|ast| tsv_ts::format_in(&ast, &content, self.d()))
+            let parsed = tsv_ts::parse(&content, &arena).ok();
+            parsed.map(|ast| tsv_ts::format_in(&ast, &content, self.d()))
         };
 
         match formatted {
@@ -825,7 +731,7 @@ impl<'a> Printer<'a> {
                     indented,
                     d.hardline(),
                     d.text("</"),
-                    d.symbol(tag_sym),
+                    name_doc,
                     d.text(">"),
                 ])
             }
@@ -835,7 +741,7 @@ impl<'a> Printer<'a> {
                     opening_tag,
                     d.text_pooled(&content),
                     d.text("</"),
-                    d.symbol(tag_sym),
+                    name_doc,
                     d.text(">"),
                 ])
             }

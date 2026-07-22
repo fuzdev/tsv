@@ -69,9 +69,13 @@ impl<'a> Printer<'a> {
     pub(super) fn print_css_atrule(&mut self, atrule: &internal::CssAtrule<'_>) {
         self.write("@");
         // At-rule names are ASCII case-insensitive; lowercase for output (`@MEDIA`
-        // → `@media`), matching prettier. The stored `name` keeps its source case
-        // (public AST matches Svelte).
-        self.write(&value_normalization::lowercase_at_rule_name(atrule.name));
+        // → `@media`), matching prettier. Emit from the name's *source* span, not the
+        // decoded `name`: an escaped name (`@m\A x`) decodes to a raw control char,
+        // and emitting that verbatim would inject it into the output (content loss on
+        // reparse). `lowercase_at_rule_name` leaves an escaped (`\`) name verbatim,
+        // so the escape is preserved — matching how property names / preludes emit.
+        let name_src = atrule.name_span.extract(self.source);
+        self.write(&value_normalization::lowercase_at_rule_name(name_src));
 
         // Print prelude based on type
         match &atrule.prelude {
@@ -243,7 +247,7 @@ impl<'a> Printer<'a> {
         }
 
         if let Some(block) = &atrule.block {
-            self.write(" {\n");
+            self.write_block_open();
             // Format the block's children via the shared block-body routine (also
             // used by rule bodies). At-rule blocks have no pre-`{` comments — the
             // prelude owns that region — so `start_index` is 0. A nested rule flows

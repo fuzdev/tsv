@@ -297,13 +297,21 @@ pub(crate) fn lang_label(parser_type: ParserType) -> &'static str {
     }
 }
 
+/// Cap on per-file table rows. Results are sorted slowest-first, so the cap
+/// keeps the actionable head; a huge corpus (e.g. the 22K-file wpt harvest)
+/// otherwise spends more of the run printing rows than profiling, polluting
+/// perf-record boards taken over this command. Aggregates always cover every
+/// file.
+const MAX_TABLE_ROWS: usize = 200;
+
 fn print_table(results: &[FileResult], iterations: usize, skipped: usize) {
     let total = Aggregate::from_results(results.iter());
     let langs = lang_groups(results);
     let total_label = files_label(total.files);
+    let shown = &results[..results.len().min(MAX_TABLE_ROWS)];
 
     // Calculate column widths
-    let name_width = results
+    let name_width = shown
         .iter()
         .map(|r| display_path(&r.path).len())
         .chain(std::iter::once(total_label.len()))
@@ -332,7 +340,7 @@ fn print_table(results: &[FileResult], iterations: usize, skipped: usize) {
         "----", "----", "----", "-----", "------", "-----", "-----", "-----",
     );
 
-    for r in results {
+    for r in shown {
         let parse_pct = if r.total_us > 0.0 {
             r.parse_us / r.total_us * 100.0
         } else {
@@ -347,6 +355,13 @@ fn print_table(results: &[FileResult], iterations: usize, skipped: usize) {
             &format_duration(r.total_us),
             &format!("{parse_pct:.0}%"),
             &format!("{:.1}", us_per_kb(r.size, r.total_us)),
+        );
+    }
+    if results.len() > shown.len() {
+        eprintln!(
+            "... {} more files not shown (slowest {} listed; totals cover all)",
+            results.len() - shown.len(),
+            shown.len()
         );
     }
 
@@ -503,13 +518,19 @@ pub(crate) fn resolve_profile_files(
         return Err(CliError::Failed);
     }
     let total = files.len();
-    files.retain(|p| {
-        !p.file_name()
-            .and_then(|n| n.to_str())
-            .is_some_and(|n| n.starts_with("input_invalid"))
-    });
+    files.retain(|p| !is_input_invalid_fixture(p));
     let skipped = total - files.len();
     Ok((files, skipped))
+}
+
+/// Whether a fixture file is an intentionally-invalid `input_invalid_*` fixture — one that must
+/// fail to parse, so every corpus-walking audit skips it (it never reaches the property under
+/// test). The single definition of the check the audits share, so a policy change (a renamed
+/// prefix, a stricter match) is made once rather than at every command that walks the tree.
+pub(crate) fn is_input_invalid_fixture(path: &Path) -> bool {
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(|n| n.starts_with("input_invalid"))
 }
 
 /// Resolve paths to files, expanding directories
@@ -532,7 +553,11 @@ pub(crate) fn resolve_files(paths: &[String]) -> Result<Vec<PathBuf>, String> {
             files.extend(matched);
         }
     }
-    files.sort();
+    // Byte-order sort: `PathBuf`'s component-wise `Ord` re-walks `Components`
+    // per compare, which dominates the non-measured tail of a huge-corpus run
+    // (tens of thousands of harvest files) and dilutes perf-record boards.
+    // OS-string bytes give the same determinism and dedup adjacency.
+    files.sort_by(|a, b| a.as_os_str().cmp(b.as_os_str()));
     files.dedup();
     Ok(files)
 }

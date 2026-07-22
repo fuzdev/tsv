@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 750,
+	"end": 754,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,44 +10,44 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 293,
-				"data": " A component (inline) keeps a following short {#await}/{#snippet} inline regardless of\nsibling type — text, an inline element, or {@const}/{@debug} (valid inside a component,\nunlike inside a block element). Only block-element parents break; a component stays inline,\nmatching prettier. "
+				"end": 297,
+				"data": "\n\tA component (inline) keeps a following short {#await}/{#snippet} inline regardless of\n\tsibling type — text, an inline element, or {@const}/{@debug} (valid inside a component,\n\tunlike inside a block element). Only block-element parents break; a component stays inline,\n\tmatching prettier.\n"
 			},
 			{
 				"type": "Text",
-				"start": 293,
-				"end": 295,
+				"start": 297,
+				"end": 299,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 295,
-				"end": 328,
+				"start": 299,
+				"end": 332,
 				"data": " {@const} sibling + await "
 			},
 			{
 				"type": "Text",
-				"start": 328,
-				"end": 329,
+				"start": 332,
+				"end": 333,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "Component",
-				"start": 329,
-				"end": 375,
+				"start": 333,
+				"end": 379,
 				"name": "Comp",
 				"name_loc": {
 					"start": {
-						"line": 7,
+						"line": 9,
 						"column": 1,
-						"character": 330
+						"character": 334
 					},
 					"end": {
-						"line": 7,
+						"line": 9,
 						"column": 5,
-						"character": 334
+						"character": 338
 					}
 				},
 				"attributes": [],
@@ -56,8 +56,8 @@
 					"nodes": [
 						{
 							"type": "ConstTag",
-							"start": 335,
-							"end": 349,
+							"start": 339,
+							"end": 353,
 							"declaration": {
 								"type": "VariableDeclaration",
 								"kind": "const",
@@ -67,61 +67,61 @@
 										"id": {
 											"type": "Identifier",
 											"name": "a",
-											"start": 343,
-											"end": 344,
+											"start": 347,
+											"end": 348,
 											"loc": {
 												"start": {
-													"line": 7,
+													"line": 9,
 													"column": 14,
-													"character": 343
+													"character": 347
 												},
 												"end": {
-													"line": 7,
+													"line": 9,
 													"column": 15,
-													"character": 344
+													"character": 348
 												}
 											}
 										},
 										"init": {
 											"type": "Literal",
-											"start": 347,
-											"end": 348,
+											"start": 351,
+											"end": 352,
 											"loc": {
 												"start": {
-													"line": 7,
+													"line": 9,
 													"column": 18
 												},
 												"end": {
-													"line": 7,
+													"line": 9,
 													"column": 19
 												}
 											},
 											"value": 1,
 											"raw": "1"
 										},
-										"start": 343,
-										"end": 348
+										"start": 347,
+										"end": 352
 									}
 								],
-								"start": 337,
-								"end": 348
+								"start": 341,
+								"end": 352
 							}
 						},
 						{
 							"type": "AwaitBlock",
-							"start": 349,
-							"end": 368,
+							"start": 353,
+							"end": 372,
 							"expression": {
 								"type": "Identifier",
-								"start": 357,
-								"end": 358,
+								"start": 361,
+								"end": 362,
 								"loc": {
 									"start": {
-										"line": 7,
+										"line": 9,
 										"column": 28
 									},
 									"end": {
-										"line": 7,
+										"line": 9,
 										"column": 29
 									}
 								},
@@ -134,8 +134,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 359,
-										"end": 360,
+										"start": 363,
+										"end": 364,
 										"raw": "x",
 										"data": "x"
 									}
@@ -149,39 +149,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 375,
-				"end": 377,
+				"start": 379,
+				"end": 381,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 377,
-				"end": 410,
+				"start": 381,
+				"end": 414,
 				"data": " {@debug} sibling + await "
 			},
 			{
 				"type": "Text",
-				"start": 410,
-				"end": 411,
+				"start": 414,
+				"end": 415,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "Component",
-				"start": 411,
-				"end": 453,
+				"start": 415,
+				"end": 457,
 				"name": "Comp",
 				"name_loc": {
 					"start": {
-						"line": 10,
+						"line": 12,
 						"column": 1,
-						"character": 412
+						"character": 416
 					},
 					"end": {
-						"line": 10,
+						"line": 12,
 						"column": 5,
-						"character": 416
+						"character": 420
 					}
 				},
 				"attributes": [],
@@ -190,20 +190,20 @@
 					"nodes": [
 						{
 							"type": "DebugTag",
-							"start": 417,
-							"end": 427,
+							"start": 421,
+							"end": 431,
 							"identifiers": [
 								{
 									"type": "Identifier",
-									"start": 425,
-									"end": 426,
+									"start": 429,
+									"end": 430,
 									"loc": {
 										"start": {
-											"line": 10,
+											"line": 12,
 											"column": 14
 										},
 										"end": {
-											"line": 10,
+											"line": 12,
 											"column": 15
 										}
 									},
@@ -213,19 +213,19 @@
 						},
 						{
 							"type": "AwaitBlock",
-							"start": 427,
-							"end": 446,
+							"start": 431,
+							"end": 450,
 							"expression": {
 								"type": "Identifier",
-								"start": 435,
-								"end": 436,
+								"start": 439,
+								"end": 440,
 								"loc": {
 									"start": {
-										"line": 10,
+										"line": 12,
 										"column": 24
 									},
 									"end": {
-										"line": 10,
+										"line": 12,
 										"column": 25
 									}
 								},
@@ -238,8 +238,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 437,
-										"end": 438,
+										"start": 441,
+										"end": 442,
 										"raw": "x",
 										"data": "x"
 									}
@@ -253,39 +253,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 453,
-				"end": 455,
+				"start": 457,
+				"end": 459,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 455,
-				"end": 543,
+				"start": 459,
+				"end": 547,
 				"data": " inline-element sibling + await (breakable, but a component parent never forces) "
 			},
 			{
 				"type": "Text",
-				"start": 543,
-				"end": 544,
+				"start": 547,
+				"end": 548,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "Component",
-				"start": 544,
-				"end": 590,
+				"start": 548,
+				"end": 594,
 				"name": "Comp",
 				"name_loc": {
 					"start": {
-						"line": 13,
+						"line": 15,
 						"column": 1,
-						"character": 545
+						"character": 549
 					},
 					"end": {
-						"line": 13,
+						"line": 15,
 						"column": 5,
-						"character": 549
+						"character": 553
 					}
 				},
 				"attributes": [],
@@ -294,19 +294,19 @@
 					"nodes": [
 						{
 							"type": "RegularElement",
-							"start": 550,
-							"end": 564,
+							"start": 554,
+							"end": 568,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 13,
+									"line": 15,
 									"column": 7,
-									"character": 551
+									"character": 555
 								},
 								"end": {
-									"line": 13,
+									"line": 15,
 									"column": 11,
-									"character": 555
+									"character": 559
 								}
 							},
 							"attributes": [],
@@ -315,8 +315,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 556,
-										"end": 557,
+										"start": 560,
+										"end": 561,
 										"raw": "s",
 										"data": "s"
 									}
@@ -325,19 +325,19 @@
 						},
 						{
 							"type": "AwaitBlock",
-							"start": 564,
-							"end": 583,
+							"start": 568,
+							"end": 587,
 							"expression": {
 								"type": "Identifier",
-								"start": 572,
-								"end": 573,
+								"start": 576,
+								"end": 577,
 								"loc": {
 									"start": {
-										"line": 13,
+										"line": 15,
 										"column": 28
 									},
 									"end": {
-										"line": 13,
+										"line": 15,
 										"column": 29
 									}
 								},
@@ -350,8 +350,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 574,
-										"end": 575,
+										"start": 578,
+										"end": 579,
 										"raw": "x",
 										"data": "x"
 									}
@@ -365,39 +365,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 590,
-				"end": 592,
+				"start": 594,
+				"end": 596,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 592,
-				"end": 621,
+				"start": 596,
+				"end": 625,
 				"data": " text sibling + await "
 			},
 			{
 				"type": "Text",
-				"start": 621,
-				"end": 622,
+				"start": 625,
+				"end": 626,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "Component",
-				"start": 622,
-				"end": 659,
+				"start": 626,
+				"end": 663,
 				"name": "Comp",
 				"name_loc": {
 					"start": {
-						"line": 16,
+						"line": 18,
 						"column": 1,
-						"character": 623
+						"character": 627
 					},
 					"end": {
-						"line": 16,
+						"line": 18,
 						"column": 5,
-						"character": 627
+						"character": 631
 					}
 				},
 				"attributes": [],
@@ -406,26 +406,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 628,
-							"end": 633,
+							"start": 632,
+							"end": 637,
 							"raw": "text ",
 							"data": "text "
 						},
 						{
 							"type": "AwaitBlock",
-							"start": 633,
-							"end": 652,
+							"start": 637,
+							"end": 656,
 							"expression": {
 								"type": "Identifier",
-								"start": 641,
-								"end": 642,
+								"start": 645,
+								"end": 646,
 								"loc": {
 									"start": {
-										"line": 16,
+										"line": 18,
 										"column": 19
 									},
 									"end": {
-										"line": 16,
+										"line": 18,
 										"column": 20
 									}
 								},
@@ -438,8 +438,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 643,
-										"end": 644,
+										"start": 647,
+										"end": 648,
 										"raw": "x",
 										"data": "x"
 									}
@@ -453,39 +453,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 659,
-				"end": 661,
+				"start": 663,
+				"end": 665,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 661,
-				"end": 696,
+				"start": 665,
+				"end": 700,
 				"data": " {@const} sibling + snippet "
 			},
 			{
 				"type": "Text",
-				"start": 696,
-				"end": 697,
+				"start": 700,
+				"end": 701,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "Component",
-				"start": 697,
-				"end": 749,
+				"start": 701,
+				"end": 753,
 				"name": "Comp",
 				"name_loc": {
 					"start": {
-						"line": 19,
+						"line": 21,
 						"column": 1,
-						"character": 698
+						"character": 702
 					},
 					"end": {
-						"line": 19,
+						"line": 21,
 						"column": 5,
-						"character": 702
+						"character": 706
 					}
 				},
 				"attributes": [],
@@ -494,8 +494,8 @@
 					"nodes": [
 						{
 							"type": "ConstTag",
-							"start": 703,
-							"end": 717,
+							"start": 707,
+							"end": 721,
 							"declaration": {
 								"type": "VariableDeclaration",
 								"kind": "const",
@@ -505,65 +505,65 @@
 										"id": {
 											"type": "Identifier",
 											"name": "a",
-											"start": 711,
-											"end": 712,
+											"start": 715,
+											"end": 716,
 											"loc": {
 												"start": {
-													"line": 19,
+													"line": 21,
 													"column": 14,
-													"character": 711
+													"character": 715
 												},
 												"end": {
-													"line": 19,
+													"line": 21,
 													"column": 15,
-													"character": 712
+													"character": 716
 												}
 											}
 										},
 										"init": {
 											"type": "Literal",
-											"start": 715,
-											"end": 716,
+											"start": 719,
+											"end": 720,
 											"loc": {
 												"start": {
-													"line": 19,
+													"line": 21,
 													"column": 18
 												},
 												"end": {
-													"line": 19,
+													"line": 21,
 													"column": 19
 												}
 											},
 											"value": 1,
 											"raw": "1"
 										},
-										"start": 711,
-										"end": 716
+										"start": 715,
+										"end": 720
 									}
 								],
-								"start": 705,
-								"end": 716
+								"start": 709,
+								"end": 720
 							}
 						},
 						{
 							"type": "SnippetBlock",
-							"start": 717,
-							"end": 742,
+							"start": 721,
+							"end": 746,
 							"expression": {
 								"type": "Identifier",
 								"name": "f",
-								"start": 727,
-								"end": 728,
+								"start": 731,
+								"end": 732,
 								"loc": {
 									"start": {
-										"line": 19,
+										"line": 21,
 										"column": 30,
-										"character": 727
+										"character": 731
 									},
 									"end": {
-										"line": 19,
+										"line": 21,
 										"column": 31,
-										"character": 728
+										"character": 732
 									}
 								}
 							},
@@ -573,8 +573,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 731,
-										"end": 732,
+										"start": 735,
+										"end": 736,
 										"raw": "x",
 										"data": "x"
 									}

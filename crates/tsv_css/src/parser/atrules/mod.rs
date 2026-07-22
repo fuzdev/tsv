@@ -70,9 +70,14 @@ pub(crate) fn parse_atrule<'arena>(
         return Err(parser.error_expected_after("at-rule name", "@"));
     }
 
-    // Internal AST: use decoded value (spec-compliant)
-    let name_ident = parser.current_identifier();
-    let name = parser.alloc_str_in(name_ident);
+    // Internal AST: use decoded value (spec-compliant). The name token's source
+    // span is captured too — the printer emits the name from source (escape-
+    // preserving), not from the decoded string (which may hold a raw control char).
+    let name = parser.current_identifier_in_arena();
+    let name_span = Span {
+        start: parser.span_pos(parser.current_start),
+        end: parser.span_pos(parser.current_end),
+    };
     parser.advance()?;
 
     parser.skip_whitespace()?;
@@ -121,7 +126,7 @@ pub(crate) fn parse_atrule<'arena>(
         // Wrapping is handled in the printer by finding and/or boundaries
         // Fully structuring preludes is a deferred design option — see
         // docs/architecture.md § "Red-Green Trees (Deferred)"
-        let (content, span) = parse_raw_prelude_content(parser, false, true, false)?;
+        let (content, span) = parse_raw_prelude_content(parser, true, false)?;
         PreludeValue::Media { content, span }
     } else {
         // Parse as raw string for other at-rules (@keyframes, @layer, @page, etc.).
@@ -134,7 +139,7 @@ pub(crate) fn parse_atrule<'arena>(
         // stays source-verbatim either way (the printer-facing `content` is what differs);
         // see `convert/mod.rs`.
         let is_namespace = name_lc == "namespace";
-        let (content, span) = parse_raw_prelude_content(parser, false, is_namespace, is_namespace)?;
+        let (content, span) = parse_raw_prelude_content(parser, is_namespace, is_namespace)?;
         PreludeValue::Raw { content, span }
     };
 
@@ -164,6 +169,7 @@ pub(crate) fn parse_atrule<'arena>(
         parser.advance()?;
         return Ok(CssAtrule {
             name,
+            name_span,
             prelude,
             block: None,
             span: Span { start, end },
@@ -174,6 +180,7 @@ pub(crate) fn parse_atrule<'arena>(
 
     Ok(CssAtrule {
         name,
+        name_span,
         prelude,
         block,
         span: Span { start, end },
@@ -200,9 +207,12 @@ pub(super) fn reconsume_prelude_as_raw<'arena>(
 
     // Verbatim prelude text runs from its first token to the boundary token; outer
     // whitespace is trimmed so the public AST (from `span`) and printer `content` agree.
+    // Escape-aware, and CSS-whitespace-only: a prelude can end in an escape whose payload
+    // is that whitespace (`@layer a\ ;`), and an NBSP is prelude content, not padding.
     let raw = &parser.source()[prelude_start_raw..parser.current_start];
-    let content = raw.trim();
-    let content_start_raw = prelude_start_raw + (raw.len() - raw.trim_start().len());
+    let lead = crate::escapes::trim_start_css(raw);
+    let content = crate::escapes::trim_end_preserving_escape(lead);
+    let content_start_raw = prelude_start_raw + (raw.len() - lead.len());
     let content_end_raw = content_start_raw + content.len();
 
     Ok(PreludeValue::Raw {

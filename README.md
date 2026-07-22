@@ -21,11 +21,13 @@ tsv prioritizes, in order:
 1. correctness (Svelte and TypeScript conformance, spec adherence for HTML/CSS/JS)
 2. speed
 3. binary size and memory usage
-4. extensibility (valued but deprioritized)
+4. extensibility (valued but deprioritized), modularity, and reusability
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for stats.
 Compared to Oxc and Biome, tsv (v0.2, not yet published) is faster,
 smaller, and uses less memory to parse and format its supported languages.
+One reason for tsv to exist is to help find the performance bonuses
+being left on the table in the Web ecosystem's increasingly-native implementations.
 
 This is an early release, and reports and feedback are appreciated -
 see the [issues](https://github.com/fuzdev/tsv/issues)
@@ -121,6 +123,11 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
     and there are no config files or CLI options for formatting style;
     i.e. `tsv format` is opinionated like `gofmt`, `zig fmt`, and Python's Black,
     see [CLAUDE.md § Configuration](CLAUDE.md#configuration)
+  - `<svelte:options preserveWhitespace />` is not detected: whitespace handling
+    is uniform (only `<pre>`/`<textarea>` content is whitespace-sensitive), any
+    reformatting under that option is already render-visible, and prettier
+    behaves the same — see
+    [docs/conformance_svelte.md § Template Whitespace](docs/conformance_svelte.md#template-whitespace-clean_nodes)
   - pushes complexity and mess to the printer and JSON conversion,
     out of the parser and internal AST,
     keeping the model clean for the other planned tools
@@ -145,6 +152,7 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
     JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.2
   - no C compiler needed to build tsv
 - optimal
+  - prioritizes speed then binary size and memory usage
   - ships optimal binary artifacts: runtime speed and compiled
     code size are priorities, so if all you need is a formatter or parser,
     a minimal build is available (with lang-specific artifacts likely coming),

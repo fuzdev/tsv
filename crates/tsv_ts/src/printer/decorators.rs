@@ -61,7 +61,7 @@ impl<'a> Printer<'a> {
     /// the same source line stay together with a space (`/* c1 */ /* c2 */`); every
     /// other boundary drops to its own line via a blank-preserving `hardline` —
     /// prettier's leading-comment separator rule (`printLeadingComment`), the same
-    /// rule `push_leading_comment_run` / `build_leading_comments_before` apply for an
+    /// rule `push_leading_comment_run` / `push_leading_comments_before` apply for an
     /// undecorated member. Emits NO trailing separator toward the token:
     /// the decorator layout's own item-join / trailing break connects to it. Shared
     /// by all three decorator comment paths (class-level, member, parameter) so a

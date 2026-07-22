@@ -36,6 +36,7 @@ mod render;
 mod scan;
 
 pub(crate) use declarations::HeritageKeyword;
+pub(crate) use lists::BlankRule;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
 pub(super) use super::{Printer, calls, layout};
@@ -45,11 +46,14 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::{Comment, comments_to_emit_in_range};
 
-/// Small stack-allocated vector of comment references. Inline capacity 4 keeps
-/// the common comment gaps off the heap: 0–2 comments are the bulk, and a short
-/// stacked `//` block (3–4 lines, common in documented code) still fits inline.
-/// A larger run spills to a single heap alloc — exactly what a `Vec` would do.
-pub(crate) type CommentVec<'a> = SmallVec<[&'a Comment; 4]>;
+/// Small stack-allocated vector of comment references. Inline capacity 8 keeps
+/// the common comment gaps off the heap: 0–2 comments are the bulk, and a
+/// stacked `//` block (3–8 lines, common in documented code) still fits inline;
+/// comment-dense corpora put the p99 statement-gap run at 7 (`cargo run -p
+/// tsv_debug --features buffer_stats buffer_sizes` — the histogram source for
+/// this `N`). A larger run spills to a single heap alloc — exactly what a
+/// `Vec` would do.
+pub(crate) type CommentVec<'a> = SmallVec<[&'a Comment; 8]>;
 
 /// Spacing style for comments in doc building
 #[derive(Debug, Clone, Copy)]
@@ -58,7 +62,11 @@ pub(crate) enum CommentSpacing {
     Leading,
     /// Space after comment: `/* c */ `
     Trailing,
-    /// No spacing: `/* c */`
+    /// No spacing around the run: `/* c */`.
+    ///
+    /// ⚠️ This governs the run's **outer** edges only — comments *within* the run are
+    /// still separated, or a multi-comment run fuses into `/* a *//* b */`. The caller
+    /// picks `None` because it has already placed the anchor's space itself.
     None,
 }
 
@@ -103,6 +111,34 @@ pub(crate) enum LeadingGlue {
     /// across a source newline — prettier's assignment/call pull-up
     /// ([`build_rhs_comments_glued_opt`](Printer::build_rhs_comments_glued_opt)).
     AdjacentGlued,
+    /// `Adjacent`, but an author **blank** line after a glued block's `*/` does not
+    /// force the comment onto its own line — it yields with the soft `line` like a
+    /// plain newline. The **value-gap** mode: the gap between a head (`=`, `:`, `as`,
+    /// a keyword) and the value it introduces.
+    ///
+    /// The distinction is which break the blank belongs to. A glued block does not run
+    /// to end-of-line, so nothing forces the value down and the break after `*/` is the
+    /// author's — which tsv reflows at every value position
+    /// ([conformance_prettier.md](../../../../docs/conformance_prettier.md) §Authored
+    /// breaks in value position). A blank line is a property of a line break: collapse
+    /// the break and there are no longer two lines for it to separate, so the blank
+    /// yields with it. `Adjacent` keeps the opposite rule because *its* blank separates
+    /// two list items, which is ordinary authoring tsv preserves (the
+    /// `arrays/end_of_line_block_comment` divergence fixture pins it).
+    ///
+    /// Without this split the two families disagreed on whitespace *quantity*: at a
+    /// value gap one newline collapsed and two hung, while ~20 peer gaps on
+    /// `AdjacentGlued` collapsed both. An author who wants the blank kept writes the
+    /// comment on its own line, where the break IS forced and it survives.
+    AdjacentValueGap,
+}
+
+impl LeadingGlue {
+    /// Whether an author blank line after a glued block's `*/` forces it onto its own
+    /// line (preserving the blank) rather than yielding with the soft `line`.
+    fn blank_forces_own_line(self) -> bool {
+        !matches!(self, Self::AdjacentValueGap)
+    }
 }
 
 impl<'a> Printer<'a> {
@@ -157,6 +193,34 @@ impl<'a> Printer<'a> {
             parts.push(d.literalline());
         }
         parts.push(d.hardline());
+    }
+
+    /// Emit the separator after one comment in a leading run, toward the **physical**
+    /// next comment rather than `emit_next` (the start of the next *emitted* comment,
+    /// or the value/argument when this is the last). An owned comment — glued to the
+    /// token after it, printed by that token's node — is skipped by every emit
+    /// iterator yet still occupies the source gap, so both decisions here must anchor
+    /// past it: [`blank_scan_end`](Self::blank_scan_end) finds the first physical
+    /// comment in `(comment.end, emit_next)`, then a same-line block hugs it with a
+    /// space ([`comment_hugs_next`](Self::comment_hugs_next)) and everything else takes
+    /// the blank-preserving hardline. The single statement of that rule for the
+    /// hand-rolled leading-run emitters whose surrounding loop can't route through
+    /// [`push_leading_comment_run`](Self::push_leading_comment_run)
+    /// (`build_eq_comment_break_rhs`, `append_keyword_value_line_comments`,
+    /// `emit_leading_comments_inline_aware`) — so a run the author glued stays glued
+    /// and a multiline owned comment's own newline is never read as an author blank line.
+    pub(crate) fn push_leading_run_separator(
+        &self,
+        parts: &mut DocBuf,
+        comment: &Comment,
+        emit_next: u32,
+    ) {
+        let next = self.blank_scan_end(comment.span.end, emit_next);
+        if self.comment_hugs_next(comment, next) {
+            parts.push(self.d().text(" "));
+        } else {
+            self.push_blank_preserving_hardline(parts, comment.span.end, next);
+        }
     }
 
     /// Emit the whole gap between two comma-separated items when the gap contains a
@@ -343,6 +407,7 @@ impl<'a> Printer<'a> {
         // comment keeps the inline spacing.
         let mut parts = DocBuf::new();
         let mut prev_was_line = false;
+        let mut prev_end: Option<u32> = None;
         let mut first = true;
         for comment in comments_to_emit_in_range(self.comments, start, end) {
             // Apply filter
@@ -350,12 +415,23 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
+            // An authored blank line between two comments that each occupy their own
+            // line separates two distinct remarks, exactly as a blank between two
+            // statements does, so it survives (`conformance_prettier.md` §"No blank above
+            // a body block's `{`"). Only meaningful where the separator is a `hardline`:
+            // an inline run has no lines to separate.
+            let blank_before = prev_was_line
+                && prev_end.is_some_and(|p| self.has_blank_line_between(p, comment.span.start));
+
             match spacing {
                 CommentSpacing::Leading => {
                     // Separator before this comment: the surrounding-indent `hardline`
                     // after a line comment (no leading space — it starts the line),
                     // else the inline leading space.
                     if !first && prev_was_line {
+                        if blank_before {
+                            parts.push(d.literalline());
+                        }
                         parts.push(d.hardline());
                     } else {
                         parts.push(d.text(" "));
@@ -374,13 +450,26 @@ impl<'a> Printer<'a> {
                     }
                 }
                 CommentSpacing::None => {
-                    if !first && prev_was_line {
-                        parts.push(d.hardline());
+                    if !first {
+                        if prev_was_line {
+                            if blank_before {
+                                parts.push(d.literalline());
+                            }
+                            parts.push(d.hardline());
+                        } else {
+                            // A block comment doesn't end its line, so the next comment
+                            // still needs an explicit separator — without one the run
+                            // fuses into `/* a *//* b */`. `None` suppresses the
+                            // *leading* space before the run, not the separators inside
+                            // it.
+                            parts.push(d.text(" "));
+                        }
                     }
                     parts.push(self.build_comment_doc(comment));
                 }
             }
             prev_was_line = !comment.is_block;
+            prev_end = Some(comment.span.end);
             first = false;
         }
         Some(d.concat(&parts))
@@ -422,6 +511,75 @@ impl<'a> Printer<'a> {
         }
         // `concat` short-circuits the no-comments-in-range case to `empty()`.
         d.concat(&parts)
+    }
+
+    /// Leading comment run for a conditional branch arm (`?`/`:` → branch value):
+    /// each comment takes a space when the next content shares its closing line
+    /// (`? /* c */ v` stays glued), else `soft_sep` — the caller's collapsible
+    /// line, so an authored break after the comment holds when the conditional is
+    /// broken and yields when it is flat. This is prettier's `printLeadingComment`
+    /// separator, except its own-line `hardline` case is deliberately not
+    /// mirrored: tsv re-glues an own-line comment to the operator, so a hardline
+    /// keyed on the authored newline *before* the comment would collapse on the
+    /// second pass (prettier itself is non-idempotent there), and the
+    /// §Authored-breaks-in-value-position rule collapses the fitting form anyway.
+    /// Separator anchors ride the physical next comment
+    /// ([`Self::blank_scan_end`]) so an owned comment glued to the value can't
+    /// desync them.
+    ///
+    /// Line comments never reach this run — both conditional printers route them
+    /// to their breaking layouts — and a line comment's collapsible separator
+    /// would swallow the branch, so that routing is load-bearing.
+    ///
+    /// Returns `None` when the gap has no comments to emit.
+    pub(crate) fn build_branch_comment_run(
+        &self,
+        start: u32,
+        end: u32,
+        soft_sep: DocId,
+    ) -> Option<DocId> {
+        let d = self.d();
+        let mut parts = DocBuf::new();
+        let mut comments = comments_to_emit_in_range(self.comments, start, end).peekable();
+        while let Some(comment) = comments.next() {
+            debug_assert!(
+                comment.is_block,
+                "line comments belong to the breaking layout"
+            );
+            parts.push(self.build_comment_doc(comment));
+            let emit_next = comments.peek().map_or(end, |n| n.span.start);
+            let next = self.blank_scan_end(comment.span.end, emit_next);
+            if self.comment_hugs_next(comment, next) {
+                parts.push(d.text(" "));
+            } else if self.has_blank_line_between(comment.span.end, next) {
+                // An author blank after the comment is itself a break trigger
+                // (prettier breaks the conditional on it too), so the break is
+                // forced and the blank survives — the conditional-branch
+                // carve-out in conformance_prettier.md §Authored breaks in
+                // value position. The expression printer routes blank gaps to
+                // its breaking layout before building a run
+                // (`comment_followed_by_blank`), so this arm serves the
+                // conditional-type branches.
+                parts.push(d.literalline());
+                parts.push(d.hardline());
+            } else {
+                parts.push(soft_sep);
+            }
+        }
+        if parts.is_empty() {
+            None
+        } else {
+            Some(d.concat(&parts))
+        }
+    }
+
+    /// Prepend an optional leading doc (a comment run) to `doc`; `None` passes
+    /// `doc` through untouched, keeping the comment-free path allocation-free.
+    pub(crate) fn prepend_opt(&self, lead: Option<DocId>, doc: DocId) -> DocId {
+        match lead {
+            Some(lead) => self.d().concat(&[lead, doc]),
+            None => doc,
+        }
     }
 
     /// Leading-spacing counterpart of [`Self::build_trailing_comments_hang_next`]: a
@@ -531,12 +689,72 @@ impl<'a> Printer<'a> {
         self.build_leading_comment_run_opt(start, end, LeadingGlue::Adjacent)
     }
 
+    /// The **keyword→operand** gap emitter: `await`→operand, `new`→callee.
+    ///
+    /// One question, one predicate — the gate
+    /// ([`Printer::comments_force_own_line_between`], i.e. the shared
+    /// `comment_hangs_next`) picks the emitter, so the two cannot answer differently:
+    ///
+    /// - It **hangs** (a line comment, or a multiline block the author broke after) →
+    ///   [`Self::build_rhs_comments_opt`], keeping the author's break and its
+    ///   authored separators.
+    /// - Otherwise — a **single-line block in ANY authored position** (glued,
+    ///   trailing the keyword, or on its own line) → the inline emitter. Nothing
+    ///   forces it off the line, so it trails inline and the author's break is
+    ///   reflowed: the keyword→value rule its `as`/`satisfies`, `export =`, and
+    ///   module-header siblings follow. See conformance_prettier.md §Authored breaks
+    ///   in value position.
+    ///
+    /// ⚠️ Emitting the second case through `build_rhs_comments_opt` reads as the
+    /// obvious code and is the bug this replaced: that builder picks each separator
+    /// from the comment's AUTHORED position, so an own-line comment kept a hardline
+    /// while the concat glued it to the keyword. The result — comment pulled up,
+    /// break kept — *is* the glued authoring, which reflows inline on the next pass,
+    /// so the format was not idempotent on its own output. Swapping to
+    /// [`Self::build_rhs_comments_glued_opt`] does not fix it either: no
+    /// [`LeadingGlue`] variant collapses an own-line comment, and it regresses the
+    /// authored-blank case. The routing is the fix, not the glue.
+    ///
+    /// ⚠️ **Do not merge this with `gap_comment_continuation_tail`** (the module-header
+    /// gap emitter) on the strength of their matching gate→{hang, inline} shape. The
+    /// resemblance is structural, not semantic — the *gates differ on purpose* for a
+    /// **glued multiline block** (`kw /* …⏎… */ v`): this gate
+    /// ([`Printer::comment_hangs_next`]) collapses it inline, while the header gap's
+    /// `has_multiline_block_comments_on_page_between` hangs *any* multiline block, glued
+    /// or not — its own doc calls that "this gap's deliberate difference from its
+    /// `build_keyword_to_name_continuation` twin". Unifying them would silently change
+    /// one family or the other.
+    pub(crate) fn build_keyword_operand_comments_opt(&self, start: u32, end: u32) -> Option<DocId> {
+        if self.comments_force_own_line_between(start, end) {
+            self.build_rhs_comments_opt(start, end)
+        } else {
+            self.build_inline_comments_between_doc_trailing_space_opt(start, end)
+        }
+    }
+
+    /// Like `build_rhs_comments_opt`, but an author blank line after a glued block's
+    /// `*/` yields with the soft `line` instead of forcing the comment onto its own
+    /// line — [`LeadingGlue::AdjacentValueGap`], the head→value gap rule. Use at a
+    /// value gap (`=`, `:`, `as`, a keyword); a list gap stays on
+    /// [`build_rhs_comments_opt`](Self::build_rhs_comments_opt), where a blank
+    /// separates two items and is preserved.
+    pub(crate) fn build_value_gap_comments_opt(&self, start: u32, end: u32) -> Option<DocId> {
+        self.build_leading_comment_run_opt(start, end, LeadingGlue::AdjacentValueGap)
+    }
+
     /// Like `build_rhs_comments_opt`, but a single-line block comment glued to the
     /// operator (not on its own line) hugs the value with a space even when the
     /// value follows on the next source line — prettier pulls the value up in the
     /// assignment/call layout (`= /* c */⏎v` → `= /* c */ v`). Positions that keep
-    /// the author's line break for a glued block (decorators, `await` operands,
-    /// object property values, …) stay on the non-gluing `build_rhs_comments_opt`.
+    /// the author's line break for a glued block stay on the non-gluing
+    /// `build_rhs_comments_opt` — a decorator is the clear case (`@dec /* c */⏎class`),
+    /// since its following declaration owns its own line regardless.
+    ///
+    /// ⚠️ Don't grow an example list here without probing each entry: this comment
+    /// previously named `await` operands and object property values as keeping the
+    /// break, and **both actually collapse** (`await /* c */ x`, `k: /* c */ 1`).
+    /// The gluing/non-gluing split is a property of each call site, so the call sites
+    /// are the source of truth, not a list here.
     ///
     /// `return`/`throw` arguments pull up here too, but for a stronger reason than
     /// layout: they are restricted productions, so keeping the break would be ASI and
@@ -578,10 +796,10 @@ impl<'a> Printer<'a> {
     /// (tuples, type params/args, function-type params, the union's first member, the
     /// bracket-break shell, the broken `<T>` cast), the array literal / array pattern
     /// element runs, the body/member runs via
-    /// [`build_leading_comments_before`](Self::build_leading_comments_before) (class,
+    /// [`push_leading_comments_before`](Self::push_leading_comments_before) (class,
     /// interface and enum members, statement lists, type literals, expanded object
     /// patterns), and — for all but its last comment —
-    /// [`build_orphaned_comment_run`](Self::build_orphaned_comment_run).
+    /// [`push_orphaned_comment_run`](Self::push_orphaned_comment_run).
     ///
     /// Three loops still emit a leading run themselves, because their surrounding
     /// separator policy genuinely differs — the import/export specifier list, the
@@ -601,17 +819,36 @@ impl<'a> Printer<'a> {
         let mut comments = comments.peekable();
         while let Some(comment) = comments.next() {
             parts.push(self.build_comment_doc(comment));
-            // The next thing after this comment is the following comment, or the
-            // terminal (value/member/item/body) for the last one.
-            let next = comments.peek().map_or(terminal_pos, |c| c.span.start);
+            // The next thing after this comment — the following comment, or the
+            // terminal (value/member/item/body) for the last one. Anchored on the
+            // PHYSICAL next comment, not just the emitted one: an owned comment (glued
+            // to the value, so printed by the value's node and skipped by the emit
+            // iterator) still occupies the gap here, and both the glue test and the
+            // blank-line scan below are physical questions. Anchoring past it would
+            // unglue a run the author wrote glued (`/* a */ /* b⏎*/ v` → `/* a */` on
+            // its own line) and, worse, read the owned comment's own newline as an
+            // author blank line — inserting one on the next pass (non-idempotent).
+            // Owned comments are always the glued suffix of a leading run, so this
+            // only ever differs at the last emitted comment; bounding `blank_scan_end`
+            // at the emit-next keeps it from over-reaching a caller's filtered set.
+            let next = self.blank_scan_end(
+                comment.span.end,
+                comments.peek().map_or(terminal_pos, |c| c.span.start),
+            );
             let hugs = match glue {
-                LeadingGlue::Adjacent => self.comment_hugs_next(comment, next),
+                // `AdjacentValueGap` differs from `Adjacent` only in the blank-line
+                // rule below, not in the hug test — the soft `line` is the point at a
+                // value gap (it lets a value too long for the comment's line break
+                // below it), so it must not become an unconditional space.
+                LeadingGlue::Adjacent | LeadingGlue::AdjacentValueGap => {
+                    self.comment_hugs_next(comment, next)
+                }
                 // A glued (not own-line) single-line block hugs across a source
                 // newline; the same-line-as-next case still hugs as in `Adjacent`.
                 LeadingGlue::AdjacentGlued => {
                     comment.is_block
                         && (self.is_same_line(comment.span.end, next)
-                            || !self.comment_forces_own_line(comment))
+                            || !self.comment_cannot_glue_to_operator(comment))
                 }
             };
             if hugs {
@@ -619,13 +856,20 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(" "));
             } else if comment.is_block
                 && !self.is_own_line_comment(comment)
-                && !self.has_blank_line_between(comment.span.end, next)
+                && !(glue.blank_forces_own_line()
+                    && self.has_blank_line_between(comment.span.end, next))
             {
                 // A block with a newline *after* its `*/` but none before its `/*`:
                 // prettier's `printLeadingComment` emits a soft `line` here, so what
                 // follows pulls up onto the comment's line when the enclosing group
                 // fits and drops below when it breaks. An own-line block (newline on
                 // both sides) takes the `hardline` branch instead.
+                //
+                // Whether a **blank** line after the `*/` overrides that and forces the
+                // hardline is per-site (`LeadingGlue::blank_forces_own_line`): it does
+                // in a list, where a blank between items is ordinary authoring tsv
+                // preserves, and does not in a value gap, where the blank sits inside a
+                // break already judged unforced.
                 parts.push(d.line());
                 parts.push(continuation);
             } else {
@@ -664,18 +908,24 @@ impl<'a> Printer<'a> {
     }
 
     /// Prepend optional RHS leading comments — block comments in the gap between an
-    /// `=`/`:` and the value (`build_rhs_comments_opt`) — to an already-built
-    /// `value_doc`, returning `value_doc` unchanged when the gap carries none.
-    /// Centralizes the `match build_rhs_comments_opt { Some(c) => concat([c, v]),
-    /// None => v }` idiom shared by the initializer/property value sites (variable
-    /// declarators, class properties, enum members, object property values).
+    /// `=`/`:` and the value — to an already-built `value_doc`, returning `value_doc`
+    /// unchanged when the gap carries none. Centralizes the `match { Some(c) =>
+    /// concat([c, v]), None => v }` idiom shared by the initializer/property value
+    /// sites (variable declarators, class properties, enum members, object property
+    /// values, import-attribute values).
+    ///
+    /// Every caller is a head→value gap, so the run is built in the value-gap mode
+    /// ([`LeadingGlue::AdjacentValueGap`]) — an author blank line after a glued block
+    /// yields with the break rather than forcing the comment onto its own line. A
+    /// *list* gap must not route here; it wants
+    /// [`build_rhs_comments_opt`](Self::build_rhs_comments_opt).
     pub(crate) fn prepend_rhs_comments(
         &self,
         value_doc: DocId,
         start: u32,
         value_start: u32,
     ) -> DocId {
-        match self.build_rhs_comments_opt(start, value_start) {
+        match self.build_value_gap_comments_opt(start, value_start) {
             Some(comments_doc) => self.d().concat(&[comments_doc, value_doc]),
             None => value_doc,
         }
@@ -689,8 +939,12 @@ impl<'a> Printer<'a> {
     /// `build_value` is called only when a break is forced, so a comment-free
     /// initializer never pays to build the value doc here.
     ///
-    /// Shared by variable declarators and for-loop init clauses so both place a
-    /// comment after `=` identically:
+    /// Shared by variable declarators, for-loop init clauses, and enum members so all
+    /// three place a comment after `=` identically. That sharing is the point: the enum
+    /// member emitted its own positional run instead, and drifted twice over — it
+    /// preserved a break the others reflow, and relocated an own-line comment onto the
+    /// `=` line, which is not idempotent (the moved comment reads as glued next pass).
+    /// A new `=`→value gap should route here rather than re-derive the layout:
     ///
     /// - **Line comment** after `=`: mandatory break after `=`. A comment on the
     ///   `=`'s line trails it inline; a comment on its own line leads the value on
@@ -724,9 +978,11 @@ impl<'a> Printer<'a> {
                     trailing.push(self.build_comment_doc(comment));
                 } else {
                     leading.push(self.build_comment_doc(comment));
-                    // Preserve an author blank line before the next comment / value.
-                    let next = after_eq.get(ci + 1).map_or(value_start, |c| c.span.start);
-                    self.push_blank_preserving_hardline(&mut leading, comment.span.end, next);
+                    self.push_leading_run_separator(
+                        &mut leading,
+                        comment,
+                        after_eq.get(ci + 1).map_or(value_start, |c| c.span.start),
+                    );
                 }
             }
             Some(d.concat(&[
@@ -736,7 +992,7 @@ impl<'a> Printer<'a> {
             ]))
         } else if self
             .comments_on_page_between(eq_pos + 1, value_start)
-            .any(|c| self.comment_forces_own_line(c))
+            .any(|c| self.comment_cannot_glue_to_operator(c))
         {
             // Own-line / multiline block → break-after-operator hang.
             let comments_doc = self
