@@ -588,7 +588,6 @@ impl<'a> Printer<'a> {
 
         for i in 1..operands.len() {
             let operand = &operands[i];
-            let prev_operand = &operands[i - 1];
 
             // shouldInlineLogicalExpression: the last operand (non-empty object/array)
             // uses a space instead of line(), keeping operator and RHS on the same line.
@@ -599,7 +598,6 @@ impl<'a> Printer<'a> {
             self.append_post_operator_parts(
                 &mut continuation_parts,
                 op_pos.end,
-                prev_operand.span.end,
                 operand,
                 allow_breaks,
                 prev_forced_break,
@@ -824,12 +822,10 @@ impl<'a> Printer<'a> {
     // the operand plus the four layout flags are all load-bearing here
     // TODO: fold op_end/operand/allow_breaks/lead_with_space/chain_has_comments into a
     // small `PostOperatorCtx` struct to retire the allow (byte-identical output)
-    #[allow(clippy::too_many_arguments)]
     fn append_post_operator_parts(
         &self,
         parts: &mut DocBuf,
         op_end: u32,
-        _prev_operand_end: u32,
         operand: &ChainOperand,
         allow_breaks: bool,
         lead_with_space: bool,

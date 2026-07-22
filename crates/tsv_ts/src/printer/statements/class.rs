@@ -2,6 +2,7 @@
 
 use super::Printer;
 use crate::ast::internal;
+use crate::printer::class_common::{ClassHeaderLayout, ClassHeaderOptions};
 use crate::printer::{CommentSpacing, CommentVec};
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
@@ -189,11 +190,12 @@ impl<'a> Printer<'a> {
                 extends_doc,
                 implements_doc,
                 decl.implements,
-                decl.body.body.is_empty(),
-                decl.body.span.start,
-                group_mode,
-                has_heritage_line_comments,
-                true,
+                ClassHeaderOptions {
+                    body_is_empty: decl.body.body.is_empty(),
+                    body_start: decl.body.span.start,
+                    layout: ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments),
+                    emit_pre_body_comments: true,
+                },
             );
             let continuation = d.concat(&[
                 header_doc,
@@ -218,11 +220,12 @@ impl<'a> Printer<'a> {
             extends_doc,
             implements_doc,
             decl.implements,
-            decl.body.body.is_empty(),
-            decl.body.span.start,
-            group_mode,
-            has_heritage_line_comments,
-            true,
+            ClassHeaderOptions {
+                body_is_empty: decl.body.body.is_empty(),
+                body_start: decl.body.span.start,
+                layout: ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments),
+                emit_pre_body_comments: true,
+            },
         );
 
         d.concat(&[
