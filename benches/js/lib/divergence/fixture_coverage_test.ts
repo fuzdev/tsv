@@ -299,7 +299,6 @@ const KNOWN_PARTIAL: Record<string, string> = {
 	'typescript/expressions/calls/chained/trailing_member_comment_prettier_divergence': '2 hunks',
 	'typescript/statements/switch/case_block_comment_prettier_divergence': '1 hunk',
 	'typescript/statements/switch/discriminant_trailing_comment_prettier_divergence': '1 hunk',
-	'typescript/statements/switch/empty_comment_prettier_divergence': '1 hunk',
 };
 
 /**
