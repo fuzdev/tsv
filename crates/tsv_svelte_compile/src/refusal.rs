@@ -1216,10 +1216,15 @@ pub enum Refusal {
     /// trailing pseudo) are supported.
     #[error("unsupported css selector in <style> (:global/:is/:where/:has/:not/:root/nesting)")]
     CssUnsupportedSelector,
-    /// An attribute selector matched against a dynamic, potentially-enumerable
-    /// attribute value — the oracle's `get_possible_values` bounded static-eval,
-    /// which tsv declines to port (refusing rather than risk a false match).
-    #[error("css attribute selector against a dynamic attribute value (static-eval not ported)")]
+    /// An attribute selector matched against a dynamic attribute value whose
+    /// oracle enumeration (`get_possible_values`, now ported) contains a literal
+    /// tsv cannot stringify byte-exactly — a BigInt, a regex, a non-integer or
+    /// out-of-safe-range number, or an escaped object key. Refusing the whole
+    /// compile is a safe over-refusal (never a dropped value that would
+    /// under-match); the enumerable rest scopes normally.
+    #[error(
+        "css attribute selector against an un-stringifiable dynamic value (bigint/regex/non-integer number)"
+    )]
     CssDynamicAttributeMatch,
     /// A case-insensitive attribute match with a non-ASCII operand (the selector
     /// name/value or the element's attribute name/value). The oracle folds case

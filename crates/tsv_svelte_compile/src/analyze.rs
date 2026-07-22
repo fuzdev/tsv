@@ -240,21 +240,31 @@ pub(crate) fn stringify_value(value: &Value) -> Result<String, Gray> {
 }
 
 /// JS `String(number)` for the safe subset: integer-valued f64 within the safe
-/// range (including `-0` → `"0"`) and `NaN`/`Infinity`. Everything else `Gray`
-/// (shortest-roundtrip + exponent formatting is not ported).
-fn stringify_number(n: f64) -> Result<String, Gray> {
+/// range (including `-0` → `"0"`) and `NaN`/`Infinity`. `None` for everything else
+/// (shortest-roundtrip + exponent formatting is not ported). The shared integer
+/// discipline the CSS dynamic-attribute static-eval (`css_scope`) reuses for a
+/// numeric `Literal`.
+pub(crate) fn stringify_js_number(n: f64) -> Option<String> {
     if n.is_nan() {
-        return Ok("NaN".to_string());
+        return Some("NaN".to_string());
     }
     if n.is_infinite() {
-        return Ok(if n > 0.0 { "Infinity" } else { "-Infinity" }.to_string());
+        return Some(if n > 0.0 { "Infinity" } else { "-Infinity" }.to_string());
     }
     const SAFE: f64 = 9_007_199_254_740_991.0; // 2^53 - 1
     if n.fract() == 0.0 && n.abs() <= SAFE {
         // -0 prints as "0".
-        return Ok(format!("{}", n as i64));
+        return Some(format!("{}", n as i64));
     }
-    gray(format!("non-integer numeric fold ({n})"))
+    None
+}
+
+/// [`stringify_js_number`] in the evaluator's `Gray`-refusal idiom.
+fn stringify_number(n: f64) -> Result<String, Gray> {
+    match stringify_js_number(n) {
+        Some(s) => Ok(s),
+        None => gray(format!("non-integer numeric fold ({n})")),
+    }
 }
 
 /// The rune base names (`$state` → `state`, …). A `$name` whose base is a rune is

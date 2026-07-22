@@ -224,14 +224,78 @@ fn compile_css_refused_selector_shapes() {
 }
 
 #[test]
-fn compile_css_dynamic_attribute_value_match_refuses() {
-    // A VALUED attribute selector matched against a same-named dynamic attribute
-    // value the oracle would `get_possible_values`-enumerate (here an all-literal
-    // ternary) is not ported — refuse rather than risk a false match.
+fn compile_css_dynamic_attribute_value_enumerated_no_match_prunes() {
+    // A VALUED attribute selector against a same-named dynamic attribute value the
+    // oracle `get_possible_values`-enumerates (an all-literal ternary → {'a','b'})
+    // is now ported: neither branch matches `[data-x="z"]`, so the selector matches
+    // no element and refuses `CssSelectorNoMatch` (the oracle comment-wraps it) —
+    // NOT `CssDynamicAttributeMatch`. Confirms the ternary was enumerated, not
+    // assume-matched.
     assert_unsupported(
         "<script>let c = $state(true);</script>\n<p data-x={c ? 'a' : 'b'}>y</p>\n<style>[data-x=\"z\"]{ color: red }</style>",
-        "dynamic attribute value",
+        "matches no element",
     );
+}
+
+#[test]
+fn compile_css_dynamic_attribute_logical_and_falsy_bounded() {
+    // A non-`class` `&&` injects the falsy quartet (`''`/`false`/`NaN`/`0`), so
+    // `[data-x=""]` matches (the `''` member) and the element scopes — but the set
+    // is BOUNDED, so a selector for a value not in it (`[data-x="q"]`) still prunes.
+    let css = compile_css(
+        "<script>let c = $state(true);</script>\n<p data-x={c && 'v'}>y</p>\n<style>[data-x=\"\"]{ color: red }</style>",
+    );
+    assert_eq!(css, "[data-x=\"\"].svelte-tsvhash{ color: red }");
+    assert_unsupported(
+        "<script>let c = $state(true);</script>\n<p data-x={c && 'v'}>y</p>\n<style>[data-x=\"q\"]{ color: red }</style>",
+        "matches no element",
+    );
+}
+
+#[test]
+fn compile_css_dynamic_attribute_ts_wrapper_erased_before_gather() {
+    // The oracle erases TypeScript in phase 1, BEFORE CSS analysis, so `{false as
+    // true}` is gathered as `false` → {"false"} — it does NOT match `[data-active=
+    // 'true']`, so the selector matches no element and refuses `CssSelectorNoMatch`.
+    // Reading the raw `TSAsExpression` (not stripping the wrapper) would fall to
+    // `else → UNKNOWN → assume-match` and OVER-scope the element (a MISMATCH the
+    // corpus caught). This pins the wrapper strip. Shape = the `unused-ts-as-
+    // expression` Svelte suite fixture.
+    assert_unsupported(
+        "<script lang=\"ts\">\n\t//\n</script>\n<div data-active={false as true}>\n\t<span></span>\n</div>\n<style>[data-active='true'] > span{ background-color: red }</style>",
+        "matches no element",
+    );
+}
+
+#[test]
+fn compile_css_dynamic_attribute_ts_wrapper_nested_enumerates() {
+    // A wrapper nested inside a conditional branch is stripped by the recursion's
+    // per-entry strip: `c ? (0 as any) : (1 as any)` enumerates {"0","1"}. `[data-x=
+    // "0"]` matches (scopes) while `[data-x="9"]` prunes — confirming the branches
+    // were ENUMERATED through the wrappers, not assume-matched.
+    let css = compile_css(
+        "<script lang=\"ts\">let c = $state(true);</script>\n<p data-x={c ? (0 as any) : (1 as any)}>y</p>\n<style>[data-x=\"0\"]{ color: red }</style>",
+    );
+    assert_eq!(css, "[data-x=\"0\"].svelte-tsvhash{ color: red }");
+    assert_unsupported(
+        "<script lang=\"ts\">let c = $state(true);</script>\n<p data-x={c ? (0 as any) : (1 as any)}>y</p>\n<style>[data-x=\"9\"]{ color: red }</style>",
+        "matches no element",
+    );
+}
+
+#[test]
+fn compile_css_dynamic_attribute_unstringifiable_literal_refuses() {
+    // An otherwise-enumerable set carrying a literal tsv cannot stringify byte-exactly
+    // refuses the whole compile (a safe over-refusal — the oracle enumerates it, e.g.
+    // `String(0.5)="0.5"`, so tsv declines rather than drop the value and under-match).
+    // A non-integer number, a BigInt, and a regex each hit the `CssDynamicAttributeMatch`
+    // arm (narrowed to exactly this un-stringifiable residual).
+    for value in ["0.5", "10n", "/x/"] {
+        assert_unsupported(
+            &format!("<p data-x={{{value}}}>y</p>\n<style>[data-x=\"z\"]{{ color: red }}</style>"),
+            "un-stringifiable dynamic value",
+        );
+    }
 }
 
 #[test]

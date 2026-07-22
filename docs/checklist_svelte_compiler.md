@@ -1353,8 +1353,12 @@ bump resets per comma. A scoped element with no `class` markup synthesizes
     unsupported `:global` form (`:global(a, b)`, `.x:global`, `:global(<chain>)`), a
     bare pseudo-only compound, and namespaced/escaped names;
   - `css attribute selector against a dynamic attribute value (static-eval not ported)`
-    — an enumerable dynamic attribute value the oracle's `get_possible_values` would
-    enumerate (a safe over-refusal; a single plain expression still assume-matches);
+    — the oracle's `get_possible_values` bounded static-eval + multi-chunk combination
+    loop is ported, so a dynamic/mixed value is enumerated and tested; this bucket now
+    fires only when an otherwise-enumerable set contains a literal tsv cannot stringify
+    byte-exactly (BigInt, regex, non-integer / out-of-safe-range number, escaped object
+    key) — refusing the whole compile is a safe over-refusal (an UNKNOWN chunk still
+    assume-matches);
   - `css case-insensitive match with a non-ASCII operand (Unicode case-fold not ported)`;
   - `css selector {selector} matches no element (pruning not implemented)`.
 - **Planned** (each its own follow-up sub-slice): `:global { … }` global blocks (a

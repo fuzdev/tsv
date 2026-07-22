@@ -1408,12 +1408,21 @@ classes, this one enumerates scoping candidates.
   matching runs for a `-global-` keyframes and one `@media`-nested too (the prune walk is
   name-blind). Keyframes is discriminated case-SENSITIVELY, so `@KEYFRAMES` recurses as a
   group at-rule and its `from`/`to` refuse via `CssSelectorNoMatch`.
-  **Refused**: `:global{}`
+  A **dynamic or mixed attribute value** (`class={x?'a':'b'}`, `class={['a', c&&'b']}`,
+  `class="pre-{x}"`, `data-x={0}`) is matched by porting the oracle's
+  `get_possible_values` bounded static-eval (`css/utils.js`) + the multi-chunk
+  combination loop (`css-prune.js:747-818`) in `attribute_matches`: the candidate
+  values are enumerated and each tested. An `UNKNOWN` chunk (a plain identifier /
+  member / call / template / non-`class` array-object / `&&`-with-unknown-left, …)
+  assume-matches; an un-stringifiable literal inside an otherwise-enumerable set
+  (BigInt, regex, non-integer / out-of-safe-range number, escaped object key) refuses
+  the whole compile (`CssDynamicAttributeMatch` — a safe over-refusal, never a dropped
+  value that would under-match). **Refused**: `:global{}`
   global blocks (nested rules), `:is`/`:where`/`:has`/`:not`, `:root`/`:host`, nesting,
   the `||` column combinator, a snippet/render-crossing combinator path
   (`CssCombinatorSelector` — the site-resolution product isn't built, a safe
-  over-refusal), empty rules (`CssEmptyRule`), an enumerable dynamic attribute value
-  (`CssDynamicAttributeMatch`), a non-ASCII case-insensitive operand
+  over-refusal), empty rules (`CssEmptyRule`), an un-stringifiable dynamic attribute
+  value (`CssDynamicAttributeMatch`, above), a non-ASCII case-insensitive operand
   (`CssCaseInsensitiveNonAscii`), and a chain matching no element
   (`CssSelectorNoMatch`).
 

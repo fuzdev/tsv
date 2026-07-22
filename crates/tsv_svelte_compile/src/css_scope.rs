@@ -44,12 +44,14 @@ use tsv_css::ast::internal::{
 };
 use tsv_lang::Span;
 use tsv_svelte::ast::internal::{AttributeNode, AttributeValue, Element, SpecialElement, Style};
-use tsv_ts::ast::internal::Expression;
+use tsv_ts::ast::internal::{BinaryOperator, Expression, Literal, LiteralValue, ObjectProperty};
 
+use crate::analyze::stringify_js_number;
 use crate::element_census::{
     CensusNode, ElementCensus, PathFrame, get_ancestor_elements, get_possible_element_siblings,
     has_element_parent,
 };
+use crate::script_decls::plain_identifier_str;
 use crate::text_class::{is_css_whitespace, is_js_whitespace};
 use crate::transform_server::unsupported;
 use crate::{CompileError, Refusal};
@@ -1347,9 +1349,13 @@ fn is_attribute_whitelisted(element_name: &str, attr_name: &str) -> bool {
         && attr_name.eq_ignore_ascii_case("open")
 }
 
-/// Port of the oracle's `attribute_matches` (`css-prune.js:713-822`). The
-/// `get_possible_values` bounded static-eval is not ported: a single plain
-/// expression (`{x}`) is `UNKNOWN` → assume match; anything enumerable refuses.
+/// Port of the oracle's `attribute_matches` (`css-prune.js:713-822`), including the
+/// `get_possible_values` bounded static-eval and the multi-chunk combination loop: a
+/// dynamic or mixed attribute value (`class={x?'a':'b'}`, `class={['a', c&&'b']}`,
+/// `class="pre-{x}"`, `data-x={0}`) is enumerated and each candidate tested. An
+/// `UNKNOWN` chunk (a plain identifier / member / call / template / …) assume-matches
+/// (`Ok(true)`); an un-stringifiable literal inside an otherwise-enumerable set
+/// refuses (`CssDynamicAttributeMatch`) rather than drop a value and under-match.
 #[allow(clippy::too_many_arguments)]
 fn attribute_matches(
     element: CensusNode<'_>,
@@ -1402,12 +1408,19 @@ fn attribute_matches(
                     }
                     return Ok(matches);
                 }
-                if let [AttributeValue::ExpressionTag(tag)] = values
-                    && is_unknown_expression(&tag.expression)
-                {
+                // The general chunks path (`css-prune.js:747-818`): a match returns
+                // `true`; NO match falls through to the next attribute (the oracle has
+                // no `return false` here — unlike the text path above).
+                if attribute_chunks_match(
+                    values,
+                    &name_lower,
+                    expected,
+                    operator,
+                    case_insensitive,
+                    source,
+                )? {
                     return Ok(true);
                 }
-                return Err(unsupported(Refusal::CssDynamicAttributeMatch));
             }
             _ => {}
         }
@@ -1415,11 +1428,324 @@ fn attribute_matches(
     Ok(false)
 }
 
-fn is_unknown_expression(expr: &Expression<'_>) -> bool {
-    matches!(
-        expr,
-        Expression::Identifier(_) | Expression::MemberExpression(_) | Expression::CallExpression(_)
-    )
+/// The oracle's multi-chunk combination loop (`css-prune.js:747-818`): enumerate the
+/// whitespace-delimited candidate values of a dynamic/mixed attribute and test each
+/// against the selector. Returns `Ok(true)` where the oracle `return true`s — an
+/// `UNKNOWN` chunk (`if (!current_possible_values) return true`), the `prev_values >
+/// 20` exponential bailout, or a matching candidate — and `Ok(false)` when it
+/// computes every combination and none match (the oracle then falls through to the
+/// next attribute). An un-stringifiable literal in an enumerable set refuses.
+fn attribute_chunks_match(
+    chunks: &[AttributeValue<'_>],
+    name_lower: &str,
+    expected: &str,
+    operator: Option<AttributeMatcher>,
+    case_insensitive: bool,
+    source: &str,
+) -> Result<bool, CompileError> {
+    let is_class = name_lower == "class";
+    let mut possible_values: HashSet<String> = HashSet::new();
+    let mut prev_values: Vec<String> = Vec::new();
+
+    for chunk in chunks {
+        let Some(current) = get_possible_values(chunk, is_class, source)? else {
+            // impossible to find out all combinations
+            return Ok(true);
+        };
+
+        if !prev_values.is_empty() {
+            let mut start_with_space: Vec<String> = Vec::new();
+            let mut remaining: Vec<String> = Vec::new();
+            for value in &current {
+                if starts_with_js_whitespace(value) {
+                    start_with_space.push(value.clone());
+                } else {
+                    remaining.push(value.clone());
+                }
+            }
+            if !remaining.is_empty() {
+                if !start_with_space.is_empty() {
+                    for prev in &prev_values {
+                        possible_values.insert(prev.clone());
+                    }
+                }
+                let mut combined: Vec<String> = Vec::new();
+                for prev in &prev_values {
+                    for value in &remaining {
+                        combined.push(format!("{prev}{value}"));
+                    }
+                }
+                prev_values = combined;
+                for value in &start_with_space {
+                    if ends_with_js_whitespace(value) {
+                        possible_values.insert(value.clone());
+                    } else {
+                        prev_values.push(value.clone());
+                    }
+                }
+                // The oracle `continue`s here, skipping the trailing push + `> 20`
+                // check for this chunk (so `combined` can transiently exceed 20).
+                continue;
+            }
+            for prev in &prev_values {
+                possible_values.insert(prev.clone());
+            }
+            prev_values = Vec::new();
+        }
+        for value in &current {
+            if ends_with_js_whitespace(value) {
+                possible_values.insert(value.clone());
+            } else {
+                prev_values.push(value.clone());
+            }
+        }
+        if prev_values.len() < current.len() {
+            prev_values.push(" ".to_string());
+        }
+        if prev_values.len() > 20 {
+            // might grow exponentially, bail out
+            return Ok(true);
+        }
+    }
+    for prev in &prev_values {
+        possible_values.insert(prev.clone());
+    }
+
+    for value in &possible_values {
+        // ASCII-fold parity guard, mirroring the single-text path: a non-ASCII
+        // operand under `i` folds differently in Rust than in JS `toLowerCase`.
+        if case_insensitive && !value.is_ascii() {
+            return Err(unsupported(Refusal::CssCaseInsensitiveNonAscii));
+        }
+        if test_attribute(operator, expected, case_insensitive, value) {
+            return Ok(true);
+        }
+    }
+    Ok(false)
+}
+
+/// `/^\s/.test(s)` — the first character is JS whitespace (`is_js_whitespace` = JS
+/// `\s`). Empty string → `false`.
+fn starts_with_js_whitespace(s: &str) -> bool {
+    s.chars().next().is_some_and(is_js_whitespace)
+}
+
+/// `/\s$/.test(s)` — the last character is JS whitespace.
+fn ends_with_js_whitespace(s: &str) -> bool {
+    s.chars().next_back().is_some_and(is_js_whitespace)
+}
+
+/// The oracle's `get_possible_values` (`css/utils.js:85-96`): a `Text` chunk yields
+/// its decoded data; an `{expression}` chunk is gathered. `Ok(None)` = the oracle's
+/// `null` (the set contained `UNKNOWN` → assume match). An un-stringifiable literal
+/// refuses.
+fn get_possible_values(
+    chunk: &AttributeValue<'_>,
+    is_class: bool,
+    source: &str,
+) -> Result<Option<Vec<String>>, CompileError> {
+    match chunk {
+        AttributeValue::Text(text) => Ok(Some(vec![text.data(source).into_owned()])),
+        AttributeValue::ExpressionTag(tag) => {
+            let mut set = GatherSet::default();
+            gather_possible_values(&tag.expression, is_class, &mut set, false, source)?;
+            if set.unknown {
+                return Ok(None);
+            }
+            Ok(Some(
+                set.values.iter().map(PossibleValue::stringify).collect(),
+            ))
+        }
+    }
+}
+
+/// A member of the oracle's possible-values `Set`. A JS `Set` dedups on RAW values
+/// *before* `String(...)` maps them, so the falsy quartet the `&&` handling injects
+/// (`false`, `NaN`, `0`) must stay distinct from same-spelling string literals to
+/// reproduce the set's size exactly — the `prev_values > 20` bailout is the only
+/// observer, but the fidelity is free. A `Literal` always contributes a `Str` (the
+/// oracle adds `String(node.value)` immediately); only the injection adds the raw
+/// non-strings.
+#[derive(PartialEq, Eq, Hash, Clone)]
+enum PossibleValue {
+    Str(String),
+    /// Raw `false` — `String(false)` = `"false"`.
+    False,
+    /// Raw `0` — `String(0)` = `"0"`.
+    Zero,
+    /// Raw `NaN` — `String(NaN)` = `"NaN"`.
+    Nan,
+}
+
+impl PossibleValue {
+    /// `String(value)` — how the oracle stringifies each set member.
+    fn stringify(&self) -> String {
+        match self {
+            PossibleValue::Str(s) => s.clone(),
+            PossibleValue::False => "false".to_string(),
+            PossibleValue::Zero => "0".to_string(),
+            PossibleValue::Nan => "NaN".to_string(),
+        }
+    }
+
+    /// JS falsiness — the empty string, and the injected `false`/`0`/`NaN`.
+    fn is_falsy(&self) -> bool {
+        match self {
+            PossibleValue::Str(s) => s.is_empty(),
+            PossibleValue::False | PossibleValue::Zero | PossibleValue::Nan => true,
+        }
+    }
+}
+
+/// The oracle's `set` threaded through `gather_possible_values`: the concrete
+/// members plus the `UNKNOWN` sentinel (a flag, since it is queried but never
+/// stringified). Once `unknown`, `get_possible_values` returns `null`.
+#[derive(Default)]
+struct GatherSet {
+    values: HashSet<PossibleValue>,
+    unknown: bool,
+}
+
+/// Follow the TypeScript-expression wrappers to their inner expression, mirroring
+/// `erase.rs`'s "five TS wrappers + `JsdocCast` unwrap to inner". The oracle erases
+/// TypeScript in phase 1 before CSS analysis, so its `get_possible_values` sees the
+/// erased value; tsv's CSS matcher reads the raw AST, so it must unwrap here.
+///
+/// ⚠️ This list MUST stay exhaustive against `erase.rs`'s wrapper arms (the five
+/// `TS*` + `JsdocCast`) — a forgotten wrapper variant falls to `else → UNKNOWN →
+/// assume-match` and re-introduces an over-match MISMATCH for that variant.
+/// (`ParenthesizedExpression` is deliberately absent: template expressions parse with
+/// `preserve_parens: false`, so no paren node reaches here.) A pure reference-follow,
+/// no allocation.
+fn strip_ts_wrappers<'a, 'arena>(mut node: &'a Expression<'arena>) -> &'a Expression<'arena> {
+    loop {
+        node = match node {
+            Expression::TSAsExpression(n) => n.expression,
+            Expression::TSSatisfiesExpression(n) => n.expression,
+            Expression::TSNonNullExpression(n) => n.expression,
+            Expression::TSInstantiationExpression(n) => n.expression,
+            Expression::TSTypeAssertion(n) => n.expression,
+            Expression::JsdocCast(cast) => cast.inner,
+            _ => return node,
+        };
+    }
+}
+
+/// The oracle's `gather_possible_values` (`css/utils.js:11-78`). Adds each concrete
+/// value the expression can take to `set`, or marks it `UNKNOWN`. An un-stringifiable
+/// literal (BigInt / regex / non-integer number / escaped object key) refuses.
+fn gather_possible_values(
+    node: &Expression<'_>,
+    is_class: bool,
+    set: &mut GatherSet,
+    is_nested: bool,
+    source: &str,
+) -> Result<(), CompileError> {
+    if set.unknown {
+        // no point traversing any further
+        return Ok(());
+    }
+    // The oracle erases TypeScript in phase 1, BEFORE CSS analysis, so a value like
+    // `{false as true}` it gathers is already `false`. tsv reads the raw, un-erased
+    // template expression here, so strip the TS-expression wrappers to their inner
+    // expression first (else a `TSAsExpression` falls to `else → UNKNOWN` and
+    // over-matches). Stripping at entry also covers wrappers nested in the
+    // conditional/logical/array/object sub-expressions this fn recurses into.
+    let node = strip_ts_wrappers(node);
+    match node {
+        Expression::Literal(lit) => {
+            set.values.insert(literal_possible_value(lit, source)?);
+        }
+        // The oracle treats a regex as an enumerable `Literal` (`String(/x/)` =
+        // `"/x/"`); tsv models it as a distinct node and cannot reproduce its
+        // source-format stringification, so refuse rather than fall to UNKNOWN and
+        // over-match a selector the oracle would prune.
+        Expression::RegexLiteral(_) => {
+            return Err(unsupported(Refusal::CssDynamicAttributeMatch));
+        }
+        Expression::ConditionalExpression(cond) => {
+            gather_possible_values(cond.consequent, is_class, set, is_nested, source)?;
+            gather_possible_values(cond.alternate, is_class, set, is_nested, source)?;
+        }
+        // Svelte's parser routes `&&` / `||` / `??` through `BinaryExpression`; the
+        // oracle's `LogicalExpression` arm is exactly `operator.is_logical()`.
+        Expression::BinaryExpression(bin) if bin.operator.is_logical() => {
+            if bin.operator == BinaryOperator::AmpersandAmpersand {
+                // `&&` is special: the left value is only included when it is falsy.
+                let mut left = GatherSet::default();
+                gather_possible_values(bin.left, is_class, &mut left, is_nested, source)?;
+                if left.unknown {
+                    // Add the non-nullish falsy values, unless this is a `class`
+                    // attribute processed by clsx inside an array/object.
+                    if !is_class || !is_nested {
+                        set.values.insert(PossibleValue::Str(String::new()));
+                        set.values.insert(PossibleValue::False);
+                        set.values.insert(PossibleValue::Nan);
+                        set.values.insert(PossibleValue::Zero);
+                    }
+                } else {
+                    for value in &left.values {
+                        if value.is_falsy() && (!is_class || !is_nested) {
+                            set.values.insert(value.clone());
+                        }
+                    }
+                }
+                gather_possible_values(bin.right, is_class, set, is_nested, source)?;
+            } else {
+                gather_possible_values(bin.left, is_class, set, is_nested, source)?;
+                gather_possible_values(bin.right, is_class, set, is_nested, source)?;
+            }
+        }
+        Expression::ArrayExpression(arr) if is_class => {
+            // `.flatten()` skips a hole (the oracle's `if (entry)`); a spread element
+            // is a non-Literal node → the recursion marks it UNKNOWN via the else arm.
+            for entry in arr.elements.iter().flatten() {
+                gather_possible_values(entry, is_class, set, true, source)?;
+            }
+        }
+        Expression::ObjectExpression(obj) if is_class => {
+            for property in obj.properties {
+                if set.unknown {
+                    break;
+                }
+                match property {
+                    ObjectProperty::Property(p) if !p.computed => match &p.key {
+                        Expression::Identifier(id) => match plain_identifier_str(id, source) {
+                            Some(name) => {
+                                set.values.insert(PossibleValue::Str(name.to_string()));
+                            }
+                            // An escaped key's decoded name is not reproduced here;
+                            // refuse (safe over-refusal) rather than UNKNOWN-assume.
+                            None => return Err(unsupported(Refusal::CssDynamicAttributeMatch)),
+                        },
+                        Expression::Literal(lit) => {
+                            set.values.insert(literal_possible_value(lit, source)?);
+                        }
+                        _ => set.unknown = true,
+                    },
+                    _ => set.unknown = true,
+                }
+            }
+        }
+        _ => set.unknown = true,
+    }
+    Ok(())
+}
+
+/// `String(node.value)` for a `Literal` — the value the oracle adds to the set. A
+/// BigInt (radix/source-format risk) and a non-integer / out-of-safe-range number
+/// refuse, mirroring `analyze`'s integer-only stringification discipline.
+fn literal_possible_value(lit: &Literal<'_>, source: &str) -> Result<PossibleValue, CompileError> {
+    let value = match &lit.value {
+        LiteralValue::String(s) => s.resolve(lit.span, source).to_string(),
+        LiteralValue::Boolean(b) => if *b { "true" } else { "false" }.to_string(),
+        LiteralValue::Null => "null".to_string(),
+        LiteralValue::Number(n) => {
+            stringify_js_number(*n).ok_or_else(|| unsupported(Refusal::CssDynamicAttributeMatch))?
+        }
+        LiteralValue::BigInt => return Err(unsupported(Refusal::CssDynamicAttributeMatch)),
+    };
+    Ok(PossibleValue::Str(value))
 }
 
 fn test_attribute(
