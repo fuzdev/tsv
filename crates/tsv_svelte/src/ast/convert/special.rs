@@ -15,8 +15,8 @@ use tsv_lang::{
     Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span, estimated_json_capacity,
 };
 use tsv_ts::ast::convert::{
-    CommentMode, Schema, SkeletonRecorder, SkeletonTree, WriterComments, write_expression_embedded,
-    write_program_embedded, write_variable_declaration_embedded,
+    CommentMode, ProgramLoc, Schema, SkeletonRecorder, SkeletonTree, WriterComments,
+    write_expression_embedded, write_program_embedded, write_variable_declaration_embedded,
 };
 
 use super::comment_attachment::{
@@ -243,9 +243,8 @@ pub(super) fn build_script_writer_comments(
         source,
         LocationMapper::identity(tracker),
         schema,
-        (dummy, dummy),
+        ProgramLoc::Emit(dummy, dummy), // skeleton pass: bytes discarded, loc irrelevant
         CommentMode::Record(&recorder),
-        true, // skeleton pass: bytes discarded, loc irrelevant
     );
     let tree = recorder.finish();
     let root = tree.roots()[0];
