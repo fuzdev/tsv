@@ -752,8 +752,7 @@ pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
         let a = n.abs();
         if (1e-6..1e-5).contains(&a) {
             // `{a:e}` is the shortest round-trip scientific form (`d[.ddd]e-6`);
-            // its mantissa digits are exactly `s` in the spec, so the fixed form
-            // is `0.` + five zeros + those digits.
+            // its mantissa digits are exactly `s` in the spec.
             let sci = format!("{a:e}");
             let mantissa = sci.split('e').next().unwrap_or(&sci);
             let mut out = String::with_capacity(8 + mantissa.len());
