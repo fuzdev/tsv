@@ -75,19 +75,19 @@ const INDEX_UNIT_ROUNDTRIP_PRETTY_PIN: usize = 14;
 /// are invariant gates; the counts below pin the in-scope denominators +
 /// parse-divergence census so any drift (a harness-port change, a tsv parser
 /// change, or a typescript-go pull) forces a deliberate re-pin.
-const RUN_IN_SCOPE_TESTS_PIN: usize = 9388;
-const RUN_IN_SCOPE_VARIANTS_PIN: usize = 9887;
-const RUN_EXPECT_CLEAN_PIN: usize = 4435;
-const RUN_BASELINED_PARSED_PIN: usize = 4446;
-const RUN_PARSE_REJECTED_PIN: usize = 1006;
-const RUN_PARSE_REJECTED_NO_BASELINE_PIN: usize = 45;
-const RUN_PARSE_REJECTED_TS1XXX_PIN: usize = 451;
-const RUN_PARSE_REJECTED_OTHER_PIN: usize = 510;
+const RUN_IN_SCOPE_TESTS_PIN: usize = 9389;
+const RUN_IN_SCOPE_VARIANTS_PIN: usize = 9888;
+const RUN_EXPECT_CLEAN_PIN: usize = 4436;
+const RUN_BASELINED_PARSED_PIN: usize = 4462;
+const RUN_PARSE_REJECTED_PIN: usize = 990;
+const RUN_PARSE_REJECTED_NO_BASELINE_PIN: usize = 44;
+const RUN_PARSE_REJECTED_TS1XXX_PIN: usize = 456;
+const RUN_PARSE_REJECTED_OTHER_PIN: usize = 490;
 const RUN_SCRIPT_RETRY_PIN: usize = 25;
 /// Tracked parser crashes carved out of the sweep (the `CRASH_EXCLUSIONS`
 /// ledger). Pinned so the ledger can't grow or shrink silently — a move means a
 /// tsv parser robustness change (a fix removes an entry; a regression adds one).
-const RUN_CRASH_EXCLUDED_PIN: usize = 1;
+const RUN_CRASH_EXCLUDED_PIN: usize = 0;
 
 /// REGRESSION PINS (exact, two-sided) for the family grading (the bind + merge +
 /// check + flow gate). Measured vs pin 168e7015. `family_extra` is gated to 0
@@ -111,7 +111,7 @@ const RUN_CRASH_EXCLUDED_PIN: usize = 1;
 /// (matches gained) is a real improvement that re-pins; a rise in `other` fails the
 /// run. `family_match` / `family_missing` are the aggregate totals (573 / 37);
 /// `dup_*` / `flow_*` pin the sub-family partitions.
-const RUN_FAMILY_GRADED_PIN: usize = 4066;
+const RUN_FAMILY_GRADED_PIN: usize = 4083;
 const RUN_FAMILY_POSITIVE_PIN: usize = 140;
 const RUN_FAMILY_MATCH_PIN: usize = 573;
 const RUN_FAMILY_MISSING_PIN: usize = 37;
@@ -157,7 +157,7 @@ const RUN_MISSING_CAUSE_PINS: [(MissingCause, &str, usize); 4] = [
         RUN_MISSING_DEFERRED_CFA_PIN,
     ),
 ];
-const RUN_CARVE_OUT_RULE_A_PIN: usize = 380;
+const RUN_CARVE_OUT_RULE_A_PIN: usize = 379;
 const RUN_CARVE_OUT_RULE_A_FAMILY_PIN: usize = 11;
 const RUN_MODULE_DETECTION_PIN: usize = 1;
 

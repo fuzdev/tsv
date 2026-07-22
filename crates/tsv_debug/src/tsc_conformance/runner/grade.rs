@@ -108,17 +108,12 @@ enum CrashKind {
 /// reported (never silently). Each entry names its cause + kind; the list is a
 /// tracked-defect ledger, not a way to hide bugs. A [`CrashKind::CatchablePanic`]
 /// entry is liveness-probed every run (see [`probe_crash_exclusion`]).
-const CRASH_EXCLUSIONS: &[(&str, CrashKind)] = &[
-    // tsv_ts robustness bug: `export * from <identifier>;` (a non-string module
-    // specifier) trips a `debug_assert!(TokenKind::String)` in
-    // `parse_string_literal` (parser/mod.rs). Dev-profile only (debug_assert is
-    // compiled out in release), so `cargo run` — the gate's profile — panics.
-    // A future tsv_ts fix should reject the form gracefully; then drop this entry.
-    (
-        "exportDeclarationInInternalModule.ts",
-        CrashKind::CatchablePanic,
-    ),
-];
+///
+/// Currently empty — no tracked parser crasher in the in-scope corpus. (The
+/// former `exportDeclarationInInternalModule.ts` entry — `export * from
+/// <identifier>;` tripping a `debug_assert!` in `parse_string_literal` — no
+/// longer panics.)
+const CRASH_EXCLUSIONS: &[(&str, CrashKind)] = &[];
 
 /// The [`CrashKind`] of a crash-excluded test, or `None` if not excluded.
 fn crash_exclusion_kind(basename: &str) -> Option<CrashKind> {
