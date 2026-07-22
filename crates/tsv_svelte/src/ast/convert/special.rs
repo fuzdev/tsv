@@ -15,7 +15,7 @@ use tsv_lang::{
     Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span, estimated_json_capacity,
 };
 use tsv_ts::ast::convert::{
-    CommentMode, ProgramLoc, Schema, SkeletonRecorder, SkeletonTree, WriterComments,
+    CommentMode, EmbedWriter, ProgramLoc, Schema, SkeletonRecorder, SkeletonTree, WriterComments,
     write_expression_embedded, write_program_embedded, write_variable_declaration_embedded,
 };
 
@@ -39,6 +39,23 @@ fn skeleton_writer(island_span: Span) -> JsonWriter {
     ))
 }
 
+/// The `EmbedWriter` a byte-space skeleton pass hands to a `tsv_ts` embedded
+/// writer: identity map (comment-attach spans line up in byte space), the
+/// `Record` role, and `emit_loc: true` — the skeleton bytes are discarded, only
+/// the recorded tree is used, so the emitted `loc` is irrelevant.
+fn skeleton_env<'a>(
+    source: &'a str,
+    tracker: &'a LocationTracker,
+    recorder: &'a SkeletonRecorder,
+) -> EmbedWriter<'a> {
+    EmbedWriter {
+        source,
+        loc: LocationMapper::identity(tracker),
+        comments: CommentMode::Record(recorder),
+        emit_loc: true,
+    }
+}
+
 /// Record an internal expression's wire tree via a byte-space skeleton emit
 /// (identity map) — the structure the island-scoped attach passes walk.
 fn expression_skeleton(
@@ -48,15 +65,22 @@ fn expression_skeleton(
 ) -> SkeletonTree {
     let recorder = SkeletonRecorder::new();
     let mut w = skeleton_writer(expr.span());
-    write_expression_embedded(
-        &mut w,
-        expr,
-        source,
-        LocationMapper::identity(tracker),
-        CommentMode::Record(&recorder),
-        true, // skeleton pass: bytes discarded, loc irrelevant
-    );
+    write_expression_embedded(&mut w, expr, skeleton_env(source, tracker, &recorder));
     recorder.finish()
+}
+
+/// The inputs every template comment-attach builder (`build_*_writer_comments`)
+/// shares: the template comments to place, the source text, and the byte-offset
+/// tracker its byte-space skeleton pass runs under. Bundled so the call sites —
+/// and `build_expression_list_writer_comments`, which would otherwise trip
+/// `too_many_arguments` — thread one value instead of the same three.
+/// (`build_script_writer_comments` is not in the set: it attaches the script's
+/// *own* comments, not the template set, and is schema-driven.)
+#[derive(Clone, Copy)]
+pub(super) struct AttachInputs<'a> {
+    pub(super) template_comments: &'a [&'a Comment],
+    pub(super) source: &'a str,
+    pub(super) tracker: &'a LocationTracker,
 }
 
 /// Build the per-node comment map for a comment-bearing template expression
@@ -70,19 +94,17 @@ fn expression_skeleton(
 /// each node's close.
 pub(super) fn build_expression_writer_comments(
     expr: &tsv_ts::ast::internal::Expression<'_>,
-    template_comments: &[&Comment],
-    source: &str,
-    tracker: &LocationTracker,
+    attach: AttachInputs<'_>,
     container_start: u32,
     range_end: u32,
 ) -> WriterComments {
-    let tree = expression_skeleton(expr, source, tracker);
+    let tree = expression_skeleton(expr, attach.source, attach.tracker);
     let mut out = WriterComments::default();
     try_attach_comments_to_node(
         &tree,
         tree.roots()[0],
-        template_comments,
-        source,
+        attach.template_comments,
+        attach.source,
         container_start,
         range_end,
         &mut out,
@@ -103,28 +125,26 @@ pub(super) fn build_expression_writer_comments(
 /// and is reproduced at emit time.
 pub(super) fn build_const_tag_writer_comments(
     tag: &internal::ConstTag<'_>,
-    template_comments: &[&Comment],
-    source: &str,
-    tracker: &LocationTracker,
+    attach: AttachInputs<'_>,
 ) -> WriterComments {
     let id_span = tag.id.span();
     let mut out = WriterComments::default();
-    let id_tree = expression_skeleton(&tag.id, source, tracker);
+    let id_tree = expression_skeleton(&tag.id, attach.source, attach.tracker);
     try_attach_comments_to_node(
         &id_tree,
         id_tree.roots()[0],
-        template_comments,
-        source,
+        attach.template_comments,
+        attach.source,
         id_span.start,
         id_span.end,
         &mut out,
     );
-    let init_tree = expression_skeleton(&tag.init, source, tracker);
+    let init_tree = expression_skeleton(&tag.init, attach.source, attach.tracker);
     try_attach_comments_to_node(
         &init_tree,
         init_tree.roots()[0],
-        template_comments,
-        source,
+        attach.template_comments,
+        attach.source,
         id_span.end,
         tag.span.end,
         &mut out,
@@ -139,9 +159,7 @@ pub(super) fn build_const_tag_writer_comments(
 /// comment leading a later declarator (`{let a = 1, /* c */ b}`) unattached.
 pub(super) fn build_declaration_tag_writer_comments(
     var_decl: &tsv_ts::ast::internal::VariableDeclaration<'_>,
-    template_comments: &[&Comment],
-    source: &str,
-    tracker: &LocationTracker,
+    attach: AttachInputs<'_>,
     tag_start: u32,
     tag_end: u32,
 ) -> WriterComments {
@@ -150,18 +168,15 @@ pub(super) fn build_declaration_tag_writer_comments(
     write_variable_declaration_embedded(
         &mut w,
         var_decl,
-        source,
-        LocationMapper::identity(tracker),
-        CommentMode::Record(&recorder),
-        true, // skeleton pass: bytes discarded, loc irrelevant
+        skeleton_env(attach.source, attach.tracker, &recorder),
     );
     let tree = recorder.finish();
     let mut out = WriterComments::default();
     try_attach_comments_to_node(
         &tree,
         tree.roots()[0],
-        template_comments,
-        source,
+        attach.template_comments,
+        attach.source,
         tag_start,
         tag_end,
         &mut out,
@@ -178,34 +193,25 @@ pub(super) fn build_declaration_tag_writer_comments(
 /// spans. `wrapper_end` is the discarded parse wrapper's end (`{@debug}`'s
 /// `SequenceExpression` — its last item never claims a trailing comment);
 /// `None` for snippet parameters.
-#[allow(clippy::too_many_arguments)]
 pub(super) fn build_expression_list_writer_comments(
     items: &[tsv_ts::ast::internal::Expression<'_>],
-    template_comments: &[&Comment],
-    source: &str,
-    tracker: &LocationTracker,
+    attach: AttachInputs<'_>,
     container_start: u32,
     range_end: u32,
     wrapper_end: Option<u32>,
 ) -> WriterComments {
     let recorder = SkeletonRecorder::new();
     let mut w = skeleton_writer(Span::new(container_start, range_end));
+    let env = skeleton_env(attach.source, attach.tracker, &recorder);
     for item in items {
-        write_expression_embedded(
-            &mut w,
-            item,
-            source,
-            LocationMapper::identity(tracker),
-            CommentMode::Record(&recorder),
-            true, // skeleton pass: bytes discarded, loc irrelevant
-        );
+        write_expression_embedded(&mut w, item, env);
     }
     let tree = recorder.finish();
     let mut out = WriterComments::default();
     attach_expression_list(
         &tree,
-        template_comments,
-        source,
+        attach.template_comments,
+        attach.source,
         container_start,
         range_end,
         wrapper_end,
