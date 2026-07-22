@@ -704,14 +704,9 @@ pub(super) fn write_name(
 
 /// Emit a numeric literal value the way acorn's JSON does: non-finite as
 /// `null` (JSON has no Infinity/NaN — an overflow literal like `1e999`),
-/// integral doubles as expanded shortest-round-trip integers (JS
-/// `JSON.stringify` semantics), everything else as ryu.
-///
-/// Known divergence (pre-existing, carried over from the typed converter):
-/// integral doubles in `(u64::MAX, 1e21)` — e.g. `1e20` — emit ryu's `1e+20`
-/// where JS prints expanded digits.
-/// TODO: emit JS-style expanded text for integral doubles beyond `u64` up to
-/// 1e21 (fixtures-first).
+/// integral doubles below `1e21` as their expanded shortest-round-trip integer
+/// digits and integral doubles at/above `1e21` in exponential form (JS
+/// `Number::toString` / `JSON.stringify` semantics), everything else as ryu.
 pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
     if !n.is_finite() {
         // ±Inf → null, matching JSON.stringify (a parsed literal is never NaN).
@@ -736,6 +731,15 @@ pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
         }
         if let Ok(v) = shortest.parse::<u64>() {
             w.u64(v);
+            return;
+        }
+        // Beyond u64 but below 1e21, JS `Number::toString` still prints the
+        // expanded integer (the spec's `k <= n <= 21` case); `shortest` —
+        // Rust's shortest-round-trip Display — already holds those exact digits.
+        // At/above 1e21 JS switches to exponential, where Rust's Display would
+        // wrongly keep expanding, so that range falls through to ryu (`w.f64`).
+        if n.abs() < 1e21 {
+            w.raw(&shortest);
             return;
         }
     }
