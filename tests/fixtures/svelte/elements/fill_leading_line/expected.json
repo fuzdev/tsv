@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 372,
+	"end": 579,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -110,38 +110,38 @@
 			{
 				"type": "Text",
 				"start": 143,
-				"end": 145,
-				"raw": "\n\n",
-				"data": "\n\n"
+				"end": 144,
+				"raw": "\n",
+				"data": "\n"
 			},
 			{
 				"type": "Comment",
-				"start": 145,
-				"end": 233,
-				"data": " breaks AT that leading `line`: it must become the newline, not a space after it "
+				"start": 144,
+				"end": 441,
+				"data": " overflows: the glued `~{yyyyyyyyyy}` rides its line (prettier keeps it, tsv now matches), and\n     the leading `line` before `ccccc` becomes the newline itself — not a newline followed by the\n     space it stood for, which would strand a leading space at the head of the continuation line "
 			},
 			{
 				"type": "Text",
-				"start": 233,
-				"end": 234,
+				"start": 441,
+				"end": 442,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 234,
-				"end": 371,
+				"start": 442,
+				"end": 578,
 				"name": "li",
 				"name_loc": {
 					"start": {
-						"line": 7,
+						"line": 8,
 						"column": 1,
-						"character": 235
+						"character": 443
 					},
 					"end": {
-						"line": 7,
+						"line": 8,
 						"column": 3,
-						"character": 237
+						"character": 445
 					}
 				},
 				"attributes": [],
@@ -150,26 +150,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 238,
-							"end": 271,
+							"start": 446,
+							"end": 479,
 							"raw": "\n\taaaaa aaaaa aaaaa aaaaa aaaaa ~",
 							"data": "\n\taaaaa aaaaa aaaaa aaaaa aaaaa ~"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 271,
-							"end": 283,
+							"start": 479,
+							"end": 491,
 							"expression": {
 								"type": "Identifier",
-								"start": 272,
-								"end": 282,
+								"start": 480,
+								"end": 490,
 								"loc": {
 									"start": {
-										"line": 8,
+										"line": 9,
 										"column": 33
 									},
 									"end": {
-										"line": 8,
+										"line": 9,
 										"column": 43
 									}
 								},
@@ -178,27 +178,27 @@
 						},
 						{
 							"type": "Text",
-							"start": 283,
-							"end": 328,
-							"raw": " bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb\n\t~",
-							"data": " bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb\n\t~"
+							"start": 491,
+							"end": 535,
+							"raw": " bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb ~",
+							"data": " bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb ~"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 328,
-							"end": 340,
+							"start": 535,
+							"end": 547,
 							"expression": {
 								"type": "Identifier",
-								"start": 329,
-								"end": 339,
+								"start": 536,
+								"end": 546,
 								"loc": {
 									"start": {
 										"line": 9,
-										"column": 3
+										"column": 89
 									},
 									"end": {
 										"line": 9,
-										"column": 13
+										"column": 99
 									}
 								},
 								"name": "yyyyyyyyyy"
@@ -206,8 +206,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 340,
-							"end": 366,
+							"start": 547,
+							"end": 573,
 							"raw": "\n\tccccc ccccc ccccc ccccc\n",
 							"data": "\n\tccccc ccccc ccccc ccccc\n"
 						}

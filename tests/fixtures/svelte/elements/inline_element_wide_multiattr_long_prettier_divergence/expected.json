@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 188,
+	"end": 187,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "RegularElement",
 				"start": 0,
-				"end": 187,
+				"end": 186,
 				"name": "p",
 				"name_loc": {
 					"start": {
@@ -205,9 +205,9 @@
 						{
 							"type": "Text",
 							"start": 163,
-							"end": 183,
-							"raw": "\n\ttail1 tail2 tail3\n",
-							"data": "\n\ttail1 tail2 tail3\n"
+							"end": 182,
+							"raw": " tail1 tail2 tail3\n",
+							"data": " tail1 tail2 tail3\n"
 						}
 					]
 				}
