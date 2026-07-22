@@ -18,10 +18,10 @@
 //
 // ## Module Organization
 //
-// - **analysis.rs**: Linearization, grouping, merge decisions, SymbolLookup trait
+// - **analysis.rs**: Linearization, grouping, merge decisions
 // - **types.rs**: Core data structures (ChainNode, ChainGroup)
-// - **printing.rs**: Node/group rendering, ChainPrinter trait
-// - **adapter.rs**: ChainPrinter/SymbolLookup impls binding the main Printer to this module
+// - **printing.rs**: Node/group rendering
+// - **adapter.rs**: chain-helper methods on the main Printer
 // - **builder/**: Doc building logic split into focused submodules
 //   - mod.rs: Main build_chain_doc entry point
 //   - member_only.rs: Member-only chains using fill()
@@ -39,11 +39,10 @@ mod types;
 
 // Re-export public API
 pub use analysis::{
-    SymbolLookup, group_chain_nodes, linearize_chain_from_call, linearize_chain_from_member,
+    group_chain_nodes, linearize_chain_from_call, linearize_chain_from_member,
     linearize_chain_from_non_null,
 };
 pub use builder::build_chain_doc;
-pub use printing::ChainPrinter;
 pub use types::ChainNode;
 #[cfg(feature = "buffer_stats")]
 pub use types::{ChainGroupNodesVec, ChainGroupVec, ChainNodeVec};

@@ -699,8 +699,7 @@ impl<'a> Printer<'a> {
         let softline = d.softline();
         let inner = d.concat(&[softline, content]);
         let indented = d.indent(inner);
-        let softline2 = d.softline();
-        let concat = d.concat(&[d.text("{"), indented, softline2, d.text("}")]);
+        let concat = d.concat(&[d.text("{"), indented, softline, d.text("}")]);
         d.group(concat)
     }
 

@@ -151,7 +151,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::Const) => {
                 // Check for `export const enum` declaration
                 let declaration = if self.peek_kind() == TokenKind::Keyword(KeywordKind::Enum) {
-                    self.parse_enum_declaration(true, false)?
+                    self.parse_enum_declaration(true)?
                 } else {
                     self.parse_variable_declaration()?
                 };
@@ -159,7 +159,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             // export enum ...
             TokenKind::Keyword(KeywordKind::Enum) => {
-                let decl = self.parse_enum_declaration(false, false)?;
+                let decl = self.parse_enum_declaration(false)?;
                 Ok(self.export_named(start, decl, ExportKind::Value))
             }
             TokenKind::Keyword(KeywordKind::Function) => {
@@ -245,7 +245,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     }
                     // export namespace/module
                     "namespace" | "module" => {
-                        let decl = self.parse_module_declaration(false, false)?;
+                        let decl = self.parse_module_declaration()?;
                         Ok(self.export_named(start, decl, ExportKind::Value))
                     }
                     _ => {
@@ -308,7 +308,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     return Err(self.error_expected_after("'function'", "async"));
                 }
 
-                let result = self.parse_function_declaration_or_declare(false, true)?;
+                let result = self.parse_function_declaration_or_declare(true)?;
                 match result {
                     ExportFunctionDeclaration::Declaration(mut func) => {
                         // Update span to include 'async' keyword
@@ -325,7 +325,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             TokenKind::Keyword(KeywordKind::Function) => {
                 // Name is optional for export default function() {}
-                let result = self.parse_function_declaration_or_declare(false, false)?;
+                let result = self.parse_function_declaration_or_declare(false)?;
                 match result {
                     ExportFunctionDeclaration::Declaration(func) => {
                         let end = func.span.end;
