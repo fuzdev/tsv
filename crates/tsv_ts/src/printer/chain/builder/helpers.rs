@@ -18,7 +18,6 @@ use tsv_lang::doc::{DocBuf, arena::DocId};
 pub(crate) struct ChainPartsBuilder<'a, 'p, 'pr> {
     parts: &'p mut DocBuf,
     printer: &'a Printer<'pr>,
-    use_hardline: bool,
     use_expanded: bool,
 }
 
@@ -26,7 +25,6 @@ impl<'a, 'p, 'pr> ChainPartsBuilder<'a, 'p, 'pr> {
     pub(crate) fn new(
         parts: &'p mut DocBuf,
         printer: &'a Printer<'pr>,
-        use_hardline: bool,
         use_expanded: bool,
         group_count: usize,
     ) -> Self {
@@ -37,7 +35,6 @@ impl<'a, 'p, 'pr> ChainPartsBuilder<'a, 'p, 'pr> {
         Self {
             parts,
             printer,
-            use_hardline,
             use_expanded,
         }
     }
@@ -96,21 +93,11 @@ impl<'a, 'p, 'pr> ChainPartsBuilder<'a, 'p, 'pr> {
     /// and the member-only breaking path render gap comments identically.
     fn add_comments_and_break(&mut self, group: &ChainGroup<'_>) {
         if let Some((object_end, property_start)) = group_comment_gap(group, self.printer) {
-            push_gap_comments_and_break(
-                self.parts,
-                self.printer,
-                object_end,
-                property_start,
-                self.use_hardline,
-            );
+            push_gap_comments_and_break(self.parts, self.printer, object_end, property_start);
         } else {
             // No member range - just add line break
             let d = self.printer.arena();
-            self.parts.push(if self.use_hardline {
-                d.hardline()
-            } else {
-                d.softline()
-            });
+            self.parts.push(d.hardline());
         }
     }
 
@@ -134,7 +121,6 @@ pub(crate) fn build_rest_parts_with_comments<'a>(
     parts: &mut DocBuf,
     rest_groups: &[ChainGroup<'a>],
     printer: &Printer<'_>,
-    use_hardline: bool,
     use_expanded: bool,
 ) {
     // Check if last group is a simple member (no calls) - it should stay on same line as `})`
@@ -160,18 +146,12 @@ pub(crate) fn build_rest_parts_with_comments<'a>(
             }
         });
 
-    let mut builder = ChainPartsBuilder::new(
-        parts,
-        printer,
-        use_hardline,
-        use_expanded,
-        rest_groups.len(),
-    );
+    let mut builder = ChainPartsBuilder::new(parts, printer, use_expanded, rest_groups.len());
     for (i, group) in rest_groups.iter().enumerate() {
         // Don't add hardline before last group if it's a simple member WITHOUT
         // comments that force a break
         let is_last = i == rest_groups.len() - 1;
-        if is_last && last_is_simple_member && use_hardline && !last_has_break_forcing_comments {
+        if is_last && last_is_simple_member && !last_has_break_forcing_comments {
             builder.add_group_no_break(group);
         } else {
             builder.add_group(group);
@@ -207,7 +187,7 @@ pub(super) fn build_expanded_chain_doc<'a>(
 
     // Print rest with hardlines and indent (including trailing comments and blank line preservation)
     let mut rest_parts = d.pooled_docbuf();
-    build_rest_parts_with_comments(&mut rest_parts, rest, printer, true, false);
+    build_rest_parts_with_comments(&mut rest_parts, rest, printer, false);
 
     d.concat(&[first_doc, d.indent(d.concat(&rest_parts))])
 }

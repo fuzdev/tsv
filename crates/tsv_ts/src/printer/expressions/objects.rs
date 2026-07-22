@@ -828,27 +828,21 @@ impl<'a> Printer<'a> {
     /// past the key — after the `]` for computed keys — used to anchor the search
     /// for following comments/modifiers.
     ///
-    /// `unquote` drops quotes from an identifier-valid string-literal key: `true`
-    /// for property signatures (`'plain': T` → `plain: T`) and method signatures
-    /// (`'foo'(): void` → `foo(): void` — prettier 3.9 unquotes these too).
-    /// Computed keys are always emitted verbatim inside their brackets.
+    /// Drops quotes from an identifier-valid string-literal key for property
+    /// signatures (`'plain': T` → `plain: T`) and method signatures (`'foo'(): void`
+    /// → `foo(): void` — prettier 3.9 unquotes these too). Computed keys are always
+    /// emitted verbatim inside their brackets.
     pub(in crate::printer) fn build_type_member_key_doc(
         &self,
         search_start: u32,
         key: &Expression<'_>,
         computed: bool,
-        unquote: bool,
     ) -> (DocId, u32) {
         if computed {
             let key_doc = self.build_expression_doc(key);
             self.build_computed_key_bracket_doc(search_start, key, key_doc)
         } else {
-            let doc = if unquote {
-                self.build_property_key_doc(key)
-            } else {
-                self.build_expression_doc(key)
-            };
-            (doc, key.span().end)
+            (self.build_property_key_doc(key), key.span().end)
         }
     }
 

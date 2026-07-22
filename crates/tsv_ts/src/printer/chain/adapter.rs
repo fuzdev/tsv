@@ -72,7 +72,7 @@ impl<'a> Printer<'a> {
         same_line_only: bool,
     ) -> DocId {
         let block_comments = if same_line_only {
-            self.filter_block_comments(start, end, true)
+            self.filter_block_comments(start, end)
         } else {
             comments_to_emit_in_range(self.comments, start, end)
                 .filter(|c| c.is_block)

@@ -203,16 +203,12 @@ impl<'a> Printer<'a> {
     /// # Arguments
     /// * `start` - Start position (e.g., end of previous chain element)
     /// * `end` - End position (e.g., start of next chain element)
-    /// * `same_line` - If true, returns comments on same line as start; if false, returns comments on their own lines
-    pub(crate) fn filter_block_comments(
-        &self,
-        start: u32,
-        end: u32,
-        same_line: bool,
-    ) -> CommentVec<'_> {
+    ///
+    /// Returns the block comments on the same source line as `start`.
+    pub(crate) fn filter_block_comments(&self, start: u32, end: u32) -> CommentVec<'_> {
         comments_to_emit_in_range(self.comments, start, end)
             .filter(|c| c.is_block)
-            .filter(|c| same_line == self.is_same_line(start, c.span.start))
+            .filter(|c| self.is_same_line(start, c.span.start))
             .collect()
     }
 

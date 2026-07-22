@@ -288,13 +288,7 @@ pub(crate) fn print_node_inner<'a>(
             // consecutive ones onto one line where the first `//` swallows the rest.
             if !pre_bracket.trailing_line.is_empty() || !pre_bracket.leading_line.is_empty() {
                 let mut parts = DocBuf::new();
-                push_gap_comments_and_break(
-                    &mut parts,
-                    printer,
-                    *object_end,
-                    bracket_open_pos,
-                    true,
-                );
+                push_gap_comments_and_break(&mut parts, printer, *object_end, bracket_open_pos);
                 parts.push(bracket_doc);
                 return d.concat(&parts);
             }
@@ -572,19 +566,13 @@ pub(crate) fn push_gap_comments_and_break(
     printer: &Printer<'_>,
     object_end: u32,
     property_start: u32,
-    use_hardline: bool,
 ) {
     // Chain-level zero-comment gate: a comment-free chain span has no comment in this
     // gap (gap ⊆ span), so the only non-empty part below is the line break — the
     // classification and its four empty comment pushes collapse to nothing. Emit just
     // the break. Byte-identical (empty comment slots render to nothing).
     if !printer.chain_has_comments() {
-        parts.push(build_chain_line_break(
-            printer,
-            object_end,
-            property_start,
-            use_hardline,
-        ));
+        parts.push(build_chain_line_break(printer, object_end, property_start));
         return;
     }
 
@@ -596,12 +584,7 @@ pub(crate) fn push_gap_comments_and_break(
     // Trailing line comments (same line as previous element), via line_suffix
     parts.push(printer.build_trailing_line_doc(&classified.trailing_line));
     // Line break with blank line preservation
-    parts.push(build_chain_line_break(
-        printer,
-        object_end,
-        property_start,
-        use_hardline,
-    ));
+    parts.push(build_chain_line_break(printer, object_end, property_start));
 
     // When comments exist, build_chain_line_break skips blank line detection.
     // Check for blank lines before the first comment and after the last comment.
@@ -609,7 +592,7 @@ pub(crate) fn push_gap_comments_and_break(
         !classified.leading_block.is_empty() || !classified.leading_line.is_empty();
 
     // Blank line before first leading comment
-    if use_hardline && has_leading_comments {
+    if has_leading_comments {
         let first_start = classified
             .leading_block
             .first()
@@ -630,7 +613,7 @@ pub(crate) fn push_gap_comments_and_break(
     parts.push(printer.build_chain_leading_comments_doc(&classified.leading_line));
 
     // Blank line after last leading comment (before property)
-    if use_hardline && has_leading_comments {
+    if has_leading_comments {
         let last_end = classified
             .leading_line
             .last()
@@ -670,22 +653,17 @@ pub(crate) fn group_comment_gap(
     node_comment_gap(group.nodes.first()?, printer)
 }
 
-/// Build a line break doc with optional blank line preservation
+/// Build a line break doc with blank line preservation
 ///
 /// Returns:
-/// - `softline` when `use_hardline` is false
 /// - `hardline` when no blank line in source
 /// - `literalline + hardline` when blank line should be preserved
 pub(crate) fn build_chain_line_break(
     printer: &Printer<'_>,
     object_end: u32,
     property_start: u32,
-    use_hardline: bool,
 ) -> DocId {
     let d = printer.arena();
-    if !use_hardline {
-        return d.softline();
-    }
 
     // Check for blank line preservation (only when no comments - comments handle their own spacing)
     // When there are comments between obj and property, the 2+ newlines (one before comment,

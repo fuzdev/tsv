@@ -13,7 +13,7 @@
 // the embedded TS `<script>`/`{expr}` and CSS `<style>` ASTs, which share the
 // same `Bump`) is one bump-allocated graph, freed wholesale when the `Bump`
 // drops. `Style` holds a `CssStyleSheet<'arena>` borrowing that shared arena.
-// Leaf nodes that hold only `Span`/`Symbol`/primitives carry no lifetime
+// Leaf nodes that hold only `Span`/primitives carry no lifetime
 // (`HtmlComment`, `Text`, `SvelteOptions`, the `*Tag`-with-no-expression nodes).
 
 use std::borrow::Cow;

@@ -308,7 +308,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     return Err(self.error_expected_after("'function'", "async"));
                 }
 
-                let result = self.parse_function_declaration_or_declare(false, true)?;
+                let result = self.parse_function_declaration_or_declare(true)?;
                 match result {
                     ExportFunctionDeclaration::Declaration(mut func) => {
                         // Update span to include 'async' keyword
@@ -325,7 +325,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             TokenKind::Keyword(KeywordKind::Function) => {
                 // Name is optional for export default function() {}
-                let result = self.parse_function_declaration_or_declare(false, false)?;
+                let result = self.parse_function_declaration_or_declare(false)?;
                 match result {
                     ExportFunctionDeclaration::Declaration(func) => {
                         let end = func.span.end;

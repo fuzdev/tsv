@@ -132,24 +132,6 @@ impl KeywordKind {
         }
     }
 
-    /// Returns true if this is a declaration keyword (const, let, var, function)
-    #[inline]
-    pub const fn is_declaration_keyword(self) -> bool {
-        matches!(
-            self,
-            KeywordKind::Const | KeywordKind::Let | KeywordKind::Var
-        )
-    }
-
-    /// Returns true if this is a literal keyword (true, false, null, undefined)
-    #[inline]
-    pub const fn is_literal_keyword(self) -> bool {
-        matches!(
-            self,
-            KeywordKind::True | KeywordKind::False | KeywordKind::Null | KeywordKind::Undefined
-        )
-    }
-
     /// Returns true if this is a type keyword (number, string, boolean, etc.)
     #[inline]
     pub const fn is_type_keyword(self) -> bool {

@@ -160,7 +160,7 @@ impl PoolSpan {
     }
 }
 
-/// Text content in a Doc - static, owned, or a symbol to resolve at print time
+/// Text content in a Doc - a static string, a pooled owned string, or a source span resolved at print time
 #[derive(Debug, Clone)]
 pub enum DocText {
     /// Static string literal - no allocation, just stores pointer.
