@@ -1,0 +1,682 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 509,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `//` comment authored on the `(` line of a return/throw argument stays trailing",
+			"start": 20,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the `(`; prettier relocates it to its own line. The comment forces the parens to",
+			"start": 106,
+			"end": 189,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " break either way — the only question is whether it leads the argument line or",
+			"start": 191,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trails the `(`.",
+			"start": 273,
+			"end": 291,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 324,
+			"end": 328,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 11
+				},
+				"end": {
+					"line": 7,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 375,
+			"end": 379,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 11
+				},
+				"end": {
+					"line": 12,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 427,
+			"end": 431,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 11
+				},
+				"end": {
+					"line": 17,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 477,
+			"end": 481,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 10
+				},
+				"end": {
+					"line": 22,
+					"column": 14
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 508,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 499,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 26,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 293,
+					"end": 345,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 302,
+						"end": 308,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 10
+							},
+							"end": {
+								"line": 6,
+								"column": 16
+							}
+						},
+						"name": "assign"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 311,
+						"end": 345,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 19
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 315,
+								"end": 342,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 4
+									}
+								},
+								"argument": {
+									"type": "AssignmentExpression",
+									"start": 332,
+									"end": 337,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 3
+										},
+										"end": {
+											"line": 8,
+											"column": 8
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 332,
+										"end": 333,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 3
+											},
+											"end": {
+												"line": 8,
+												"column": 4
+											}
+										},
+										"name": "a"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 336,
+										"end": 337,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 7
+											},
+											"end": {
+												"line": 8,
+												"column": 8
+											}
+										},
+										"name": "b"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 324,
+											"end": 328
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `//` comment authored on the `(` line of a return/throw argument stays trailing",
+							"start": 20,
+							"end": 104
+						},
+						{
+							"type": "Line",
+							"value": " the `(`; prettier relocates it to its own line. The comment forces the parens to",
+							"start": 106,
+							"end": 189
+						},
+						{
+							"type": "Line",
+							"value": " break either way — the only question is whether it leads the argument line or",
+							"start": 191,
+							"end": 271
+						},
+						{
+							"type": "Line",
+							"value": " trails the `(`.",
+							"start": 273,
+							"end": 291
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 347,
+					"end": 395,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 356,
+						"end": 359,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 10
+							},
+							"end": {
+								"line": 11,
+								"column": 13
+							}
+						},
+						"name": "seq"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 362,
+						"end": 395,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 16
+							},
+							"end": {
+								"line": 15,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 366,
+								"end": 392,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 4
+									}
+								},
+								"argument": {
+									"type": "SequenceExpression",
+									"start": 383,
+									"end": 387,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 3
+										},
+										"end": {
+											"line": 13,
+											"column": 7
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 383,
+											"end": 384,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 3
+												},
+												"end": {
+													"line": 13,
+													"column": 4
+												}
+											},
+											"name": "a"
+										},
+										{
+											"type": "Identifier",
+											"start": 386,
+											"end": 387,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 6
+												},
+												"end": {
+													"line": 13,
+													"column": 7
+												}
+											},
+											"name": "b"
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 375,
+											"end": 379
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 397,
+					"end": 444,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 406,
+						"end": 411,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 10
+							},
+							"end": {
+								"line": 16,
+								"column": 15
+							}
+						},
+						"name": "ident"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 414,
+						"end": 444,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 18
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 418,
+								"end": 441,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 4
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 435,
+									"end": 436,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 3
+										},
+										"end": {
+											"line": 18,
+											"column": 4
+										}
+									},
+									"name": "a",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 427,
+											"end": 431
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 446,
+					"end": 498,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 455,
+						"end": 462,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 10
+							},
+							"end": {
+								"line": 21,
+								"column": 17
+							}
+						},
+						"name": "thrower"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 465,
+						"end": 498,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 20
+							},
+							"end": {
+								"line": 25,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ThrowStatement",
+								"start": 469,
+								"end": 495,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 4
+									}
+								},
+								"argument": {
+									"type": "AssignmentExpression",
+									"start": 485,
+									"end": 490,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 3
+										},
+										"end": {
+											"line": 23,
+											"column": 8
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 485,
+										"end": 486,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 3
+											},
+											"end": {
+												"line": 23,
+												"column": 4
+											}
+										},
+										"name": "a"
+									},
+									"right": {
+										"type": "Identifier",
+										"start": 489,
+										"end": 490,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 7
+											},
+											"end": {
+												"line": 23,
+												"column": 8
+											}
+										},
+										"name": "b"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 477,
+											"end": 481
+										}
+									]
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
