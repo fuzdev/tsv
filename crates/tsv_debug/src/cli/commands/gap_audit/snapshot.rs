@@ -159,20 +159,22 @@ mod tests {
     /// A minimal shape carrying `payloads` — only the snapshot columns matter here, so the
     /// example is filler.
     fn mk_agg(payloads: &[&'static str]) -> ShapeAgg {
+        let mut examples = crate::audit::examples::ExampleSet::default();
+        examples.offer(Example {
+            payload: "block",
+            path: "p.svelte".to_string(),
+            injection_offset: 0,
+            attribution_offset: 0,
+            snippet: String::new(),
+            text: "/* c */".to_string(),
+            injected: true,
+        });
         ShapeAgg {
             count: 1,
             payloads: payloads.iter().copied().collect(),
             bystander_hits: 0,
             files: BTreeSet::new(),
-            examples: vec![Example {
-                payload: "block",
-                path: "p.svelte".to_string(),
-                injection_offset: 0,
-                attribution_offset: 0,
-                snippet: String::new(),
-                text: "/* c */".to_string(),
-                injected: true,
-            }],
+            examples,
             verify: None,
         }
     }

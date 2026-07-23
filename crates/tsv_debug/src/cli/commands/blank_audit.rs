@@ -96,12 +96,16 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::comment_ledger::{self, CommentFindingKind};
 
-use crate::audit::parallel::run_pool;
+use crate::audit::examples::{ExampleOrd, ExampleSet};
+use crate::audit::parallel::{ArmedRun, run_pool};
 use crate::audit::properties::{
     F1Outcome, Formatted, Pristine, Utf16ToByte, f1_check, leaf_conservation_diff, ledger_format,
     pristine_format, structurally_equivalent, tsv_parse_to_value,
 };
-use crate::audit::ratchet::{GateDiff, Ratchet, SnapshotKey};
+use crate::audit::ratchet::{
+    GateDiff, Ratchet, SnapshotKey, print_ratchet_skipped, refuse_narrowed_update,
+    report_unpinned_panics,
+};
 use crate::audit::report::{
     self, BlankDetail, Detail, Finding, ReportExample, RunSummary, Severity,
 };
@@ -109,9 +113,10 @@ use crate::audit::sites::{
     code_regions, injection_sites, site_shape, snippet, source_has_ignore_directive,
     string_and_template_spans,
 };
+use crate::audit::tally::CappedPaths;
 use crate::cli::CliError;
 
-use super::profile::{is_input_invalid_fixture, resolve_files};
+use super::profile::{is_input_invalid_fixture, resolve_seed_files};
 
 /// Inject a blank line into every gap and assert format stays a well-behaved fixed point.
 ///
@@ -158,10 +163,6 @@ pub struct BlankAuditCommand {
 /// exactly one empty line; adjacent to an existing newline it forms a longer run, the input the
 /// ≤1-blank-run invariant must collapse.
 const PAYLOAD: &str = "\n\n";
-
-/// Cap on stored `not_clean` paths — enough to triage, bounded on a noisy corpus (the count
-/// stays exact).
-const NOT_CLEAN_PATH_CAP: usize = 20;
 
 /// Why an injected blank is a finding. `Panic` is the one absolute break (never pinnable); the
 /// rest are policy invariants the ratchet grades.
@@ -339,8 +340,8 @@ fn snapshot_keys(shapes: &BTreeMap<(BlankKind, String), ShapeAgg>) -> BTreeSet<B
         .collect()
 }
 
-/// One reproducible instance of a shape — the smallest by `(path, offset)`, so the chosen example
-/// is thread-count independent.
+/// One reproducible instance of a shape — kept as the single smallest by `(path, offset)`
+/// (an [`ExampleSet`] at `N = 1`), so the chosen example is thread-count independent.
 #[derive(Clone)]
 struct Example {
     path: String,
@@ -349,7 +350,7 @@ struct Example {
     snippet: String,
 }
 
-impl Example {
+impl ExampleOrd for Example {
     fn sort_key(&self) -> (&str, usize) {
         (&self.path, self.offset)
     }
@@ -361,32 +362,8 @@ struct ShapeAgg {
     count: usize,
     /// Distinct seed files the shape fired in.
     files: BTreeSet<String>,
-    /// The smallest example by `(path, offset)` — `None` only before the first hit records one.
-    example: Option<Example>,
-}
-
-impl ShapeAgg {
-    /// Keep `cand` iff it is smaller than the current example (or there is none) — so the kept
-    /// example is the global smallest `(path, offset)`, independent of merge / `--jobs` order.
-    fn offer_example(&mut self, cand: Example) {
-        let replace = match &self.example {
-            None => true,
-            Some(e) => cand.sort_key() < e.sort_key(),
-        };
-        if replace {
-            self.example = Some(cand);
-        }
-    }
-
-    /// The canonical example. A recorded shape is always created *with* its first hit's example
-    /// ([`Tally::record`] calls [`Self::offer_example`]), so this never sees `None` — an empty one
-    /// is a construction bug.
-    #[allow(clippy::expect_used)] // invariant: a recorded shape carries an example
-    fn canonical(&self) -> &Example {
-        self.example
-            .as_ref()
-            .expect("a recorded shape always carries an example")
-    }
+    /// The smallest example by `(path, offset)`.
+    examples: ExampleSet<Example, 1>,
 }
 
 /// One thread's slice of the work.
@@ -406,11 +383,10 @@ struct Tally {
     /// `comments:audit`, not injected into. ~0 over `tests/fixtures`.
     dirty_files: Vec<String>,
     /// Files that aren't a clean format fixed point AS AUTHORED (non-idempotent, unreparseable,
-    /// or already blank-run-violating) — reported and skipped. Over `tests/fixtures` these are
-    /// the variant / unformatted fixture files (expected).
-    not_clean: usize,
-    /// A bounded sample of the `not_clean` paths (the count stays exact).
-    not_clean_paths: Vec<String>,
+    /// or already blank-run-violating) — reported and skipped, exact count + bounded path
+    /// sample. Over `tests/fixtures` these are the variant / unformatted fixture files
+    /// (expected).
+    not_clean: CappedPaths,
 }
 
 impl Tally {
@@ -425,15 +401,12 @@ impl Tally {
         let e = self.shapes.entry((kind, shape)).or_default();
         e.count += 1;
         e.files.insert(path.to_string());
-        e.offer_example(candidate);
+        e.examples.offer(candidate);
     }
 
     /// Record a file skipped for not being a clean fixed point as authored.
     fn record_not_clean(&mut self, display: String) {
-        self.not_clean += 1;
-        if self.not_clean_paths.len() < NOT_CLEAN_PATH_CAP {
-            self.not_clean_paths.push(display);
-        }
+        self.not_clean.push(display);
     }
 
     fn merge(&mut self, other: Tally) {
@@ -444,20 +417,13 @@ impl Tally {
         self.files_done += other.files_done;
         self.parse_skipped += other.parse_skipped;
         self.dirty_files.extend(other.dirty_files);
-        self.not_clean += other.not_clean;
-        for p in other.not_clean_paths {
-            if self.not_clean_paths.len() < NOT_CLEAN_PATH_CAP {
-                self.not_clean_paths.push(p);
-            }
-        }
+        self.not_clean.merge(other.not_clean);
         for (k, v) in other.shapes {
             match self.shapes.get_mut(&k) {
                 Some(e) => {
                     e.count += v.count;
                     e.files.extend(v.files);
-                    if let Some(ex) = v.example {
-                        e.offer_example(ex);
-                    }
+                    e.examples.merge(v.examples);
                 }
                 None => {
                     self.shapes.insert(k, v);
@@ -574,9 +540,9 @@ fn audit_file(path: &std::path::Path, render: bool, tally: &mut Tally) {
         return;
     }
 
-    // Pristine 1/3 — ledger-clean, and capture the seed's own comment spans (to exclude a site
-    // inside one).
-    let comment_spans = match pristine_format(&source, parser) {
+    // Pristine 1/3 — ledger-clean; capture the seed's own comment spans (to exclude a site
+    // inside one) and the pristine output the same format already paid for.
+    let (comment_spans, pristine_output) = match pristine_format(&source, parser) {
         Pristine::Skip { dirty: false } => {
             tally.parse_skipped += 1;
             return;
@@ -585,7 +551,10 @@ fn audit_file(path: &std::path::Path, render: bool, tally: &mut Tally) {
             tally.dirty_files.push(display);
             return;
         }
-        Pristine::Clean { comment_spans } => comment_spans,
+        Pristine::Clean {
+            comment_spans,
+            output,
+        } => (comment_spans, output),
     };
     // Pristine 2/3 — a format fixed point (idempotency / reparse / leaf) as authored.
     match std::panic::catch_unwind(AssertUnwindSafe(|| f1_check(&source, parser, render))) {
@@ -595,17 +564,13 @@ fn audit_file(path: &std::path::Path, render: bool, tally: &mut Tally) {
             return;
         }
     }
-    // Pristine 3/3 — capture the pristine output, and reject a file already holding a 2+ blank run
-    // as authored. The pristine output is the fast-path oracle below: an injection the formatter
-    // ABSORBS reproduces it byte-for-byte, and it is already a proven fixed point, so nothing needs
-    // checking. (Only the byte-identity of the fast path is a "proxy" — the slow path grades each
-    // changed output exactly against the injected input, not against the pristine.)
+    // Pristine 3/3 — reject a file already holding a 2+ blank run as authored. The pristine
+    // output (carried by `pristine_format` above — `format_source(&source)`, no second format)
+    // is the fast-path oracle below: an injection the formatter ABSORBS reproduces it
+    // byte-for-byte, and it is already a proven fixed point, so nothing needs checking. (Only
+    // the byte-identity of the fast path is a "proxy" — the slow path grades each changed
+    // output exactly against the injected input, not against the pristine.)
     let has_format_ignore = source_has_ignore_directive(&source);
-    let Ok(pristine_output) = format_source(&source, parser) else {
-        // Unreachable — the f1 check above already formatted `source` cleanly — but total.
-        tally.record_not_clean(display);
-        return;
-    };
     let Some(pristine_wire) = tsv_parse_to_value(&pristine_output, parser) else {
         // Unreachable — the f1 check just proved the output reparses — but total.
         tally.record_not_clean(display);
@@ -767,44 +732,15 @@ impl BlankAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let default_paths = self.paths.is_empty();
         let narrowed = self.narrowing_flags();
-        if self.update && !narrowed.is_empty() {
-            eprintln!(
-                "Error: --update pins the FULL default run (the blank payload over \
-                 tests/fixtures). This run is narrowed by {}, so its shape set is a SUBSET of \
-                 what the snapshot means — writing it would silently unpin real bugs. Re-run \
-                 without {}.",
-                narrowed.join(" / "),
-                narrowed.join(" / ")
-            );
-            return Err(CliError::Failed);
-        }
-        let paths = if default_paths {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.paths.clone()
-        };
-        let mut files = match resolve_files(&paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
-        if self.limit > 0 {
-            files.truncate(self.limit);
-        }
-        if files.is_empty() {
-            eprintln!("Error: no seed files found (searched {paths:?})");
-            return Err(CliError::Failed);
-        }
+        refuse_narrowed_update(
+            self.update,
+            &narrowed,
+            "the blank payload over tests/fixtures",
+            "SUBSET",
+        )?;
+        let files = resolve_seed_files(&self.paths, self.limit)?;
 
-        // Process-global; the per-thread ledgers are thread-local, so arming once covers workers.
-        comment_ledger::set_comment_check(true);
-        // The audit provokes panics on purpose (a formatter crash IS a finding) — suppress the
-        // default hook's per-panic output.
-        let prev_hook = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|_| {}));
-
+        let armed = ArmedRun::arm(false);
         let render = true;
         // Stride-chunked worker pool (see `audit::parallel::run_pool`); a worker panic outside the
         // per-injection catch fails the run rather than silently dropping a tally.
@@ -814,19 +750,10 @@ impl BlankAuditCommand {
             |path, tally| audit_file(path, render, tally),
             Tally::merge,
         )?;
-
-        std::panic::set_hook(prev_hook);
-        comment_ledger::set_comment_check(false);
+        drop(armed);
 
         if self.update {
-            let found = snapshot_keys(&total.shapes);
-            ratchet().write(&found)?;
-            let written = found.iter().filter(|k| k.is_pinnable()).count();
-            println!(
-                "✓ wrote {} shape(s) to {}",
-                written,
-                known_shapes_path().display()
-            );
+            ratchet().write_pinned(&snapshot_keys(&total.shapes), "shape")?;
             // The report-only STRUCTURAL-DIVERGENCE shapes are deliberately NOT in the file — name
             // the count at re-pin so it's clear they were seen and held soft, not lost.
             let soft = count_soft(&total.shapes);
@@ -837,15 +764,11 @@ impl BlankAuditCommand {
                 );
             }
             report_not_clean(&total, false, true);
-            let panics = count_panics(&total.shapes);
-            if panics > 0 {
-                eprintln!(
-                    "\n✗ {panics} PANIC shape(s) were NOT pinned — a blank in a gap must never \
-                     crash the formatter, so the gate will keep failing until they are fixed."
-                );
-                return Err(CliError::Failed);
-            }
-            return Ok(());
+            return report_unpinned_panics(
+                count_panics(&total.shapes),
+                "shape",
+                "a blank in a gap",
+            );
         }
 
         // Grade BEFORE printing (only a graded run can be quiet).
@@ -900,12 +823,7 @@ impl BlankAuditCommand {
         // A narrowed default run reaches only part of the snapshot's shape set, so grading it
         // would report every unreached shape as stale — report and stop rather than fail.
         if !narrowed.is_empty() {
-            eprintln!(
-                "\n○ ratchet SKIPPED — {} narrows this run, and the snapshot pins the full \
-                 default one. Findings above are reported, NOT graded: this is not a passing \
-                 gate.",
-                narrowed.join(" / ")
-            );
+            print_ratchet_skipped(&narrowed);
             return Ok(());
         }
         match &graded {
@@ -931,12 +849,11 @@ impl BlankAuditCommand {
                 panics.len()
             );
             for ((_, shape), agg) in panics.iter().take(40) {
-                if let Some(ex) = &agg.example {
-                    eprintln!(
-                        "    {shape:<20} e.g. inject blank at {}:{}",
-                        ex.path, ex.offset
-                    );
-                }
+                let ex = agg.examples.canonical();
+                eprintln!(
+                    "    {shape:<20} e.g. inject blank at {}:{}",
+                    ex.path, ex.offset
+                );
             }
             if panics.len() > 40 {
                 eprintln!("    … and {} more", panics.len() - 40);
@@ -1008,7 +925,7 @@ fn build_report(total: &Tally) -> (RunSummary, Vec<Finding>) {
         .shapes
         .iter()
         .map(|((kind, shape), agg)| {
-            let ex = agg.canonical();
+            let ex = agg.examples.canonical();
             Finding {
                 audit: "blank_audit",
                 severity: if *kind == BlankKind::Panic {
@@ -1050,7 +967,7 @@ fn build_report(total: &Tally) -> (RunSummary, Vec<Finding>) {
 /// expected `unformatted_*` variants, so the list is pure noise inside `deno task check`, but over
 /// a real corpus (an explicit path) it is the triage list.
 fn report_not_clean(total: &Tally, json: bool, show_paths: bool) {
-    if total.not_clean == 0 {
+    if total.not_clean.is_empty() {
         return;
     }
     let line = |s: String| {
@@ -1065,7 +982,7 @@ fn report_not_clean(total: &Tally, json: bool, show_paths: bool) {
          unreparseable, or already blank-run-violating). Over tests/fixtures this is expected \
          (the variant / unformatted / prettier-output fixture files are not tsv fixed points); \
          over a real-code corpus each wants triage{}",
-        total.not_clean,
+        total.not_clean.count(),
         if show_paths {
             ":"
         } else {
@@ -1075,30 +992,22 @@ fn report_not_clean(total: &Tally, json: bool, show_paths: bool) {
     if !show_paths {
         return;
     }
-    for p in total.not_clean_paths.iter().take(NOT_CLEAN_PATH_CAP) {
+    for p in total.not_clean.sample() {
         line(format!("    {p}"));
     }
-    let shown = total.not_clean_paths.len().min(NOT_CLEAN_PATH_CAP);
-    if total.not_clean > shown {
-        line(format!("    … and {} more", total.not_clean - shown));
-    }
-}
-
-/// The per-shape hit count out of a finding's detail — the local reader (`Finding::count` is
-/// private to `report.rs`). A blank run only ever produces `Detail::Blank`; the `Gap` arm is for
-/// totality.
-fn finding_count(f: &Finding) -> usize {
-    match &f.detail {
-        Detail::Blank(d) => d.count,
-        Detail::Gap(d) => d.count,
-        Detail::Ignore(d) => d.count,
+    let shown = total.not_clean.sample().len();
+    if total.not_clean.count() > shown {
+        line(format!(
+            "    … and {} more",
+            total.not_clean.count() - shown
+        ));
     }
 }
 
 /// Whether a finding is REPORT-ONLY (the ungraded `STRUCTURAL-DIVERGENCE` class) — the partition
 /// predicate that splits the shared graded printers from [`report_soft`].
 fn is_soft_finding(f: &Finding) -> bool {
-    matches!(&f.detail, Detail::Blank(d) if !d.gated)
+    !f.gated()
 }
 
 /// Print the report-only `STRUCTURAL-DIVERGENCE` section — reported, never gated (fuzz-soft
@@ -1108,7 +1017,7 @@ fn report_soft(soft: &[Finding], show_rows: bool) {
     if soft.is_empty() {
         return;
     }
-    let hits: usize = soft.iter().map(finding_count).sum();
+    let hits: usize = soft.iter().map(Finding::count).sum();
     println!(
         "\n○ {} STRUCTURAL-DIVERGENCE shape(s) ({hits} hit(s)) — reported, NOT gated (soft, like \
          fuzz's structural_divergence: a blank-induced structural change over Svelte is \
@@ -1125,9 +1034,9 @@ fn report_soft(soft: &[Finding], show_rows: bool) {
         return;
     }
     let mut rows: Vec<&Finding> = soft.iter().collect();
-    rows.sort_by_key(|f| std::cmp::Reverse(finding_count(f)));
+    rows.sort_by_key(|f| std::cmp::Reverse(f.count()));
     for f in rows.iter().take(40) {
-        println!("  {:>7}×  {}", finding_count(f), f.site);
+        println!("  {:>7}×  {}", f.count(), f.site);
         let ex = &f.example;
         println!(
             "            e.g. inject blank at {}:{}  {}",
@@ -1145,14 +1054,16 @@ mod tests {
 
     /// A minimal shape agg carrying one example — for the snapshot tests.
     fn mk_agg() -> ShapeAgg {
+        let mut examples = ExampleSet::default();
+        examples.offer(Example {
+            path: "p.svelte".to_string(),
+            offset: 0,
+            snippet: String::new(),
+        });
         ShapeAgg {
             count: 1,
             files: BTreeSet::new(),
-            example: Some(Example {
-                path: "p.svelte".to_string(),
-                offset: 0,
-                snippet: String::new(),
-            }),
+            examples,
         }
     }
 
@@ -1359,7 +1270,7 @@ mod tests {
         assert_eq!(agg.count, 2);
         assert_eq!(agg.files.len(), 2);
         assert_eq!(
-            agg.example.as_ref().unwrap().path,
+            agg.examples.canonical().path,
             "a.ts",
             "the smallest (path, offset) is canonical"
         );

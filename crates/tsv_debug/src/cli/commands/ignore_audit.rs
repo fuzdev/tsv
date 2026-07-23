@@ -79,19 +79,24 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::comment_ledger;
 
+use crate::audit::examples::{ExampleOrd, ExampleSet};
 use crate::audit::node_edge::is_non_structural_key;
-use crate::audit::parallel::run_pool;
+use crate::audit::parallel::{ArmedRun, run_pool};
 use crate::audit::properties::{Pristine, Utf16ToByte, pristine_format, tsv_parse_to_value};
-use crate::audit::ratchet::{GateDiff, Ratchet, SnapshotKey};
+use crate::audit::ratchet::{
+    GateDiff, Ratchet, SnapshotKey, print_ratchet_skipped, refuse_narrowed_update,
+    report_unpinned_panics,
+};
 use crate::audit::report::{
     self, Detail, Finding, IgnoreDetail, ReportExample, RunSummary, Severity,
 };
 use crate::audit::sites::{
     code_regions, snippet, source_has_ignore_directive, string_and_template_spans,
 };
+use crate::audit::tally::CappedPaths;
 use crate::cli::CliError;
 
-use super::profile::{is_input_invalid_fixture, resolve_files};
+use super::profile::{is_input_invalid_fixture, resolve_seed_files};
 
 /// Inject a `// prettier-ignore` directive before every JS node and assert its perturbed source
 /// survives verbatim.
@@ -145,9 +150,6 @@ const DIRECTIVE: &str = "// prettier-ignore\n";
 /// curated, construct-specific guess. (Member-chain `.` / `?.` are deliberately excluded: they lead
 /// a DIFFERENT node — the member's property — which is its own position, not handled here.)
 const LINE_LEAD_OPERATORS: [&str; 4] = ["|", "&", "?", ":"];
-
-/// Cap on stored `not_clean` paths — enough to triage, bounded on a noisy corpus (count stays exact).
-const NOT_CLEAN_PATH_CAP: usize = 20;
 
 /// Why an injected directive is a finding. `Panic` is the one absolute break (never pinnable);
 /// `Unhonored` is the ratcheted position ledger.
@@ -260,8 +262,8 @@ fn snapshot_keys(shapes: &BTreeMap<(IgnoreKind, String), ShapeAgg>) -> BTreeSet<
         .collect()
 }
 
-/// One reproducible instance of a position — the smallest by `(path, offset)`, so the chosen
-/// example is thread-count independent.
+/// One reproducible instance of a position — kept as the single smallest by `(path, offset)`
+/// (an [`ExampleSet`] at `N = 1`), so the chosen example is thread-count independent.
 #[derive(Clone)]
 struct Example {
     path: String,
@@ -271,7 +273,7 @@ struct Example {
     snippet: String,
 }
 
-impl Example {
+impl ExampleOrd for Example {
     fn sort_key(&self) -> (&str, usize) {
         (&self.path, self.offset)
     }
@@ -284,26 +286,7 @@ struct ShapeAgg {
     /// Distinct seed files the position fired in.
     files: BTreeSet<String>,
     /// The smallest example by `(path, offset)`.
-    example: Option<Example>,
-}
-
-impl ShapeAgg {
-    fn offer_example(&mut self, cand: Example) {
-        let replace = match &self.example {
-            None => true,
-            Some(e) => cand.sort_key() < e.sort_key(),
-        };
-        if replace {
-            self.example = Some(cand);
-        }
-    }
-
-    #[allow(clippy::expect_used)] // invariant: a recorded shape carries an example
-    fn canonical(&self) -> &Example {
-        self.example
-            .as_ref()
-            .expect("a recorded shape always carries an example")
-    }
+    examples: ExampleSet<Example, 1>,
 }
 
 /// One thread's slice of the work.
@@ -321,9 +304,9 @@ struct Tally {
     files_done: usize,
     parse_skipped: usize,
     /// Files not a clean format fixed point AS AUTHORED (or already directive-bearing) — reported
-    /// and skipped. Over `tests/fixtures` these are the variant / unformatted / format-ignore files.
-    not_clean: usize,
-    not_clean_paths: Vec<String>,
+    /// and skipped, exact count + bounded path sample. Over `tests/fixtures` these are the
+    /// variant / unformatted / format-ignore files.
+    not_clean: CappedPaths,
 }
 
 impl Tally {
@@ -337,14 +320,11 @@ impl Tally {
         let e = self.shapes.entry((kind, cand.shape.clone())).or_default();
         e.count += 1;
         e.files.insert(path.to_string());
-        e.offer_example(example);
+        e.examples.offer(example);
     }
 
     fn record_not_clean(&mut self, display: String) {
-        self.not_clean += 1;
-        if self.not_clean_paths.len() < NOT_CLEAN_PATH_CAP {
-            self.not_clean_paths.push(display);
-        }
+        self.not_clean.push(display);
     }
 
     fn merge(&mut self, other: Tally) {
@@ -355,20 +335,13 @@ impl Tally {
         self.rejected += other.rejected;
         self.files_done += other.files_done;
         self.parse_skipped += other.parse_skipped;
-        self.not_clean += other.not_clean;
-        for p in other.not_clean_paths {
-            if self.not_clean_paths.len() < NOT_CLEAN_PATH_CAP {
-                self.not_clean_paths.push(p);
-            }
-        }
+        self.not_clean.merge(other.not_clean);
         for (k, v) in other.shapes {
             match self.shapes.get_mut(&k) {
                 Some(e) => {
                     e.count += v.count;
                     e.files.extend(v.files);
-                    if let Some(ex) = v.example {
-                        e.offer_example(ex);
-                    }
+                    e.examples.merge(v.examples);
                 }
                 None => {
                     self.shapes.insert(k, v);
@@ -524,7 +497,7 @@ fn audit_file(path: &Path, tally: &mut Tally) {
     // Pristine 1/2 — ledger-clean, and capture the seed's own comment spans (a comment interior is
     // excluded from perturbation: a formatter preserves comment text, so a doubled space there
     // would survive reformatting and read as a false "honored").
-    let comment_spans = match pristine_format(&source, parser) {
+    let (comment_spans, pristine_output) = match pristine_format(&source, parser) {
         Pristine::Skip { dirty: false } => {
             tally.parse_skipped += 1;
             return;
@@ -533,18 +506,19 @@ fn audit_file(path: &Path, tally: &mut Tally) {
             tally.record_not_clean(display);
             return;
         }
-        Pristine::Clean { comment_spans } => comment_spans,
+        Pristine::Clean {
+            comment_spans,
+            output,
+        } => (comment_spans, output),
     };
-    // Pristine 2/2 — a TRUE fixed point AS AUTHORED (`format(source) == source`). Stricter than
+    // Pristine 2/2 — a TRUE fixed point AS AUTHORED (`format(source) == source`, read off the
+    // output the pristine format above already computed — no second format). Stricter than
     // `f1_check`'s "idempotent after the first pass", which every `unformatted_*` variant fixture
     // also satisfies: the audit needs the node's canonical form to BE its source form, so honoring
     // (the perturbed slice survives verbatim) and reformatting (the perturbation collapses) are
     // cleanly distinguishable — a non-canonical seed muddies that. Being a fixed point also proves
     // the source reparses and that formatting corrupts nothing (output == input).
-    let fixed_point = std::panic::catch_unwind(AssertUnwindSafe(|| {
-        format_source(&source, parser).is_ok_and(|f| f == source)
-    }));
-    if !matches!(fixed_point, Ok(true)) {
+    if pristine_output != source {
         tally.record_not_clean(display);
         return;
     }
@@ -640,67 +614,27 @@ impl IgnoreAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let default_paths = self.paths.is_empty();
         let narrowed = self.narrowing_flags();
-        if self.update && !narrowed.is_empty() {
-            eprintln!(
-                "Error: --update pins the FULL default run (the directive payload over \
-                 tests/fixtures). This run is narrowed by {}, so its shape set is a SUBSET of what \
-                 the snapshot means — writing it would silently unpin real bugs. Re-run without {}.",
-                narrowed.join(" / "),
-                narrowed.join(" / ")
-            );
-            return Err(CliError::Failed);
-        }
-        let paths = if default_paths {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.paths.clone()
-        };
-        let mut files = match resolve_files(&paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
-        if self.limit > 0 {
-            files.truncate(self.limit);
-        }
-        if files.is_empty() {
-            eprintln!("Error: no seed files found (searched {paths:?})");
-            return Err(CliError::Failed);
-        }
+        refuse_narrowed_update(
+            self.update,
+            &narrowed,
+            "the directive payload over tests/fixtures",
+            "SUBSET",
+        )?;
+        let files = resolve_seed_files(&self.paths, self.limit)?;
 
-        // Process-global; the per-thread ledgers are thread-local, so arming once covers workers.
         // Armed so `pristine_format`'s dirty check works; this audit reads no ledger findings.
-        comment_ledger::set_comment_check(true);
-        // The audit provokes panics on purpose — suppress the default hook's per-panic output.
-        let prev_hook = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|_| {}));
-
+        let armed = ArmedRun::arm(false);
         let total = run_pool(&files, self.jobs, audit_file, Tally::merge)?;
-
-        std::panic::set_hook(prev_hook);
-        comment_ledger::set_comment_check(false);
+        drop(armed);
 
         if self.update {
-            let found = snapshot_keys(&total.shapes);
-            ratchet().write(&found)?;
-            let written = found.iter().filter(|k| k.is_pinnable()).count();
-            println!(
-                "✓ wrote {} position(s) to {}",
-                written,
-                known_shapes_path().display()
-            );
+            ratchet().write_pinned(&snapshot_keys(&total.shapes), "position")?;
             report_not_clean(&total, false, true);
-            let panics = count_panics(&total.shapes);
-            if panics > 0 {
-                eprintln!(
-                    "\n✗ {panics} PANIC position(s) were NOT pinned — an injected directive must \
-                     never crash the formatter, so the gate will keep failing until they are fixed."
-                );
-                return Err(CliError::Failed);
-            }
-            return Ok(());
+            return report_unpinned_panics(
+                count_panics(&total.shapes),
+                "position",
+                "an injected directive",
+            );
         }
 
         // Grade only on the full default corpus — the snapshot describes exactly that.
@@ -730,11 +664,7 @@ impl IgnoreAuditCommand {
             };
         }
         if !narrowed.is_empty() {
-            eprintln!(
-                "\n○ ratchet SKIPPED — {} narrows this run, and the snapshot pins the full default \
-                 one. Findings above are reported, NOT graded: this is not a passing gate.",
-                narrowed.join(" / ")
-            );
+            print_ratchet_skipped(&narrowed);
             return Ok(());
         }
         match &graded {
@@ -757,7 +687,7 @@ impl IgnoreAuditCommand {
                 panics.len()
             );
             for ((_, shape), agg) in panics.iter().take(40) {
-                let ex = agg.canonical();
+                let ex = agg.examples.canonical();
                 eprintln!("    {shape:<28} e.g. {}:{}", ex.path, ex.offset);
             }
         }
@@ -827,7 +757,7 @@ fn build_report(total: &Tally) -> (RunSummary, Vec<Finding>) {
         .shapes
         .iter()
         .map(|((kind, shape), agg)| {
-            let ex = agg.canonical();
+            let ex = agg.examples.canonical();
             Finding {
                 audit: "ignore_audit",
                 severity: if *kind == IgnoreKind::Panic {
@@ -866,7 +796,7 @@ fn build_report(total: &Tally) -> (RunSummary, Vec<Finding>) {
 /// noise in `deno task check`), but over a real corpus (an explicit path / `--report`) they are the
 /// triage list, matching `blank_audit`'s `report_not_clean`.
 fn report_not_clean(total: &Tally, json: bool, show_paths: bool) {
-    if total.not_clean == 0 {
+    if total.not_clean.is_empty() {
         return;
     }
     let line = |s: String| {
@@ -876,13 +806,17 @@ fn report_not_clean(total: &Tally, json: bool, show_paths: bool) {
             println!("{s}");
         }
     };
-    let paths = if show_paths && !total.not_clean_paths.is_empty() {
+    let paths = if show_paths && !total.not_clean.sample().is_empty() {
         let sample: Vec<String> = total
-            .not_clean_paths
+            .not_clean
+            .sample()
             .iter()
             .map(|p| format!("    {p}"))
             .collect();
-        let more = total.not_clean.saturating_sub(total.not_clean_paths.len());
+        let more = total
+            .not_clean
+            .count()
+            .saturating_sub(total.not_clean.sample().len());
         let tail = if more > 0 {
             format!("\n    … and {more} more")
         } else {
@@ -896,6 +830,6 @@ fn report_not_clean(total: &Tally, json: bool, show_paths: bool) {
         "\n○ {} file(s) skipped — not a clean format fixed point AS AUTHORED (or already \
          directive-bearing). Over tests/fixtures this is expected (variant / unformatted / \
          format-ignore fixtures); over a real-code corpus each wants triage{paths}",
-        total.not_clean
+        total.not_clean.count()
     ));
 }

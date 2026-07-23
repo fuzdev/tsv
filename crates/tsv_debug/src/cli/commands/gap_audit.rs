@@ -114,23 +114,25 @@ use snapshot::{
 };
 use verify::{verify_example, victim_seed_offset};
 
+use crate::audit::examples::{ExampleOrd, ExampleSet};
 use crate::audit::node_edge::{NodeEdgeKey, node_edge_key_with_map};
-use crate::audit::parallel::run_pool;
+use crate::audit::parallel::{ArmedRun, run_pool};
 use crate::audit::properties::{
     Formatted, Pristine, Utf16ToByte, Verdict, VerifyOutcome, VerifySummary, ledger_format,
     pristine_format, tsv_parse_to_value,
 };
-use crate::audit::ratchet::{GateDiff, SnapshotKey};
+use crate::audit::ratchet::{
+    GateDiff, print_ratchet_skipped, refuse_narrowed_update, report_unpinned_panics,
+};
 use crate::audit::report::{
     self, Confidence, Detail, Finding, GapDetail, ReportExample, RunSummary, Severity,
 };
 use crate::audit::sites::{code_regions, injection_sites, site_shape, snippet};
 use crate::cli::CliError;
 use tsv_cli::cli::input::ParserType;
-use tsv_lang::comment_ledger::{self, CommentFindingKind};
-use tsv_lang::doc::swallow;
+use tsv_lang::comment_ledger::CommentFindingKind;
 
-use super::profile::{is_input_invalid_fixture, resolve_files};
+use super::profile::{is_input_invalid_fixture, resolve_seed_files};
 
 /// Inject a comment into every gap and assert the print-once ledger still holds.
 ///
@@ -349,18 +351,12 @@ struct Example {
     injected: bool,
 }
 
-impl Example {
-    /// The tie-break that makes the chosen example **thread-count independent**.
-    ///
-    /// Threads take files by stride, so which one first sees a shape depends on `--jobs`;
-    /// picking the smallest `(path, attribution_offset)` instead of "whoever merged first"
-    /// keeps a report (and any diff of one) stable across `--jobs 1` and `--jobs 12`. The
-    /// **attribution** offset (not the injection offset) is the sort key so the canonical
+impl ExampleOrd for Example {
+    /// The **attribution** offset (not the injection offset) is the sort key, so the canonical
     /// example is the finding's own smallest *victim* site — the meaningful, shape-consistent
-    /// locus. Two examples can now tie on `(path, attribution_offset)` while differing in
-    /// injection offset (two injections dropping the same victim); ties only ever arise within
-    /// one file (one worker), so [`ShapeAgg::offer_example`]'s first-seen tie-break stays
-    /// deterministic across `--jobs`.
+    /// locus. Two examples can tie on `(path, attribution_offset)` while differing in injection
+    /// offset (two injections dropping the same victim); the [`ExampleSet`]'s first-seen
+    /// tie-break keeps that deterministic across `--jobs`.
     fn sort_key(&self) -> (&str, usize) {
         (&self.path, self.attribution_offset)
     }
@@ -371,7 +367,7 @@ impl Example {
 /// One example gives a single Confirmed/Unconfirmed bit, which cannot tell "uniformly an
 /// instrument gap" (every example unconfirmed) from "a mixed real drop" (some confirmed) —
 /// the distinction phase 0 of the gaps arc turns on. Keeping the N *smallest* by
-/// [`Example::sort_key`] samples the shape while staying bounded in memory and cheap to
+/// [`ExampleOrd::sort_key`] samples the shape while staying bounded in memory and cheap to
 /// verify (each example is two extra formats, run once per shape — not per site). Five is
 /// enough to separate all-vs-none-vs-mixed without inflating the verify pass.
 const VERIFY_EXAMPLES: usize = 5;
@@ -393,45 +389,11 @@ struct ShapeAgg {
     /// Distinct seed files the shape fired in — separates "one weird fixture" from
     /// "everything with a dot in it". Bounded by the corpus, and shapes are few.
     files: BTreeSet<String>,
-    /// The [`VERIFY_EXAMPLES`] smallest examples by [`Example::sort_key`], kept sorted
-    /// ascending, so `examples[0]` is the canonical (smallest) one every report shows.
-    examples: Vec<Example>,
+    /// The [`VERIFY_EXAMPLES`] smallest examples by [`ExampleOrd::sort_key`] — `canonical()`
+    /// is the smallest one every report shows.
+    examples: ExampleSet<Example, VERIFY_EXAMPLES>,
     /// The in-run self-verification outcome — `None` until the verify pass runs.
     verify: Option<VerifyOutcome>,
-}
-
-impl ShapeAgg {
-    /// The canonical example — the smallest by [`Example::sort_key`], shown in every report.
-    ///
-    /// A recorded shape always has at least one example (it is created *with* the hit that
-    /// recorded it, via `or_insert_with` + [`Self::offer_example`]), so this never sees an
-    /// empty set — an empty one is a construction bug.
-    #[allow(clippy::expect_used)] // invariant: a recorded shape is created with its first example
-    fn canonical(&self) -> &Example {
-        self.examples
-            .first()
-            .expect("a recorded shape always carries at least one example")
-    }
-
-    /// Offer `candidate` to the bounded min-N set, keeping it sorted ascending by
-    /// [`Example::sort_key`] and capped at [`VERIFY_EXAMPLES`].
-    ///
-    /// Thread-count independence rides on this keeping the N *smallest* by `(path, offset)`,
-    /// exactly the tie-break the old single-example version used. A later candidate that
-    /// *ties* an existing one on `sort_key` sorts **after** it (`<=` insertion point), so the
-    /// first-seen among equal keys stays canonical — `examples[0]` never regresses to a
-    /// later arrival. Ties only ever occur within one file (one worker/tally), so the final
-    /// merged set is deterministic regardless of `--jobs`.
-    fn offer_example(&mut self, candidate: Example) {
-        let pos = self
-            .examples
-            .partition_point(|e| e.sort_key() <= candidate.sort_key());
-        if pos >= VERIFY_EXAMPLES && self.examples.len() >= VERIFY_EXAMPLES {
-            return; // larger than every kept example, and the set is already full
-        }
-        self.examples.insert(pos, candidate);
-        self.examples.truncate(VERIFY_EXAMPLES);
-    }
 }
 
 /// One thread's slice of the work.
@@ -542,7 +504,7 @@ impl Tally {
                 payloads: BTreeSet::new(),
                 bystander_hits: 0,
                 files: BTreeSet::new(),
-                examples: Vec::new(),
+                examples: ExampleSet::default(),
                 verify: None,
             });
         e.count += 1;
@@ -551,7 +513,7 @@ impl Tally {
         }
         e.payloads.insert(hit.payload.label());
         e.files.insert(hit.path.to_string());
-        e.offer_example(candidate);
+        e.examples.offer(candidate);
     }
 
     fn merge(&mut self, other: Tally) {
@@ -576,11 +538,9 @@ impl Tally {
                     e.payloads.extend(v.payloads);
                     e.files.extend(v.files);
                     // Keep the N smallest across both, NOT whoever merged first — see
-                    // `Example::sort_key` / `ShapeAgg::offer_example`. Workers take disjoint
-                    // files, so the two example sets never share a path (no cross-tally ties).
-                    for ex in v.examples {
-                        e.offer_example(ex);
-                    }
+                    // `ExampleSet::merge`. Workers take disjoint files, so the two example
+                    // sets never share a path (no cross-tally ties).
+                    e.examples.merge(v.examples);
                 }
                 None => {
                     self.shapes.insert(k, v);
@@ -634,7 +594,9 @@ fn audit_file(
             tally.dirty_files.push(display);
             return;
         }
-        Pristine::Clean { comment_spans } => comment_spans,
+        // The carried pristine output goes unused here: gap grades by the ledger, never
+        // against the pristine text.
+        Pristine::Clean { comment_spans, .. } => comment_spans,
     };
     tally.files_done += 1;
 
@@ -811,50 +773,17 @@ impl GapAuditCommand {
 
         let default_paths = self.paths.is_empty();
         let narrowed = self.narrowing_flags();
-        if self.update && !narrowed.is_empty() {
-            eprintln!(
-                "Error: --update pins the FULL default run (all {} payloads over \
-                 tests/fixtures). This run is narrowed by {}, so its shape set is a \
-                 SUBSET (or, for --all-bytes, a superset) of what the snapshot means — \
-                 writing it would silently unpin real bugs. Re-run without {}.",
-                Payload::ALL.len(),
-                narrowed.join(" / "),
-                narrowed.join(" / ")
-            );
-            return Err(CliError::Failed);
-        }
-        let paths = if default_paths {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.paths.clone()
-        };
-        let mut files = match resolve_files(&paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
-        if self.limit > 0 {
-            files.truncate(self.limit);
-        }
-        if files.is_empty() {
-            eprintln!("Error: no seed files found (searched {paths:?})");
-            return Err(CliError::Failed);
-        }
+        refuse_narrowed_update(
+            self.update,
+            &narrowed,
+            &format!("all {} payloads over tests/fixtures", Payload::ALL.len()),
+            "SUBSET (or, for --all-bytes, a superset)",
+        )?;
+        let files = resolve_seed_files(&self.paths, self.limit)?;
 
-        // Process-global; the per-thread ledgers below are thread-local, so arming once
-        // here covers every worker.
-        comment_ledger::set_comment_check(true);
-        // Armed on the SAME format the ledger rides — no extra format, no extra parse. Both
-        // flags are process-global and both report sets are thread-local, so arming once here
-        // covers every worker. See `Kind::Swallow` for why the ledger cannot see this class.
-        swallow::set_swallow_check(true);
-
-        // The audit provokes panics on purpose (a formatter crash IS a finding), so keep
-        // the default hook from printing each one.
-        let prev_hook = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|_| {}));
+        // Swallow armed too, on the SAME format the ledger rides — no extra format, no extra
+        // parse. See `Kind::Swallow` for why the ledger cannot see this class.
+        let armed = ArmedRun::arm(true);
 
         let all_bytes = self.all_bytes;
         // Key each hit to its `(node, edge)` at record time only when a rollup consumer will read
@@ -943,9 +872,8 @@ impl GapAuditCommand {
             }
         }
 
-        std::panic::set_hook(prev_hook);
-        comment_ledger::set_comment_check(false);
-        swallow::set_swallow_check(false);
+        // Disarm here, not at scope end — the verify pass above is the audit's last format.
+        drop(armed);
 
         if self.update {
             // Read the pre-write snapshot so the yield line can distinguish RETIRED (a bug a
@@ -961,19 +889,7 @@ impl GapAuditCommand {
             } else {
                 BTreeSet::new()
             };
-            let found = snapshot_keys(&total.shapes);
-            ratchet().write(&found)?;
-            // Count what was actually written (the pinnable keys), not every shape — a
-            // panic is not pinned (see `is_pinnable`), so reporting `total.shapes.len()`
-            // would overstate the file by exactly the crashes it deliberately omits.
-            let pinned: BTreeSet<KnownKey> =
-                found.iter().filter(|k| k.is_pinnable()).cloned().collect();
-            let written = pinned.len();
-            println!(
-                "✓ wrote {} shape(s) to {}",
-                written,
-                known_shapes_path().display()
-            );
+            let pinned = ratchet().write_pinned(&snapshot_keys(&total.shapes), "shape")?;
             // Yield line: RETIRED = pinned before, gone now (the slice's win); ADDED = pinned now,
             // absent before (a newly-reached or regressed shape). RE-PINNED (the intersection) is
             // silent — it's the unchanged bulk. `net` is the file's change in size.
@@ -998,16 +914,11 @@ impl GapAuditCommand {
                      see docs/gap_audit.md."
                 );
             }
-            let panics = count_panics(&total.shapes);
-            if panics > 0 {
-                eprintln!(
-                    "\n✗ {panics} PANIC shape(s) were NOT pinned — a comment in a gap must \
-                     never crash the formatter, so the gate will keep failing until they \
-                     are fixed."
-                );
-                return Err(CliError::Failed);
-            }
-            return Ok(());
+            return report_unpinned_panics(
+                count_panics(&total.shapes),
+                "shape",
+                "a comment in a gap",
+            );
         }
 
         // `graded` was computed above (before the verify pass) so the pass could be skipped when
@@ -1076,12 +987,7 @@ impl GapAuditCommand {
         // the code. These flags are diagnostics; report and stop rather than fail on the
         // narrowing itself.
         if !narrowed.is_empty() {
-            eprintln!(
-                "\n○ ratchet SKIPPED — {} narrows this run, and the snapshot pins the full \
-                 default one. Findings above are reported, NOT graded: this is not a \
-                 passing gate.",
-                narrowed.join(" / ")
-            );
+            print_ratchet_skipped(&narrowed);
             return Ok(());
         }
         match &graded {
@@ -1112,7 +1018,7 @@ impl GapAuditCommand {
                 panics.len()
             );
             for ((_, shape), agg) in panics.iter().take(40) {
-                let ex = agg.canonical();
+                let ex = agg.examples.canonical();
                 // A panic hit is always the injected comment (injection == attribution), so this
                 // "inject … at" line names the injection offset that reproduces the crash.
                 eprintln!(
@@ -1216,7 +1122,7 @@ fn build_report(total: &Tally, payloads: &[Payload]) -> (RunSummary, Vec<Finding
         .shapes
         .iter()
         .map(|((kind, shape), agg)| {
-            let ex = agg.canonical();
+            let ex = agg.examples.canonical();
             Finding {
                 audit: "gap_audit",
                 severity: severity_of(*kind),
@@ -1377,56 +1283,17 @@ mod tests {
             payloads: BTreeSet::new(),
             bystander_hits: 0,
             files: BTreeSet::new(),
-            examples: Vec::new(),
+            examples: ExampleSet::default(),
             verify: None,
         }
-    }
-
-    /// The bounded set keeps the `VERIFY_EXAMPLES` smallest by `sort_key`, whatever the
-    /// arrival order — the property that makes the kept set (and any diff of it) independent
-    /// of `--jobs`.
-    #[test]
-    fn offer_example_keeps_the_n_smallest_by_sort_key() {
-        let mut agg = empty_agg();
-        for off in [9, 3, 7, 1, 5, 8, 2, 6, 0, 4] {
-            agg.offer_example(mk_example("a.svelte", off));
-        }
-        let offsets: Vec<usize> = agg.examples.iter().map(|e| e.attribution_offset).collect();
-        assert_eq!(offsets, (0..VERIFY_EXAMPLES).collect::<Vec<_>>());
-        assert_eq!(
-            agg.canonical().attribution_offset,
-            0,
-            "canonical is the smallest"
-        );
-    }
-
-    /// A later candidate that TIES an existing one on `sort_key` (same path + offset,
-    /// different payload) sorts AFTER it, so the first-seen stays canonical — `examples[0]`
-    /// never regresses to a later arrival, matching the old single-example tie-break.
-    #[test]
-    fn offer_example_ties_keep_the_first_seen_canonical() {
-        let mut agg = empty_agg();
-        let mut first = mk_example("a.svelte", 0);
-        first.payload = "block";
-        let mut second = mk_example("a.svelte", 0);
-        second.payload = "line";
-        agg.offer_example(first);
-        agg.offer_example(second);
-        assert_eq!(
-            agg.examples.len(),
-            2,
-            "both ties are distinct examples, both kept"
-        );
-        assert_eq!(
-            agg.canonical().payload,
-            "block",
-            "first-seen stays canonical"
-        );
     }
 
     /// Merging two tallies keeps the `VERIFY_EXAMPLES` smallest across both. Workers take
     /// disjoint files, so the two example sets never share a path — the merged min-N is
     /// determined purely by the global `(path, offset)` set, independent of merge order.
+    /// (The offer-level semantics — N-smallest, first-seen ties — are the substrate's,
+    /// pinned by [`crate::audit::examples`]'s own tests; this pins the `Tally::merge`
+    /// wiring and the `VERIFY_EXAMPLES` cap on top of them.)
     #[test]
     fn merge_keeps_the_n_smallest_examples_across_tallies() {
         let key = (Kind::Dropped, "IDENT⟨⟩.".to_string());
@@ -1435,14 +1302,14 @@ mod tests {
         {
             let mut agg = empty_agg();
             for off in [0, 2, 4, 6, 8] {
-                agg.offer_example(mk_example("a.svelte", off));
+                agg.examples.offer(mk_example("a.svelte", off));
             }
             a.shapes.insert(key.clone(), agg);
         }
         {
             let mut agg = empty_agg();
             for off in [1, 3, 5, 7, 9] {
-                agg.offer_example(mk_example("b.svelte", off));
+                agg.examples.offer(mk_example("b.svelte", off));
             }
             b.shapes.insert(key.clone(), agg);
         }
@@ -1527,12 +1394,12 @@ mod tests {
             .expect("the bystander keys on the VICTIM site, not the injection site");
         assert_eq!(victim.bystander_hits, 1, "recorded as a bystander");
         assert_eq!(
-            victim.canonical().attribution_offset,
+            victim.examples.canonical().attribution_offset,
             member_dot,
             "the attribution offset is the victim's own site"
         );
         assert_eq!(
-            victim.canonical().injection_offset,
+            victim.examples.canonical().injection_offset,
             import_dot,
             "the injection offset survives for reproduction"
         );
