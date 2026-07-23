@@ -352,6 +352,15 @@ impl<'a> Printer<'a> {
                     }
                 }
             } else if is_inline_content(node) {
+                // Axis-3 sibling-`>` dangle onto glued following TEXT: an inline element byte-glued
+                // to text on both sides (no whitespace either side, so break-before can't fire)
+                // dangles its closing `>` onto the following text's line when that fits, else
+                // block-styles — the text-follower analog of the element→element run and the
+                // element→block dangle. Checked before the element-run (disjoint: this needs a
+                // following TEXT, the run a following element).
+                if let Some(dangle_doc) = self.try_build_glued_both_text_dangle(trimmed_nodes, i) {
+                    self.push_inline_child_doc(&mut child_docs, dangle_doc, prev_text_ws);
+                }
                 // Axis-3 element→element sibling-`>` dangle ("G2"), over a maximal glued RUN: when
                 // this element heads a run of 2+ byte-glued inline elements (`<span>foo</span><b>b</b><a…>`),
                 // build the whole run as ONE concat, so the preceding text's break-before-flow
@@ -360,7 +369,8 @@ impl<'a> Printer<'a> {
                 // after the text can't rescue a wide LATER element in the run) — and each adjacent
                 // Soft pair sheds its `>` onto the next tag's line. Built once at the head; the tail
                 // elements are skipped via `glued_run_consumed_until`.
-                if let Some((run_doc, run_end)) = self.try_build_glued_element_run(trimmed_nodes, i)
+                else if let Some((run_doc, run_end)) =
+                    self.try_build_glued_element_run(trimmed_nodes, i)
                 {
                     // Honor a trimmed boundary space from the previous text node exactly as
                     // the single-element path does — the run leads with `group([line, …])` so
@@ -1231,6 +1241,60 @@ impl<'a> Printer<'a> {
     /// `None` when `nodes[i]` is not an inline element or has no glued inline-element follower (the
     /// caller handles it as an ordinary inline child). Detecting at the head and skipping the tail
     /// keeps the build O(run length); a walk-back-and-rebuild at each element would be O(length²).
+    /// The closing-`>` dangle onto glued following TEXT: when the inline element at `i` is
+    /// byte-glued to content text on **both** sides — no whitespace either side, so the
+    /// break-before rule cannot fire — build it as
+    /// [`Printer::build_inline_element_close_gt_dangle`], the three-state group that dangles the
+    /// closing `>` onto the following text's line when that fits and block-styles otherwise. The
+    /// text-follower analog of the element→element run ([`Self::try_build_glued_element_run`]) and
+    /// the element→block dangle ([`Self::try_block_sibling_gt_dangle`]). `None` unless the
+    /// glued-both-text shape holds and the element is the eligible flat hug-both form.
+    fn try_build_glued_both_text_dangle(
+        &self,
+        nodes: &[FragmentNode<'_>],
+        i: usize,
+    ) -> Option<DocId> {
+        let node = nodes.get(i)?;
+        // Inline element only — a block `<div>` reaching this arm goes multiline, never dangles.
+        let FragmentNode::Element(element) = node else {
+            return None;
+        };
+        if self.is_block_fragment_node(node) {
+            return None;
+        }
+        // glued-before: the previous node is content text byte-glued with no trailing whitespace
+        // (a trailing space would be a break-before boundary, handled elsewhere). Symmetric with the
+        // glued-after check below — `is_ascii_ws_only` excludes an empty / whitespace-only prev text
+        // (which carries no content the element could be glued *to*).
+        let prev = nodes.get(i.checked_sub(1)?)?;
+        let FragmentNode::Text(pt) = prev else {
+            return None;
+        };
+        if pt.is_ascii_ws_only
+            || !Self::byte_glued(prev, node)
+            || pt
+                .raw(self.source)
+                .ends_with(|c: char| c.is_ascii_whitespace())
+        {
+            return None;
+        }
+        // glued-after: the next node is content text byte-glued with no leading whitespace (so the
+        // dangled `>` leads that text's line; a leading space would wrap at the space instead).
+        let next = nodes.get(i + 1)?;
+        let FragmentNode::Text(nt) = next else {
+            return None;
+        };
+        if nt.is_ascii_ws_only
+            || !Self::byte_glued(node, next)
+            || nt
+                .raw(self.source)
+                .starts_with(|c: char| c.is_ascii_whitespace())
+        {
+            return None;
+        }
+        self.build_inline_element_close_gt_dangle(element)
+    }
+
     fn try_build_glued_element_run(
         &self,
         trimmed_nodes: &[FragmentNode<'_>],

@@ -323,21 +323,29 @@ impl<'a> Printer<'a> {
         self.build_inline_element_sibling_gt(element, true, None)
     }
 
-    /// Shared body for the axis-3 element sibling-`>` roles, composable so one element can play
-    /// **both** at once inside a glued run (`build_glued_element_run`): it **sheds** its closing
-    /// `>` to the following sibling (`external_close = true`) and/or **receives** a preceding
-    /// sibling's `>` as a leading `if_break` inside its attrs group (`gt_prefix = Some`) — a mid-run
-    /// element does both. The single render-safe shape is a flat hug-both (`Soft`) content layout,
-    /// so a wrong element kind returns `None` and the caller keeps that boundary an intact `>`.
-    pub(crate) fn build_inline_element_sibling_gt(
+    /// Shared eligibility + setup for the two axis-3 sibling-`>` roles — the element→element/block
+    /// follower ([`Self::build_inline_element_sibling_gt`]) and the glued-text follower
+    /// ([`Self::build_inline_element_close_gt_dangle`]). Classifies the tag, builds its attrs /
+    /// parts / context, and confirms the flat hug-both (`Soft`) content layout — the single shape
+    /// with one trailing `>` we can cleanly split off. Returns `(parts, ctx, attr_docs,
+    /// children_doc)`; `None` for any non-Soft shape (the callers then keep the element and its `>`
+    /// intact).
+    ///
+    /// `children_doc` is the trimmed inline shape `build_content_element_doc`'s Soft arm builds, so
+    /// a dangled element renders its content identically to its undangled form (incl. trimming a
+    /// render-free boundary space — `<span>text </span>{#each…}` must dangle like the glued form).
+    ///
+    /// Special-content elements (raw `<script>`/`<style>`, foreign `<template>`, whitespace-sensitive
+    /// `<pre>`/`<textarea>`) never participate — their closing tags aren't the simple hug-both shape.
+    /// Soft alone qualifies (Hug's glued boundaries already collapse to it): a one-sided-newline or
+    /// render-free boundary trims to the same glued form, so without the dangle `format(newline
+    /// authoring)` would emit the glued no-dangle form, which the next pass reads as Hug and dangles —
+    /// a non-idempotent 2-cycle (`authoring_audit`'s hard bucket). Multiline (Hard) and
+    /// void/empty/self-closing forms keep their `>`.
+    fn prepare_soft_sibling_element<'e>(
         &self,
-        element: &internal::Element<'_>,
-        external_close: bool,
-        gt_prefix: Option<DocId>,
-    ) -> Option<DocId> {
-        // Special-content elements (raw `<script>`/`<style>`, foreign `<template>`,
-        // whitespace-sensitive `<pre>`/`<textarea>`) never participate — their closing
-        // tags aren't the simple hug-both shape.
+        element: &'e internal::Element<'e>,
+    ) -> Option<(ElementParts<'e>, ElementContext, DocBuf, DocId)> {
         let class = self.classify_tag(element);
         if class.is_style
             || class.is_script
@@ -359,35 +367,74 @@ impl<'a> Printer<'a> {
         );
         let parts = self.element_parts(element, class);
         let ctx = self.analyze_element(&parts, &attr_docs);
-        // Only a flat content layout has a single trailing `>` we can cleanly split off:
-        // Hug (glued boundaries), and Soft (a collapsing boundary — a one-sided newline or
-        // a render-free run — that trims to the same glued form; without the dangle here,
-        // format(one-sided-newline authoring) would emit the glued no-dangle form, which
-        // the next pass reads as Hug and dangles — a non-idempotent 2-cycle,
-        // `authoring_audit`'s hard bucket). Multiline children (Hard) and the
-        // void/empty/self-closing forms keep their `>` (return None → no dangle).
         match self.compute_element_layout(&parts, &ctx) {
             ElementLayout::WithContent(BoundaryMode::Soft) => {
-                // Children built exactly as `build_content_element_doc`'s Hug arm builds
-                // them (trimmed), so the dangled element renders its content identically
-                // to its undangled form — incl. trimming a render-free boundary space
-                // (`<span>text </span>{#each…}` must dangle like the glued authoring).
                 let children_doc = self.build_nodes_doc_trimmed(
                     element.fragment.nodes,
                     Self::nodes_have_breakable_expression(element.fragment.nodes),
                     false,
                 );
-                Some(self.build_collapsible_element_doc(
-                    &parts,
-                    &ctx,
-                    &attr_docs,
-                    children_doc,
-                    external_close,
-                    gt_prefix,
-                ))
+                Some((parts, ctx, attr_docs, children_doc))
             }
             _ => None,
         }
+    }
+
+    /// Shared body for the axis-3 element sibling-`>` roles, composable so one element can play
+    /// **both** at once inside a glued run (`build_glued_element_run`): it **sheds** its closing
+    /// `>` to the following sibling (`external_close = true`) and/or **receives** a preceding
+    /// sibling's `>` as a leading `if_break` inside its attrs group (`gt_prefix = Some`) — a mid-run
+    /// element does both. `None` for any non-Soft shape (the boundary stays an intact `>`).
+    pub(crate) fn build_inline_element_sibling_gt(
+        &self,
+        element: &internal::Element<'_>,
+        external_close: bool,
+        gt_prefix: Option<DocId>,
+    ) -> Option<DocId> {
+        let (parts, ctx, attr_docs, children_doc) = self.prepare_soft_sibling_element(element)?;
+        Some(self.build_collapsible_element_doc(
+            &parts,
+            &ctx,
+            &attr_docs,
+            children_doc,
+            external_close,
+            gt_prefix,
+        ))
+    }
+
+    /// Build a glued-both inline element as the closing-`>` dangle onto glued following text —
+    /// the axis-3 sibling-`>` dangle generalized from an element/block follower to a **text**
+    /// follower (see fragment_doc's `try_build_glued_both_text_dangle`). Returns `Some` only for
+    /// the flat hug-both (`Soft`) shape, mirroring [`Self::build_inline_element_sibling_gt`]'s
+    /// eligibility; `None` keeps the element intact so the caller falls back to the normal path.
+    ///
+    /// A three-state `conditional_group` — the renderer picks the first whose flat first line fits:
+    /// 1. **inline** `<span>content</span>` — the element fits fully on the line;
+    /// 2. **dangle** `<span>content</span⏎>` — content stays inline, only the `>` drops to the
+    ///    following text's line; chosen when `prefix<span>content</span` still fits. Render-safe:
+    ///    the newline sits inside the end tag (ignored), so the AST is byte-identical;
+    /// 3. **block-style** — the ordinary collapsible group (both tags intact, content on its own
+    ///    indented line), the fallback when even `…</span` overflows (a wide prefix or wide
+    ///    content), where dangling the `>` wouldn't help. Identical to the non-dangle output.
+    ///
+    /// The `inline`/`dangle` states share the `<span>content</span` head (only the final `>`'s
+    /// placement differs), and `children_doc` is shared with `block_state` too — a `conditional_group`
+    /// candidate that never renders never records its comments (the print-once ledger keys on the
+    /// rendered node), so the shared subtrees are sound.
+    pub(crate) fn build_inline_element_close_gt_dangle(
+        &self,
+        element: &internal::Element<'_>,
+    ) -> Option<DocId> {
+        let (parts, ctx, attr_docs, children_doc) = self.prepare_soft_sibling_element(element)?;
+        let d = self.d();
+        let name = parts.name;
+        let opening = self.build_opening_tag(name, &attr_docs, ctx.has_multiline_attr);
+        let head = d.concat(&[opening, d.text(">"), children_doc, d.text("</"), name]);
+        let inline_state = d.concat(&[head, d.text(">")]);
+        let dangle_state = d.concat(&[head, d.hardline(), d.text(">")]);
+        let block_state =
+            self.build_collapsible_element_doc(&parts, &ctx, &attr_docs, children_doc, false, None);
+        Some(d.conditional_group(&[inline_state, dangle_state, block_state]))
     }
 
     /// Build doc for void or self-closing element
