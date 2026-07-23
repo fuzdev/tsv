@@ -328,6 +328,17 @@ pub(super) fn type_needs_parens_for_conditional_extends(ts_type: &TSType<'_>) ->
     }
 }
 
+/// Whether `ts_type` is an `infer U` carrying an `extends` constraint. The
+/// constraint has two paren-forcing consequences, keyed on this one shape: it
+/// greedily absorbs a following `|`/`&` (so a constrained infer needs parens as a
+/// union/intersection member — see `type_needs_parens_in_union_or_intersection`),
+/// and it abuts a trailing conditional `?` (so it needs parens as a nested
+/// function/constructor return in a conditional extends-type — see
+/// `return_type_is_constrained_infer`). A bare `infer U` forces neither.
+pub(super) fn is_constrained_infer(ts_type: &TSType<'_>) -> bool {
+    matches!(ts_type, TSType::Infer(i) if i.type_parameter.constraint.is_some())
+}
+
 /// True when a function/constructor return type — descending through a `p is X`
 /// type predicate and through further nested function/constructor returns — is a
 /// `TSInferType` carrying an `extends` constraint. The nesting matters:
@@ -342,7 +353,7 @@ fn return_type_is_constrained_infer(return_type: &internal::TSTypeAnnotation<'_>
         }
     }
     match ty {
-        TSType::Infer(i) => i.type_parameter.constraint.is_some(),
+        TSType::Infer(_) => is_constrained_infer(ty),
         TSType::Function(f) => return_type_is_constrained_infer(&f.return_type),
         TSType::Constructor(c) => return_type_is_constrained_infer(&c.return_type),
         _ => false,
@@ -377,14 +388,22 @@ pub(super) fn type_needs_parens_for_prefix_operator(ts_type: &TSType<'_>) -> boo
 /// `TSConstructorType`, `TSConditionalType`, `TSUnionType`, and
 /// `TSIntersectionType` all fall through to the same check in
 /// `needs-parentheses.js` — `isUnionType(parent) || isIntersectionType(parent)`.
+///
+/// A **constrained** `infer U extends T` is the one extra case: its `extends`
+/// constraint greedily absorbs a following `|`/`&` (`infer U extends A | B` ⇒
+/// constraint `A | B`), so as a union/intersection member it must keep its parens
+/// or the constraint silently widens (`(infer U extends number) | { a: 1 }` → the
+/// constraint would become `number | { a: 1 }`). A bare `infer U` (no constraint)
+/// has nothing to absorb and needs no parens. Matches Prettier's dedicated
+/// `TSInferType` arm in `needs-parentheses.js` — parens when the node is a `types`
+/// member of a union/intersection and `node.typeParameter.constraint` is set.
 pub(super) fn type_needs_parens_in_union_or_intersection(ts_type: &TSType<'_>) -> bool {
-    let inner = unwrap_parenthesized(ts_type);
-    matches!(
-        inner,
+    match unwrap_parenthesized(ts_type) {
         TSType::Union(_)
-            | TSType::Intersection(_)
-            | TSType::Function(_)
-            | TSType::Constructor(_)
-            | TSType::Conditional(_)
-    )
+        | TSType::Intersection(_)
+        | TSType::Function(_)
+        | TSType::Constructor(_)
+        | TSType::Conditional(_) => true,
+        other => is_constrained_infer(other),
+    }
 }

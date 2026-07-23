@@ -296,9 +296,16 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 6,
-	typescript: 129,
+	typescript: 128,
 	css: 22,
 };
+// typescript 129→128 (2026-07-22, tsv tip 5a29bf10 + the constrained-infer member paren fix;
+// checkout INPUTS unchanged from the 130→129 line below — svelte 6 + css 22 unchanged, SAFETY 0).
+// A clean −1 tsv-code move: `type_needs_parens_in_union_or_intersection` now keeps the parens
+// around a constrained `infer U extends T` that is a union/intersection member (prettier's
+// dedicated TSInferType arm), so prettier/tests/format/typescript/infer-extends/basic.ts leaves
+// `unknown` for `match`. This was the 🔴 constraint-widening bug (the strip changed the infer's
+// constraint node) — fixtures/typescript/types/infer/constrained_member_parens pins it.
 // typescript 130→129 (2026-07-22, tsv benchmark tip 0ded51fb — post #533–#536 + the
 // prettier@3.9.6 npm-oracle bump (#548); suite/framework checkout INPUTS unchanged — svelte
 // b4d1583ae, kit da5b08ea7, svelte.dev c21c2d0f0, prettier 1dcd0b05d, prettier-plugin-svelte
