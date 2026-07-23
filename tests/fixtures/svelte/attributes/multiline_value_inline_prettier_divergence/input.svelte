@@ -1,5 +1,6 @@
 <p>
-	text <span
+	text
+	<span
 		data-attr="a,
   b"
 	>

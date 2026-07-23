@@ -1181,6 +1181,62 @@ impl DocArena {
         range.resolve(&self.children.borrow()).first().copied()
     }
 
+    /// The **single** constructor of the inline-sibling wrap — `group(concat([line, x]))`, an
+    /// inline child led by a collapsible boundary `line` (a space when the fill fits, a break when
+    /// it wraps). Every producer routes through here (`push_inline_child_doc` in `tsv_svelte`), and
+    /// [`Self::strip_leading_line_group`] is its exact structural inverse, so the two cannot drift:
+    /// a `strip_leading_line_group_round_trips` test asserts `strip(inline_sibling_line_group(x)) ==
+    /// Some(x)`. Co-locating the pair here is the guard the ~600-line gap between producer and
+    /// matcher otherwise lacks (a silent `None` reintroduces the stray-space non-idempotency).
+    #[inline]
+    pub fn inline_sibling_line_group(&self, x: DocId) -> DocId {
+        self.group(self.concat(&[self.line(), x]))
+    }
+
+    /// If `id` is exactly the inline-sibling wrap [`Self::inline_sibling_line_group`] builds — a
+    /// non-breaking `Group(Concat([Line(Normal|Soft), X]))` with no conditional-group states —
+    /// return the inner `X` (the bare element doc), dropping the leading boundary `Line`. `None` for
+    /// any other shape. The exact inverse of that constructor (round-trip-tested); keep them in
+    /// lockstep.
+    ///
+    /// The after-element fold uses this to keep `X` bare in the fold's lead content slot and
+    /// hoist the boundary line OUTSIDE the fold. Otherwise the fill's break and the group's own
+    /// re-decided leading line both charge the one boundary — a stray leading space on the
+    /// continuation line, which the next pass reads as indentation and drops (non-idempotent).
+    #[inline]
+    pub fn strip_leading_line_group(&self, id: DocId) -> Option<DocId> {
+        let nodes = self.nodes.borrow();
+        let DocNode::Group {
+            contents,
+            expanded_states,
+            should_break,
+            ..
+        } = &nodes[id.index()]
+        else {
+            return None;
+        };
+        if *should_break {
+            return None;
+        }
+        let children = self.children.borrow();
+        if !expanded_states.resolve(&children).is_empty() {
+            return None;
+        }
+        let DocNode::Concat(range) = &nodes[contents.index()] else {
+            return None;
+        };
+        let [first, x] = range.resolve(&children) else {
+            return None;
+        };
+        if !matches!(
+            nodes[first.index()],
+            DocNode::Line(LineKind::Normal | LineKind::Soft)
+        ) {
+            return None;
+        }
+        Some(*x)
+    }
+
     /// Tag `id` as the doc node that emits the comment at `span` in `source`.
     ///
     /// The print-once comment ledger's build-side seam for a doc-based printer: the
@@ -2693,5 +2749,41 @@ mod render_indent_tests {
         assert_eq!(whitespace(indent), "\t\t");
         assert_eq!(indent.trailing_align_spaces(), 0);
         assert_eq!(indent.column(TAB_WIDTH), 2 * TAB_WIDTH);
+    }
+}
+
+#[cfg(test)]
+mod inline_sibling_line_group_tests {
+    //! The inline-sibling wrap producer/matcher must stay in lockstep. The producer
+    //! ([`super::DocArena::inline_sibling_line_group`]) lives here in `tsv_lang`; its consumer
+    //! ([`super::DocArena::strip_leading_line_group`], the after-element fold's matcher) is asked a
+    //! crate away in `tsv_svelte`. A silent shape drift returns `None` there and reintroduces the
+    //! stray-space non-idempotency the fold exists to prevent — invisible until an authoring corpus
+    //! hits it. This round-trip is the guard the ~600-line producer↔matcher gap otherwise lacks.
+    use super::DocArena;
+
+    #[test]
+    fn strip_leading_line_group_round_trips() {
+        let a = DocArena::new();
+        let x = a.text("x");
+        assert_eq!(
+            a.strip_leading_line_group(a.inline_sibling_line_group(x)),
+            Some(x),
+            "strip_leading_line_group must be the exact inverse of inline_sibling_line_group",
+        );
+    }
+
+    #[test]
+    fn strip_leading_line_group_rejects_other_shapes() {
+        let a = DocArena::new();
+        let x = a.text("x");
+        // A bare element (no wrap) and a group whose lead is not a boundary line are both `None` —
+        // the fold then keeps them intact rather than stripping a line that was never there.
+        assert_eq!(a.strip_leading_line_group(x), None);
+        let no_lead_line = a.group(a.concat(&[a.text("a"), a.line()]));
+        assert_eq!(a.strip_leading_line_group(no_lead_line), None);
+        // A forced-break group of the right shape is also rejected (the wrap is non-breaking).
+        let broken = a.group_break(a.concat(&[a.line(), x]));
+        assert_eq!(a.strip_leading_line_group(broken), None);
     }
 }

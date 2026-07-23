@@ -41,7 +41,16 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Check for comments between `:` and the type
         let colon_end = annotation.span.start + 1; // After the `:`
-        let type_start = annotation.type_annotation.span().start;
+        // A redundant paren shell with a leading line-comment run (`: (// c\n T)`) strips
+        // to the same continuation-indent hang as bare `: // c\n T`; substitute the
+        // unwrapped inner (`ty`) and widen the gap window (`type_start`) to its start so
+        // the line-comment branch below fires — the outer paren would otherwise hide the
+        // comment and the inline path would relocate it at a differing indent (a
+        // non-idempotency). A mixed (leading block) or trailing shell hoists losslessly
+        // too — the leading run via the continuation indent, the trailing comment via
+        // `with_stripped_paren_trailing`. A shell with no leading line comment is returned
+        // unchanged, so the block-comment / no-comment paths below preserve it in place.
+        let (type_start, ty) = self.keyword_value_stripped_paren_hang(annotation.type_annotation);
 
         // Zero-comment gate over the `:`→type gap, computed once and reused by every
         // arm below (the union arm and the simple fall-through ask for this exact
@@ -69,7 +78,9 @@ impl<'a> Printer<'a> {
             // here: a newline-broken block compacts to the inline value-side position
             // (`a: /* c */ X`) rather than hanging — a deliberate, cataloged choice
             // (annotation_leading_block_prettier_divergence).
-            let type_doc = self.build_type_doc(annotation.type_annotation);
+            // Type position: a trailing block lifted from the shell trails the type
+            // inline before the terminator (`defer = false`).
+            let type_doc = self.build_hang_value_doc(annotation.type_annotation, ty, false);
             d.concat(&[
                 d.text(":"),
                 self.build_continuation_indent(colon_end, type_start, type_doc),
@@ -84,7 +95,7 @@ impl<'a> Printer<'a> {
             // and inherit breaking from this context's group. Redundant comment-free
             // parens are stripped first so `(A | B)` / `(A & B)` get the bare layout
             // (prettier strips them too); other parens keep the `_` fall-through.
-            match self.unwrap_redundant_parens(annotation.type_annotation) {
+            match self.unwrap_redundant_parens(ty) {
                 TSType::Union(u) => {
                     let type_doc = self.build_union_type_doc(u);
                     // Comments between `:` and the union type (e.g., `: /* c */ A | B`);
@@ -110,7 +121,7 @@ impl<'a> Printer<'a> {
                 _ => self.build_simple_type_annotation_doc(
                     colon_end,
                     type_start,
-                    annotation.type_annotation,
+                    ty,
                     gap_has_comments,
                 ),
             }
@@ -213,8 +224,15 @@ impl<'a> Printer<'a> {
             self.has_comments_to_emit_between(annotation.span.start, annotation.span.end);
 
         // First check for line comments between `:` and the type.
-        // If there are comments, fall back to build_type_annotation_doc which handles them properly.
-        if has_comments && self.has_line_comments_between(colon_end, type_start) {
+        // If there are comments, fall back to build_type_annotation_doc which handles them
+        // properly. A redundant paren shell with a leading line-comment run in the return
+        // type (`(): (// c\n T)`) must delegate just like the bare `(): // c\n T` — widen the
+        // probe to the unwrapped inner's start so the outer paren doesn't hide the comment
+        // (build_type_annotation_doc strips the shell and hangs the type; without this the
+        // wrapping logic below would relocate the comment non-idempotently).
+        let (line_comment_probe_end, _) =
+            self.keyword_value_stripped_paren_hang(annotation.type_annotation);
+        if has_comments && self.has_line_comments_between(colon_end, line_comment_probe_end) {
             return self.build_type_annotation_doc(annotation);
         }
 

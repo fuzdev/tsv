@@ -328,6 +328,17 @@ pub(super) fn type_needs_parens_for_conditional_extends(ts_type: &TSType<'_>) ->
     }
 }
 
+/// Whether `ts_type` is an `infer U` carrying an `extends` constraint. The
+/// constraint has two paren-forcing consequences, keyed on this one shape: it
+/// greedily absorbs a following `|`/`&` (so a constrained infer needs parens as a
+/// union/intersection member — see `type_needs_parens_in_union_or_intersection`),
+/// and it abuts a trailing conditional `?` (so it needs parens as a nested
+/// function/constructor return in a conditional extends-type — see
+/// `return_type_is_constrained_infer`). A bare `infer U` forces neither.
+pub(super) fn is_constrained_infer(ts_type: &TSType<'_>) -> bool {
+    matches!(ts_type, TSType::Infer(i) if i.type_parameter.constraint.is_some())
+}
+
 /// True when a function/constructor return type — descending through a `p is X`
 /// type predicate and through further nested function/constructor returns — is a
 /// `TSInferType` carrying an `extends` constraint. The nesting matters:
@@ -342,7 +353,7 @@ fn return_type_is_constrained_infer(return_type: &internal::TSTypeAnnotation<'_>
         }
     }
     match ty {
-        TSType::Infer(i) => i.type_parameter.constraint.is_some(),
+        TSType::Infer(_) => is_constrained_infer(ty),
         TSType::Function(f) => return_type_is_constrained_infer(&f.return_type),
         TSType::Constructor(c) => return_type_is_constrained_infer(&c.return_type),
         _ => false,
@@ -377,14 +388,42 @@ pub(super) fn type_needs_parens_for_prefix_operator(ts_type: &TSType<'_>) -> boo
 /// `TSConstructorType`, `TSConditionalType`, `TSUnionType`, and
 /// `TSIntersectionType` all fall through to the same check in
 /// `needs-parentheses.js` — `isUnionType(parent) || isIntersectionType(parent)`.
+///
+/// A **constrained** `infer U extends T` is the one extra case: its `extends`
+/// constraint greedily absorbs a following `|`/`&` (`infer U extends A | B` ⇒
+/// constraint `A | B`), so as a union/intersection member it must keep its parens
+/// or the constraint silently widens (`(infer U extends number) | { a: 1 }` → the
+/// constraint would become `number | { a: 1 }`). A bare `infer U` (no constraint)
+/// has nothing to absorb and needs no parens. Matches Prettier's dedicated
+/// `TSInferType` arm in `needs-parentheses.js` — parens when the node is a `types`
+/// member of a union/intersection and `node.typeParameter.constraint` is set.
 pub(super) fn type_needs_parens_in_union_or_intersection(ts_type: &TSType<'_>) -> bool {
     let inner = unwrap_parenthesized(ts_type);
-    matches!(
-        inner,
+    // A degenerate ONE-element intersection/union (`& b`, `| b` — the leading-operator
+    // syntax) is transparent: it prints as just its member (prettier collapses it), so
+    // the parens decision applies to that member, not the one-element wrapper. Without
+    // this, `a | & b` wraps the member as if it were a real intersection → `a | (b)`,
+    // where prettier emits `a | b`. A multi-element intersection/union keeps its parens.
+    if let Some(single) = single_member_composite(inner) {
+        return type_needs_parens_in_union_or_intersection(single);
+    }
+    match inner {
         TSType::Union(_)
-            | TSType::Intersection(_)
-            | TSType::Function(_)
-            | TSType::Constructor(_)
-            | TSType::Conditional(_)
-    )
+        | TSType::Intersection(_)
+        | TSType::Function(_)
+        | TSType::Constructor(_)
+        | TSType::Conditional(_) => true,
+        other => is_constrained_infer(other),
+    }
+}
+
+/// The single member of a one-element `TSUnionType` / `TSIntersectionType`, else `None`.
+/// A one-element composite is semantically just its member (the leading-`|`/`&` syntax),
+/// and prettier collapses it, so callers see through it.
+fn single_member_composite<'a>(ts_type: &'a TSType<'a>) -> Option<&'a TSType<'a>> {
+    match ts_type {
+        TSType::Union(u) if u.types.len() == 1 => Some(&u.types[0]),
+        TSType::Intersection(i) if i.types.len() == 1 => Some(&i.types[0]),
+        _ => None,
+    }
 }

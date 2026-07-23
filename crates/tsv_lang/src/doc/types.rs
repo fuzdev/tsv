@@ -63,24 +63,6 @@ pub struct DocContext {
     /// Example: CSS declarations add ";" after the value, so reserve 1 char.
     pub trailing_reserve: usize,
 
-    /// When set, the fill's FIRST item, if it renders at the start of its line (i.e. it was
-    /// pushed to its own line by a preceding break — it "dropped"), forces the separator after it
-    /// to break, so the next item takes its own line.
-    ///
-    /// Scoped to the Svelte after-element fold of a *sandwiched* inline element/component: a wide
-    /// inline child that drops to its own line owns that line — the trailing text after it wraps to
-    /// the next line rather than hugging the dropped child's `>`. Off for every other fill (text
-    /// word-wrap and CSS value lists pack greedily after a dropped item), so the flag never affects
-    /// them.
-    ///
-    /// Exception: a *block-style* dropped element (its own content doesn't fit flat, so it wraps
-    /// intact and dangles its `>` low) with *terminal* trailing text yields to
-    /// [`Self::hug_terminal_after_break`] — the tail hugs the dangled `>` when it fits, the same as
-    /// the first-child case, since nothing follows the tail (the hug stays convergent). The render
-    /// loop skips this unconditional break in that case; the plain dropped-*whole* case (the element
-    /// stays flat on its own line) still owns its line.
-    pub break_after_dropped_first: bool,
-
     /// When set, the fill's trailing separator (its terminal `line`, the only one reaching the
     /// "content + separator" render case) measures the *immediately following* node — the next
     /// item on the render stack — as a WHOLE flat unit, instead of letting that node's own internal
@@ -95,11 +77,28 @@ pub struct DocContext {
     /// [`crate::doc::DocArena::after_element_fold_lead`].
     ///
     /// Scoped to the Svelte text→flow-element boundary fill (a text run whose next sibling is a
-    /// flowing inline element/component, ended with a trailing `line`). Off for every other fill, so
-    /// a small element after text still packs and CSS/value-list fills are unaffected. This is the
-    /// leading-boundary counterpart of [`Self::break_after_dropped_first`]: both re-couple the
-    /// width-driven drop decision to the boundary rule at render position so the space- and
-    /// newline-authored forms converge to one fixed point.
+    /// flowing inline element/component). Off for every other fill, so a small element after text
+    /// still packs and CSS/value-list fills are unaffected. It re-couples the width-driven drop
+    /// decision to the boundary rule at render position so the space- and newline-authored forms
+    /// converge to one fixed point.
+    ///
+    /// **One flag, both boundary shapes**, distinguished only by whether a separator sits between
+    /// the last word and the following element — the fill's own parity routes each to the right
+    /// render case, so the same flag drives both without cross-talk:
+    /// - **space-separated** (`… word <a…>`, a trailing `line`): the element is the fill's Case-2
+    ///   separator target; the whole-flat measurement lands in Case 2's `sep_fits`.
+    /// - **glued** (`… glued<a…>`, no whitespace, no trailing separator): the glued word is the
+    ///   fill's Case-1 last item and the element follows on the render stack; the same whole-flat
+    ///   measurement lands in Case 1's `content_fits`. Without it Case 1 inherits Break mode into
+    ///   the element and short-circuits at its first internal line (wrongly "fits"), welding the
+    ///   word and breaking the element's own content in place. Measuring the following run as a
+    ///   whole flat unit breaks at the whitespace boundary BEFORE the glued word so the whole run
+    ///   (`glued<a>…</a>`) moves to a fresh line together — never splitting the glued boundary,
+    ///   which would inject a rendered space.
+    ///
+    /// A ws-fill also reaches the Case-1 measurement at `is_final_segment` (its last word), but
+    /// there the measured content is a bare word whose only consumer is `should_remeasure`, inert
+    /// for a groupless leaf — so the shared flag stays free of cross-case contamination.
     pub break_before_wide_flow: bool,
 
     /// When set, the fill's FIRST item, if it sits mid-line (right after a small prefix such as a
@@ -126,6 +125,20 @@ pub struct DocContext {
     /// newline, so it never reaches this fold). Off for every other fill — CSS value lists and
     /// non-terminal text (`trailing_line`, the non-convergent cascade) keep their own-line break.
     pub hug_terminal_after_break: bool,
+
+    /// When set, the fill's LAST item is measured **alone** (rest-of-render ignored) even though a
+    /// node follows it on the render stack. That following node is glued to the last word with no
+    /// whitespace — a Svelte `{expr}` / `{@html}` / `{@render}` tag welded to the end of a text run
+    /// (`… tsv is ~{ratio}`). prettier keeps the mustache *outside* the text `fill`, so the fill
+    /// never sees its width and never breaks before the word it is glued to: the word stays on the
+    /// line and the tag rides past printWidth after it. tsv's fill would otherwise fold the glued
+    /// tag into the last word's fit check (`~` + `{ratio}`) and break before `~`, stranding the tag
+    /// on its own line. This flag restores prettier's behavior for exactly that boundary.
+    ///
+    /// Scoped to a text-run fill immediately followed by a glued tag (`next_is_tag && !trailing_ws`).
+    /// Off for every other fill, so the general last-item look-ahead (a hard-limit guard that keeps
+    /// the following node from overshooting printWidth) is unaffected.
+    pub trailing_glued_tag: bool,
 }
 
 /// Sentinel value for cached_width: text contains a newline.

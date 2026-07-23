@@ -41,6 +41,23 @@ enum BinaryChainStyle {
     ContinuationIndent,
 }
 
+/// How a `SequenceExpression`'s own grouping parens are emitted. One 3-valued mode
+/// rather than two independent bools — the fourth combination (bare *and*
+/// keep-trailing-inside) is impossible (a bare sequence has no `)` to keep a comment
+/// before), so an enum makes it unrepresentable.
+#[derive(Clone, Copy)]
+enum SeqParens {
+    /// Self-parenthesize; the last operand's trailing comment floats OUT after `)`
+    /// (statement / throw / call-argument position).
+    FloatOut,
+    /// Self-parenthesize; the last operand's trailing comment stays INSIDE before `)`
+    /// (value position — return arg / var init / assignment RHS; prettier #19263).
+    KeepInside,
+    /// No parens — bare comma-joined operands; an enclosing construct supplies the
+    /// grouping and owns the edge-comment gaps (a leading-comment-forced hanging paren).
+    Bare,
+}
+
 /// Operator position in source, used for comment splitting
 #[derive(Clone, Copy)]
 struct OperatorPosition {
@@ -1156,16 +1173,18 @@ impl<'a> Printer<'a> {
         // docs/conformance_prettier.md §Comment relocation for why prettier (whose own
         // retention is scoped to those two) diverges here.
         if self.argument_has_own_line_comment(yield_expr.span.start, arg) {
-            let mut body = DocBuf::new();
-            if let Some(comments) = self.build_rhs_comments_opt(keyword_end, argument_start) {
-                body.push(comments);
-            }
-            body.push(self.build_expression_doc(arg));
-            // The trailing comment stays INSIDE the parens, where it was written.
-            if has_trailing_comments {
-                self.append_trailing_paren_comments(&mut body, argument_end, yield_expr.span.end);
-            }
-            return self.build_hanging_paren_doc(keyword, d.concat(&body));
+            // Shared with `return`/`throw` (`build_comment_paren_doc`), the three restricted
+            // productions on one path: a same-line-as-`(` `//` comment trails the `(`, a
+            // sequence operand renders bare, and a comment before the `)` stays inside. The
+            // boundary is discarded — `yield` is an expression, so its enclosing statement
+            // (not this doc) appends the `;`, and `yield_expr.span.end` is the `)`.
+            let (hanging, _boundary) = self.build_restricted_production_paren_doc(
+                keyword,
+                keyword_end,
+                arg,
+                yield_expr.span.end,
+            );
+            return hanging;
         }
 
         let mut parts: DocBuf = smallvec![d.text(keyword), d.text(" ")];
@@ -1220,7 +1239,22 @@ impl<'a> Printer<'a> {
         // Float-out path: the last operand's trailing comment is the caller's job
         // (it lives in the stripped grouping-paren gap, outside `seq.span`), so the
         // in-sequence trailing scan stops at `seq.span.end`.
-        self.build_sequence_doc_inner(seq, seq.span.end, false)
+        self.build_sequence_doc_inner(seq, seq.span.end, SeqParens::FloatOut)
+    }
+
+    /// Bare variant: the comma-joined operands **without** the sequence's own
+    /// wrapping parens (and without the paren-gap edge-comment floats). Used where an
+    /// enclosing construct already supplies the required grouping parens and owns the
+    /// edge gaps — a restricted-production (`return` / `throw` / `yield` / `yield*`)
+    /// argument forced into the hanging `kw (⏎ // c⏎ body⏎)` form by a leading own-line
+    /// comment ([`Self::build_restricted_production_paren_doc`]). Self-parenthesizing
+    /// there would double the parens (`return (⏎ (a, b)⏎)`); prettier keeps the sequence
+    /// bare inside the one pair the comment break already needs.
+    pub(in crate::printer) fn build_sequence_doc_bare(
+        &self,
+        seq: &internal::SequenceExpression<'_>,
+    ) -> DocId {
+        self.build_sequence_doc_inner(seq, seq.span.end, SeqParens::Bare)
     }
 
     /// Value-position variant: a trailing comment on the last operand stays
@@ -1239,15 +1273,17 @@ impl<'a> Printer<'a> {
         seq: &internal::SequenceExpression<'_>,
         trailing_end: u32,
     ) -> DocId {
-        self.build_sequence_doc_inner(seq, trailing_end, true)
+        self.build_sequence_doc_inner(seq, trailing_end, SeqParens::KeepInside)
     }
 
     fn build_sequence_doc_inner(
         &self,
         seq: &internal::SequenceExpression<'_>,
         trailing_end: u32,
-        keep_trailing_inside: bool,
+        parens: SeqParens,
     ) -> DocId {
+        let wrap_parens = !matches!(parens, SeqParens::Bare);
+        let keep_trailing_inside = matches!(parens, SeqParens::KeepInside);
         // Line comments anywhere up to `trailing_end` (incl. the last operand's
         // trailing comment, which lives outside `seq.span` in value positions) need
         // break handling so the comment isn't swallowed by the following comma/operand
@@ -1257,11 +1293,7 @@ impl<'a> Printer<'a> {
         if comments_to_emit_in_range(self.comments, seq.span.start, trailing_end)
             .any(|c| !c.is_block)
         {
-            return self.build_sequence_doc_with_line_comments(
-                seq,
-                trailing_end,
-                keep_trailing_inside,
-            );
+            return self.build_sequence_doc_with_line_comments(seq, trailing_end, parens);
         }
 
         let d = self.d();
@@ -1275,11 +1307,12 @@ impl<'a> Printer<'a> {
         // off above, so a present comment here is a block, handled by the full path).
         let seq_has_comments = self.has_comments_to_emit_between(seq.span.start, seq.span.end);
 
-        // First operand's leading-edge comments float OUT, before the opening `(`.
-        let first_start = seq.expressions[0].span().start;
-        self.append_floated_leading_comments(&mut parts, seq.span.start, first_start);
-
-        parts.push(d.text("("));
+        if wrap_parens {
+            // First operand's leading-edge comments float OUT, before the opening `(`.
+            let first_start = seq.expressions[0].span().start;
+            self.append_floated_leading_comments(&mut parts, seq.span.start, first_start);
+            parts.push(d.text("("));
+        }
         for (i, expr) in seq.expressions.iter().enumerate() {
             let is_last = i + 1 == n;
             let expr_start = expr.span().start;
@@ -1318,6 +1351,11 @@ impl<'a> Printer<'a> {
             {
                 parts.push(self.build_comments_between(expr_end, comma, CommentSpacing::Leading));
             }
+        }
+        if !wrap_parens {
+            // Bare: the enclosing construct supplies the closing `)` and owns the
+            // trailing-edge comment gap (past `seq.span.end`), so stop at the operands.
+            return d.concat(&parts);
         }
         let last_end = seq.expressions[n - 1].span().end;
         if keep_trailing_inside {
@@ -1385,15 +1423,20 @@ impl<'a> Printer<'a> {
         &self,
         seq: &internal::SequenceExpression<'_>,
         trailing_end: u32,
-        keep_trailing_inside: bool,
+        parens: SeqParens,
     ) -> DocId {
+        let wrap_parens = !matches!(parens, SeqParens::Bare);
+        let keep_trailing_inside = matches!(parens, SeqParens::KeepInside);
         let d = self.d();
         let n = seq.expressions.len();
 
-        // First operand's leading-edge comments float OUT, before the opening `(`.
+        // First operand's leading-edge comments float OUT, before the opening `(`
+        // (skipped in the bare case — the enclosing construct owns that edge gap).
         let mut outer = DocBuf::new();
-        let first_start = seq.expressions[0].span().start;
-        self.append_floated_leading_comments(&mut outer, seq.span.start, first_start);
+        if wrap_parens {
+            let first_start = seq.expressions[0].span().start;
+            self.append_floated_leading_comments(&mut outer, seq.span.start, first_start);
+        }
 
         // Build per-operand docs (own-line leading + core + same-line trailing),
         // joined by `,` + line inside a group forced to break.
@@ -1468,6 +1511,13 @@ impl<'a> Printer<'a> {
                 inner.push(d.line());
             }
             inner.push(d.concat(&od));
+        }
+
+        if !wrap_parens {
+            // Bare: operands only (break-forced by the interior line comment); the
+            // enclosing construct provides the grouping parens and owns the edge gaps.
+            outer.push(d.group(d.concat(&inner)));
+            return d.concat(&outer);
         }
 
         if keep_trailing_inside {

@@ -20,9 +20,16 @@
 //! The shared property set is still growing: [`f1_check`] now lives here — the
 //! core that (wrapped in `catch_unwind` by its callers) drives the no-panic
 //! guard, the F1 idempotency fixed point, the reparse-skeleton compare, and the
-//! leaf-conservation check — and `fuzz` consumes it (as does `blank_audit`). Still
-//! pending: `roundtrip_audit`'s phase-1 reparse gate has not yet migrated onto the
-//! substrate.
+//! leaf-conservation check — and `fuzz` consumes it (as does `blank_audit`).
+//! `roundtrip_audit` shares the reparse primitives directly
+//! ([`tsv_parse_to_value`] / [`structurally_equivalent`] /
+//! [`leaf_conservation_diff`]); its phase-1 verdict orchestration stays
+//! **deliberately separate** rather than reusing [`f1_check`], because it keeps
+//! the verbose AST diff (which [`f1_check`] discards) and must *not* run the
+//! idempotency step — folding it onto [`f1_check`] would force a diff-return +
+//! skip-idempotency toggle onto `fuzz` / `blank_audit`, which want neither. If
+//! this is ever unified, the non-degrading shape is a smaller shared
+//! reparse-compare core that both phase-1 and [`f1_check`] call.
 
 use std::collections::BTreeMap;
 
@@ -704,7 +711,7 @@ mod ledger {
     }
 
     /// The pristine-format outcome for a seed file: whether it is injectable, and if so the byte
-    /// spans of the comments it already holds.
+    /// spans of the comments it already holds plus the formatted output.
     ///
     /// The audit checks a file is clean *as authored* before injecting. `Clean` also carries the
     /// existing comment spans so `injection_sites` can skip a site that falls strictly *inside*
@@ -715,11 +722,20 @@ mod ledger {
         /// already-had-findings case (reported) from the doesn't-parse case (silently skipped).
         Skip { dirty: bool },
         /// Clean; carries the byte spans of the comments the seed already holds (empty when it
-        /// has none).
-        Clean { comment_spans: Vec<tsv_lang::Span> },
+        /// has none) and the formatted output the check already paid for — `format_source(src)`,
+        /// free to carry (see [`pristine_format`]).
+        Clean {
+            comment_spans: Vec<tsv_lang::Span>,
+            /// The pristine format's own output. `blank_audit` grades its fast path against it
+            /// (the pristine output) and `ignore_audit` gates on `output == src` (the strict
+            /// fixed-point check) — both formerly re-formatted the seed to recompute exactly
+            /// this string, one whole format per file.
+            output: String,
+        },
     }
 
-    /// Format `src` once to check it is clean AND capture its registered comment spans.
+    /// Format `src` once to check it is clean AND capture its registered comment spans (plus the
+    /// formatted output itself, so a consumer needing it doesn't format the seed a second time).
     ///
     /// Kept separate from [`ledger_format`] because it reads the spans **before** the drain (via
     /// [`comment_ledger::parsed_comment_spans`], which the drain discards). Only the once-per-file
@@ -735,14 +751,17 @@ mod ledger {
                 let _ = comment_ledger::take_comment_ledger();
                 Pristine::Skip { dirty: false }
             }
-            Ok(Ok(_output)) => {
+            Ok(Ok(output)) => {
                 // Pass `src` itself, so `document_key(src)` matches the host document by pointer
                 // identity and the spans are strictly host-absolute (a nested `<style>` island
                 // registers under its own key and is excluded — see `parsed_comment_spans`).
                 let comment_spans = comment_ledger::parsed_comment_spans(src);
                 let ledger = comment_ledger::take_comment_ledger();
                 if ledger.findings.is_empty() {
-                    Pristine::Clean { comment_spans }
+                    Pristine::Clean {
+                        comment_spans,
+                        output,
+                    }
                 } else {
                     Pristine::Skip { dirty: true }
                 }

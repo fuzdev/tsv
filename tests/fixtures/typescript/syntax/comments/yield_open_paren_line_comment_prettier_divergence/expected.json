@@ -1,0 +1,736 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 654,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A `//` comment authored on the `(` line of a yield argument stays trailing the",
+			"start": 20,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `(`; prettier relocates it to trail the `yield` keyword with the argument below.",
+			"start": 103,
+			"end": 186,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The comment forces the parens to break either way — the only question is whether",
+			"start": 188,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " it leads the argument line or trails the `(`. The yield analog of the return/throw",
+			"start": 273,
+			"end": 358,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " keyword_open_paren_line_comment fixture (the third restricted production).",
+			"start": 360,
+			"end": 437,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 470,
+			"end": 474,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 10
+				},
+				"end": {
+					"line": 8,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 521,
+			"end": 525,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 10
+				},
+				"end": {
+					"line": 13,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 573,
+			"end": 577,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 10
+				},
+				"end": {
+					"line": 18,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 626,
+			"end": 630,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 11
+				},
+				"end": {
+					"line": 23,
+					"column": 15
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 653,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 644,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 27,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "FunctionDeclaration",
+					"start": 439,
+					"end": 491,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 449,
+						"end": 455,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 11
+							},
+							"end": {
+								"line": 7,
+								"column": 17
+							}
+						},
+						"name": "assign"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 458,
+						"end": 491,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 20
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 462,
+								"end": 488,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 462,
+									"end": 487,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 3
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "AssignmentExpression",
+										"start": 478,
+										"end": 483,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 3
+											},
+											"end": {
+												"line": 9,
+												"column": 8
+											}
+										},
+										"operator": "=",
+										"left": {
+											"type": "Identifier",
+											"start": 478,
+											"end": 479,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 3
+												},
+												"end": {
+													"line": 9,
+													"column": 4
+												}
+											},
+											"name": "a"
+										},
+										"right": {
+											"type": "Identifier",
+											"start": 482,
+											"end": 483,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 7
+												},
+												"end": {
+													"line": 9,
+													"column": 8
+												}
+											},
+											"name": "b"
+										},
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 470,
+												"end": 474
+											}
+										]
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A `//` comment authored on the `(` line of a yield argument stays trailing the",
+							"start": 20,
+							"end": 101
+						},
+						{
+							"type": "Line",
+							"value": " `(`; prettier relocates it to trail the `yield` keyword with the argument below.",
+							"start": 103,
+							"end": 186
+						},
+						{
+							"type": "Line",
+							"value": " The comment forces the parens to break either way — the only question is whether",
+							"start": 188,
+							"end": 271
+						},
+						{
+							"type": "Line",
+							"value": " it leads the argument line or trails the `(`. The yield analog of the return/throw",
+							"start": 273,
+							"end": 358
+						},
+						{
+							"type": "Line",
+							"value": " keyword_open_paren_line_comment fixture (the third restricted production).",
+							"start": 360,
+							"end": 437
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 493,
+					"end": 541,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 503,
+						"end": 506,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 11
+							},
+							"end": {
+								"line": 12,
+								"column": 14
+							}
+						},
+						"name": "seq"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 509,
+						"end": 541,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 17
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 513,
+								"end": 538,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 513,
+									"end": 537,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 15,
+											"column": 3
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "SequenceExpression",
+										"start": 529,
+										"end": 533,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 3
+											},
+											"end": {
+												"line": 14,
+												"column": 7
+											}
+										},
+										"expressions": [
+											{
+												"type": "Identifier",
+												"start": 529,
+												"end": 530,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 3
+													},
+													"end": {
+														"line": 14,
+														"column": 4
+													}
+												},
+												"name": "a"
+											},
+											{
+												"type": "Identifier",
+												"start": 532,
+												"end": 533,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 6
+													},
+													"end": {
+														"line": 14,
+														"column": 7
+													}
+												},
+												"name": "b"
+											}
+										],
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 521,
+												"end": 525
+											}
+										]
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 543,
+					"end": 590,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 553,
+						"end": 558,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 11
+							},
+							"end": {
+								"line": 17,
+								"column": 16
+							}
+						},
+						"name": "ident"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 561,
+						"end": 590,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 19
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 565,
+								"end": 587,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 565,
+									"end": 586,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 20,
+											"column": 3
+										}
+									},
+									"delegate": false,
+									"argument": {
+										"type": "Identifier",
+										"start": 581,
+										"end": 582,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 3
+											},
+											"end": {
+												"line": 19,
+												"column": 4
+											}
+										},
+										"name": "a",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 573,
+												"end": 577
+											}
+										]
+									}
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 592,
+					"end": 643,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 602,
+						"end": 610,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 11
+							},
+							"end": {
+								"line": 22,
+								"column": 19
+							}
+						},
+						"name": "delegate"
+					},
+					"expression": false,
+					"generator": true,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 613,
+						"end": 643,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 22
+							},
+							"end": {
+								"line": 26,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 617,
+								"end": 640,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 4
+									}
+								},
+								"expression": {
+									"type": "YieldExpression",
+									"start": 617,
+									"end": 639,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 25,
+											"column": 3
+										}
+									},
+									"delegate": true,
+									"argument": {
+										"type": "Identifier",
+										"start": 634,
+										"end": 635,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 3
+											},
+											"end": {
+												"line": 24,
+												"column": 4
+											}
+										},
+										"name": "a",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 626,
+												"end": 630
+											}
+										]
+									}
+								}
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

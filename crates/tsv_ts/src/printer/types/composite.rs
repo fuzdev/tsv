@@ -65,22 +65,18 @@ impl<'a> Printer<'a> {
         // block there rides the flat path and trails the extends type.
         // Block comments between true_type and : are trailing (don't force breaking).
         // Also: leading line comments inside stripped parens around extends_type
-        // (e.g., `a extends (// c\n  b)`) — these are relocated to trail
-        // extends_type and force breaking.
-        let extends_paren_has_leading_line_comment = matches!(
-            c.extends_type,
-            TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p),
-        );
+        // (e.g., `a extends (// c\n  b)`, or the double-nested `((// c\n  b))`) —
+        // these are relocated to trail extends_type and force breaking. The deep
+        // predicate scans the whole stripped shell, not just the outer paren's own
+        // gap, so a comment hiding one layer in still forces the break.
+        let extends_paren_has_leading_line_comment =
+            self.stripped_paren_has_leading_line_comment(c.extends_type);
         // Same for true_type / false_type: leading line comments inside their
         // parens get relocated to trail extends_type / true_type respectively.
-        let true_paren_has_leading_line_comment = matches!(
-            c.true_type,
-            TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p),
-        );
-        let false_paren_has_leading_line_comment = matches!(
-            c.false_type,
-            TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p),
-        );
+        let true_paren_has_leading_line_comment =
+            self.stripped_paren_has_leading_line_comment(c.true_type);
+        let false_paren_has_leading_line_comment =
+            self.stripped_paren_has_leading_line_comment(c.false_type);
         // In the `?`/`:`→branch gaps, only a comment that HANGS its branch breaks the
         // layout: a line comment, or a multiline block the author broke after
         // (`comments_force_own_line_between` — the shared keyword→value gate). A glued
@@ -412,18 +408,59 @@ impl<'a> Printer<'a> {
             CommentSpacing::Trailing,
         );
 
-        // Special case: TSParenthesizedType extends_type with a leading line
-        // comment inside the parens (e.g., `extends (// c\n  b)`). Strip the
-        // parens, build the inner type, and append the line comment as trailing
-        // on the inner type — matching prettier's relocation.
-        if let TSType::Parenthesized(p) = c.extends_type
-            && self.paren_has_leading_line_comment(p)
-        {
+        // Special case: parenthesized extends_type with a **pure** leading line-comment
+        // run inside the parens (`extends (// c\n  b)`, or the double-nested
+        // `((// c\n  b))`). Strip EVERY redundant layer, build the fully-unwrapped
+        // inner type, and append the line comment(s) as trailing on it — matching
+        // prettier's relocation. The deep window catches a comment hiding one layer
+        // in, which the shallow paren-own-gap window missed (non-idempotent). This
+        // pure-line trail-on-inner is the conditional-extends' own canonical, pinned by
+        // the non-divergence `extends_paren_leading_line_comment`; a mixed/trailing shell
+        // declines it (below).
+        if self.stripped_paren_has_leading_line_comment(c.extends_type) {
+            let inner = unwrap_parenthesized(c.extends_type);
             let mut parts: DocBuf = smallvec![d.text(" "), comments_after_extends];
-            parts.push(self.build_type_doc(p.type_annotation));
-            for comment in self.paren_leading_line_comments(p) {
+            parts.push(self.build_type_doc(inner));
+            for comment in self.stripped_paren_leading_line_comments(c.extends_type) {
                 parts.push(self.build_trailing_line_comment_doc(comment));
             }
+            return d.concat(&parts);
+        }
+
+        // A MIXED (`(/* b */ // c\n B)`) or TRAILING (`(// c\n B /* t */)`) paren shell
+        // carries a leading line comment alongside a leading block and/or a trailing
+        // comment, so it declines the narrow trail-on-inner above — trailing a leading
+        // block would move it from leading to trailing, and the trailing case would
+        // reorder (a `//` must end its line). Instead it HANGS the unwrapped inner at the
+        // same fixed point the bare (paren-free) authoring settles on — the shared
+        // keyword→value seam (mirroring the prefix-operator site). `value_hang_start !=`
+        // the shell start means the wide seam stripped it; pure-line already returned
+        // above, so only mixed/trailing reach here.
+        let (value_hang_start, value_hang_type) =
+            self.keyword_value_stripped_paren_hang(c.extends_type);
+        if value_hang_start != extends_type_start
+            && self.comments_force_own_line_between(extends_kw_end, value_hang_start)
+        {
+            // A re-added extends-type paren carries the conditional check/extends indent
+            // depth (`build_type_doc_maybe_parens`), matching this builder's other arms —
+            // not the prefix operator's bare `d.parens`. Type position, so a trailing block
+            // lifted from the shell trails the inner inline (`defer = false`).
+            let value_doc = self.with_stripped_paren_trailing(
+                self.build_type_doc_maybe_parens(
+                    value_hang_type,
+                    type_needs_parens_for_conditional_extends,
+                ),
+                c.extends_type,
+                value_hang_type,
+                false,
+            );
+            let mut parts: DocBuf = smallvec![];
+            self.append_keyword_value_line_comments(
+                &mut parts,
+                extends_kw_end,
+                value_hang_start,
+                value_doc,
+            );
             return d.concat(&parts);
         }
 
@@ -504,37 +541,25 @@ impl<'a> Printer<'a> {
         // Detect leading line comments inside parens around true_type / false_type
         // for relocation: prettier moves them to trail extends_type / true_type
         // (e.g., `extends b ? (// c\n  C) : D` → `extends b // c\n  ? C\n  : D`).
-        let true_paren = match c.true_type {
-            TSType::Parenthesized(p) => Some(p),
-            _ => None,
-        };
-        let false_paren = match c.false_type {
-            TSType::Parenthesized(p) => Some(p),
-            _ => None,
-        };
-        let true_paren_leading_line_comments: CommentVec<'_> = true_paren
-            .map(|p| self.paren_leading_line_comments(p))
-            .unwrap_or_default();
-        let false_paren_leading_line_comments: CommentVec<'_> = false_paren
-            .map(|p| self.paren_leading_line_comments(p))
-            .unwrap_or_default();
+        let true_paren_leading_line_comments: CommentVec<'_> =
+            self.stripped_paren_leading_line_comments(c.true_type);
+        let false_paren_leading_line_comments: CommentVec<'_> =
+            self.stripped_paren_leading_line_comments(c.false_type);
 
         // Build branch type docs (same nested-conditional logic as non-breaking path).
-        // When we relocated leading line comments from a TSParenthesizedType wrapper,
-        // build the inner type directly so the relocated comments aren't emitted twice.
-        let true_type_doc =
-            if let Some(p) = true_paren.filter(|_| !true_paren_leading_line_comments.is_empty()) {
-                self.build_type_doc(p.type_annotation)
-            } else if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type) {
-                self.build_conditional_type_doc_inner(inner)
-            } else {
-                self.build_type_doc(c.true_type)
-            };
+        // When we relocated leading line comments from a parenthesized wrapper (any
+        // nesting depth), build the fully-unwrapped inner type directly so the
+        // relocated comments aren't emitted twice.
+        let true_type_doc = if !true_paren_leading_line_comments.is_empty() {
+            self.build_type_doc(unwrap_parenthesized(c.true_type))
+        } else if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type) {
+            self.build_conditional_type_doc_inner(inner)
+        } else {
+            self.build_type_doc(c.true_type)
+        };
 
-        let false_type_doc = if let Some(p) =
-            false_paren.filter(|_| !false_paren_leading_line_comments.is_empty())
-        {
-            self.build_type_doc(p.type_annotation)
+        let false_type_doc = if !false_paren_leading_line_comments.is_empty() {
+            self.build_type_doc(unwrap_parenthesized(c.false_type))
         } else if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type) {
             self.build_conditional_type_doc_inner(inner)
         } else {
@@ -845,15 +870,23 @@ impl<'a> Printer<'a> {
 
             body_parts.push(d.text(":"));
 
+            // A redundant paren shell with a leading line-comment run (`]: (// c\n V)`)
+            // strips to the same hang as bare `]: // c\n V`; route it through the shared
+            // keyword→value seam so the paren form is idempotent (the outer paren would
+            // otherwise hide the comment from the gate). A mixed / trailing shell hoists
+            // losslessly too — the trailing comment via `build_hang_value_doc`.
+            let (value_start, value_type) = self.keyword_value_stripped_paren_hang(type_ann);
             // A line comment after `:` stays trailing it, with the value type on
             // the next line (preserve-in-place; prettier relocates the comment to
             // trail the member `;`).
-            if self.has_line_comments_between(bracket_close, type_start) {
-                let value_doc = self.build_type_doc(type_ann);
+            if self.has_line_comments_between(bracket_close, value_start) {
+                // Type position: a trailing block lifted from the shell trails the value
+                // inline before the member `;` (`defer = false`).
+                let value_doc = self.build_hang_value_doc(type_ann, value_type, false);
                 self.append_keyword_value_line_comments(
                     &mut body_parts,
                     bracket_close,
-                    type_start,
+                    value_start,
                     value_doc,
                 );
             } else {
@@ -963,6 +996,27 @@ impl<'a> Printer<'a> {
     // Tuple Types
     //
 
+    /// Render one tuple element. A tuple that breaks places each element on its own
+    /// indented line, so an intersection element is an `own_line` context: its
+    /// first-member comment hoist must not add a second continuation indent on top of
+    /// the tuple's element indent (see `build_intersection_type_doc`'s `own_line`).
+    /// Non-intersection elements — and intersections without a hoisting first-member
+    /// comment, for which `own_line` is a no-op — route through the shared
+    /// `build_type_doc` unchanged.
+    ///
+    // TODO: the sibling own-line container positions — a type-argument list `<…>`, an
+    // arrow/function return type, and an `(A & B)[]` array element — still route their
+    // intersection through the trailing-prefix `build_type_doc` default and so hit the
+    // same first-member-hoist over-indent (a latent non-idempotency, near-zero real-code
+    // frequency). Each needs the same own-line routing (plus, for the conditional branch,
+    // the separate un-glue fix) as part of the intersection-printer convergence.
+    fn build_tuple_element_doc(&self, elem: &TSType<'_>) -> DocId {
+        match elem {
+            TSType::Intersection(i) => self.build_intersection_type_doc(i, true, true),
+            _ => self.build_type_doc(elem),
+        }
+    }
+
     /// Build a Doc for a tuple type: `[A, B, C]`
     ///
     /// Uses width-aware breaking: inline if fits, one element per line if not.
@@ -984,7 +1038,7 @@ impl<'a> Printer<'a> {
                     parts.push(d.text(","));
                     parts.push(d.line());
                 }
-                parts.push(self.build_type_doc(elem));
+                parts.push(self.build_tuple_element_doc(elem));
             }
             let inner = d.concat(&[d.softline(), d.concat(&parts)]);
             return d.group(d.concat(&[d.text("["), d.indent(inner), d.softline(), d.text("]")]));
@@ -1029,7 +1083,7 @@ impl<'a> Printer<'a> {
                 self.build_inline_comments_between_doc_trailing_space(prev_end, elem.span().start);
             parts.push(leading);
 
-            parts.push(self.build_type_doc(elem));
+            parts.push(self.build_tuple_element_doc(elem));
 
             let elem_end = elem.span().end;
             prev_end = if i + 1 < t.element_types.len() {
@@ -1082,7 +1136,8 @@ impl<'a> Printer<'a> {
             // bracket-line prefix below).
             let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
             let leading = self.build_leading_comments_multiline(prev_end, elem_start, skip_delim);
-            inner_parts.push(self.build_list_element_group(leading, self.build_type_doc(elem)));
+            inner_parts
+                .push(self.build_list_element_group(leading, self.build_tuple_element_doc(elem)));
 
             if !is_last {
                 let next_start = t.element_types[i + 1].span().start;

@@ -86,17 +86,13 @@ pub fn write_program_json(
 /// comment-bearing template expression island (each node emits its attached
 /// leading/trailing comments at its close), `Record` for the byte-space
 /// skeleton pass that builds an island's comment map.
+#[inline]
 pub fn write_expression_embedded(
     w: &mut JsonWriter,
     expr: &internal::Expression<'_>,
-    source: &str,
-    loc: LocationMapper<'_>,
-    comments: CommentMode<'_>,
-    emit_loc: bool,
+    env: EmbedWriter<'_>,
 ) {
-    let mut ctx = Ctx::new(source, loc);
-    ctx.comments = comments;
-    ctx.emit_loc = emit_loc;
+    let ctx = Ctx::from_embed(env);
     expressions::write_expression(w, expr, &ctx);
 }
 
@@ -104,17 +100,13 @@ pub fn write_expression_embedded(
 /// `tsv_svelte`'s `{const …}` / `{let …}` declaration tag. Shares the host
 /// document's `LocationMapper` (spans are host-file coordinates), emitting final char-space
 /// positions directly. `comments` as in `write_expression_embedded`.
+#[inline]
 pub fn write_variable_declaration_embedded(
     w: &mut JsonWriter,
     var_decl: &internal::VariableDeclaration<'_>,
-    source: &str,
-    loc: LocationMapper<'_>,
-    comments: CommentMode<'_>,
-    emit_loc: bool,
+    env: EmbedWriter<'_>,
 ) {
-    let mut ctx = Ctx::new(source, loc);
-    ctx.comments = comments;
-    ctx.emit_loc = emit_loc;
+    let ctx = Ctx::from_embed(env);
     write_variable_declaration(w, var_decl, &ctx, false);
 }
 
@@ -126,17 +118,13 @@ pub fn write_variable_declaration_embedded(
 /// stripping (unlike a block pattern). `comments` is `Emit` for the fused form
 /// of a comment-bearing snippet name (`{#snippet /* c */ name(…)}`), where a
 /// leading comment attaches to the `Identifier`.
+#[inline]
 pub fn write_identifier_expression_with_character(
     w: &mut JsonWriter,
     expr: &internal::Expression<'_>,
-    source: &str,
-    loc: LocationMapper<'_>,
-    comments: CommentMode<'_>,
-    emit_loc: bool,
+    env: EmbedWriter<'_>,
 ) {
-    let mut ctx = Ctx::new(source, loc);
-    ctx.comments = comments;
-    ctx.emit_loc = emit_loc;
+    let ctx = Ctx::from_embed(env);
     write_identifier_expression_with_character_in(w, expr, &ctx);
 }
 
@@ -182,17 +170,13 @@ fn write_identifier_expression_with_character_in(
 /// pattern (`{@const { b = /* c */ 1 } = expr}`): canonical parses it as a
 /// synthetic `(pattern = 1)` acorn expression whose comment attach covers the
 /// pattern subtree, and attached comments emit at each node's close.
+#[inline]
 pub fn write_pattern_embedded(
     w: &mut JsonWriter,
     expr: &internal::Expression<'_>,
-    source: &str,
-    loc: LocationMapper<'_>,
-    comments: CommentMode<'_>,
-    emit_loc: bool,
+    env: EmbedWriter<'_>,
 ) {
-    let mut ctx = Ctx::new(source, loc);
-    ctx.comments = comments;
-    ctx.emit_loc = emit_loc;
+    let mut ctx = Ctx::from_embed(env);
     // The pattern root's own annotation is the `read_context`-synthesized one
     // whose `loc` is omitted (a block-pattern root is always an identifier or a
     // destructure, so no other root shape can carry one).
@@ -210,8 +194,8 @@ pub fn write_pattern_embedded(
             // Destructure: `+1`-column adjustment on the start line (when `> 1`).
             // Only affects column output, so skip the line lookup entirely on the
             // no-locations path (where it would only hit the stub `[0]` table).
-            if emit_loc {
-                let line = loc.pos_and_position(expr.span().start).1.line;
+            if env.emit_loc {
+                let line = env.loc.pos_and_position(expr.span().start).1.line;
                 if line > 1 {
                     ctx.pattern_line = line;
                 }
@@ -335,6 +319,27 @@ pub enum ProgramLoc {
     Emit(Position, Position),
 }
 
+/// The per-document inputs the four "plain" embedded writers share
+/// (`write_expression_embedded`, `write_pattern_embedded`,
+/// `write_variable_declaration_embedded`,
+/// `write_identifier_expression_with_character`) — the source text, offset
+/// mapper, comment role, and `loc`-emission flag each one funnels into a `Ctx`.
+///
+/// Bundled into one `Copy` value (all fields are `Copy` — two references, an
+/// enum, a bool) so the call sites stop re-threading the same four arguments.
+/// It is an entry-boundary convenience only: each writer destructures it into a
+/// stack `Ctx` (`Ctx::from_embed`) and the per-node walk threads `&Ctx` exactly
+/// as before — the fused char-space emission never sees it, so this is output-
+/// and hot-path-neutral. (`write_program_embedded` stays out of this set: it
+/// carries `Schema` + `ProgramLoc`, and its `loc` flag lives in `ProgramLoc`.)
+#[derive(Clone, Copy)]
+pub struct EmbedWriter<'a> {
+    pub source: &'a str,
+    pub loc: LocationMapper<'a>,
+    pub comments: CommentMode<'a>,
+    pub emit_loc: bool,
+}
+
 /// The per-document environment every writer function shares (`source` and the
 /// `LocationMapper`).
 ///
@@ -398,6 +403,23 @@ impl<'a> Ctx<'a> {
             comments: CommentMode::Off,
             vanilla_acorn: false,
             emit_loc: true,
+        }
+    }
+
+    /// The per-document context for an embedded writer: the shared `EmbedWriter`
+    /// inputs plus the inert pattern-quirk defaults. Sets `comments`/`emit_loc`
+    /// in the initializer (no post-construction re-assignment), so with the
+    /// entry writers inlined the `EmbedWriter` aggregate scalar-replaces away.
+    #[inline]
+    fn from_embed(env: EmbedWriter<'a>) -> Self {
+        Ctx {
+            source: env.source,
+            loc: env.loc,
+            pattern_line: 0,
+            pattern_ann_span: Span::new(u32::MAX, u32::MAX),
+            comments: env.comments,
+            vanilla_acorn: false,
+            emit_loc: env.emit_loc,
         }
     }
 }
@@ -682,14 +704,10 @@ pub(super) fn write_name(
 
 /// Emit a numeric literal value the way acorn's JSON does: non-finite as
 /// `null` (JSON has no Infinity/NaN — an overflow literal like `1e999`),
-/// integral doubles as expanded shortest-round-trip integers (JS
-/// `JSON.stringify` semantics), everything else as ryu.
-///
-/// Known divergence (pre-existing, carried over from the typed converter):
-/// integral doubles in `(u64::MAX, 1e21)` — e.g. `1e20` — emit ryu's `1e+20`
-/// where JS prints expanded digits.
-/// TODO: emit JS-style expanded text for integral doubles beyond `u64` up to
-/// 1e21 (fixtures-first).
+/// integral doubles below `1e21` as their expanded shortest-round-trip integer
+/// digits and integral doubles at/above `1e21` in exponential form (JS
+/// `Number::toString` / `JSON.stringify` semantics), everything else as ryu —
+/// which matches JS except the one non-integral decade handled below.
 pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
     if !n.is_finite() {
         // ±Inf → null, matching JSON.stringify (a parsed literal is never NaN).
@@ -714,6 +732,36 @@ pub(super) fn write_number_value(w: &mut JsonWriter, n: f64) {
         }
         if let Ok(v) = shortest.parse::<u64>() {
             w.u64(v);
+            return;
+        }
+        // Beyond u64 but below 1e21, JS `Number::toString` still prints the
+        // expanded integer (the spec's `k <= n <= 21` case); `shortest` —
+        // Rust's shortest-round-trip Display — already holds those exact digits.
+        // At/above 1e21 JS switches to exponential, where Rust's Display would
+        // wrongly keep expanding, so that range falls through to ryu (`w.f64`).
+        if n.abs() < 1e21 {
+            w.raw(&shortest);
+            return;
+        }
+    } else {
+        // Non-integral. JS `Number::toString` uses fixed notation down to the
+        // spec's `n = -5` (|x| in [1e-6, 1e-5)), whereas ryu switches to
+        // scientific one decade earlier — the sole non-integral divergence.
+        // In that single decade the point sits at position -5, so the fixed
+        // form is `0.` + five zeros + the shortest significant digits.
+        let a = n.abs();
+        if (1e-6..1e-5).contains(&a) {
+            // `{a:e}` is the shortest round-trip scientific form (`d[.ddd]e-6`);
+            // its mantissa digits are exactly `s` in the spec.
+            let sci = format!("{a:e}");
+            let mantissa = sci.split('e').next().unwrap_or(&sci);
+            let mut out = String::with_capacity(8 + mantissa.len());
+            if n.is_sign_negative() {
+                out.push('-');
+            }
+            out.push_str("0.00000");
+            out.extend(mantissa.chars().filter(|&c| c != '.'));
+            w.raw(&out);
             return;
         }
     }

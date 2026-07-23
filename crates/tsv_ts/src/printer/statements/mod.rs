@@ -382,8 +382,7 @@ impl<'a> Printer<'a> {
         // owns its own trailing gap (the parens are retained, so the `)` — not the span
         // end — divides inside from outside), so it returns before the shared scan below.
         if self.argument_has_own_line_comment(keyword_start, arg) {
-            let own_line_comments = self.build_rhs_comments_opt(keyword_end, arg.span().start);
-            return self.build_comment_paren_doc(keyword, arg, span_end, own_line_comments);
+            return self.build_comment_paren_doc(keyword, keyword_end, arg, span_end);
         }
 
         // Trailing comments from stripped grouping parens: `return (x /* c */)` → `return x /* c */;`
@@ -588,25 +587,59 @@ impl<'a> Printer<'a> {
             })
     }
 
-    /// Build unconditional paren-wrapped doc for return/throw with own-line comments.
+    /// The shared paren-wrapped operand layout for the three **restricted productions**
+    /// (`return` / `throw` / `yield` / `yield*`): `kw (⏎ body⏎)`, emitted when a comment
+    /// forces the operand's break — the break is legal only inside the parens (each is
+    /// `kw [no LineTerminator here] operand`, so a bare newline is ASI, which would end
+    /// the production and silently drop the operand).
     ///
-    /// Matches Prettier's `["(", indent([hardline, argumentDoc]), hardline, ")"]`
-    /// (function.js:239). Unlike the binaryish case which uses `ifBreak`, this is
-    /// unconditional because the comment placement makes the line break semantically necessary.
-    fn build_comment_paren_doc(
+    /// A `//` LINE comment authored on the SAME line as the grouping `(` stays trailing
+    /// the `(` (`kw ( // c⏎ …`) rather than dropping to its own line — the comment-position
+    /// philosophy (a same-line `//` is a deliberate authoring choice), where prettier
+    /// relocates it. A block comment, or any comment on its own line below `(`, keeps the
+    /// own-line placement (matching prettier). The operand renders BARE — a sequence must
+    /// not self-parenthesize (`build_sequence_doc` would give `(a, b)`) and an assignment
+    /// needs no inner `(a = b)`; the hanging parens ARE the grouping, so an inner pair
+    /// would double it. A comment before the `)` stays inside the parens where it was
+    /// written.
+    ///
+    /// Returns the hanging doc and the grouping `)` boundary. A statement caller
+    /// ([`Self::build_comment_paren_doc`]) uses the boundary to place a comment authored
+    /// between the `)` and the `;`; the `yield` expression discards it (its `span_end` is
+    /// the `)`, so nothing follows).
+    pub(in crate::printer) fn build_restricted_production_paren_doc(
         &self,
         keyword: &'static str,
+        keyword_end: u32,
         arg: &Expression<'_>,
         span_end: u32,
-        inline_comments: Option<DocId>,
-    ) -> DocId {
+    ) -> (DocId, u32) {
         let d = self.d();
-        let raw_expr_doc = self.build_expression_doc(arg);
-        // Assignment expressions need inner parens for clarity: return (\n  (a = b)\n);
-        let expr_doc = if matches!(arg, Expression::AssignmentExpression(_)) {
-            d.parens(raw_expr_doc)
-        } else {
-            raw_expr_doc
+        let arg_start = arg.span().start;
+
+        // Split a same-line-as-`(` line comment off the leading run so it can trail the
+        // `(`; the rest lead the argument below.
+        let open_paren = find_char_skipping_comments(
+            self.source.as_bytes(),
+            keyword_end as usize,
+            arg_start as usize,
+            b'(',
+        )
+        .map(|p| p as u32);
+        let first_comment = comments_to_emit_in_range(self.comments, keyword_end, arg_start).next();
+        let (paren_trailing, leading_start) = match (open_paren, first_comment) {
+            (Some(op), Some(c))
+                if !c.is_block && !self.has_newline_between(op + 1, c.span.start) =>
+            {
+                (Some(self.build_comment_doc(c)), c.span.end)
+            }
+            _ => (None, keyword_end),
+        };
+        let inline_comments = self.build_rhs_comments_opt(leading_start, arg_start);
+
+        let expr_doc = match arg {
+            Expression::SequenceExpression(seq) => self.build_sequence_doc_bare(seq),
+            _ => self.build_expression_doc(arg),
         };
         let mut body = DocBuf::new();
         if let Some(comments_doc) = inline_comments {
@@ -614,12 +647,8 @@ impl<'a> Printer<'a> {
         }
         body.push(expr_doc);
 
-        // The grouping `)` — not the statement end — bounds what is *inside* the parens.
-        // These parens are not optional: they are what makes the comment-forced break
-        // legal, so a comment before the `)` stays inside them, where it was written
-        // (`build_yield_doc`'s hanging branch is the same rule for the third restricted
-        // production; omitting it here DROPPED the comment outright). A comment *past* the
-        // `)` is outside them and follows the ordinary terminator rule, trailing the `;`.
+        // The grouping `)` — not the statement/expression end — bounds what is *inside* the
+        // parens. A comment before the `)` stays inside them, where it was written.
         let argument_end = arg.span().end;
         let boundary = self
             .retained_grouping_close(argument_end, span_end)
@@ -628,7 +657,27 @@ impl<'a> Printer<'a> {
             self.append_trailing_paren_comments(&mut body, argument_end, boundary);
         }
 
-        let mut parts: DocBuf = smallvec![self.build_hanging_paren_doc(keyword, d.concat(&body))];
+        (
+            self.build_hanging_paren_doc(keyword, d.concat(&body), paren_trailing),
+            boundary,
+        )
+    }
+
+    /// Build unconditional paren-wrapped doc for a return/throw operand with own-line
+    /// comments, terminated by `;`. Wraps the shared
+    /// [`Self::build_restricted_production_paren_doc`] layout and appends the statement
+    /// `;`, placing a comment authored in the `)`→`;` gap between the two.
+    fn build_comment_paren_doc(
+        &self,
+        keyword: &'static str,
+        keyword_end: u32,
+        arg: &Expression<'_>,
+        span_end: u32,
+    ) -> DocId {
+        let d = self.d();
+        let (hanging, boundary) =
+            self.build_restricted_production_paren_doc(keyword, keyword_end, arg, span_end);
+        let mut parts: DocBuf = smallvec![hanging];
         let after = if self.has_comments_to_emit_between(boundary, span_end) {
             self.split_terminator_gap_comments(&mut parts, boundary, span_end, false)
         } else {
@@ -682,15 +731,26 @@ impl<'a> Printer<'a> {
     ///
     /// `body` is the already-assembled operand doc, including any leading comment
     /// run and any trailing comment that stays inside the parens.
+    ///
+    /// `paren_trailing` is a `//` line comment the author put on the `(` line — it trails
+    /// the `(` (`kw ( // c⏎ …`) instead of leading `body` on its own line (the
+    /// comment-position divergence; see [`Self::build_comment_paren_doc`]). `None` keeps
+    /// the plain `kw (` open.
     pub(in crate::printer) fn build_hanging_paren_doc(
         &self,
         keyword: &'static str,
         body: DocId,
+        paren_trailing: Option<DocId>,
     ) -> DocId {
         let d = self.d();
+        let open = match paren_trailing {
+            // `kw ( // c` — the line comment runs to end-of-line; the indent's hardline
+            // supplies the break, so nothing is swallowed.
+            Some(comment) => d.concat(&[d.text(keyword), d.text(" ( "), comment]),
+            None => d.concat(&[d.text(keyword), d.text(" (")]),
+        };
         d.concat(&[
-            d.text(keyword),
-            d.text(" ("),
+            open,
             d.indent(d.concat(&[d.hardline(), body])),
             d.hardline(),
             d.text(")"),

@@ -303,15 +303,14 @@ impl<'a> Printer<'a> {
         let mut prev_end = param.name.span.end;
 
         if let Some(constraint) = &param.constraint {
-            // If the constraint is `(// leading\n T)`, treat the leading line
-            // comment inside the parens as if it were between `extends` and the
-            // constraint so it forces the indent-and-break layout (matching
-            // prettier's paren stripping).
-            let (value_search_end, value_type): (u32, &TSType<'_>) = if has_comments
-                && let TSType::Parenthesized(p) = constraint
-                && self.paren_has_leading_line_comment(p)
-            {
-                (p.type_annotation.span().start, p.type_annotation)
+            // If the constraint is `(// leading\n T)` — or the double-nested
+            // `((// leading\n T))` — treat the leading line comment inside the parens
+            // as if it were between `extends` and the constraint so it forces the
+            // indent-and-break layout (matching prettier's paren stripping). The deep
+            // window unwraps every redundant layer; a shallow one-level window missed
+            // a comment nested one paren deeper (non-idempotent).
+            let (value_search_end, value_type): (u32, &TSType<'_>) = if has_comments {
+                self.keyword_value_stripped_paren_hang(constraint)
             } else {
                 (constraint.span().start, constraint)
             };
@@ -345,11 +344,23 @@ impl<'a> Printer<'a> {
                 comment_range,
                 value_type,
                 GroupId::TypeParameterConstraint,
+                constraint,
             );
             prev_end = constraint.span().end;
         }
 
         if let Some(default) = &param.default {
+            // Same deep-window paren handling as the constraint above: `<T = (// c\n U)>`
+            // (and the double-nested form) strips to the same hang as bare `<T = // c\n U>`,
+            // so substitute the unwrapped inner and widen the gap window to its start. A
+            // mixed / trailing shell hoists losslessly too — the trailing comment is
+            // reattached in `append_keyword_value` via `build_hang_value_doc`.
+            let (value_search_end, value_type): (u32, &TSType<'_>) = if has_comments {
+                self.keyword_value_stripped_paren_hang(default)
+            } else {
+                (default.span().start, default)
+            };
+
             // Find `=` between previous end and default
             let comment_range = has_comments.then(|| {
                 #[allow(clippy::expect_used)] // = must exist when a default is present
@@ -371,15 +382,16 @@ impl<'a> Printer<'a> {
                 ) {
                     parts.push(pre);
                 }
-                (eq_end, default.span().start)
+                (eq_end, value_search_end)
             });
 
             parts.push(d.text(" ="));
             self.append_keyword_value(
                 &mut parts,
                 comment_range,
-                default,
+                value_type,
                 GroupId::TypeParameterDefault,
+                default,
             );
             prev_end = default.span().end;
         }
@@ -421,6 +433,10 @@ impl<'a> Printer<'a> {
         comment_range: Option<(u32, u32)>,
         value_type: &TSType<'_>,
         group_id: GroupId,
+        // The original (pre-seam) constraint/default node, so a trailing comment lifted
+        // from a stripped redundant-paren shell (`extends (// c\n T /* t */)`) can be
+        // reattached in the hang branch. Equal to `value_type` when no shell was stripped.
+        shell: &TSType<'_>,
     ) {
         let d = self.d();
         // Strip redundant comment-free parens so `(A | B)` / `(A & B)` constraints
@@ -455,8 +471,10 @@ impl<'a> Printer<'a> {
                 // A line comment or multiline block after the keyword hangs the bound type
                 // on its own line (and expands the `<…>` via the gate at :163). A
                 // single-line block comment (own-line, trailing, or glued) collapses inline
-                // and keeps `<…>` collapsed (the fall-through below).
-                let value_doc = self.build_type_doc(value_type);
+                // and keeps `<…>` collapsed (the fall-through below). Type position: a
+                // trailing block lifted from a stripped shell trails the value inline
+                // before the `,`/`>` (`defer = false`).
+                let value_doc = self.build_hang_value_doc(shell, value_type, false);
                 self.append_keyword_value_line_comments(parts, keyword_end, value_start, value_doc);
                 return;
             }

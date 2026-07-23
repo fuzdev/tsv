@@ -1,0 +1,240 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 810,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 589,
+				"data": "\n\tA glued text word, a glued HTML comment, and an inline element form one glued run with\n\tno whitespace between them, so the break lands at the last whitespace boundary BEFORE\n\tthe word: the whole run (word, comment, element) moves to the fresh line together.\n\tBreaking inside the run would inject a rendered space. Cases: fits at exactly 100 (stays\n\tinline, control); 101 (breaks before the glued word + collapses). Prettier pulls the\n\tglued word back onto the text line and dangles the element — see output_prettier.svelte\n\t(prettier keeps that form; tsv normalizes it to input).\n"
+			},
+			{
+				"type": "Text",
+				"start": 589,
+				"end": 590,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 590,
+				"end": 698,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 591
+					},
+					"end": {
+						"line": 10,
+						"column": 2,
+						"character": 592
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 593,
+							"end": 658,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 wdx glued",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 wdx glued"
+						},
+						{
+							"type": "Comment",
+							"start": 658,
+							"end": 666,
+							"data": "c"
+						},
+						{
+							"type": "RegularElement",
+							"start": 666,
+							"end": 692,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 73,
+									"character": 667
+								},
+								"end": {
+									"line": 11,
+									"column": 74,
+									"character": 668
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 669,
+									"end": 680,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 11,
+											"column": 75,
+											"character": 669
+										},
+										"end": {
+											"line": 11,
+											"column": 79,
+											"character": 673
+										}
+									},
+									"value": [
+										{
+											"start": 675,
+											"end": 679,
+											"type": "Text",
+											"raw": "/a/b",
+											"data": "/a/b"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 681,
+										"end": 688,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 692,
+							"end": 694,
+							"raw": ".\n",
+							"data": ".\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 698,
+				"end": 699,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 699,
+				"end": 809,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 700
+					},
+					"end": {
+						"line": 13,
+						"column": 2,
+						"character": 701
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 702,
+							"end": 769,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 wdxy\n\tglued",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 wdxy\n\tglued"
+						},
+						{
+							"type": "Comment",
+							"start": 769,
+							"end": 777,
+							"data": "c"
+						},
+						{
+							"type": "RegularElement",
+							"start": 777,
+							"end": 803,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 15,
+									"column": 15,
+									"character": 778
+								},
+								"end": {
+									"line": 15,
+									"column": 16,
+									"character": 779
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 780,
+									"end": 791,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 15,
+											"column": 17,
+											"character": 780
+										},
+										"end": {
+											"line": 15,
+											"column": 21,
+											"character": 784
+										}
+									},
+									"value": [
+										{
+											"start": 786,
+											"end": 790,
+											"type": "Text",
+											"raw": "/a/b",
+											"data": "/a/b"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 792,
+										"end": 799,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 803,
+							"end": 805,
+							"raw": ".\n",
+							"data": ".\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

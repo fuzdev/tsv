@@ -256,6 +256,7 @@ Tip: Use `deno task fixtures:audit <pattern>` to classify novel prettier outputs
 - `divergent_variant_*.svelte` — Prettier-stable, our formatter rewrites to a distinct third stable form (NOT input, NOT the form)
 - `prettier_intermediate_*.svelte` — Prettier's unstable first-pass output (from `unformatted_ours_*`, converges to input)
 - `prettier_intermediate_to_variant_*.svelte` — Prettier's unstable first-pass output (from `unformatted_ours_*`, converges to a `variant_*`/`prettier_variant_*`)
+- `prettier_intermediate_to_divergent_variant_*.svelte` — Prettier's unstable first-pass output (from `unformatted_ours_*`, converges to a `divergent_variant_*` — the target N7/N7b can't accept; see N7c)
 - `audit_signature.txt` — Pins prettier's multi-pass chain from `output_prettier.*` to fixed point (auto-generated; see F4)
 - `prettier_nonconvergent.txt` — Prettier never reaches a fixed point on input (no oracle exists); claim live-verified (see F5/S18)
 - `prettier_rejects.txt` — Prettier throws on the input (parse rejection or printer crash; no oracle exists); the file's trimmed content is the expected-error substring, claim live-verified (see F6/S19)
@@ -320,7 +321,7 @@ All fixtures use `input.svelte` as canonical source.
    - `variant_*.*` files (dual-stable forms), OR
    - `divergent_variant_*.*` files (divergent-variant forms), OR
    - `unformatted_ours_*.*` files (testing our formatter only), OR
-   - `prettier_intermediate_*.*` or `prettier_intermediate_to_variant_*.*` files (multi-pass convergence), OR
+   - `prettier_intermediate_*.*`, `prettier_intermediate_to_variant_*.*`, or `prettier_intermediate_to_divergent_variant_*.*` files (multi-pass convergence), OR
    - `prettier_nonconvergent.txt` (prettier never reaches a fixed point), OR
    - `prettier_rejects.txt` (prettier throws on the input)
 9. **S8-rev**: `_prettier_divergence` directories MUST document the divergence with one of:
@@ -410,6 +411,11 @@ on real codebases.
   - `prettier(unformatted_ours_X) == prettier_intermediate_to_variant_X` (matches first-pass output)
   - `prettier(prettier_intermediate_to_variant_X) != prettier_intermediate_to_variant_X` (verifies it's unstable)
   - `prettier(prettier_intermediate_to_variant_X) ∈ {variant_*, prettier_variant_*}` (converges to a documented variant, not input)
+- **N7c**: `prettier_intermediate_to_divergent_variant_*.*` captures prettier's unstable first-pass output when it converges to a documented `divergent_variant_*` — the convergence target N7/N7b can't accept (N7 → `input`, N7b → `variant_*`/`prettier_variant_*`). Completes the intermediate-convergence family across all three prettier-stable-form kinds (`input` / `variant` / `divergent_variant`). Arises when prettier's unstable first pass on an `unformatted_ours_*` shell settles on a **prettier-stable form our formatter rewrites to a third form** (the intersection first-member redundant-paren *mixed* case, where prettier's shell terminal is a glued form tsv un-glues):
+  - `prettier(unformatted_ours_X) == prettier_intermediate_to_divergent_variant_X` (matches first-pass output)
+  - `prettier(prettier_intermediate_to_divergent_variant_X) != prettier_intermediate_to_divergent_variant_X` (verifies it's unstable)
+  - `prettier(prettier_intermediate_to_divergent_variant_X) ∈ {divergent_variant_*}` (converges to a documented divergent_variant, not input or a variant)
+  - Requires at least one `divergent_variant_*` sibling (the convergence target). Auto-generated/updated/removed by `fixtures:update:formatted` (a new `ChainShape::UnstableConvergesToDivergentVariant`), like its N7/N7b siblings. `fixtures:audit` also *suggests* this marker during fixture design (a `Suggestion::PrettierIntermediateToDivergentVariant`, mirroring the N7b arm): when an `unformatted_ours_*` shell's prettier chain is unstable and converges to an existing `divergent_variant_*`, the audit names the marker to create instead of an `Investigate`.
 - **N8**: `unformatted_prettier_*.*`: `prettier(file) == output_prettier.*` (prettier normalizes to its canonical output)
   - Requires `output_prettier.*` to exist
   - Tests that prettier normalizes these variants to prettier's stable output
@@ -841,6 +847,7 @@ per-kind checks are the S/C/F/N rules in [All Validation Rules](#all-validation-
 3. **Normalization divergence** (`prettier(input) == input`) — `input.*` + `unformatted_ours_*.*` + README only.
 4. **Unstable intermediate** (prettier requires two passes) — add `prettier_intermediate_*.*`: `unformatted_ours_X` → prettier → `prettier_intermediate_X` (unstable) → prettier → `input` (stable). Our formatter reaches the stable form in one pass.
    - **4b** — `prettier_intermediate_to_variant_*.*` when prettier's second pass lands on a documented `variant_*`/`prettier_variant_*` instead of `input` (the D → C → B chain; requires the convergence target to exist in the fixture).
+   - **4c** — `prettier_intermediate_to_divergent_variant_*.*` when prettier's second pass lands on a documented `divergent_variant_*` (the target N7/N7b can't accept — see N7c; requires a `divergent_variant_*` sibling). The intersection first-member redundant-paren *mixed* case: prettier's shell terminal is a glued form our formatter un-glues.
 5. **Testing prettier's normalization to its own output** — `unformatted_prettier_*.*` (requires `output_prettier.*`): `prettier(file) == output_prettier.*`; our formatter is not applied to these.
 6. **Dual-stable forms** — `variant_*.*`: both formatters keep the file stable; neither normalizes it to `input`.
 7. **Divergent-variant forms** — `divergent_variant_*.*`: prettier keeps the form stable; ours rewrites it to a *third* stable form, so three stable forms coexist.

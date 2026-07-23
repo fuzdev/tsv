@@ -137,7 +137,6 @@ impl<'a> Printer<'a> {
             indent_parts.push(self.build_type_alias_eq_value_doc(
                 decl,
                 eq_pos,
-                type_start,
                 has_complex_params,
                 false,
             ));
@@ -152,13 +151,7 @@ impl<'a> Printer<'a> {
             ) {
                 parts.push(block_doc);
             }
-            parts.push(self.build_type_alias_eq_value_doc(
-                decl,
-                eq_pos,
-                type_start,
-                has_complex_params,
-                true,
-            ));
+            parts.push(self.build_type_alias_eq_value_doc(decl, eq_pos, has_complex_params, true));
         }
 
         // Comments between the value and `;`: block comments stay before `;`
@@ -208,7 +201,12 @@ impl<'a> Printer<'a> {
         match ty {
             TSType::TypeOperator(o) => {
                 let kw_end = o.span.start + o.operator.as_str().len() as u32;
-                self.comments_force_own_line_between(kw_end, o.type_annotation.span().start)
+                // Same deep-window paren handling as the operator's own builder: a
+                // `keyof (// c\n T)` hangs the operand via the unwrapped inner's start, so
+                // this gate must widen the same way or it disagrees with the builder about
+                // whether the value breaks (the `=` would then break too, non-idempotently).
+                let (operand_start, _) = self.keyword_value_stripped_paren_hang(o.type_annotation);
+                self.comments_force_own_line_between(kw_end, operand_start)
             }
             TSType::TypeQuery(q) => {
                 let kw_end = q.span.start + "typeof".len() as u32;
@@ -225,11 +223,20 @@ impl<'a> Printer<'a> {
         &self,
         decl: &internal::TSTypeAliasDeclaration<'_>,
         eq_pos: u32,
-        type_start: u32,
         has_complex_params: bool,
         lead_space: bool,
     ) -> DocId {
         let d = self.d();
+        // A redundant paren shell around the RHS whose leading gap holds a line comment
+        // (`type A = (/* b */ // c\n Z)`, and the double-nested form) strips to the same
+        // fixed point the bare `type A = /* b */ // c\n Z` settles on. Widen the `=`→value
+        // window to the unwrapped inner's start so the leading run (block + line) routes
+        // through the force-break branch below, and build the value from the inner (plus
+        // any trailing comment) — the shared keyword→value seam the other hang sites use.
+        // When no line comment forces a hang, the seam returns the RHS unchanged, so the
+        // block-comment / comment-free `=` layouts below are untouched.
+        let (type_start, value_type) =
+            self.keyword_value_stripped_paren_hang(&decl.type_annotation);
         let mut parts: DocBuf = smallvec![d.text(if lead_space { " =" } else { "=" })];
 
         // A leading comment between `=` and the RHS forces the value onto its own
@@ -284,8 +291,11 @@ impl<'a> Printer<'a> {
             parts.extend(inline_parts);
 
             // Type uses its own group (via build_type_doc) so unions/intersections
-            // can independently decide whether to break
-            let type_doc = self.build_type_doc(&decl.type_annotation);
+            // can independently decide whether to break. Built from the unwrapped inner
+            // (equal to the RHS when no shell was stripped) plus any trailing comment
+            // lifted from the shell; type position, so a trailing block trails the value
+            // inline before the `;` (`defer = false`).
+            let type_doc = self.build_hang_value_doc(&decl.type_annotation, value_type, false);
             let mut indent_content: DocBuf = smallvec![d.hardline()];
             indent_content.extend(indent_comment_parts);
             indent_content.push(type_doc);
@@ -335,9 +345,19 @@ impl<'a> Printer<'a> {
                     // expansion, so keep `= {` together like other internally-breaking types
                     parts.push(d.text(" "));
                     parts.push(make_rhs(type_doc));
-                } else {
-                    // Normal unions: break after `=` with leading `| `
+                } else if lead_space {
+                    // Normal unions: break after `=` with leading `| ` and a hanging indent.
                     parts.push(hang_after_operator(d, make_rhs(type_doc)));
+                } else {
+                    // Pre-`=` own-line comment path (`type A<X>⏎// c⏎= | a | b`): `lead_space`
+                    // is false ONLY here, and the caller already wrapped comment + `=` + value
+                    // in one `d.indent`. A break must therefore NOT add the hang's extra indent
+                    // — the members sit at the `=`'s level, not one deeper (else a double-indent).
+                    // Still grouped so a short union stays inline on the `=` line (`= A | B`),
+                    // matching the hang arm's flat case. A `_prettier_divergence`
+                    // (type_alias_line_pre_equals_break): prettier relocates the comment after
+                    // `=` and never emits this preserved-comment form.
+                    parts.push(d.group(d.concat(&[d.line(), make_rhs(type_doc)])));
                 }
             } else if let TSType::Intersection(i) = value_type {
                 // Intersection types (prettier's `fluid`): the first member hugs the

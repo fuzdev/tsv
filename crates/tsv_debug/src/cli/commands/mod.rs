@@ -33,6 +33,9 @@ pub mod format_prettier;
 pub mod fuzz;
 #[cfg(feature = "comment_check")]
 pub mod gap_audit;
+// Requires the `comment_check` feature — `pristine_format`'s dirty check drives the ledger.
+#[cfg(feature = "comment_check")]
+pub mod ignore_audit;
 pub mod json_profile;
 pub mod lex_diff;
 pub mod line_width;

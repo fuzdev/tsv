@@ -9,7 +9,10 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 `## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
-<!-- bump: patch -->
+
+- various formatting fixes
+- feat: wrap Svelte without dangling
+  [#558](https://github.com/fuzdev/tsv/pull/558)
 
 ## 0.2.0
 

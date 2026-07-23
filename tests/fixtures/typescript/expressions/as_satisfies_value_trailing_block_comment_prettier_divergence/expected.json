@@ -1,0 +1,769 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 535,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment trailing the cast type. A cast is a value position, so the",
+			"start": 20,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing block defers past the statement `;` (line_suffix), matching the",
+			"start": 99,
+			"end": 174,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " declarator's own value-to-`;` trailing-comment handling.",
+			"start": 176,
+			"end": 235,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 255,
+			"end": 262,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 19
+				},
+				"end": {
+					"line": 5,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 290,
+			"end": 297,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 26
+				},
+				"end": {
+					"line": 7,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A block comment leads the cast type and another trails it: the leading block",
+			"start": 300,
+			"end": 379,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trails the keyword inline, the trailing block defers past `;`.",
+			"start": 381,
+			"end": 446,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 463,
+			"end": 470,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 16
+				},
+				"end": {
+					"line": 11,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 474,
+			"end": 481,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 27
+				},
+				"end": {
+					"line": 11,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " b ",
+			"start": 506,
+			"end": 513,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 23
+				},
+				"end": {
+					"line": 13,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 517,
+			"end": 524,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 34
+				},
+				"end": {
+					"line": 13,
+					"column": 41
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 534,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 525,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 14,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 237,
+					"end": 254,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 18
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 243,
+							"end": 253,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 17
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 243,
+								"end": 244,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 247,
+								"end": 253,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 17
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 247,
+									"end": 248,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 11
+										},
+										"end": {
+											"line": 5,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 252,
+									"end": 253,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 16
+										},
+										"end": {
+											"line": 5,
+											"column": 17
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 252,
+										"end": 253,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 16
+											},
+											"end": {
+												"line": 5,
+												"column": 17
+											}
+										},
+										"name": "A"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment trailing the cast type. A cast is a value position, so the",
+							"start": 20,
+							"end": 97
+						},
+						{
+							"type": "Line",
+							"value": " trailing block defers past the statement `;` (line_suffix), matching the",
+							"start": 99,
+							"end": 174
+						},
+						{
+							"type": "Line",
+							"value": " declarator's own value-to-`;` trailing-comment handling.",
+							"start": 176,
+							"end": 235
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 255,
+							"end": 262
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 265,
+					"end": 289,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 271,
+							"end": 288,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 271,
+								"end": 272,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "TSSatisfiesExpression",
+								"start": 275,
+								"end": 288,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 11
+									},
+									"end": {
+										"line": 7,
+										"column": 24
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 275,
+									"end": 276,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 11
+										},
+										"end": {
+											"line": 7,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 287,
+									"end": 288,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 23
+										},
+										"end": {
+											"line": 7,
+											"column": 24
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 287,
+										"end": 288,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 23
+											},
+											"end": {
+												"line": 7,
+												"column": 24
+											}
+										},
+										"name": "B"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 290,
+							"end": 297
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 448,
+					"end": 473,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 26
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 454,
+							"end": 472,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 11,
+									"column": 25
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 454,
+								"end": 455,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 458,
+								"end": 472,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 11
+									},
+									"end": {
+										"line": 11,
+										"column": 25
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 458,
+									"end": 459,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 11
+										},
+										"end": {
+											"line": 11,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 471,
+									"end": 472,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 24
+										},
+										"end": {
+											"line": 11,
+											"column": 25
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 471,
+										"end": 472,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 24
+											},
+											"end": {
+												"line": 11,
+												"column": 25
+											}
+										},
+										"name": "C"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " b ",
+											"start": 463,
+											"end": 470
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment leads the cast type and another trails it: the leading block",
+							"start": 300,
+							"end": 379
+						},
+						{
+							"type": "Line",
+							"value": " trails the keyword inline, the trailing block defers past `;`.",
+							"start": 381,
+							"end": 446
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 474,
+							"end": 481
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 484,
+					"end": 516,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 33
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 490,
+							"end": 515,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 32
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 490,
+								"end": 491,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "TSSatisfiesExpression",
+								"start": 494,
+								"end": 515,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 11
+									},
+									"end": {
+										"line": 13,
+										"column": 32
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 494,
+									"end": 495,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 11
+										},
+										"end": {
+											"line": 13,
+											"column": 12
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 514,
+									"end": 515,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 31
+										},
+										"end": {
+											"line": 13,
+											"column": 32
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 514,
+										"end": 515,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 31
+											},
+											"end": {
+												"line": 13,
+												"column": 32
+											}
+										},
+										"name": "D"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " b ",
+											"start": 506,
+											"end": 513
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 517,
+							"end": 524
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

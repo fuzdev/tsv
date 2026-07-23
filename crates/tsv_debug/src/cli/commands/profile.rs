@@ -650,6 +650,43 @@ pub(crate) fn is_input_invalid_fixture(path: &Path) -> bool {
         .is_some_and(|n| n.starts_with("input_invalid"))
 }
 
+/// Resolve an injection audit's seed corpus: the positional `paths` (defaulting to
+/// `tests/fixtures` when empty — the corpus the audits' snapshots describe), through
+/// [`resolve_files`], then `limit` (`0` = unlimited). An empty result is an error — a gate over
+/// zero files proves nothing. Shared by `gap_audit` / `blank_audit` / `ignore_audit` (hence the
+/// `comment_check` gate), the way [`is_input_invalid_fixture`] is shared above.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] (after a user-facing message) when a path fails to resolve or
+/// no seed files are found.
+#[cfg(feature = "comment_check")]
+pub(crate) fn resolve_seed_files(
+    arg_paths: &[String],
+    limit: usize,
+) -> Result<Vec<PathBuf>, CliError> {
+    let paths: Vec<String> = if arg_paths.is_empty() {
+        vec!["tests/fixtures".to_string()]
+    } else {
+        arg_paths.to_vec()
+    };
+    let mut files = match resolve_files(&paths) {
+        Ok(f) => f,
+        Err(e) => {
+            eprintln!("Error: {e}");
+            return Err(CliError::Failed);
+        }
+    };
+    if limit > 0 {
+        files.truncate(limit);
+    }
+    if files.is_empty() {
+        eprintln!("Error: no seed files found (searched {paths:?})");
+        return Err(CliError::Failed);
+    }
+    Ok(files)
+}
+
 /// Resolve paths to files, expanding directories
 pub(crate) fn resolve_files(paths: &[String]) -> Result<Vec<PathBuf>, String> {
     let mut files = Vec::new();

@@ -1980,7 +1980,7 @@ const forced_continuation_indent: DivergencePattern = {
 const inline_content_block_style: DivergencePattern = {
 	id: 'inline_content_block_style',
 	description:
-		'tsv lays out inline element/block content block-style (tags intact, content on its own line); prettier dangles the tag delimiters / hugs the content',
+		'tsv lays out inline element/block content block-style (tags intact, content on its own line), breaks before an inline element whose text-line overflows so its opening tag starts a fresh line, and lays a whitespace-collapsing container (table/select/…) out block-style; prettier dangles the tag delimiters / hugs the content / dangles the opening tag / keeps the container inline',
 	languages: ['svelte'],
 	conformance_sections: ['Svelte: Inline content block-style', 'Svelte: Blocks'],
 	fixtures: [
@@ -1989,6 +1989,11 @@ const inline_content_block_style: DivergencePattern = {
 		'svelte/elements/block_multiline_attrs_content_hug_prettier_divergence',
 		'svelte/elements/inline_if_sibling_fill_long_prettier_divergence',
 		'svelte/elements/inline_content_hug_long_prettier_divergence',
+		'svelte/elements/inline_break_before_wrap_long_prettier_divergence',
+		'svelte/elements/inline_break_before_component_long_prettier_divergence',
+		'svelte/elements/inline_break_before_void_long_prettier_divergence',
+		'svelte/elements/ws_collapsing_containers_prettier_divergence',
+		'svelte/elements/implicit_close_table_prettier_divergence',
 	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
@@ -2040,12 +2045,46 @@ const inline_content_block_style: DivergencePattern = {
 		// no block tag on a changed line at all.
 		const block_head_at_eol = /\{#(?:if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
 		const block_branch_alone = /^[ \t]*\{[:/](?:else|then|catch|if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
+		// The whitespace-collapsing-container block-style (§"reaches inter-sibling whitespace …
+		// a whitespace-collapsing container"): inside `<table>`/`<tbody>`/`<thead>`/`<tfoot>`/
+		// `<tr>`/`<colgroup>`/`<select>`/`<datalist>` the compiler removes inter-sibling
+		// whitespace entirely, so tsv lays the container out block-style — each child on its own
+		// line — where prettier keeps it inline on one line. The marker is one of those container
+		// open/close tags sitting ALONE on an OUR line: prettier keeps content after the open tag
+		// (`<select><option>…`), so the tag is never alone on its side. Content-keyed on the exact
+		// `can_remove_entirely` name set — an ordinary parent's inter-sibling space is
+		// render-significant and never block-styled this way, so it carries no such marker. This
+		// is a subset of the whole-diff the whole-file `strip_all_ws` SAFETY gate above already
+		// proved whitespace-only.
+		const container_tag_alone =
+			/^[ \t]*<\/?(?:table|tbody|thead|tfoot|tr|colgroup|select|datalist)\b[^<>]*>[ \t]*$/;
+		// The break-before posture (§"The rule reaches the element's own *position*"): an
+		// inline element preceded by same-line text that must wrap starts a FRESH line in
+		// ours, where prettier dangles the OPENING tag on the overflowing text line. The
+		// mirror of `dangle_close`, on the PRETTIER (removed) side — a `<tag` that begins
+		// after same-line text + a space (the "dangle after a space" the rule forbids),
+		// at EOL. Two prettier forms, both absent from ours (which broke before the tag):
+		//   (a) the COMPLETE open tag trails the text and only the content/close dangle
+		//       (`…using <MdnLink path="…">` at EOL — the collapse/block-style sub-shape); or
+		//   (b) the open tag's ATTRIBUTES wrap, so the bare tag NAME trails the text
+		//       (`…with the <TomeLink` at EOL) and `>`/`/>` lands on its own line.
+		// The leading `\S[ \t]` (text + one space before `<`) is what keeps this off the
+		// rejected broad "open-tag at line start" markers: an element that legitimately
+		// begins its own line is indent-only before `<` and never matches. `[A-Za-z]`
+		// after `<` excludes a closing `</tag`; the tag-name class admits `:`/`.` /`-`
+		// (`<svelte:element`, `<Foo.Bar`, custom elements) like the dangle markers above.
+		const dangle_open_tag_after_text = /\S[ \t]<[A-Za-z][\w.:-]*(?:[ \t][^<>]*>)?[ \t]*$/;
 		let has_signature = false;
 		for (const hunk of ctx.hunks) {
 			if (
 				hunk.removed_lines.concat(hunk.added_lines).some((l) => dangle_close.test(l) || dangle_open.test(l)) ||
+				hunk.removed_lines.some((l) => dangle_open_tag_after_text.test(l)) ||
 				hunk.added_lines.some(
-					(l) => block_head_alone.test(l) || block_head_at_eol.test(l) || block_branch_alone.test(l),
+					(l) =>
+						block_head_alone.test(l) ||
+						block_head_at_eol.test(l) ||
+						block_branch_alone.test(l) ||
+						container_tag_alone.test(l),
 				)
 			) {
 				has_signature = true;
@@ -2062,7 +2101,7 @@ const inline_content_block_style: DivergencePattern = {
 			confidence: 'likely',
 			hunk_indices: ctx.hunks.map((h) => h.index),
 			reason:
-				'inline/block content laid out block-style (tags intact, content on its own line); prettier dangles the tag delimiters',
+				'inline/block content laid out block-style (tags intact, content on its own line), or an inline element broken before onto a fresh line; prettier dangles the tag delimiters / dangles the opening tag',
 		};
 	},
 };
@@ -2849,10 +2888,161 @@ const jsdoc_type_cast_parens: DivergencePattern = {
 	},
 };
 
+const template_embedded_verbatim: DivergencePattern = {
+	id: 'template_embedded_verbatim',
+	description: 'Tagged/decorator template body kept verbatim; prettier reformats the embedded language',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['TypeScript: Template Literals'],
+	fixtures: [
+		'typescript/expressions/literals/template/embedded_language_verbatim_prettier_divergence',
+	],
+	detect(ctx) {
+		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
+
+		// Prettier's `embeddedLanguageFormatting` reformats a tagged template whose tag it
+		// recognizes as an embedded language (html/css/graphql/gql) — collapsing embedded
+		// HTML whitespace, expanding embedded CSS onto its own lines. tsv keeps the body
+		// verbatim. Prettier-side signal (this is a prettier-side-only divergence — tsv does
+		// nothing): prettier reflowed a recognized-tag template, and ours kept a one-line
+		// `tag`…`` form prettier did not reproduce.
+		const embedded_tag_template = /\b(?:html|css|graphql|gql)`/;
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			const prettier_reflowed = hunk.removed_lines.some((l) => embedded_tag_template.test(l));
+			const ours_verbatim = hunk.added_lines.some(
+				(l) => embedded_tag_template.test(l) && !hunk.removed_lines.includes(l),
+			);
+			return prettier_reflowed && ours_verbatim;
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'template_embedded_verbatim',
+				confidence: 'certain',
+				hunk_indices,
+				reason:
+					'Tagged-template body kept verbatim (prettier reformats the embedded html/css/graphql language; tsv does no embedded formatting)',
+			};
+		}
+		return null;
+	},
+};
+
+const field_key_unquote: DivergencePattern = {
+	id: 'field_key_unquote',
+	description: 'Class field key unquoted; prettier keeps a valid-identifier field key quoted',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['TypeScript'],
+	fixtures: ['typescript/declarations/class/field_key_unquote_prettier_divergence'],
+	// Unquoting only drops the surrounding `'`, a char SAFETY already excludes, so this
+	// pattern never moves the semantic char count — `may_alter_char_frequency` stays false.
+	detect(ctx) {
+		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
+
+		// tsv unquotes a valid-identifier CLASS FIELD key (`'x' = 1` → `x = 1`, `'count': T`
+		// → `count: T`, `static 'total'` → `static total`); prettier unquotes class
+		// method/accessor keys but keeps FIELD keys quoted. Object / type-literal / interface
+		// keys agree (both unquote → no hunk), so a prettier-quoted → ours-unquoted key hunk is
+		// only ever this class-field case.
+		//
+		// The quoted key is anchored at member-line start (after leading whitespace + optional
+		// field modifiers), so a quoted *value* (`b = 'b'`, `const a = 'x'`) and the
+		// reverse-direction enum case (prettier unquotes an enum key, tsv keeps it quoted —
+		// its `'b'` is never line-initial) are excluded. ASCII-ident only: the astral ES2015
+		// key (`'𐊧'`) is the separate `property_key_es2015_ident` divergence; numeric /
+		// non-ident keys (`'0a'`, `'x-y'`, `'0'`) stay quoted in both. The quoted key is
+		// followed by a field terminator — `=` (init), `:` (annotation), `?` (optional), or a
+		// bare `;` / end (field declaration).
+		const field_modifiers =
+			'(?:(?:static|readonly|public|private|protected|declare|abstract|accessor|override)\\s+)*';
+		const quoted_field_key = new RegExp(
+			`^\\s*${field_modifiers}'([A-Za-z_$][A-Za-z0-9_$]*)'\\s*(?:[=:?;]|$)`,
+		);
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			for (const p_line of hunk.removed_lines) {
+				const m = quoted_field_key.exec(p_line);
+				if (!m) continue;
+				const ident = m[1];
+				// The same field key, unquoted, must appear line-initial on an ours line (the
+				// quoted form gone) — proving tsv dropped the quotes rather than some unrelated
+				// edit removing the line.
+				const bare = new RegExp(`^\\s*${field_modifiers}${ident}\\s*(?:[=:?;]|$)`);
+				const unquoted_on_ours = hunk.added_lines.some(
+					(o) => bare.test(o) && !o.includes(`'${ident}'`),
+				);
+				if (unquoted_on_ours) return true;
+			}
+			return false;
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'field_key_unquote',
+				confidence: 'certain',
+				hunk_indices,
+				reason:
+					'Class field key unquoted (tsv unquotes a valid-identifier class field key; prettier keeps it quoted)',
+			};
+		}
+		return null;
+	},
+};
+
 // ─── Pattern Registry ───────────────────────────────────────────────────────
 //
 // Ordered: specific → broad. Specific patterns run first for best explanations.
 // Multiple patterns CAN claim the same hunk (by design).
+
+/**
+ * Retained parenthesized union member with an interior line comment: prettier
+ * explodes the inner union one member per line (`| a` / `| b // c`), tsv applies
+ * its union-fit layout and keeps it inline (`a | b // c`). The line comment forces
+ * the parens open in both, so the only difference is the inner union's inline vs
+ * exploded layout. Catalogued as **Retained paren union member line comment** in
+ * conformance_prettier.md; the same shape is 18389's remaining unexplained hunk.
+ *
+ * Content-preservation proof: strip prettier's leading `| ` from each exploded
+ * member and rejoin with ` | ` — a pure inline↔exploded reflow is byte-identical to
+ * ours' inline line, so a dropped or added member (real content loss) breaks the
+ * equality and is never claimed. `may_alter_char_frequency` stays false (fail-closed):
+ * the reflow only toggles the leading pipes prettier adds, which the SAFETY
+ * differential already treats as prettier-excess rather than ours-loss.
+ */
+const union_paren_member_inline: DivergencePattern = {
+	id: 'union_paren_member_inline',
+	description:
+		'Interior line comment in a retained parenthesized union member: prettier explodes the inner union one-per-line, tsv keeps it inline (union-fit)',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['TypeScript'],
+	fixtures: ['typescript/types/union_intersection_retained_paren_line_comment_prettier_divergence'],
+	detect(ctx) {
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			// prettier (removed) explodes: >= 2 leading-pipe union members, nothing else.
+			const removed = hunk.removed_lines.map((l) => l.trim());
+			if (removed.length < 2) return false;
+			if (!removed.every((l) => l.startsWith('| '))) return false;
+			// ours (added) collapses to a single inline line.
+			const added = hunk.added_lines.map((l) => l.trim());
+			if (added.length !== 1) return false;
+			// A pure inline<->exploded reflow: strip each exploded member's `| ` and
+			// rejoin with ` | `; equality proves no member was dropped or added.
+			const prettier_inline = removed.map((l) => l.slice(2)).join(' | ');
+			return prettier_inline === added[0];
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'union_paren_member_inline',
+				confidence: 'likely',
+				hunk_indices,
+				reason:
+					'tsv keeps a parenthesized union member inline (union-fit); prettier explodes it one member per line',
+			};
+		}
+		return null;
+	},
+};
 
 export const PATTERNS: DivergencePattern[] = [
 	// 1. Language-specific narrow patterns (certain or rare)
@@ -2878,11 +3068,14 @@ export const PATTERNS: DivergencePattern[] = [
 
 	// 3. Feature-specific patterns
 	template_literal_width,
+	template_embedded_verbatim,
+	field_key_unquote,
 	block_expression_logical,
 	single_specifier_import,
 	member_expression_call,
 	return_type_generic_union,
 	non_null_paren_base,
+	union_paren_member_inline,
 	forced_continuation_indent,
 
 	// 4. Svelte-specific patterns

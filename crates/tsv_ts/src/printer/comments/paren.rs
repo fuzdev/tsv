@@ -405,6 +405,23 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let expr_end = expr.span().end;
 
+        // A sequence in this (value) position keeps its trailing comment INSIDE its own
+        // required parens (`() => (1, 2, 3 /* c */)`) rather than doubling the grouping
+        // paren (`() => ((1, 2, 3) /* c */)`) — the same rule and path as
+        // `build_expression_doc_with_paren_comments`. `build_expression_doc` would
+        // self-parenthesize the sequence and then this method would re-wrap it. The
+        // grouping `)` sits outside `seq.span`, so scan to it.
+        if let internal::Expression::SequenceExpression(seq) = expr {
+            let grouping_close = tsv_lang::source_scan::find_char_skipping_comments(
+                self.source.as_bytes(),
+                expr_end as usize,
+                boundary_end as usize,
+                b')',
+            )
+            .map_or(boundary_end, |p| p as u32);
+            return self.build_sequence_doc_value(seq, grouping_close);
+        }
+
         let Some((comment_parts, needs_break)) =
             self.trailing_paren_comment_parts(expr_end, boundary_end)
         else {

@@ -403,6 +403,40 @@ Deno.test('inline_content_block_style: negative - content differs (safety gate b
 	assertEquals(match, null);
 });
 
+Deno.test('inline_content_block_style: positive - break-before, complete open tag dangles at EOL', () => {
+	// The break-before posture (form a): prettier keeps the whole opening tag on the
+	// overflowing text line (`…using <MdnLink …>` at EOL) and dangles only the content;
+	// tsv breaks before the element so it starts a fresh line and collapses inline.
+	// The fuz_ui Redirect/+page.svelte shape. Whitespace-only.
+	const prettier = 'text using <MdnLink path="/a/b">\n\ta meta tag\n</MdnLink>';
+	const ours = 'text using\n<MdnLink path="/a/b">a meta tag</MdnLink>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('inline_content_block_style: positive - break-before, bare tag name dangles (attrs wrap)', () => {
+	// The break-before posture (form b): prettier wraps the void component's attributes,
+	// leaving the bare tag NAME dangling after the text (`…with the <TomeLink` at EOL) and
+	// `/>` on its own line; tsv breaks before it. The fuz_ui icons/logos shape. Whitespace-only.
+	const prettier = 'mounted with the <TomeLink\n\tslug="Svg"\n/>';
+	const ours = 'mounted with the\n<TomeLink slug="Svg" />';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('inline_content_block_style: negative - open tag legitimately starts its own line', () => {
+	// An opening tag that begins its own line (indent-only before `<`, no preceding
+	// text + space) is NOT a break-before dangle — the `\S[ \t]` guard rejects it, so a
+	// plain indentation-only reflow of an already-fresh-line element stays unclaimed.
+	const prettier = '<div>\n\t<span class="x">text</span>\n</div>';
+	const ours = '<div>\n\t\t<span class="x">text</span>\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertEquals(match, null);
+});
+
 // ─── svelte_boundary_ws_trim ────────────────────────────────────────────────
 
 Deno.test('svelte_boundary_ws_trim: positive - fragment-edge run trimmed inside a tag', () => {
@@ -764,6 +798,37 @@ Deno.test('member_expression_call: negative - no module pattern in source', () =
 	const ours = 'const p = something.other(\n\t"path",\n);';
 	const ctx = make_context(ours, prettier, 'typescript');
 	const match = run_pattern('member_expression_call', ctx);
+	assertEquals(match, null);
+});
+
+// ─── union_paren_member_inline ──────────────────────────────────────────────
+
+Deno.test('union_paren_member_inline: positive - inner union kept inline vs exploded', () => {
+	// prettier explodes `| a` / `| b // c`; tsv keeps `a | b // c` inline (18389's shape).
+	const prettier = '\t| (\n\t\t\t| A\n\t\t\t| B // comment 1\n\t  )\n\t| C;';
+	const ours = '\t| (\n\t\t\tA | B // comment 1\n\t  )\n\t| C;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('union_paren_member_inline', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'union_paren_member_inline');
+});
+
+Deno.test('union_paren_member_inline: negative - overmatch rejection, a member is DROPPED', () => {
+	// prettier has three members; ours drops `C`. A pure reflow would preserve every
+	// member — the string-equality proof fails, so a content-loss bug is never claimed.
+	const prettier = '\t| (\n\t\t\t| A\n\t\t\t| B\n\t\t\t| C // c\n\t  )\n\t| D;';
+	const ours = '\t| (\n\t\t\tA | B // c\n\t  )\n\t| D;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('union_paren_member_inline', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('union_paren_member_inline: negative - overmatch rejection, a member is ADDED', () => {
+	// ours has an extra member `C` prettier does not — also a content change, rejected.
+	const prettier = '\t| (\n\t\t\t| A\n\t\t\t| B // c\n\t  )\n\t| D;';
+	const ours = '\t| (\n\t\t\tA | B | C // c\n\t  )\n\t| D;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('union_paren_member_inline', ctx);
 	assertEquals(match, null);
 });
 
@@ -1504,6 +1569,79 @@ Deno.test('instantiation_parens: negative - normal generic usage', () => {
 	const ours = '\tconst x = foo<T>();';
 	const ctx = make_context(ours, prettier, 'typescript');
 	const match = run_pattern('instantiation_parens', ctx);
+	assertEquals(match, null);
+});
+
+// ─── template_embedded_verbatim ───────────────────────────────────────────
+
+Deno.test('template_embedded_verbatim: positive - html body collapsed by prettier', () => {
+	const ours = '\tconst t = html`<div>  {{label}}  </div>`;';
+	const prettier = '\tconst t = html`<div>{{label}}</div>`;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('template_embedded_verbatim', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'template_embedded_verbatim');
+	assertEquals(match!.confidence, 'certain');
+});
+
+Deno.test('template_embedded_verbatim: positive - css body expanded by prettier', () => {
+	const ours = '\tconst s = css`.a{color:red}`;';
+	const prettier = '\tconst s = css`\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t`;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('template_embedded_verbatim', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('template_embedded_verbatim: negative - unrecognized tag (no embedded formatting)', () => {
+	// `sql` is not an embedded-language tag prettier reformats, so a diff on a
+	// `sql`…`` template must not be claimed.
+	const ours = '\tconst q = sql`SELECT 1`;';
+	const prettier = '\tconst q = sql`SELECT 2`;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('template_embedded_verbatim', ctx);
+	assertEquals(match, null);
+});
+
+// ─── field_key_unquote ────────────────────────────────────────────────────
+
+Deno.test('field_key_unquote: positive - annotated field key unquoted', () => {
+	// The corpus shape (typescript/class/quoted-property.ts): prettier keeps the class
+	// field key quoted, tsv unquotes it.
+	const ours = 'class User {\n\tusername: string;\n}';
+	const prettier = "class User {\n\t'username': string;\n}";
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('field_key_unquote', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'field_key_unquote');
+	assertEquals(match!.confidence, 'certain');
+});
+
+Deno.test('field_key_unquote: positive - init + static field keys unquoted', () => {
+	const ours = 'class C {\n\tx = 1;\n\tstatic total = 3;\n}';
+	const prettier = "class C {\n\t'x' = 1;\n\tstatic 'total' = 3;\n}";
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('field_key_unquote', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('field_key_unquote: negative - enum key (reverse direction)', () => {
+	// The enum case is the OPPOSITE direction — prettier unquotes the enum member key,
+	// tsv keeps it quoted (`'b'` is a value/initializer, never line-initial). Must not be
+	// claimed, or a real enum-key gap would be masked.
+	const ours = "enum E {\n\t'b' = 'b'\n}";
+	const prettier = "enum E {\n\tb = 'b'\n}";
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('field_key_unquote', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('field_key_unquote: negative - field value change is not a key unquote', () => {
+	// The field KEY (`greeting`) is unquoted on both sides; only a quoted VALUE differs.
+	// The detector keys on the member-line-initial key, never a value, so this is not claimed.
+	const ours = "class C {\n\tgreeting = 'hi';\n}";
+	const prettier = "class C {\n\tgreeting = 'hello';\n}";
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('field_key_unquote', ctx);
 	assertEquals(match, null);
 });
 

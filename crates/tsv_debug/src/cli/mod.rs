@@ -7,6 +7,8 @@ use commands::blank_audit::BlankAuditCommand;
 use commands::comment_audit::CommentAuditCommand;
 #[cfg(feature = "comment_check")]
 use commands::gap_audit::GapAuditCommand;
+#[cfg(feature = "comment_check")]
+use commands::ignore_audit::IgnoreAuditCommand;
 #[cfg(feature = "swallow_check")]
 use commands::swallow_audit::SwallowAuditCommand;
 use commands::{
@@ -96,6 +98,10 @@ pub enum Subcommand {
     // ledger-clean invariant; the `blanks:audit` deno task passes the feature.
     #[cfg(feature = "comment_check")]
     BlankAudit(BlankAuditCommand),
+    // Same `comment_check` gate — the ignore-directive audit drives the ledger via
+    // `pristine_format`; the `ignore:audit` deno task passes the feature.
+    #[cfg(feature = "comment_check")]
+    IgnoreAudit(IgnoreAuditCommand),
     Compare(CompareCommand),
     ConformanceAudit(ConformanceAuditCommand),
     AstDiff(AstDiffCommand),
@@ -158,6 +164,8 @@ impl TopLevel {
             Subcommand::GapAudit(c) => c.run(),
             #[cfg(feature = "comment_check")]
             Subcommand::BlankAudit(c) => c.run(),
+            #[cfg(feature = "comment_check")]
+            Subcommand::IgnoreAudit(c) => c.run(),
             Subcommand::Compare(c) => c.run(),
             Subcommand::ConformanceAudit(c) => c.run(),
             Subcommand::AstDiff(c) => c.run(),

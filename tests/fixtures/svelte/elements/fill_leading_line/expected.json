@@ -1,0 +1,221 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 579,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 73,
+				"data": " fits: the leading `line` before `ccccc` renders flat, as a space "
+			},
+			{
+				"type": "Text",
+				"start": 73,
+				"end": 74,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 74,
+				"end": 143,
+				"name": "li",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 75
+					},
+					"end": {
+						"line": 2,
+						"column": 3,
+						"character": 77
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 78,
+							"end": 87,
+							"raw": "\n\taaaaa ~",
+							"data": "\n\taaaaa ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 87,
+							"end": 99,
+							"expression": {
+								"type": "Identifier",
+								"start": 88,
+								"end": 98,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 9
+									},
+									"end": {
+										"line": 3,
+										"column": 19
+									}
+								},
+								"name": "xxxxxxxxxx"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 99,
+							"end": 107,
+							"raw": " bbbbb ~",
+							"data": " bbbbb ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 107,
+							"end": 119,
+							"expression": {
+								"type": "Identifier",
+								"start": 108,
+								"end": 118,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 29
+									},
+									"end": {
+										"line": 3,
+										"column": 39
+									}
+								},
+								"name": "yyyyyyyyyy"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 119,
+							"end": 138,
+							"raw": " ccccc ccccc ccccc\n",
+							"data": " ccccc ccccc ccccc\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 143,
+				"end": 144,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 144,
+				"end": 441,
+				"data": " overflows: the glued `~{yyyyyyyyyy}` rides its line (prettier keeps it, tsv now matches), and\n     the leading `line` before `ccccc` becomes the newline itself — not a newline followed by the\n     space it stood for, which would strand a leading space at the head of the continuation line "
+			},
+			{
+				"type": "Text",
+				"start": 441,
+				"end": 442,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 442,
+				"end": 578,
+				"name": "li",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 443
+					},
+					"end": {
+						"line": 8,
+						"column": 3,
+						"character": 445
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 446,
+							"end": 479,
+							"raw": "\n\taaaaa aaaaa aaaaa aaaaa aaaaa ~",
+							"data": "\n\taaaaa aaaaa aaaaa aaaaa aaaaa ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 479,
+							"end": 491,
+							"expression": {
+								"type": "Identifier",
+								"start": 480,
+								"end": 490,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 33
+									},
+									"end": {
+										"line": 9,
+										"column": 43
+									}
+								},
+								"name": "xxxxxxxxxx"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 491,
+							"end": 535,
+							"raw": " bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb ~",
+							"data": " bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb ~"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 535,
+							"end": 547,
+							"expression": {
+								"type": "Identifier",
+								"start": 536,
+								"end": 546,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 89
+									},
+									"end": {
+										"line": 9,
+										"column": 99
+									}
+								},
+								"name": "yyyyyyyyyy"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 547,
+							"end": 573,
+							"raw": "\n\tccccc ccccc ccccc ccccc\n",
+							"data": "\n\tccccc ccccc ccccc ccccc\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
