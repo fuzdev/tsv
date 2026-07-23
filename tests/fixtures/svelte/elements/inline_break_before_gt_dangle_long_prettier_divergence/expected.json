@@ -1,0 +1,155 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 839,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 613,
+				"data": "\n\tGlued inline-element chain (G2). When an inline element is glued (no whitespace) to a\n\tfollowing inline element whose own opening tag must wrap, tsv dangles the FIRST element's\n\tclosing `>` onto the second element's line (`</span` on one line, `><a` on the next) so no\n\topening tag is stranded at a line end after a space. The whole glued run first breaks to a\n\tfresh line at the whitespace boundary before it. The `>` move is tag-internal (byte-identical\n\tAST), so it is render-safe. Prettier keeps the run on the text line and dangles the second\n\ttag's attributes instead — see output_prettier.svelte.\n"
+			},
+			{
+				"type": "Text",
+				"start": 613,
+				"end": 614,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 614,
+				"end": 838,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 615
+					},
+					"end": {
+						"line": 10,
+						"column": 2,
+						"character": 616
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 617,
+							"end": 695,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12\n\t",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 695,
+							"end": 713,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 12,
+									"column": 2,
+									"character": 696
+								},
+								"end": {
+									"line": 12,
+									"column": 6,
+									"character": 700
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 701,
+										"end": 704,
+										"raw": "foo",
+										"data": "foo"
+									}
+								]
+							}
+						},
+						{
+							"type": "RegularElement",
+							"start": 713,
+							"end": 832,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 13,
+									"column": 3,
+									"character": 714
+								},
+								"end": {
+									"line": 13,
+									"column": 4,
+									"character": 715
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 718,
+									"end": 813,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 14,
+											"column": 2,
+											"character": 718
+										},
+										"end": {
+											"line": 14,
+											"column": 6,
+											"character": 722
+										}
+									},
+									"value": [
+										{
+											"start": 724,
+											"end": 812,
+											"type": "Text",
+											"raw": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 816,
+										"end": 828,
+										"raw": "\n\t\tcontent\n\t",
+										"data": "\n\t\tcontent\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 832,
+							"end": 834,
+							"raw": ".\n",
+							"data": ".\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -608,9 +608,13 @@ impl<'a> Printer<'a> {
         // where prettier relocates it. A block comment, or any comment on its own line
         // below `(`, keeps the own-line placement (matching prettier). Split such a comment
         // off the leading run so it can trail the `(`; the rest lead the argument below.
-        let open_paren =
-            find_char_skipping_comments(self.source.as_bytes(), keyword_end as usize, arg_start as usize, b'(')
-                .map(|p| p as u32);
+        let open_paren = find_char_skipping_comments(
+            self.source.as_bytes(),
+            keyword_end as usize,
+            arg_start as usize,
+            b'(',
+        )
+        .map(|p| p as u32);
         let first_comment = comments_to_emit_in_range(self.comments, keyword_end, arg_start).next();
         let (paren_trailing, leading_start) = match (open_paren, first_comment) {
             (Some(op), Some(c))

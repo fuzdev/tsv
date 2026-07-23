@@ -1,0 +1,294 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 428,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 179,
+				"data": " An inline element that wraps, preceded by another inline node (element or expression tag) across a space, breaks to a fresh line with no stray leading space (idempotent). "
+			},
+			{
+				"type": "Text",
+				"start": 179,
+				"end": 180,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 180,
+				"end": 305,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 181
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 182
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 183,
+							"end": 253,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 ",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 253,
+							"end": 267,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 70,
+									"character": 254
+								},
+								"end": {
+									"line": 3,
+									"column": 74,
+									"character": 258
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 259,
+										"end": 260,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 267,
+							"end": 269,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 269,
+							"end": 295,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 2,
+									"character": 270
+								},
+								"end": {
+									"line": 4,
+									"column": 3,
+									"character": 271
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 272,
+									"end": 283,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 4,
+											"column": 4,
+											"character": 272
+										},
+										"end": {
+											"line": 4,
+											"column": 8,
+											"character": 276
+										}
+									},
+									"value": [
+										{
+											"start": 278,
+											"end": 282,
+											"type": "Text",
+											"raw": "/a/b",
+											"data": "/a/b"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 284,
+										"end": 291,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 295,
+							"end": 301,
+							"raw": " tail\n",
+							"data": " tail\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 305,
+				"end": 306,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 306,
+				"end": 427,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 307
+					},
+					"end": {
+						"line": 6,
+						"column": 2,
+						"character": 308
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 309,
+							"end": 386,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 ",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 386,
+							"end": 389,
+							"expression": {
+								"type": "Identifier",
+								"start": 387,
+								"end": 388,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 77
+									},
+									"end": {
+										"line": 7,
+										"column": 78
+									}
+								},
+								"name": "x"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 389,
+							"end": 391,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 391,
+							"end": 417,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 2,
+									"character": 392
+								},
+								"end": {
+									"line": 8,
+									"column": 3,
+									"character": 393
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 394,
+									"end": 405,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 8,
+											"column": 4,
+											"character": 394
+										},
+										"end": {
+											"line": 8,
+											"column": 8,
+											"character": 398
+										}
+									},
+									"value": [
+										{
+											"start": 400,
+											"end": 404,
+											"type": "Text",
+											"raw": "/a/b",
+											"data": "/a/b"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 406,
+										"end": 413,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 417,
+							"end": 423,
+							"raw": " tail\n",
+							"data": " tail\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
