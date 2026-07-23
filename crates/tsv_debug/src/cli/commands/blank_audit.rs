@@ -106,7 +106,8 @@ use crate::audit::report::{
     self, BlankDetail, Detail, Finding, ReportExample, RunSummary, Severity,
 };
 use crate::audit::sites::{
-    code_regions, injection_sites, site_shape, snippet, string_and_template_spans,
+    code_regions, injection_sites, site_shape, snippet, source_has_ignore_directive,
+    string_and_template_spans,
 };
 use crate::cli::CliError;
 
@@ -469,7 +470,8 @@ impl Tally {
 /// Walk `node` collecting the verbatim-blank regions — template-literal quasis (verbatim text)
 /// and Svelte `<pre>` / `<textarea>` (whitespace-preserving elements), in byte space via `map`.
 /// A format-ignore region is NOT found here (locating its range from the output is fragile) — a
-/// format-ignore-bearing file is exempted whole (see [`source_has_format_ignore`]).
+/// format-ignore-bearing file is exempted whole (see
+/// [`source_has_ignore_directive`](crate::audit::sites::source_has_ignore_directive)).
 ///
 /// A multi-line **string literal** is deliberately NOT a skip region here, even though it too can
 /// hold a verbatim blank run: that omission is safe because a base file already carrying such a run
@@ -513,15 +515,6 @@ fn collect_blank_skip(node: &Value, map: &Utf16ToByte, out: &mut Vec<(usize, usi
         }
         _ => {}
     }
-}
-
-/// Whether `source` bears a format-ignore / prettier-ignore directive (a coarse substring scan).
-///
-/// A file that does is exempted from invariant 6 whole — locating the exact verbatim range from
-/// the output is fragile, and over-exempting only suppresses findings (sound), never invents them.
-/// The other five invariants still run on such a file.
-fn source_has_format_ignore(source: &str) -> bool {
-    source.contains("format-ignore") || source.contains("prettier-ignore")
 }
 
 /// The byte offset of the first ≥2-blank-line run in `output` that falls OUTSIDE a legitimate
@@ -607,7 +600,7 @@ fn audit_file(path: &std::path::Path, render: bool, tally: &mut Tally) {
     // ABSORBS reproduces it byte-for-byte, and it is already a proven fixed point, so nothing needs
     // checking. (Only the byte-identity of the fast path is a "proxy" — the slow path grades each
     // changed output exactly against the injected input, not against the pristine.)
-    let has_format_ignore = source_has_format_ignore(&source);
+    let has_format_ignore = source_has_ignore_directive(&source);
     let Ok(pristine_output) = format_source(&source, parser) else {
         // Unreachable — the f1 check above already formatted `source` cleanly — but total.
         tally.record_not_clean(display);
@@ -1098,6 +1091,7 @@ fn finding_count(f: &Finding) -> usize {
     match &f.detail {
         Detail::Blank(d) => d.count,
         Detail::Gap(d) => d.count,
+        Detail::Ignore(d) => d.count,
     }
 }
 

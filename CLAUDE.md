@@ -209,6 +209,8 @@ deno task gaps:audit:update          # regenerate that snapshot after fixing a s
 deno task gaps:audit:rank            # rank the pinned shapes for triage (also --since; see ./docs/gap_audit.md)
 deno task blanks:audit               # blank-line injection audit — RATCHET over `blank_audit_known.txt`, ~24 s (gated in `deno task check`; ./docs/blank_audit.md)
 deno task blanks:audit:update        # regenerate that snapshot after fixing a shape; refuses a narrowed run
+deno task ignore:audit               # ignore-directive honoring audit (Arm A) — RATCHET over `ignore_audit_known.txt`: `prettier-ignore` positions that silently reformat an ignored node (gated in `deno task check`; ./docs/audits.md)
+deno task ignore:audit:update        # regenerate that snapshot after adding a printer opt-in (a now-honored position goes stale); refuses a narrowed run
 deno task render:audit <paths>       # render-equivalence over REAL Svelte code (needs the sidecar — NOT in `deno task check`; release-gated as a leg of `deno task conformance`; ./docs/audits.md)
 deno task idempotency:sweep          # F1 (idempotency) sweep over the real-code corpus (minutes, machine-dependent — NOT in `deno task check`; conformance cadence; ./docs/audits.md)
 deno task audit:corpus               # the standing content-loss/robustness bundle over REAL code (publish Step 3c; NOT in `deno task check`; ./docs/audits.md)

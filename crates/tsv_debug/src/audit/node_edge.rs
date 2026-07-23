@@ -69,7 +69,7 @@ struct WireChild<'a> {
 /// `start`/`end`, so [`collect_child`] sees through them and finds nothing — which holds only
 /// while those sub-objects stay spanless. A wire revision that gave one a span would silently
 /// promote it to a child (the CSS `Rule.metadata` walker test guards exactly that boundary).
-fn is_non_structural_key(key: &str) -> bool {
+pub(crate) fn is_non_structural_key(key: &str) -> bool {
     matches!(
         key,
         "loc" | "leadingComments" | "trailingComments" | "comments"
