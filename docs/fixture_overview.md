@@ -415,7 +415,7 @@ on real codebases.
   - `prettier(unformatted_ours_X) == prettier_intermediate_to_divergent_variant_X` (matches first-pass output)
   - `prettier(prettier_intermediate_to_divergent_variant_X) != prettier_intermediate_to_divergent_variant_X` (verifies it's unstable)
   - `prettier(prettier_intermediate_to_divergent_variant_X) ∈ {divergent_variant_*}` (converges to a documented divergent_variant, not input or a variant)
-  - Requires at least one `divergent_variant_*` sibling (the convergence target). Auto-generated/updated/removed by `fixtures:update:formatted` (a new `ChainShape::UnstableConvergesToDivergentVariant`), like its N7/N7b siblings.
+  - Requires at least one `divergent_variant_*` sibling (the convergence target). Auto-generated/updated/removed by `fixtures:update:formatted` (a new `ChainShape::UnstableConvergesToDivergentVariant`), like its N7/N7b siblings. `fixtures:audit` also *suggests* this marker during fixture design (a `Suggestion::PrettierIntermediateToDivergentVariant`, mirroring the N7b arm): when an `unformatted_ours_*` shell's prettier chain is unstable and converges to an existing `divergent_variant_*`, the audit names the marker to create instead of an `Investigate`.
 - **N8**: `unformatted_prettier_*.*`: `prettier(file) == output_prettier.*` (prettier normalizes to its canonical output)
   - Requires `output_prettier.*` to exist
   - Tests that prettier normalizes these variants to prettier's stable output

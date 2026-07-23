@@ -515,7 +515,8 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let boundary_owns_expansion = intersection_has_huggable_last_type(intersection)
             || intersection_has_expanding_first_type(intersection);
-        self.build_intersection_type_doc(intersection, !boundary_owns_expansion)
+        // A hanging caller trails a prefix (`= …`), so the hoist keeps its continuation indent.
+        self.build_intersection_type_doc(intersection, !boundary_owns_expansion, false)
     }
 
     /// Build a Doc for a union type with line comments between members.
@@ -959,12 +960,23 @@ impl<'a> Printer<'a> {
     /// When `wrap_in_group` is true (default), wraps in its own group for
     /// independent breaking decisions. When false, inherits from parent.
     ///
+    /// `own_line` tells the first-member comment hoist that the caller has already
+    /// placed this intersection on its own indented line (a tuple element), rather
+    /// than trailing a prefix on the enclosing line (`type T = …`, `[K in …]: …`).
+    /// The hoist's continuation indent hangs the run one level under a *trailing*
+    /// prefix; on an own-line placement the caller's line indent already supplies
+    /// that level, so a second one over-indents the reparsed bare form (the tuple
+    /// non-idempotency). Almost every caller is a trailing-prefix context and passes
+    /// `false`; only own-line element callers pass `true`. See
+    /// `intersection_first_member_hoist_comments`.
+    ///
     /// See also: `build_intersection_type_annotation_doc` in type_annotation.rs
     /// for the `: Type` annotation variant (shares continuation logic).
     pub(in crate::printer) fn build_intersection_type_doc(
         &self,
         intersection: &TSIntersectionType<'_>,
         wrap_in_group: bool,
+        own_line: bool,
     ) -> DocId {
         let d = self.d();
         if intersection.types.is_empty() {
@@ -1017,8 +1029,11 @@ impl<'a> Printer<'a> {
                 // comment(s) + intersection under the alias `=` so continuation lines
                 // align (`type T = // c⏎⇥A & B`) and the form stays idempotent —
                 // without it, pass 2 re-indents the reparsed, no-longer-parenthesized
-                // body. The line-comment layout already self-indents per member.
-                return if line_comment_layout {
+                // body. The line-comment layout already self-indents per member, and an
+                // `own_line` caller (tuple element) already indents the whole element, so
+                // both skip the extra level — adding it there over-indents the
+                // continuation past the reparsed bare form (a non-idempotency).
+                return if line_comment_layout || own_line {
                     body
                 } else {
                     d.indent(body)

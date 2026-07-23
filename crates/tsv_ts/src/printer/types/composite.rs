@@ -996,6 +996,27 @@ impl<'a> Printer<'a> {
     // Tuple Types
     //
 
+    /// Render one tuple element. A tuple that breaks places each element on its own
+    /// indented line, so an intersection element is an `own_line` context: its
+    /// first-member comment hoist must not add a second continuation indent on top of
+    /// the tuple's element indent (see `build_intersection_type_doc`'s `own_line`).
+    /// Non-intersection elements — and intersections without a hoisting first-member
+    /// comment, for which `own_line` is a no-op — route through the shared
+    /// `build_type_doc` unchanged.
+    ///
+    // TODO: the sibling own-line container positions — a type-argument list `<…>`, an
+    // arrow/function return type, and an `(A & B)[]` array element — still route their
+    // intersection through the trailing-prefix `build_type_doc` default and so hit the
+    // same first-member-hoist over-indent (a latent non-idempotency, near-zero real-code
+    // frequency). Each needs the same own-line routing (plus, for the conditional branch,
+    // the separate un-glue fix) as part of the intersection-printer convergence.
+    fn build_tuple_element_doc(&self, elem: &TSType<'_>) -> DocId {
+        match elem {
+            TSType::Intersection(i) => self.build_intersection_type_doc(i, true, true),
+            _ => self.build_type_doc(elem),
+        }
+    }
+
     /// Build a Doc for a tuple type: `[A, B, C]`
     ///
     /// Uses width-aware breaking: inline if fits, one element per line if not.
@@ -1017,7 +1038,7 @@ impl<'a> Printer<'a> {
                     parts.push(d.text(","));
                     parts.push(d.line());
                 }
-                parts.push(self.build_type_doc(elem));
+                parts.push(self.build_tuple_element_doc(elem));
             }
             let inner = d.concat(&[d.softline(), d.concat(&parts)]);
             return d.group(d.concat(&[d.text("["), d.indent(inner), d.softline(), d.text("]")]));
@@ -1062,7 +1083,7 @@ impl<'a> Printer<'a> {
                 self.build_inline_comments_between_doc_trailing_space(prev_end, elem.span().start);
             parts.push(leading);
 
-            parts.push(self.build_type_doc(elem));
+            parts.push(self.build_tuple_element_doc(elem));
 
             let elem_end = elem.span().end;
             prev_end = if i + 1 < t.element_types.len() {
@@ -1115,7 +1136,8 @@ impl<'a> Printer<'a> {
             // bracket-line prefix below).
             let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
             let leading = self.build_leading_comments_multiline(prev_end, elem_start, skip_delim);
-            inner_parts.push(self.build_list_element_group(leading, self.build_type_doc(elem)));
+            inner_parts
+                .push(self.build_list_element_group(leading, self.build_tuple_element_doc(elem)));
 
             if !is_last {
                 let next_start = t.element_types[i + 1].span().start;

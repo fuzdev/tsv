@@ -189,6 +189,8 @@ enum Suggestion {
     PrettierIntermediate(String),
     /// Suggest creating a prettier_intermediate_to_variant_* file
     PrettierIntermediateToVariant(String),
+    /// Suggest creating a prettier_intermediate_to_divergent_variant_* file
+    PrettierIntermediateToDivergentVariant(String),
     /// Prettier-chain from output_prettier is documented in audit_signature.txt (chain depth K)
     DocumentedMultiPass(usize),
     /// Needs investigation
@@ -295,6 +297,11 @@ fn format_suggestion(suggestion: &Suggestion) -> String {
         Suggestion::PrettierIntermediateToVariant(suffix) => {
             format!(
                 "suggest prettier_intermediate_to_variant_{suffix} (prettier unstable, converges to a variant_* / prettier_variant_*)"
+            )
+        }
+        Suggestion::PrettierIntermediateToDivergentVariant(suffix) => {
+            format!(
+                "suggest prettier_intermediate_to_divergent_variant_{suffix} (prettier unstable, converges to a divergent_variant_*)"
             )
         }
         Suggestion::DocumentedMultiPass(depth) => {
@@ -587,28 +594,33 @@ async fn classify_novel(
         if second_pass == *input_content {
             Some(Suggestion::PrettierIntermediate(suffix.to_string()))
         } else {
-            // Does the second pass converge to a documented variant_* / prettier_variant_*?
-            let converges_to_variant = known_files.iter().any(|(name, content)| {
-                (name.starts_with("variant_") || name.starts_with("prettier_variant_"))
-                    && name.ends_with(input_ext)
-                    && *content == second_pass
-            });
-            if converges_to_variant {
+            // Second pass is stable but isn't `input` — classify by which documented
+            // stable-form kind it landed on. The prefix sets are disjoint:
+            // "divergent_variant_" starts with neither "variant_" nor "prettier_variant_".
+            let converges_to = |prefixes: &[&str]| {
+                known_files.iter().any(|(name, content)| {
+                    prefixes.iter().any(|p| name.starts_with(p))
+                        && name.ends_with(input_ext)
+                        && *content == second_pass
+                })
+            };
+            if converges_to(&["variant_", "prettier_variant_"]) {
                 Some(Suggestion::PrettierIntermediateToVariant(
                     suffix.to_string(),
                 ))
+            } else if converges_to(&["divergent_variant_"]) {
+                Some(Suggestion::PrettierIntermediateToDivergentVariant(
+                    suffix.to_string(),
+                ))
+            } else if matches!(ours_result, Some(FormatResult::MatchesInput)) {
+                Some(Suggestion::Investigate(
+                    "prettier unstable, does not converge to input, a variant, or a divergent_variant"
+                        .to_string(),
+                ))
             } else {
-                let ours_normalizes = matches!(ours_result, Some(FormatResult::MatchesInput));
-                if ours_normalizes {
-                    Some(Suggestion::Investigate(
-                        "prettier unstable, does not converge to input or any documented variant"
-                            .to_string(),
-                    ))
-                } else {
-                    Some(Suggestion::Investigate(
-                        "prettier unstable, non-converging".to_string(),
-                    ))
-                }
+                Some(Suggestion::Investigate(
+                    "prettier unstable, non-converging".to_string(),
+                ))
             }
         }
     }
