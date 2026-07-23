@@ -20,6 +20,16 @@ use tsv_cli::cli::input::ParserType;
 
 use crate::audit::properties::{Utf16ToByte, tsv_parse_to_value};
 
+/// Whether `source` bears an ignore directive anywhere — a coarse substring pre-scan for the
+/// `format-ignore` / `prettier-ignore` families (the exact recognizer is
+/// `tsv_lang::is_format_ignore_directive`, on a comment's trimmed text). Shared by the injection
+/// audits' directive-awareness: `blank_audit` exempts such a file from its blank-run invariant
+/// (locating the verbatim ignore range from the output alone is fragile), and `ignore_audit` skips
+/// it as a seed (an injected directive interacting with a pre-existing one is fragile).
+pub(crate) fn source_has_ignore_directive(source: &str) -> bool {
+    source.contains("format-ignore") || source.contains("prettier-ignore")
+}
+
 /// Whether `c` can sit inside an identifier — the site filter's notion of "in a word".
 fn is_word(c: char) -> bool {
     c.is_alphanumeric() || c == '_' || c == '$'
