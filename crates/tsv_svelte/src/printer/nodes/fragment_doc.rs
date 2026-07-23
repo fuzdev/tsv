@@ -354,8 +354,7 @@ impl<'a> Printer<'a> {
                 // after the text can't rescue a wide LATER element in the run) — and each adjacent
                 // Soft pair sheds its `>` onto the next tag's line. Built once at the head; the tail
                 // elements are skipped via `glued_run_consumed_until`.
-                if let Some((run_doc, run_end)) =
-                    self.try_build_glued_element_run(trimmed_nodes, i)
+                if let Some((run_doc, run_end)) = self.try_build_glued_element_run(trimmed_nodes, i)
                 {
                     child_docs.push(run_doc);
                     glued_run_consumed_until = run_end + 1;

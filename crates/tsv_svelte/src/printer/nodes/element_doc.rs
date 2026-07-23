@@ -532,7 +532,14 @@ impl<'a> Printer<'a> {
         // conformance_prettier.md §Svelte: Inline content block-style and the
         // inline_boundary_whitespace fixture.
         if boundary == BoundaryMode::Soft {
-            return self.build_collapsible_element_doc(parts, ctx, attr_docs, children_doc, false, None);
+            return self.build_collapsible_element_doc(
+                parts,
+                ctx,
+                attr_docs,
+                children_doc,
+                false,
+                None,
+            );
         }
 
         // Full multiline. `children_doc` was built once above as the multiline shape
@@ -588,9 +595,12 @@ impl<'a> Printer<'a> {
         // attrs group as a leading `if_break` (the G2 sibling-`>` dangle) — see
         // [`Self::build_opening_tag_with_gt_prefix`].
         let opening = match gt_prefix {
-            Some(gt) => {
-                self.build_opening_tag_with_gt_prefix(parts.name, attr_docs, ctx.has_multiline_attr, gt)
-            }
+            Some(gt) => self.build_opening_tag_with_gt_prefix(
+                parts.name,
+                attr_docs,
+                ctx.has_multiline_attr,
+                gt,
+            ),
             None => self.build_opening_tag(parts.name, attr_docs, ctx.has_multiline_attr),
         };
 
