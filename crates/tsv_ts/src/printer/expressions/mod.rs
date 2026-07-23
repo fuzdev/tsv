@@ -30,6 +30,7 @@ mod template_literal;
 use self::operators::OperatorBuf;
 use crate::ast::internal::{BinaryExpression, Expression, TSType};
 use crate::printer::comments::{CommentFilter, CommentSpacing};
+use crate::printer::types::helpers::unwrap_parenthesized;
 use crate::printer::{
     ParenContext, PatternContext, Printer, chain, class_expr_has_decorators,
     jsdoc_cast_comment_is_own_line,
@@ -677,15 +678,35 @@ impl<'a> Printer<'a> {
         // (uniform for every cast type, including `as const`).
         if let Some(kw_pos) = keyword_pos {
             let kw_end = kw_pos + keyword.len() as u32;
-            // Skip the `empty()` child on the comment-free `as Type` gap. Byte-identical.
-            if self.has_comments_to_emit_between(kw_end, type_start) {
-                parts.push(self.build_comments_between(
-                    kw_end,
-                    type_start,
-                    CommentSpacing::Trailing,
-                ));
+            // A cast is a value position. When the type is a redundant paren shell whose
+            // trailing gap holds a block comment (`as (Z /* t */)`, `as (/* b */ Z /* t */)`,
+            // and the double-nested forms — but no leading *line* comment, which hangs via
+            // the branch above), strip the shell and defer that trailing block past the
+            // statement `;` (`as Z; /* t */`) via `with_stripped_paren_trailing`, matching
+            // the declarator's own value→`;` handling so the paren form is idempotent in one
+            // pass. A leading block still trails the keyword inline. Without the defer the
+            // cast emits the block before the `;` and the next pass relocates it.
+            let inner = unwrap_parenthesized(type_annotation);
+            if inner.span() != type_annotation.span()
+                && self.has_comments_to_emit_between(inner.span().end, type_annotation.span().end)
+            {
+                for comment in comments_to_emit_in_range(self.comments, kw_end, inner.span().start)
+                {
+                    parts.push(self.build_comment_doc(comment));
+                    parts.push(d.text(" "));
+                }
+                parts.push(self.build_hang_value_doc(type_annotation, inner, true));
+            } else {
+                // Skip the `empty()` child on the comment-free `as Type` gap. Byte-identical.
+                if self.has_comments_to_emit_between(kw_end, type_start) {
+                    parts.push(self.build_comments_between(
+                        kw_end,
+                        type_start,
+                        CommentSpacing::Trailing,
+                    ));
+                }
+                parts.push(self.build_type_doc(type_annotation));
             }
-            parts.push(self.build_type_doc(type_annotation));
         } else {
             parts.push(self.build_type_doc(type_annotation));
         }

@@ -408,12 +408,15 @@ impl<'a> Printer<'a> {
             CommentSpacing::Trailing,
         );
 
-        // Special case: parenthesized extends_type with a leading line comment
-        // inside the parens (`extends (// c\n  b)`, or the double-nested
+        // Special case: parenthesized extends_type with a **pure** leading line-comment
+        // run inside the parens (`extends (// c\n  b)`, or the double-nested
         // `((// c\n  b))`). Strip EVERY redundant layer, build the fully-unwrapped
         // inner type, and append the line comment(s) as trailing on it — matching
         // prettier's relocation. The deep window catches a comment hiding one layer
-        // in, which the shallow paren-own-gap window missed (non-idempotent).
+        // in, which the shallow paren-own-gap window missed (non-idempotent). This
+        // pure-line trail-on-inner is the conditional-extends' own canonical, pinned by
+        // the non-divergence `extends_paren_leading_line_comment`; a mixed/trailing shell
+        // declines it (below).
         if self.stripped_paren_has_leading_line_comment(c.extends_type) {
             let inner = unwrap_parenthesized(c.extends_type);
             let mut parts: DocBuf = smallvec![d.text(" "), comments_after_extends];
@@ -421,6 +424,43 @@ impl<'a> Printer<'a> {
             for comment in self.stripped_paren_leading_line_comments(c.extends_type) {
                 parts.push(self.build_trailing_line_comment_doc(comment));
             }
+            return d.concat(&parts);
+        }
+
+        // A MIXED (`(/* b */ // c\n B)`) or TRAILING (`(// c\n B /* t */)`) paren shell
+        // carries a leading line comment alongside a leading block and/or a trailing
+        // comment, so it declines the narrow trail-on-inner above — trailing a leading
+        // block would move it from leading to trailing, and the trailing case would
+        // reorder (a `//` must end its line). Instead it HANGS the unwrapped inner at the
+        // same fixed point the bare (paren-free) authoring settles on — the shared
+        // keyword→value seam (mirroring the prefix-operator site). `value_hang_start !=`
+        // the shell start means the wide seam stripped it; pure-line already returned
+        // above, so only mixed/trailing reach here.
+        let (value_hang_start, value_hang_type) =
+            self.keyword_value_stripped_paren_hang(c.extends_type);
+        if value_hang_start != extends_type_start
+            && self.comments_force_own_line_between(extends_kw_end, value_hang_start)
+        {
+            // A re-added extends-type paren carries the conditional check/extends indent
+            // depth (`build_type_doc_maybe_parens`), matching this builder's other arms —
+            // not the prefix operator's bare `d.parens`. Type position, so a trailing block
+            // lifted from the shell trails the inner inline (`defer = false`).
+            let value_doc = self.with_stripped_paren_trailing(
+                self.build_type_doc_maybe_parens(
+                    value_hang_type,
+                    type_needs_parens_for_conditional_extends,
+                ),
+                c.extends_type,
+                value_hang_type,
+                false,
+            );
+            let mut parts: DocBuf = smallvec![];
+            self.append_keyword_value_line_comments(
+                &mut parts,
+                extends_kw_end,
+                value_hang_start,
+                value_doc,
+            );
             return d.concat(&parts);
         }
 

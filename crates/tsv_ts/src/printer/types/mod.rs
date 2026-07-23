@@ -691,7 +691,13 @@ impl<'a> Printer<'a> {
                 // position: defer to end of line so it lands past the terminator.
                 let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
                 parts.push(d.line_suffix(suffix));
-                needs_break = true;
+                // A trailing LINE comment must end its own line, so force the enclosing
+                // group open; a deferred trailing BLOCK rides `line_suffix` alone (it
+                // flushes before the statement's own terminator/newline) and must NOT
+                // force a break — at an inline value position that would split the value
+                // onto its own line. Hang callers already break via their leading comment,
+                // so this is a no-op for them.
+                needs_break |= !comment.is_block;
             }
         }
         if needs_break {
