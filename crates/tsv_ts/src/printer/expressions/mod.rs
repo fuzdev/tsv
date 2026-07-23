@@ -624,14 +624,22 @@ impl<'a> Printer<'a> {
         // See as_satisfies_value_line_comment / as_satisfies_value_own_line_block_comment.
         if let Some(kw_pos) = keyword_pos {
             let kw_end = kw_pos + keyword.len() as u32;
+            // A redundant paren shell holding a leading line-comment run (`x as (// c\n A)`,
+            // and the double-nested form) strips to the same hang the bare `x as // c\n A`
+            // settles on — route it through the shared keyword→value seam so the paren form
+            // is idempotent. Without this the gate below measures the OUTER paren and the
+            // comment inside it is invisible, so the inline path relocates it at a differing
+            // indent (a non-idempotency). The seam's content-loss guard preserves a mixed
+            // shell in place.
+            let (value_start, value_type) = self.keyword_value_stripped_paren_hang(type_annotation);
             // A line comment or multiline block hangs the type on its own line; a
             // single-line block comment collapses inline (the fall-through below).
             // Prettier relocates the collapsed comment before the keyword instead.
-            if self.comments_force_own_line_between(kw_end, type_start) {
+            if self.comments_force_own_line_between(kw_end, value_start) {
                 parts.push(d.text(" "));
                 parts.push(d.text(keyword));
-                let type_doc = self.build_type_doc(type_annotation);
-                self.append_keyword_value_line_comments(&mut parts, kw_end, type_start, type_doc);
+                let type_doc = self.build_type_doc(value_type);
+                self.append_keyword_value_line_comments(&mut parts, kw_end, value_start, type_doc);
                 return d.concat(&parts);
             }
         }

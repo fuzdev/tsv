@@ -830,15 +830,21 @@ impl<'a> Printer<'a> {
 
             body_parts.push(d.text(":"));
 
+            // A redundant paren shell with a leading line-comment run (`]: (// c\n V)`)
+            // strips to the same hang as bare `]: // c\n V`; route it through the shared
+            // keyword→value seam so the paren form is idempotent (the outer paren would
+            // otherwise hide the comment from the gate). The guard leaves a mixed shell to
+            // the else branch, which preserves it via `unwrap_redundant_parens`.
+            let (value_start, value_type) = self.keyword_value_stripped_paren_hang(type_ann);
             // A line comment after `:` stays trailing it, with the value type on
             // the next line (preserve-in-place; prettier relocates the comment to
             // trail the member `;`).
-            if self.has_line_comments_between(bracket_close, type_start) {
-                let value_doc = self.build_type_doc(type_ann);
+            if self.has_line_comments_between(bracket_close, value_start) {
+                let value_doc = self.build_type_doc(value_type);
                 self.append_keyword_value_line_comments(
                     &mut body_parts,
                     bracket_close,
-                    type_start,
+                    value_start,
                     value_doc,
                 );
             } else {
