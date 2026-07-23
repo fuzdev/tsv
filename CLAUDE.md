@@ -631,6 +631,7 @@ See [Development Philosophy](#development-philosophy-test-driven-development-wit
 sibling makes a precise, validated claim — `expected_ours.json` / `expected_svelte.json`
 (parser divergence), `output_prettier.*` / `prettier_variant_*` / `variant_*` /
 `divergent_variant_*` / `prettier_intermediate_*` / `prettier_intermediate_to_variant_*` /
+`prettier_intermediate_to_divergent_variant_*` /
 `audit_signature.txt` (formatter divergence + prettier multi-pass pins),
 `prettier_nonconvergent.txt` / `prettier_rejects.txt` / `tsv_rejects.txt` (no-oracle
 markers), `unformatted_*` / `unformatted_ours_*` / `unformatted_prettier_*`

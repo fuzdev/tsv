@@ -46,6 +46,15 @@ pub struct FixtureFiles {
     /// but the second pass converges to a documented `variant_*` /
     /// `prettier_variant_*` form rather than input (N7b).
     pub prettier_intermediate_to_variant: Vec<String>,
+    /// `prettier_intermediate_to_divergent_variant_*`: like
+    /// `prettier_intermediate_to_variant`, but the second pass converges to a
+    /// documented `divergent_variant_*` form (a prettier-stable form our
+    /// formatter rewrites to a third form) rather than input or a `variant_*`
+    /// (N7c). The convergence target no other intermediate marker accepts —
+    /// arises when prettier's unstable first pass on an `unformatted_ours_*`
+    /// shell settles on a glued form ours un-glues (the intersection
+    /// first-member redundant-paren mixed case).
+    pub prettier_intermediate_to_divergent_variant: Vec<String>,
     /// `input_invalid_*`: invalid syntax that must fail BOTH parsers.
     pub input_invalid: Vec<String>,
     /// `prettier_nonconvergent.txt` marker present: prettier has no fixed
@@ -114,6 +123,7 @@ impl FixtureFiles {
         files.divergent_variant.sort();
         files.prettier_intermediate.sort();
         files.prettier_intermediate_to_variant.sort();
+        files.prettier_intermediate_to_divergent_variant.sort();
         files.input_invalid.sort();
         files.unknown.sort();
         files
@@ -135,6 +145,8 @@ impl FixtureFiles {
             Some(&mut self.unformatted_prettier)
         } else if filename.starts_with("unformatted_") {
             Some(&mut self.unformatted)
+        } else if filename.starts_with("prettier_intermediate_to_divergent_variant_") {
+            Some(&mut self.prettier_intermediate_to_divergent_variant)
         } else if filename.starts_with("prettier_intermediate_to_variant_") {
             Some(&mut self.prettier_intermediate_to_variant)
         } else if filename.starts_with("prettier_intermediate_") {
@@ -198,6 +210,10 @@ mod tests {
                 "prettier_intermediate_to_variant",
                 &files.prettier_intermediate_to_variant,
             ),
+            (
+                "prettier_intermediate_to_divergent_variant",
+                &files.prettier_intermediate_to_divergent_variant,
+            ),
             ("input_invalid", &files.input_invalid),
         ];
         buckets.iter().find(|(_, v)| !v.is_empty()).map(|(n, _)| *n)
@@ -219,6 +235,10 @@ mod tests {
             (
                 "prettier_intermediate_to_variant_x.svelte",
                 "prettier_intermediate_to_variant",
+            ),
+            (
+                "prettier_intermediate_to_divergent_variant_x.svelte",
+                "prettier_intermediate_to_divergent_variant",
             ),
             ("input_invalid_x.svelte", "input_invalid"),
         ];
