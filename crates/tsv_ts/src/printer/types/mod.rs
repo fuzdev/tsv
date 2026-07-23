@@ -135,8 +135,8 @@ impl<'a> Printer<'a> {
                     // (`x is (// c\n T)`, and the double-nested form) strips to the same
                     // hang as bare `x is // c\n T`; route it through the shared keyword→value
                     // seam so the paren form is idempotent (the outer paren would otherwise
-                    // hide the comment from the gate below). The guard preserves a mixed
-                    // shell in place, handled by the else branch's `unwrap_redundant_parens`.
+                    // hide the comment from the gate below). A mixed / trailing shell hoists
+                    // losslessly too — the trailing comment via `build_hang_value_doc`.
                     let (value_start, value_type) =
                         self.keyword_value_stripped_paren_hang(type_ann);
                     // A line comment or multiline block after `is` hangs the predicate
@@ -147,7 +147,9 @@ impl<'a> Printer<'a> {
                     if let Some(is_end) = is_end
                         && self.comments_force_own_line_between(is_end, value_start)
                     {
-                        let value_doc = self.build_type_doc(value_type);
+                        // Type position: a trailing block lifted from the shell trails
+                        // the type inline before the body `{` (`defer = false`).
+                        let value_doc = self.build_hang_value_doc(type_ann, value_type, false);
                         parts.push(d.text(" is"));
                         self.append_keyword_value_line_comments(
                             &mut parts,
@@ -223,8 +225,9 @@ impl<'a> Printer<'a> {
                 // is idempotent (the outer paren would otherwise hide the comment from the
                 // gate). `needs_parens` is recomputed on the *unwrapped* operand: a
                 // semantically-required paren (a union under `keyof`) is re-added rather
-                // than dropped, a redundant one is shed. The guard leaves a mixed shell to
-                // the fall-through, which preserves it via `o.type_annotation`.
+                // than dropped, a redundant one is shed. A mixed / trailing shell hoists
+                // losslessly too — the trailing comment via `with_stripped_paren_trailing`,
+                // applied after the operand's own parens are (re-)added.
                 let (operand_hang_start, operand_hang_type) =
                     self.keyword_value_stripped_paren_hang(o.type_annotation);
                 if self.comments_force_own_line_between(keyword_end, operand_hang_start) {
@@ -234,6 +237,14 @@ impl<'a> Printer<'a> {
                     } else {
                         operand_doc
                     };
+                    // Type position: a trailing block lifted from the shell trails the
+                    // operand inline (`defer = false`).
+                    let value_doc = self.with_stripped_paren_trailing(
+                        value_doc,
+                        o.type_annotation,
+                        operand_hang_type,
+                        false,
+                    );
                     let mut parts = smallvec![d.text(o.operator.as_str())];
                     self.append_keyword_value_line_comments(
                         &mut parts,
@@ -539,15 +550,14 @@ impl<'a> Printer<'a> {
         &self,
         ty: &TSType<'_>,
     ) -> bool {
-        // Fail-fast on the cheap gates (this runs unconditionally, 3× per conditional
-        // type): a non-paren, or a paren with no leading line comment, never allocates
-        // the collector's `CommentVec`. Both gates are implied by a non-empty run, so
-        // adding them can't change the result — only skip the collect + trailing scan.
-        matches!(ty, TSType::Parenthesized(_))
-            && self.has_line_comments_between(
-                ty.span().start + 1,
-                unwrap_parenthesized(ty).span().start,
-            )
+        // The narrow analog is exactly the hang predicate (a paren shell with a leading
+        // line comment) PLUS the content-loss check that the run is safe to hoist — no
+        // leading block, no trailing comment (`stripped_paren_leading_line_comments`
+        // returns empty otherwise). The hang predicate's cheap `matches!` + line-comment
+        // scan fail-fast before the collector's `CommentVec` allocates (this runs
+        // unconditionally, 3× per conditional type), so composing stays as cheap as the
+        // hand-inlined gates were.
+        self.stripped_paren_hang_has_leading_line_comment(ty)
             && !self.stripped_paren_leading_line_comments(ty).is_empty()
     }
 
@@ -589,39 +599,121 @@ impl<'a> Printer<'a> {
         smallvec![]
     }
 
+    /// Hang-seam analog of [`Self::stripped_paren_has_leading_line_comment`], but
+    /// **wider**: true when a possibly multiply-nested redundant paren shell holds a
+    /// leading **line** comment anywhere in its (deep) leading gap — the hang trigger —
+    /// *regardless* of whether it also carries a leading **block** comment (a mixed
+    /// shell, `(/* b */ // c\n X)`) or a **trailing** comment (`(// c\n X /* t */)`).
+    ///
+    /// The narrower predicate declines those two shapes to avoid dropping the extra
+    /// comment when the caller renders only the stripped inner; the hang seam instead
+    /// hoists the whole run losslessly — the leading block + line via the caller's own
+    /// leading-comment emitter (the gap window widens to the unwrapped inner's start,
+    /// which spans the stripped parens), the trailing comment via
+    /// [`Self::with_stripped_paren_trailing`]. So the seam only needs to know a line
+    /// comment forces the hang; block-leading and trailing no longer decline it.
+    ///
+    /// Kept separate from the narrow predicate so the union-member / conditional-`extends`
+    /// callers of the `stripped_*_leading_line_comments` pair — which retain the paren and
+    /// preserve every comment *in place* — are unaffected.
+    fn stripped_paren_hang_has_leading_line_comment(&self, ty: &TSType<'_>) -> bool {
+        matches!(ty, TSType::Parenthesized(_))
+            && self.has_line_comments_between(
+                ty.span().start + 1,
+                unwrap_parenthesized(ty).span().start,
+            )
+    }
+
     /// The shared keyword→value seam for a hang position whose caller strips redundant
     /// parens off `value` before laying it out (`as`/`satisfies` cast, `: T` annotation,
-    /// mapped-type value, type-parameter `=` default, predicate `is`, prefix operators):
-    /// if `value` is a redundant paren shell holding a **relocatable** leading
-    /// line-comment run, return the fully-unwrapped inner type and its start, so the
-    /// comment falls into the keyword→value gap and hangs idempotently (the same fixed
-    /// point the bare, paren-free form already settles on); otherwise return `value` and
-    /// its own start, unchanged.
+    /// mapped-type value, type-parameter `=` default / `extends` constraint, predicate
+    /// `is`, prefix operators): if `value` is a redundant paren shell whose leading gap
+    /// holds a line comment (mixed and trailing shells included), return the
+    /// fully-unwrapped inner type and its start, so the leading run falls into the
+    /// keyword→value gap and hangs idempotently (the same fixed point the bare,
+    /// paren-free form already settles on); otherwise return `value` and its own start,
+    /// unchanged.
     ///
-    /// The relocation safety is [`Self::stripped_paren_has_leading_line_comment`]'s
-    /// content-loss guard — a block comment in the leading gap, or any trailing comment,
-    /// declines the substitution so the caller preserves every comment in place. Mirrors
-    /// the type-parameter constraint / conditional-`extends` sites, generalized to the
-    /// neighbouring keyword→value positions.
+    /// Losslessness: the caller's leading-comment emitter (fed the widened gap window)
+    /// prints the leading block + line run, and [`Self::with_stripped_paren_trailing`]
+    /// prints any comment in the shell's trailing gap — so no comment is dropped by the
+    /// strip. Gated by [`Self::stripped_paren_hang_has_leading_line_comment`].
     pub(in crate::printer) fn keyword_value_stripped_paren_hang<'t>(
         &self,
         value: &'t TSType<'t>,
     ) -> (u32, &'t TSType<'t>) {
-        // TODO: a MIXED shell — a block comment in the leading gap, or any trailing comment
-        // (`(/* b */ // c\n X)`, `(// c\n X /* t */)`) — declines the substitution here. The
-        // guard keeps that lossless (every comment survives, preserved in place by
-        // `build_parenthesized_type_unwrap_doc`), but that preserve-in-place path is itself
-        // non-idempotent at these keyword→value positions when the enclosing context does
-        // not hang the value — the same indent drift this seam fixes for the pure
-        // line-comment run, one class deeper (and shared with the union-member callers of
-        // the `stripped_*_leading_line_comments` pair). Closing it means hanging the whole
-        // comment run (block + line, and the trailing comment) while stripping the shell.
-        if self.stripped_paren_has_leading_line_comment(value) {
+        if self.stripped_paren_hang_has_leading_line_comment(value) {
             let inner = unwrap_parenthesized(value);
             (inner.span().start, inner)
         } else {
             (value.span().start, value)
         }
+    }
+
+    /// Append the trailing comment lifted out of a stripped redundant-paren shell to an
+    /// already-built hung value doc. A no-op unless `original` is a paren shell the hang
+    /// seam stripped to `inner` (`original.span() != inner.span()`) that carries a
+    /// comment in its trailing gap `(inner.end, original.end)` — the gap the leading-run
+    /// emitters ([`Self::append_keyword_value_line_comments`] et al.) never reach.
+    ///
+    /// A trailing **line** comment always uses `line_suffix` (a `//` must end its line).
+    /// A trailing **block** comment trails inline at a **type** position (`defer` =
+    /// false) — where the enclosing construct keeps a value-trailing block before its
+    /// terminator, so inline is that position's fixed point — but uses `line_suffix` at a
+    /// **value** position (`defer` = true, an `as`/`satisfies` cast) so it defers past the
+    /// statement `;`, matching the declarator's own value→`;` trailing-comment handling.
+    /// Mirrors [`Self::build_parenthesized_type_unwrap_doc`]'s trailing arm.
+    pub(in crate::printer) fn with_stripped_paren_trailing(
+        &self,
+        value_doc: DocId,
+        original: &TSType<'_>,
+        inner: &TSType<'_>,
+        defer: bool,
+    ) -> DocId {
+        // Not a stripped shell → nothing was lifted out of a trailing gap.
+        if original.span() == inner.span() {
+            return value_doc;
+        }
+        let trailing_start = inner.span().end;
+        let trailing_end = original.span().end;
+        if !self.has_comments_to_emit_between(trailing_start, trailing_end) {
+            return value_doc;
+        }
+        let d = self.d();
+        let mut parts: DocBuf = smallvec![value_doc];
+        let mut needs_break = false;
+        for comment in comments_to_emit_in_range(self.comments, trailing_start, trailing_end) {
+            if comment.is_block && !defer {
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
+            } else {
+                // Trailing line comment (always), or a deferred trailing block at a value
+                // position: defer to end of line so it lands past the terminator.
+                let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
+                parts.push(d.line_suffix(suffix));
+                needs_break = true;
+            }
+        }
+        if needs_break {
+            parts.push(d.break_parent());
+        }
+        d.concat(&parts)
+    }
+
+    /// Convenience over [`Self::with_stripped_paren_trailing`] for the common hang site:
+    /// build `inner`'s type doc and append any trailing comment lifted from a stripped
+    /// `original` shell in one call, so callers don't repeat `inner`. `original` /
+    /// `inner` are the seam's `(shell, unwrapped)` pair — equal when nothing was
+    /// stripped, a no-op then. `defer` follows `with_stripped_paren_trailing` (true at a
+    /// value position — an `as`/`satisfies` cast). The prefix-operator site keeps calling
+    /// the lower-level helper directly because it re-parenthesizes the operand first.
+    pub(in crate::printer) fn build_hang_value_doc(
+        &self,
+        original: &TSType<'_>,
+        inner: &TSType<'_>,
+        defer: bool,
+    ) -> DocId {
+        self.with_stripped_paren_trailing(self.build_type_doc(inner), original, inner, defer)
     }
 
     /// Build a complete import type: the `import(<specifier>)` call plus its
