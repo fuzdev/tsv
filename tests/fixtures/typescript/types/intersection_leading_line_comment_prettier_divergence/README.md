@@ -14,7 +14,10 @@ When the comment is authored *inside* the first member's redundant parens
 parens and hoists the comment to the same trailing-`=` continuation form as the
 input — indented, so the result is idempotent. Prettier instead breaks the
 intersection first (`prettier_intermediate_to_variant_parens`) before converging
-to the own-line form.
+to the own-line form. A *doubly* nested redundant paren
+(`type C = ((// leading\n\ta)) & b;`, `unformatted_ours_double_parens`) strips
+and hoists identically — the whole paren shell is scanned, not just its outermost
+layer — with the same prettier intermediate.
 
 ## Reason
 
