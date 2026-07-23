@@ -1,0 +1,143 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 458,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 339,
+				"data": "\n\tVoid / self-closing parity for the break-before rule: a void element (<img />) preceded\n\tby same-line text moves to its own line rather than dangling its opening tag; with no\n\tcontent it simply sits on the fresh line. Prettier keeps the opening tag on the text\n\tline and wraps its attributes — see prettier_variant_dangle.svelte.\n"
+			},
+			{
+				"type": "Text",
+				"start": 339,
+				"end": 340,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 340,
+				"end": 457,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 341
+					},
+					"end": {
+						"line": 7,
+						"column": 2,
+						"character": 342
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 343,
+							"end": 428,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13\n\t",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12 word13\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 428,
+							"end": 452,
+							"name": "img",
+							"name_loc": {
+								"start": {
+									"line": 9,
+									"column": 2,
+									"character": 429
+								},
+								"end": {
+									"line": 9,
+									"column": 5,
+									"character": 432
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 433,
+									"end": 441,
+									"name": "src",
+									"name_loc": {
+										"start": {
+											"line": 9,
+											"column": 6,
+											"character": 433
+										},
+										"end": {
+											"line": 9,
+											"column": 9,
+											"character": 436
+										}
+									},
+									"value": [
+										{
+											"start": 438,
+											"end": 440,
+											"type": "Text",
+											"raw": "/a",
+											"data": "/a"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 442,
+									"end": 449,
+									"name": "alt",
+									"name_loc": {
+										"start": {
+											"line": 9,
+											"column": 15,
+											"character": 442
+										},
+										"end": {
+											"line": 9,
+											"column": 18,
+											"character": 445
+										}
+									},
+									"value": [
+										{
+											"start": 447,
+											"end": 448,
+											"type": "Text",
+											"raw": "x",
+											"data": "x"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": []
+							}
+						},
+						{
+							"type": "Text",
+							"start": 452,
+							"end": 453,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

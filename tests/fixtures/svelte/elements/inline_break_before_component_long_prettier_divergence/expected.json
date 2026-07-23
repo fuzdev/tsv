@@ -1,0 +1,228 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 788,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 461,
+				"data": "\n\tComponent parity for the break-before rule: an inline component preceded by same-line\n\ttext starts on a fresh line rather than dangling its opening tag. It collapses back\n\tinline when it fits, else lays out block-style. Byte-identical in shape to the HTML\n\tinline-element fixture (inline_break_before_wrap_long) — the fold is element-type\n\tagnostic. Prettier keeps the opening tag on the text line and dangles it — see\n\tprettier_variant_dangle.svelte.\n"
+			},
+			{
+				"type": "Text",
+				"start": 461,
+				"end": 462,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 462,
+				"end": 581,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 463
+					},
+					"end": {
+						"line": 9,
+						"column": 2,
+						"character": 464
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 465,
+							"end": 543,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12\n\t",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 543,
+							"end": 575,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 2,
+									"character": 544
+								},
+								"end": {
+									"line": 11,
+									"column": 6,
+									"character": 548
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 549,
+									"end": 560,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 11,
+											"column": 7,
+											"character": 549
+										},
+										"end": {
+											"line": 11,
+											"column": 11,
+											"character": 553
+										}
+									},
+									"value": [
+										{
+											"start": 555,
+											"end": 559,
+											"type": "Text",
+											"raw": "/a/b",
+											"data": "/a/b"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 561,
+										"end": 568,
+										"raw": "content",
+										"data": "content"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 575,
+							"end": 577,
+							"raw": ".\n",
+							"data": ".\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 581,
+				"end": 582,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 582,
+				"end": 787,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 583
+					},
+					"end": {
+						"line": 13,
+						"column": 2,
+						"character": 584
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 585,
+							"end": 663,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12\n\t",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12\n\t"
+						},
+						{
+							"type": "Component",
+							"start": 663,
+							"end": 781,
+							"name": "Comp",
+							"name_loc": {
+								"start": {
+									"line": 15,
+									"column": 2,
+									"character": 664
+								},
+								"end": {
+									"line": 15,
+									"column": 6,
+									"character": 668
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 669,
+									"end": 678,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 15,
+											"column": 7,
+											"character": 669
+										},
+										"end": {
+											"line": 15,
+											"column": 11,
+											"character": 673
+										}
+									},
+									"value": [
+										{
+											"start": 675,
+											"end": 677,
+											"type": "Text",
+											"raw": "/a",
+											"data": "/a"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 679,
+										"end": 774,
+										"raw": "\n\t\tcontent1 content2 content3 content4 content5 content6 content7 content8 content9 content10\n\t",
+										"data": "\n\t\tcontent1 content2 content3 content4 content5 content6 content7 content8 content9 content10\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 781,
+							"end": 783,
+							"raw": ".\n",
+							"data": ".\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

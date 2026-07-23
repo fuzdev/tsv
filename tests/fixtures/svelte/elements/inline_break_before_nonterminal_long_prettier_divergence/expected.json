@@ -1,0 +1,124 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 553,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 348,
+				"data": "\n\tThe break-before rule with a following whitespace-separated sibling (non-terminal): the\n\telement breaks to a fresh line and lays out block-style (content too long to collapse); the\n\tterminal trailing text ` tail` hugs the intact `</a>`. Prettier keeps the opening tag on the\n\ttext line and dangles it — see prettier_variant_dangle.svelte.\n"
+			},
+			{
+				"type": "Text",
+				"start": 348,
+				"end": 349,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 349,
+				"end": 552,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 350
+					},
+					"end": {
+						"line": 7,
+						"column": 2,
+						"character": 351
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 352,
+							"end": 430,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12\n\t",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11 word12\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 430,
+							"end": 542,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 9,
+									"column": 2,
+									"character": 431
+								},
+								"end": {
+									"line": 9,
+									"column": 3,
+									"character": 432
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 433,
+									"end": 442,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 9,
+											"column": 4,
+											"character": 433
+										},
+										"end": {
+											"line": 9,
+											"column": 8,
+											"character": 437
+										}
+									},
+									"value": [
+										{
+											"start": 439,
+											"end": 441,
+											"type": "Text",
+											"raw": "/a",
+											"data": "/a"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 443,
+										"end": 538,
+										"raw": "\n\t\tcontent1 content2 content3 content4 content5 content6 content7 content8 content9 content10\n\t",
+										"data": "\n\t\tcontent1 content2 content3 content4 content5 content6 content7 content8 content9 content10\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 542,
+							"end": 548,
+							"raw": " tail\n",
+							"data": " tail\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
