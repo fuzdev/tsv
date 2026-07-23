@@ -208,10 +208,14 @@ impl<'a> Printer<'a> {
     }
 
     /// Shared implementation of `build_type_doc_maybe_parens` /
-    /// `build_intersection_member_type_doc`. `indent_default_paren` gates only the
-    /// default (non-union, non-trailing-object-intersection) paren case: `true`
-    /// wraps the inner type in `d.indent` (union-member offset / conditional
-    /// check-extends depth), `false` leaves it bare (intersection members).
+    /// `build_intersection_member_type_doc`. `indent_default_paren` gates two paren
+    /// cases: (1) the default paren — `true` wraps the inner type in `d.indent`
+    /// (union-member offset / conditional check-extends depth), `false` leaves it
+    /// bare (intersection members); and (2) the trailing-object-intersection special
+    /// case — `true` takes it (the union-member `| {` double-indent alignment),
+    /// `false` skips it so the intersection member falls to the bare default arm
+    /// (single indent). Both keep an intersection member one level shallower than the
+    /// union-member/conditional layout.
     fn build_type_doc_maybe_parens_impl(
         &self,
         ts_type: &TSType<'_>,
@@ -220,11 +224,21 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         if needs_parens(ts_type) {
-            // Special case: intersection with trailing object type
-            // Build custom doc for proper alignment of closing `})`
+            // Special case: intersection with trailing object type — build a custom
+            // doc that aligns the trailing object's body + closing `})` with the
+            // union member's `| {` offset (`build_aligned_object_literal_doc`'s double
+            // indent). That alignment is correct only in a union-member context
+            // (`indent_default_paren == true`, via `build_type_doc_maybe_parens` /
+            // `build_union_member_offset_doc`); for an *intersection* member
+            // (`build_intersection_member_type_doc`, `indent_default_paren == false`)
+            // the trailing object hangs one level too deep. There the default arm
+            // below (bare `("(", inner, ")")`, no inner indent) reproduces the array
+            // path's single-indent layout, matching prettier. See
+            // `intersection_paren_member_trailing_object_long`.
             // Note: unwrap_parenthesized to handle cases like `(A & {...})` where
             // the input is TSParenthesizedType wrapping TSIntersectionType
-            if let TSType::Intersection(intersection) = unwrap_parenthesized(ts_type)
+            if indent_default_paren
+                && let TSType::Intersection(intersection) = unwrap_parenthesized(ts_type)
                 && let Some(last) = intersection.types.last()
                 && let TSType::TypeLiteral(obj) = unwrap_parenthesized(last)
             {
@@ -305,9 +319,11 @@ impl<'a> Printer<'a> {
     /// before `)` (`(a | b /* c */)`). Prettier hoists these out of the parens; tsv
     /// keeps them with the parenthesized member. A trailing *line* comment before `)`
     /// is preserved here too (forcing the group to break). A leading *line* comment
-    /// after `(` is normally pre-relocated by the union/intersection line-comment
-    /// paths, so it only reaches here when `emit_inner_leading_line_comments` is set —
-    /// the first-union-member case, which has no previous member to relocate onto.
+    /// after `(` is only emitted here when `emit_inner_leading_line_comments` is set —
+    /// the paren-union member arms of `build_union_type_doc_with_line_comments`, which
+    /// keep such a comment inside the parens for EVERY member (first or later); other
+    /// callers pass `false` because a leading line comment has already been handled
+    /// upstream (relocated or emitted before the member).
     pub(super) fn build_parenthesized_union_doc(
         &self,
         union: &TSUnionType<'_>,
@@ -321,12 +337,11 @@ impl<'a> Printer<'a> {
         let mut indented: DocBuf = smallvec![d.softline()];
         if let Some(p) = paren {
             // Leading comments between `(` and the union. Block comments stay inline
-            // (`(/* c */ a | b)`). A leading *line* comment is normally relocated by
-            // the union/intersection line-comment paths (to trail the previous outer
-            // member), so it reaches here only for the FIRST union member — which has
-            // no previous member to relocate onto, so it is kept inside the parens
-            // leading the inner union. A line comment must end its line, so it forces
-            // the paren group to break.
+            // (`(/* c */ a | b)`). A leading *line* comment reaches here only when
+            // `emit_inner_leading_line_comments` is set — the paren-union member of an
+            // outer union, whose comment tsv keeps inside the parens leading the inner
+            // union (for every member, not just the first). A line comment must end its
+            // line, so it forces the paren group to break.
             for comment in
                 comments_to_emit_in_range(self.comments, p.span.start + 1, union.span.start)
             {
