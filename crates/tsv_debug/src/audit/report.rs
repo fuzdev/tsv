@@ -202,8 +202,9 @@ pub(crate) struct Finding {
 
 impl Finding {
     /// The per-shape instance count, read out of the audit-specific detail — the
-    /// worst-first sort key of the human report.
-    fn count(&self) -> usize {
+    /// worst-first sort key of the human report (and of an audit's own report-only
+    /// sections, e.g. blank's `report_soft`).
+    pub(crate) fn count(&self) -> usize {
         match &self.detail {
             Detail::Gap(d) => d.count,
             Detail::Blank(d) => d.count,
@@ -214,7 +215,7 @@ impl Finding {
     /// Whether the shape is part of its audit's ratchet-graded set. The report-only classes
     /// (`gap_audit`'s `SWALLOW`, `blank_audit`'s `STRUCTURAL-DIVERGENCE`) answer `false`, so a
     /// summary can speak for the graded invariants without counting them.
-    fn gated(&self) -> bool {
+    pub(crate) fn gated(&self) -> bool {
         match &self.detail {
             Detail::Gap(d) => d.gated,
             Detail::Blank(d) => d.gated,

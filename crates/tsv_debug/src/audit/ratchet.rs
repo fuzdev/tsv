@@ -13,13 +13,18 @@
 //! - any **unpinnable** key (see [`SnapshotKey::is_pinnable`]) — an invariant so
 //!   absolute it is never allowed into the list whose shrinking is the goal.
 //!
-//! `gap_audit` (`gap_audit_known.txt`) and `blank_audit` (`blank_audit_known.txt`)
-//! are the consumers. It is written generic — parameterized on the snapshot
-//! **path**, the **key type** ([`SnapshotKey`], which owns its own line
-//! render/parse and its pinnability rule), and (via that trait) the **pinnable
-//! predicate** — so the second injection audit (blank-line injection) adopted it
-//! without copying the read/render/grade/refuse-narrow logic. It is deliberately
-//! *minimal*: no generality beyond what a second consumer would actually reuse.
+//! `gap_audit` (`gap_audit_known.txt`), `blank_audit` (`blank_audit_known.txt`),
+//! and `ignore_audit` (`ignore_audit_known.txt`) are the consumers. It is written
+//! generic — parameterized on the snapshot **path**, the **key type**
+//! ([`SnapshotKey`], which owns its own line render/parse and its pinnability
+//! rule), and (via that trait) the **pinnable predicate** — so each later
+//! injection audit adopted it without copying the read/render/grade/refuse-narrow
+//! logic. It is deliberately *minimal*: no generality beyond what a second
+//! consumer would actually reuse. The consumer-side orchestration those audits
+//! were still copying — the narrowed-`--update` refusal, the write confirmation,
+//! the "ratchet SKIPPED" notice, the unpinned-PANIC epilogue — lives here too
+//! ([`refuse_narrowed_update`] / [`Ratchet::write_pinned`] /
+//! [`print_ratchet_skipped`] / [`report_unpinned_panics`]).
 //!
 //! What the snapshot buys and does not: a shape not on the list fails the gate,
 //! so no *new* kind of bug lands silently; but a new instance at an **existing**
@@ -155,6 +160,31 @@ impl Ratchet {
         })
     }
 
+    /// [`Self::write`], plus the consumer bookkeeping every audit was copying around it:
+    /// compute the pinnable subset that was actually written, print the `✓ wrote N` line, and
+    /// return that pinned set (gap's yield line diffs it against the pre-write snapshot; the
+    /// other consumers drop it). `noun` is the audit's own word for a snapshot key — gap /
+    /// blank "shape", ignore "position".
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CliError::Failed`] when the snapshot file cannot be written ([`Self::write`]).
+    #[cfg(feature = "comment_check")]
+    pub(crate) fn write_pinned<K: SnapshotKey>(
+        &self,
+        found: &BTreeSet<K>,
+        noun: &str,
+    ) -> Result<BTreeSet<K>, CliError> {
+        self.write(found)?;
+        let pinned: BTreeSet<K> = found.iter().filter(|k| k.is_pinnable()).cloned().collect();
+        println!(
+            "✓ wrote {} {noun}(s) to {}",
+            pinned.len(),
+            self.path.display()
+        );
+        Ok(pinned)
+    }
+
     /// Diff a run's `found` keys against the committed snapshot.
     ///
     /// `found` is the run's **whole** key set — pinnable and not. The ratchet
@@ -207,6 +237,80 @@ impl<K> GateDiff<K> {
     pub(crate) fn holds(&self) -> bool {
         self.new.is_empty() && self.stale.is_empty() && self.unpinnable == 0
     }
+}
+
+// ---------------------------------------------------------------------------
+// Consumer orchestration — the prose every ratchet-consuming audit was copying
+// into its `run()`. Behind `comment_check` because the three consumers are;
+// `compile_corpus_compare --ratchet` (the always-compiled consumer) has its own
+// path-keyed flow with different semantics and keeps its own messages.
+// ---------------------------------------------------------------------------
+
+/// Refuse `--update` on a narrowed run. The snapshot describes the FULL default run —
+/// `scope` names it in the audit's own words (e.g. "the blank payload over tests/fixtures") —
+/// so pinning a narrowed one would silently unpin real bugs. `relation` names what the
+/// narrowed shape set is relative to the snapshot's ("SUBSET"; gap's
+/// "SUBSET (or, for --all-bytes, a superset)"). A no-op unless `update` and the run is
+/// narrowed, so it is callable unconditionally at the top of a consumer's `run()`.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] (after the user-facing refusal) when `update` is set on a
+/// narrowed run.
+#[cfg(feature = "comment_check")]
+pub(crate) fn refuse_narrowed_update(
+    update: bool,
+    narrowed: &[&'static str],
+    scope: &str,
+    relation: &str,
+) -> Result<(), CliError> {
+    if !update || narrowed.is_empty() {
+        return Ok(());
+    }
+    let flags = narrowed.join(" / ");
+    eprintln!(
+        "Error: --update pins the FULL default run ({scope}). This run is narrowed by \
+         {flags}, so its shape set is a {relation} of what the snapshot means — writing it \
+         would silently unpin real bugs. Re-run without {flags}."
+    );
+    Err(CliError::Failed)
+}
+
+/// The notice a narrowed (non-`--update`) default run prints INSTEAD of grading: it reaches
+/// only part of the snapshot's shape set, so grading would report every unreached shape as
+/// stale — findings are reported, never graded, and the run must not read as a passing gate.
+#[cfg(feature = "comment_check")]
+pub(crate) fn print_ratchet_skipped(narrowed: &[&'static str]) {
+    eprintln!(
+        "\n○ ratchet SKIPPED — {} narrows this run, and the snapshot pins the full default \
+         one. Findings above are reported, NOT graded: this is not a passing gate.",
+        narrowed.join(" / ")
+    );
+}
+
+/// The `--update` epilogue for the never-pinnable class: a PANIC key is deliberately NOT
+/// written (see [`SnapshotKey::is_pinnable`]), so a re-pin with crashes present must still
+/// exit non-zero — otherwise `--update` would read as having laundered them. `noun` matches
+/// [`Ratchet::write_pinned`]'s; `subject` names the audit's injected thing ("an injected
+/// directive", "a blank in a gap", "a comment in a gap").
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] (after the user-facing message) when `panics > 0`.
+#[cfg(feature = "comment_check")]
+pub(crate) fn report_unpinned_panics(
+    panics: usize,
+    noun: &str,
+    subject: &str,
+) -> Result<(), CliError> {
+    if panics == 0 {
+        return Ok(());
+    }
+    eprintln!(
+        "\n✗ {panics} PANIC {noun}(s) were NOT pinned — {subject} must never crash the \
+         formatter, so the gate will keep failing until they are fixed."
+    );
+    Err(CliError::Failed)
 }
 
 #[cfg(test)]

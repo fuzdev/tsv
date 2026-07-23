@@ -10,6 +10,54 @@ use std::path::{Path, PathBuf};
 
 use crate::cli::CliError;
 
+/// The process-global arming bracket every injection audit wraps around its [`run_pool`]
+/// call: the print-once comment ledger armed (the per-thread ledgers are thread-local, so
+/// arming once covers every worker), optionally the swallow check (`gap_audit` — armed on
+/// the SAME format the ledger rides, no extra format), and the default panic hook
+/// suppressed (the audits provoke panics on purpose — a formatter crash IS a finding — so
+/// the hook's per-panic output is noise).
+///
+/// RAII: `Drop` restores the hook and disarms the flags — including on the early-return
+/// error path out of [`run_pool`], which the hand-rolled bracket this replaces leaked on
+/// (documented as immaterial since nothing formats after a failed run, but structural
+/// correctness is free here). Callers `drop(armed)` explicitly at the point the audit
+/// stops formatting (gap's verify pass formats, so its window is wider), keeping each
+/// audit's disarm point deliberate rather than wherever scope happens to end.
+pub(crate) struct ArmedRun {
+    prev_hook: Option<PanicHook>,
+    swallow: bool,
+}
+
+/// The boxed hook `std::panic::take_hook` hands back — held for the restore on drop.
+type PanicHook = Box<dyn Fn(&std::panic::PanicHookInfo<'_>) + Sync + Send + 'static>;
+
+impl ArmedRun {
+    pub(crate) fn arm(swallow: bool) -> Self {
+        tsv_lang::comment_ledger::set_comment_check(true);
+        if swallow {
+            tsv_lang::doc::swallow::set_swallow_check(true);
+        }
+        let prev_hook = std::panic::take_hook();
+        std::panic::set_hook(Box::new(|_| {}));
+        Self {
+            prev_hook: Some(prev_hook),
+            swallow,
+        }
+    }
+}
+
+impl Drop for ArmedRun {
+    fn drop(&mut self) {
+        if let Some(hook) = self.prev_hook.take() {
+            std::panic::set_hook(hook);
+        }
+        tsv_lang::comment_ledger::set_comment_check(false);
+        if self.swallow {
+            tsv_lang::doc::swallow::set_swallow_check(false);
+        }
+    }
+}
+
 /// Run `per_file` over `files` on a stride-chunked worker pool and return the merged tally.
 ///
 /// `jobs_hint` is the `--jobs N` flag (`None` / `Some(0)` → `available_parallelism`, capped at the
