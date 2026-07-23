@@ -1507,6 +1507,36 @@ Deno.test('instantiation_parens: negative - normal generic usage', () => {
 	assertEquals(match, null);
 });
 
+// ─── template_embedded_verbatim ───────────────────────────────────────────
+
+Deno.test('template_embedded_verbatim: positive - html body collapsed by prettier', () => {
+	const ours = '\tconst t = html`<div>  {{label}}  </div>`;';
+	const prettier = '\tconst t = html`<div>{{label}}</div>`;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('template_embedded_verbatim', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'template_embedded_verbatim');
+	assertEquals(match!.confidence, 'certain');
+});
+
+Deno.test('template_embedded_verbatim: positive - css body expanded by prettier', () => {
+	const ours = '\tconst s = css`.a{color:red}`;';
+	const prettier = '\tconst s = css`\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t`;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('template_embedded_verbatim', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('template_embedded_verbatim: negative - unrecognized tag (no embedded formatting)', () => {
+	// `sql` is not an embedded-language tag prettier reformats, so a diff on a
+	// `sql`…`` template must not be claimed.
+	const ours = '\tconst q = sql`SELECT 1`;';
+	const prettier = '\tconst q = sql`SELECT 2`;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('template_embedded_verbatim', ctx);
+	assertEquals(match, null);
+});
+
 // ─── single_type_param_comma ──────────────────────────────────────────────
 
 Deno.test('single_type_param_comma: positive - bare <T> vs prettier <T,>', () => {
