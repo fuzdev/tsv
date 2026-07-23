@@ -403,6 +403,40 @@ Deno.test('inline_content_block_style: negative - content differs (safety gate b
 	assertEquals(match, null);
 });
 
+Deno.test('inline_content_block_style: positive - break-before, complete open tag dangles at EOL', () => {
+	// The break-before posture (form a): prettier keeps the whole opening tag on the
+	// overflowing text line (`…using <MdnLink …>` at EOL) and dangles only the content;
+	// tsv breaks before the element so it starts a fresh line and collapses inline.
+	// The fuz_ui Redirect/+page.svelte shape. Whitespace-only.
+	const prettier = 'text using <MdnLink path="/a/b">\n\ta meta tag\n</MdnLink>';
+	const ours = 'text using\n<MdnLink path="/a/b">a meta tag</MdnLink>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('inline_content_block_style: positive - break-before, bare tag name dangles (attrs wrap)', () => {
+	// The break-before posture (form b): prettier wraps the void component's attributes,
+	// leaving the bare tag NAME dangling after the text (`…with the <TomeLink` at EOL) and
+	// `/>` on its own line; tsv breaks before it. The fuz_ui icons/logos shape. Whitespace-only.
+	const prettier = 'mounted with the <TomeLink\n\tslug="Svg"\n/>';
+	const ours = 'mounted with the\n<TomeLink slug="Svg" />';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('inline_content_block_style: negative - open tag legitimately starts its own line', () => {
+	// An opening tag that begins its own line (indent-only before `<`, no preceding
+	// text + space) is NOT a break-before dangle — the `\S[ \t]` guard rejects it, so a
+	// plain indentation-only reflow of an already-fresh-line element stays unclaimed.
+	const prettier = '<div>\n\t<span class="x">text</span>\n</div>';
+	const ours = '<div>\n\t\t<span class="x">text</span>\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertEquals(match, null);
+});
+
 // ─── svelte_boundary_ws_trim ────────────────────────────────────────────────
 
 Deno.test('svelte_boundary_ws_trim: positive - fragment-edge run trimmed inside a tag', () => {

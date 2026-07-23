@@ -77,10 +77,28 @@ pub struct DocContext {
     /// [`crate::doc::DocArena::after_element_fold_lead`].
     ///
     /// Scoped to the Svelte text→flow-element boundary fill (a text run whose next sibling is a
-    /// flowing inline element/component, ended with a trailing `line`). Off for every other fill, so
-    /// a small element after text still packs and CSS/value-list fills are unaffected. It re-couples
-    /// the width-driven drop decision to the boundary rule at render position so the space- and
-    /// newline-authored forms converge to one fixed point.
+    /// flowing inline element/component). Off for every other fill, so a small element after text
+    /// still packs and CSS/value-list fills are unaffected. It re-couples the width-driven drop
+    /// decision to the boundary rule at render position so the space- and newline-authored forms
+    /// converge to one fixed point.
+    ///
+    /// **One flag, both boundary shapes**, distinguished only by whether a separator sits between
+    /// the last word and the following element — the fill's own parity routes each to the right
+    /// render case, so the same flag drives both without cross-talk:
+    /// - **space-separated** (`… word <a…>`, a trailing `line`): the element is the fill's Case-2
+    ///   separator target; the whole-flat measurement lands in Case 2's `sep_fits`.
+    /// - **glued** (`… glued<a…>`, no whitespace, no trailing separator): the glued word is the
+    ///   fill's Case-1 last item and the element follows on the render stack; the same whole-flat
+    ///   measurement lands in Case 1's `content_fits`. Without it Case 1 inherits Break mode into
+    ///   the element and short-circuits at its first internal line (wrongly "fits"), welding the
+    ///   word and breaking the element's own content in place. Measuring the following run as a
+    ///   whole flat unit breaks at the whitespace boundary BEFORE the glued word so the whole run
+    ///   (`glued<a>…</a>`) moves to a fresh line together — never splitting the glued boundary,
+    ///   which would inject a rendered space.
+    ///
+    /// A ws-fill also reaches the Case-1 measurement at `is_final_segment` (its last word), but
+    /// there the measured content is a bare word whose only consumer is `should_remeasure`, inert
+    /// for a groupless leaf — so the shared flag stays free of cross-case contamination.
     pub break_before_wide_flow: bool,
 
     /// When set, the fill's FIRST item, if it sits mid-line (right after a small prefix such as a

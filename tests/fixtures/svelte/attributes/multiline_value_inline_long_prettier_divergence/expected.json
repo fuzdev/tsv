@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 163,
+	"end": 164,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "RegularElement",
 				"start": 0,
-				"end": 162,
+				"end": 163,
 				"name": "p",
 				"name_loc": {
 					"start": {
@@ -31,49 +31,49 @@
 						{
 							"type": "Text",
 							"start": 3,
-							"end": 10,
-							"raw": "\n\ttext ",
-							"data": "\n\ttext "
+							"end": 11,
+							"raw": "\n\ttext\n\t",
+							"data": "\n\ttext\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 10,
-							"end": 57,
+							"start": 11,
+							"end": 58,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 2,
-									"column": 7,
-									"character": 11
+									"line": 3,
+									"column": 2,
+									"character": 12
 								},
 								"end": {
-									"line": 2,
-									"column": 11,
-									"character": 15
+									"line": 3,
+									"column": 6,
+									"character": 16
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 18,
-									"end": 36,
+									"start": 19,
+									"end": 37,
 									"name": "data-attr",
 									"name_loc": {
 										"start": {
-											"line": 3,
+											"line": 4,
 											"column": 2,
-											"character": 18
+											"character": 19
 										},
 										"end": {
-											"line": 3,
+											"line": 4,
 											"column": 11,
-											"character": 27
+											"character": 28
 										}
 									},
 									"value": [
 										{
-											"start": 29,
-											"end": 35,
+											"start": 30,
+											"end": 36,
 											"type": "Text",
 											"raw": "a,\n  b",
 											"data": "a,\n  b"
@@ -86,8 +86,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 39,
-										"end": 50,
+										"start": 40,
+										"end": 51,
 										"raw": "\n\t\tinline\n\t",
 										"data": "\n\t\tinline\n\t"
 									}
@@ -96,8 +96,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 57,
-							"end": 158,
+							"start": 58,
+							"end": 159,
 							"raw": " text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14\n\ttext15_ x\n",
 							"data": " text1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14\n\ttext15_ x\n"
 						}
