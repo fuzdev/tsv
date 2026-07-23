@@ -71,19 +71,34 @@ impl<'a> Printer<'a> {
     // Union Types
     //
 
-    /// The leading line comments inside a **redundant** parenthesized union member —
-    /// one whose parens the comment-free rule strips (`(b)` → `b`,
-    /// `!type_needs_parens_in_union_or_intersection`), so the comment cannot stay
-    /// "inside" parens that don't survive. The relocatable-run analysis (≥1 comment,
-    /// all line, no block/trailing in the shell; `((// c⏎ b))` nesting peeled) is the
-    /// shared [`Self::stripped_paren_leading_line_comments`]; this only adds the
-    /// union-specific gate that a **retained**-paren member (union / intersection /
-    /// function / conditional) keeps its comment inside, returning empty for those.
-    fn stripped_redundant_paren_leading_line_comments(&self, t: &TSType<'_>) -> CommentVec<'_> {
-        if type_needs_parens_in_union_or_intersection(t) {
+    /// The FULL leading comment run (block + line) inside a **redundant** parenthesized
+    /// union member — one whose parens the comment-free rule strips (`(b)` → `b`,
+    /// `!type_needs_parens_in_union_or_intersection`), so the comment cannot stay "inside"
+    /// parens that don't survive — whose leading gap holds a **line** comment. Covers the
+    /// pure-line (`(// c⏎ b)`), mixed (`(/* b */ // c⏎ b)`), and trailing (`(// c⏎ b /* t */)`)
+    /// shells uniformly: the whole run hoists losslessly — the leading block + line each on
+    /// their own line before the `| ` (this run, via [`Self::push_own_line_comment_run`]),
+    /// the trailing comment appended to the member via [`Self::with_stripped_paren_trailing`].
+    /// Declines a **retained**-paren member (union / intersection / function / conditional —
+    /// its comment stays inside, the arms further down) and a non-paren member. Requires a
+    /// **line** comment in the leading gap: a block-only (`(/* b */ b)`) or comment-free gap
+    /// keeps its block inline and is already idempotent, so it returns empty (the general
+    /// member arm). Peels every redundant nesting layer (`((// c⏎ b))` → `b`) to match the
+    /// detection window. The narrow shared [`Self::stripped_paren_leading_line_comments`]
+    /// (line-only, no block/trailing) still serves the conditional-`extends` and
+    /// intersection-first-member callers.
+    fn stripped_redundant_paren_member_leading_run(&self, t: &TSType<'_>) -> CommentVec<'_> {
+        if type_needs_parens_in_union_or_intersection(t) || !matches!(t, TSType::Parenthesized(_)) {
             return smallvec![];
         }
-        self.stripped_paren_leading_line_comments(t)
+        let inner = unwrap_parenthesized(t);
+        let leading: CommentVec<'_> =
+            comments_to_emit_in_range(self.comments, t.span().start, inner.span().start).collect();
+        if leading.iter().any(|c| !c.is_block) {
+            leading
+        } else {
+            smallvec![]
+        }
     }
 
     /// Push each comment on its own line (comment + `hardline`), the layout a
@@ -545,10 +560,14 @@ impl<'a> Printer<'a> {
             // A LATER member that is a REDUNDANT parenthesized type (`a | (// c⏎ b)`): its
             // leading line comment can't stay "inside" parens the comment-free rule strips,
             // so it leads the member on its own line before the `| ` (emitted below,
-            // rendered from the stripped inner). See the helper for the full rule; empty for
-            // a retained-paren member (whose comment stays inside, the arms further down).
+            // rendered from the stripped inner). The wide collector also hoists a mixed
+            // (`(/* b */ // c⏎ b)`) or trailing (`(// c⏎ b /* t */)`) run losslessly: the
+            // leading block + line each on their own line here, the trailing comment
+            // appended to the member below. Empty for a retained-paren member (whose comment
+            // stays inside, the arms further down) or a block-only leading gap (stays
+            // inline).
             let stripped_paren_leading = if i > 0 {
-                self.stripped_redundant_paren_leading_line_comments(t)
+                self.stripped_redundant_paren_member_leading_run(t)
             } else {
                 smallvec![]
             };
@@ -652,17 +671,20 @@ impl<'a> Printer<'a> {
             // `is_paren_union_member` arm of `build_union_member_offset_doc`). See
             // union_intersection_retained_paren_leading_line_comment_prettier_divergence.
             if !stripped_paren_leading.is_empty() {
-                // Redundant-paren member: its leading line comment was already emitted
-                // before the `| ` above, so render the member as its fully STRIPPED inner —
-                // building `t` (the parens) instead would emit the comment a second time.
+                // Redundant-paren member: its leading run was already emitted before the
+                // `| ` above, so render the member as its fully STRIPPED inner — building
+                // `t` (the parens) instead would emit the comment a second time.
                 // `unwrap_parenthesized` peels every redundant layer (`((// c⏎ b))` → `b`),
                 // matching the detection window. `first_leading` is empty here (later
                 // member), extended only to keep the consume-by-move invariant the arm
                 // chain relies on.
                 parts.extend(first_leading);
-                parts.push(
-                    self.build_union_member_offset_doc(unwrap_parenthesized(t), member_parens),
-                );
+                let inner = unwrap_parenthesized(t);
+                let member_doc = self.build_union_member_offset_doc(inner, member_parens);
+                // A trailing comment lifted from the shell (`(// c⏎ b /* t */)`) trails the
+                // member inline (`| b /* t */`) — a type position, so `defer = false`. A
+                // no-op for the pure-line / mixed cases (no comment in the trailing gap).
+                parts.push(self.with_stripped_paren_trailing(member_doc, t, inner, false));
             } else if let TSType::Parenthesized(p) = t
                 && let TSType::Union(inner_union) = p.type_annotation
                 && self.paren_has_leading_line_comment(p)
