@@ -1,0 +1,274 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 93,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 92,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 83,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 10,
+					"end": 51,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 2,
+							"column": 42
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 16,
+							"end": 50,
+							"loc": {
+								"start": {
+									"line": 2,
+									"column": 7
+								},
+								"end": {
+									"line": 2,
+									"column": 41
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 16,
+								"end": 17,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 7
+									},
+									"end": {
+										"line": 2,
+										"column": 8
+									}
+								},
+								"name": "t"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 20,
+								"end": 50,
+								"loc": {
+									"start": {
+										"line": 2,
+										"column": 11
+									},
+									"end": {
+										"line": 2,
+										"column": 41
+									}
+								},
+								"tag": {
+									"type": "Identifier",
+									"start": 20,
+									"end": 24,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 11
+										},
+										"end": {
+											"line": 2,
+											"column": 15
+										}
+									},
+									"name": "html"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 24,
+									"end": 50,
+									"loc": {
+										"start": {
+											"line": 2,
+											"column": 15
+										},
+										"end": {
+											"line": 2,
+											"column": 41
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 25,
+											"end": 49,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 16
+												},
+												"end": {
+													"line": 2,
+													"column": 40
+												}
+											},
+											"value": {
+												"raw": "<div>  {{label}}  </div>",
+												"cooked": "<div>  {{label}}  </div>"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 53,
+					"end": 82,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 59,
+							"end": 81,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 59,
+								"end": 60,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "s"
+							},
+							"init": {
+								"type": "TaggedTemplateExpression",
+								"start": 63,
+								"end": 81,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 29
+									}
+								},
+								"tag": {
+									"type": "Identifier",
+									"start": 63,
+									"end": 66,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 11
+										},
+										"end": {
+											"line": 3,
+											"column": 14
+										}
+									},
+									"name": "css"
+								},
+								"quasi": {
+									"type": "TemplateLiteral",
+									"start": 66,
+									"end": 81,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 14
+										},
+										"end": {
+											"line": 3,
+											"column": 29
+										}
+									},
+									"expressions": [],
+									"quasis": [
+										{
+											"type": "TemplateElement",
+											"start": 67,
+											"end": 80,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 15
+												},
+												"end": {
+													"line": 3,
+													"column": 28
+												}
+											},
+											"value": {
+												"raw": ".a{color:red}",
+												"cooked": ".a{color:red}"
+											},
+											"tail": true
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

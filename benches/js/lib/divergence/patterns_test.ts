@@ -1507,6 +1507,79 @@ Deno.test('instantiation_parens: negative - normal generic usage', () => {
 	assertEquals(match, null);
 });
 
+// ─── template_embedded_verbatim ───────────────────────────────────────────
+
+Deno.test('template_embedded_verbatim: positive - html body collapsed by prettier', () => {
+	const ours = '\tconst t = html`<div>  {{label}}  </div>`;';
+	const prettier = '\tconst t = html`<div>{{label}}</div>`;';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('template_embedded_verbatim', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'template_embedded_verbatim');
+	assertEquals(match!.confidence, 'certain');
+});
+
+Deno.test('template_embedded_verbatim: positive - css body expanded by prettier', () => {
+	const ours = '\tconst s = css`.a{color:red}`;';
+	const prettier = '\tconst s = css`\n\t\t.a {\n\t\t\tcolor: red;\n\t\t}\n\t`;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('template_embedded_verbatim', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('template_embedded_verbatim: negative - unrecognized tag (no embedded formatting)', () => {
+	// `sql` is not an embedded-language tag prettier reformats, so a diff on a
+	// `sql`…`` template must not be claimed.
+	const ours = '\tconst q = sql`SELECT 1`;';
+	const prettier = '\tconst q = sql`SELECT 2`;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('template_embedded_verbatim', ctx);
+	assertEquals(match, null);
+});
+
+// ─── field_key_unquote ────────────────────────────────────────────────────
+
+Deno.test('field_key_unquote: positive - annotated field key unquoted', () => {
+	// The corpus shape (typescript/class/quoted-property.ts): prettier keeps the class
+	// field key quoted, tsv unquotes it.
+	const ours = 'class User {\n\tusername: string;\n}';
+	const prettier = "class User {\n\t'username': string;\n}";
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('field_key_unquote', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'field_key_unquote');
+	assertEquals(match!.confidence, 'certain');
+});
+
+Deno.test('field_key_unquote: positive - init + static field keys unquoted', () => {
+	const ours = 'class C {\n\tx = 1;\n\tstatic total = 3;\n}';
+	const prettier = "class C {\n\t'x' = 1;\n\tstatic 'total' = 3;\n}";
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('field_key_unquote', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('field_key_unquote: negative - enum key (reverse direction)', () => {
+	// The enum case is the OPPOSITE direction — prettier unquotes the enum member key,
+	// tsv keeps it quoted (`'b'` is a value/initializer, never line-initial). Must not be
+	// claimed, or a real enum-key gap would be masked.
+	const ours = "enum E {\n\t'b' = 'b'\n}";
+	const prettier = "enum E {\n\tb = 'b'\n}";
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('field_key_unquote', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('field_key_unquote: negative - field value change is not a key unquote', () => {
+	// The field KEY (`greeting`) is unquoted on both sides; only a quoted VALUE differs.
+	// The detector keys on the member-line-initial key, never a value, so this is not claimed.
+	const ours = "class C {\n\tgreeting = 'hi';\n}";
+	const prettier = "class C {\n\tgreeting = 'hello';\n}";
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('field_key_unquote', ctx);
+	assertEquals(match, null);
+});
+
 // ─── single_type_param_comma ──────────────────────────────────────────────
 
 Deno.test('single_type_param_comma: positive - bare <T> vs prettier <T,>', () => {

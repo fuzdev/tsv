@@ -2849,6 +2849,107 @@ const jsdoc_type_cast_parens: DivergencePattern = {
 	},
 };
 
+const template_embedded_verbatim: DivergencePattern = {
+	id: 'template_embedded_verbatim',
+	description: 'Tagged/decorator template body kept verbatim; prettier reformats the embedded language',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['TypeScript: Template Literals'],
+	fixtures: [
+		'typescript/expressions/literals/template/embedded_language_verbatim_prettier_divergence',
+	],
+	detect(ctx) {
+		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
+
+		// Prettier's `embeddedLanguageFormatting` reformats a tagged template whose tag it
+		// recognizes as an embedded language (html/css/graphql/gql) — collapsing embedded
+		// HTML whitespace, expanding embedded CSS onto its own lines. tsv keeps the body
+		// verbatim. Prettier-side signal (this is a prettier-side-only divergence — tsv does
+		// nothing): prettier reflowed a recognized-tag template, and ours kept a one-line
+		// `tag`…`` form prettier did not reproduce.
+		const embedded_tag_template = /\b(?:html|css|graphql|gql)`/;
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			const prettier_reflowed = hunk.removed_lines.some((l) => embedded_tag_template.test(l));
+			const ours_verbatim = hunk.added_lines.some(
+				(l) => embedded_tag_template.test(l) && !hunk.removed_lines.includes(l),
+			);
+			return prettier_reflowed && ours_verbatim;
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'template_embedded_verbatim',
+				confidence: 'certain',
+				hunk_indices,
+				reason:
+					'Tagged-template body kept verbatim (prettier reformats the embedded html/css/graphql language; tsv does no embedded formatting)',
+			};
+		}
+		return null;
+	},
+};
+
+const field_key_unquote: DivergencePattern = {
+	id: 'field_key_unquote',
+	description: 'Class field key unquoted; prettier keeps a valid-identifier field key quoted',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['TypeScript'],
+	fixtures: ['typescript/declarations/class/field_key_unquote_prettier_divergence'],
+	// Unquoting only drops the surrounding `'`, a char SAFETY already excludes, so this
+	// pattern never moves the semantic char count — `may_alter_char_frequency` stays false.
+	detect(ctx) {
+		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
+
+		// tsv unquotes a valid-identifier CLASS FIELD key (`'x' = 1` → `x = 1`, `'count': T`
+		// → `count: T`, `static 'total'` → `static total`); prettier unquotes class
+		// method/accessor keys but keeps FIELD keys quoted. Object / type-literal / interface
+		// keys agree (both unquote → no hunk), so a prettier-quoted → ours-unquoted key hunk is
+		// only ever this class-field case.
+		//
+		// The quoted key is anchored at member-line start (after leading whitespace + optional
+		// field modifiers), so a quoted *value* (`b = 'b'`, `const a = 'x'`) and the
+		// reverse-direction enum case (prettier unquotes an enum key, tsv keeps it quoted —
+		// its `'b'` is never line-initial) are excluded. ASCII-ident only: the astral ES2015
+		// key (`'𐊧'`) is the separate `property_key_es2015_ident` divergence; numeric /
+		// non-ident keys (`'0a'`, `'x-y'`, `'0'`) stay quoted in both. The quoted key is
+		// followed by a field terminator — `=` (init), `:` (annotation), `?` (optional), or a
+		// bare `;` / end (field declaration).
+		const field_modifiers =
+			'(?:(?:static|readonly|public|private|protected|declare|abstract|accessor|override)\\s+)*';
+		const quoted_field_key = new RegExp(
+			`^\\s*${field_modifiers}'([A-Za-z_$][A-Za-z0-9_$]*)'\\s*(?:[=:?;]|$)`,
+		);
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			for (const p_line of hunk.removed_lines) {
+				const m = quoted_field_key.exec(p_line);
+				if (!m) continue;
+				const ident = m[1];
+				// The same field key, unquoted, must appear line-initial on an ours line (the
+				// quoted form gone) — proving tsv dropped the quotes rather than some unrelated
+				// edit removing the line.
+				const bare = new RegExp(`^\\s*${field_modifiers}${ident}\\s*(?:[=:?;]|$)`);
+				const unquoted_on_ours = hunk.added_lines.some(
+					(o) => bare.test(o) && !o.includes(`'${ident}'`),
+				);
+				if (unquoted_on_ours) return true;
+			}
+			return false;
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'field_key_unquote',
+				confidence: 'certain',
+				hunk_indices,
+				reason:
+					'Class field key unquoted (tsv unquotes a valid-identifier class field key; prettier keeps it quoted)',
+			};
+		}
+		return null;
+	},
+};
+
 // ─── Pattern Registry ───────────────────────────────────────────────────────
 //
 // Ordered: specific → broad. Specific patterns run first for best explanations.
@@ -2878,6 +2979,8 @@ export const PATTERNS: DivergencePattern[] = [
 
 	// 3. Feature-specific patterns
 	template_literal_width,
+	template_embedded_verbatim,
+	field_key_unquote,
 	block_expression_logical,
 	single_specifier_import,
 	member_expression_call,
