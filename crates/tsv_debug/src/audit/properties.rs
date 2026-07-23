@@ -20,9 +20,16 @@
 //! The shared property set is still growing: [`f1_check`] now lives here — the
 //! core that (wrapped in `catch_unwind` by its callers) drives the no-panic
 //! guard, the F1 idempotency fixed point, the reparse-skeleton compare, and the
-//! leaf-conservation check — and `fuzz` consumes it (as does `blank_audit`). Still
-//! pending: `roundtrip_audit`'s phase-1 reparse gate has not yet migrated onto the
-//! substrate.
+//! leaf-conservation check — and `fuzz` consumes it (as does `blank_audit`).
+//! `roundtrip_audit` shares the reparse primitives directly
+//! ([`tsv_parse_to_value`] / [`structurally_equivalent`] /
+//! [`leaf_conservation_diff`]); its phase-1 verdict orchestration stays
+//! **deliberately separate** rather than reusing [`f1_check`], because it keeps
+//! the verbose AST diff (which [`f1_check`] discards) and must *not* run the
+//! idempotency step — folding it onto [`f1_check`] would force a diff-return +
+//! skip-idempotency toggle onto `fuzz` / `blank_audit`, which want neither. If
+//! this is ever unified, the non-degrading shape is a smaller shared
+//! reparse-compare core that both phase-1 and [`f1_check`] call.
 
 use std::collections::BTreeMap;
 
