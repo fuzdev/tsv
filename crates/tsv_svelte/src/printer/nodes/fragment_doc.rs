@@ -282,6 +282,14 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
+            // Consume the "previous text trimmed a boundary space" signal once per iteration:
+            // snapshot it and clear the field, so no dispatch arm can leak a stale flag by
+            // forgetting to reset — the class of bug this whole path has repeatedly hit. Only
+            // `handle_text_child` re-arms the field (for the *next* sibling); the block and inline
+            // arms are the two readers and take the snapshot by value. The early `continue` paths
+            // above run before this and intentionally carry the flag forward untouched.
+            let prev_text_ws = std::mem::take(&mut handle_whitespace_of_prev_text);
+
             if matches!(node, FragmentNode::Text(_)) {
                 self.handle_text_child(
                     trimmed_nodes,
@@ -303,7 +311,7 @@ impl<'a> Printer<'a> {
                     i,
                     force_break,
                     &mut child_docs,
-                    &mut handle_whitespace_of_prev_text,
+                    prev_text_ws,
                 );
             } else if multiline && is_control_flow_block(node) {
                 // Control-flow block (`{#if}`/`{#each}`/`{#await}`/`{#key}`/`{#snippet}`) in the
@@ -323,7 +331,6 @@ impl<'a> Printer<'a> {
                         child_docs.push(element_doc);
                     }
                     child_docs.push(block_doc);
-                    handle_whitespace_of_prev_text = false;
                 } else {
                     // No dangle. A block the root marked as part of a SINGLE-LINE inline run builds
                     // in inline context (its long body inner-breaks rather than dropping to its own
@@ -343,7 +350,6 @@ impl<'a> Printer<'a> {
                     if let Some(node_doc) = node_doc {
                         child_docs.push(node_doc);
                     }
-                    handle_whitespace_of_prev_text = false;
                 }
             } else if is_inline_content(node) {
                 // Axis-3 element→element sibling-`>` dangle ("G2"), over a maximal glued RUN: when
@@ -356,15 +362,15 @@ impl<'a> Printer<'a> {
                 // elements are skipped via `glued_run_consumed_until`.
                 if let Some((run_doc, run_end)) = self.try_build_glued_element_run(trimmed_nodes, i)
                 {
-                    child_docs.push(run_doc);
+                    // Honor a trimmed boundary space from the previous text node exactly as
+                    // the single-element path does — the run leads with `group([line, …])` so
+                    // an inter-sibling space before a glued run (`</span>` ` ` `<br/><br/>`)
+                    // renders (a space when it fits, a break when the fill wraps) rather than
+                    // being dropped.
+                    self.push_inline_child_doc(&mut child_docs, run_doc, prev_text_ws);
                     glued_run_consumed_until = run_end + 1;
-                    handle_whitespace_of_prev_text = false;
                 } else {
-                    self.handle_inline_child(
-                        node,
-                        &mut child_docs,
-                        &mut handle_whitespace_of_prev_text,
-                    );
+                    self.handle_inline_child(node, &mut child_docs, prev_text_ws);
                 }
             } else {
                 // Other nodes (comments, `{@const}`/`{@debug}`/`{const}`/`{let}` tags).
@@ -376,7 +382,6 @@ impl<'a> Printer<'a> {
                 {
                     child_docs.push(node_doc);
                 }
-                handle_whitespace_of_prev_text = false;
             }
         }
 
@@ -832,20 +837,32 @@ impl<'a> Printer<'a> {
         &self,
         node: &FragmentNode<'_>,
         child_docs: &mut DocBuf,
-        handle_whitespace_of_prev_text: &mut bool,
+        prev_text_ws: bool,
     ) {
-        let d = self.d();
         if let Some(node_doc) = self.build_fragment_node_doc(node) {
-            if *handle_whitespace_of_prev_text {
-                // Previous text had trailing whitespace - wrap element with leading line
-                let line = d.line();
-                let inner = d.concat(&[line, node_doc]);
-                child_docs.push(d.group(inner));
-            } else {
-                child_docs.push(node_doc);
-            }
+            self.push_inline_child_doc(child_docs, node_doc, prev_text_ws);
         }
-        *handle_whitespace_of_prev_text = false;
+    }
+
+    /// Push an already-built inline child doc, honoring a pending trimmed-boundary space
+    /// from the previous text node. When `prev_text_ws` is set (the prev text trimmed a
+    /// space-only boundary and deferred the separator to the next sibling — prettier's
+    /// `handleWhitespaceOfPrevTextNode`), lead with a collapsible `line` inside a group: a
+    /// space when the fill fits, a break when it wraps.
+    ///
+    /// Shared by the single-element path (`handle_inline_child`) and the glued-element-run
+    /// path in `build_nodes_doc`, so a trimmed boundary space is never dropped before a
+    /// byte-glued run (`</span>` ` ` `<br/><br/>`) — the single-sibling case already worked
+    /// because a run of one falls through to `handle_inline_child`. The caller snapshots and
+    /// clears the flag (`prev_text_ws`), so this only reads it.
+    fn push_inline_child_doc(&self, child_docs: &mut DocBuf, node_doc: DocId, prev_text_ws: bool) {
+        if prev_text_ws {
+            let d = self.d();
+            let inner = d.concat(&[d.line(), node_doc]);
+            child_docs.push(d.group(inner));
+        } else {
+            child_docs.push(node_doc);
+        }
     }
 
     /// Whether a node is a block-level *element* — the `handleBlockChild` set in
@@ -872,7 +889,7 @@ impl<'a> Printer<'a> {
     ///
     /// - **before** when the previous sibling exists, is not itself a block element, and is
     ///   either a non-text node or a text whose boundary whitespace was consumed (the
-    ///   `handle_whitespace_of_prev_text` flag) or trimmed away (no longer ends with ws).
+    ///   `prev_text_ws` snapshot) or trimmed away (no longer ends with ws).
     /// - **after** when the next sibling exists and is either a non-text node, or content
     ///   text (or an empty text immediately followed by an inline element) that does **not**
     ///   start with a linebreak — a leading-linebreak text supplies its own break.
@@ -882,7 +899,7 @@ impl<'a> Printer<'a> {
         i: usize,
         force_break: bool,
         child_docs: &mut DocBuf,
-        handle_whitespace_of_prev_text: &mut bool,
+        prev_text_ws: bool,
     ) {
         let d = self.d();
         let sep = || {
@@ -898,7 +915,7 @@ impl<'a> Printer<'a> {
         let break_before = match prev {
             Some(p) if !self.is_block_element_node(p) => match p {
                 FragmentNode::Text(t) => {
-                    *handle_whitespace_of_prev_text
+                    prev_text_ws
                         || !t
                             .raw(self.source)
                             .ends_with(|c: char| c.is_ascii_whitespace())
@@ -929,8 +946,6 @@ impl<'a> Printer<'a> {
         if break_after {
             child_docs.push(sep());
         }
-
-        *handle_whitespace_of_prev_text = false;
     }
 
     /// Build a doc for a node sequence in multiline / block context.

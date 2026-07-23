@@ -1980,7 +1980,7 @@ const forced_continuation_indent: DivergencePattern = {
 const inline_content_block_style: DivergencePattern = {
 	id: 'inline_content_block_style',
 	description:
-		'tsv lays out inline element/block content block-style (tags intact, content on its own line); prettier dangles the tag delimiters / hugs the content',
+		'tsv lays out inline element/block content block-style (tags intact, content on its own line) and breaks before an inline element whose text-line overflows so its opening tag starts a fresh line; prettier dangles the tag delimiters / hugs the content / dangles the opening tag',
 	languages: ['svelte'],
 	conformance_sections: ['Svelte: Inline content block-style', 'Svelte: Blocks'],
 	fixtures: [
@@ -1989,6 +1989,9 @@ const inline_content_block_style: DivergencePattern = {
 		'svelte/elements/block_multiline_attrs_content_hug_prettier_divergence',
 		'svelte/elements/inline_if_sibling_fill_long_prettier_divergence',
 		'svelte/elements/inline_content_hug_long_prettier_divergence',
+		'svelte/elements/inline_break_before_wrap_long_prettier_divergence',
+		'svelte/elements/inline_break_before_component_long_prettier_divergence',
+		'svelte/elements/inline_break_before_void_long_prettier_divergence',
 	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
@@ -2040,10 +2043,27 @@ const inline_content_block_style: DivergencePattern = {
 		// no block tag on a changed line at all.
 		const block_head_at_eol = /\{#(?:if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
 		const block_branch_alone = /^[ \t]*\{[:/](?:else|then|catch|if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
+		// The break-before posture (§"The rule reaches the element's own *position*"): an
+		// inline element preceded by same-line text that must wrap starts a FRESH line in
+		// ours, where prettier dangles the OPENING tag on the overflowing text line. The
+		// mirror of `dangle_close`, on the PRETTIER (removed) side — a `<tag` that begins
+		// after same-line text + a space (the "dangle after a space" the rule forbids),
+		// at EOL. Two prettier forms, both absent from ours (which broke before the tag):
+		//   (a) the COMPLETE open tag trails the text and only the content/close dangle
+		//       (`…using <MdnLink path="…">` at EOL — the collapse/block-style sub-shape); or
+		//   (b) the open tag's ATTRIBUTES wrap, so the bare tag NAME trails the text
+		//       (`…with the <TomeLink` at EOL) and `>`/`/>` lands on its own line.
+		// The leading `\S[ \t]` (text + one space before `<`) is what keeps this off the
+		// rejected broad "open-tag at line start" markers: an element that legitimately
+		// begins its own line is indent-only before `<` and never matches. `[A-Za-z]`
+		// after `<` excludes a closing `</tag`; the tag-name class admits `:`/`.` /`-`
+		// (`<svelte:element`, `<Foo.Bar`, custom elements) like the dangle markers above.
+		const dangle_open_tag_after_text = /\S[ \t]<[A-Za-z][\w.:-]*(?:[ \t][^<>]*>)?[ \t]*$/;
 		let has_signature = false;
 		for (const hunk of ctx.hunks) {
 			if (
 				hunk.removed_lines.concat(hunk.added_lines).some((l) => dangle_close.test(l) || dangle_open.test(l)) ||
+				hunk.removed_lines.some((l) => dangle_open_tag_after_text.test(l)) ||
 				hunk.added_lines.some(
 					(l) => block_head_alone.test(l) || block_head_at_eol.test(l) || block_branch_alone.test(l),
 				)
@@ -2062,7 +2082,7 @@ const inline_content_block_style: DivergencePattern = {
 			confidence: 'likely',
 			hunk_indices: ctx.hunks.map((h) => h.index),
 			reason:
-				'inline/block content laid out block-style (tags intact, content on its own line); prettier dangles the tag delimiters',
+				'inline/block content laid out block-style (tags intact, content on its own line), or an inline element broken before onto a fresh line; prettier dangles the tag delimiters / dangles the opening tag',
 		};
 	},
 };
