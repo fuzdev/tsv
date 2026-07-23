@@ -4,7 +4,7 @@
 // - Type parameter declarations: `<T, U extends V = W>`
 // - Type parameter instantiation (type arguments): `<T, U>`
 
-use super::helpers::is_simple_type_arg;
+use super::helpers::{is_simple_type_arg, unwrap_parenthesized};
 use super::{BlankRule, CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
 use crate::printer::layout::fluid_after_operator;
@@ -303,18 +303,19 @@ impl<'a> Printer<'a> {
         let mut prev_end = param.name.span.end;
 
         if let Some(constraint) = &param.constraint {
-            // If the constraint is `(// leading\n T)`, treat the leading line
-            // comment inside the parens as if it were between `extends` and the
-            // constraint so it forces the indent-and-break layout (matching
-            // prettier's paren stripping).
-            let (value_search_end, value_type): (u32, &TSType<'_>) = if has_comments
-                && let TSType::Parenthesized(p) = constraint
-                && self.paren_has_leading_line_comment(p)
-            {
-                (p.type_annotation.span().start, p.type_annotation)
-            } else {
-                (constraint.span().start, constraint)
-            };
+            // If the constraint is `(// leading\n T)` — or the double-nested
+            // `((// leading\n T))` — treat the leading line comment inside the parens
+            // as if it were between `extends` and the constraint so it forces the
+            // indent-and-break layout (matching prettier's paren stripping). The deep
+            // window unwraps every redundant layer; a shallow one-level window missed
+            // a comment nested one paren deeper (non-idempotent).
+            let (value_search_end, value_type): (u32, &TSType<'_>) =
+                if has_comments && self.stripped_paren_has_leading_line_comment(constraint) {
+                    let inner = unwrap_parenthesized(constraint);
+                    (inner.span().start, inner)
+                } else {
+                    (constraint.span().start, constraint)
+                };
 
             // Find `extends` keyword between name and constraint. A `TSTypeParameter`
             // constraint is always spelled `extends` — mapped-type `[K in T]` keys use

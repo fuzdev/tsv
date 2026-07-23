@@ -488,9 +488,14 @@ impl<'a> Printer<'a> {
     }
 
     /// Returns true if there's a line comment between `(` and the inner type
-    /// of a parenthesized type (e.g., `(// leading\n T)`). Used by every
-    /// printer that strips parens around a type to detect when the inner
-    /// line comment needs to be relocated.
+    /// of a parenthesized type (e.g., `(// leading\n T)`).
+    ///
+    /// ⚠️ **Shallow — checks only THIS paren's own one-level gap.** Correct only
+    /// when the caller retains this exact paren (the `TSType::Union(_)`-guarded
+    /// paren-union member callers). For a paren the caller will STRIP — where a
+    /// double-nested `((// c\n T))` hides the comment one layer deeper, between the
+    /// two `(`s this window never reaches — use the deep
+    /// [`Self::stripped_paren_has_leading_line_comment`] instead.
     pub(in crate::printer) fn paren_has_leading_line_comment(
         &self,
         p: &TSParenthesizedType<'_>,
@@ -498,20 +503,77 @@ impl<'a> Printer<'a> {
         self.has_line_comments_between(p.span.start + 1, p.type_annotation.span().start)
     }
 
-    /// Collect the line comments between `(` and the inner type of a
-    /// parenthesized type. Block comments are excluded — relocation paths
-    /// only apply to line comments.
-    pub(in crate::printer) fn paren_leading_line_comments(
+    // TODO: an adjacent, deeper bug class remains unfixed — the keyword→value hang
+    // positions (`as`/`satisfies` cast, `: T` return / annotation, mapped-type value,
+    // type-parameter `=` default, predicate `is`) gate on `comments_force_own_line_between`
+    // over the OUTER paren, not this deep window, so `((// c\n X))` — and even the single
+    // `(// c\n X)` — places non-idempotently there. Those sites build the value via
+    // `build_type_doc(paren)` (no paren-strip), so the fix is a separate, larger change,
+    // not just routing through the deep helper below.
+
+    /// Deep analog of [`Self::paren_has_leading_line_comment`]: does a possibly
+    /// multiply-nested redundant paren shell (`((// c\n X))`) hold a **relocatable**
+    /// leading line-comment run — one it is safe to hoist while stripping the shell?
+    /// True exactly when [`Self::stripped_paren_leading_line_comments`] returns a run.
+    ///
+    /// This is the predicate every caller that will **strip** the paren layers wants:
+    /// the comment can't stay "inside" parens that don't survive, so it must relocate
+    /// with the strip. Using the shallow window here was the bug — a double-nested
+    /// paren's comment fell between the two `(`s and the caller relocated nothing,
+    /// placing it non-idempotently. Mirrors `build_union_type_doc`'s
+    /// `has_paren_inner_leading_line_comments` router probe.
+    pub(in crate::printer) fn stripped_paren_has_leading_line_comment(
         &self,
-        p: &TSParenthesizedType<'_>,
+        ty: &TSType<'_>,
+    ) -> bool {
+        // Fail-fast on the cheap gates (this runs unconditionally, 3× per conditional
+        // type): a non-paren, or a paren with no leading line comment, never allocates
+        // the collector's `CommentVec`. Both gates are implied by a non-empty run, so
+        // adding them can't change the result — only skip the collect + trailing scan.
+        matches!(ty, TSType::Parenthesized(_))
+            && self.has_line_comments_between(
+                ty.span().start + 1,
+                unwrap_parenthesized(ty).span().start,
+            )
+            && !self.stripped_paren_leading_line_comments(ty).is_empty()
+    }
+
+    /// Collect the leading line-comment run in a stripped paren shell — the deep-window
+    /// collector paired with [`Self::stripped_paren_has_leading_line_comment`]. Scans
+    /// the whole discarded shell, from the OUTERMOST `(` to the fully-unwrapped inner
+    /// type's start (`unwrap_parenthesized`), where the shallow predicate sees only one
+    /// paren's own gap.
+    ///
+    /// Returns the run ONLY when stripping the shell would relocate it losslessly: the
+    /// leading gap holds ≥1 comment, ALL line comments, AND there is no comment in the
+    /// trailing gap between the inner type and the outermost `)`. A block comment in
+    /// the leading gap, or any trailing comment, would be silently DROPPED by the
+    /// stripped-inner render the caller uses — so the run is declined (empty), and the
+    /// caller builds the parenthesized type normally, preserving every comment in
+    /// place. Mirrors [`Self::stripped_redundant_paren_leading_line_comments`] (its
+    /// union analog), minus the union-specific redundancy check the caller's context
+    /// already implies. Empty when `ty` is not a parenthesized type.
+    pub(in crate::printer) fn stripped_paren_leading_line_comments(
+        &self,
+        ty: &TSType<'_>,
     ) -> CommentVec<'_> {
-        comments_to_emit_in_range(
-            self.comments,
-            p.span.start + 1,
-            p.type_annotation.span().start,
-        )
-        .filter(|c| !c.is_block)
-        .collect()
+        if !matches!(ty, TSType::Parenthesized(_)) {
+            return smallvec![];
+        }
+        let inner = unwrap_parenthesized(ty);
+        let lead: CommentVec<'_> =
+            comments_to_emit_in_range(self.comments, ty.span().start + 1, inner.span().start)
+                .collect();
+        // Non-empty + all line comments ⇒ ≥1 leading line comment and no block comment
+        // in the leading gap; the trailing check rules out a comment between the inner
+        // and the outermost `)`.
+        if !lead.is_empty()
+            && lead.iter().all(|c| !c.is_block)
+            && !self.has_comments_to_emit_between(inner.span().end, ty.span().end - 1)
+        {
+            return lead;
+        }
+        smallvec![]
     }
 
     /// Build a complete import type: the `import(<specifier>)` call plus its

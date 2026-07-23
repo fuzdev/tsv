@@ -13,7 +13,7 @@ use super::helpers::{
     unwrap_parenthesized,
 };
 use super::{CommentFilter, CommentSpacing, Printer};
-use crate::ast::internal::{TSIntersectionType, TSParenthesizedType, TSType, TSUnionType};
+use crate::ast::internal::{TSIntersectionType, TSType, TSUnionType};
 use crate::printer::CommentVec;
 use crate::printer::LeadingGlue;
 use crate::printer::analysis::has_newline_after_position;
@@ -74,33 +74,16 @@ impl<'a> Printer<'a> {
     /// The leading line comments inside a **redundant** parenthesized union member —
     /// one whose parens the comment-free rule strips (`(b)` → `b`,
     /// `!type_needs_parens_in_union_or_intersection`), so the comment cannot stay
-    /// "inside" parens that don't survive — but ONLY when the paren shell holds
-    /// nothing else: no block comment in the leading gap, no comment between the
-    /// inner and `)`. Those extra comments would be dropped by the stripped-inner
-    /// render the caller uses, so the guard keeps this to the exact case a later
-    /// member's leading line comment leads it on its own line before the `| `
-    /// (`build_union_type_doc_with_line_comments`). Empty for a retained-paren member
-    /// (union / intersection / function / conditional), whose comment stays inside.
-    /// `unwrap_parenthesized` peels every redundant layer, so nested `((// c⏎ b))` is
-    /// covered too.
+    /// "inside" parens that don't survive. The relocatable-run analysis (≥1 comment,
+    /// all line, no block/trailing in the shell; `((// c⏎ b))` nesting peeled) is the
+    /// shared [`Self::stripped_paren_leading_line_comments`]; this only adds the
+    /// union-specific gate that a **retained**-paren member (union / intersection /
+    /// function / conditional) keeps its comment inside, returning empty for those.
     fn stripped_redundant_paren_leading_line_comments(&self, t: &TSType<'_>) -> CommentVec<'_> {
-        if let TSType::Parenthesized(_) = t
-            && !type_needs_parens_in_union_or_intersection(t)
-        {
-            let inner = unwrap_parenthesized(t);
-            let lead: CommentVec<'_> =
-                comments_to_emit_in_range(self.comments, t.span().start + 1, inner.span().start)
-                    .collect();
-            // Non-empty + all line comments ⇒ ≥1 leading line comment and no block comment
-            // in the gap; the trailing check rules out a comment between inner and `)`.
-            if !lead.is_empty()
-                && lead.iter().all(|c| !c.is_block)
-                && !self.has_comments_to_emit_between(inner.span().end, t.span().end - 1)
-            {
-                return lead;
-            }
+        if type_needs_parens_in_union_or_intersection(t) {
+            return smallvec![];
         }
-        smallvec![]
+        self.stripped_paren_leading_line_comments(t)
     }
 
     /// Push each comment on its own line (comment + `hardline`), the layout a
@@ -982,12 +965,13 @@ impl<'a> Printer<'a> {
         let member_parens = union_member_parens(intersection.types.len());
 
         // Hoist leading line comments inside the first member's stripped parens
-        // OUT of the intersection (e.g., `(// c\n a) & b` → `// c\n a & b`).
-        // The comment goes on its own line BEFORE the intersection so the
-        // intersection content itself can still fit inline.
-        if has_comments && let Some(TSType::Parenthesized(first_paren)) = intersection.types.first()
-        {
-            let first_paren_leading = self.paren_leading_line_comments(first_paren);
+        // OUT of the intersection (e.g., `(// c\n a) & b` → `// c\n a & b`, and the
+        // double-nested `((// c\n a)) & b` the same way). The comment goes on its own
+        // line BEFORE the intersection so the intersection content itself can still fit
+        // inline. The deep window scans the whole stripped shell, not just the outer
+        // paren's own gap, so a comment nested one paren deeper still hoists.
+        if has_comments && let Some(first_member) = intersection.types.first() {
+            let first_paren_leading = self.intersection_first_member_hoist_comments(first_member);
             if !first_paren_leading.is_empty() {
                 // The compact inline body can't represent an *isolated* between-member
                 // comment (a line/own-line comment forces multiline); route those through
@@ -998,10 +982,7 @@ impl<'a> Printer<'a> {
                 let inner = if line_comment_layout {
                     self.build_intersection_type_doc_with_line_comments(intersection, true)
                 } else {
-                    self.build_intersection_type_doc_with_first_paren_leading_stripped(
-                        intersection,
-                        first_paren,
-                    )
+                    self.build_intersection_type_doc_with_first_paren_leading_stripped(intersection)
                 };
                 let mut parts = DocBuf::new();
                 for comment in &first_paren_leading {
@@ -1223,11 +1204,10 @@ impl<'a> Printer<'a> {
             CommentSpacing::Trailing,
             CommentFilter::BlockOnly,
         ));
-        let first_doc = match first {
-            TSType::Parenthesized(fp) if strip_first_paren_leading => {
-                self.build_intersection_first_member_stripped(fp, member_parens)
-            }
-            _ => self.build_intersection_line_comment_member_doc(first, member_parens),
+        let first_doc = if strip_first_paren_leading && matches!(first, TSType::Parenthesized(_)) {
+            self.build_intersection_first_member_stripped(first, member_parens)
+        } else {
+            self.build_intersection_line_comment_member_doc(first, member_parens)
         };
         parts.push(first_doc);
 
@@ -1376,23 +1356,65 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The leading line-comment run the intersection hoist relocates out of the first
+    /// member's stripped paren shell. Its render safety differs from the shared
+    /// [`Self::stripped_paren_leading_line_comments`] by inner shape:
+    ///
+    /// - a **union** inner re-wraps through `build_parenthesized_union_doc`, which
+    ///   re-emits the shell's leading block comments and trailing comments in place — so
+    ///   the shell can hold anything and only the leading line run needs hoisting (no
+    ///   block/trailing decline);
+    /// - a **bare** inner (`build_type_doc`) drops whatever the shell held, so there the
+    ///   shared guard's decline (block in the leading gap, or any trailing comment →
+    ///   preserve the parens in place instead) still applies.
+    ///
+    /// Without the union carve-out, a mixed shell (`(/* b */ // c⏎ a | b) & d`) declined
+    /// and dropped the line comment its inner union would have kept.
+    fn intersection_first_member_hoist_comments(
+        &self,
+        first_member: &TSType<'_>,
+    ) -> CommentVec<'_> {
+        if !matches!(first_member, TSType::Parenthesized(_)) {
+            return smallvec![];
+        }
+        let inner = unwrap_parenthesized(first_member);
+        if matches!(inner, TSType::Union(_)) {
+            return comments_to_emit_in_range(
+                self.comments,
+                first_member.span().start + 1,
+                inner.span().start,
+            )
+            .filter(|c| !c.is_block)
+            .collect();
+        }
+        self.stripped_paren_leading_line_comments(first_member)
+    }
+
     /// Build the first intersection member's type doc with its parenthesized leading
-    /// line comment excluded (the caller — the hoist path — emits that comment before
-    /// the intersection). Precedence parens are kept where the member needs them
-    /// (`(A | B) & C`) and dropped where redundant (`(a) & b` → `a & b`).
+    /// line comment(s) excluded (the caller — the hoist path — emits them before the
+    /// intersection). Every redundant paren layer is stripped (`unwrap_parenthesized`,
+    /// so the double-nested `((a)) & b` reduces the same as `(a) & b`); precedence
+    /// parens are then re-applied where the bare inner needs them (`(A | B) & C`) and
+    /// dropped where redundant (`(a) & b` → `a & b`).
     fn build_intersection_first_member_stripped(
         &self,
-        first_paren: &TSParenthesizedType<'_>,
+        first_member: &TSType<'_>,
         member_parens: fn(&TSType<'_>) -> bool,
     ) -> DocId {
         let d = self.d();
-        let inner = first_paren.type_annotation;
+        let inner = unwrap_parenthesized(first_member);
         if member_parens(inner) {
             // Re-wrap inner in parens (e.g., union in intersection: `(A | B) & C`).
             if let TSType::Union(union) = inner {
                 // The hoisted leading line comment is emitted by the caller, so pass
                 // `false` to keep `build_parenthesized_union_doc` block-comment-only.
-                self.build_parenthesized_union_doc(union, Some(first_paren), false)
+                // The outermost paren bounds the block-comment scan, so a block comment
+                // authored in the stripped shell (before the union) is still preserved.
+                let paren = match first_member {
+                    TSType::Parenthesized(p) => Some(p),
+                    _ => None,
+                };
+                self.build_parenthesized_union_doc(union, paren, false)
             } else {
                 // Matches the bare intersection-member parenthesization in
                 // `build_intersection_member_type_doc`: no inner `d.indent`, the
@@ -1408,8 +1430,8 @@ impl<'a> Printer<'a> {
     /// leading line comments excluded from the output — the compact **inline** form
     /// (`a & b & c`) used by the hoisting path in `build_intersection_type_doc` when the
     /// intersection has no *isolated* between-member comment. The caller emits the
-    /// hoisted comment before this doc, and passes the first member's
-    /// `TSParenthesizedType` directly so we can strip its parens without re-matching.
+    /// hoisted comment before this doc; the first member's parens are stripped from
+    /// `intersection.types[0]`.
     ///
     /// Block comments between members are emitted in place — a before-`&` block trails
     /// the previous member, an after-`&` block leads the next — so they aren't dropped.
@@ -1420,11 +1442,11 @@ impl<'a> Printer<'a> {
     fn build_intersection_type_doc_with_first_paren_leading_stripped(
         &self,
         intersection: &TSIntersectionType<'_>,
-        first_paren: &TSParenthesizedType<'_>,
     ) -> DocId {
         let d = self.d();
         let member_parens = union_member_parens(intersection.types.len());
-        let first_doc = self.build_intersection_first_member_stripped(first_paren, member_parens);
+        let first_doc =
+            self.build_intersection_first_member_stripped(&intersection.types[0], member_parens);
 
         // Build the rest as `first & second & third...` inline, preserving any block
         // comment on its authored side of each `&` (`prev /* c */ & /* c */ next`).
