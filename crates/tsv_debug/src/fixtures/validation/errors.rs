@@ -204,6 +204,31 @@ pub enum ValidationError {
     )]
     NormalizationPrettierIntermediateToVariantNoVariantTarget(String),
 
+    // Prettier intermediate to divergent_variant (N7c): unstable first-pass
+    // output that converges to a divergent_variant_* (a prettier-stable form ours
+    // rewrites to a third form) — the convergence target no other intermediate
+    // marker accepts.
+    #[error(
+        "{0} doesn't match prettier's first-pass output from corresponding unformatted_ours_* file"
+    )]
+    NormalizationPrettierIntermediateToDivergentVariantMismatch(String),
+    #[error("{0} is stable (prettier preserves it) - should be divergent_variant_* instead")]
+    NormalizationPrettierIntermediateToDivergentVariantIsStable(String),
+    #[error(
+        "{0} doesn't converge to a documented divergent_variant_* file after second pass (converges to input — rename to prettier_intermediate_* instead)"
+    )]
+    NormalizationPrettierIntermediateToDivergentVariantConvergesToInput(String),
+    #[error(
+        "{0} doesn't converge to any documented divergent_variant_* file after second pass (if it converges to a variant_*/prettier_variant_*, use prettier_intermediate_to_variant_* instead)"
+    )]
+    NormalizationPrettierIntermediateToDivergentVariantNotConverging(String),
+    #[error("{0} has no corresponding unformatted_ours_* file")]
+    NormalizationPrettierIntermediateToDivergentVariantMissingSource(String),
+    #[error(
+        "{0} requires at least one divergent_variant_* file in the fixture (the convergence target)"
+    )]
+    NormalizationPrettierIntermediateToDivergentVariantNoVariantTarget(String),
+
     // Undocumented prettier output (N10): a fixture that pins prettier's stable
     // forms (has output_prettier / prettier_variant_* / variant_*) must account
     // for prettier's output of every unformatted_ours_* variant.
@@ -436,6 +461,24 @@ impl ValidationError {
             Self::NormalizationPrettierIntermediateToVariantNoVariantTarget(_) => {
                 "Add a variant_* or prettier_variant_* file documenting the convergence target"
             }
+            Self::NormalizationPrettierIntermediateToDivergentVariantMismatch(_) => {
+                "Update prettier_intermediate_to_divergent_variant_* to match prettier's actual first-pass output"
+            }
+            Self::NormalizationPrettierIntermediateToDivergentVariantIsStable(_) => {
+                "Rename to divergent_variant_* (prettier preserves this idempotently)"
+            }
+            Self::NormalizationPrettierIntermediateToDivergentVariantConvergesToInput(_) => {
+                "Rename to prettier_intermediate_* (second pass converges to input, not a divergent_variant)"
+            }
+            Self::NormalizationPrettierIntermediateToDivergentVariantNotConverging(_) => {
+                "Check that the file's second prettier pass produces content matching some divergent_variant_* sibling (if it matches a variant_*/prettier_variant_*, use prettier_intermediate_to_variant_*)"
+            }
+            Self::NormalizationPrettierIntermediateToDivergentVariantMissingSource(_) => {
+                "Add corresponding unformatted_ours_* file or remove prettier_intermediate_to_divergent_variant_* file"
+            }
+            Self::NormalizationPrettierIntermediateToDivergentVariantNoVariantTarget(_) => {
+                "Add a divergent_variant_* file documenting the convergence target"
+            }
             Self::UndocumentedPrettierOutput(_) => {
                 "Document prettier's output: add a variant_* / prettier_variant_* / divergent_variant_* (or prettier_intermediate*_*) sibling matching it, or update the existing one if prettier changed"
             }
@@ -535,6 +578,12 @@ impl ValidationError {
             | Self::NormalizationPrettierIntermediateToVariantNotConverging(_)
             | Self::NormalizationPrettierIntermediateToVariantMissingSource(_)
             | Self::NormalizationPrettierIntermediateToVariantNoVariantTarget(_)
+            | Self::NormalizationPrettierIntermediateToDivergentVariantMismatch(_)
+            | Self::NormalizationPrettierIntermediateToDivergentVariantIsStable(_)
+            | Self::NormalizationPrettierIntermediateToDivergentVariantConvergesToInput(_)
+            | Self::NormalizationPrettierIntermediateToDivergentVariantNotConverging(_)
+            | Self::NormalizationPrettierIntermediateToDivergentVariantMissingSource(_)
+            | Self::NormalizationPrettierIntermediateToDivergentVariantNoVariantTarget(_)
             | Self::UndocumentedPrettierOutput(_) => "Normalization",
 
             Self::RenderEquivalenceMismatch(_) | Self::RenderEquivalenceFallbackDivergence(_) => {
@@ -576,18 +625,19 @@ pub enum ValidationSuccess {
     InvalidSyntaxVariantsOk(usize), // number of invalid syntax files validated
     // Prettier-side normalization rules: one counter per rule so summaries can
     // distinguish "validated n files" from "had nothing to validate"
-    PrettierVariantsStable(usize),                 // N1
-    VariantsStable(usize),                         // N9a
-    DivergentVariantStable(usize),                 // N11a
-    UnformattedPrettierNormalized(usize),          // N3
-    UnformattedOursDivergent(usize),               // N6
-    PrettierIntermediatesConverge(usize),          // N7
-    PrettierIntermediatesToVariantConverge(usize), // N7b
-    UnformattedPrettierToOutput(usize),            // N8
-    PrettierOutputsPinned(usize),                  // N10
-    PrettierNonconvergenceVerified,                // F5
-    PrettierRejectionVerified,                     // F6
-    TsvRejectionVerified,                          // F7
+    PrettierVariantsStable(usize),                          // N1
+    VariantsStable(usize),                                  // N9a
+    DivergentVariantStable(usize),                          // N11a
+    UnformattedPrettierNormalized(usize),                   // N3
+    UnformattedOursDivergent(usize),                        // N6
+    PrettierIntermediatesConverge(usize),                   // N7
+    PrettierIntermediatesToVariantConverge(usize),          // N7b
+    PrettierIntermediatesToDivergentVariantConverge(usize), // N7c
+    UnformattedPrettierToOutput(usize),                     // N8
+    PrettierOutputsPinned(usize),                           // N10
+    PrettierNonconvergenceVerified,                         // F5
+    PrettierRejectionVerified,                              // F6
+    TsvRejectionVerified,                                   // F7
 }
 
 impl fmt::Display for ValidationSuccess {
@@ -638,6 +688,12 @@ impl fmt::Display for ValidationSuccess {
                 write!(
                     f,
                     "{n} prettier_intermediate_to_variant_* converge to a variant (N7b)"
+                )
+            }
+            Self::PrettierIntermediatesToDivergentVariantConverge(n) => {
+                write!(
+                    f,
+                    "{n} prettier_intermediate_to_divergent_variant_* converge to a divergent_variant (N7c)"
                 )
             }
             Self::UnformattedPrettierToOutput(n) => {

@@ -340,6 +340,7 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
         .chain(&files.divergent_variant)
         .chain(&files.prettier_intermediate)
         .chain(&files.prettier_intermediate_to_variant)
+        .chain(&files.prettier_intermediate_to_divergent_variant)
     {
         if let Ok(content) = read_file(&fixture_dir.join(name)) {
             known_files.insert(name.clone(), content);
@@ -360,6 +361,12 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
     files_to_audit.extend(files.divergent_variant.iter().cloned());
     files_to_audit.extend(files.prettier_intermediate.iter().cloned());
     files_to_audit.extend(files.prettier_intermediate_to_variant.iter().cloned());
+    files_to_audit.extend(
+        files
+            .prettier_intermediate_to_divergent_variant
+            .iter()
+            .cloned(),
+    );
 
     let mut file_audits = Vec::new();
     let mut has_novel = false;

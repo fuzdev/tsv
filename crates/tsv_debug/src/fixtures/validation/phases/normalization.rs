@@ -473,6 +473,15 @@ pub(in crate::fixtures::validation) async fn validate_normalization_prettier(
         &unformatted_ours_outputs,
     )
     .await;
+    validate_n7c_intermediates_to_divergent_variant(
+        result,
+        fixture,
+        input,
+        input_ext,
+        files,
+        &unformatted_ours_outputs,
+    )
+    .await;
     validate_n8_unformatted_prettier(result, fixture, files).await;
     validate_n10_cross_path_discovery(
         result,
@@ -967,6 +976,155 @@ async fn validate_n7b_intermediates_to_variant(
     }
 }
 
+/// N7c: prettier_intermediate_to_divergent_variant_* validation
+///
+/// The `divergent_variant`-targeted sibling of N7b: prettier's unstable first-pass
+/// output from an `unformatted_ours_*` shell whose second pass converges to a
+/// documented `divergent_variant_*` (a prettier-stable form our formatter rewrites
+/// to a third form), rather than input (N7) or a `variant_*`/`prettier_variant_*`
+/// (N7b). This is the convergence target no other intermediate marker accepts —
+/// it arises when the intersection first-member redundant-paren shell's prettier
+/// path settles on a glued form ours un-glues. Checks mirror N7b exactly, only the
+/// convergence target set differs.
+async fn validate_n7c_intermediates_to_divergent_variant(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    input: &str,
+    input_ext: &str,
+    files: &FixtureFiles,
+    unformatted_ours_prettier_outputs: &HashMap<String, String>,
+) {
+    let fixture_dir = &fixture.path;
+    let prettier_parser = fixture.input_type().prettier_parser();
+
+    // Pre-read divergent_variant_* contents — the allowed convergence targets.
+    // Read failures are tolerated without an error: N11a owns these files and
+    // reports unreadable ones loudly, so a silent skip here can't hide a gap.
+    let mut divergent_variant_target_contents: Vec<String> = Vec::new();
+    for dv_name in &files.divergent_variant {
+        if let Ok(content) = read_file(&fixture_dir.join(dv_name)) {
+            divergent_variant_target_contents.push(content);
+        }
+    }
+
+    let mut converged = 0;
+
+    for intermediate_name in &files.prettier_intermediate_to_divergent_variant {
+        let intermediate_path = fixture_dir.join(intermediate_name);
+        let intermediate_content = match read_file(&intermediate_path) {
+            Ok(c) => c,
+            Err(e) => {
+                result.add_error(ValidationError::FileReadError(e));
+                continue;
+            }
+        };
+
+        // Extract suffix: prettier_intermediate_to_divergent_variant_X.svelte -> X
+        let suffix = intermediate_name
+            .strip_prefix("prettier_intermediate_to_divergent_variant_")
+            .and_then(|s| s.strip_suffix(input_ext))
+            .unwrap_or("");
+
+        // Check 1: Must have corresponding unformatted_ours_* file
+        let Some(expected_content) = unformatted_ours_prettier_outputs.get(suffix) else {
+            result.add_error(
+                ValidationError::NormalizationPrettierIntermediateToDivergentVariantMissingSource(
+                    intermediate_name.clone(),
+                ),
+            );
+            continue;
+        };
+
+        // Check 2: must have at least one divergent_variant_* file as convergence target
+        if divergent_variant_target_contents.is_empty() {
+            result.add_error(
+                ValidationError::NormalizationPrettierIntermediateToDivergentVariantNoVariantTarget(
+                    intermediate_name.clone(),
+                ),
+            );
+            continue;
+        }
+
+        // Check 3: prettier(unformatted_ours_X) == prettier_intermediate_to_divergent_variant_X
+        if *expected_content != intermediate_content {
+            result.add_error(
+                ValidationError::NormalizationPrettierIntermediateToDivergentVariantMismatch(
+                    intermediate_name.clone(),
+                ),
+            );
+            result.add_diff(
+                &format!(
+                    "prettier_intermediate_to_divergent_variant mismatch: {}/{}",
+                    fixture.relative_path, intermediate_name
+                ),
+                &intermediate_content,
+                expected_content,
+                &diff::DiffOptions::freshness(),
+            );
+            continue;
+        }
+
+        // Check 4: prettier(intermediate) != intermediate (unstable)
+        match run_prettier(&intermediate_content, prettier_parser).await {
+            Ok(second_pass) => {
+                if second_pass == intermediate_content {
+                    result.add_error(
+                        ValidationError::NormalizationPrettierIntermediateToDivergentVariantIsStable(
+                            intermediate_name.clone(),
+                        ),
+                    );
+                    continue;
+                }
+
+                // Check 5: second pass must NOT equal input (else use prettier_intermediate_* instead)
+                if second_pass == *input {
+                    result.add_error(
+                        ValidationError::NormalizationPrettierIntermediateToDivergentVariantConvergesToInput(
+                            intermediate_name.clone(),
+                        ),
+                    );
+                    continue;
+                }
+
+                // Check 6: second pass must match some divergent_variant_* content
+                let hits_divergent_variant =
+                    divergent_variant_target_contents.contains(&second_pass);
+                if !hits_divergent_variant {
+                    result.add_error(
+                        ValidationError::NormalizationPrettierIntermediateToDivergentVariantNotConverging(
+                            intermediate_name.clone(),
+                        ),
+                    );
+                    if let Some(first_target) = divergent_variant_target_contents.first() {
+                        result.add_diff(
+                            &format!(
+                                "prettier_intermediate_to_divergent_variant not converging: {}/{}",
+                                fixture.relative_path, intermediate_name
+                            ),
+                            &second_pass,
+                            first_target,
+                            &diff::DiffOptions::prettier_behavior(),
+                        );
+                    }
+                } else {
+                    converged += 1;
+                }
+            }
+            Err(e) => {
+                result.add_error(ValidationError::FormatterError(format!(
+                    "Prettier on {intermediate_name}: {e}"
+                )));
+            }
+        }
+    }
+
+    if converged > 0 {
+        result.add_success(
+            ValidationSuccess::PrettierIntermediatesToDivergentVariantConverge(converged),
+        );
+    }
+}
+
 /// N8: unformatted_prettier_* validation
 ///
 /// These files test that prettier normalizes certain inputs to output_prettier.*.
@@ -1081,6 +1239,14 @@ fn validate_n10_cross_path_discovery(
     for intermediate_name in &files.prettier_intermediate_to_variant {
         let suffix = intermediate_name
             .strip_prefix("prettier_intermediate_to_variant_")
+            .and_then(|s| s.strip_suffix(input_ext))
+            .unwrap_or("")
+            .to_string();
+        claimed_suffixes.insert(suffix);
+    }
+    for intermediate_name in &files.prettier_intermediate_to_divergent_variant {
+        let suffix = intermediate_name
+            .strip_prefix("prettier_intermediate_to_divergent_variant_")
             .and_then(|s| s.strip_suffix(input_ext))
             .unwrap_or("")
             .to_string();
