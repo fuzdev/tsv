@@ -25,5 +25,13 @@ formatters and is not a divergence — only a line comment, which runs to EOL an
 forces the type onto its own line, differs. The single underlying rule lives in
 the shared `build_type_annotation_doc`.
 
+A redundant paren wrapping the annotation type with the line comment inside
+(`const e: (// c\n X)`, and the double-nested `((…))`) strips to this same fixed
+point — the `unformatted_ours_single_paren` / `unformatted_ours_double_parens`
+variants verify the paren form is idempotent too (across the variable /
+class-property / parameter / return contexts). An arrow-function return type
+cannot take this form — `(): (// c\n X) =>` parses as a function type, a syntax
+error in both formatters — so that context stays bare in the variants.
+
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
 §Uniform Forced-Continuation Indent and §Comment Position Philosophy.

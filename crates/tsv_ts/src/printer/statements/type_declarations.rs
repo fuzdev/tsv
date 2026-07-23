@@ -208,7 +208,12 @@ impl<'a> Printer<'a> {
         match ty {
             TSType::TypeOperator(o) => {
                 let kw_end = o.span.start + o.operator.as_str().len() as u32;
-                self.comments_force_own_line_between(kw_end, o.type_annotation.span().start)
+                // Same deep-window paren handling as the operator's own builder: a
+                // `keyof (// c\n T)` hangs the operand via the unwrapped inner's start, so
+                // this gate must widen the same way or it disagrees with the builder about
+                // whether the value breaks (the `=` would then break too, non-idempotently).
+                let (operand_start, _) = self.keyword_value_stripped_paren_hang(o.type_annotation);
+                self.comments_force_own_line_between(kw_end, operand_start)
             }
             TSType::TypeQuery(q) => {
                 let kw_end = q.span.start + "typeof".len() as u32;

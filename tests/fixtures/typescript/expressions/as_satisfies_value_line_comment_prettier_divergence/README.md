@@ -30,4 +30,10 @@ comment (`x as /* c */ A`) stays inline in both formatters and is not a
 divergence (see the regular
 [as_satisfies_keyword_comment](../as_satisfies_keyword_comment/) fixture).
 
+A redundant paren wrapping the cast type with the line comment inside
+(`x as (// c\n A)`, and the double-nested `((…))`) strips to this same fixed
+point — the `unformatted_ours_single_paren` / `unformatted_ours_double_parens`
+variants verify the paren form is idempotent too (prettier still floats the
+comment out, so they are `_ours` variants).
+
 See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
