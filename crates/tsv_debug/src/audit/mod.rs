@@ -6,6 +6,9 @@
 //!
 //! - [`ratchet`] — the "every line is a known bug, the file shrinking is the goal"
 //!   snapshot gate (the shape a large, churny finding set needs instead of a count).
+//! - [`examples`] — the bounded, `--jobs`-deterministic example set every audit's
+//!   per-shape aggregate keeps its reproducers in.
+//! - [`tally`] — run-level tally primitives (the capped skipped-path bucket).
 //! - [`node_edge`] — the wire-tree walker keying an injection offset to its
 //!   enclosing AST node + child-role edge, the coarse companion to `sites`'
 //!   file-independent shape keying.
@@ -17,9 +20,9 @@
 //! - [`report`] — the shared reporting envelope (`{severity, confidence, site,
 //!   example, detail}`) and the human / JSON printers.
 //!
-//! `gap_audit` and `blank_audit` are the consumers; the modules are written
-//! generic where a second audit would reuse them, and no further — `blank_audit`
-//! is that second audit.
+//! `gap_audit`, `blank_audit`, and `ignore_audit` are the consumers; the modules
+//! are written generic where a second consumer would actually reuse them, and no
+//! further.
 
 // Always compiled: `properties` hosts the reparse primitives the `roundtrip_audit`
 // / `fuzz` commands share, which are not behind `comment_check`. (Its ledger /
@@ -36,6 +39,8 @@ pub(crate) mod ratchet;
 // `tsv_lang::comment_ledger`), so gate these too — otherwise they read as dead
 // code in a default build.
 #[cfg(feature = "comment_check")]
+pub(crate) mod examples;
+#[cfg(feature = "comment_check")]
 pub(crate) mod node_edge;
 #[cfg(feature = "comment_check")]
 pub(crate) mod parallel;
@@ -43,3 +48,5 @@ pub(crate) mod parallel;
 pub(crate) mod report;
 #[cfg(feature = "comment_check")]
 pub(crate) mod sites;
+#[cfg(feature = "comment_check")]
+pub(crate) mod tally;
