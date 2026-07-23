@@ -2955,6 +2955,56 @@ const field_key_unquote: DivergencePattern = {
 // Ordered: specific → broad. Specific patterns run first for best explanations.
 // Multiple patterns CAN claim the same hunk (by design).
 
+/**
+ * Retained parenthesized union member with an interior line comment: prettier
+ * explodes the inner union one member per line (`| a` / `| b // c`), tsv applies
+ * its union-fit layout and keeps it inline (`a | b // c`). The line comment forces
+ * the parens open in both, so the only difference is the inner union's inline vs
+ * exploded layout. Catalogued as **Retained paren union member line comment** in
+ * conformance_prettier.md; the same shape is 18389's remaining unexplained hunk.
+ *
+ * Content-preservation proof: strip prettier's leading `| ` from each exploded
+ * member and rejoin with ` | ` — a pure inline↔exploded reflow is byte-identical to
+ * ours' inline line, so a dropped or added member (real content loss) breaks the
+ * equality and is never claimed. `may_alter_char_frequency` stays false (fail-closed):
+ * the reflow only toggles the leading pipes prettier adds, which the SAFETY
+ * differential already treats as prettier-excess rather than ours-loss.
+ */
+const union_paren_member_inline: DivergencePattern = {
+	id: 'union_paren_member_inline',
+	description:
+		'Interior line comment in a retained parenthesized union member: prettier explodes the inner union one-per-line, tsv keeps it inline (union-fit)',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['TypeScript'],
+	fixtures: ['typescript/types/union_intersection_retained_paren_line_comment_prettier_divergence'],
+	detect(ctx) {
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			// prettier (removed) explodes: >= 2 leading-pipe union members, nothing else.
+			const removed = hunk.removed_lines.map((l) => l.trim());
+			if (removed.length < 2) return false;
+			if (!removed.every((l) => l.startsWith('| '))) return false;
+			// ours (added) collapses to a single inline line.
+			const added = hunk.added_lines.map((l) => l.trim());
+			if (added.length !== 1) return false;
+			// A pure inline<->exploded reflow: strip each exploded member's `| ` and
+			// rejoin with ` | `; equality proves no member was dropped or added.
+			const prettier_inline = removed.map((l) => l.slice(2)).join(' | ');
+			return prettier_inline === added[0];
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'union_paren_member_inline',
+				confidence: 'likely',
+				hunk_indices,
+				reason:
+					'tsv keeps a parenthesized union member inline (union-fit); prettier explodes it one member per line',
+			};
+		}
+		return null;
+	},
+};
+
 export const PATTERNS: DivergencePattern[] = [
 	// 1. Language-specific narrow patterns (certain or rare)
 	bom_strip,
@@ -2986,6 +3036,7 @@ export const PATTERNS: DivergencePattern[] = [
 	member_expression_call,
 	return_type_generic_union,
 	non_null_paren_base,
+	union_paren_member_inline,
 	forced_continuation_indent,
 
 	// 4. Svelte-specific patterns

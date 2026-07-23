@@ -767,6 +767,37 @@ Deno.test('member_expression_call: negative - no module pattern in source', () =
 	assertEquals(match, null);
 });
 
+// ─── union_paren_member_inline ──────────────────────────────────────────────
+
+Deno.test('union_paren_member_inline: positive - inner union kept inline vs exploded', () => {
+	// prettier explodes `| a` / `| b // c`; tsv keeps `a | b // c` inline (18389's shape).
+	const prettier = '\t| (\n\t\t\t| A\n\t\t\t| B // comment 1\n\t  )\n\t| C;';
+	const ours = '\t| (\n\t\t\tA | B // comment 1\n\t  )\n\t| C;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('union_paren_member_inline', ctx);
+	assertNotEquals(match, null);
+	assertEquals(match!.pattern, 'union_paren_member_inline');
+});
+
+Deno.test('union_paren_member_inline: negative - overmatch rejection, a member is DROPPED', () => {
+	// prettier has three members; ours drops `C`. A pure reflow would preserve every
+	// member — the string-equality proof fails, so a content-loss bug is never claimed.
+	const prettier = '\t| (\n\t\t\t| A\n\t\t\t| B\n\t\t\t| C // c\n\t  )\n\t| D;';
+	const ours = '\t| (\n\t\t\tA | B // c\n\t  )\n\t| D;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('union_paren_member_inline', ctx);
+	assertEquals(match, null);
+});
+
+Deno.test('union_paren_member_inline: negative - overmatch rejection, a member is ADDED', () => {
+	// ours has an extra member `C` prettier does not — also a content change, rejected.
+	const prettier = '\t| (\n\t\t\t| A\n\t\t\t| B // c\n\t  )\n\t| D;';
+	const ours = '\t| (\n\t\t\tA | B | C // c\n\t  )\n\t| D;';
+	const ctx = make_context(ours, prettier, 'typescript');
+	const match = run_pattern('union_paren_member_inline', ctx);
+	assertEquals(match, null);
+});
+
 // ─── comment_position ───────────────────────────────────────────────────────
 
 Deno.test('comment_position: positive - comment moved to different line', () => {

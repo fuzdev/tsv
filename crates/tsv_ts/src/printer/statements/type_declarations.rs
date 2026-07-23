@@ -335,9 +335,19 @@ impl<'a> Printer<'a> {
                     // expansion, so keep `= {` together like other internally-breaking types
                     parts.push(d.text(" "));
                     parts.push(make_rhs(type_doc));
-                } else {
-                    // Normal unions: break after `=` with leading `| `
+                } else if lead_space {
+                    // Normal unions: break after `=` with leading `| ` and a hanging indent.
                     parts.push(hang_after_operator(d, make_rhs(type_doc)));
+                } else {
+                    // Pre-`=` own-line comment path (`type A<X>⏎// c⏎= | a | b`): `lead_space`
+                    // is false ONLY here, and the caller already wrapped comment + `=` + value
+                    // in one `d.indent`. A break must therefore NOT add the hang's extra indent
+                    // — the members sit at the `=`'s level, not one deeper (else a double-indent).
+                    // Still grouped so a short union stays inline on the `=` line (`= A | B`),
+                    // matching the hang arm's flat case. A `_prettier_divergence`
+                    // (type_alias_line_pre_equals_break): prettier relocates the comment after
+                    // `=` and never emits this preserved-comment form.
+                    parts.push(d.group(d.concat(&[d.line(), make_rhs(type_doc)])));
                 }
             } else if let TSType::Intersection(i) = value_type {
                 // Intersection types (prettier's `fluid`): the first member hugs the

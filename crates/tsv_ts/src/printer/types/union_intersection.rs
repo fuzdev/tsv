@@ -71,6 +71,49 @@ impl<'a> Printer<'a> {
     // Union Types
     //
 
+    /// The leading line comments inside a **redundant** parenthesized union member —
+    /// one whose parens the comment-free rule strips (`(b)` → `b`,
+    /// `!type_needs_parens_in_union_or_intersection`), so the comment cannot stay
+    /// "inside" parens that don't survive — but ONLY when the paren shell holds
+    /// nothing else: no block comment in the leading gap, no comment between the
+    /// inner and `)`. Those extra comments would be dropped by the stripped-inner
+    /// render the caller uses, so the guard keeps this to the exact case a later
+    /// member's leading line comment leads it on its own line before the `| `
+    /// (`build_union_type_doc_with_line_comments`). Empty for a retained-paren member
+    /// (union / intersection / function / conditional), whose comment stays inside.
+    /// `unwrap_parenthesized` peels every redundant layer, so nested `((// c⏎ b))` is
+    /// covered too.
+    fn stripped_redundant_paren_leading_line_comments(&self, t: &TSType<'_>) -> CommentVec<'_> {
+        if let TSType::Parenthesized(_) = t
+            && !type_needs_parens_in_union_or_intersection(t)
+        {
+            let inner = unwrap_parenthesized(t);
+            let lead: CommentVec<'_> =
+                comments_to_emit_in_range(self.comments, t.span().start + 1, inner.span().start)
+                    .collect();
+            // Non-empty + all line comments ⇒ ≥1 leading line comment and no block comment
+            // in the gap; the trailing check rules out a comment between inner and `)`.
+            if !lead.is_empty()
+                && lead.iter().all(|c| !c.is_block)
+                && !self.has_comments_to_emit_between(inner.span().end, t.span().end - 1)
+            {
+                return lead;
+            }
+        }
+        smallvec![]
+    }
+
+    /// Push each comment on its own line (comment + `hardline`), the layout a
+    /// stripped-redundant-paren member's leading line run takes before its `| `
+    /// separator ([`Self::stripped_redundant_paren_leading_line_comments`]).
+    fn push_own_line_comment_run(&self, parts: &mut DocBuf, comments: &CommentVec<'_>) {
+        let d = self.d();
+        for comment in comments {
+            parts.push(self.build_comment_doc(comment));
+            parts.push(d.hardline());
+        }
+    }
+
     /// Emit the leading block comments in `[start, end)` before the FIRST union
     /// member, choosing the separator after each comment per Prettier's
     /// `printLeadingComment`: a `line` when the source has a newline after the
@@ -282,15 +325,23 @@ impl<'a> Printer<'a> {
         // Check for line comments that force the multiline layout:
         // - Between union members (`A | B // c\n  | C`)
         // - Before the first member (`| // c\n  A | B`)
-        // - Inside a member's stripped paren (`A | (// c\n  B)`) — these are
-        //   relocated to trail the previous member in the multiline path.
+        // - Inside a member's parens (`A | (// c\n  B)`) — a retained paren keeps the
+        //   comment inside; a redundant one leads its member on its own line. Either way
+        //   the comment is a line comment, so the multiline layout is required.
         if has_comments {
             let first_type_start = union.types.first().map(|t| t.span().start);
             let has_leading_line_comments = first_type_start
                 .is_some_and(|start| self.has_line_comments_between(union.span.start, start));
-            let has_paren_inner_leading_line_comments = union.types.iter().any(
-                |t| matches!(t, TSType::Parenthesized(p) if self.paren_has_leading_line_comment(p)),
-            );
+            // A line comment inside a member's parens (before the — possibly nested —
+            // inner type), matching the window `build_union_type_doc_with_line_comments`
+            // reads for both the retained-paren and stripped-redundant-paren arms.
+            let has_paren_inner_leading_line_comments = union.types.iter().any(|t| {
+                matches!(t, TSType::Parenthesized(_))
+                    && self.has_line_comments_between(
+                        t.span().start + 1,
+                        unwrap_parenthesized(t).span().start,
+                    )
+            });
             if has_leading_line_comments
                 || self.union_has_own_line_member_comment(union)
                 || has_paren_inner_leading_line_comments
@@ -497,9 +548,7 @@ impl<'a> Printer<'a> {
             //
             // ⚠️ Empty for every later member, and the arm chain below consumes it by
             // move — an arm that neither extends nor inspects it is a **dropped comment**
-            // (`comments:audit` is the corpus-wide guard). The relocated-paren arm can't
-            // coexist with a non-empty run: its `relocated_paren_leading` is empty unless
-            // `i > 0`.
+            // (`comments:audit` is the corpus-wide guard).
             //
             // `None` for `skip_delim`: the union's leading `|` is not run through
             // `delimiter_line_comment_prefix`, unlike the bracket/angle/paren lists, so
@@ -510,15 +559,13 @@ impl<'a> Printer<'a> {
                 DocBuf::new()
             };
 
-            // For non-first members, detect leading line comments inside the
-            // parens of a TSParenthesizedType wrapper. Prettier relocates these
-            // to trail the previous member (e.g., `a | (// c\n b)` becomes
-            // `| a // c\n | b`). We extract them so they can be emitted before
-            // the `| ` separator and skipped when building the member's type doc.
-            let relocated_paren_leading: CommentVec<'_> = if i > 0
-                && let TSType::Parenthesized(p) = t
-            {
-                self.paren_leading_line_comments(p)
+            // A LATER member that is a REDUNDANT parenthesized type (`a | (// c⏎ b)`): its
+            // leading line comment can't stay "inside" parens the comment-free rule strips,
+            // so it leads the member on its own line before the `| ` (emitted below,
+            // rendered from the stripped inner). See the helper for the full rule; empty for
+            // a retained-paren member (whose comment stays inside, the arms further down).
+            let stripped_paren_leading = if i > 0 {
+                self.stripped_redundant_paren_leading_line_comments(t)
             } else {
                 smallvec![]
             };
@@ -540,11 +587,6 @@ impl<'a> Printer<'a> {
                         pipe_pos,
                         true,
                     ));
-
-                    // Relocated paren leading line comments: trail prev member
-                    for comment in &relocated_paren_leading {
-                        parts.push(self.build_trailing_line_comment_doc(comment));
-                    }
 
                     // Comments after the pipe lead this member. Line comments (and
                     // own-line block comments) go on their own line BEFORE the `| `
@@ -594,6 +636,7 @@ impl<'a> Printer<'a> {
                         }
                         parts.push(d.hardline());
                     }
+                    self.push_own_line_comment_run(&mut parts, &stripped_paren_leading);
                     parts.push(d.text("| "));
                     for comment in comments_to_emit_in_range(self.comments, after_pipe, type_start)
                     {
@@ -605,6 +648,7 @@ impl<'a> Printer<'a> {
                 } else {
                     // No pipe found, just add separator
                     parts.push(d.hardline());
+                    self.push_own_line_comment_run(&mut parts, &stripped_paren_leading);
                     parts.push(d.text("| "));
                 }
             } else {
@@ -614,51 +658,35 @@ impl<'a> Printer<'a> {
             }
 
             // Add the type with the same per-member offset as the main path
-            // (`build_union_member_offset_doc`). When we relocated leading line
-            // comments from inside a `TSParenthesizedType` wrapper, build the inner
-            // type directly so the relocated comments aren't emitted again, re-wrap
-            // with the proper parenthesized layout when precedence demands it, and
-            // apply the offset so it lines up like any other member.
-            if !relocated_paren_leading.is_empty()
-                && let TSType::Parenthesized(p) = t
-            {
-                // Unreachable with a held run — this arm needs `i > 0`, the run needs
-                // `i == 0` (see its declaration), so there is nothing here to emit.
-                debug_assert!(first_leading.is_empty());
-                let inner = p.type_annotation;
-                if let TSType::Union(union) = inner {
-                    // `build_parenthesized_union_doc` lays out `(`/`)` on their own
-                    // lines and only emits block comments in the paren gaps (the
-                    // leading line comment was already relocated above, so pass
-                    // `false`). A paren-union takes the per-member `align(2)` offset
-                    // (see `build_union_member_offset_doc`).
-                    parts.push(
-                        d.align(2, self.build_parenthesized_union_doc(union, Some(p), false)),
-                    );
-                } else if type_needs_parens_in_union_or_intersection(inner) {
-                    // Default-paren (function / conditional / intersection): the whole
-                    // `(…)` takes the `align(2)` offset with no inner indent (Prettier's
-                    // bare needs-parens wrapping), matching the main path.
-                    parts.push(d.align(
-                        2,
-                        d.concat(&[d.text("("), self.build_type_doc(inner), d.text(")")]),
-                    ));
-                } else {
-                    parts.push(d.align(2, self.build_type_doc(inner)));
-                }
-            } else if i == 0
-                && let TSType::Parenthesized(p) = t
+            // (`build_union_member_offset_doc`). A parenthesized union member with a
+            // leading line comment inside the parens keeps the comment there — for
+            // EVERY member, not just the first (`| (⏎ // c⏎ inner⏎)`). Per the comment
+            // position philosophy tsv associates the comment with the member it
+            // documents rather than hoisting it out; prettier hoists it onto its own
+            // line above the member. `true` to `build_parenthesized_union_doc` emits
+            // the leading line comment inside so it is not dropped; the per-member
+            // `align(2)` offset lines it up like any other paren-union member (the
+            // `is_paren_union_member` arm of `build_union_member_offset_doc`). See
+            // union_intersection_retained_paren_leading_line_comment_prettier_divergence.
+            if !stripped_paren_leading.is_empty() {
+                // Redundant-paren member: its leading line comment was already emitted
+                // before the `| ` above, so render the member as its fully STRIPPED inner —
+                // building `t` (the parens) instead would emit the comment a second time.
+                // `unwrap_parenthesized` peels every redundant layer (`((// c⏎ b))` → `b`),
+                // matching the detection window. `first_leading` is empty here (later
+                // member), extended only to keep the consume-by-move invariant the arm
+                // chain relies on.
+                parts.extend(first_leading);
+                parts.push(
+                    self.build_union_member_offset_doc(unwrap_parenthesized(t), member_parens),
+                );
+            } else if let TSType::Parenthesized(p) = t
                 && let TSType::Union(inner_union) = p.type_annotation
                 && self.paren_has_leading_line_comment(p)
             {
-                // First union member is a parenthesized union with a leading line
-                // comment inside the parens. Unlike a later member (relocated to trail
-                // the previous member above), there is no previous member, so keep the
-                // comment inside the parens leading the inner union — passing `true`
-                // to `build_parenthesized_union_doc` so it is not dropped. Take the
-                // per-member `align(2)` offset like any other paren-union member
-                // (matching the `is_paren_union_member` arm of
-                // `build_union_member_offset_doc`).
+                // `first_leading` is non-empty only for the first member (see its
+                // declaration); a later member's leading comments were emitted on their
+                // own line above, so this extends nothing there.
                 parts.extend(first_leading);
                 parts.push(d.align(
                     2,

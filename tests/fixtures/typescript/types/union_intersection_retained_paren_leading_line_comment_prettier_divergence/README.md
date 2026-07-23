@@ -28,12 +28,27 @@ line whenever the group breaks.
 
 This mirrors the trailing-comment sibling
 [union_intersection_retained_paren_line_comment](../union_intersection_retained_paren_line_comment_prettier_divergence/),
-which likewise keeps a line comment inside the retained parens for the first
-member. The asymmetry shown by the `Mid` case: a leading line comment inside a
-**later** member's parens relocates to trail the previous member (both formatters
-agree — see
-[union_paren_member_long_line_comment](../comments/union_paren_member_long_line_comment/));
-only the first member, with no previous member to relocate onto, keeps the
-comment inside.
+which likewise keeps a line comment inside the retained parens. The `Mid` case
+shows this holds for a **later** member too: a leading line comment inside any
+member's parens is kept inside, associated with the member it documents, not just
+the first — tsv never hoists it out (whereas prettier hoists it onto its own line
+above the member).
+
+`MidFunction` / `MidConditional` / `MidIntersection` show the rule spans every
+**retained**-paren member kind, not only unions: a later paren-function,
+-conditional, or plain paren-intersection member keeps the comment inside too.
+Prettier instead trails the comment on the *previous* member (`| A // c`) and keeps
+the member inline (`| (() => B)`). Because tsv keeps the comment inside, the line
+comment forces the paren group open, so a conditional breaks its branches and an
+intersection its members — an expansion prettier's hoist avoids. Whether the paren
+is *retained* is decided exactly as it is comment-free; only a **redundant** paren
+(stripped) can't host the comment, and there it leads the member on its own line
+instead — see
+[union_redundant_paren_member_line_comment](../union_redundant_paren_member_line_comment_prettier_divergence/).
+
+An *authored-trailing* comment (`| A // c`, written on the member's own line rather
+than inside a following member's parens) is a different case and stays trailing in
+both formatters — see
+[union_paren_member_long_line_comment](../comments/union_paren_member_long_line_comment/).
 
 See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
