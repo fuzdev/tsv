@@ -14,10 +14,11 @@
 //! - **verdict_string** — the human one-line verdict suffix.
 //! - **detail** ([`Detail`]) — the audit-specific payload, carried **verbatim**
 //!   and rendered by the audit's own arm. Enum-dispatched, one variant per audit:
-//!   [`gap_audit`](crate::cli::commands) ([`Detail::Gap`]) and
-//!   [`blank_audit`](crate::cli::commands) ([`Detail::Blank`]).
+//!   [`gap_audit`](crate::cli::commands) ([`Detail::Gap`]),
+//!   [`blank_audit`](crate::cli::commands) ([`Detail::Blank`]), and
+//!   [`ignore_audit`](crate::cli::commands) ([`Detail::Ignore`]).
 //!
-//! Two consumers today (gap and blank), so the envelope is concrete (no generics /
+//! Three consumers today (gap, blank, ignore), so the envelope is concrete (no generics /
 //! `dyn`), but the skeleton is audit-agnostic and the detail slot is where each
 //! audit's own vocabulary lives.
 //!
@@ -160,11 +161,30 @@ pub(crate) struct BlankDetail {
     pub(crate) gated: bool,
 }
 
+/// `ignore_audit`'s audit-specific detail — the per-position aggregate the envelope carries
+/// verbatim. Like [`BlankDetail`] (kind / count / files), plus the canonical example's `node_type`
+/// (which AST node kind sits at the `{parent}.{field}` position — triage that the flat position key
+/// alone doesn't carry). Both kinds (`UNHONORED` / `PANIC`) are part of the gate — there is no
+/// report-only class — so `gated` is always `true`.
+pub(crate) struct IgnoreDetail {
+    /// The verbatim finding-kind label — `UNHONORED` / `PANIC`.
+    pub(crate) kind_label: &'static str,
+    /// How many injections hit this position.
+    pub(crate) count: usize,
+    /// Distinct seed files the position fired in.
+    pub(crate) files: usize,
+    /// The canonical example's node kind at this position.
+    pub(crate) node_type: String,
+    /// Always `true` — no report-only class (kept for envelope uniformity with [`BlankDetail`]).
+    pub(crate) gated: bool,
+}
+
 /// The audit-specific detail slot — one variant per audit (enum-dispatch, the
 /// fuz-stack idiom over `dyn`). Adding an audit adds a variant and a printer arm.
 pub(crate) enum Detail {
     Gap(GapDetail),
     Blank(BlankDetail),
+    Ignore(IgnoreDetail),
 }
 
 /// One finding in the shared envelope.
@@ -187,6 +207,7 @@ impl Finding {
         match &self.detail {
             Detail::Gap(d) => d.count,
             Detail::Blank(d) => d.count,
+            Detail::Ignore(d) => d.count,
         }
     }
 
@@ -197,6 +218,7 @@ impl Finding {
         match &self.detail {
             Detail::Gap(d) => d.gated,
             Detail::Blank(d) => d.gated,
+            Detail::Ignore(d) => d.gated,
         }
     }
 }
@@ -285,6 +307,12 @@ pub(crate) fn print_report(s: &RunSummary, findings: &[Finding]) {
                 "✓ no injected blank broke a gated invariant across {} accepted injections",
                 s.accepted
             );
+        } else if s.audit == "ignore_audit" {
+            println!(
+                "✓ every injected `// prettier-ignore` was honored — no position silently \
+                 reformats an ignored node across {} accepted injections",
+                s.accepted
+            );
         } else {
             println!(
                 "✓ every injected comment printed exactly once — no gap drops a comment across \
@@ -353,6 +381,21 @@ pub(crate) fn print_report(s: &RunSummary, findings: &[Finding]) {
                 let ex = &f.example;
                 println!(
                     "            e.g. inject blank at {}:{}  {}",
+                    ex.path, ex.injection_offset, ex.snippet
+                );
+                println!();
+            }
+            Detail::Ignore(d) => {
+                // An ignore finding keys on the AST position (`{parent}.{field}`); the node kind is
+                // the representative example's, since one position can hold several node kinds.
+                println!("  {:>7}×  {:<14} {}", d.count, d.kind_label, f.site);
+                println!(
+                    "            {} file(s) · e.g. node {}",
+                    d.files, d.node_type
+                );
+                let ex = &f.example;
+                println!(
+                    "            e.g. inject `// prettier-ignore` at {}:{}  {}",
                     ex.path, ex.injection_offset, ex.snippet
                 );
                 println!();
@@ -427,6 +470,21 @@ pub(crate) fn print_json(
                     // Whether this shape gates: `false` for the report-only STRUCTURAL-DIVERGENCE
                     // class (kept in the report, excluded from the ratchet), so a consumer can
                     // filter the gated set out of the whole finding list.
+                    "gated": d.gated,
+                    "example_payload": ex.payload,
+                    "example_path": ex.path,
+                    "example_injection_offset": ex.injection_offset,
+                    "example_snippet": ex.snippet,
+                }),
+                Detail::Ignore(d) => serde_json::json!({
+                    "audit": f.audit,
+                    // `gate-failing` (ignore's PANIC) vs `informational` (UNHONORED, ratchet-graded).
+                    "severity": f.severity.label(),
+                    "kind": d.kind_label,
+                    "shape": f.site,
+                    "count": d.count,
+                    "files": d.files,
+                    "node_type": d.node_type,
                     "gated": d.gated,
                     "example_payload": ex.payload,
                     "example_path": ex.path,

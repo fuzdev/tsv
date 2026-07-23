@@ -14,6 +14,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Comment ledger](#comment-ledger-audit-commentsaudit) | `comments:audit` | a parsed comment DROPPED or DOUBLE-PRINTED (print-once) | `deno task check` |
 | [Gap injection](#gap-injection-audit-gapsaudit) | `gaps:audit` | comment drops in gaps no fixture covers | `deno task check` (ratchet) |
 | [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse / ledger / blank-run | `deno task check` (ratchet) |
+| [Ignore honoring](#ignore-directive-honoring-audit-ignoreaudit) | `ignore:audit` | `prettier-ignore` positions that silently reformat an ignored node | `deno task check` (ratchet) |
 | [Build fanout](#build-fanout-audit-fanoutaudit) | `fanout:audit` | exponential doc-node rebuild in nested layout candidates | `deno task check` |
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check` |
@@ -142,6 +143,38 @@ cargo run --profile corpus -p tsv_debug --features audits blank_audit ~/dev/zzz/
 ```
 
 `deno task blanks:audit:update` regenerates the snapshot after fixing a shape; it refuses a narrowed run.
+
+## Ignore-Directive Honoring Audit (`ignore:audit`)
+
+The mechanized discovery of unhonored `// prettier-ignore` / `format-ignore` positions (Arm A of the systematic ignore-honoring gap). Recognition is centralized (`tsv_lang::is_format_ignore_directive`), but *consumption* is a per-node opt-in the printer makes at ~15 scattered sites — any position without one silently reformats an ignored construct, breaking the drop-in `prettier-ignore` contract. This audit turns the guess-list of suspected positions into a computed ledger, the way `comments:audit` structurally guards the per-site `owned_by_node` model rather than trusting each site by inspection. Design rationale lives in the `ignore_audit` module docs.
+
+```bash
+# ignore_audit - inject `// prettier-ignore` before every JS node and assert the
+# node's PERTURBED source survives verbatim. Per candidate node that leads its line
+# (inside a code_regions JS span), prepend the directive on its own line and DOUBLE
+# the node's interior structural spaces (reformat-removable; string/template/comment
+# interiors excluded), format once, and check the perturbed slice is a substring of
+# the output: present ⇒ honored, absent ⇒ UNHONORED at that node's AST position
+# (`{parent}.{field}`). A cheaper single-format check than blank_audit's F1 battery.
+# Pure Rust, no sidecar.
+cargo run --profile corpus -p tsv_debug --features audits ignore_audit   # tests/fixtures
+cargo run --profile corpus -p tsv_debug --features audits ignore_audit ~/dev/zzz/src
+# Also: --json, --report, --jobs N, --limit N, --update. Build with `--profile corpus`
+# (optimized + panic=unwind) so a formatter panic is caught + reported.
+#
+# GATED as a RATCHET (like gap_audit / blank_audit): `ignore_audit_known.txt` pins the known
+# unhonored positions, born red — the file shrinking (adding printer opt-ins) is the goal. A
+# NEW unhonored position, a STALE one (now honors), or any PANIC (a crash on the injected
+# directive — unpinnable) FAILS. Keyed by AST position, so every site of a position rolls up to
+# one line; a "covered" position can still appear when an uncovered SUB-PATH of it (e.g. an object
+# property nested in a member chain) doesn't honor.
+# Scope: JS positions only (the TS `//` directive over code_regions — standalone .ts/.svelte.ts +
+# Svelte <script>/{expr}); CSS `/* prettier-ignore */` and Svelte template `<!-- prettier-ignore -->`
+# are a follow-up; whitespace-perturbation only (a quote/paren-only reformat is invisible — Arm B's
+# remit); only format fixed points injected.
+```
+
+`deno task ignore:audit:update` regenerates the snapshot after adding a printer opt-in (a now-honored position goes stale → drop its line); it refuses a narrowed run.
 
 ## Build-Fanout Audit (`fanout:audit`)
 
