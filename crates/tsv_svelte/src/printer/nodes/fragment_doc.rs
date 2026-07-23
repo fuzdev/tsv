@@ -229,14 +229,24 @@ impl<'a> Printer<'a> {
             && trimmed_nodes.iter().any(|n| self.is_block_element_node(n));
 
         let mut format_ignore_next = false;
+        // Exclusive upper bound of indices already consumed by a maximal glued-element run built
+        // at its head (`build_glued_element_run`): the run is built ONCE at its first element and
+        // its tail elements are skipped, so the build is O(run length), not the O(run length²) a
+        // rebuild-at-each-element would cost on a long glued run (generated per-token `<span>`s).
+        let mut glued_run_consumed_until = 0usize;
         // Running `has_preceding_breakable` flag (see `build_nodes_doc`): OR-in the
         // prior node once per iteration rather than re-scanning `trimmed_nodes[..i]` at each of the
         // two use sites below. Reading `trimmed_nodes[i - 1]` at the top keeps the flag equal to
-        // `trimmed_nodes[..i]` through the `continue`s (format-ignore, whitespace-run collapse).
+        // `trimmed_nodes[..i]` through the `continue`s (format-ignore, whitespace-run collapse,
+        // glued-run skip).
         let mut has_preceding_breakable = false;
         for (i, node) in trimmed_nodes.iter().enumerate() {
             if i > 0 && is_inline_content(&trimmed_nodes[i - 1]) {
                 has_preceding_breakable = true;
+            }
+            // Tail of a glued element run already built at its head — skip (its doc is in place).
+            if i < glued_run_consumed_until {
+                continue;
             }
             // format-ignore: skip whitespace, emit raw source for ignored node
             if format_ignore_next {
@@ -336,11 +346,26 @@ impl<'a> Printer<'a> {
                     handle_whitespace_of_prev_text = false;
                 }
             } else if is_inline_content(node) {
-                self.handle_inline_child(
-                    node,
-                    &mut child_docs,
-                    &mut handle_whitespace_of_prev_text,
-                );
+                // Axis-3 element→element sibling-`>` dangle ("G2"), over a maximal glued RUN: when
+                // this element heads a run of 2+ byte-glued inline elements (`<span>foo</span><b>b</b><a…>`),
+                // build the whole run as ONE concat, so the preceding text's break-before-flow
+                // measurement sees the whole run as a unit — it moves to a fresh line together rather
+                // than dangling an opening tag after a space (any single element short enough to fit
+                // after the text can't rescue a wide LATER element in the run) — and each adjacent
+                // Soft pair sheds its `>` onto the next tag's line. Built once at the head; the tail
+                // elements are skipped via `glued_run_consumed_until`.
+                if let Some((run_doc, run_end)) = self.try_build_glued_element_run(trimmed_nodes, i)
+                {
+                    child_docs.push(run_doc);
+                    glued_run_consumed_until = run_end + 1;
+                    handle_whitespace_of_prev_text = false;
+                } else {
+                    self.handle_inline_child(
+                        node,
+                        &mut child_docs,
+                        &mut handle_whitespace_of_prev_text,
+                    );
+                }
             } else {
                 // Other nodes (comments, `{@const}`/`{@debug}`/`{const}`/`{let}` tags).
                 // `has_preceding_breakable` (tracked above) affects whether block conditions use
@@ -625,7 +650,23 @@ impl<'a> Printer<'a> {
                         // Last child: fold the element and the trailing words into ONE fill so a
                         // wide element wraps its own content within printWidth and the words pack
                         // after it — see `build_after_element_fold`.
-                        child_docs.push(self.build_after_element_fold(last_doc, raw));
+                        //
+                        // If the popped element is `handle_inline_child`'s `group([line, X])`
+                        // inline-sibling wrap (an element preceded by an inline sibling across a
+                        // bare space), keep X bare in the fold's lead content slot and hoist the
+                        // boundary line OUTSIDE the fold, reusing the standalone `group([line, …])`
+                        // shape. Folding the *line* into the lead double-counts the boundary: the
+                        // fill breaks before the fold AND the wrapping group re-renders its own
+                        // leading line flat → a stray leading space, non-idempotent
+                        // (`inline_break_before_prev_inline_long`).
+                        let folded = match d.strip_leading_line_group(last_doc) {
+                            Some(inner) => {
+                                let fold = self.build_after_element_fold(inner, raw);
+                                d.group(d.concat(&[d.line(), fold]))
+                            }
+                            None => self.build_after_element_fold(last_doc, raw),
+                        };
+                        child_docs.push(folded);
                         return;
                     }
                     // Non-last (text between two inline elements): keep the group-wrapped boundary.
@@ -725,12 +766,33 @@ impl<'a> Printer<'a> {
             // breaking its own tag in place. The newline-authored boundary already does this (it
             // emits a hardline); this makes the space-authored boundary converge to the same form.
             //
-            // Scoped to `!is_first`, mirroring prettier-plugin-svelte's `handleTextChild`: only a
-            // MIDDLE text node trims its trailing whitespace and lets the following inline element be
-            // wrapped in a droppable `group([line, element])`. A FIRST-child text leaves the element
-            // bare, so it hugs and overflows (the sanctioned `inline_closing_text` shape). Matching
-            // that split keeps the first-child hug cases unchanged while the in-flow boundaries drop.
-            let fill_doc = if trailing_line && next_is_flow && !is_first {
+            // Couple the break to the wide-element drop whether the preceding text is a first or a
+            // middle child: an inline element preceded by same-line content that must wrap starts on
+            // a fresh line rather than dangling its opening tag at the end of the text line (the
+            // `inline_break_before_*` divergences). tsv converges every authoring to that form where
+            // prettier keeps the opening tag on the text line — see conformance_prettier.md §Svelte:
+            // Inline content block-style. A first-child element with NO preceding text is unaffected
+            // (it never reaches this text handler; `hug_wide_first` still guards its idempotency).
+            let fill_doc = if next_is_flow && (trailing_line || !has_trailing_ws) {
+                // One `break_before_wide_flow` boundary rule, both authored shapes (the render side
+                // routes each to the right fill case by parity — see the flag's doc):
+                // - **space-separated** (`… word <a…>`, `trailing_line`): the trailing `line` is the
+                //   Case-2 separator; measuring the following element/run flat breaks it so a wide
+                //   element drops to its own line whole rather than packing onto the text line.
+                // - **glued** (`… glued<a…>`, `!has_trailing_ws`, no separator): the glued word is
+                //   the Case-1 last item; the same flat measurement breaks at the whitespace boundary
+                //   BEFORE the glued word so the whole glued run moves to a fresh line together,
+                //   never splitting the glued boundary (which would inject a rendered space).
+                //
+                // Either way an inline element preceded by same-line content that must wrap starts on
+                // a fresh line rather than dangling its opening tag at the text line's end (the
+                // `inline_break_before_*` divergences) — tsv converges every authoring to that form
+                // where prettier keeps the opening tag on the text line (conformance_prettier.md
+                // §Svelte: Inline content block-style). Coupled whether the preceding text is a first
+                // or middle child; a first-child element with NO preceding text is unaffected (it
+                // never reaches this handler; `hug_wide_first` still guards its idempotency). Not
+                // `multiline`-gated: a single-line-authored run that must wrap by width still
+                // converges to the fresh-line form (a short run that fits is a no-op).
                 d.with_context(
                     fill_doc,
                     tsv_lang::doc::DocContext {
@@ -743,8 +805,8 @@ impl<'a> Printer<'a> {
                 // (`… tsv is ~{ratio}`). prettier keeps the tag outside the fill, so the fill never
                 // breaks before that word and the tag rides past printWidth after it. Measure the
                 // last word alone so tsv matches — otherwise the glued tag folds into the word's fit
-                // check and strands it on its own line. (`has_trailing_ws` false ⇒ `trailing_line`
-                // false, so this never coincides with the branch above.)
+                // check and strands it on its own line. (A tag is never `next_is_flow`, so this is
+                // disjoint from the flow branch above.)
                 d.with_context(
                     fill_doc,
                     tsv_lang::doc::DocContext {
@@ -1050,6 +1112,98 @@ impl<'a> Printer<'a> {
         // `will_break`, then a rebuild — which made nested dangles O(2^depth).)
         let block_doc = self.build_block_node_doc_with_gt(block, gt)?;
         Some((element_doc, block_doc))
+    }
+
+    /// The element→element analog of [`Self::try_block_sibling_gt_dangle`] ("G2"), generalized from
+    /// a pair to a maximal glued RUN: when `nodes[i]` HEADS a run of 2+ byte-glued inline elements,
+    /// build the whole run as one concat (see [`Self::build_glued_element_run`]) and return
+    /// `(run_doc, run_end)` — the last index the run covers, so the caller can skip the tail.
+    /// `None` when `nodes[i]` is not an inline element or has no glued inline-element follower (the
+    /// caller handles it as an ordinary inline child). Detecting at the head and skipping the tail
+    /// keeps the build O(run length); a walk-back-and-rebuild at each element would be O(length²).
+    fn try_build_glued_element_run(
+        &self,
+        trimmed_nodes: &[FragmentNode<'_>],
+        i: usize,
+    ) -> Option<(DocId, usize)> {
+        let node = trimmed_nodes.get(i)?;
+        if !matches!(node, FragmentNode::Element(_)) || self.is_block_fragment_node(node) {
+            return None;
+        }
+        // Extend forward over the unbroken byte-glued chain of inline elements.
+        let mut end = i;
+        while let Some(next) = trimmed_nodes.get(end + 1) {
+            if matches!(next, FragmentNode::Element(_))
+                && !self.is_block_fragment_node(next)
+                && trimmed_nodes[end].span().end == next.span().start
+            {
+                end += 1;
+            } else {
+                break;
+            }
+        }
+        // A lone element (no glued follower) is an ordinary inline child.
+        if end == i {
+            return None;
+        }
+        let run_doc = self.build_glued_element_run(trimmed_nodes, i, end)?;
+        Some((run_doc, end))
+    }
+
+    /// Build a maximal run of byte-adjacent (glued) inline **elements** — `nodes[start..=end]`,
+    /// all plain non-block `Element`s (`None` if any isn't) — as ONE concat. Two effects, both the
+    /// point of the "run travels together" posture:
+    ///
+    /// - **break-before as a unit**: the preceding text's break-before-flow measurement measures
+    ///   this whole concat flat (`after_element_fold_lead` returns `None` for a plain concat → the
+    ///   whole thing), so a wide element anywhere in the run pulls the *entire* run to a fresh line
+    ///   rather than stranding an opening tag after a space.
+    /// - **per-pair sibling-`>` dangle (G2)**: each adjacent pair whose BOTH elements are
+    ///   Soft-eligible sheds the first's closing `>` onto the second's line (`</span⏎><a⏎…`); the
+    ///   receiver renders it as a leading `if_break` inside its attrs group, so it hugs when the
+    ///   attrs fit and dangles when they wrap. A mid-run element both receives (from its left) and
+    ///   sheds (to its right).
+    ///
+    /// Eligibility is a per-element property (a flat hug-both `Soft` layout), computed up front for
+    /// every element because a pair's shed decision needs BOTH neighbours' eligibility — a shed
+    /// whose receiver turned out ineligible would strand the `>`. Against an ineligible neighbour
+    /// the boundary stays an intact `>` (the element renders its ordinary doc), so nothing is ever
+    /// lost. The `>` moves only *inside* a closing tag, so every reparse is byte-identical —
+    /// render-safe.
+    fn build_glued_element_run(
+        &self,
+        nodes: &[FragmentNode<'_>],
+        start: usize,
+        end: usize,
+    ) -> Option<DocId> {
+        let d = self.d();
+        let mut els: SmallVec<[&internal::Element<'_>; 8]> = SmallVec::new();
+        let mut eligible: SmallVec<[bool; 8]> = SmallVec::new();
+        for node in &nodes[start..=end] {
+            let FragmentNode::Element(el) = node else {
+                return None;
+            };
+            if self.is_block_fragment_node(node) {
+                return None;
+            }
+            eligible.push(self.build_inline_element_omit_close_gt(el).is_some());
+            els.push(el);
+        }
+        let n = els.len();
+        let mut parts: SmallVec<[DocId; 8]> = SmallVec::new();
+        for idx in 0..n {
+            let sheds = idx + 1 < n && eligible[idx] && eligible[idx + 1];
+            let receives = idx > 0 && eligible[idx] && eligible[idx - 1];
+            let doc = if sheds || receives {
+                let gt = if receives { Some(d.text(">")) } else { None };
+                // `sheds || receives` implies `eligible[idx]`, so this is `Some`.
+                self.build_inline_element_sibling_gt(els[idx], sheds, gt)?
+            } else {
+                self.build_fragment_node_doc(&nodes[start + idx])?
+            };
+            parts.push(doc);
+        }
+        Some(d.concat(&parts))
     }
 
     /// Dispatch a control-flow block (`{#if}` / `{#each}` / `{#key}` / `{#await}` /

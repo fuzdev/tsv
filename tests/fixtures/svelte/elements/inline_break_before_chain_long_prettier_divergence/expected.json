@@ -1,0 +1,186 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 827,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 605,
+				"data": "\n\tGlued inline-element CHAIN of 3+ (G2, generalized to a run). A whole run of byte-glued\n\tinline elements travels together: preceded by same-line text that must wrap, the entire\n\trun breaks to a fresh line at the whitespace boundary before it (a later wide element pulls\n\tthe whole run over — no earlier short element can strand the run on the text line), and\n\tevery adjacent pair sheds the first element's closing `>` onto the next tag's line\n\t(`</span` / `><b` / `</b` / `><a`). Prettier keeps the run on the text line and dangles the\n\tlast tag's attributes instead — see output_prettier.svelte.\n"
+			},
+			{
+				"type": "Text",
+				"start": 605,
+				"end": 606,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 606,
+				"end": 826,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 607
+					},
+					"end": {
+						"line": 10,
+						"column": 2,
+						"character": 608
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 609,
+							"end": 680,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11\n\t",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 word11\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 680,
+							"end": 694,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 12,
+									"column": 2,
+									"character": 681
+								},
+								"end": {
+									"line": 12,
+									"column": 6,
+									"character": 685
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 686,
+										"end": 687,
+										"raw": "a",
+										"data": "a"
+									}
+								]
+							}
+						},
+						{
+							"type": "RegularElement",
+							"start": 694,
+							"end": 704,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 12,
+									"column": 16,
+									"character": 695
+								},
+								"end": {
+									"line": 12,
+									"column": 17,
+									"character": 696
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 697,
+										"end": 698,
+										"raw": "b",
+										"data": "b"
+									}
+								]
+							}
+						},
+						{
+							"type": "RegularElement",
+							"start": 704,
+							"end": 820,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 13,
+									"column": 3,
+									"character": 705
+								},
+								"end": {
+									"line": 13,
+									"column": 4,
+									"character": 706
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 709,
+									"end": 801,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 14,
+											"column": 2,
+											"character": 709
+										},
+										"end": {
+											"line": 14,
+											"column": 6,
+											"character": 713
+										}
+									},
+									"value": [
+										{
+											"start": 715,
+											"end": 800,
+											"type": "Text",
+											"raw": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"data": "/aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 804,
+										"end": 816,
+										"raw": "\n\t\tcontent\n\t",
+										"data": "\n\t\tcontent\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 820,
+							"end": 822,
+							"raw": ".\n",
+							"data": ".\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 955,
+	"end": 925,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -99,31 +99,31 @@
 			{
 				"type": "Comment",
 				"start": 196,
-				"end": 373,
-				"data": " literal non-breaking space, exactly 101: \"tex\" tips past printWidth, so <code> lays out block-style (.x on its own line); the NBSP keeps \"tex\" glued to the </code> line "
+				"end": 362,
+				"data": " literal non-breaking space, exactly 101: the line overflows, so <code> breaks to a fresh line and collapses inline; the NBSP keeps \"tex\" glued to the </code> "
 			},
 			{
 				"type": "Text",
-				"start": 373,
-				"end": 374,
+				"start": 362,
+				"end": 363,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 374,
-				"end": 488,
+				"start": 363,
+				"end": 473,
 				"name": "p",
 				"name_loc": {
 					"start": {
 						"line": 7,
 						"column": 1,
-						"character": 375
+						"character": 364
 					},
 					"end": {
 						"line": 7,
 						"column": 2,
-						"character": 376
+						"character": 365
 					}
 				},
 				"attributes": [],
@@ -132,26 +132,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 377,
-							"end": 459,
-							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaa ",
-							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaa "
+							"start": 366,
+							"end": 449,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaa\n\t",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 aaaa\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 459,
-							"end": 479,
+							"start": 449,
+							"end": 464,
 							"name": "code",
 							"name_loc": {
 								"start": {
-									"line": 8,
-									"column": 82,
-									"character": 460
+									"line": 9,
+									"column": 2,
+									"character": 450
 								},
 								"end": {
-									"line": 8,
-									"column": 86,
-									"character": 464
+									"line": 9,
+									"column": 6,
+									"character": 454
 								}
 							},
 							"attributes": [],
@@ -160,97 +160,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 465,
-										"end": 472,
-										"raw": "\n\t\t.x\n\t",
-										"data": "\n\t\t.x\n\t"
-									}
-								]
-							}
-						},
-						{
-							"type": "Text",
-							"start": 479,
-							"end": 484,
-							"raw": " tex\n",
-							"data": " tex\n"
-						}
-					]
-				}
-			},
-			{
-				"type": "Text",
-				"start": 488,
-				"end": 490,
-				"raw": "\n\n",
-				"data": "\n\n"
-			},
-			{
-				"type": "Comment",
-				"start": 490,
-				"end": 562,
-				"data": " &nbsp; entity, exactly 100: glues \"te\" to </code>, stays inline "
-			},
-			{
-				"type": "Text",
-				"start": 562,
-				"end": 563,
-				"raw": "\n",
-				"data": "\n"
-			},
-			{
-				"type": "RegularElement",
-				"start": 563,
-				"end": 671,
-				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 14,
-						"column": 1,
-						"character": 564
-					},
-					"end": {
-						"line": 14,
-						"column": 2,
-						"character": 565
-					}
-				},
-				"attributes": [],
-				"fragment": {
-					"type": "Fragment",
-					"nodes": [
-						{
-							"type": "Text",
-							"start": 566,
-							"end": 643,
-							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 ",
-							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 "
-						},
-						{
-							"type": "RegularElement",
-							"start": 643,
-							"end": 658,
-							"name": "code",
-							"name_loc": {
-								"start": {
-									"line": 15,
-									"column": 77,
-									"character": 644
-								},
-								"end": {
-									"line": 15,
-									"column": 81,
-									"character": 648
-								}
-							},
-							"attributes": [],
-							"fragment": {
-								"type": "Fragment",
-								"nodes": [
-									{
-										"type": "Text",
-										"start": 649,
-										"end": 651,
+										"start": 455,
+										"end": 457,
 										"raw": ".x",
 										"data": ".x"
 									}
@@ -259,49 +170,49 @@
 						},
 						{
 							"type": "Text",
-							"start": 658,
-							"end": 667,
-							"raw": "&nbsp;te\n",
-							"data": " te\n"
+							"start": 464,
+							"end": 469,
+							"raw": " tex\n",
+							"data": " tex\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 671,
-				"end": 673,
+				"start": 473,
+				"end": 475,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 673,
-				"end": 839,
-				"data": " &nbsp; entity, exactly 101: \"tex\" tips past printWidth, so <code> lays out block-style (.x on its own line); the &nbsp; keeps \"tex\" glued to the </code> line "
+				"start": 475,
+				"end": 547,
+				"data": " &nbsp; entity, exactly 100: glues \"te\" to </code>, stays inline "
 			},
 			{
 				"type": "Text",
-				"start": 839,
-				"end": 840,
+				"start": 547,
+				"end": 548,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 840,
-				"end": 954,
+				"start": 548,
+				"end": 656,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 19,
+						"line": 13,
 						"column": 1,
-						"character": 841
+						"character": 549
 					},
 					"end": {
-						"line": 19,
+						"line": 13,
 						"column": 2,
-						"character": 842
+						"character": 550
 					}
 				},
 				"attributes": [],
@@ -310,26 +221,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 843,
-							"end": 920,
+							"start": 551,
+							"end": 628,
 							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 ",
 							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 "
 						},
 						{
 							"type": "RegularElement",
-							"start": 920,
-							"end": 940,
+							"start": 628,
+							"end": 643,
 							"name": "code",
 							"name_loc": {
 								"start": {
-									"line": 20,
+									"line": 14,
 									"column": 77,
-									"character": 921
+									"character": 629
 								},
 								"end": {
-									"line": 20,
+									"line": 14,
 									"column": 81,
-									"character": 925
+									"character": 633
 								}
 							},
 							"attributes": [],
@@ -338,18 +249,107 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 926,
-										"end": 933,
-										"raw": "\n\t\t.x\n\t",
-										"data": "\n\t\t.x\n\t"
+										"start": 634,
+										"end": 636,
+										"raw": ".x",
+										"data": ".x"
 									}
 								]
 							}
 						},
 						{
 							"type": "Text",
-							"start": 940,
-							"end": 950,
+							"start": 643,
+							"end": 652,
+							"raw": "&nbsp;te\n",
+							"data": " te\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 656,
+				"end": 658,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 658,
+				"end": 813,
+				"data": " &nbsp; entity, exactly 101: the line overflows, so <code> breaks to a fresh line and collapses inline; the &nbsp; keeps \"tex\" glued to the </code> "
+			},
+			{
+				"type": "Text",
+				"start": 813,
+				"end": 814,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 814,
+				"end": 924,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 18,
+						"column": 1,
+						"character": 815
+					},
+					"end": {
+						"line": 18,
+						"column": 2,
+						"character": 816
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 817,
+							"end": 895,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12\n\t",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 895,
+							"end": 910,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 20,
+									"column": 2,
+									"character": 896
+								},
+								"end": {
+									"line": 20,
+									"column": 6,
+									"character": 900
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 901,
+										"end": 903,
+										"raw": ".x",
+										"data": ".x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 910,
+							"end": 920,
 							"raw": "&nbsp;tex\n",
 							"data": " tex\n"
 						}

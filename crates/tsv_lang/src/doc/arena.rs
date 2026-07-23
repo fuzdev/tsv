@@ -1181,6 +1181,49 @@ impl DocArena {
         range.resolve(&self.children.borrow()).first().copied()
     }
 
+    /// If `id` is exactly `handle_inline_child`'s inline-sibling wrap — a non-breaking
+    /// `Group(Concat([Line(Normal|Soft), X]))` with no conditional-group states — return the
+    /// inner `X` (the bare element doc), dropping the leading boundary `Line`. `None` for any
+    /// other shape.
+    ///
+    /// The after-element fold uses this to keep `X` bare in the fold's lead content slot and
+    /// hoist the boundary line OUTSIDE the fold. Otherwise the fill's break and the group's own
+    /// re-decided leading line both charge the one boundary — a stray leading space on the
+    /// continuation line, which the next pass reads as indentation and drops (non-idempotent).
+    #[inline]
+    pub fn strip_leading_line_group(&self, id: DocId) -> Option<DocId> {
+        let nodes = self.nodes.borrow();
+        let DocNode::Group {
+            contents,
+            expanded_states,
+            should_break,
+            ..
+        } = &nodes[id.index()]
+        else {
+            return None;
+        };
+        if *should_break {
+            return None;
+        }
+        let children = self.children.borrow();
+        if !expanded_states.resolve(&children).is_empty() {
+            return None;
+        }
+        let DocNode::Concat(range) = &nodes[contents.index()] else {
+            return None;
+        };
+        let [first, x] = range.resolve(&children) else {
+            return None;
+        };
+        if !matches!(
+            nodes[first.index()],
+            DocNode::Line(LineKind::Normal | LineKind::Soft)
+        ) {
+            return None;
+        }
+        Some(*x)
+    }
+
     /// Tag `id` as the doc node that emits the comment at `span` in `source`.
     ///
     /// The print-once comment ledger's build-side seam for a doc-based printer: the

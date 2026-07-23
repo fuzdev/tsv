@@ -56,7 +56,44 @@ pub(super) fn render_fill_iterative(
         } else {
             rest_commands
         };
-        let content_fits = if is_final_segment && !lookahead_rest.is_empty() {
+        // `break_before_wide_flow`, Case-1 half: a GLUED text→element boundary (`… glued<a…>`) has
+        // no trailing separator, so the glued last word is the fill's last item and the element
+        // follows on the render stack — the whole-flat measurement lands here (the space-separated
+        // half lands in Case 2's `sep_fits`). A ws-fill also reaches this at `is_final_segment`, but
+        // its content there is a bare word whose `content_fits` only feeds `should_remeasure` (inert
+        // for a groupless leaf), so keying the block on the shared flag is contamination-free.
+        let content_fits = if context.break_before_wide_flow
+            && is_final_segment
+            && rest_commands
+                .last()
+                .is_some_and(|c| arena.will_break(c.doc))
+        {
+            // Forced-break element: the following inline element glued to the last word is already
+            // multiline (wrapped attributes / block-body handler), so the glued run can't stay on
+            // the line — never "fits". Mirrors Case 2's forced-break short-circuit; a flat
+            // measurement would wrongly report a fit at the element's own hardline.
+            false
+        } else if context.break_before_wide_flow && is_final_segment && !rest_commands.is_empty() {
+            // Measure the following element as a WHOLE flat unit so the fill breaks at the
+            // whitespace boundary BEFORE the glued last word when (word + element) don't fit. The
+            // element's inherited Break mode would otherwise let `arena_fits` short-circuit at its
+            // first internal line and wrongly report "fits", welding the word and breaking the
+            // element's own content in place.
+            let mut rest_flat: SmallVec<[ArenaCommand; 8]> = SmallVec::from_slice(rest_commands);
+            if let Some(next) = rest_flat.last_mut() {
+                next.doc = arena.after_element_fold_lead(next.doc).unwrap_or(next.doc);
+                next.mode = Mode::Flat;
+            }
+            arena_fits_with_lookahead(
+                arena,
+                content,
+                Mode::Flat,
+                &rest_flat,
+                remaining as isize,
+                embed,
+                source,
+            )
+        } else if is_final_segment && !lookahead_rest.is_empty() {
             arena_fits_with_lookahead(
                 arena,
                 content,

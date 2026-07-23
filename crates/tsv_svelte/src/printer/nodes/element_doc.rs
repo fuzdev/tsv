@@ -311,6 +311,21 @@ impl<'a> Printer<'a> {
         &self,
         element: &internal::Element<'_>,
     ) -> Option<DocId> {
+        self.build_inline_element_sibling_gt(element, true, None)
+    }
+
+    /// Shared body for the axis-3 element sibling-`>` roles, composable so one element can play
+    /// **both** at once inside a glued run (`build_glued_element_run`): it **sheds** its closing
+    /// `>` to the following sibling (`external_close = true`) and/or **receives** a preceding
+    /// sibling's `>` as a leading `if_break` inside its attrs group (`gt_prefix = Some`) — a mid-run
+    /// element does both. The single render-safe shape is a flat hug-both (`Soft`) content layout,
+    /// so a wrong element kind returns `None` and the caller keeps that boundary an intact `>`.
+    pub(crate) fn build_inline_element_sibling_gt(
+        &self,
+        element: &internal::Element<'_>,
+        external_close: bool,
+        gt_prefix: Option<DocId>,
+    ) -> Option<DocId> {
         // Special-content elements (raw `<script>`/`<style>`, foreign `<template>`,
         // whitespace-sensitive `<pre>`/`<textarea>`) never participate — their closing
         // tags aren't the simple hug-both shape.
@@ -358,7 +373,8 @@ impl<'a> Printer<'a> {
                     &ctx,
                     &attr_docs,
                     children_doc,
-                    true,
+                    external_close,
+                    gt_prefix,
                 ))
             }
             _ => None,
@@ -438,6 +454,37 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Build an opening tag whose leading `>` (`gt`) belongs to a **preceding glued inline
+    /// element** whose closing tag shed it (the axis-3 sibling-`>` dangle extended to an
+    /// element→element chain, "G2"). The `gt` sits as a leading `if_break([hardline, gt], gt)`
+    /// **inside** this tag's own attrs group, so it reads that group's break decision: when the
+    /// attributes wrap (`</span⏎><a⏎…`) the `>` drops with a hardline onto this tag's line; when
+    /// they fit flat (`</span><a…`) the `>` hugs. Placing the `<name` inside the group too (unlike
+    /// [`Self::build_opening_tag`], where it sits outside) is what lets the id-less `if_break`
+    /// read the attrs group — an `if_break` binds to its nearest enclosing `Group`.
+    fn build_opening_tag_with_gt_prefix(
+        &self,
+        name: DocId,
+        attr_docs: &[DocId],
+        force_break: bool,
+        gt: DocId,
+    ) -> DocId {
+        let d = self.d();
+        if attr_docs.is_empty() {
+            // No attrs ⇒ this tag can never wrap ⇒ the `>` always hugs, statically.
+            return d.concat(&[gt, d.text("<"), name]);
+        }
+        let sl = d.softline();
+        let attrs_body = d.indent(d.concat(&[d.concat(attr_docs), d.dedent(sl)]));
+        let prefix = d.if_break(d.concat(&[d.hardline(), gt]), gt);
+        let whole = d.concat(&[prefix, d.text("<"), name, attrs_body]);
+        if force_break {
+            d.group_break(whole)
+        } else {
+            d.group(whole)
+        }
+    }
+
     /// Build doc for element with content using boundary modes.
     ///
     /// Every arm here is **block-style**: both tags stay intact and the content moves to its own
@@ -485,7 +532,14 @@ impl<'a> Printer<'a> {
         // conformance_prettier.md §Svelte: Inline content block-style and the
         // inline_boundary_whitespace fixture.
         if boundary == BoundaryMode::Soft {
-            return self.build_collapsible_element_doc(parts, ctx, attr_docs, children_doc, false);
+            return self.build_collapsible_element_doc(
+                parts,
+                ctx,
+                attr_docs,
+                children_doc,
+                false,
+                None,
+            );
         }
 
         // Full multiline. `children_doc` was built once above as the multiline shape
@@ -527,6 +581,7 @@ impl<'a> Printer<'a> {
         attr_docs: &[DocId],
         children_doc: DocId,
         external_close: bool,
+        gt_prefix: Option<DocId>,
     ) -> DocId {
         let d = self.d();
 
@@ -535,7 +590,19 @@ impl<'a> Printer<'a> {
         // group and the content group stay SEPARATE, so attr-wrapping and content-wrapping
         // decouple — the decoupling that makes the with-attrs case idempotent now that content no
         // longer flows on the tag lines. See conformance_prettier.md.
-        let opening = self.build_opening_tag(parts.name, attr_docs, ctx.has_multiline_attr);
+        //
+        // `gt_prefix` (Some) is a preceding glued element's shed `>`, threaded into this tag's
+        // attrs group as a leading `if_break` (the G2 sibling-`>` dangle) — see
+        // [`Self::build_opening_tag_with_gt_prefix`].
+        let opening = match gt_prefix {
+            Some(gt) => self.build_opening_tag_with_gt_prefix(
+                parts.name,
+                attr_docs,
+                ctx.has_multiline_attr,
+                gt,
+            ),
+            None => self.build_opening_tag(parts.name, attr_docs, ctx.has_multiline_attr),
+        };
 
         // External close: the trailing `>` and its preceding boundary break are emitted elsewhere,
         // so both collapse to nothing here.

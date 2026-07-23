@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 178,
+	"end": 375,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 58,
-				"data": " Text after inline closing tag stays hugged with > "
+				"end": 259,
+				"data": "\n\tAn inline component preceded by same-line text breaks to a fresh line and collapses\n\tinline, rather than dangling its opening tag on the text line. Prettier keeps the opening\n\ttag on the text line and dangles it — see prettier_variant_dangle.svelte.\n"
 			},
 			{
 				"type": "Text",
-				"start": 58,
-				"end": 59,
+				"start": 259,
+				"end": 260,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 59,
-				"end": 177,
+				"start": 260,
+				"end": 374,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 2,
+						"line": 6,
 						"column": 1,
-						"character": 60
+						"character": 261
 					},
 					"end": {
-						"line": 2,
+						"line": 6,
 						"column": 2,
-						"character": 61
+						"character": 262
 					}
 				},
 				"attributes": [],
@@ -43,50 +43,50 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 62,
-							"end": 100,
-							"raw": "\n\ttext1 text2 text3 text4 text5 text6 ",
-							"data": "\n\ttext1 text2 text3 text4 text5 text6 "
+							"start": 263,
+							"end": 302,
+							"raw": "\n\ttext1 text2 text3 text4 text5 text6\n\t",
+							"data": "\n\ttext1 text2 text3 text4 text5 text6\n\t"
 						},
 						{
 							"type": "Component",
-							"start": 100,
-							"end": 171,
+							"start": 302,
+							"end": 368,
 							"name": "Comp",
 							"name_loc": {
 								"start": {
-									"line": 3,
-									"column": 38,
-									"character": 101
+									"line": 8,
+									"column": 2,
+									"character": 303
 								},
 								"end": {
-									"line": 3,
-									"column": 42,
-									"character": 105
+									"line": 8,
+									"column": 6,
+									"character": 307
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 106,
-									"end": 155,
+									"start": 308,
+									"end": 357,
 									"name": "href",
 									"name_loc": {
 										"start": {
-											"line": 3,
-											"column": 43,
-											"character": 106
+											"line": 8,
+											"column": 7,
+											"character": 308
 										},
 										"end": {
-											"line": 3,
-											"column": 47,
-											"character": 110
+											"line": 8,
+											"column": 11,
+											"character": 312
 										}
 									},
 									"value": [
 										{
-											"start": 112,
-											"end": 154,
+											"start": 314,
+											"end": 356,
 											"type": "Text",
 											"raw": "https://fuz.dev/long/path/to/resource/aaaa",
 											"data": "https://fuz.dev/long/path/to/resource/aaaa"
@@ -99,18 +99,18 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 156,
-										"end": 164,
-										"raw": "\n\t\tMDN\n\t",
-										"data": "\n\t\tMDN\n\t"
+										"start": 358,
+										"end": 361,
+										"raw": "MDN",
+										"data": "MDN"
 									}
 								]
 							}
 						},
 						{
 							"type": "Text",
-							"start": 171,
-							"end": 173,
+							"start": 368,
+							"end": 370,
 							"raw": ".\n",
 							"data": ".\n"
 						}
