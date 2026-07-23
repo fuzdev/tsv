@@ -9,7 +9,8 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 `## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
-<!-- bump: patch -->
+
+- various formatting fixes
 
 ## 0.2.0
 
