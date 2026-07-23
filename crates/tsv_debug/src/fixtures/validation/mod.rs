@@ -62,6 +62,7 @@ pub struct FixtureValidation {
     pub divergent_variant_count: usize,
     pub prettier_intermediate_count: usize,
     pub prettier_intermediate_to_variant_count: usize,
+    pub prettier_intermediate_to_divergent_variant_count: usize,
     pub invalid_syntax_count: usize,
     /// Input content for cross-fixture duplicate detection (populated during validation)
     pub input_content: Option<String>,
@@ -110,6 +111,7 @@ impl FixtureValidation {
             divergent_variant_count: 0,
             prettier_intermediate_count: 0,
             prettier_intermediate_to_variant_count: 0,
+            prettier_intermediate_to_divergent_variant_count: 0,
             invalid_syntax_count: 0,
             input_content: None,
             input_file_name: None,
@@ -184,6 +186,8 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
     result.divergent_variant_count = files.divergent_variant.len();
     result.prettier_intermediate_count = files.prettier_intermediate.len();
     result.prettier_intermediate_to_variant_count = files.prettier_intermediate_to_variant.len();
+    result.prettier_intermediate_to_divergent_variant_count =
+        files.prettier_intermediate_to_divergent_variant.len();
     result.invalid_syntax_count = files.input_invalid.len();
 
     // Read input file

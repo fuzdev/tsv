@@ -223,7 +223,9 @@ async fn run(filters: &[String]) -> Result<(), CliError> {
         println!("⚠️  Updated source of truth files (output_prettier.*)");
     }
     if intermediate_created > 0 || intermediate_updated > 0 || intermediate_removed > 0 {
-        println!("⚠️  Updated prettier_intermediate_* / prettier_intermediate_to_variant_* files");
+        println!(
+            "⚠️  Updated prettier_intermediate_* / prettier_intermediate_to_variant_* / prettier_intermediate_to_divergent_variant_* files"
+        );
     }
     if signature_created > 0 || signature_updated > 0 || signature_removed > 0 {
         println!("⚠️  Updated audit_signature.txt files");
@@ -431,6 +433,10 @@ enum ChainShape {
     /// First pass unstable, second pass equals a sibling `variant_*` / `prettier_variant_*` —
     /// write `prettier_intermediate_to_variant_*`.
     UnstableConvergesToVariant,
+    /// First pass unstable, second pass equals a sibling `divergent_variant_*` (a
+    /// prettier-stable form ours rewrites to a third form) — write
+    /// `prettier_intermediate_to_divergent_variant_*` (N7c).
+    UnstableConvergesToDivergentVariant,
     /// First pass unstable, second pass is neither `input` nor any documented variant —
     /// the chain is anchored further downstream and captured by `audit_signature.txt`
     /// alongside `output_prettier.*`; no intermediate file is appropriate.
@@ -467,11 +473,18 @@ async fn update_intermediate_files(
     let files = FixtureFiles::scan(fixture);
 
     // Pre-load convergence-target contents to distinguish "converges to input" from
-    // "converges to a documented variant" on the second pass.
+    // "converges to a documented variant" / "…to a documented divergent_variant" on the
+    // second pass.
     let mut variant_target_contents: Vec<String> = Vec::new();
     for pv_name in files.prettier_variant.iter().chain(&files.variant) {
         if let Ok(content) = fixtures::read_file(&fixture.path.join(pv_name)) {
             variant_target_contents.push(content);
+        }
+    }
+    let mut divergent_variant_target_contents: Vec<String> = Vec::new();
+    for dv_name in &files.divergent_variant {
+        if let Ok(content) = fixtures::read_file(&fixture.path.join(dv_name)) {
+            divergent_variant_target_contents.push(content);
         }
     }
 
@@ -484,22 +497,30 @@ async fn update_intermediate_files(
 
         let plain_filename = format!("prettier_intermediate_{suffix}{input_ext}");
         let to_variant_filename = format!("prettier_intermediate_to_variant_{suffix}{input_ext}");
+        let to_divergent_variant_filename =
+            format!("prettier_intermediate_to_divergent_variant_{suffix}{input_ext}");
         let plain_path = fixture.path.join(&plain_filename);
         let to_variant_path = fixture.path.join(&to_variant_filename);
+        let to_divergent_variant_path = fixture.path.join(&to_divergent_variant_filename);
 
-        let (shape, formatted) =
-            match classify_variant_chain(fixture, variant_name, &input, &variant_target_contents)
-                .await
-            {
-                Ok(pair) => pair,
-                Err(e) => {
-                    results.push(IntermediateOutput::File(
-                        plain_filename,
-                        FormattedResult::Failed(e),
-                    ));
-                    continue;
-                }
-            };
+        let (shape, formatted) = match classify_variant_chain(
+            fixture,
+            variant_name,
+            &input,
+            &variant_target_contents,
+            &divergent_variant_target_contents,
+        )
+        .await
+        {
+            Ok(pair) => pair,
+            Err(e) => {
+                results.push(IntermediateOutput::File(
+                    plain_filename,
+                    FormattedResult::Failed(e),
+                ));
+                continue;
+            }
+        };
 
         match shape {
             ChainShape::NormalizesToInput | ChainShape::StableFirstPass => {
@@ -507,6 +528,7 @@ async fn update_intermediate_files(
                     &[
                         (&plain_path, &plain_filename),
                         (&to_variant_path, &to_variant_filename),
+                        (&to_divergent_variant_path, &to_divergent_variant_filename),
                     ],
                     &mut results,
                 );
@@ -522,6 +544,7 @@ async fn update_intermediate_files(
                     &[
                         (&plain_path, &plain_filename),
                         (&to_variant_path, &to_variant_filename),
+                        (&to_divergent_variant_path, &to_divergent_variant_filename),
                     ],
                     &mut results,
                 );
@@ -540,6 +563,7 @@ async fn update_intermediate_files(
                     &[
                         (&plain_path, &plain_filename),
                         (&to_variant_path, &to_variant_filename),
+                        (&to_divergent_variant_path, &to_divergent_variant_filename),
                     ],
                     &mut results,
                 );
@@ -548,8 +572,10 @@ async fn update_intermediate_files(
                 write_intermediate_target(
                     &plain_path,
                     plain_filename,
-                    &to_variant_path,
-                    to_variant_filename,
+                    &[
+                        (&to_variant_path, &to_variant_filename),
+                        (&to_divergent_variant_path, &to_divergent_variant_filename),
+                    ],
                     &formatted,
                     &mut results,
                 );
@@ -558,8 +584,22 @@ async fn update_intermediate_files(
                 write_intermediate_target(
                     &to_variant_path,
                     to_variant_filename,
-                    &plain_path,
-                    plain_filename,
+                    &[
+                        (&plain_path, &plain_filename),
+                        (&to_divergent_variant_path, &to_divergent_variant_filename),
+                    ],
+                    &formatted,
+                    &mut results,
+                );
+            }
+            ChainShape::UnstableConvergesToDivergentVariant => {
+                write_intermediate_target(
+                    &to_divergent_variant_path,
+                    to_divergent_variant_filename,
+                    &[
+                        (&plain_path, &plain_filename),
+                        (&to_variant_path, &to_variant_filename),
+                    ],
                     &formatted,
                     &mut results,
                 );
@@ -580,6 +620,7 @@ async fn classify_variant_chain(
     variant_name: &str,
     input: &str,
     variant_target_contents: &[String],
+    divergent_variant_target_contents: &[String],
 ) -> Result<(ChainShape, String), String> {
     let variant_content = fixtures::read_file(&fixture.path.join(variant_name))?;
     let parser = fixture.input_type().prettier_parser();
@@ -607,6 +648,8 @@ async fn classify_variant_chain(
         ChainShape::UnstableConvergesToInput
     } else if variant_target_contents.contains(&second_pass) {
         ChainShape::UnstableConvergesToVariant
+    } else if divergent_variant_target_contents.contains(&second_pass) {
+        ChainShape::UnstableConvergesToDivergentVariant
     } else {
         ChainShape::UnstableNotConverging
     };
@@ -630,23 +673,25 @@ fn remove_stale_intermediates(
 }
 
 /// Write `formatted` into `target_path` (Created/Updated/Unchanged) and clean up any stale
-/// `opposite_path` from a previous run with a different chain shape.
+/// `opposite_paths` from a previous run with a different chain shape (there are now three
+/// mutually exclusive intermediate kinds — plain / to_variant / to_divergent_variant).
 fn write_intermediate_target(
     target_path: &std::path::Path,
     target_filename: String,
-    opposite_path: &std::path::Path,
-    opposite_filename: String,
+    opposite_paths: &[(&std::path::Path, &String)],
     formatted: &str,
     results: &mut Vec<IntermediateOutput>,
 ) {
-    if opposite_path.exists()
-        && let Err(e) = fixtures::delete_file_if_exists(opposite_path)
-    {
-        results.push(IntermediateOutput::File(
-            opposite_filename,
-            FormattedResult::Failed(e),
-        ));
-        // Continue to write the correct target even on cleanup failure.
+    for (opposite_path, opposite_filename) in opposite_paths {
+        if opposite_path.exists()
+            && let Err(e) = fixtures::delete_file_if_exists(opposite_path)
+        {
+            results.push(IntermediateOutput::File(
+                (*opposite_filename).clone(),
+                FormattedResult::Failed(e),
+            ));
+            // Continue to write the correct target even on cleanup failure.
+        }
     }
 
     let existing = fixtures::read_file(target_path).ok();

@@ -1386,9 +1386,14 @@ impl<'a> Printer<'a> {
     ///   re-emits the shell's leading block comments and trailing comments in place — so
     ///   the shell can hold anything and only the leading line run needs hoisting (no
     ///   block/trailing decline);
-    /// - a **bare** inner (`build_type_doc`) drops whatever the shell held, so there the
-    ///   shared guard's decline (block in the leading gap, or any trailing comment →
-    ///   preserve the parens in place instead) still applies.
+    /// - a **bare** inner strips its parens entirely, so the whole leading run (block +
+    ///   line) hoists here and the stripped inner is built via `build_hang_value_doc`
+    ///   (which re-attaches any trailing comment) — mirroring the bug188 keyword→value
+    ///   seam. Gated on a leading **line** comment (the hang trigger): a mixed
+    ///   (`(/* b */ // c⏎ A) & B`) or trailing (`(// c⏎ A /* t */) & B`) shell hoists and
+    ///   settles on the same fixed point the bare authoring does; a block-only or
+    ///   trailing-block-only shell has no line comment, so it stays on the idempotent
+    ///   no-hoist path.
     ///
     /// Without the union carve-out, a mixed shell (`(/* b */ // c⏎ a | b) & d`) declined
     /// and dropped the line comment its inner union would have kept.
@@ -1409,7 +1414,22 @@ impl<'a> Printer<'a> {
             .filter(|c| !c.is_block)
             .collect();
         }
-        self.stripped_paren_leading_line_comments(first_member)
+        // Bare inner: hoist the full leading run (block + line), but only when a leading
+        // line comment forces the hang — a block-only leading gap keeps its block inline
+        // and is already idempotent. Collect the run once and gate on it directly (the
+        // hang trigger is a line comment in the run). The trailing comment is re-attached
+        // by `build_hang_value_doc` in `build_intersection_first_member_stripped`, so
+        // nothing is dropped.
+        let lead: CommentVec<'_> = comments_to_emit_in_range(
+            self.comments,
+            first_member.span().start + 1,
+            inner.span().start,
+        )
+        .collect();
+        if lead.iter().any(|c| !c.is_block) {
+            return lead;
+        }
+        smallvec![]
     }
 
     /// Build the first intersection member's type doc with its parenthesized leading
@@ -1441,10 +1461,20 @@ impl<'a> Printer<'a> {
                 // Matches the bare intersection-member parenthesization in
                 // `build_intersection_member_type_doc`: no inner `d.indent`, the
                 // level comes from the intersection printer's own `& `-line indent.
-                d.concat(&[d.text("("), self.build_type_doc(inner), d.text(")")])
+                // Thread any trailing comment lifted from the stripped shell through the
+                // precedence re-wrap (an object-trailing intersection inner,
+                // `(// c⏎ X & { … } /* t */) & B`) so it isn't dropped — the `)` the
+                // re-wrap adds is not the stripped shell's, so the trailing gap comment
+                // still needs re-attaching.
+                let rewrapped = d.concat(&[d.text("("), self.build_type_doc(inner), d.text(")")]);
+                self.with_stripped_paren_trailing(rewrapped, first_member, inner, false)
             }
         } else {
-            self.build_type_doc(inner)
+            // Re-attach any trailing comment lifted from a stripped shell (`(A /* t */)`);
+            // type position, so a trailing block trails the member inline (defer = false).
+            // A no-op when `first_member` was not a stripped shell or held no trailing
+            // comment — leaving the bare-inner layout unchanged.
+            self.build_hang_value_doc(first_member, inner, false)
         }
     }
 

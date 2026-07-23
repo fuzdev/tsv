@@ -52,6 +52,7 @@ pub struct ValidationSummary {
     pub total_divergent_variant: usize,
     pub total_prettier_intermediate: usize,
     pub total_prettier_intermediate_to_variant: usize,
+    pub total_prettier_intermediate_to_divergent_variant: usize,
     pub total_invalid_syntax: usize,
     pub results: Vec<FixtureValidation>,
     pub cross_fixture_duplicates: Vec<Vec<String>>,
@@ -86,6 +87,8 @@ impl ValidationSummary {
         self.total_prettier_intermediate += result.prettier_intermediate_count;
         self.total_prettier_intermediate_to_variant +=
             result.prettier_intermediate_to_variant_count;
+        self.total_prettier_intermediate_to_divergent_variant +=
+            result.prettier_intermediate_to_divergent_variant_count;
         self.total_invalid_syntax += result.invalid_syntax_count;
         self.total_undocumented_prettier += result.undocumented_prettier_outputs.len();
         self.total_render_equiv_compile += result.render_equiv_verified_compile;
@@ -315,6 +318,12 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
             variant_parts.push(format!(
                 "{} prettier_intermediate_to_variant_*",
                 summary.total_prettier_intermediate_to_variant
+            ));
+        }
+        if summary.total_prettier_intermediate_to_divergent_variant > 0 {
+            variant_parts.push(format!(
+                "{} prettier_intermediate_to_divergent_variant_*",
+                summary.total_prettier_intermediate_to_divergent_variant
             ));
         }
         if summary.total_invalid_syntax > 0 {

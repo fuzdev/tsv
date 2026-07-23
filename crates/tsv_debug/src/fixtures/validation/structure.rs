@@ -233,6 +233,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
             .chain(&files.divergent_variant)
             .chain(&files.prettier_intermediate)
             .chain(&files.prettier_intermediate_to_variant)
+            .chain(&files.prettier_intermediate_to_divergent_variant)
         {
             conflicts.push(name.clone());
         }
@@ -358,6 +359,8 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
     let has_prettier_intermediate_files = !files.prettier_intermediate.is_empty();
     let has_prettier_intermediate_to_variant_files =
         !files.prettier_intermediate_to_variant.is_empty();
+    let has_prettier_intermediate_to_divergent_variant_files =
+        !files.prettier_intermediate_to_divergent_variant.is_empty();
 
     // Prettier divergence suffix is required when ANY prettier divergence files exist
     let needs_prettier_divergence_suffix = has_output_prettier
@@ -368,6 +371,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         || !files.unformatted_prettier.is_empty()
         || has_prettier_intermediate_files
         || has_prettier_intermediate_to_variant_files
+        || has_prettier_intermediate_to_divergent_variant_files
         || files.prettier_nonconvergent
         || files.prettier_rejects;
 
@@ -415,6 +419,13 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
             reasons.push(format!(
                 "{} prettier_intermediate_to_variant_*{} file(s)",
                 files.prettier_intermediate_to_variant.len(),
+                input_ext
+            ));
+        }
+        if has_prettier_intermediate_to_divergent_variant_files {
+            reasons.push(format!(
+                "{} prettier_intermediate_to_divergent_variant_*{} file(s)",
+                files.prettier_intermediate_to_divergent_variant.len(),
                 input_ext
             ));
         }
@@ -624,6 +635,8 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
     let has_divergent_variant = !files.divergent_variant.is_empty();
     let has_prettier_intermediate = !files.prettier_intermediate.is_empty();
     let has_prettier_intermediate_to_variant = !files.prettier_intermediate_to_variant.is_empty();
+    let has_prettier_intermediate_to_divergent_variant =
+        !files.prettier_intermediate_to_divergent_variant.is_empty();
 
     let needs_readme = has_parser_divergence
         || has_formatter_divergence
@@ -632,6 +645,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         || has_divergent_variant
         || has_prettier_intermediate
         || has_prettier_intermediate_to_variant
+        || has_prettier_intermediate_to_divergent_variant
         || files.prettier_nonconvergent
         || files.prettier_rejects;
 
@@ -668,6 +682,11 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         if has_prettier_intermediate_to_variant {
             reasons.push(format!(
                 "- Prettier intermediate to variant (prettier_intermediate_to_variant_*{input_ext})"
+            ));
+        }
+        if has_prettier_intermediate_to_divergent_variant {
+            reasons.push(format!(
+                "- Prettier intermediate to divergent variant (prettier_intermediate_to_divergent_variant_*{input_ext})"
             ));
         }
         if files.prettier_nonconvergent {
@@ -786,6 +805,7 @@ fn validate_tsv_rejects_structure(
         .chain(&files.divergent_variant)
         .chain(&files.prettier_intermediate)
         .chain(&files.prettier_intermediate_to_variant)
+        .chain(&files.prettier_intermediate_to_divergent_variant)
         .chain(&files.input_invalid)
     {
         conflicts.push(name.clone());
