@@ -1,0 +1,324 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1371,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 901,
+				"data": "\n\tAn inline element glued to text on BOTH sides (no whitespace either side) on an\n\tover-width line cannot break before or after, so tsv dangles the element's closing\n\t`>` — `<span>x</span⏎>` — the render-safe, tag-internal break (whitespace inside an\n\tend tag is ignored, so the AST is byte-identical). This is the sibling-`>` dangle\n\t(already used when an inline element is glued to a following element/block) firing onto\n\tfollowing glued text, and the no-trailing-space analog of the trailing-space wrap. It\n\tapplies while the dangle line (`prefix<span>content</span`) still fits ≤100; the\n\tcontent stays inline. Both formatters agree. Cases: fits inline@100 (control); 101\n\t(breaks + dangles); larger content that still fits the dangle line (dangles); the widest\n\tprefix whose dangle line is exactly 100 (dangles — one wider block-styles, see\n\tinline_glued_before_long_prettier_divergence).\n"
+			},
+			{
+				"type": "Text",
+				"start": 901,
+				"end": 902,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 902,
+				"end": 1010,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 903
+					},
+					"end": {
+						"line": 14,
+						"column": 2,
+						"character": 904
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 905,
+							"end": 949,
+							"raw": "\n\tffffffffffffffffffffffffffffffffffffffffff",
+							"data": "\n\tffffffffffffffffffffffffffffffffffffffffff"
+						},
+						{
+							"type": "RegularElement",
+							"start": 949,
+							"end": 963,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 15,
+									"column": 44,
+									"character": 950
+								},
+								"end": {
+									"line": 15,
+									"column": 48,
+									"character": 954
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 955,
+										"end": 956,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 963,
+							"end": 1006,
+							"raw": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+							"data": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1010,
+				"end": 1011,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1011,
+				"end": 1122,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 1012
+					},
+					"end": {
+						"line": 17,
+						"column": 2,
+						"character": 1013
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1014,
+							"end": 1058,
+							"raw": "\n\tffffffffffffffffffffffffffffffffffffffffff",
+							"data": "\n\tffffffffffffffffffffffffffffffffffffffffff"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1058,
+							"end": 1074,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 18,
+									"column": 44,
+									"character": 1059
+								},
+								"end": {
+									"line": 18,
+									"column": 48,
+									"character": 1063
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1064,
+										"end": 1065,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1074,
+							"end": 1118,
+							"raw": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+							"data": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1122,
+				"end": 1123,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1123,
+				"end": 1248,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 21,
+						"column": 1,
+						"character": 1124
+					},
+					"end": {
+						"line": 21,
+						"column": 2,
+						"character": 1125
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1126,
+							"end": 1148,
+							"raw": "\n\tffffffffffffffffffff",
+							"data": "\n\tffffffffffffffffffff"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1148,
+							"end": 1203,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 22,
+									"column": 22,
+									"character": 1149
+								},
+								"end": {
+									"line": 22,
+									"column": 26,
+									"character": 1153
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1154,
+										"end": 1194,
+										"raw": "cccccccccccccccccccccccccccccccccccccccc",
+										"data": "cccccccccccccccccccccccccccccccccccccccc"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1203,
+							"end": 1244,
+							"raw": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+							"data": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1248,
+				"end": 1249,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1249,
+				"end": 1370,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 25,
+						"column": 1,
+						"character": 1250
+					},
+					"end": {
+						"line": 25,
+						"column": 2,
+						"character": 1251
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1252,
+							"end": 1339,
+							"raw": "\n\tfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+							"data": "\n\tfffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1339,
+							"end": 1355,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 26,
+									"column": 87,
+									"character": 1340
+								},
+								"end": {
+									"line": 26,
+									"column": 91,
+									"character": 1344
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1345,
+										"end": 1346,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1355,
+							"end": 1366,
+							"raw": "bbbbbbbbbb\n",
+							"data": "bbbbbbbbbb\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

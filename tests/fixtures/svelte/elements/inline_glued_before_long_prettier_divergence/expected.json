@@ -1,0 +1,287 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1223,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 361,
+				"data": "\n\tTwo glued-before shapes where tsv does NOT dangle the closing `>` (unlike the\n\tdangle case, see inline_glued_both_dangle). The dangle only applies while the\n\tdangle line (`prefix<span>content</span`) fits ≤100; past that, and when there is\n\ta trailing space to wrap at instead, tsv resolves the over-width line differently\n\tfrom prettier. Cases below.\n"
+			},
+			{
+				"type": "Text",
+				"start": 361,
+				"end": 363,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 363,
+				"end": 694,
+				"data": " glued both sides, dangle line at 101 (one past the widest that dangles) → block-style,\n     since dangling the `>` would leave `…<span>x</span` over-width; prettier double-dangles\n     (`<span⏎>x</span⏎>`). This is the block-style side of the dangle boundary — the\n     dangle@100 case is in inline_glued_both_dangle_long. "
+			},
+			{
+				"type": "Text",
+				"start": 694,
+				"end": 695,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 695,
+				"end": 820,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 696
+					},
+					"end": {
+						"line": 13,
+						"column": 2,
+						"character": 697
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 698,
+							"end": 786,
+							"raw": "\n\tffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff",
+							"data": "\n\tffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffffff"
+						},
+						{
+							"type": "RegularElement",
+							"start": 786,
+							"end": 805,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 88,
+									"character": 787
+								},
+								"end": {
+									"line": 14,
+									"column": 92,
+									"character": 791
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 792,
+										"end": 798,
+										"raw": "\n\t\tx\n\t",
+										"data": "\n\t\tx\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 805,
+							"end": 816,
+							"raw": "bbbbbbbbbb\n",
+							"data": "bbbbbbbbbb\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 820,
+				"end": 822,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 822,
+				"end": 902,
+				"data": " glued before, space after, fits at exactly 100 → stays inline (control) "
+			},
+			{
+				"type": "Text",
+				"start": 902,
+				"end": 903,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 903,
+				"end": 1011,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 20,
+						"column": 1,
+						"character": 904
+					},
+					"end": {
+						"line": 20,
+						"column": 2,
+						"character": 905
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 906,
+							"end": 949,
+							"raw": "\n\tfffffffffffffffffffffffffffffffffffffffff",
+							"data": "\n\tfffffffffffffffffffffffffffffffffffffffff"
+						},
+						{
+							"type": "RegularElement",
+							"start": 949,
+							"end": 963,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 21,
+									"column": 43,
+									"character": 950
+								},
+								"end": {
+									"line": 21,
+									"column": 47,
+									"character": 954
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 955,
+										"end": 956,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 963,
+							"end": 1007,
+							"raw": " bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+							"data": " bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1011,
+				"end": 1013,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1013,
+				"end": 1111,
+				"data": " glued before, space after, 101 → wraps at the trailing space; prettier keeps the 101 line "
+			},
+			{
+				"type": "Text",
+				"start": 1111,
+				"end": 1112,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1112,
+				"end": 1222,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 25,
+						"column": 1,
+						"character": 1113
+					},
+					"end": {
+						"line": 25,
+						"column": 2,
+						"character": 1114
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1115,
+							"end": 1158,
+							"raw": "\n\tfffffffffffffffffffffffffffffffffffffffff",
+							"data": "\n\tfffffffffffffffffffffffffffffffffffffffff"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1158,
+							"end": 1172,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 26,
+									"column": 43,
+									"character": 1159
+								},
+								"end": {
+									"line": 26,
+									"column": 47,
+									"character": 1163
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1164,
+										"end": 1165,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1172,
+							"end": 1218,
+							"raw": "\n\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n",
+							"data": "\n\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
