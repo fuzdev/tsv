@@ -303,15 +303,14 @@ impl<'a> Printer<'a> {
         let mut prev_end = param.name.span.end;
 
         if let Some(constraint) = &param.constraint {
-            // If the constraint is `(// leading\n T)`, treat the leading line
-            // comment inside the parens as if it were between `extends` and the
-            // constraint so it forces the indent-and-break layout (matching
-            // prettier's paren stripping).
-            let (value_search_end, value_type): (u32, &TSType<'_>) = if has_comments
-                && let TSType::Parenthesized(p) = constraint
-                && self.paren_has_leading_line_comment(p)
-            {
-                (p.type_annotation.span().start, p.type_annotation)
+            // If the constraint is `(// leading\n T)` — or the double-nested
+            // `((// leading\n T))` — treat the leading line comment inside the parens
+            // as if it were between `extends` and the constraint so it forces the
+            // indent-and-break layout (matching prettier's paren stripping). The deep
+            // window unwraps every redundant layer; a shallow one-level window missed
+            // a comment nested one paren deeper (non-idempotent).
+            let (value_search_end, value_type): (u32, &TSType<'_>) = if has_comments {
+                self.keyword_value_stripped_paren_hang(constraint)
             } else {
                 (constraint.span().start, constraint)
             };
@@ -350,6 +349,16 @@ impl<'a> Printer<'a> {
         }
 
         if let Some(default) = &param.default {
+            // Same deep-window paren handling as the constraint above: `<T = (// c\n U)>`
+            // (and the double-nested form) strips to the same hang as bare `<T = // c\n U>`,
+            // so substitute the unwrapped inner and widen the gap window to its start. The
+            // guard preserves a mixed shell in place (via `append_keyword_value`).
+            let (value_search_end, value_type): (u32, &TSType<'_>) = if has_comments {
+                self.keyword_value_stripped_paren_hang(default)
+            } else {
+                (default.span().start, default)
+            };
+
             // Find `=` between previous end and default
             let comment_range = has_comments.then(|| {
                 #[allow(clippy::expect_used)] // = must exist when a default is present
@@ -371,14 +380,14 @@ impl<'a> Printer<'a> {
                 ) {
                     parts.push(pre);
                 }
-                (eq_end, default.span().start)
+                (eq_end, value_search_end)
             });
 
             parts.push(d.text(" ="));
             self.append_keyword_value(
                 &mut parts,
                 comment_range,
-                default,
+                value_type,
                 GroupId::TypeParameterDefault,
             );
             prev_end = default.span().end;

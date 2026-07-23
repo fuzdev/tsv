@@ -131,18 +131,29 @@ impl<'a> Printer<'a> {
                             CommentSpacing::Leading,
                         ));
                     }
+                    // A redundant paren shell with a leading line-comment run
+                    // (`x is (// c\n T)`, and the double-nested form) strips to the same
+                    // hang as bare `x is // c\n T`; route it through the shared keyword→value
+                    // seam so the paren form is idempotent (the outer paren would otherwise
+                    // hide the comment from the gate below). The guard preserves a mixed
+                    // shell in place, handled by the else branch's `unwrap_redundant_parens`.
+                    let (value_start, value_type) =
+                        self.keyword_value_stripped_paren_hang(type_ann);
                     // A line comment or multiline block after `is` hangs the predicate
                     // type on the next line; a single-line block comment (own-line,
                     // trailing, or glued) collapses inline (the else branch). Prettier
                     // relocates the collapsed comment before `is`. See
                     // predicate_is_line_comment / predicate_is_own_line_block_comment.
                     if let Some(is_end) = is_end
-                        && self.comments_force_own_line_between(is_end, type_start)
+                        && self.comments_force_own_line_between(is_end, value_start)
                     {
-                        let value_doc = self.build_type_doc(type_ann);
+                        let value_doc = self.build_type_doc(value_type);
                         parts.push(d.text(" is"));
                         self.append_keyword_value_line_comments(
-                            &mut parts, is_end, type_start, value_doc,
+                            &mut parts,
+                            is_end,
+                            value_start,
+                            value_doc,
                         );
                     } else {
                         let comments_doc = is_end.map_or_else(
@@ -206,9 +217,19 @@ impl<'a> Printer<'a> {
                 // fixed point, since the prefix operators are an in-place-collapse gap,
                 // not a relocation. See type_operator_keyword_line_comment /
                 // type_operator_keyword_own_line_block_comment.
-                if self.comments_force_own_line_between(keyword_end, operand_start) {
-                    let operand_doc = self.build_type_doc(o.type_annotation);
-                    let value_doc = if needs_parens {
+                // A redundant paren shell with a leading line-comment run
+                // (`keyof (// c\n T)`) strips to the same hang as bare `keyof // c\n T`;
+                // route the operand through the shared keyword→value seam so the paren form
+                // is idempotent (the outer paren would otherwise hide the comment from the
+                // gate). `needs_parens` is recomputed on the *unwrapped* operand: a
+                // semantically-required paren (a union under `keyof`) is re-added rather
+                // than dropped, a redundant one is shed. The guard leaves a mixed shell to
+                // the fall-through, which preserves it via `o.type_annotation`.
+                let (operand_hang_start, operand_hang_type) =
+                    self.keyword_value_stripped_paren_hang(o.type_annotation);
+                if self.comments_force_own_line_between(keyword_end, operand_hang_start) {
+                    let operand_doc = self.build_type_doc(operand_hang_type);
+                    let value_doc = if type_needs_parens_for_prefix_operator(operand_hang_type) {
                         d.parens(operand_doc)
                     } else {
                         operand_doc
@@ -217,7 +238,7 @@ impl<'a> Printer<'a> {
                     self.append_keyword_value_line_comments(
                         &mut parts,
                         keyword_end,
-                        operand_start,
+                        operand_hang_start,
                         value_doc,
                     );
                     return d.concat(&parts);
@@ -488,9 +509,14 @@ impl<'a> Printer<'a> {
     }
 
     /// Returns true if there's a line comment between `(` and the inner type
-    /// of a parenthesized type (e.g., `(// leading\n T)`). Used by every
-    /// printer that strips parens around a type to detect when the inner
-    /// line comment needs to be relocated.
+    /// of a parenthesized type (e.g., `(// leading\n T)`).
+    ///
+    /// ⚠️ **Shallow — checks only THIS paren's own one-level gap.** Correct only
+    /// when the caller retains this exact paren (the `TSType::Union(_)`-guarded
+    /// paren-union member callers). For a paren the caller will STRIP — where a
+    /// double-nested `((// c\n T))` hides the comment one layer deeper, between the
+    /// two `(`s this window never reaches — use the deep
+    /// [`Self::stripped_paren_has_leading_line_comment`] instead.
     pub(in crate::printer) fn paren_has_leading_line_comment(
         &self,
         p: &TSParenthesizedType<'_>,
@@ -498,20 +524,104 @@ impl<'a> Printer<'a> {
         self.has_line_comments_between(p.span.start + 1, p.type_annotation.span().start)
     }
 
-    /// Collect the line comments between `(` and the inner type of a
-    /// parenthesized type. Block comments are excluded — relocation paths
-    /// only apply to line comments.
-    pub(in crate::printer) fn paren_leading_line_comments(
+    /// Deep analog of [`Self::paren_has_leading_line_comment`]: does a possibly
+    /// multiply-nested redundant paren shell (`((// c\n X))`) hold a **relocatable**
+    /// leading line-comment run — one it is safe to hoist while stripping the shell?
+    /// True exactly when [`Self::stripped_paren_leading_line_comments`] returns a run.
+    ///
+    /// This is the predicate every caller that will **strip** the paren layers wants:
+    /// the comment can't stay "inside" parens that don't survive, so it must relocate
+    /// with the strip. Using the shallow window here was the bug — a double-nested
+    /// paren's comment fell between the two `(`s and the caller relocated nothing,
+    /// placing it non-idempotently. Mirrors `build_union_type_doc`'s
+    /// `has_paren_inner_leading_line_comments` router probe.
+    pub(in crate::printer) fn stripped_paren_has_leading_line_comment(
         &self,
-        p: &TSParenthesizedType<'_>,
+        ty: &TSType<'_>,
+    ) -> bool {
+        // Fail-fast on the cheap gates (this runs unconditionally, 3× per conditional
+        // type): a non-paren, or a paren with no leading line comment, never allocates
+        // the collector's `CommentVec`. Both gates are implied by a non-empty run, so
+        // adding them can't change the result — only skip the collect + trailing scan.
+        matches!(ty, TSType::Parenthesized(_))
+            && self.has_line_comments_between(
+                ty.span().start + 1,
+                unwrap_parenthesized(ty).span().start,
+            )
+            && !self.stripped_paren_leading_line_comments(ty).is_empty()
+    }
+
+    /// Collect the leading line-comment run in a stripped paren shell — the deep-window
+    /// collector paired with [`Self::stripped_paren_has_leading_line_comment`]. Scans
+    /// the whole discarded shell, from the OUTERMOST `(` to the fully-unwrapped inner
+    /// type's start (`unwrap_parenthesized`), where the shallow predicate sees only one
+    /// paren's own gap.
+    ///
+    /// Returns the run ONLY when stripping the shell would relocate it losslessly: the
+    /// leading gap holds ≥1 comment, ALL line comments, AND there is no comment in the
+    /// trailing gap between the inner type and the outermost `)`. A block comment in
+    /// the leading gap, or any trailing comment, would be silently DROPPED by the
+    /// stripped-inner render the caller uses — so the run is declined (empty), and the
+    /// caller builds the parenthesized type normally, preserving every comment in
+    /// place. Mirrors [`Self::stripped_redundant_paren_leading_line_comments`] (its
+    /// union analog), minus the union-specific redundancy check the caller's context
+    /// already implies. Empty when `ty` is not a parenthesized type.
+    pub(in crate::printer) fn stripped_paren_leading_line_comments(
+        &self,
+        ty: &TSType<'_>,
     ) -> CommentVec<'_> {
-        comments_to_emit_in_range(
-            self.comments,
-            p.span.start + 1,
-            p.type_annotation.span().start,
-        )
-        .filter(|c| !c.is_block)
-        .collect()
+        if !matches!(ty, TSType::Parenthesized(_)) {
+            return smallvec![];
+        }
+        let inner = unwrap_parenthesized(ty);
+        let lead: CommentVec<'_> =
+            comments_to_emit_in_range(self.comments, ty.span().start + 1, inner.span().start)
+                .collect();
+        // Non-empty + all line comments ⇒ ≥1 leading line comment and no block comment
+        // in the leading gap; the trailing check rules out a comment between the inner
+        // and the outermost `)`.
+        if !lead.is_empty()
+            && lead.iter().all(|c| !c.is_block)
+            && !self.has_comments_to_emit_between(inner.span().end, ty.span().end - 1)
+        {
+            return lead;
+        }
+        smallvec![]
+    }
+
+    /// The shared keyword→value seam for a hang position whose caller strips redundant
+    /// parens off `value` before laying it out (`as`/`satisfies` cast, `: T` annotation,
+    /// mapped-type value, type-parameter `=` default, predicate `is`, prefix operators):
+    /// if `value` is a redundant paren shell holding a **relocatable** leading
+    /// line-comment run, return the fully-unwrapped inner type and its start, so the
+    /// comment falls into the keyword→value gap and hangs idempotently (the same fixed
+    /// point the bare, paren-free form already settles on); otherwise return `value` and
+    /// its own start, unchanged.
+    ///
+    /// The relocation safety is [`Self::stripped_paren_has_leading_line_comment`]'s
+    /// content-loss guard — a block comment in the leading gap, or any trailing comment,
+    /// declines the substitution so the caller preserves every comment in place. Mirrors
+    /// the type-parameter constraint / conditional-`extends` sites, generalized to the
+    /// neighbouring keyword→value positions.
+    pub(in crate::printer) fn keyword_value_stripped_paren_hang<'t>(
+        &self,
+        value: &'t TSType<'t>,
+    ) -> (u32, &'t TSType<'t>) {
+        // TODO: a MIXED shell — a block comment in the leading gap, or any trailing comment
+        // (`(/* b */ // c\n X)`, `(// c\n X /* t */)`) — declines the substitution here. The
+        // guard keeps that lossless (every comment survives, preserved in place by
+        // `build_parenthesized_type_unwrap_doc`), but that preserve-in-place path is itself
+        // non-idempotent at these keyword→value positions when the enclosing context does
+        // not hang the value — the same indent drift this seam fixes for the pure
+        // line-comment run, one class deeper (and shared with the union-member callers of
+        // the `stripped_*_leading_line_comments` pair). Closing it means hanging the whole
+        // comment run (block + line, and the trailing comment) while stripping the shell.
+        if self.stripped_paren_has_leading_line_comment(value) {
+            let inner = unwrap_parenthesized(value);
+            (inner.span().start, inner)
+        } else {
+            (value.span().start, value)
+        }
     }
 
     /// Build a complete import type: the `import(<specifier>)` call plus its

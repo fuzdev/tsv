@@ -68,6 +68,12 @@ Emitting the comment inline instead would **swallow the operand**
 content loss); keeping it on the operator line via `line_suffix` with the operand
 on the next line avoids the loss.
 
+A redundant paren wrapping the operand with the line comment inside
+(`keyof (// c\n B)`, and the double-nested `((…))`) strips to this same fixed
+point — the `unformatted_ours_single_paren` / `unformatted_ours_double_parens`
+variants verify the paren form is idempotent too. A paren that is *required*
+(e.g. `keyof (A | B)`) is re-added around the hung operand rather than dropped.
+
 See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation
 ("Prefix type-operator operand hang" — layout for the trailing form, relocation
 for the own-line form).
