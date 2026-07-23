@@ -489,7 +489,11 @@ impl<'a> Printer<'a> {
         } else {
             self.push_pre_name_comments_doc(&mut parts, cursor, key_start);
             key_region_end = prop.key.span().end;
-            parts.push(self.build_expression_doc(&prop.key));
+            // A non-computed field key is unquoted when it is a valid identifier,
+            // the same rule as an object property key (`'x' = 1` → `x = 1`). Prettier
+            // leaves class field keys quoted — a cataloged divergence (tsv is
+            // consistent with its own object/type/interface unquoting).
+            parts.push(self.build_property_key_doc(&prop.key));
         }
 
         // Optional/definite modifier after key, with comment extraction.
@@ -709,7 +713,11 @@ impl<'a> Printer<'a> {
                 self.push_pre_name_comments_doc(&mut parts, cursor, key_start);
             }
             key_region_end = method.key.span().end;
-            parts.push(self.build_expression_doc(&method.key));
+            // A non-computed method / accessor key is unquoted when it is a valid
+            // identifier, the same rule as an object property key (`'foo'() {}` →
+            // `foo() {}`). This matches prettier for methods/accessors; a string-keyed
+            // `'constructor'` unquotes to the real `constructor` with identical meaning.
+            parts.push(self.build_property_key_doc(&method.key));
         }
 
         // Optional marker: `m?()` (abstract / ambient / interface methods),
