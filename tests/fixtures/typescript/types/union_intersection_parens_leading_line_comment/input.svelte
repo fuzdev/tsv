@@ -1,6 +1,7 @@
 <script lang="ts">
-	// case A: later union member with leading line comment - relocates to trail the
-	// previous member
+	// case A: a comment authored trailing a union member stays trailing in both
+	// formatters (contrast a comment authored inside a LATER member's parens, which
+	// tsv keeps inside — see union_intersection_retained_paren_leading_line_comment)
 	type A =
 		| a // leading
 		| b;

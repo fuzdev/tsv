@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 817,
+	"end": 1633,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -140,9 +140,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " a leading line comment inside a LATER member's parens relocates to trail the",
+			"value": " a leading line comment inside a LATER member's parens is kept inside the parens,",
 			"start": 557,
-			"end": 636,
+			"end": 640,
 			"loc": {
 				"start": {
 					"line": 22,
@@ -150,15 +150,15 @@
 				},
 				"end": {
 					"line": 22,
-					"column": 80
+					"column": 84
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " previous member; only the first member - with no previous member to relocate",
-			"start": 638,
-			"end": 717,
+			"value": " the same as the first member - tsv associates it with the member it documents",
+			"start": 642,
+			"end": 722,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -166,15 +166,15 @@
 				},
 				"end": {
 					"line": 23,
-					"column": 80
+					"column": 81
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " onto - keeps the comment inside the parens",
-			"start": 719,
-			"end": 764,
+			"value": " rather than hoisting it out (prettier hoists it to its own line above the member)",
+			"start": 724,
+			"end": 808,
 			"loc": {
 				"start": {
 					"line": 24,
@@ -182,23 +182,199 @@
 				},
 				"end": {
 					"line": 24,
-					"column": 46
+					"column": 85
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 783,
-			"end": 787,
+			"start": 837,
+			"end": 841,
 			"loc": {
 				"start": {
-					"line": 26,
-					"column": 6
+					"line": 28,
+					"column": 4
 				},
 				"end": {
-					"line": 26,
-					"column": 10
+					"line": 28,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the keep-inside rule holds for every RETAINED-paren member kind, not just unions:",
+			"start": 867,
+			"end": 951,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a later paren-function member keeps the comment inside (prettier trails it on the",
+			"start": 953,
+			"end": 1037,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " previous member and keeps the member inline)",
+			"start": 1039,
+			"end": 1086,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1118,
+			"end": 1122,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 5
+				},
+				"end": {
+					"line": 38,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a later paren-conditional member - keeping the comment inside forces the paren",
+			"start": 1145,
+			"end": 1226,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 1
+				},
+				"end": {
+					"line": 42,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " group open, so the conditional breaks its branches; prettier hoists the comment",
+			"start": 1228,
+			"end": 1310,
+			"loc": {
+				"start": {
+					"line": 43,
+					"column": 1
+				},
+				"end": {
+					"line": 43,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " out and keeps the conditional inline",
+			"start": 1312,
+			"end": 1351,
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 1
+				},
+				"end": {
+					"line": 44,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1386,
+			"end": 1390,
+			"loc": {
+				"start": {
+					"line": 47,
+					"column": 5
+				},
+				"end": {
+					"line": 47,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a later paren-intersection member (no trailing object) - same keep-inside, the",
+			"start": 1433,
+			"end": 1514,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 1
+				},
+				"end": {
+					"line": 53,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " forced-open paren breaks the intersection",
+			"start": 1516,
+			"end": 1560,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 1
+				},
+				"end": {
+					"line": 54,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 1596,
+			"end": 1600,
+			"loc": {
+				"start": {
+					"line": 57,
+					"column": 5
+				},
+				"end": {
+					"line": 57,
+					"column": 9
 				}
 			}
 		}
@@ -206,19 +382,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 816,
+		"end": 1632,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 807,
+			"end": 1623,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 29,
+					"line": 61,
 					"column": 9
 				}
 			},
@@ -692,22 +868,22 @@
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 766,
-					"end": 806,
+					"start": 810,
+					"end": 864,
 					"loc": {
 						"start": {
 							"line": 25,
 							"column": 1
 						},
 						"end": {
-							"line": 28,
+							"line": 31,
 							"column": 6
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 771,
-						"end": 774,
+						"start": 815,
+						"end": 818,
 						"loc": {
 							"start": {
 								"line": 25,
@@ -722,23 +898,23 @@
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
-						"start": 779,
-						"end": 805,
+						"start": 823,
+						"end": 863,
 						"loc": {
 							"start": {
 								"line": 26,
 								"column": 2
 							},
 							"end": {
-								"line": 28,
+								"line": 31,
 								"column": 5
 							}
 						},
 						"types": [
 							{
 								"type": "TSTypeReference",
-								"start": 781,
-								"end": 782,
+								"start": 825,
+								"end": 826,
 								"loc": {
 									"start": {
 										"line": 26,
@@ -751,8 +927,8 @@
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 781,
-									"end": 782,
+									"start": 825,
+									"end": 826,
 									"loc": {
 										"start": {
 											"line": 26,
@@ -764,71 +940,63 @@
 										}
 									},
 									"name": "A"
-								},
-								"trailingComments": [
-									{
-										"type": "Line",
-										"value": " c",
-										"start": 783,
-										"end": 787
-									}
-								]
+								}
 							},
 							{
 								"type": "TSParenthesizedType",
-								"start": 792,
-								"end": 799,
+								"start": 831,
+								"end": 857,
 								"loc": {
 									"start": {
 										"line": 27,
 										"column": 4
 									},
 									"end": {
-										"line": 27,
-										"column": 11
+										"line": 30,
+										"column": 5
 									}
 								},
 								"typeAnnotation": {
 									"type": "TSUnionType",
-									"start": 793,
-									"end": 798,
+									"start": 846,
+									"end": 851,
 									"loc": {
 										"start": {
-											"line": 27,
-											"column": 5
+											"line": 29,
+											"column": 4
 										},
 										"end": {
-											"line": 27,
-											"column": 10
+											"line": 29,
+											"column": 9
 										}
 									},
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 793,
-											"end": 794,
+											"start": 846,
+											"end": 847,
 											"loc": {
 												"start": {
-													"line": 27,
-													"column": 5
+													"line": 29,
+													"column": 4
 												},
 												"end": {
-													"line": 27,
-													"column": 6
+													"line": 29,
+													"column": 5
 												}
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 793,
-												"end": 794,
+												"start": 846,
+												"end": 847,
 												"loc": {
 													"start": {
-														"line": 27,
-														"column": 5
+														"line": 29,
+														"column": 4
 													},
 													"end": {
-														"line": 27,
-														"column": 6
+														"line": 29,
+														"column": 5
 													}
 												},
 												"name": "B"
@@ -836,63 +1004,71 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 797,
-											"end": 798,
+											"start": 850,
+											"end": 851,
 											"loc": {
 												"start": {
-													"line": 27,
-													"column": 9
+													"line": 29,
+													"column": 8
 												},
 												"end": {
-													"line": 27,
-													"column": 10
+													"line": 29,
+													"column": 9
 												}
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 797,
-												"end": 798,
+												"start": 850,
+												"end": 851,
 												"loc": {
 													"start": {
-														"line": 27,
-														"column": 9
+														"line": 29,
+														"column": 8
 													},
 													"end": {
-														"line": 27,
-														"column": 10
+														"line": 29,
+														"column": 9
 													}
 												},
 												"name": "C"
 											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 837,
+											"end": 841
 										}
 									]
 								}
 							},
 							{
 								"type": "TSTypeReference",
-								"start": 804,
-								"end": 805,
+								"start": 862,
+								"end": 863,
 								"loc": {
 									"start": {
-										"line": 28,
+										"line": 31,
 										"column": 4
 									},
 									"end": {
-										"line": 28,
+										"line": 31,
 										"column": 5
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 804,
-									"end": 805,
+									"start": 862,
+									"end": 863,
 									"loc": {
 										"start": {
-											"line": 28,
+											"line": 31,
 											"column": 4
 										},
 										"end": {
-											"line": 28,
+											"line": 31,
 											"column": 5
 										}
 									},
@@ -904,21 +1080,754 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " a leading line comment inside a LATER member's parens relocates to trail the",
+							"value": " a leading line comment inside a LATER member's parens is kept inside the parens,",
 							"start": 557,
-							"end": 636
+							"end": 640
 						},
 						{
 							"type": "Line",
-							"value": " previous member; only the first member - with no previous member to relocate",
-							"start": 638,
-							"end": 717
+							"value": " the same as the first member - tsv associates it with the member it documents",
+							"start": 642,
+							"end": 722
 						},
 						{
 							"type": "Line",
-							"value": " onto - keeps the comment inside the parens",
-							"start": 719,
-							"end": 764
+							"value": " rather than hoisting it out (prettier hoists it to its own line above the member)",
+							"start": 724,
+							"end": 808
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1088,
+					"end": 1142,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1093,
+						"end": 1104,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 6
+							},
+							"end": {
+								"line": 36,
+								"column": 17
+							}
+						},
+						"name": "MidFunction"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1109,
+						"end": 1141,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 2
+							},
+							"end": {
+								"line": 40,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1111,
+								"end": 1112,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 4
+									},
+									"end": {
+										"line": 37,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1111,
+									"end": 1112,
+									"loc": {
+										"start": {
+											"line": 37,
+											"column": 4
+										},
+										"end": {
+											"line": 37,
+											"column": 5
+										}
+									},
+									"name": "A"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 1117,
+								"end": 1135,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 4
+									},
+									"end": {
+										"line": 39,
+										"column": 12
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSFunctionType",
+									"start": 1127,
+									"end": 1134,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 4
+										},
+										"end": {
+											"line": 39,
+											"column": 11
+										}
+									},
+									"parameters": [],
+									"typeAnnotation": {
+										"type": "TSTypeAnnotation",
+										"start": 1130,
+										"end": 1134,
+										"loc": {
+											"start": {
+												"line": 39,
+												"column": 7
+											},
+											"end": {
+												"line": 39,
+												"column": 11
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 1133,
+											"end": 1134,
+											"loc": {
+												"start": {
+													"line": 39,
+													"column": 10
+												},
+												"end": {
+													"line": 39,
+													"column": 11
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 1133,
+												"end": 1134,
+												"loc": {
+													"start": {
+														"line": 39,
+														"column": 10
+													},
+													"end": {
+														"line": 39,
+														"column": 11
+													}
+												},
+												"name": "B"
+											}
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 1118,
+											"end": 1122
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1140,
+								"end": 1141,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 4
+									},
+									"end": {
+										"line": 40,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1140,
+									"end": 1141,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 4
+										},
+										"end": {
+											"line": 40,
+											"column": 5
+										}
+									},
+									"name": "D"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the keep-inside rule holds for every RETAINED-paren member kind, not just unions:",
+							"start": 867,
+							"end": 951
+						},
+						{
+							"type": "Line",
+							"value": " a later paren-function member keeps the comment inside (prettier trails it on the",
+							"start": 953,
+							"end": 1037
+						},
+						{
+							"type": "Line",
+							"value": " previous member and keeps the member inline)",
+							"start": 1039,
+							"end": 1086
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1353,
+					"end": 1430,
+					"loc": {
+						"start": {
+							"line": 45,
+							"column": 1
+						},
+						"end": {
+							"line": 51,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1358,
+						"end": 1372,
+						"loc": {
+							"start": {
+								"line": 45,
+								"column": 6
+							},
+							"end": {
+								"line": 45,
+								"column": 20
+							}
+						},
+						"name": "MidConditional"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1377,
+						"end": 1429,
+						"loc": {
+							"start": {
+								"line": 46,
+								"column": 2
+							},
+							"end": {
+								"line": 51,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1379,
+								"end": 1380,
+								"loc": {
+									"start": {
+										"line": 46,
+										"column": 4
+									},
+									"end": {
+										"line": 46,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1379,
+									"end": 1380,
+									"loc": {
+										"start": {
+											"line": 46,
+											"column": 4
+										},
+										"end": {
+											"line": 46,
+											"column": 5
+										}
+									},
+									"name": "A"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 1385,
+								"end": 1423,
+								"loc": {
+									"start": {
+										"line": 47,
+										"column": 4
+									},
+									"end": {
+										"line": 50,
+										"column": 8
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSConditionalType",
+									"start": 1395,
+									"end": 1422,
+									"loc": {
+										"start": {
+											"line": 48,
+											"column": 4
+										},
+										"end": {
+											"line": 50,
+											"column": 7
+										}
+									},
+									"checkType": {
+										"type": "TSTypeReference",
+										"start": 1395,
+										"end": 1396,
+										"loc": {
+											"start": {
+												"line": 48,
+												"column": 4
+											},
+											"end": {
+												"line": 48,
+												"column": 5
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 1395,
+											"end": 1396,
+											"loc": {
+												"start": {
+													"line": 48,
+													"column": 4
+												},
+												"end": {
+													"line": 48,
+													"column": 5
+												}
+											},
+											"name": "B"
+										}
+									},
+									"extendsType": {
+										"type": "TSTypeReference",
+										"start": 1405,
+										"end": 1406,
+										"loc": {
+											"start": {
+												"line": 48,
+												"column": 14
+											},
+											"end": {
+												"line": 48,
+												"column": 15
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 1405,
+											"end": 1406,
+											"loc": {
+												"start": {
+													"line": 48,
+													"column": 14
+												},
+												"end": {
+													"line": 48,
+													"column": 15
+												}
+											},
+											"name": "C"
+										}
+									},
+									"trueType": {
+										"type": "TSTypeReference",
+										"start": 1413,
+										"end": 1414,
+										"loc": {
+											"start": {
+												"line": 49,
+												"column": 6
+											},
+											"end": {
+												"line": 49,
+												"column": 7
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 1413,
+											"end": 1414,
+											"loc": {
+												"start": {
+													"line": 49,
+													"column": 6
+												},
+												"end": {
+													"line": 49,
+													"column": 7
+												}
+											},
+											"name": "D"
+										}
+									},
+									"falseType": {
+										"type": "TSTypeReference",
+										"start": 1421,
+										"end": 1422,
+										"loc": {
+											"start": {
+												"line": 50,
+												"column": 6
+											},
+											"end": {
+												"line": 50,
+												"column": 7
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 1421,
+											"end": 1422,
+											"loc": {
+												"start": {
+													"line": 50,
+													"column": 6
+												},
+												"end": {
+													"line": 50,
+													"column": 7
+												}
+											},
+											"name": "E"
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 1386,
+											"end": 1390
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1428,
+								"end": 1429,
+								"loc": {
+									"start": {
+										"line": 51,
+										"column": 4
+									},
+									"end": {
+										"line": 51,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1428,
+									"end": 1429,
+									"loc": {
+										"start": {
+											"line": 51,
+											"column": 4
+										},
+										"end": {
+											"line": 51,
+											"column": 5
+										}
+									},
+									"name": "F"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a later paren-conditional member - keeping the comment inside forces the paren",
+							"start": 1145,
+							"end": 1226
+						},
+						{
+							"type": "Line",
+							"value": " group open, so the conditional breaks its branches; prettier hoists the comment",
+							"start": 1228,
+							"end": 1310
+						},
+						{
+							"type": "Line",
+							"value": " out and keeps the conditional inline",
+							"start": 1312,
+							"end": 1351
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 1562,
+					"end": 1622,
+					"loc": {
+						"start": {
+							"line": 55,
+							"column": 1
+						},
+						"end": {
+							"line": 60,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 1567,
+						"end": 1582,
+						"loc": {
+							"start": {
+								"line": 55,
+								"column": 6
+							},
+							"end": {
+								"line": 55,
+								"column": 21
+							}
+						},
+						"name": "MidIntersection"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 1587,
+						"end": 1621,
+						"loc": {
+							"start": {
+								"line": 56,
+								"column": 2
+							},
+							"end": {
+								"line": 60,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 1589,
+								"end": 1590,
+								"loc": {
+									"start": {
+										"line": 56,
+										"column": 4
+									},
+									"end": {
+										"line": 56,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1589,
+									"end": 1590,
+									"loc": {
+										"start": {
+											"line": 56,
+											"column": 4
+										},
+										"end": {
+											"line": 56,
+											"column": 5
+										}
+									},
+									"name": "A"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 1595,
+								"end": 1615,
+								"loc": {
+									"start": {
+										"line": 57,
+										"column": 4
+									},
+									"end": {
+										"line": 59,
+										"column": 6
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSIntersectionType",
+									"start": 1605,
+									"end": 1614,
+									"loc": {
+										"start": {
+											"line": 58,
+											"column": 4
+										},
+										"end": {
+											"line": 59,
+											"column": 5
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 1605,
+											"end": 1606,
+											"loc": {
+												"start": {
+													"line": 58,
+													"column": 4
+												},
+												"end": {
+													"line": 58,
+													"column": 5
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 1605,
+												"end": 1606,
+												"loc": {
+													"start": {
+														"line": 58,
+														"column": 4
+													},
+													"end": {
+														"line": 58,
+														"column": 5
+													}
+												},
+												"name": "B"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 1613,
+											"end": 1614,
+											"loc": {
+												"start": {
+													"line": 59,
+													"column": 4
+												},
+												"end": {
+													"line": 59,
+													"column": 5
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 1613,
+												"end": 1614,
+												"loc": {
+													"start": {
+														"line": 59,
+														"column": 4
+													},
+													"end": {
+														"line": 59,
+														"column": 5
+													}
+												},
+												"name": "C"
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 1596,
+											"end": 1600
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 1620,
+								"end": 1621,
+								"loc": {
+									"start": {
+										"line": 60,
+										"column": 4
+									},
+									"end": {
+										"line": 60,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 1620,
+									"end": 1621,
+									"loc": {
+										"start": {
+											"line": 60,
+											"column": 4
+										},
+										"end": {
+											"line": 60,
+											"column": 5
+										}
+									},
+									"name": "D"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a later paren-intersection member (no trailing object) - same keep-inside, the",
+							"start": 1433,
+							"end": 1514
+						},
+						{
+							"type": "Line",
+							"value": " forced-open paren breaks the intersection",
+							"start": 1516,
+							"end": 1560
 						}
 					]
 				}

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 470,
+	"end": 538,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " inner union fits inline after the comment relocates out - parens kept, no break",
+			"value": " comment authored trailing the previous member (stays trailing in both formatters);",
 			"start": 20,
-			"end": 102,
+			"end": 105,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,22 +22,38 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 83
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the parenthesized inner union is kept, fits inline, no break",
+			"start": 107,
+			"end": 170,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 64
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 121,
-			"end": 125,
+			"start": 189,
+			"end": 193,
 			"loc": {
 				"start": {
-					"line": 4,
+					"line": 5,
 					"column": 6
 				},
 				"end": {
-					"line": 4,
+					"line": 5,
 					"column": 10
 				}
 			}
@@ -45,15 +61,15 @@
 		{
 			"type": "Line",
 			"value": " inner union breaks one member per line - content indents one level past the `| (`",
-			"start": 141,
-			"end": 225,
+			"start": 209,
+			"end": 293,
 			"loc": {
 				"start": {
-					"line": 7,
+					"line": 8,
 					"column": 1
 				},
 				"end": {
-					"line": 7,
+					"line": 8,
 					"column": 85
 				}
 			}
@@ -61,15 +77,15 @@
 		{
 			"type": "Line",
 			"value": " member offset, closing `)` sits at the offset (tabs-only: prettier uses spaces)",
-			"start": 227,
-			"end": 309,
+			"start": 295,
+			"end": 377,
 			"loc": {
 				"start": {
-					"line": 8,
+					"line": 9,
 					"column": 1
 				},
 				"end": {
-					"line": 8,
+					"line": 9,
 					"column": 83
 				}
 			}
@@ -77,15 +93,15 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 328,
-			"end": 332,
+			"start": 396,
+			"end": 400,
 			"loc": {
 				"start": {
-					"line": 10,
+					"line": 11,
 					"column": 6
 				},
 				"end": {
-					"line": 10,
+					"line": 11,
 					"column": 10
 				}
 			}
@@ -94,48 +110,48 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 469,
+		"end": 537,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 460,
+			"end": 528,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 15,
+					"line": 16,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 104,
-					"end": 138,
+					"start": 172,
+					"end": 206,
 					"loc": {
 						"start": {
-							"line": 3,
+							"line": 4,
 							"column": 1
 						},
 						"end": {
-							"line": 5,
+							"line": 6,
 							"column": 12
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 109,
-						"end": 112,
+						"start": 177,
+						"end": 180,
 						"loc": {
 							"start": {
-								"line": 3,
+								"line": 4,
 								"column": 6
 							},
 							"end": {
-								"line": 3,
+								"line": 4,
 								"column": 9
 							}
 						},
@@ -143,44 +159,44 @@
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
-						"start": 117,
-						"end": 137,
+						"start": 185,
+						"end": 205,
 						"loc": {
 							"start": {
-								"line": 4,
+								"line": 5,
 								"column": 2
 							},
 							"end": {
-								"line": 5,
+								"line": 6,
 								"column": 11
 							}
 						},
 						"types": [
 							{
 								"type": "TSTypeReference",
-								"start": 119,
-								"end": 120,
+								"start": 187,
+								"end": 188,
 								"loc": {
 									"start": {
-										"line": 4,
+										"line": 5,
 										"column": 4
 									},
 									"end": {
-										"line": 4,
+										"line": 5,
 										"column": 5
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 119,
-									"end": 120,
+									"start": 187,
+									"end": 188,
 									"loc": {
 										"start": {
-											"line": 4,
+											"line": 5,
 											"column": 4
 										},
 										"end": {
-											"line": 4,
+											"line": 5,
 											"column": 5
 										}
 									},
@@ -190,65 +206,65 @@
 									{
 										"type": "Line",
 										"value": " c",
-										"start": 121,
-										"end": 125
+										"start": 189,
+										"end": 193
 									}
 								]
 							},
 							{
 								"type": "TSParenthesizedType",
-								"start": 130,
-								"end": 137,
+								"start": 198,
+								"end": 205,
 								"loc": {
 									"start": {
-										"line": 5,
+										"line": 6,
 										"column": 4
 									},
 									"end": {
-										"line": 5,
+										"line": 6,
 										"column": 11
 									}
 								},
 								"typeAnnotation": {
 									"type": "TSUnionType",
-									"start": 131,
-									"end": 136,
+									"start": 199,
+									"end": 204,
 									"loc": {
 										"start": {
-											"line": 5,
+											"line": 6,
 											"column": 5
 										},
 										"end": {
-											"line": 5,
+											"line": 6,
 											"column": 10
 										}
 									},
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 131,
-											"end": 132,
+											"start": 199,
+											"end": 200,
 											"loc": {
 												"start": {
-													"line": 5,
+													"line": 6,
 													"column": 5
 												},
 												"end": {
-													"line": 5,
+													"line": 6,
 													"column": 6
 												}
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 131,
-												"end": 132,
+												"start": 199,
+												"end": 200,
 												"loc": {
 													"start": {
-														"line": 5,
+														"line": 6,
 														"column": 5
 													},
 													"end": {
-														"line": 5,
+														"line": 6,
 														"column": 6
 													}
 												},
@@ -257,29 +273,29 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 135,
-											"end": 136,
+											"start": 203,
+											"end": 204,
 											"loc": {
 												"start": {
-													"line": 5,
+													"line": 6,
 													"column": 9
 												},
 												"end": {
-													"line": 5,
+													"line": 6,
 													"column": 10
 												}
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 135,
-												"end": 136,
+												"start": 203,
+												"end": 204,
 												"loc": {
 													"start": {
-														"line": 5,
+														"line": 6,
 														"column": 9
 													},
 													"end": {
-														"line": 5,
+														"line": 6,
 														"column": 10
 													}
 												},
@@ -294,37 +310,43 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " inner union fits inline after the comment relocates out - parens kept, no break",
+							"value": " comment authored trailing the previous member (stays trailing in both formatters);",
 							"start": 20,
-							"end": 102
+							"end": 105
+						},
+						{
+							"type": "Line",
+							"value": " the parenthesized inner union is kept, fits inline, no break",
+							"start": 107,
+							"end": 170
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 311,
-					"end": 459,
+					"start": 379,
+					"end": 527,
 					"loc": {
 						"start": {
-							"line": 9,
+							"line": 10,
 							"column": 1
 						},
 						"end": {
-							"line": 14,
+							"line": 15,
 							"column": 6
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 316,
-						"end": 319,
+						"start": 384,
+						"end": 387,
 						"loc": {
 							"start": {
-								"line": 9,
+								"line": 10,
 								"column": 6
 							},
 							"end": {
-								"line": 9,
+								"line": 10,
 								"column": 9
 							}
 						},
@@ -332,44 +354,44 @@
 					},
 					"typeAnnotation": {
 						"type": "TSUnionType",
-						"start": 324,
-						"end": 458,
+						"start": 392,
+						"end": 526,
 						"loc": {
 							"start": {
-								"line": 10,
+								"line": 11,
 								"column": 2
 							},
 							"end": {
-								"line": 14,
+								"line": 15,
 								"column": 5
 							}
 						},
 						"types": [
 							{
 								"type": "TSTypeReference",
-								"start": 326,
-								"end": 327,
+								"start": 394,
+								"end": 395,
 								"loc": {
 									"start": {
-										"line": 10,
+										"line": 11,
 										"column": 4
 									},
 									"end": {
-										"line": 10,
+										"line": 11,
 										"column": 5
 									}
 								},
 								"typeName": {
 									"type": "Identifier",
-									"start": 326,
-									"end": 327,
+									"start": 394,
+									"end": 395,
 									"loc": {
 										"start": {
-											"line": 10,
+											"line": 11,
 											"column": 4
 										},
 										"end": {
-											"line": 10,
+											"line": 11,
 											"column": 5
 										}
 									},
@@ -379,65 +401,65 @@
 									{
 										"type": "Line",
 										"value": " c",
-										"start": 328,
-										"end": 332
+										"start": 396,
+										"end": 400
 									}
 								]
 							},
 							{
 								"type": "TSParenthesizedType",
-								"start": 337,
-								"end": 458,
+								"start": 405,
+								"end": 526,
 								"loc": {
 									"start": {
-										"line": 11,
+										"line": 12,
 										"column": 4
 									},
 									"end": {
-										"line": 14,
+										"line": 15,
 										"column": 5
 									}
 								},
 								"typeAnnotation": {
 									"type": "TSUnionType",
-									"start": 343,
-									"end": 452,
+									"start": 411,
+									"end": 520,
 									"loc": {
 										"start": {
-											"line": 12,
+											"line": 13,
 											"column": 4
 										},
 										"end": {
-											"line": 13,
+											"line": 14,
 											"column": 56
 										}
 									},
 									"types": [
 										{
 											"type": "TSTypeReference",
-											"start": 345,
-											"end": 395,
+											"start": 413,
+											"end": 463,
 											"loc": {
 												"start": {
-													"line": 12,
+													"line": 13,
 													"column": 6
 												},
 												"end": {
-													"line": 12,
+													"line": 13,
 													"column": 56
 												}
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 345,
-												"end": 395,
+												"start": 413,
+												"end": 463,
 												"loc": {
 													"start": {
-														"line": 12,
+														"line": 13,
 														"column": 6
 													},
 													"end": {
-														"line": 12,
+														"line": 13,
 														"column": 56
 													}
 												},
@@ -446,29 +468,29 @@
 										},
 										{
 											"type": "TSTypeReference",
-											"start": 402,
-											"end": 452,
+											"start": 470,
+											"end": 520,
 											"loc": {
 												"start": {
-													"line": 13,
+													"line": 14,
 													"column": 6
 												},
 												"end": {
-													"line": 13,
+													"line": 14,
 													"column": 56
 												}
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 402,
-												"end": 452,
+												"start": 470,
+												"end": 520,
 												"loc": {
 													"start": {
-														"line": 13,
+														"line": 14,
 														"column": 6
 													},
 													"end": {
-														"line": 13,
+														"line": 14,
 														"column": 56
 													}
 												},
@@ -484,14 +506,14 @@
 						{
 							"type": "Line",
 							"value": " inner union breaks one member per line - content indents one level past the `| (`",
-							"start": 141,
-							"end": 225
+							"start": 209,
+							"end": 293
 						},
 						{
 							"type": "Line",
 							"value": " member offset, closing `)` sits at the offset (tabs-only: prettier uses spaces)",
-							"start": 227,
-							"end": 309
+							"start": 295,
+							"end": 377
 						}
 					]
 				}

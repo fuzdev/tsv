@@ -1,5 +1,6 @@
 <script lang="ts">
-	// inner union fits inline after the comment relocates out - parens kept, no break
+	// comment authored trailing the previous member (stays trailing in both formatters);
+	// the parenthesized inner union is kept, fits inline, no break
 	type Fit =
 		| Z // c
 		| (D | E);

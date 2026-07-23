@@ -1173,19 +1173,18 @@ impl<'a> Printer<'a> {
         // docs/conformance_prettier.md §Comment relocation for why prettier (whose own
         // retention is scoped to those two) diverges here.
         if self.argument_has_own_line_comment(yield_expr.span.start, arg) {
-            let mut body = DocBuf::new();
-            if let Some(comments) = self.build_rhs_comments_opt(keyword_end, argument_start) {
-                body.push(comments);
-            }
-            body.push(self.build_expression_doc(arg));
-            // The trailing comment stays INSIDE the parens, where it was written.
-            if has_trailing_comments {
-                self.append_trailing_paren_comments(&mut body, argument_end, yield_expr.span.end);
-            }
-            // TODO: `yield` does not yet preserve a same-line-as-`(` `//` comment trailing
-            // the `(` the way `return`/`throw` do (`build_comment_paren_doc`) — tracked as a
-            // follow-up, along with sharing that path across all three restricted productions.
-            return self.build_hanging_paren_doc(keyword, d.concat(&body), None);
+            // Shared with `return`/`throw` (`build_comment_paren_doc`), the three restricted
+            // productions on one path: a same-line-as-`(` `//` comment trails the `(`, a
+            // sequence operand renders bare, and a comment before the `)` stays inside. The
+            // boundary is discarded — `yield` is an expression, so its enclosing statement
+            // (not this doc) appends the `;`, and `yield_expr.span.end` is the `)`.
+            let (hanging, _boundary) = self.build_restricted_production_paren_doc(
+                keyword,
+                keyword_end,
+                arg,
+                yield_expr.span.end,
+            );
+            return hanging;
         }
 
         let mut parts: DocBuf = smallvec![d.text(keyword), d.text(" ")];
@@ -1246,11 +1245,11 @@ impl<'a> Printer<'a> {
     /// Bare variant: the comma-joined operands **without** the sequence's own
     /// wrapping parens (and without the paren-gap edge-comment floats). Used where an
     /// enclosing construct already supplies the required grouping parens and owns the
-    /// edge gaps — a `return`/`throw` argument forced into the hanging
-    /// `kw (⏎ // c⏎ body⏎)` form by a leading own-line comment
-    /// ([`Self::build_comment_paren_doc`]). Self-parenthesizing there would double the
-    /// parens (`return (⏎ (a, b)⏎)`); prettier keeps the sequence bare inside the one
-    /// pair the comment break already needs.
+    /// edge gaps — a restricted-production (`return` / `throw` / `yield` / `yield*`)
+    /// argument forced into the hanging `kw (⏎ // c⏎ body⏎)` form by a leading own-line
+    /// comment ([`Self::build_restricted_production_paren_doc`]). Self-parenthesizing
+    /// there would double the parens (`return (⏎ (a, b)⏎)`); prettier keeps the sequence
+    /// bare inside the one pair the comment break already needs.
     pub(in crate::printer) fn build_sequence_doc_bare(
         &self,
         seq: &internal::SequenceExpression<'_>,
