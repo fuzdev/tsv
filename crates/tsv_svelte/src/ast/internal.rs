@@ -853,6 +853,9 @@ impl TagFacts {
     /// non-block regular element, but may still print self-closing (prettier's `didSelfClose`), so
     /// it is the third contributor to `can_self_close` alongside component and foreign.
     const NAMESPACED: u16 = 1 << 9;
+    /// `tsv_html::collapses_child_whitespace` — a whitespace-collapsing container (`<table>`,
+    /// `<select>`, …) whose inter-sibling whitespace the compiler removes entirely.
+    const WS_COLLAPSING: u16 = 1 << 10;
 
     /// Derive the facts from the tag name. The single source: [`Element::facts`] stores exactly
     /// this, and the equivalence test grades every accessor against the predicates named here.
@@ -884,6 +887,9 @@ impl TagFacts {
         }
         if tsv_html::preserves_whitespace(tag_name) {
             bits |= Self::WS_SENSITIVE;
+        }
+        if tsv_html::collapses_child_whitespace(tag_name) {
+            bits |= Self::WS_COLLAPSING;
         }
         if tag_name.starts_with('!') {
             bits |= Self::DECLARATION;
@@ -917,6 +923,9 @@ impl TagFacts {
     }
     pub(crate) fn is_ws_sensitive(self) -> bool {
         self.0 & Self::WS_SENSITIVE != 0
+    }
+    pub(crate) fn collapses_child_whitespace(self) -> bool {
+        self.0 & Self::WS_COLLAPSING != 0
     }
     pub(crate) fn is_declaration(self) -> bool {
         self.0 & Self::DECLARATION != 0
@@ -1331,7 +1340,16 @@ mod tests {
             "p",
             "h1",
             "menu",
+            // whitespace-collapsing containers (WS_COLLAPSING, all 8) + near-miss non-members
             "table",
+            "select",
+            "tr",
+            "tbody",
+            "thead",
+            "tfoot",
+            "colgroup",
+            "datalist",
+            "optgroup",
             "ul",
             "li",
             "pre",
@@ -1417,6 +1435,11 @@ mod tests {
                 facts.is_ws_sensitive(),
                 tsv_html::preserves_whitespace(tag),
                 "ws-sensitive: {tag:?}"
+            );
+            assert_eq!(
+                facts.collapses_child_whitespace(),
+                tsv_html::collapses_child_whitespace(tag),
+                "ws-collapsing: {tag:?}"
             );
             assert_eq!(
                 facts.is_declaration(),

@@ -7,8 +7,16 @@ trim is uniform — the compiler deletes every fragment-edge run at compile
 boundary spaces trim on all three. Prettier instead consults its per-element
 whitespace-sensitivity data and preserves the authored boundary space on each.
 
-- `prettier_variant_spaces.svelte` — prettier's stable spaced forms; tsv normalizes
-  every case to the glued `input.svelte`.
+Two divergences overlap on the `<td>` / `<option>` cases: the boundary-space **trim**
+(`<td> text </td>` → `<td>text</td>`) *and*, because `<table>` / `<tr>` / `<select>` are
+whitespace-collapsing containers (`clean_nodes` `can_remove_entirely`), the **block-style**
+layout of the container — each cell/row/option on its own line, inter-sibling whitespace
+trimmed (see [ws_collapsing_containers](../ws_collapsing_containers_prettier_divergence/)).
+The `<svg><text>` case takes neither: `<text>` is the SVG `can_remove_entirely` exception, so
+its content stays inline — only its boundary space trims.
+
+- `prettier_variant_spaces.svelte` — prettier's stable spaced/inline forms; tsv normalizes
+  every case to the trimmed, block-style `input.svelte`.
 
 Block elements, components, and `svelte:element` need no pin here — prettier trims
 those boundaries too (its sensitivity data marks them insignificant), so they agree
