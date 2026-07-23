@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 446,
+	"end": 459,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -60,9 +60,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " A class member key is never unquoted — it stays a string literal.",
+			"value": " A class field key unquotes the same way; prettier keeps class field keys quoted.",
 			"start": 258,
-			"end": 326,
+			"end": 341,
 			"loc": {
 				"start": {
 					"line": 10,
@@ -70,15 +70,15 @@
 				},
 				"end": {
 					"line": 10,
-					"column": 69
+					"column": 84
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " A key that is not a valid identifier stays quoted.",
-			"start": 354,
-			"end": 407,
+			"start": 367,
+			"end": 420,
 			"loc": {
 				"start": {
 					"line": 14,
@@ -94,12 +94,12 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 445,
+		"end": 458,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 436,
+			"end": 449,
 			"loc": {
 				"start": {
 					"line": 1,
@@ -475,8 +475,8 @@
 				},
 				{
 					"type": "ClassDeclaration",
-					"start": 328,
-					"end": 352,
+					"start": 343,
+					"end": 365,
 					"loc": {
 						"start": {
 							"line": 11,
@@ -489,8 +489,8 @@
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 334,
-						"end": 335,
+						"start": 349,
+						"end": 350,
 						"loc": {
 							"start": {
 								"line": 11,
@@ -506,8 +506,8 @@
 					"superClass": null,
 					"body": {
 						"type": "ClassBody",
-						"start": 336,
-						"end": 352,
+						"start": 351,
+						"end": 365,
 						"loc": {
 							"start": {
 								"line": 11,
@@ -521,8 +521,8 @@
 						"body": [
 							{
 								"type": "PropertyDefinition",
-								"start": 340,
-								"end": 349,
+								"start": 355,
+								"end": 362,
 								"loc": {
 									"start": {
 										"line": 12,
@@ -530,15 +530,15 @@
 									},
 									"end": {
 										"line": 12,
-										"column": 11
+										"column": 9
 									}
 								},
 								"static": false,
 								"computed": false,
 								"key": {
-									"type": "Literal",
-									"start": 340,
-									"end": 344,
+									"type": "Identifier",
+									"start": 355,
+									"end": 357,
 									"loc": {
 										"start": {
 											"line": 12,
@@ -546,24 +546,23 @@
 										},
 										"end": {
 											"line": 12,
-											"column": 6
+											"column": 4
 										}
 									},
-									"value": "𐊧",
-									"raw": "'𐊧'"
+									"name": "𐊧"
 								},
 								"value": {
 									"type": "Literal",
-									"start": 347,
-									"end": 348,
+									"start": 360,
+									"end": 361,
 									"loc": {
 										"start": {
 											"line": 12,
-											"column": 9
+											"column": 7
 										},
 										"end": {
 											"line": 12,
-											"column": 10
+											"column": 8
 										}
 									},
 									"value": 1,
@@ -575,16 +574,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " A class member key is never unquoted — it stays a string literal.",
+							"value": " A class field key unquotes the same way; prettier keeps class field keys quoted.",
 							"start": 258,
-							"end": 326
+							"end": 341
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 409,
-					"end": 435,
+					"start": 422,
+					"end": 448,
 					"loc": {
 						"start": {
 							"line": 15,
@@ -598,8 +597,8 @@
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 415,
-							"end": 434,
+							"start": 428,
+							"end": 447,
 							"loc": {
 								"start": {
 									"line": 15,
@@ -612,8 +611,8 @@
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 415,
-								"end": 420,
+								"start": 428,
+								"end": 433,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -628,8 +627,8 @@
 							},
 							"init": {
 								"type": "ObjectExpression",
-								"start": 423,
-								"end": 434,
+								"start": 436,
+								"end": 447,
 								"loc": {
 									"start": {
 										"line": 15,
@@ -643,8 +642,8 @@
 								"properties": [
 									{
 										"type": "Property",
-										"start": 425,
-										"end": 432,
+										"start": 438,
+										"end": 445,
 										"loc": {
 											"start": {
 												"line": 15,
@@ -660,8 +659,8 @@
 										"computed": false,
 										"key": {
 											"type": "Literal",
-											"start": 425,
-											"end": 429,
+											"start": 438,
+											"end": 442,
 											"loc": {
 												"start": {
 													"line": 15,
@@ -677,8 +676,8 @@
 										},
 										"value": {
 											"type": "Literal",
-											"start": 431,
-											"end": 432,
+											"start": 444,
+											"end": 445,
 											"loc": {
 												"start": {
 													"line": 15,
@@ -703,8 +702,8 @@
 						{
 							"type": "Line",
 							"value": " A key that is not a valid identifier stays quoted.",
-							"start": 354,
-							"end": 407
+							"start": 367,
+							"end": 420
 						}
 					]
 				}

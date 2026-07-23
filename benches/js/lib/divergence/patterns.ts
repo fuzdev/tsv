@@ -2849,6 +2849,46 @@ const jsdoc_type_cast_parens: DivergencePattern = {
 	},
 };
 
+const template_embedded_verbatim: DivergencePattern = {
+	id: 'template_embedded_verbatim',
+	description: 'Tagged/decorator template body kept verbatim; prettier reformats the embedded language',
+	languages: ['typescript', 'svelte'],
+	conformance_sections: ['TypeScript: Template Literals'],
+	fixtures: [
+		'typescript/expressions/literals/template/embedded_language_verbatim_prettier_divergence',
+	],
+	detect(ctx) {
+		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
+
+		// Prettier's `embeddedLanguageFormatting` reformats a tagged template whose tag it
+		// recognizes as an embedded language (html/css/graphql/gql) — collapsing embedded
+		// HTML whitespace, expanding embedded CSS onto its own lines. tsv keeps the body
+		// verbatim. Prettier-side signal (this is a prettier-side-only divergence — tsv does
+		// nothing): prettier reflowed a recognized-tag template, and ours kept a one-line
+		// `tag`…`` form prettier did not reproduce.
+		const embedded_tag_template = /\b(?:html|css|graphql|gql)`/;
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			const prettier_reflowed = hunk.removed_lines.some((l) => embedded_tag_template.test(l));
+			const ours_verbatim = hunk.added_lines.some(
+				(l) => embedded_tag_template.test(l) && !hunk.removed_lines.includes(l),
+			);
+			return prettier_reflowed && ours_verbatim;
+		});
+
+		if (hunk_indices.length > 0) {
+			return {
+				pattern: 'template_embedded_verbatim',
+				confidence: 'certain',
+				hunk_indices,
+				reason:
+					'Tagged-template body kept verbatim (prettier reformats the embedded html/css/graphql language; tsv does no embedded formatting)',
+			};
+		}
+		return null;
+	},
+};
+
 // ─── Pattern Registry ───────────────────────────────────────────────────────
 //
 // Ordered: specific → broad. Specific patterns run first for best explanations.
@@ -2878,6 +2918,7 @@ export const PATTERNS: DivergencePattern[] = [
 
 	// 3. Feature-specific patterns
 	template_literal_width,
+	template_embedded_verbatim,
 	block_expression_logical,
 	single_specifier_import,
 	member_expression_call,

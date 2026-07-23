@@ -15,7 +15,10 @@ the key, prettier keeps it quoted (its own fixed point).
 The rule is position-scoped and never over-unquotes:
 
 - Object-literal keys, type-literal members, and interface members unquote.
-- A class member key is never unquoted (stays a string literal in both formatters).
+- A class member key unquotes the same way in tsv (`'𐊧' = 1` → `𐊧 = 1`); prettier keeps
+  class **field** keys quoted (its own inconsistency — see
+  [field_key_unquote](../../../declarations/class/field_key_unquote_prettier_divergence/)),
+  so the astral field diverges on both counts.
 - A key that is not a valid identifier (`'0a'`) stays quoted in both.
 
 ## Reason
