@@ -398,12 +398,32 @@ pub(super) fn type_needs_parens_for_prefix_operator(ts_type: &TSType<'_>) -> boo
 /// `TSInferType` arm in `needs-parentheses.js` — parens when the node is a `types`
 /// member of a union/intersection and `node.typeParameter.constraint` is set.
 pub(super) fn type_needs_parens_in_union_or_intersection(ts_type: &TSType<'_>) -> bool {
-    match unwrap_parenthesized(ts_type) {
+    let inner = unwrap_parenthesized(ts_type);
+    // A degenerate ONE-element intersection/union (`& b`, `| b` — the leading-operator
+    // syntax) is transparent: it prints as just its member (prettier collapses it), so
+    // the parens decision applies to that member, not the one-element wrapper. Without
+    // this, `a | & b` wraps the member as if it were a real intersection → `a | (b)`,
+    // where prettier emits `a | b`. A multi-element intersection/union keeps its parens.
+    if let Some(single) = single_member_composite(inner) {
+        return type_needs_parens_in_union_or_intersection(single);
+    }
+    match inner {
         TSType::Union(_)
         | TSType::Intersection(_)
         | TSType::Function(_)
         | TSType::Constructor(_)
         | TSType::Conditional(_) => true,
         other => is_constrained_infer(other),
+    }
+}
+
+/// The single member of a one-element `TSUnionType` / `TSIntersectionType`, else `None`.
+/// A one-element composite is semantically just its member (the leading-`|`/`&` syntax),
+/// and prettier collapses it, so callers see through it.
+fn single_member_composite<'a>(ts_type: &'a TSType<'a>) -> Option<&'a TSType<'a>> {
+    match ts_type {
+        TSType::Union(u) if u.types.len() == 1 => Some(&u.types[0]),
+        TSType::Intersection(i) if i.types.len() == 1 => Some(&i.types[0]),
+        _ => None,
     }
 }

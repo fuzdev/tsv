@@ -4,26 +4,30 @@
 	// (`[no LineTerminator here]`), so a break after the keyword means ASI. A line comment
 	// keeps the parens and breaks inside them.
 	function fn1() {
-		return ( // c
-		a);
+		return (
+			// c
+			a);
 	}
 
 	// the argument shape doesn't matter — a member expression behaves the same
 	function fn2() {
-		return ( // c
-		a.b);
+		return (
+			// c
+			a.b);
 	}
 
 	// a ternary argument too
 	function fn3() {
-		return ( // c
-		cond ? a : b);
+		return (
+			// c
+			cond ? a : b);
 	}
 
 	// throw is restricted the same way
 	function fn4() {
-		throw ( // c
-		a);
+		throw (
+			// c
+			a);
 	}
 
 	// a block comment with the argument after it on the same line collapses inline — nothing
