@@ -556,11 +556,14 @@ only the committed-tree pins (`check.yml` is a clean checkout — no sibling
 clones); the rest are dev-machine gates at conformance/publish cadence.
 
 **Update ritual** (same as the artifact size bounds): the failure message
-prints expected vs got — update the constant + its measured-on comment in the
-same change, and say why in the commit. Record the checkout **commit** in the
-comment (`git -C ../<repo> rev-parse --short HEAD`) — upstream version files
-only bump at release, so the commit is the only precise statement of what a
-pin was measured against. When re-pinning after a suite refresh, glance at the
+prints expected vs got — update the constant and say why in the **commit
+message**. That is where a pin move's history belongs — do NOT narrate it as an
+in-file comment (the `X→Y (date): …` running changelogs were swept out;
+`gate_counts.ts` docstrings stay semantic). When a checkout moves, re-record its
+**commit** in `GATE_CHECKOUT_COMMITS` in the same change (`git -C ../<repo>
+rev-parse --short HEAD`) — that struct is the single provenance record for what a
+pin was measured against (upstream version files only bump at release). When
+re-pinning after a suite refresh, glance at the
 full bucket table, not just the changed number — a count move can mask
 offsetting changes (the per-file gates — unexpected over-rejections, stale
 ledgers, SAFETY — catch tsv-side regressions independently, but the glance is
