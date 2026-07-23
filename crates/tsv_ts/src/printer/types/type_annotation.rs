@@ -46,8 +46,10 @@ impl<'a> Printer<'a> {
         // unwrapped inner (`ty`) and widen the gap window (`type_start`) to its start so
         // the line-comment branch below fires — the outer paren would otherwise hide the
         // comment and the inline path would relocate it at a differing indent (a
-        // non-idempotency). The guard leaves a mixed shell unsubstituted (`ty` stays the
-        // original paren), so the block-comment / no-comment paths preserve it in place.
+        // non-idempotency). A mixed (leading block) or trailing shell hoists losslessly
+        // too — the leading run via the continuation indent, the trailing comment via
+        // `with_stripped_paren_trailing`. A shell with no leading line comment is returned
+        // unchanged, so the block-comment / no-comment paths below preserve it in place.
         let (type_start, ty) = self.keyword_value_stripped_paren_hang(annotation.type_annotation);
 
         // Zero-comment gate over the `:`→type gap, computed once and reused by every
@@ -76,7 +78,9 @@ impl<'a> Printer<'a> {
             // here: a newline-broken block compacts to the inline value-side position
             // (`a: /* c */ X`) rather than hanging — a deliberate, cataloged choice
             // (annotation_leading_block_prettier_divergence).
-            let type_doc = self.build_type_doc(ty);
+            // Type position: a trailing block lifted from the shell trails the type
+            // inline before the terminator (`defer = false`).
+            let type_doc = self.build_hang_value_doc(annotation.type_annotation, ty, false);
             d.concat(&[
                 d.text(":"),
                 self.build_continuation_indent(colon_end, type_start, type_doc),

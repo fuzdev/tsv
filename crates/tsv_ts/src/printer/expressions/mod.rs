@@ -629,8 +629,9 @@ impl<'a> Printer<'a> {
             // settles on — route it through the shared keyword→value seam so the paren form
             // is idempotent. Without this the gate below measures the OUTER paren and the
             // comment inside it is invisible, so the inline path relocates it at a differing
-            // indent (a non-idempotency). The seam's content-loss guard preserves a mixed
-            // shell in place.
+            // indent (a non-idempotency). A mixed (leading block) or trailing shell hoists
+            // losslessly too — the leading run below, the trailing comment via
+            // `with_stripped_paren_trailing`.
             let (value_start, value_type) = self.keyword_value_stripped_paren_hang(type_annotation);
             // A line comment or multiline block hangs the type on its own line; a
             // single-line block comment collapses inline (the fall-through below).
@@ -638,7 +639,10 @@ impl<'a> Printer<'a> {
             if self.comments_force_own_line_between(kw_end, value_start) {
                 parts.push(d.text(" "));
                 parts.push(d.text(keyword));
-                let type_doc = self.build_type_doc(value_type);
+                // A cast is a value position: a trailing block lifted from the shell
+                // defers past the statement `;` (`x as // c\n\tA; /* t */`), matching the
+                // declarator's own value→`;` trailing handling — so `defer = true`.
+                let type_doc = self.build_hang_value_doc(type_annotation, value_type, true);
                 self.append_keyword_value_line_comments(&mut parts, kw_end, value_start, type_doc);
                 return d.concat(&parts);
             }
