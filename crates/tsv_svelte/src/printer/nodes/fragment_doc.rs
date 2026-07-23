@@ -372,6 +372,21 @@ impl<'a> Printer<'a> {
                 } else {
                     self.handle_inline_child(node, &mut child_docs, prev_text_ws);
                 }
+            } else if !format_ignore_next
+                && let Some((unit_doc, run_end)) =
+                    self.try_build_glued_comment_prefixed_element(trimmed_nodes, i)
+            {
+                // Glued comment prefix (`<!--c--><a…>`): the comment(s) are the element's prefix,
+                // so build comments + element as ONE concat here (at the head comment) and skip the
+                // tail via `glued_run_consumed_until`. This is the comment analog of the glued
+                // element run above — the preceding text's break-before-flow measurement then sees
+                // the whole unit flat and moves it to a fresh line together (its `next_is_flow`
+                // looked through the comments via `comment_glued_next_flow`), rather than dangling
+                // the opening tag after a space. Honor a trimmed boundary space from the previous
+                // text exactly as the single-element path does. Guarded on `!format_ignore_next` so
+                // a `<!-- prettier-ignore -->` directive still routes to the raw path below.
+                self.push_inline_child_doc(&mut child_docs, unit_doc, prev_text_ws);
+                glued_run_consumed_until = run_end + 1;
             } else {
                 // Other nodes (comments, `{@const}`/`{@debug}`/`{const}`/`{let}` tags).
                 // `has_preceding_breakable` (tracked above) affects whether block conditions use
@@ -400,6 +415,15 @@ impl<'a> Printer<'a> {
             node,
             FragmentNode::ExpressionTag(_) | FragmentNode::HtmlTag(_) | FragmentNode::RenderTag(_)
         )
+    }
+
+    /// Whether two fragment nodes are **byte-glued** — no source between them (`a`'s end is `b`'s
+    /// start). The core adjacency test behind every "glued run" in this file: a glued boundary is
+    /// render-significant (breaking it would inject a rendered space), so a glued prefix or element
+    /// run always travels as one unit. Any node — including whitespace-only text — between them
+    /// makes them non-adjacent.
+    fn byte_glued(a: &FragmentNode<'_>, b: &FragmentNode<'_>) -> bool {
+        a.span().end == b.span().start
     }
 
     /// Check if a node is a format-ignore comment — the directive that pins the next node's
@@ -454,7 +478,16 @@ impl<'a> Printer<'a> {
         let next_node = trimmed_nodes.get(i + 1);
         let prev_is_inline = prev_node.is_some_and(is_inline_content);
         let prev_is_tag = prev_node.is_some_and(Self::is_tag_node);
-        let next_is_inline = next_node.is_some_and(is_inline_content);
+        // A byte-glued HTML-comment run (`<!--c--><a…>`) between this text and an inline element
+        // makes the comment the element's glued prefix: the break-before coupling must treat the
+        // effective next node as that element (skip the comments), so the whole run travels to a
+        // fresh line together rather than dangling the opening tag after a space. The comment run
+        // is then built + printed with the element as one concat by the main loop's
+        // `try_build_glued_comment_prefixed_element` arm — see [`Self::glued_comment_run_element`].
+        let comment_glued_next_flow = self
+            .glued_comment_run_element(trimmed_nodes, i + 1)
+            .is_some();
+        let next_is_inline = next_node.is_some_and(is_inline_content) || comment_glued_next_flow;
         let next_is_tag = next_node.is_some_and(Self::is_tag_node);
         // Whether the next sibling is an HTML *inline* element vs a *block* element —
         // the two kinds prettier-plugin-svelte trims boundary whitespace *into* (the
@@ -471,7 +504,8 @@ impl<'a> Printer<'a> {
         // ends its fill with a trailing `line` so the boundary breaks per width inside the
         // fill (keeping the run idempotent), rather than a `group([line, node])` whose
         // all-or-nothing break flip-flops across passes.
-        let next_is_flow = next_node.is_some_and(|n| self.is_inline_el_or_comp(n));
+        let next_is_flow =
+            next_node.is_some_and(|n| self.is_inline_el_or_comp(n)) || comment_glued_next_flow;
         // Whether the *previous* sibling is a block element — prettier trims a boundary
         // whitespace adjacent to a block but does NOT then wrap the next inline element in
         // `group([line, el])` (`handleWhitespaceOfPrevTextNode = !isBlockElement(prevNode)`),
@@ -857,9 +891,11 @@ impl<'a> Printer<'a> {
     /// clears the flag (`prev_text_ws`), so this only reads it.
     fn push_inline_child_doc(&self, child_docs: &mut DocBuf, node_doc: DocId, prev_text_ws: bool) {
         if prev_text_ws {
-            let d = self.d();
-            let inner = d.concat(&[d.line(), node_doc]);
-            child_docs.push(d.group(inner));
+            // The single producer of the inline-sibling wrap; `DocArena::strip_leading_line_group`
+            // (the after-element fold's matcher, a crate away) is its exact inverse. Routing through
+            // the named constructor keeps the two in lockstep — a shape drift here would silently
+            // return `None` there and reintroduce the stray-space non-idempotency.
+            child_docs.push(self.d().inline_sibling_line_group(node_doc));
         } else {
             child_docs.push(node_doc);
         }
@@ -960,6 +996,65 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_nodes_doc_multiline(&self, nodes: &[FragmentNode<'_>]) -> DocId {
         let breakable_exprs = Self::nodes_have_breakable_expression(nodes);
         self.build_nodes_doc_trimmed(nodes, breakable_exprs, true)
+    }
+
+    /// Build the content of a **whitespace-collapsing container** (`<table>`, `<select>`, … —
+    /// `tsv_html::collapses_child_whitespace`) block-style: every non-whitespace child on its own
+    /// line, with the inter-sibling whitespace **trimmed**. Svelte's compiler removes that
+    /// whitespace entirely (`clean_nodes` `can_remove_entirely`), so this is render-equivalent to
+    /// the inline form and reproduces the block-authored form both formatters already keep — see
+    /// [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+    ///
+    /// Whitespace-only text nodes are dropped — with one carry-over: an **authored blank line**
+    /// (2+ newlines) is a Tier-2 authoring signal preserved block-style everywhere else, so it
+    /// survives (collapsed to a single blank) between the two children it separates, exactly as
+    /// `handle_text_child`'s `newline_count >= 2` does on the general path. Every non-whitespace
+    /// node (element, control-flow block, comment, tag) is built in multiline context and
+    /// `hardline`-separated. A `<!-- prettier-ignore -->` directive still suppresses the next node
+    /// (emitted raw), and a whitespace-only node between the directive and the ignored node is
+    /// skipped without clearing the pending flag. `can_remove_entirely` keys on the **direct**
+    /// element parent, so this runs only for the container's own content — a nested `{#each}` body
+    /// builds through the ordinary path (its parent is the block, not the container), matching the
+    /// compiler.
+    pub(super) fn build_container_content_doc(&self, nodes: &[FragmentNode<'_>]) -> DocId {
+        let d = self.d();
+        let mut parts = d.pooled_docbuf();
+        let mut format_ignore_next = false;
+        // A skipped inter-sibling whitespace run carrying a blank line: the run itself is trimmed
+        // (render-free), but the blank line is carried to the next child as a doubled separator.
+        let mut pending_blank = false;
+        for node in nodes {
+            // Trim inter-sibling whitespace — render-free in this container — but remember an
+            // authored blank line so the next child reintroduces it.
+            if let FragmentNode::Text(t) = node
+                && t.is_ascii_ws_only
+            {
+                if t.newline_count >= 2 {
+                    pending_blank = true;
+                }
+                continue;
+            }
+            let node_doc = if format_ignore_next {
+                format_ignore_next = false;
+                self.format_ignore_raw_doc(node)
+            } else {
+                if Self::is_format_ignore_comment(node, self.source) {
+                    format_ignore_next = true;
+                }
+                self.build_fragment_node_doc_in_multiline(node)
+            };
+            if let Some(node_doc) = node_doc {
+                if !parts.is_empty() {
+                    parts.push(d.hardline());
+                    if pending_blank {
+                        parts.push(d.hardline());
+                    }
+                }
+                pending_blank = false;
+                parts.push(node_doc);
+            }
+        }
+        d.concat(&parts)
     }
 
     /// Check if a fragment node is a block-level node (needs its own line)
@@ -1115,7 +1210,7 @@ impl<'a> Printer<'a> {
             return None;
         };
         // Inline element, directly adjacent (no whitespace between it and the block).
-        if self.is_block_fragment_node(prev) || prev.span().end != block.span().start {
+        if self.is_block_fragment_node(prev) || !Self::byte_glued(prev, block) {
             return None;
         }
         let element_doc = self.build_inline_element_omit_close_gt(element)?;
@@ -1150,7 +1245,7 @@ impl<'a> Printer<'a> {
         while let Some(next) = trimmed_nodes.get(end + 1) {
             if matches!(next, FragmentNode::Element(_))
                 && !self.is_block_fragment_node(next)
-                && trimmed_nodes[end].span().end == next.span().start
+                && Self::byte_glued(&trimmed_nodes[end], next)
             {
                 end += 1;
             } else {
@@ -1163,6 +1258,86 @@ impl<'a> Printer<'a> {
         }
         let run_doc = self.build_glued_element_run(trimmed_nodes, i, end)?;
         Some((run_doc, end))
+    }
+
+    /// If `nodes[i]` **begins** a byte-glued run of one or more HTML comments that ends glued to an
+    /// inline element/component, return that element's index. Every comment in the run must be
+    /// byte-adjacent to the next node and the last one byte-adjacent to the element
+    /// (`<!--a--><!--b--><a…>`); any whitespace inside the run stops it (`None`), as does a run
+    /// glued to a non-inline node, and a **format-ignore directive** anywhere in the run (see below).
+    /// Whitespace *before* `nodes[i]` is the boundary the break lands on, exactly as for a glued
+    /// text prefix — but a *glued comment* before `nodes[i]` makes it a non-head member of a longer
+    /// run, and only the head opens the unit (`None` otherwise). The comment run is the element's
+    /// glued prefix; the break-before machinery then measures comments + element as one unit (see
+    /// [`Self::try_build_glued_comment_prefixed_element`] and [`Self::handle_text_child`]'s
+    /// `comment_glued_next_flow`).
+    ///
+    /// Two bail conditions beyond "not a clean glued run":
+    /// - **Head-only** — a comment byte-glued *after* another comment is a non-head member, and the
+    ///   head already decided the run's fate (a suffix of a run that failed to resolve fails the
+    ///   same way). Bailing in O(1) here, rather than re-scanning from each member, keeps a long
+    ///   *unresolved* glued-comment run linear instead of O(run length²): the member then builds
+    ///   individually via the ordinary path — identical output, since it would have returned `None`.
+    /// - **Directive** — a `<!-- prettier-ignore -->` / `format-ignore` comment must reach the
+    ///   per-node path so it suppresses its target; absorbing it into a glued unit would format the
+    ///   very node it means to pin.
+    fn glued_comment_run_element(&self, nodes: &[FragmentNode<'_>], i: usize) -> Option<usize> {
+        if !matches!(nodes.get(i)?, FragmentNode::Comment(_)) {
+            return None;
+        }
+        // Head-only guard (linear-cost): a comment glued after another comment is a non-head member.
+        if let Some(p) = i.checked_sub(1)
+            && matches!(&nodes[p], FragmentNode::Comment(_))
+            && Self::byte_glued(&nodes[p], &nodes[i])
+        {
+            return None;
+        }
+        let mut j = i;
+        loop {
+            // A format-ignore directive anywhere in the run (head or interior) routes to the
+            // per-node path so the directive is honored — never swallowed into the glued unit.
+            if Self::is_format_ignore_comment(&nodes[j], self.source) {
+                return None;
+            }
+            let next = nodes.get(j + 1)?;
+            if !Self::byte_glued(&nodes[j], next) {
+                return None; // whitespace inside the run — not a single glued unit
+            }
+            match next {
+                FragmentNode::Comment(_) => j += 1,
+                _ if self.is_inline_el_or_comp(next) => return Some(j + 1),
+                _ => return None,
+            }
+        }
+    }
+
+    /// When `nodes[i]` heads a glued HTML-comment run ending in an inline element
+    /// ([`Self::glued_comment_run_element`]), build the comments + the element as ONE concat and
+    /// return `(unit_doc, end)` — the last index the unit covers, so the caller skips the tail via
+    /// `glued_run_consumed_until`. The comment prefix travels with the element: because the unit is
+    /// a plain concat, the preceding text's break-before-flow measurement sees the whole thing flat
+    /// (`after_element_fold_lead` → `None`), so a wide element pulls its comment prefix to the fresh
+    /// line together rather than dangling the opening tag after a space. The element may itself head
+    /// a glued-element run (G2) — reuse [`Self::try_build_glued_element_run`] there — else it is an
+    /// ordinary inline child. `None` when `nodes[i]` is not a glued-comment prefix.
+    fn try_build_glued_comment_prefixed_element(
+        &self,
+        nodes: &[FragmentNode<'_>],
+        i: usize,
+    ) -> Option<(DocId, usize)> {
+        let elem_idx = self.glued_comment_run_element(nodes, i)?;
+        // Build the element (or the glued-element run it heads), then prepend the comment docs.
+        let (elem_doc, end) = match self.try_build_glued_element_run(nodes, elem_idx) {
+            Some((run_doc, run_end)) => (run_doc, run_end),
+            None => (self.build_fragment_node_doc(&nodes[elem_idx])?, elem_idx),
+        };
+        let d = self.d();
+        let mut parts = d.pooled_docbuf();
+        for node in &nodes[i..elem_idx] {
+            parts.push(self.build_fragment_node_doc(node)?);
+        }
+        parts.push(elem_doc);
+        Some((d.concat(&parts), end))
     }
 
     /// Build a maximal run of byte-adjacent (glued) inline **elements** — `nodes[start..=end]`,
