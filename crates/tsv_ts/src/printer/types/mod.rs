@@ -65,7 +65,9 @@ impl<'a> Printer<'a> {
             TSType::Literal(lit) => self.build_literal_type_doc(lit),
             TSType::Array(arr) => self.build_array_type_doc(arr),
             TSType::Union(u) => self.build_union_type_doc(u),
-            TSType::Intersection(i) => self.build_intersection_type_doc(i, true),
+            // Default trailing-prefix context; own-line element callers (tuple) invoke
+            // `build_intersection_type_doc` directly with `own_line = true`.
+            TSType::Intersection(i) => self.build_intersection_type_doc(i, true, false),
             TSType::TypeReference(r) => {
                 let mut parts: DocBuf = smallvec![self.build_entity_name_doc(&r.type_name)];
                 if let Some(type_args) = &r.type_arguments {
