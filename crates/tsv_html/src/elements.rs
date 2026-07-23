@@ -187,6 +187,25 @@ pub fn is_void_element(tag_name: &str) -> bool {
         || tag_name.eq_ignore_ascii_case("!doctype")
 }
 
+/// Whether inter-sibling whitespace inside this element is removed **entirely** by Svelte's
+/// compiler (`clean_nodes` `can_remove_entirely`) rather than collapsed to a rendered space.
+///
+/// These containers never render whitespace between their children, so a formatter may lay them
+/// out block-style with no inter-sibling space and stay render-equivalent. This is the **exact**
+/// Svelte set — a deliberate *subset* of what HTML collapses (Svelte's source carries a
+/// `// TODO others?`), verified element-by-element against the compiler: `optgroup` / `ul` / `ol`
+/// / `menu` / `dl` / `fieldset` are **not** members (Svelte keeps their inter-sibling space, so a
+/// drop-in must too). The other arm of `can_remove_entirely` — any SVG element outside a `<text>`
+/// element — is a namespace-level rule the caller applies, not a tag-name question, so it is not
+/// covered here.
+#[inline]
+pub fn collapses_child_whitespace(tag_name: &str) -> bool {
+    matches!(
+        tag_name,
+        "select" | "table" | "tbody" | "thead" | "tfoot" | "tr" | "colgroup" | "datalist"
+    )
+}
+
 /// Check if an element is an SVG element
 #[inline]
 pub fn is_svg_element(tag_name: &str) -> bool {
@@ -412,6 +431,26 @@ mod tests {
         assert!(is_void_element("!DocType"));
         // ...but it needs the leading '!'.
         assert!(!is_void_element("doctype"));
+    }
+
+    #[test]
+    fn test_collapses_child_whitespace() {
+        // The exact Svelte `can_remove_entirely` name set.
+        for tag in [
+            "select", "table", "tbody", "thead", "tfoot", "tr", "colgroup", "datalist",
+        ] {
+            assert!(collapses_child_whitespace(tag), "member: {tag:?}");
+        }
+        // Deliberately NOT members — HTML collapses these but Svelte's set omits them
+        // (`// TODO others?`), and tsv must match Svelte, not raw HTML.
+        for tag in [
+            "optgroup", "ul", "ol", "menu", "dl", "fieldset", "td", "th", "option", "div", "span",
+            "svg",
+        ] {
+            assert!(!collapses_child_whitespace(tag), "non-member: {tag:?}");
+        }
+        // Case-sensitive: callers pass already-lowercased tag names.
+        assert!(!collapses_child_whitespace("TABLE"));
     }
 
     #[test]

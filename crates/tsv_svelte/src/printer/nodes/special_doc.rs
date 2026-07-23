@@ -46,6 +46,12 @@ impl<'a> Printer<'a> {
             is_void: false,
             // Every `svelte:*` kind may print self-closing when the source wrote it that way.
             can_self_close: true,
+            // A `svelte:*` element is a distinct AST node type (`SvelteElement` / `SvelteComponent`
+            // / …), never a `RegularElement`, so Svelte's `can_remove_entirely` — whose container
+            // arm keys on `parent.type === 'RegularElement'` — never applies, whatever `this`
+            // resolves to (even `<svelte:element this="table">`). Inter-sibling whitespace stays
+            // significant.
+            collapses_child_ws: false,
             nodes: element.fragment.nodes,
             span: element.span,
         };

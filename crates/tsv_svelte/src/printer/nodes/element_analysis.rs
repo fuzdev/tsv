@@ -266,6 +266,7 @@ impl<'a> Printer<'a> {
         let ElementParts {
             kind,
             can_self_close,
+            collapses_child_ws,
             nodes,
             span,
             ..
@@ -302,17 +303,22 @@ impl<'a> Printer<'a> {
         let only_text_content =
             !is_empty && nodes.iter().all(|n| matches!(n, FragmentNode::Text(_)));
 
-        // Compute needs_multiline
-        let needs_multiline = self.compute_needs_multiline(
-            nodes,
-            MultilineInputs {
-                kind,
-                is_empty,
-                boundary,
-                block_flow_multiline,
-                only_text_content,
-            },
-        );
+        // Compute needs_multiline. A whitespace-collapsing container (`<table>`, `<select>`, …)
+        // with content always lays out block-style: its inter-sibling whitespace is render-free
+        // (the compiler removes it), so the children sit one-per-line with the space trimmed, the
+        // same block-style stance every other render-free boundary takes. `build_content_element_doc`
+        // reads `collapses_child_ws` off the same `parts` to build that trimmed one-per-line content.
+        let needs_multiline = (collapses_child_ws && !is_empty)
+            || self.compute_needs_multiline(
+                nodes,
+                MultilineInputs {
+                    kind,
+                    is_empty,
+                    boundary,
+                    block_flow_multiline,
+                    only_text_content,
+                },
+            );
 
         ElementContext {
             is_self_closing,

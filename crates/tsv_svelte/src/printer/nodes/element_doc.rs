@@ -103,6 +103,9 @@ pub(super) struct ElementParts<'arena> {
     pub(super) is_void: bool,
     /// Whether an empty element may print self-closing when the source wrote it that way
     pub(super) can_self_close: bool,
+    /// A whitespace-collapsing container (`<table>`, `<select>`, …): the compiler removes
+    /// inter-sibling whitespace entirely, so the content lays out block-style with it trimmed.
+    pub(super) collapses_child_ws: bool,
     pub(super) nodes: &'arena [FragmentNode<'arena>],
     pub(super) span: Span,
 }
@@ -131,6 +134,10 @@ pub(super) struct TagClass {
     pub(super) is_template: bool,
     /// `<pre>` / `<textarea>` — content whitespace is literal
     pub(super) is_ws_sensitive: bool,
+    /// `<table>` / `<select>` / … — a whitespace-collapsing container: the compiler removes
+    /// inter-sibling whitespace entirely (`clean_nodes` `can_remove_entirely`), so tsv lays the
+    /// content out block-style with the inter-sibling whitespace trimmed.
+    pub(super) collapses_child_ws: bool,
     /// `<!DOCTYPE>` — closes with `>`, not `/>`
     pub(super) is_declaration: bool,
 }
@@ -210,6 +217,7 @@ impl<'a> Printer<'a> {
             is_script: facts.is_script(),
             is_template: facts.is_template(),
             is_ws_sensitive: facts.is_ws_sensitive(),
+            collapses_child_ws: facts.collapses_child_whitespace(),
             is_declaration: facts.is_declaration(),
         }
     }
@@ -227,6 +235,7 @@ impl<'a> Printer<'a> {
             // Components, foreign (SVG/MathML), and namespaced (`foo:bar`) elements may print
             // self-closing (prettier's `didSelfClose`).
             can_self_close: class.kind.is_component() || class.is_foreign || class.is_namespaced,
+            collapses_child_ws: class.collapses_child_ws,
             nodes: element.fragment.nodes,
             span: element.span,
         }
@@ -516,11 +525,19 @@ impl<'a> Printer<'a> {
         // fits()-Break `line` — which, on a fill whose text and ternaries compete for the same
         // line, oscillates between two layouts (a non-idempotent 2-cycle, `authoring_audit`'s
         // hard bucket).
-        let children_doc = self.build_nodes_doc_trimmed(
-            nodes,
-            Self::nodes_have_breakable_expression(nodes),
-            boundary == BoundaryMode::Hard,
-        );
+        // A whitespace-collapsing container lays its children out one-per-line with the
+        // inter-sibling whitespace trimmed (render-free — the compiler removes it). Its
+        // `needs_multiline` is forced (see `analyze_element`), so `boundary` is always `Hard` here
+        // and this content flows into the multiline arm below.
+        let children_doc = if parts.collapses_child_ws {
+            self.build_container_content_doc(nodes)
+        } else {
+            self.build_nodes_doc_trimmed(
+                nodes,
+                Self::nodes_have_breakable_expression(nodes),
+                boundary == BoundaryMode::Hard,
+            )
+        };
 
         // Soft boundaries: collapse when the element fits, break block-style when it doesn't.
         //

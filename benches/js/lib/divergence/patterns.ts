@@ -1980,7 +1980,7 @@ const forced_continuation_indent: DivergencePattern = {
 const inline_content_block_style: DivergencePattern = {
 	id: 'inline_content_block_style',
 	description:
-		'tsv lays out inline element/block content block-style (tags intact, content on its own line) and breaks before an inline element whose text-line overflows so its opening tag starts a fresh line; prettier dangles the tag delimiters / hugs the content / dangles the opening tag',
+		'tsv lays out inline element/block content block-style (tags intact, content on its own line), breaks before an inline element whose text-line overflows so its opening tag starts a fresh line, and lays a whitespace-collapsing container (table/select/…) out block-style; prettier dangles the tag delimiters / hugs the content / dangles the opening tag / keeps the container inline',
 	languages: ['svelte'],
 	conformance_sections: ['Svelte: Inline content block-style', 'Svelte: Blocks'],
 	fixtures: [
@@ -1992,6 +1992,8 @@ const inline_content_block_style: DivergencePattern = {
 		'svelte/elements/inline_break_before_wrap_long_prettier_divergence',
 		'svelte/elements/inline_break_before_component_long_prettier_divergence',
 		'svelte/elements/inline_break_before_void_long_prettier_divergence',
+		'svelte/elements/ws_collapsing_containers_prettier_divergence',
+		'svelte/elements/implicit_close_table_prettier_divergence',
 	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
@@ -2043,6 +2045,19 @@ const inline_content_block_style: DivergencePattern = {
 		// no block tag on a changed line at all.
 		const block_head_at_eol = /\{#(?:if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
 		const block_branch_alone = /^[ \t]*\{[:/](?:else|then|catch|if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
+		// The whitespace-collapsing-container block-style (§"reaches inter-sibling whitespace …
+		// a whitespace-collapsing container"): inside `<table>`/`<tbody>`/`<thead>`/`<tfoot>`/
+		// `<tr>`/`<colgroup>`/`<select>`/`<datalist>` the compiler removes inter-sibling
+		// whitespace entirely, so tsv lays the container out block-style — each child on its own
+		// line — where prettier keeps it inline on one line. The marker is one of those container
+		// open/close tags sitting ALONE on an OUR line: prettier keeps content after the open tag
+		// (`<select><option>…`), so the tag is never alone on its side. Content-keyed on the exact
+		// `can_remove_entirely` name set — an ordinary parent's inter-sibling space is
+		// render-significant and never block-styled this way, so it carries no such marker. This
+		// is a subset of the whole-diff the whole-file `strip_all_ws` SAFETY gate above already
+		// proved whitespace-only.
+		const container_tag_alone =
+			/^[ \t]*<\/?(?:table|tbody|thead|tfoot|tr|colgroup|select|datalist)\b[^<>]*>[ \t]*$/;
 		// The break-before posture (§"The rule reaches the element's own *position*"): an
 		// inline element preceded by same-line text that must wrap starts a FRESH line in
 		// ours, where prettier dangles the OPENING tag on the overflowing text line. The
@@ -2065,7 +2080,11 @@ const inline_content_block_style: DivergencePattern = {
 				hunk.removed_lines.concat(hunk.added_lines).some((l) => dangle_close.test(l) || dangle_open.test(l)) ||
 				hunk.removed_lines.some((l) => dangle_open_tag_after_text.test(l)) ||
 				hunk.added_lines.some(
-					(l) => block_head_alone.test(l) || block_head_at_eol.test(l) || block_branch_alone.test(l),
+					(l) =>
+						block_head_alone.test(l) ||
+						block_head_at_eol.test(l) ||
+						block_branch_alone.test(l) ||
+						container_tag_alone.test(l),
 				)
 			) {
 				has_signature = true;

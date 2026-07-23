@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 275,
+	"end": 286,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "RegularElement",
 				"start": 60,
-				"end": 97,
+				"end": 105,
 				"name": "table",
 				"name_loc": {
 					"start": {
@@ -42,20 +42,27 @@
 					"type": "Fragment",
 					"nodes": [
 						{
-							"type": "RegularElement",
+							"type": "Text",
 							"start": 67,
-							"end": 89,
+							"end": 69,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 69,
+							"end": 96,
 							"name": "tr",
 							"name_loc": {
 								"start": {
-									"line": 2,
-									"column": 8,
-									"character": 68
+									"line": 3,
+									"column": 2,
+									"character": 70
 								},
 								"end": {
-									"line": 2,
-									"column": 10,
-									"character": 70
+									"line": 3,
+									"column": 4,
+									"character": 72
 								}
 							},
 							"attributes": [],
@@ -63,20 +70,27 @@
 								"type": "Fragment",
 								"nodes": [
 									{
+										"type": "Text",
+										"start": 73,
+										"end": 76,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
 										"type": "RegularElement",
-										"start": 71,
-										"end": 84,
+										"start": 76,
+										"end": 89,
 										"name": "td",
 										"name_loc": {
 											"start": {
-												"line": 2,
-												"column": 12,
-												"character": 72
+												"line": 4,
+												"column": 3,
+												"character": 77
 											},
 											"end": {
-												"line": 2,
-												"column": 14,
-												"character": 74
+												"line": 4,
+												"column": 5,
+												"character": 79
 											}
 										},
 										"attributes": [],
@@ -85,55 +99,69 @@
 											"nodes": [
 												{
 													"type": "Text",
-													"start": 75,
-													"end": 79,
+													"start": 80,
+													"end": 84,
 													"raw": "text",
 													"data": "text"
 												}
 											]
 										}
+									},
+									{
+										"type": "Text",
+										"start": 89,
+										"end": 91,
+										"raw": "\n\t",
+										"data": "\n\t"
 									}
 								]
 							}
+						},
+						{
+							"type": "Text",
+							"start": 96,
+							"end": 97,
+							"raw": "\n",
+							"data": "\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 97,
-				"end": 99,
+				"start": 105,
+				"end": 107,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 99,
-				"end": 154,
+				"start": 107,
+				"end": 162,
 				"data": " Inline-classified option: boundary spaces trim "
 			},
 			{
 				"type": "Text",
-				"start": 154,
-				"end": 155,
+				"start": 162,
+				"end": 163,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 155,
-				"end": 193,
+				"start": 163,
+				"end": 204,
 				"name": "select",
 				"name_loc": {
 					"start": {
-						"line": 5,
+						"line": 9,
 						"column": 1,
-						"character": 156
+						"character": 164
 					},
 					"end": {
-						"line": 5,
+						"line": 9,
 						"column": 7,
-						"character": 162
+						"character": 170
 					}
 				},
 				"attributes": [],
@@ -141,20 +169,27 @@
 					"type": "Fragment",
 					"nodes": [
 						{
+							"type": "Text",
+							"start": 171,
+							"end": 173,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
 							"type": "RegularElement",
-							"start": 163,
-							"end": 184,
+							"start": 173,
+							"end": 194,
 							"name": "option",
 							"name_loc": {
 								"start": {
-									"line": 5,
-									"column": 9,
-									"character": 164
+									"line": 10,
+									"column": 2,
+									"character": 174
 								},
 								"end": {
-									"line": 5,
-									"column": 15,
-									"character": 170
+									"line": 10,
+									"column": 8,
+									"character": 180
 								}
 							},
 							"attributes": [],
@@ -163,52 +198,59 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 171,
-										"end": 175,
+										"start": 181,
+										"end": 185,
 										"raw": "text",
 										"data": "text"
 									}
 								]
 							}
+						},
+						{
+							"type": "Text",
+							"start": 194,
+							"end": 195,
+							"raw": "\n",
+							"data": "\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 193,
-				"end": 195,
+				"start": 204,
+				"end": 206,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 195,
-				"end": 245,
+				"start": 206,
+				"end": 256,
 				"data": " Foreign (svg) child: boundary spaces trim "
 			},
 			{
 				"type": "Text",
-				"start": 245,
-				"end": 246,
+				"start": 256,
+				"end": 257,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 246,
-				"end": 274,
+				"start": 257,
+				"end": 285,
 				"name": "svg",
 				"name_loc": {
 					"start": {
-						"line": 8,
+						"line": 14,
 						"column": 1,
-						"character": 247
+						"character": 258
 					},
 					"end": {
-						"line": 8,
+						"line": 14,
 						"column": 4,
-						"character": 250
+						"character": 261
 					}
 				},
 				"attributes": [],
@@ -217,19 +259,19 @@
 					"nodes": [
 						{
 							"type": "RegularElement",
-							"start": 251,
-							"end": 268,
+							"start": 262,
+							"end": 279,
 							"name": "text",
 							"name_loc": {
 								"start": {
-									"line": 8,
+									"line": 14,
 									"column": 6,
-									"character": 252
+									"character": 263
 								},
 								"end": {
-									"line": 8,
+									"line": 14,
 									"column": 10,
-									"character": 256
+									"character": 267
 								}
 							},
 							"attributes": [],
@@ -238,8 +280,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 257,
-										"end": 261,
+										"start": 268,
+										"end": 272,
 										"raw": "text",
 										"data": "text"
 									}
