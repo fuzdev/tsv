@@ -1231,8 +1231,10 @@ impl<'a> Printer<'a> {
     /// the surrounding loop emits itself (e.g. a type-literal member's `;`), so
     /// the terminator isn't duplicated.
     ///
-    /// Emitted as a `source_span` over the whitespace-trimmed sub-span — an
-    /// ignored region can be large, and the verbatim slice needs no pool copy.
+    /// Emitted as a `verbatim_source_span` over the whitespace-trimmed sub-span —
+    /// an ignored region can be large, and the verbatim slice needs no pool copy;
+    /// the variant keeps the frozen slice's embedded newlines opaque to
+    /// `will_break` (source layout, not a break the enclosing group must honor).
     fn raw_source_range(&self, start: u32, end: u32) -> DocId {
         let trimmed = self.source[start as usize..end as usize].trim_end();
         let span = Span {
@@ -1244,7 +1246,7 @@ impl<'a> Printer<'a> {
         #[cfg(feature = "comment_check")]
         tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
 
-        self.d().source_span(span, self.source)
+        self.d().verbatim_source_span(span, self.source)
     }
 
     /// Emit an identifier-name doc node — the doc-side name-emission seam.

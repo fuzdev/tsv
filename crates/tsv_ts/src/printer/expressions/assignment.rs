@@ -18,6 +18,7 @@ use crate::printer::ArrowChainContext;
 use crate::printer::Printer;
 use crate::printer::conditional_should_break_after_op;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
+use crate::printer::is_multiline_string_literal;
 use crate::printer::is_string_literal;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use tsv_lang::Comment;
@@ -725,6 +726,45 @@ fn is_short_arg(expr: &Expression<'_>, source: &str, print_width: usize) -> bool
     }
 }
 
+/// Whether a poorly-breakable chain carries a line-continuation string argument — a
+/// string literal whose formatted form has an internal newline (`'a\`⏎`b'`).
+///
+/// Such a string force-breaks the RHS doc (`will_break`) at a **leaf**, not at a chain
+/// break point, so it does not invalidate the `is_poorly_breakable_chain` claim: prettier
+/// likewise counts a line-continuation string as a lone short argument (its
+/// `isLoneShortArgument` string arm does not exclude newlines, unlike the template arm),
+/// keeps the chain poorly-breakable, and breaks after the operator. This is the third
+/// exemption for the `is_poorly_breakable_chain` debug_assert below.
+fn chain_has_line_continuation_string_arg(expr: &Expression<'_>, source: &str) -> bool {
+    match expr {
+        Expression::CallExpression(call) => {
+            call.arguments
+                .iter()
+                .any(|arg| arg_is_line_continuation_string(arg, source))
+                || chain_has_line_continuation_string_arg(call.callee, source)
+        }
+        Expression::MemberExpression(member) => {
+            chain_has_line_continuation_string_arg(member.object, source)
+        }
+        Expression::TSNonNullExpression(non_null) => {
+            chain_has_line_continuation_string_arg(non_null.expression, source)
+        }
+        _ => false,
+    }
+}
+
+/// Whether an argument is a string literal carrying a line continuation (`\⏎` —
+/// the formatted form keeps the embedded newline; `is_multiline_string_literal`
+/// is the raw-source predicate) — unwrapping unary operators like `is_short_arg` does.
+fn arg_is_line_continuation_string(expr: &Expression<'_>, source: &str) -> bool {
+    match expr {
+        Expression::UnaryExpression(unary) => {
+            arg_is_line_continuation_string(unary.argument, source)
+        }
+        _ => is_multiline_string_literal(expr, source),
+    }
+}
+
 /// Check if a call expression's arguments have any associated comments.
 ///
 /// Matches Prettier's `hasComment(node)` check inside `isLoneShortArgument` (utils/index.js:437).
@@ -1002,7 +1042,7 @@ impl<'a> Printer<'a> {
         // our static AST analysis missed a break-emitting node — the chain actually
         // has internal break points and may need a different layout.
         //
-        // Two exemptions, both cases where the doc force-breaks for a reason that is NOT a
+        // Three exemptions, all cases where the doc force-breaks for a reason that is NOT a
         // chain break point the static analysis missed:
         //
         // - A comment the RHS *owns* prints inside the RHS's doc (a JSDoc cast, a bundler
@@ -1020,11 +1060,17 @@ impl<'a> Printer<'a> {
         //   `has_line_comments_in_chain` directly — the member/call-chain layout predicates both
         //   reduce to it (the member one only adds an `is_member_only_chain` guard), so naming
         //   the underlying check is exact and avoids a redundant disjunct.
+        // - A *line-continuation string argument* (`a = fn('x\`⏎`y')`) force-breaks the doc at
+        //   a leaf — the string's own mandatory newline — not at a chain break point. Prettier
+        //   agrees the chain is poorly breakable here (a line-continuation string is a lone
+        //   short argument) and breaks after the operator, so the classification is sound.
+        //   (`chain_has_line_continuation_string_arg`).
         debug_assert!(
             {
                 let core_expr = unwrap_expression(right_expr);
                 self.owned_leading_comment_hangs_value(right_expr)
                     || self.has_line_comments_in_chain(right_expr)
+                    || chain_has_line_continuation_string_arg(core_expr, self.source)
                     || !is_poorly_breakable_chain(
                         core_expr,
                         self.source,

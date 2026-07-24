@@ -29,7 +29,7 @@ use super::DocBuf;
 #[cfg(feature = "swallow_check")]
 use super::swallow::swallow_check_enabled;
 use super::types::{
-    DocContext, DocText, GroupId, LineKind, Mode, PoolSpan, TEXT_WIDTH_HAS_NEWLINE,
+    CachedWidth, DocContext, DocText, GroupId, LineKind, Mode, PoolSpan, TEXT_WIDTH_HAS_NEWLINE,
     TEXT_WIDTH_NOT_COMPUTED,
 };
 
@@ -1102,6 +1102,18 @@ impl DocArena {
         self.alloc(DocNode::Text(DocText::SourceSpan(span, w)))
     }
 
+    /// [`Self::source_span`] for a **format-ignored verbatim slice** (the
+    /// `prettier-ignore` freeze): emits [`DocText::VerbatimSpan`] — identical
+    /// in measurement and render, but opaque to `will_break` (full rationale on
+    /// the variant's doc). Use ONLY for ignore-directive slices; genuine
+    /// multi-line content (line-continuation strings, `<pre>` text) keeps
+    /// [`Self::source_span`] so it force-breaks.
+    #[inline]
+    pub fn verbatim_source_span(&self, span: Span, source: &str) -> DocId {
+        let w = pooled_text_width(span.extract(source));
+        self.alloc(DocNode::Text(DocText::VerbatimSpan(span, w)))
+    }
+
     /// [`Self::source_span`] for a slice the caller guarantees is newline-free
     /// (identifier names): skips the width precompute entirely — no source read
     /// at build. Width is measured on demand at the first `fits()` touch
@@ -1710,7 +1722,15 @@ impl DocArena {
         cache: &mut [Option<bool>],
     ) -> bool {
         let result = match &nodes[id.index()] {
-            DocNode::Text(_) => false,
+            // A format-ignored verbatim slice is layout-opaque: its embedded newlines are
+            // source layout, not a break the enclosing group must honor (prettier's
+            // printIgnored string is likewise invisible to willBreak). fits() still sees
+            // the newline sentinel via the shared width slot.
+            DocNode::Text(DocText::VerbatimSpan(..)) => false,
+            // A newline-bearing Text (a line-continuation string) breaks the enclosing group,
+            // like `MultilineText` below — the width cache already flags it via `HasNewline`;
+            // `NotComputed` is identifier-only (contractually newline-free), so reads as no break.
+            DocNode::Text(t) => matches!(t.cached_width(), CachedWidth::HasNewline),
             // Contains hardlines → always breaks (like the `concat([…, hardline, …])` it replaces).
             DocNode::MultilineText { .. } => true,
             DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
@@ -1750,6 +1770,9 @@ impl DocArena {
 
     fn has_forced_break_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
         match &nodes[id.index()] {
+            // deliberate asymmetry with `will_break_fill`: this predicate stays blind to
+            // newline-bearing Text on purpose — it is the "less aggressive" (hardlines-only,
+            // ignores `should_break`) test for the last-argument hug state in the call/new printers
             DocNode::Text(_) => false,
             DocNode::MultilineText { .. } => true,
             DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
@@ -1828,6 +1851,9 @@ impl DocArena {
             DocNode::WithContext { doc, .. } => self.can_break_inner(*doc, nodes),
             DocNode::LineSuffix(inner) => self.can_break_inner(*inner, nodes),
             DocNode::MultilineText { .. } => true,
+            // deliberately newline-blind, unlike `will_break_fill`: canBreak asks
+            // "is there a breakable `line` in here?", and a Text's embedded newline
+            // (line-continuation string, verbatim slice) is content, not a break point
             DocNode::Text(_) | DocNode::LineSuffixBoundary => false,
             DocNode::BreakParent => true,
         }
