@@ -1,12 +1,17 @@
 // Format-ignore directive honoring for type-member lists (union / intersection /
-// tuple / type-parameter / type-argument members).
+// tuple / type-parameter / type-argument members) and single-child type heads (the
+// type after an annotation's `:`, an alias's `=`, a type parameter's `extends`/`=`,
+// a named tuple member's `label:`, a mapped type's `]:` value and key-side gaps).
 //
-// One seam that knows what a directive is and where it sits, so the list printers
-// only ever ask "freeze this member / this whole node?" and
+// One seam that knows what a directive is and where it sits, so the printers
+// only ever ask "freeze this member / this child / this whole node?" and
 // never re-derive directive recognition. Recognition itself stays centralized in
 // `tsv_lang::is_format_ignore_directive`; this module owns the *placement*
 // classification (the out-of-span leading run vs. an in-span inter-member gap) and
-// the paren-transparent freeze emitter.
+// the paren-transparent freeze emitter. A single-child head is composite-transparent:
+// a Union/Intersection child declines (`single_child_frozen`) and freezes via its own
+// leading-run walk, so the member rules and the head rules can never both claim one
+// directive.
 //
 // **Rule A — list-item freeze** (the single symmetric rule, every member list
 // alike), with a **total, placement-only classification** per directive: an OWN-LINE
@@ -195,13 +200,9 @@ impl<'a> Printer<'a> {
     /// so the to-emit and in-source axes coincide, but naming the in-source one keeps the
     /// module's axis choice single and deliberate (one question, one predicate).
     fn member_gap_frozen(&self, prev_end: u32, member_start: u32) -> bool {
-        if !self.has_format_ignore {
-            return false;
-        }
-        comments_in_source_range(self.comments, prev_end, member_start).any(|c| {
-            is_format_ignore_directive(c.content(self.source))
-                && (has_newline_before_position(self.source, c.span.start)
-                    || self.glued_directly_before(c.span.end, member_start))
+        self.directive_in_gap(prev_end, member_start, |c| {
+            has_newline_before_position(self.source, c.span.start)
+                || self.glued_directly_before(c.span.end, member_start)
         })
     }
 
@@ -227,6 +228,82 @@ impl<'a> Printer<'a> {
             pos = c.span.end;
         }
         ws_only(pos, member_start)
+    }
+
+    /// [`Self::member_gap_frozen`] for a mapped type's two key-side gaps, anchored per
+    /// the delimited-list convention (the gap opens just past the `{` / `[`): the
+    /// SIGNATURE gap (`{`→`[`), where an own-line or glued directive freezes the whole
+    /// `[K in ...]: V` clause (the mapped type's sole-member analog of Rule A), and the
+    /// BINDING gap (`[`→key), where a directive freezes just the `K in ...` binding —
+    /// freezing the whole node there would freeze the `[` that *precedes* the
+    /// directive, so prettier's whole-node redirect is deliberately not copied (the
+    /// `mapped_prettier_ignore_key` divergence).
+    pub(in crate::printer) fn mapped_gap_frozen(&self, gap_start: u32, target_start: u32) -> bool {
+        self.member_gap_frozen(gap_start, target_start)
+    }
+
+    /// [`Self::member_gap_frozen`] for a head position's SINGLE child — the type after
+    /// an annotation's `:`, an alias's `=`, a type parameter's `extends`/`=`, a named
+    /// tuple member's `label:`, or a mapped type's `]:`. An own-line or glued directive
+    /// in the head→child gap `[gap_start, child.span().start)` freezes the child whole.
+    ///
+    /// **Composite-transparent**: a Union/Intersection child (paren-unwrapped) declines,
+    /// so the member rules keep applying via the composite's own leading-run walk —
+    /// own-line freezes the first member (Rule A), glued freezes the whole composite.
+    ///
+    /// The window ends at the child's OWN span start, never a paren-stripped inner
+    /// start: an in-shell directive (`extends (// format-ignore⏎ T)`) stays on the
+    /// ordinary comment paths, so a frozen whole-shell slice can never double-print a
+    /// comment an enclosing gap emitter also sees.
+    pub(in crate::printer) fn single_child_frozen(
+        &self,
+        gap_start: u32,
+        child: &TSType<'_>,
+    ) -> bool {
+        // The document-level bool first: several head sites (alias, named-tuple,
+        // mapped value) ask unconditionally on hot paths, so a directive-free
+        // document must pay exactly this one branch — never the paren-unwrap below
+        // (`member_gap_frozen` re-checks the flag, harmlessly, for its other callers).
+        if !self.has_format_ignore {
+            return false;
+        }
+        if matches!(
+            unwrap_parenthesized(child),
+            TSType::Union(_) | TSType::Intersection(_)
+        ) {
+            return false;
+        }
+        self.member_gap_frozen(gap_start, child.span().start)
+    }
+
+    /// Whether the head→child gap `[gap_start, child_start)` holds an OWN-LINE
+    /// format-ignore directive — the emission-routing question at heads whose default
+    /// line-comment layout trails the first comment after the head (the annotation `:`
+    /// via `build_continuation_indent`, the named-tuple `label:` via
+    /// `build_trailing_comments_hang_next`). An own-line directive must stay own-line: a
+    /// head-trailing directive is inert under the placement classification, so the
+    /// relocated form would lose the freeze on the second pass. Asked for composite
+    /// children too — the routing is about the directive's own placement, not the
+    /// freeze target (a union child freezes via its own walk).
+    pub(in crate::printer) fn gap_has_own_line_directive(
+        &self,
+        gap_start: u32,
+        child_start: u32,
+    ) -> bool {
+        self.directive_in_gap(gap_start, child_start, |c| {
+            has_newline_before_position(self.source, c.span.start)
+        })
+    }
+
+    /// The one scan primitive behind every gap-recognition question in this module:
+    /// whether `[lo, hi)` holds a format-ignore directive whose placement satisfies
+    /// `placed`. Gated on the document-level `has_format_ignore` bool first, and always
+    /// on the **in-source axis** (see [`Self::member_gap_frozen`]'s note for why the
+    /// axes coincide for directives).
+    fn directive_in_gap(&self, lo: u32, hi: u32, placed: impl Fn(&Comment) -> bool) -> bool {
+        self.has_format_ignore
+            && comments_in_source_range(self.comments, lo, hi)
+                .any(|c| is_format_ignore_directive(c.content(self.source)) && placed(c))
     }
 
     /// [`Self::member_gap_frozen`] for list item `i`, the single home of the
@@ -266,8 +343,11 @@ impl<'a> Printer<'a> {
         (i == 0 && freeze_first) || self.list_item_frozen(container_start, &|j| types[j].span(), i)
     }
 
-    /// Paren-transparent frozen doc for a union / intersection member. Precedence parens
-    /// are kept or dropped per `member_parens`, and the freeze stays lossless:
+    /// Paren-transparent frozen doc for a union / intersection member — or, via a
+    /// caller-supplied `member_parens`, a single-child head's frozen value (the
+    /// type-parameter constraint/default site, whose conditional values keep their
+    /// clarity parens). Precedence parens are kept or dropped per `member_parens`, and
+    /// the freeze stays lossless:
     ///
     /// - **paren dropped** (`member_parens(inner)` false — a redundant `(a1)` or a bare
     ///   `a1`) → freeze just the inner slice, so `(a1)` → `‹frozen a1›`;
@@ -347,9 +427,11 @@ impl<'a> Printer<'a> {
         frozen && self.frozen_member_multiline(t, member_parens)
     }
 
-    /// [`Self::build_frozen_member_doc`] for a list position whose members never need
-    /// precedence parens (tuple elements, type arguments): a source paren there is
-    /// always redundant, so it drops under the freeze unless its shell holds a comment.
+    /// [`Self::build_frozen_member_doc`] for a position whose child never needs
+    /// precedence parens — list members (tuple elements, type arguments) and the
+    /// single-child heads (annotation `:`, alias `=`, named-tuple `label:`, mapped
+    /// value `]:`): a source paren there is always redundant, so it drops under the
+    /// freeze unless its shell holds a comment.
     pub(in crate::printer) fn build_frozen_list_member_doc(&self, t: &TSType<'_>) -> DocId {
         self.build_frozen_member_doc(t, |_| false)
     }
@@ -362,6 +444,26 @@ impl<'a> Printer<'a> {
     /// `verbatim_source_span` is `will_break`-opaque).
     pub(in crate::printer) fn frozen_list_member_multiline(&self, t: &TSType<'_>) -> bool {
         self.frozen_member_multiline(t, |_| false)
+    }
+
+    /// [`Self::build_frozen_list_member_doc`] plus the single-child heads' must-break:
+    /// a multi-line frozen slice appends a `break_parent`, so the ENCLOSING
+    /// width-decided groups (a parameter list, an object type) break cleanly around it
+    /// instead of gluing flat — a `verbatim_source_span` is `will_break`-opaque, so
+    /// without the explicit signal the container never learns the slice spans lines.
+    /// The list positions thread the same fact through their family layouts
+    /// (`frozen_member_forces_break` / `frozen_list_member_multiline`); the heads have
+    /// no family layout, so the signal rides in the doc. Same catalog class as the
+    /// multiline-member divergences: prettier glues the container flat around its
+    /// printed-ignored slice (`annotation_prettier_ignore_multiline_value`).
+    pub(in crate::printer) fn build_frozen_single_child_doc(&self, child: &TSType<'_>) -> DocId {
+        let d = self.d();
+        let frozen = self.build_frozen_list_member_doc(child);
+        if self.frozen_list_member_multiline(child) {
+            d.concat(&[frozen, d.break_parent()])
+        } else {
+            frozen
+        }
     }
 
     /// Whether a parenthesized member's shell — the bytes between `(` and the inner type,

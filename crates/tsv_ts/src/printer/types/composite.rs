@@ -21,6 +21,7 @@ use crate::printer::CommentVec;
 use crate::printer::analysis::has_newline_after_position;
 use crate::printer::layout::{bracketed_list_body, hang_after_operator};
 use smallvec::smallvec;
+use tsv_lang::Comment;
 use tsv_lang::INDENT;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -741,6 +742,31 @@ impl<'a> Printer<'a> {
             body_parts.push(d.text(" "));
         }
 
+        // Whole-signature freeze: a format-ignore directive between `{` and the `[`
+        // (own-line or glued — `mapped_gap_frozen`) freezes the whole `[K in ...]: V`
+        // clause, the mapped type's sole-member analog of Rule A. The braces and the
+        // member `;` stay parent-emitted outside the slice, and the directive itself
+        // was just emitted with the leading comments (own-line above, or inline when
+        // glued). A `readonly` modifier declines for now — the slice would need the
+        // modifier's own start position.
+        // TODO: extend the freeze slice to a `readonly`/`+`/`-` modifier.
+        if m.readonly.is_none()
+            && let Some(type_ann) = &m.type_annotation
+            && self.mapped_gap_frozen(content_start, bracket_pos)
+        {
+            let type_end = type_ann.span().end;
+            body_parts.push(self.raw_source_range(bracket_pos, type_end));
+            let body_end = m.span.end.saturating_sub(1); // before `}`
+            for comment in comments_to_emit_in_range(self.comments, type_end, body_end) {
+                body_parts.push(self.build_trailing_comment_doc(comment));
+            }
+            return self.build_mapped_type_shell(
+                source_is_multiline,
+                &leading_comments[..leading_own_line_end],
+                &body_parts,
+            );
+        }
+
         // readonly modifier: `readonly`, `+readonly`, or `-readonly`
         if let Some(readonly) = m.readonly {
             body_parts.push(d.text(match readonly {
@@ -755,29 +781,43 @@ impl<'a> Printer<'a> {
         // the `[`→key gap can break the whole `[…]` (mirrors `build_computed_key_bracket_doc`).
         let mut interior_parts: DocBuf = smallvec![];
 
-        interior_parts
-            .push(self.ident_name_doc(m.type_parameter.name, m.type_parameter.span.start));
-        // Comments around `in` keyword: `key /* c1 */ in /* c2 */ Constraint`
-        let name_len =
-            self.with_ident_name_at(m.type_parameter.name, m.type_parameter.span.start, str::len);
-        let name_end = m.type_parameter.span.start + name_len as u32;
-        let constraint_start = m.type_parameter.constraint.span().start;
-        // Find `i` of `in` keyword, skipping comments before it
-        let in_start = find_char_skipping_comments(
-            self.source.as_bytes(),
-            name_end as usize,
-            constraint_start as usize,
-            b'i',
-        );
-        let in_end = in_start.map_or(name_end, |p| (p + "in".len()) as u32);
-        let in_start = in_start.map_or(name_end, |p| p as u32);
-        // Comments between key name and `in` keyword
-        // Comment gaps break a line comment onto its own line so it can't swallow the
-        // following `in`/constraint.
-        interior_parts.push(self.build_leading_comments_break_for_line(name_end, in_start));
-        interior_parts.push(d.text(" in "));
-        interior_parts.push(self.build_trailing_comments_hang_next(in_end, constraint_start));
-        interior_parts.push(self.build_type_doc(m.type_parameter.constraint));
+        // Binding freeze: a format-ignore directive inside the bracket, own-line or
+        // glued before the key (`mapped_gap_frozen` over the `[`→key gap), freezes
+        // just the `K in ...` binding — the value keeps formatting normally, and the
+        // directive itself is emitted by the bracket's own comment machinery (the
+        // line-comment break shell, or the inline loop below).
+        if self.mapped_gap_frozen(bracket_pos + 1, param_name_start) {
+            interior_parts.push(
+                self.raw_source_range(param_name_start, m.type_parameter.constraint.span().end),
+            );
+        } else {
+            interior_parts
+                .push(self.ident_name_doc(m.type_parameter.name, m.type_parameter.span.start));
+            // Comments around `in` keyword: `key /* c1 */ in /* c2 */ Constraint`
+            let name_len = self.with_ident_name_at(
+                m.type_parameter.name,
+                m.type_parameter.span.start,
+                str::len,
+            );
+            let name_end = m.type_parameter.span.start + name_len as u32;
+            let constraint_start = m.type_parameter.constraint.span().start;
+            // Find `i` of `in` keyword, skipping comments before it
+            let in_start = find_char_skipping_comments(
+                self.source.as_bytes(),
+                name_end as usize,
+                constraint_start as usize,
+                b'i',
+            );
+            let in_end = in_start.map_or(name_end, |p| (p + "in".len()) as u32);
+            let in_start = in_start.map_or(name_end, |p| p as u32);
+            // Comments between key name and `in` keyword
+            // Comment gaps break a line comment onto its own line so it can't swallow the
+            // following `in`/constraint.
+            interior_parts.push(self.build_leading_comments_break_for_line(name_end, in_start));
+            interior_parts.push(d.text(" in "));
+            interior_parts.push(self.build_trailing_comments_hang_next(in_end, constraint_start));
+            interior_parts.push(self.build_type_doc(m.type_parameter.constraint));
+        }
 
         // as clause: `as NewKeyType`
         // Track the end of the last element inside brackets (for bracket-close comments)
@@ -875,14 +915,30 @@ impl<'a> Printer<'a> {
             // keyword→value seam so the paren form is idempotent (the outer paren would
             // otherwise hide the comment from the gate). A mixed / trailing shell hoists
             // losslessly too — the trailing comment via `build_hang_value_doc`.
-            let (value_start, value_type) = self.keyword_value_stripped_paren_hang(type_ann);
+            //
+            // A format-ignore directive in the `]:`→value gap freezes a non-composite
+            // value verbatim (`single_child_frozen`; a union/intersection value
+            // declines and freezes via its own walk). The frozen path keeps the
+            // UNWIDENED window so an in-shell directive stays on the ordinary paths.
+            let value_frozen = self.single_child_frozen(bracket_close, type_ann);
+            let (value_start, value_type) = if value_frozen {
+                (type_ann.span().start, *type_ann)
+            } else {
+                self.keyword_value_stripped_paren_hang(type_ann)
+            };
             // A line comment after `:` stays trailing it, with the value type on
             // the next line (preserve-in-place; prettier relocates the comment to
             // trail the member `;`).
             if self.has_line_comments_between(bracket_close, value_start) {
                 // Type position: a trailing block lifted from the shell trails the value
-                // inline before the member `;` (`defer = false`).
-                let value_doc = self.build_hang_value_doc(type_ann, value_type, false);
+                // inline before the member `;` (`defer = false`). A frozen value is the
+                // verbatim slice; the own-line directive keeps its own line here
+                // (`append_keyword_value_line_comments` preserves own-line comments).
+                let value_doc = if value_frozen {
+                    self.build_frozen_single_child_doc(type_ann)
+                } else {
+                    self.build_hang_value_doc(type_ann, value_type, false)
+                };
                 self.append_keyword_value_line_comments(
                     &mut body_parts,
                     bracket_close,
@@ -926,7 +982,13 @@ impl<'a> Printer<'a> {
                     }
                     _ => {
                         body_parts.push(d.text(" "));
-                        body_parts.push(self.build_type_doc(type_ann));
+                        // A glued directive froze the value (own-line took the
+                        // line-comment branch above).
+                        if value_frozen {
+                            body_parts.push(self.build_frozen_single_child_doc(type_ann));
+                        } else {
+                            body_parts.push(self.build_type_doc(type_ann));
+                        }
                     }
                 }
             }
@@ -950,17 +1012,35 @@ impl<'a> Printer<'a> {
             }
         }
 
+        self.build_mapped_type_shell(
+            source_is_multiline,
+            &leading_comments[..leading_own_line_end],
+            &body_parts,
+        )
+    }
+
+    /// The mapped type's brace shell around an already-built member body: own-line
+    /// leading comments each take their own line before the body, then the member `;`
+    /// and `}` — hardlines in the multi-line-source form, a width-decided group with
+    /// bracketSpacing boundaries and an `if_break` `;` in the one-line form.
+    fn build_mapped_type_shell(
+        &self,
+        source_is_multiline: bool,
+        own_line_leading: &[&Comment],
+        body_parts: &[DocId],
+    ) -> DocId {
+        let d = self.d();
         if source_is_multiline {
             // Multi-line source: preserve multi-line format with hardlines.
             // Own-line leading comments each take their own line before `[`; the
             // node-adjacent inline block comment (if any) already leads `body_parts`.
             let mut inner_parts: DocBuf = smallvec![];
-            for comment in &leading_comments[..leading_own_line_end] {
+            for comment in own_line_leading {
                 inner_parts.push(d.hardline());
                 inner_parts.push(self.build_comment_doc(comment));
             }
             inner_parts.push(d.hardline());
-            inner_parts.push(d.concat(&body_parts));
+            inner_parts.push(d.concat(body_parts));
             inner_parts.push(d.text(";"));
 
             d.concat(&[
@@ -975,7 +1055,7 @@ impl<'a> Printer<'a> {
             // newline when broken. An own-line leading comment (a line comment, or a
             // non-adjacent block) forces the break via its `hardline`.
             let mut all_parts: DocBuf = smallvec![];
-            for comment in &leading_comments[..leading_own_line_end] {
+            for comment in own_line_leading {
                 all_parts.push(d.hardline());
                 all_parts.push(self.build_comment_doc(comment));
             }

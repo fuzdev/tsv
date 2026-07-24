@@ -64,6 +64,15 @@ impl<'a> Printer<'a> {
 
         // Check if there's a line comment between : and the type
         if gap_has_comments && self.has_line_comments_between(colon_end, type_start) {
+            // An own-line format-ignore directive in the gap must stay OWN-LINE — the
+            // continuation indent below trails the first comment after `:`, and a
+            // head-trailing directive is inert under the placement classification, so
+            // the relocated form would lose the freeze on the second pass. Routed for
+            // composite children too: a union child freezes via its own leading-run
+            // walk, but the annotation owns the directive's emission either way.
+            if self.gap_has_own_line_directive(colon_end, annotation.type_annotation.span().start) {
+                return self.build_annotation_own_line_directive_doc(annotation);
+            }
             // Uniform forced-continuation indent (`build_continuation_indent`): the
             // first comment trails `:` on its line, then the remaining comments and the
             // type drop one indent level so the continuation reads as part of this
@@ -128,6 +137,30 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Emit `: <comments> <value>` for an annotation whose head→type gap holds an
+    /// own-line format-ignore directive. The whole run keeps its own-line placement
+    /// (`append_keyword_value_line_comments` — same-line comments trail `:`, own-line
+    /// comments and the value drop into the indent), and a non-composite type is
+    /// frozen verbatim (`single_child_frozen`); a union/intersection child builds
+    /// normally and freezes via its own leading-run walk (Rule A).
+    fn build_annotation_own_line_directive_doc(
+        &self,
+        annotation: &internal::TSTypeAnnotation<'_>,
+    ) -> DocId {
+        let d = self.d();
+        let colon_end = annotation.span.start + 1;
+        let child = annotation.type_annotation;
+        let child_start = child.span().start;
+        let value_doc = if self.single_child_frozen(colon_end, child) {
+            self.build_frozen_single_child_doc(child)
+        } else {
+            self.build_type_doc(child)
+        };
+        let mut parts: DocBuf = smallvec![d.text(":")];
+        self.append_keyword_value_line_comments(&mut parts, colon_end, child_start, value_doc);
+        d.concat(&parts)
+    }
+
     /// Emit `: <block-comments> <type>` for a simple annotation — the fall-through
     /// shared by `build_type_annotation_doc`'s `_` match arm and
     /// `build_type_annotation_doc_with_wrapping` (once its wrapping-TypeReference /
@@ -158,7 +191,14 @@ impl<'a> Printer<'a> {
                 CommentSpacing::Trailing,
             ));
         }
-        parts.push(self.build_type_doc(ty));
+        // A glued format-ignore directive in the gap freezes a non-composite type
+        // verbatim (`let v: /* format-ignore */ {x:   1}` — the directive itself was
+        // just emitted inline above; own-line directives took the own-line branch).
+        if gap_has_comments && self.single_child_frozen(colon_end, ty) {
+            parts.push(self.build_frozen_single_child_doc(ty));
+        } else {
+            parts.push(self.build_type_doc(ty));
+        }
         d.concat(&parts)
     }
 
@@ -234,6 +274,19 @@ impl<'a> Printer<'a> {
             self.keyword_value_stripped_paren_hang(annotation.type_annotation);
         if has_comments && self.has_line_comments_between(colon_end, line_comment_probe_end) {
             return self.build_type_annotation_doc(annotation);
+        }
+
+        // A glued format-ignore directive freezes a non-composite type verbatim —
+        // checked before the TypeReference-with-args branch below would rebuild a
+        // frozen `Foo<...>` from parts (own-line directives are line comments, already
+        // delegated above; composites decline and freeze via their own walk).
+        if has_comments && self.single_child_frozen(colon_end, annotation.type_annotation) {
+            return self.build_simple_type_annotation_doc(
+                colon_end,
+                type_start,
+                annotation.type_annotation,
+                true,
+            );
         }
 
         // Handle TypeReference with type arguments - use wrapping version when appropriate

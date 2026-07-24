@@ -404,6 +404,57 @@ impl<'a> Printer<'a> {
         shell: &TSType<'_>,
     ) {
         let d = self.d();
+        // A format-ignore directive in the keyword→value gap (own-line or glued)
+        // freezes a non-composite value verbatim (`single_child_frozen`; a
+        // union/intersection value declines and freezes via its own leading-run walk).
+        // Checked against the UNWIDENED gap — the window ends at the shell's own span
+        // start, so an in-shell directive stays on the ordinary paths below. An
+        // own-line directive keeps its own line (`append_keyword_value_line_comments`
+        // already preserves own-line comments); a glued one stays inline before the
+        // slice. A conditional constraint keeps its required parens under the freeze
+        // (the same clarity/`infer` rule as the unfrozen arm below).
+        if let Some((keyword_end, _)) = comment_range
+            && self.single_child_frozen(keyword_end, shell)
+        {
+            let member_parens: fn(&TSType<'_>) -> bool =
+                if group_id == GroupId::TypeParameterConstraint {
+                    |t| matches!(t, TSType::Conditional(_))
+                } else {
+                    |_| false
+                };
+            // The single-child must-break: a multi-line frozen slice signals the
+            // enclosing width-decided groups explicitly (`build_frozen_single_child_doc`'s
+            // rationale — a verbatim slice is `will_break`-opaque).
+            let frozen_doc = {
+                let base = self.build_frozen_member_doc(shell, member_parens);
+                if self.frozen_member_forces_break(true, shell, member_parens) {
+                    d.concat(&[base, d.break_parent()])
+                } else {
+                    base
+                }
+            };
+            let child_start = shell.span().start;
+            if self.comments_force_own_line_between(keyword_end, child_start) {
+                self.append_keyword_value_line_comments(
+                    parts,
+                    keyword_end,
+                    child_start,
+                    frozen_doc,
+                );
+            } else {
+                if let Some(comments) = self.build_comments_between_filtered_opt(
+                    keyword_end,
+                    child_start,
+                    CommentSpacing::Leading,
+                    CommentFilter::All,
+                ) {
+                    parts.push(comments);
+                }
+                parts.push(d.text(" "));
+                parts.push(frozen_doc);
+            }
+            return;
+        }
         // Strip redundant comment-free parens so `(A | B)` / `(A & B)` constraints
         // and defaults get the bare hanging layout (prettier strips them too).
         let value_type = self.unwrap_redundant_parens(value_type);

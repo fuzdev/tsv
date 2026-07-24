@@ -15,7 +15,7 @@
 # it is reported but never gated. It is excluded from this file by construction.
 #
 # Format: KIND<TAB>SHAPE
-# shapes: 176
+# shapes: 175
 NON-IDEMPOTENT	').⟨⟩IDENT
 NON-IDEMPOTENT	')⟨⟩.
 NON-IDEMPOTENT	(({⟨⟩IDENT
@@ -131,7 +131,6 @@ NON-IDEMPOTENT	␣⟨⟩*
 NON-IDEMPOTENT	␣⟨⟩.
 NON-IDEMPOTENT	␣⟨⟩...
 NON-IDEMPOTENT	␣⟨⟩/*
-NON-IDEMPOTENT	␣⟨⟩//
 NON-IDEMPOTENT	␣⟨⟩:
 NON-IDEMPOTENT	␣⟨⟩>
 NON-IDEMPOTENT	␣⟨⟩?

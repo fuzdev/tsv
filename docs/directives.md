@@ -79,6 +79,25 @@ type U = [
 A directive glued before the whole value (`type T = /* format-ignore */ A | B`)
 freezes the whole union instead.
 
+### On type heads
+
+The same placement rule works between a head token and the single type it
+introduces — a type annotation's `:`, a type alias's `=`, a type parameter's
+`extends` constraint or `=` default, a named tuple member's `label:`, and a
+mapped type's `]:` value. An own-line or glued directive there freezes the type
+that follows (a union or intersection child follows the member rules above
+instead), and the directive stays where the author put it:
+
+```ts
+let v:
+	// format-ignore
+	{ x:1,  y:2 };   // ← frozen verbatim
+```
+
+Inside a mapped type, a directive above the `[K in ...]: V` clause freezes the
+whole clause; a directive inside the bracket freezes just the `K in ...`
+binding.
+
 ## `format-ignore-start` / `format-ignore-end`
 
 In Svelte templates, a pair of range markers preserves every node between them:
