@@ -236,7 +236,7 @@ impl<'a> Printer<'a> {
         // When no line comment forces a hang, the seam returns the RHS unchanged, so the
         // block-comment / comment-free `=` layouts below are untouched.
         //
-        // A format-ignore directive in the `=`→RHS gap (own-line or glued) freezes a
+        // An alone-on-line format-ignore directive in the `=`→RHS gap freezes a
         // non-composite RHS verbatim (`single_child_frozen`; a union/intersection RHS
         // declines and freezes via its own leading-run walk). The frozen path keeps
         // the UNWIDENED window — an in-shell directive stays on the ordinary paths —
@@ -348,17 +348,16 @@ impl<'a> Printer<'a> {
             // unwrapped type — safe, since we only unwrap when no comments are inside
             // the parens (commented parens stay on the preserve-in-place path).
             let value_type = self.unwrap_redundant_parens(&decl.type_annotation);
-            // A glued directive froze the RHS (own-line took the force-break branch):
-            // every non-composite arm below builds the verbatim slice instead of the
-            // type doc; the union/intersection arms are unreachable when frozen
-            // (`single_child_frozen` declines composites).
-            let build_value = || -> DocId {
-                if frozen {
-                    self.build_frozen_single_child_doc(&decl.type_annotation)
-                } else {
-                    self.build_type_doc(value_type)
-                }
-            };
+            // A frozen RHS never reaches this branch: an alone-on-line directive —
+            // line or block spelling — always trips `force_break` over the same
+            // window (`comments_force_own_line_between` catches every line comment;
+            // `block_comment_isolated_own_line_between` is implied by the floor's
+            // two-sided newline checks for a block one).
+            debug_assert!(
+                !frozen,
+                "an alone-on-line directive always takes the force-break branch"
+            );
+            let build_value = || -> DocId { self.build_type_doc(value_type) };
             // For union/intersection types, build without their own group so they inherit
             // breaking from this context's group.
             if let TSType::Union(u) = value_type {

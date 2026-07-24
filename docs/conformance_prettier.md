@@ -1323,37 +1323,30 @@ too.
 **On type-member lists (union / intersection / tuple / type parameters / type
 arguments).** The ignore directives also target individual **members** of a type-member
 list under one symmetric rule (**Rule A — list-item freeze**) with a **total,
-placement-only classification** per directive — **placement keys the freeze, not the
-comment's spelling** (an own-line block comment behaves like an own-line line comment):
+placement-only classification** per directive, exception-free — **placement keys the
+freeze, not the comment's spelling** (an own-line block comment behaves like an
+own-line line comment):
 
-- **own-line** (only whitespace before it on its physical line) — in the leading gap or
-  between members — freezes the **following** member, the first member and every later
-  member identically, in unions and intersections alike;
-- **glued** (with nothing but spaces/tabs — or other comments — between it and the node
-  it precedes; block spelling by geometry, since a line comment consumes to end of line)
-  freezes that node **whole**: the whole union/intersection at the leading position
-  (`type T = /* prettier-ignore */ A | B`), the whole member at a member gap
-  (`a | /* prettier-ignore */ {x:1} | b`, including from anywhere in a glued comment run
-  — an intervening separator or bare newline breaks the glue, so
-  `a /* prettier-ignore */ | b` is not glued);
-- **anything else** — content before the directive on its line and no node glued after
-  it (trailing a member, a separator, or a declaration head) — is **inert**.
+- **own-line** (the only thing on its physical line, whitespace aside) — in the leading
+  gap or between members — freezes the **following** member, the first member and every
+  later member identically, in unions and intersections alike;
+- **anything else is inert** — a directive sharing its line with anything else (trailing
+  a member, a separator, an opening delimiter, or a declaration head, or glued before a
+  member) is an ordinary comment.
 
 A redundant paren around a frozen member
 is transparent (the inner node is frozen, the clarity paren re-synthesized outside the
 frozen slice; a fully redundant paren is dropped). This is the same behavior every
-existing honored list position already carries — a directive between `{` and the first
-class member freezes that member, not the body. The ordinary member-freeze fixtures
-`union_prettier_ignore_first_member`, `union_prettier_ignore_between_members`,
-`union_prettier_ignore_glued_whole`, and `union_prettier_ignore_glued_member` (the
-glued-member arm: leaf + composite + intersection host + comment-run transparency) match
-prettier, as do the other member-list families' — `tuple_prettier_ignore_member` /
-`tuple_prettier_ignore_glued_member` (tuple element lists),
+existing honored list position already carries — an own-line directive between `{` and
+the first class member freezes that member, not the body. The ordinary member-freeze
+fixtures `union_prettier_ignore_first_member` and
+`union_prettier_ignore_between_members` match prettier, as do the other member-list
+families' — `tuple_prettier_ignore_member` (tuple element lists),
 `type_params_prettier_ignore_member` (type-parameter declarations across function /
 interface / class / arrow hosts), and `type_arguments_prettier_ignore_member`
 (type-argument lists in type position, call-site, and `new`-expression); tsv diverges
 where freezing only the first intersection member, preserving the author's directive
-position, holding the union's per-line layout, or refusing a *trailing* directive is
+position, holding the union's per-line layout, or refusing a *non-own-line* directive is
 more defensible:
 
 - First member of an **intersection** — ◆design_choice ◆prettier_bug — an own-line
@@ -1373,15 +1366,33 @@ more defensible:
   `audit_signature.txt`) — [intersection between members](../tests/fixtures/typescript/types/intersection_prettier_ignore_between_members_prettier_divergence/)
 - Multi-line frozen union member — ◆design_choice — tsv keeps the union broken one member
   per line (its layout whenever a member spans lines); prettier glues the next member onto
-  the frozen slice's last line (`} | (b1 & b2)`) — [multiline member](../tests/fixtures/typescript/types/union_prettier_ignore_multiline_member_prettier_divergence/).
-  The tuple analog: a glued directive freezing a multi-line tuple member breaks the tuple
-  one member per line in tsv, while prettier keeps the container flat and glues the
-  separators around the verbatim slice —
-  [tuple multiline member](../tests/fixtures/typescript/types/tuple_prettier_ignore_multiline_member_prettier_divergence/).
-  The type-parameter analog: a glued directive freezing a multi-line parameter expands the
-  `<…>` in tsv (both the width-decided declaration hosts and the always-inline
-  method-signature path), while prettier glues the angle brackets around the slice —
-  [type-param multiline member](../tests/fixtures/typescript/types/type_params_prettier_ignore_multiline_member_prettier_divergence/)
+  the frozen slice's last line (`} | (b1 & b2)`) — [multiline member](../tests/fixtures/typescript/types/union_prettier_ignore_multiline_member_prettier_divergence/)
+- **Glued directive is inert** — ◆design_choice — a directive on the same line as what
+  follows it (`type T = /* prettier-ignore */ A | B`,
+  `a | /* prettier-ignore */ {x:1} | b`, `let v: /* prettier-ignore */ {…}`) is an
+  ordinary comment in tsv: the placement rule is exception-free, and only an own-line
+  directive freezes. Prettier honors the glued placement — freezing the whole union at
+  the leading position, the adjacent member at a member gap (from anywhere in a glued
+  comment run), the child at a single-child head, the whole mapped type from the
+  in-bracket key position, and gluing a container flat around a multi-line frozen
+  slice. Each fixture's `prettier_variant_frozen` pins prettier's stable frozen form,
+  which tsv normalizes —
+  [union](../tests/fixtures/typescript/types/union_prettier_ignore_glued_inert_prettier_divergence/),
+  [tuple](../tests/fixtures/typescript/types/tuple_prettier_ignore_glued_inert_prettier_divergence/),
+  [type params](../tests/fixtures/typescript/types/type_params_prettier_ignore_glued_inert_prettier_divergence/),
+  [type arguments](../tests/fixtures/typescript/types/type_arguments_prettier_ignore_glued_inert_prettier_divergence/),
+  [type heads](../tests/fixtures/typescript/types/type_heads_prettier_ignore_glued_inert_prettier_divergence/),
+  [annotation](../tests/fixtures/typescript/types/annotation_prettier_ignore_glued_inert_prettier_divergence/)
+- **After-open-brace directive is inert** — ◆design_choice — a directive trailing an
+  opening `{` (`const o = { // prettier-ignore`, `interface A { // prettier-ignore`,
+  `function f() { // prettier-ignore`) shares its line with the brace, so it is inert:
+  the comment stays on the brace line and the first member or statement formats
+  normally. Prettier relocates the directive to its own line and freezes the first
+  member — a form that is stable under **both** tools (own-line is a placement tsv
+  honors; each fixture's `variant_frozen` pins it) —
+  [object](../tests/fixtures/typescript/expressions/objects/prettier_ignore_after_brace_inert_prettier_divergence/),
+  [type members](../tests/fixtures/typescript/types/type_members_prettier_ignore_after_brace_inert_prettier_divergence/),
+  [class/enum/block](../tests/fixtures/typescript/syntax/comments/prettier_ignore_after_brace_inert_prettier_divergence/)
 - Union-valued **list member** (`[{ a: 1 } | { b: 2 }, c]`, `Foo<{ a: 1 } | { b: 2 }>`) —
   ◆design_choice — an own-line directive above a tuple element / type argument /
   type parameter that is itself a union freezes the **whole item** in tsv (Rule A: the
@@ -1399,7 +1410,11 @@ more defensible:
   direction is visible) —
   [trailing inert](../tests/fixtures/typescript/types/union_prettier_ignore_trailing_inert_prettier_divergence/),
   [tuple trailing inert](../tests/fixtures/typescript/types/tuple_prettier_ignore_trailing_inert_prettier_divergence/)
-  (the tuple-family control for the same rule)
+  (the tuple-family control for the same rule). The same inertness holds at the
+  pre-arc honored member emitters, where prettier's backward freeze keeps a perturbed
+  preceding member frozen while tsv formats both members —
+  [object trailing inert](../tests/fixtures/typescript/expressions/objects/prettier_ignore_trailing_inert_prettier_divergence/),
+  [type-member trailing inert](../tests/fixtures/typescript/types/type_members_prettier_ignore_trailing_inert_prettier_divergence/)
 - Directive trailing the **alias head** (`type A = // prettier-ignore⏎ { x: 1 } | b`) —
   ◆design_choice — trailing per the classification (content before it on its line, value
   on the next line), so tsv is inert: the comment stays where the author put it and the
@@ -1446,15 +1461,15 @@ more defensible:
 **On single-child type positions (annotation `:` / alias `=` / constraint `extends` /
 type-parameter default `=` / named-tuple `label:` / mapped-type `]:` value and `[K in ...]`
 key).** The same placement classification honors a directive before a head's single child:
-an own-line or glued directive between the head token and the child freezes the child
-whole — unless the (paren-transparent) child is a union or intersection, in which case the
-member rules above apply unchanged (own-line → first member, glued → whole composite). The
-ordinary fixtures `alias_prettier_ignore_value`, `annotation_prettier_ignore_glued`,
-`annotation_prettier_ignore_union_member`, `named_tuple_prettier_ignore_element`, and
-`mapped_prettier_ignore_signature` (a directive above a mapped type's `[K in ...]: V`
-clause freezes the whole clause — the mapped type's sole-member analog) match prettier.
-tsv diverges where prettier relocates the directive, or where its mapped-type handler
-freezes content the directive doesn't precede:
+an own-line directive between the head token and the child freezes the child whole —
+unless the (paren-transparent) child is a union or intersection, in which case the member
+rules above apply unchanged (first member freezes). The ordinary fixtures
+`alias_prettier_ignore_value`, `annotation_prettier_ignore_union_member`,
+`named_tuple_prettier_ignore_element`, and `mapped_prettier_ignore_signature` (a
+directive above a mapped type's `[K in ...]: V` clause freezes the whole clause — the
+mapped type's sole-member analog) match prettier. tsv diverges where prettier relocates
+the directive, or where its mapped-type handler freezes content the directive doesn't
+precede:
 
 - Own-line directive kept own-line at a single-child head — ◆comment_preservation
   ◆prettier_bug — at the annotation `:`, constraint `extends`, default `=`, named-tuple
@@ -1471,19 +1486,12 @@ freezes content the directive doesn't precede:
   [type-param constraint/default](../tests/fixtures/typescript/types/type_param_prettier_ignore_value_prettier_divergence/),
   [named tuple](../tests/fixtures/typescript/types/named_tuple_prettier_ignore_own_line_prettier_divergence/),
   [mapped value](../tests/fixtures/typescript/types/mapped_value_prettier_ignore_own_line_prettier_divergence/)
-- Mapped-type key: in-bracket directive freezes the binding only — ◆design_choice — a
-  directive inside the bracket (own-line or glued before `K in ...`) freezes only the
-  binding in tsv, while prettier's mapped-type handler freezes the whole mapped type —
-  including the `]: V` value side and the `[` that *precedes* the directive. The freeze
-  scope follows the directive's position: it freezes the construct it precedes —
+- Mapped-type key: in-bracket directive freezes the binding only — ◆design_choice — an
+  own-line directive inside the bracket, before `K in ...`, freezes only the binding in
+  tsv, while prettier's mapped-type handler freezes the whole mapped type — including
+  the `]: V` value side and the `[` that *precedes* the directive. The freeze scope
+  follows the directive's position: it freezes the construct it precedes —
   [mapped key](../tests/fixtures/typescript/types/mapped_prettier_ignore_key_prettier_divergence/)
-- Multi-line frozen value in a width-decided container — ◆design_choice — a glued
-  directive freezing a multi-line annotation value inside a parameter list breaks the
-  list cleanly, one parameter per line; prettier keeps the list flat and glues
-  `, b: c1) {}` onto the frozen slice's last line (its printed-ignored slice is
-  invisible to `willBreak`). The single-child analog of the multiline-member
-  divergences above —
-  [multiline value](../tests/fixtures/typescript/types/annotation_prettier_ignore_multiline_value_prettier_divergence/)
 
 See [directives.md](./directives.md) for the user-facing reference.
 

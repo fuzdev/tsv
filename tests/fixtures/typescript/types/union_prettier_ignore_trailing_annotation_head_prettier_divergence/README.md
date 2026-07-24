@@ -8,8 +8,8 @@ let v: // prettier-ignore
 	{ y: 2 } | c1;
 ```
 
-tsv's placement rule is total and placement-only: a directive with **any content before it
-on its physical line** that is not glued directly before the value is **trailing → inert**.
+tsv's placement rule is total and placement-only: a directive freezes only when it is
+**alone on its physical line**; a head-trailing directive is **inert**.
 tsv keeps the comment where the author put it (the standard head-trailing comment layout,
 continuation-indented) and reformats the annotation normally.
 
@@ -26,9 +26,9 @@ head-trailing placement, which tsv is inert to, so tsv normalizes prettier's for
 
 ## Reason
 
-One simple, teachable rule — tsv honors a directive only **own-line before a member**
-(freezes that member) or **glued directly before a value/member** (freezes it whole);
-everything else is inert. A head-trailing directive is neither, and honoring it would
+One simple, teachable rule — tsv honors a directive only when it is **alone on its
+line** (freezing the following member/value); everything else is inert. A head-trailing
+directive is not, and honoring it would
 require the same backward/sideways binding ambiguity the trailing-member case
 (`union_prettier_ignore_trailing_inert`) already refuses.
 

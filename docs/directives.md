@@ -38,25 +38,19 @@ TypeScript, `/* … */` in CSS, and `<!-- … -->` in Svelte templates.
 
 ### Placement
 
-Where the comment sits decides what it freezes. The rule is total and has three
-cases:
+Where the comment sits decides what it freezes. The rule is total and has no
+exceptions:
 
-- **On its own line** (nothing before it on its line): the directive freezes the
-  construct that follows it.
-- **Glued directly before a value** (same line, only whitespace — or other
-  comments — between the directive and what follows; block spelling only, since a
-  line comment runs to the end of its line): the directive freezes that value
-  whole.
-- **Anything else is inert.** A directive *trailing* code on its line — after a
-  statement, a list member, a separator, or a declaration head
-  (`type A = // format-ignore`) — does nothing: the surrounding code formats
-  normally. tsv only ever honors a directive that *precedes* its target.
+- **On its own line** (the only thing on its line, whitespace aside): the
+  directive freezes the construct that follows it.
+- **Anywhere else it is inert.** A directive sharing its line with anything
+  else — trailing a statement, a list member, a separator, an opening `{`
+  (`function f() { // format-ignore`), or a declaration head
+  (`type A = // format-ignore`), or glued directly before a value
+  (`let v: /* format-ignore */ {…}`) — is an ordinary comment: the surrounding
+  code formats normally.
 
-One carve-out: a directive trailing an opening `{` that ends its line — a
-block's, an object literal's, a class body's, an interface's, or a type
-literal's (`function f() { // format-ignore`) — has no preceding sibling on its
-line, so it *leads* the first member: that member freezes, and the directive
-stays where the author wrote it.
+To freeze a construct, put the directive alone on the line above it.
 
 ### On type-member lists
 
@@ -64,10 +58,10 @@ The directives also target individual **members** of a type-member list — a
 union or intersection, a tuple, a type-parameter declaration
 (`function f<T, U>`), or a type-argument list (`Foo<A, B>`, `fn<A, B>(x)`): an
 own-line directive in the list's leading gap or between members freezes the
-**next member** only, and a glued block directive freezes the member it sits
-against — the rest of the list keeps formatting normally, separators included.
-The member freezes **whole**, whatever its shape — a tuple element or type
-argument that is itself a union freezes as one item, operators and all.
+**next member** only — the rest of the list keeps formatting normally,
+separators included. The member freezes **whole**, whatever its shape — a tuple
+element or type argument that is itself a union freezes as one item, operators
+and all.
 
 ```ts
 type T =
@@ -84,16 +78,13 @@ type U = [
 ];
 ```
 
-A directive glued before the whole value (`type T = /* format-ignore */ A | B`)
-freezes the whole union instead.
-
 ### On type heads
 
 The same placement rule works between a head token and the single type it
 introduces — a type annotation's `:`, a type alias's `=`, a type parameter's
 `extends` constraint or `=` default, a named tuple member's `label:`, and a
-mapped type's `]:` value. An own-line or glued directive there freezes the type
-that follows (a union or intersection child follows the member rules above
+mapped type's `]:` value. An own-line directive there freezes the type that
+follows (a union or intersection child follows the member rules above
 instead), and the directive stays where the author put it:
 
 ```ts

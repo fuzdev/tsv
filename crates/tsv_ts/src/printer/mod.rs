@@ -46,10 +46,11 @@ mod types;
 pub use analysis::conditional_should_break_after_op;
 pub(crate) use analysis::{
     PatternContext, build_entity_name_doc, container_may_have_multiline_content,
-    has_multiline_content, has_newline_before_position, is_brace_block_multiline,
-    is_effectively_empty_body, is_module_path_fluid_call, is_multiline_string_literal,
-    is_multiline_template_expression, is_pure_property_chain, is_string_literal,
-    next_printed_stmt_start, object_pattern_should_expand, template_literal_has_newlines,
+    has_multiline_content, has_newline_after_position, has_newline_before_position,
+    is_brace_block_multiline, is_effectively_empty_body, is_module_path_fluid_call,
+    is_multiline_string_literal, is_multiline_template_expression, is_pure_property_chain,
+    is_string_literal, next_printed_stmt_start, object_pattern_should_expand,
+    template_literal_has_newlines,
 };
 pub(crate) use comments::{
     CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
@@ -1200,8 +1201,12 @@ impl<'a> Printer<'a> {
             .unwrap_or(fallback)
     }
 
-    /// Check if any comment in the range is a format-ignore directive.
-    /// Used to emit the next node as raw source text instead of formatting.
+    /// Check if any comment in the range is a format-ignore directive **alone on its
+    /// line** — the one placement that freezes (the placement floor,
+    /// `directive_alone_on_line`). Used to emit the next node as raw source text
+    /// instead of formatting. A directive sharing its line with anything — trailing
+    /// the previous member's line, trailing the opening `{`, or glued before the node
+    /// — is an ordinary comment here.
     ///
     /// Axis-free: ownership binds only a *bundler annotation* (`@__NAME__`) or a JSDoc cast,
     /// and neither is a format-ignore directive — no owned comment can ever match this
@@ -1212,8 +1217,9 @@ impl<'a> Printer<'a> {
         if !self.has_format_ignore {
             return false;
         }
-        comments_to_emit_in_range(self.comments, start, end)
-            .any(|c| is_format_ignore_directive(c.content(self.source)))
+        comments_to_emit_in_range(self.comments, start, end).any(|c| {
+            is_format_ignore_directive(c.content(self.source)) && self.directive_alone_on_line(c)
+        })
     }
 
     /// Emit a node's source span verbatim. Used to round-trip the source of a

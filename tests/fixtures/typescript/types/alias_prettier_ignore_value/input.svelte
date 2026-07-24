@@ -9,16 +9,13 @@
 		// prettier-ignore
 		(a:   1) => void;
 
-	// glued block directive freezes the value it precedes
-	type C = /* prettier-ignore */ {x:   1};
-
 	// own-line block spelling behaves like the line spelling
-	type D =
+	type C =
 		/* prettier-ignore */
 		{x:   1};
 
 	// a multi-line value keeps its verbatim layout
-	type E =
+	type D =
 		// prettier-ignore
 		{
 			x:   1;

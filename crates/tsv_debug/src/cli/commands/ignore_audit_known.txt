@@ -23,7 +23,7 @@
 # ARE pinned (this is a ratchet over a live bug family, born red).
 #
 # Format: KIND<TAB>POSITION
-# shapes: 99
+# shapes: 96
 UNHONORED	ArrayExpression.elements
 UNHONORED	ArrayPattern.elements
 UNHONORED	ArrowFunctionExpression.body
@@ -115,9 +115,6 @@ UNHONORED	VariableDeclarator.id
 UNHONORED	VariableDeclarator.init
 UNHONORED	WhileStatement.test
 UNHONORED	YieldExpression.argument
-TRAILING_FROZEN	ObjectExpression.properties
-TRAILING_FROZEN	TSInterfaceBody.body
-TRAILING_FROZEN	TSTypeLiteral.members
 UNSTABLE	ClassDeclaration.superClass
 UNSTABLE	MemberExpression.object
 UNSTABLE	TSNonNullExpression.expression

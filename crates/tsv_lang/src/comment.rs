@@ -93,9 +93,9 @@ impl Comment {
 // prettier's `prettier-ignore` family as a drop-in-compatible alias — both
 // spellings are honored identically. These predicates are the single source of
 // truth for the directive SET only; whether a recognized directive has any
-// effect is a per-printer PLACEMENT question (own-line / glued placements are
-// honored, trailing ones are inert — see docs/directives.md §Placement and
-// docs/conformance_prettier.md §Format-ignore directive). Called by each
+// effect is a per-printer PLACEMENT question (a directive alone on its line is
+// honored, every other placement is inert — see docs/directives.md §Placement
+// and docs/conformance_prettier.md §Format-ignore directive). Called by each
 // language printer (the comment types differ across crates, so the shared atom
 // operates on the trimmed text).
 
