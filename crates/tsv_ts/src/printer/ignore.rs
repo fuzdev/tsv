@@ -1,13 +1,14 @@
-// Format-ignore directive honoring for union / intersection type members.
+// Format-ignore directive honoring for type-member lists (union / intersection /
+// tuple / type-parameter / type-argument members).
 //
-// One seam that knows what a directive is and where it sits, so the union /
-// intersection printers only ever ask "freeze this member / this whole node?" and
+// One seam that knows what a directive is and where it sits, so the list printers
+// only ever ask "freeze this member / this whole node?" and
 // never re-derive directive recognition. Recognition itself stays centralized in
 // `tsv_lang::is_format_ignore_directive`; this module owns the *placement*
 // classification (the out-of-span leading run vs. an in-span inter-member gap) and
 // the paren-transparent freeze emitter.
 //
-// **Rule A — list-item freeze** (the single symmetric rule, union and intersection
+// **Rule A — list-item freeze** (the single symmetric rule, every member list
 // alike), with a **total, placement-only classification** per directive: an OWN-LINE
 // directive (only whitespace before it on its physical line) in a member list's
 // leading OR inter-item gap freezes the *following* member — the first member and
@@ -228,14 +229,33 @@ impl<'a> Printer<'a> {
         ws_only(pos, member_start)
     }
 
-    /// [`Self::member_gap_frozen`] for list member `i`, the single home of the
-    /// gap-anchor convention: the FIRST member's gap opens at the container's span
-    /// start (and is the only member `freeze_first` — the out-of-span leading-run
-    /// directive — applies to); a LATER member's gap opens at the previous member's
-    /// RAW span end — never a comma- or trailing-comment-advanced cursor — so a
-    /// directive after the separator still binds forward while the own-line floor
-    /// keeps a trailing directive inert. Every container loop routes through here
-    /// rather than picking its own anchors.
+    /// [`Self::member_gap_frozen`] for list item `i`, the single home of the
+    /// gap-anchor convention: the FIRST item's gap opens at `container_start` (the
+    /// container's span start for a bare list like a union, or just past the opening
+    /// delimiter for a delimited one — `<`/`[` — where a leading-run freeze doesn't
+    /// apply); a LATER item's gap opens at the previous item's RAW span end — never a
+    /// comma- or trailing-comment-advanced cursor — so a directive after the
+    /// separator still binds forward while the own-line floor keeps a trailing
+    /// directive inert. Every container loop routes through here (or the slice
+    /// wrapper [`Self::list_member_frozen`]) rather than picking its own anchors.
+    /// Closure-shaped so the item type is family-agnostic (`TSType` members,
+    /// `TSTypeParameter` declarations).
+    pub(in crate::printer) fn list_item_frozen(
+        &self,
+        container_start: u32,
+        item_span: &impl Fn(usize) -> Span,
+        i: usize,
+    ) -> bool {
+        if i == 0 {
+            self.member_gap_frozen(container_start, item_span(0).start)
+        } else {
+            self.member_gap_frozen(item_span(i - 1).end, item_span(i).start)
+        }
+    }
+
+    /// [`Self::list_item_frozen`] over a `TSType` slice, plus the union /
+    /// intersection `freeze_first` arm (the out-of-span leading-run directive, which
+    /// applies only to the first member of an undelimited list).
     pub(in crate::printer) fn list_member_frozen(
         &self,
         container_start: u32,
@@ -243,11 +263,7 @@ impl<'a> Printer<'a> {
         i: usize,
         freeze_first: bool,
     ) -> bool {
-        if i == 0 {
-            freeze_first || self.member_gap_frozen(container_start, types[0].span().start)
-        } else {
-            self.member_gap_frozen(types[i - 1].span().end, types[i].span().start)
-        }
+        (i == 0 && freeze_first) || self.list_item_frozen(container_start, &|j| types[j].span(), i)
     }
 
     /// Paren-transparent frozen doc for a union / intersection member. Precedence parens
@@ -329,6 +345,23 @@ impl<'a> Printer<'a> {
         member_parens: fn(&TSType<'_>) -> bool,
     ) -> bool {
         frozen && self.frozen_member_multiline(t, member_parens)
+    }
+
+    /// [`Self::build_frozen_member_doc`] for a list position whose members never need
+    /// precedence parens (tuple elements, type arguments): a source paren there is
+    /// always redundant, so it drops under the freeze unless its shell holds a comment.
+    pub(in crate::printer) fn build_frozen_list_member_doc(&self, t: &TSType<'_>) -> DocId {
+        self.build_frozen_member_doc(t, |_| false)
+    }
+
+    /// [`Self::frozen_member_multiline`] for the paren-free list positions of
+    /// [`Self::build_frozen_list_member_doc`]: whether the frozen slice spans lines.
+    /// Unlike [`Self::frozen_member_forces_break`] the frozen flag is NOT taken —
+    /// callers ask this only for an already-known-frozen member, so a width-decided
+    /// caller forces its broken layout explicitly on a `true` answer (a
+    /// `verbatim_source_span` is `will_break`-opaque).
+    pub(in crate::printer) fn frozen_list_member_multiline(&self, t: &TSType<'_>) -> bool {
+        self.frozen_member_multiline(t, |_| false)
     }
 
     /// Whether a parenthesized member's shell — the bytes between `(` and the inner type,

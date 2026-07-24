@@ -11,7 +11,7 @@
 # never listed — that invariant is absolute, so it always fails the gate.
 #
 # Format: KIND<TAB>POSITION
-# shapes: 108
+# shapes: 105
 UNHONORED	ArrayExpression.elements
 UNHONORED	ArrayPattern.elements
 UNHONORED	ArrowFunctionExpression.body
@@ -99,7 +99,6 @@ UNHONORED	TSParenthesizedType.typeAnnotation
 UNHONORED	TSPropertySignature.typeAnnotation
 UNHONORED	TSSatisfiesExpression.expression
 UNHONORED	TSSatisfiesExpression.typeAnnotation
-UNHONORED	TSTupleType.elementTypes
 UNHONORED	TSTypeAliasDeclaration.typeAnnotation
 UNHONORED	TSTypeAnnotation.typeAnnotation
 UNHONORED	TSTypeAssertion.expression
@@ -107,8 +106,6 @@ UNHONORED	TSTypeAssertion.typeAnnotation
 UNHONORED	TSTypeLiteral.members
 UNHONORED	TSTypeParameter.constraint
 UNHONORED	TSTypeParameter.default
-UNHONORED	TSTypeParameterDeclaration.params
-UNHONORED	TSTypeParameterInstantiation.params
 UNHONORED	TSTypePredicate.typeAnnotation
 UNHONORED	TSTypeReference.typeName
 UNHONORED	TemplateLiteral.expressions
