@@ -17,6 +17,7 @@ use crate::ast::internal::{TSIntersectionType, TSType, TSUnionType};
 use crate::printer::CommentVec;
 use crate::printer::LeadingGlue;
 use crate::printer::analysis::has_newline_after_position;
+use crate::printer::ignore::LeadingRunFreeze;
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -263,6 +264,42 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
+        // Format-ignore leading run (Rule A): a directive in the out-of-span region
+        // before the union freezes the whole node (same-line glued) or its first member
+        // (own-line). Gated on the document-level flag — the in-span `has_comments` gate
+        // below cannot see an out-of-span directive. The `Whole` return must precede the
+        // hug / line-comment / single-member paths; `freeze_first` is applied in the main
+        // loop and the single-member branch.
+        let leading_freeze = self.union_leading_run_freeze(union);
+        if let Some(LeadingRunFreeze::Whole) = leading_freeze {
+            return self.raw_source_range(union.span.start, union.span.end);
+        }
+        let (freeze_first, freeze_first_multiline) = match leading_freeze {
+            Some(LeadingRunFreeze::FirstMember { multiline }) => (true, multiline),
+            _ => (false, false),
+        };
+
+        // Single-member-union collapse under a freeze. A 1-element union drops its `|`
+        // when reformatted, so a member-only freeze is non-idempotent — pass 2 sees a
+        // bare member no longer routed through the union (`| {a:1}` → `{a:1}` → `{ a: 1 }`).
+        // The 1-element union is TRANSPARENT for directive binding: if the sole member is
+        // itself a Union/Intersection, fall through and build it normally so its own Rule A
+        // applies inside (`| a1&a2` → `a1 & a2`, `a1` frozen, idempotent, a design_choice
+        // divergence from prettier's `| a1&a2`); a leaf/object sole member freezes the
+        // WHOLE union span verbatim (keeps the `|` → idempotent AND matches prettier's
+        // whole-freeze). Handles the hug path too (a lone object hugs), which is why this
+        // precedes it.
+        if union.types.len() == 1
+            && (freeze_first
+                || self.member_gap_frozen(union.span.start, union.types[0].span().start))
+            && !matches!(
+                unwrap_parenthesized(&union.types[0]),
+                TSType::Union(_) | TSType::Intersection(_)
+            )
+        {
+            return self.raw_source_range(union.span.start, union.span.end);
+        }
+
         // One window search over the union gates every comment query below. All of them
         // — the leading `|`→first-member gap, the gaps either side of each separator, the
         // trailing gap, and the line-comment probes (including those that look inside a
@@ -315,7 +352,21 @@ impl<'a> Printer<'a> {
                 if i > 0 {
                     parts.push(d.text(" | "));
                 }
-                parts.push(self.build_type_doc_maybe_parens(t, member_parens));
+                // A hugged member (object / void) frozen by a directive — first member via
+                // `freeze_first` or the in-span leading gap, a later member via its gap.
+                // The hug path can't hold a composite member (only object-like huggables),
+                // so `build_frozen_member_doc` freezes it verbatim without the collapse
+                // question the len==1 branch answers below.
+                let frozen = if i == 0 {
+                    freeze_first || self.member_gap_frozen(union.span.start, t.span().start)
+                } else {
+                    self.member_gap_frozen(union.types[i - 1].span().end, t.span().start)
+                };
+                if frozen {
+                    parts.push(self.build_frozen_member_doc(t, member_parens));
+                } else {
+                    parts.push(self.build_type_doc_maybe_parens(t, member_parens));
+                }
             }
             return d.concat(&parts);
         }
@@ -362,6 +413,10 @@ impl<'a> Printer<'a> {
         // level up.
         if union.types.len() == 1 {
             let member = &union.types[0];
+            // A single-member union collapses to its member. When frozen, the resolution
+            // is handled above (`single_member_union_leaf_freeze` for a leaf/object sole
+            // member; a composite sole member falls through here and builds normally so
+            // its OWN leading-run walk applies Rule A inside — the transparency doctrine).
             if !has_comments {
                 return self.build_type_doc_maybe_parens(member, member_parens);
             }
@@ -405,6 +460,20 @@ impl<'a> Printer<'a> {
                     );
                 }
             } else {
+                // A FROZEN first member emits its leading block comments (the own-line
+                // directive) BEFORE the `| ` so the directive stays own-line and
+                // re-recognizes on pass 2; emitting it after `| ` (the general path below)
+                // relocates it to trail the pipe (`| /* prettier-ignore */`), flipping it
+                // trailing and losing the freeze next pass. The own-line block's own
+                // hardline forces the group broken, so the `if_break` `| ` appears.
+                let first_frozen =
+                    freeze_first || self.member_gap_frozen(union.span.start, type_start);
+                if has_comments && first_frozen {
+                    parts.push(
+                        self.build_member_leading_block_comments(union.span.start, type_start),
+                    );
+                }
+
                 // First type: "| " when broken, nothing when flat
                 parts.push(d.if_break(d.text("| "), d.empty()));
 
@@ -420,7 +489,8 @@ impl<'a> Printer<'a> {
                 // consistently; splitting the offset across the two siblings is sound
                 // because `align` is a per-line property. Unconditional because it binds
                 // only the breaks inside it, so a run that hugs its member is unaffected.
-                if has_comments {
+                // A frozen first member emitted its run before the `| ` above.
+                if has_comments && !first_frozen {
                     parts.push(d.align(
                         2,
                         self.build_member_leading_block_comments(union.span.start, type_start),
@@ -433,7 +503,21 @@ impl<'a> Printer<'a> {
             // that offset separately, above: the run is aligned, never this call's
             // result, so the object-literal and default-paren members that supply their
             // own indent keep declining it.
-            parts.push(self.build_union_member_offset_doc(t, member_parens));
+            //
+            // Rule A first-member freeze: emit `types[0]` verbatim (paren-transparent)
+            // instead of reformatting it. Same offset shape, so it aligns with the
+            // reformatted siblings in the broken layout.
+            // First member frozen via a leading-run directive (`freeze_first`, before
+            // `span.start`) OR an own-line directive in the in-span leading gap after the
+            // `|` (`| /* c */⏎// prettier-ignore⏎member`); later members were already
+            // handled by the offset builder's callers.
+            let frozen_first_member =
+                i == 0 && (freeze_first || self.member_gap_frozen(union.span.start, type_start));
+            if frozen_first_member {
+                parts.push(self.build_frozen_union_member_offset_doc(t, member_parens));
+            } else {
+                parts.push(self.build_union_member_offset_doc(t, member_parens));
+            }
 
             // Add trailing block comments after this type (before the next `|` separator)
             if has_comments {
@@ -460,7 +544,16 @@ impl<'a> Printer<'a> {
         // Always group the broken-member doc (Prettier's `printed = group(members)`).
         // The group makes the union's own flat/broken decision independently of the
         // parent's break, so it re-fits on the continuation line before exploding.
-        d.group(d.concat(&parts))
+        //
+        // A multi-line frozen first member forces the broken one-member-per-line layout
+        // (Rule A must-break): the frozen slice is a `will_break`-opaque verbatim span,
+        // so the break is forced explicitly here rather than propagating from the slice.
+        // A single-line frozen member keeps the width-decided layout.
+        if freeze_first_multiline {
+            d.group_break(d.concat(&parts))
+        } else {
+            d.group(d.concat(&parts))
+        }
     }
 
     /// Hanging-indent layout for a union used in a position where Prettier's
@@ -535,6 +628,16 @@ impl<'a> Printer<'a> {
         let mut parts = DocBuf::new();
         let member_parens = union_member_parens(union.types.len());
 
+        // Rule A first-member freeze in the forced-multiline path (an in-span comment
+        // routed here, plus a leading-run own-line directive before the union). Recomputed
+        // rather than threaded — gated on `has_format_ignore`, so it costs nothing in the
+        // common case. The `Whole` case never reaches here (returned early in
+        // `build_union_type_doc`).
+        let freeze_first = matches!(
+            self.union_leading_run_freeze(union),
+            Some(LeadingRunFreeze::FirstMember { .. })
+        );
+
         for (i, t) in union.types.iter().enumerate() {
             let type_start = t.span().start;
             let type_end = t.span().end;
@@ -552,7 +655,7 @@ impl<'a> Printer<'a> {
             // `None` for `skip_delim`: the union's leading `|` is not run through
             // `delimiter_line_comment_prefix`, unlike the bracket/angle/paren lists, so
             // no comment was pulled onto a delimiter line to exclude here.
-            let first_leading = if i == 0 {
+            let mut first_leading = if i == 0 {
                 self.build_leading_comments_multiline(union.span.start, type_start, None)
             } else {
                 DocBuf::new()
@@ -567,7 +670,18 @@ impl<'a> Printer<'a> {
             // appended to the member below. Empty for a retained-paren member (whose comment
             // stays inside, the arms further down) or a block-only leading gap (stays
             // inline).
-            let stripped_paren_leading = if i > 0 {
+            // Rule A member freeze (paren-transparent): the first member via a leading-run
+            // directive or the in-span leading gap, a later member via its own gap. Hoisted
+            // here so the redundant-paren leading run below is suppressed for a frozen
+            // member — its comments ride out INSIDE the frozen verbatim slice, so emitting
+            // the run separately too would DOUBLE-PRINT them (`| (// c⏎ b)` frozen).
+            let frozen_member = if i == 0 {
+                freeze_first || self.member_gap_frozen(union.span.start, type_start)
+            } else {
+                self.member_gap_frozen(union.types[i - 1].span().end, type_start)
+            };
+
+            let stripped_paren_leading = if i > 0 && !frozen_member {
                 self.stripped_redundant_paren_member_leading_run(t)
             } else {
                 smallvec![]
@@ -655,8 +769,16 @@ impl<'a> Printer<'a> {
                     parts.push(d.text("| "));
                 }
             } else {
-                // First type: always has `| ` prefix when multiline. Its leading run was
-                // built above and is emitted by the arm chain below.
+                // First type: always has `| ` prefix when multiline. A FROZEN first member
+                // emits its leading run — the own-line directive — BEFORE the `| ` so the
+                // directive stays own-line and re-recognizes on pass 2; emitting it after
+                // `| ` (the general path, below) would relocate it to trail the pipe
+                // (`| // prettier-ignore`), flipping it trailing and losing the freeze next
+                // pass. `mem::take` hands the run over here so the frozen arm doesn't
+                // re-emit it.
+                if frozen_member {
+                    parts.extend(std::mem::take(&mut first_leading));
+                }
                 parts.push(d.text("| "));
             }
 
@@ -671,7 +793,18 @@ impl<'a> Printer<'a> {
             // `align(2)` offset lines it up like any other paren-union member (the
             // `is_paren_union_member` arm of `build_union_member_offset_doc`). See
             // union_intersection_retained_paren_leading_line_comment_prettier_divergence.
-            if !stripped_paren_leading.is_empty() {
+            // Rule A member freeze (paren-transparent), the `frozen_member` hoisted above:
+            // the first member via a leading-run directive or the in-span gap, a later
+            // member via its own gap. The directive is emitted by the separator /
+            // leading-comment machinery above; only the member DOC is replaced, and the
+            // frozen member takes the same `align(2)` offset as a reformatted one. A frozen
+            // first member's own-line leading run (`first_leading`) was emitted before the
+            // `| ` above (and taken by `mem::take`), so extending it here is a no-op that
+            // preserves the arm chain's consume-by-move invariant.
+            if frozen_member {
+                parts.extend(first_leading);
+                parts.push(self.build_frozen_union_member_offset_doc(t, member_parens));
+            } else if !stripped_paren_leading.is_empty() {
                 // Redundant-paren member: its leading run was already emitted before the
                 // `| ` above, so render the member as its fully STRIPPED inner — building
                 // `t` (the parens) instead would emit the comment a second time.
@@ -983,14 +1116,39 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
+        // Format-ignore leading run (Rule A), symmetric with `build_union_type_doc`: a
+        // same-line glued directive freezes the whole intersection; an own-line directive
+        // freezes only the first member. (There is no whole-intersection arm for the
+        // own-line case — the intersection first member behaves like every other honored
+        // list position.) Gated on the document-level flag; the in-span `has_comments`
+        // gate below cannot see an out-of-span directive.
+        let first_inner = intersection
+            .types
+            .first()
+            .map(|t| unwrap_parenthesized(t).span());
+        let leading_freeze = self.leading_run_freeze(intersection.span.start, first_inner);
+        if let Some(LeadingRunFreeze::Whole) = leading_freeze {
+            return self.raw_source_range(intersection.span.start, intersection.span.end);
+        }
+        let (freeze_first, freeze_first_multiline) = match leading_freeze {
+            Some(LeadingRunFreeze::FirstMember { multiline }) => (true, multiline),
+            _ => (false, false),
+        };
+
         // One window search over the intersection, exactly as `build_union_type_doc`
         // does: every comment query below (the leading `&` gap, the gaps either side of
         // each separator, the trailing gap, the paren-hoist probe, and the line-comment
         // layout check) is bounded inside `intersection.span`, so a comment-free `A & B`
         // provably has none — no search, no empty child, and no `find_separator_position`
         // byte scan (the printed `&` is static text).
+        //
+        // On-page (not to-emit): a zero-comment fast gate is an on-page question per
+        // docs/comments.md, matching `build_union_type_doc`. Byte-identical to the old
+        // to-emit spelling today — no comment in a *type* gap is ever owned (ownership is
+        // set only in expression position) — but on-page is the correct axis, so a future
+        // owned comment in type position can't blind the layout gates this guards.
         let has_comments =
-            self.has_comments_to_emit_between(intersection.span.start, intersection.span.end);
+            self.has_comments_on_page_between(intersection.span.start, intersection.span.end);
 
         // A single-member intersection collapses to its member — see the matching
         // note in `build_union_type_doc`. The lone member needs no precedence
@@ -1080,7 +1238,14 @@ impl<'a> Printer<'a> {
             first_parts.push(leading);
         }
 
-        first_parts.push(self.build_intersection_member_type_doc(first_type, member_parens));
+        // Rule A first-member freeze: emit `types[0]` verbatim (paren-transparent). Frozen
+        // via a leading-run directive (`freeze_first`) OR an own-line directive in the
+        // in-span leading gap after a leading `&`.
+        if freeze_first || self.member_gap_frozen(intersection.span.start, first_type_start) {
+            first_parts.push(self.build_frozen_member_doc(first_type, member_parens));
+        } else {
+            first_parts.push(self.build_intersection_member_type_doc(first_type, member_parens));
+        }
 
         // Add trailing block comments after first type
         if intersection.types.len() > 1 {
@@ -1188,7 +1353,13 @@ impl<'a> Printer<'a> {
             }
         }
 
-        if needs_group {
+        // A multi-line frozen first member forces the broken layout (Rule A must-break):
+        // the frozen slice is a `will_break`-opaque verbatim span, so force it here. No
+        // fixture reaches this for an intersection (every frozen first member is
+        // single-line), but it keeps the union / intersection must-break rule symmetric.
+        if freeze_first_multiline {
+            d.group_break(d.concat(&parts))
+        } else if needs_group {
             d.group(d.concat(&parts))
         } else {
             d.concat(&parts)
@@ -1231,6 +1402,22 @@ impl<'a> Printer<'a> {
         let types = &intersection.types;
         let last = types.len() - 1;
 
+        // Rule A first-member freeze in the forced-multiline path (recomputed, gated on
+        // `has_format_ignore`; the `Whole` case is returned early upstream). The hoist
+        // path (`strip_first_paren_leading`) already relocates the first member's inner
+        // line comment, so a freeze there would double-print it — the hoist wins.
+        let freeze_first = !strip_first_paren_leading
+            && matches!(
+                self.leading_run_freeze(
+                    intersection.span.start,
+                    intersection
+                        .types
+                        .first()
+                        .map(|t| unwrap_parenthesized(t).span()),
+                ),
+                Some(LeadingRunFreeze::FirstMember { .. })
+            );
+
         // First member: leading block comments (`& /* c */ A`) + its type. Its
         // trailing `&` is emitted by the next member's iteration (it sits on this line).
         let mut parts = DocBuf::new();
@@ -1241,7 +1428,12 @@ impl<'a> Printer<'a> {
             CommentSpacing::Trailing,
             CommentFilter::BlockOnly,
         ));
-        let first_doc = if strip_first_paren_leading && matches!(first, TSType::Parenthesized(_)) {
+        let first_doc = if freeze_first
+            || (!strip_first_paren_leading
+                && self.member_gap_frozen(intersection.span.start, first.span().start))
+        {
+            self.build_frozen_member_doc(first, member_parens)
+        } else if strip_first_paren_leading && matches!(first, TSType::Parenthesized(_)) {
             self.build_intersection_first_member_stripped(first, member_parens)
         } else {
             self.build_intersection_line_comment_member_doc(first, member_parens)
@@ -1351,7 +1543,16 @@ impl<'a> Printer<'a> {
             } else {
                 unit.push(d.text(" "));
             }
-            unit.push(self.build_intersection_line_comment_member_doc(cur, member_parens));
+            // Rule A between-members freeze: an own-line directive in this member's gap
+            // freezes the member (paren-transparent). The directive is emitted by the
+            // separator / leading-comment machinery above; only the member DOC is
+            // replaced. Intersection members take no `align(2)` offset, so the bare
+            // paren-transparent doc matches a reformatted sibling.
+            if self.member_gap_frozen(prev_end, cur_start) {
+                unit.push(self.build_frozen_member_doc(cur, member_parens));
+            } else {
+                unit.push(self.build_intersection_line_comment_member_doc(cur, member_parens));
+            }
             if is_last {
                 for comment in
                     comments_to_emit_in_range(self.comments, cur.span().end, intersection.span.end)

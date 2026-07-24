@@ -34,6 +34,7 @@ mod class_common;
 mod comments;
 mod decorators;
 mod expressions;
+mod ignore;
 mod layout;
 mod needs_parens;
 mod program;

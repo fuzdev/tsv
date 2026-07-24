@@ -1,0 +1,454 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 276,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a multi-line frozen member keeps the union broken one member per line (tsv must-break);",
+			"start": 20,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier instead glues the next member onto the frozen slice's last line",
+			"start": 112,
+			"end": 187,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 200,
+			"end": 218,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 275,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 266,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 189,
+					"end": 265,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 14
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 194,
+						"end": 195,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 7
+							}
+						},
+						"name": "U"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 221,
+						"end": 264,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 10,
+								"column": 13
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeLiteral",
+								"start": 223,
+								"end": 250,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 4
+									},
+									"end": {
+										"line": 9,
+										"column": 5
+									}
+								},
+								"members": [
+									{
+										"type": "TSPropertySignature",
+										"start": 229,
+										"end": 235,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 4
+											},
+											"end": {
+												"line": 7,
+												"column": 10
+											}
+										},
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 229,
+											"end": 230,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 4
+												},
+												"end": {
+													"line": 7,
+													"column": 5
+												}
+											},
+											"name": "a"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 230,
+											"end": 235,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 5
+												},
+												"end": {
+													"line": 7,
+													"column": 10
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSLiteralType",
+												"start": 234,
+												"end": 235,
+												"loc": {
+													"start": {
+														"line": 7,
+														"column": 9
+													},
+													"end": {
+														"line": 7,
+														"column": 10
+													}
+												},
+												"literal": {
+													"type": "Literal",
+													"start": 234,
+													"end": 235,
+													"loc": {
+														"start": {
+															"line": 7,
+															"column": 9
+														},
+														"end": {
+															"line": 7,
+															"column": 10
+														}
+													},
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										}
+									},
+									{
+										"type": "TSPropertySignature",
+										"start": 240,
+										"end": 244,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 4
+											},
+											"end": {
+												"line": 8,
+												"column": 8
+											}
+										},
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 240,
+											"end": 241,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 4
+												},
+												"end": {
+													"line": 8,
+													"column": 5
+												}
+											},
+											"name": "b"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 241,
+											"end": 244,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 5
+												},
+												"end": {
+													"line": 8,
+													"column": 8
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSLiteralType",
+												"start": 243,
+												"end": 244,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 7
+													},
+													"end": {
+														"line": 8,
+														"column": 8
+													}
+												},
+												"literal": {
+													"type": "Literal",
+													"start": 243,
+													"end": 244,
+													"loc": {
+														"start": {
+															"line": 8,
+															"column": 7
+														},
+														"end": {
+															"line": 8,
+															"column": 8
+														}
+													},
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										}
+									}
+								]
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 255,
+								"end": 264,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 4
+									},
+									"end": {
+										"line": 10,
+										"column": 13
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSIntersectionType",
+									"start": 256,
+									"end": 263,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 5
+										},
+										"end": {
+											"line": 10,
+											"column": 12
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 256,
+											"end": 258,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 5
+												},
+												"end": {
+													"line": 10,
+													"column": 7
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 256,
+												"end": 258,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 5
+													},
+													"end": {
+														"line": 10,
+														"column": 7
+													}
+												},
+												"name": "b1"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 261,
+											"end": 263,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 10
+												},
+												"end": {
+													"line": 10,
+													"column": 12
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 261,
+												"end": 263,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 10
+													},
+													"end": {
+														"line": 10,
+														"column": 12
+													}
+												},
+												"name": "b2"
+											}
+										}
+									]
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 200,
+								"end": 218
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multi-line frozen member keeps the union broken one member per line (tsv must-break);",
+							"start": 20,
+							"end": 110
+						},
+						{
+							"type": "Line",
+							"value": " prettier instead glues the next member onto the frozen slice's last line",
+							"start": 112,
+							"end": 187
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
