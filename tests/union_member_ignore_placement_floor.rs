@@ -8,10 +8,9 @@
 //! `unformatted_*` fixture rules can't pin them — the normalized fixed point is asserted
 //! here directly.
 //!
-//! The classification (docs/conformance_prettier.md §Format-ignore directive): own-line →
-//! freeze the following member; glued directly before a value/member → freeze it whole;
-//! anything else (content before the directive on its line, nothing glued after) →
-//! trailing → inert.
+//! The classification (docs/conformance_prettier.md §Format-ignore directive) is
+//! exception-free: a directive alone on its line freezes the following member;
+//! any other placement — trailing, glued, after a delimiter or head — is inert.
 
 fn format(source: &str) -> String {
     let arena = bumpalo::Bump::new();
@@ -32,10 +31,9 @@ fn head_trailing_authored_pipe_normalizes_inert() {
 }
 
 /// An end-of-line block directive between members (`a | /* d */⏎ member`) is trailing →
-/// inert on pass 1: the member reformats and the union joins flat, which lands the
-/// directive GLUED directly before the now-formatted member. The glued re-read on pass 2
-/// freezes already-canonical content, so the flat form is a fixed point — the two
-/// authorings (end-of-line vs glued) legitimately share it.
+/// inert: the member reformats and the union joins flat, landing the directive glued
+/// before the now-formatted member — also an inert placement, so the flat form is an
+/// ordinary-comment fixed point.
 #[test]
 fn trailing_block_end_of_line_normalizes_to_glued_fixed_point() {
     let source = "type T = a | /* prettier-ignore */\n\t{x:1} | b;\n";

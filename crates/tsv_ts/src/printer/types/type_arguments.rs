@@ -50,8 +50,8 @@ impl<'a> Printer<'a> {
     /// [`Self::build_single_type_arg_inline`] with a caller-built argument doc — the
     /// shared emission for the instantiation curly-hug arm, whose argument doc comes
     /// from `try_build_hugging_curly_type_doc` rather than `build_type_doc`.
-    /// Applies the Rule A glued-directive freeze itself (swapping `type_doc` for the
-    /// frozen verbatim slice), so every single-argument hug path honors it.
+    /// Applies the Rule A freeze itself (swapping `type_doc` for the frozen verbatim
+    /// slice), so every single-argument hug path honors it.
     pub(in crate::printer) fn build_single_type_arg_inline_with(
         &self,
         args: &internal::TSTypeParameterInstantiation<'_>,
@@ -60,8 +60,9 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let param = &args.params[0];
-        // Rule A: a glued directive directly before the sole argument freezes it
-        // whole (own-line spellings route to the expansion builder before this).
+        // Rule A: an alone-on-line directive before the sole argument freezes it whole
+        // (`//` spellings route to the expansion builder before this; an alone-on-line
+        // block spelling can reach this inline path).
         let frozen =
             has_comments && self.list_item_frozen(args.span.start + 1, &|_| param.span(), 0);
         let arg_doc = if frozen {

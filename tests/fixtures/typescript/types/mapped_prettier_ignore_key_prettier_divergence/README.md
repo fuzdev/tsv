@@ -1,8 +1,9 @@
 # mapped_prettier_ignore_key_prettier_divergence
 
-A directive **inside a mapped type's bracket** — own-line or glued before the
-`K in ...` binding — freezes only the **binding**; the value type keeps formatting
-normally:
+An **own-line** directive **inside a mapped type's bracket**, before the
+`K in ...` binding, freezes only the **binding**; the value type keeps formatting
+normally (a glued directive is inert — see
+[type_heads_prettier_ignore_glued_inert](../type_heads_prettier_ignore_glued_inert_prettier_divergence/)):
 
 ```ts
 type A = {

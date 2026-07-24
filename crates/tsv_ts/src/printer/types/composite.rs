@@ -742,13 +742,12 @@ impl<'a> Printer<'a> {
             body_parts.push(d.text(" "));
         }
 
-        // Whole-signature freeze: a format-ignore directive between `{` and the `[`
-        // (own-line or glued — `mapped_gap_frozen`) freezes the whole `[K in ...]: V`
-        // clause, the mapped type's sole-member analog of Rule A. The braces and the
-        // member `;` stay parent-emitted outside the slice, and the directive itself
-        // was just emitted with the leading comments (own-line above, or inline when
-        // glued). A `readonly` modifier declines for now — the slice would need the
-        // modifier's own start position.
+        // Whole-signature freeze: an alone-on-line format-ignore directive between `{`
+        // and the `[` (`mapped_gap_frozen`) freezes the whole `[K in ...]: V` clause,
+        // the mapped type's sole-member analog of Rule A. The braces and the member
+        // `;` stay parent-emitted outside the slice, and the directive itself was
+        // just emitted with the leading comments. A `readonly` modifier declines for
+        // now — the slice would need the modifier's own start position.
         // TODO: extend the freeze slice to a `readonly`/`+`/`-` modifier.
         if m.readonly.is_none()
             && let Some(type_ann) = &m.type_annotation
@@ -781,8 +780,8 @@ impl<'a> Printer<'a> {
         // the `[`→key gap can break the whole `[…]` (mirrors `build_computed_key_bracket_doc`).
         let mut interior_parts: DocBuf = smallvec![];
 
-        // Binding freeze: a format-ignore directive inside the bracket, own-line or
-        // glued before the key (`mapped_gap_frozen` over the `[`→key gap), freezes
+        // Binding freeze: an alone-on-line format-ignore directive inside the
+        // bracket (`mapped_gap_frozen` over the `[`→key gap) freezes
         // just the `K in ...` binding — the value keeps formatting normally, and the
         // directive itself is emitted by the bracket's own comment machinery (the
         // line-comment break shell, or the inline loop below).
@@ -982,8 +981,8 @@ impl<'a> Printer<'a> {
                     }
                     _ => {
                         body_parts.push(d.text(" "));
-                        // A glued directive froze the value (own-line took the
-                        // line-comment branch above).
+                        // An alone-on-line BLOCK directive froze the value (the
+                        // line-comment branch above catches only `//` spellings).
                         if value_frozen {
                             body_parts.push(self.build_frozen_single_child_doc(type_ann));
                         } else {
@@ -1167,8 +1166,8 @@ impl<'a> Printer<'a> {
                 self.build_inline_comments_between_doc_trailing_space(prev_end, elem.span().start);
             parts.push(leading);
 
-            // Rule A: a glued directive in this element's gap freezes it (the
-            // directive itself was just emitted by the gap emitter above); a
+            // Rule A: an alone-on-line directive in this element's gap freezes it
+            // (the directive itself was just emitted by the gap emitter above); a
             // multi-line frozen slice forces the broken layout (a verbatim span is
             // `will_break`-opaque, so the forcing is explicit).
             let frozen = self.list_member_frozen(t.span.start + 1, t.element_types, i, false);
@@ -1232,7 +1231,7 @@ impl<'a> Printer<'a> {
             // bracket-line prefix below).
             let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
             let leading = self.build_leading_comments_multiline(prev_end, elem_start, skip_delim);
-            // Rule A: an own-line (or glued) directive in this element's gap freezes
+            // Rule A: an alone-on-line directive in this element's gap freezes
             // it; the directive itself was just emitted by the leading run above.
             // No must-break question — this layout is already all-hardline.
             let frozen = self.list_member_frozen(t.span.start + 1, t.element_types, i, false);

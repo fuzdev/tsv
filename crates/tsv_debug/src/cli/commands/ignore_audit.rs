@@ -41,10 +41,9 @@
 //!    escape's blind spot).
 //! 4. **Trailing inertness** ([`IgnoreKind::TrailingFrozen`]) — the directive appended to the
 //!    END of the preceding line instead must freeze nothing: the decided placement floor
-//!    (content before a directive on its line ⇒ inert). Skipped after an opening delimiter
-//!    (`{` / `[` / `(` / `<`), where there is no preceding sibling on the line so "trailing"
-//!    is the wrong classification — decided FORWARD-BINDING at `{` (both tools freeze the
-//!    first member; see [`FORWARD_BINDING_LINE_ENDS`]), an open decision at the rest.
+//!    (a directive freezes only when it is alone on its line, with no exceptions — a
+//!    directive trailing an opening `{`/`[`/`(`/`<` is inert like every other trailing
+//!    placement).
 //!
 //! The companion checks (2–4) run only on the **span-maximal node beginning on each line**: the
 //! directive is inserted above the whole line, so it binds to the OUTERMOST construct beginning
@@ -589,26 +588,16 @@ fn sibling_mutant(
     changed.then_some(out)
 }
 
-/// The characters a preceding line may END with that exempt a placement from the
-/// trailing-inertness assertion: after an opening delimiter there is no preceding sibling on the
-/// line, so "trailing" is the wrong classification. At `{` the forward binding is DECIDED — both
-/// tools freeze the first statement/property after `{ // prettier-ignore` (prettier relocates
-/// the directive own-line, tsv preserves its position; docs/directives.md §Placement). At
-/// `[`/`(`/`<` tsv is inert today while prettier binds forward — an open per-position decision
-/// (generalize the `{` binding vs keep inert), so the skip stays conservative rather than
-/// asserting either answer. Everything else — separators, complete statements, a trailing `=`
-/// (the fixture-pinned after-equals decision) — asserts inert.
-const FORWARD_BINDING_LINE_ENDS: [char; 4] = ['{', '[', '(', '<'];
-
 /// The trailing-inertness mutant: the directive appended to the END of the line preceding the
-/// candidate (` // prettier-ignore`), a placement the decided floor classifies as INERT (content
-/// before a directive on its line ⇒ inert; a `//` comment can never be glued forward). The
-/// perturbed node must therefore NOT survive — if it does, the position misbinds a trailing
-/// directive ([`IgnoreKind::TrailingFrozen`]). `None` when the placement is ineligible:
+/// candidate (` // prettier-ignore`), a placement the decided floor classifies as INERT — a
+/// directive freezes only when it is alone on its line, with no exceptions (a directive
+/// trailing an opening `{`/`[`/`(`/`<` is inert like every other trailing placement;
+/// docs/directives.md §Placement). The perturbed node must therefore NOT survive — if it does,
+/// the position misbinds a trailing directive ([`IgnoreKind::TrailingFrozen`]). `None` when
+/// the placement is ineligible:
 ///
 /// - no preceding line, or a blank one (the directive would be own-line — the primary check's
 ///   placement class, not this one's);
-/// - the preceding line ends with an opening delimiter ([`FORWARD_BINDING_LINE_ENDS`]);
 /// - the preceding line is not wholly inside one JS region (appending `//` into markup or a
 ///   `<script>` tag line would not lex as a JS comment);
 /// - an exclusion span covers the append point — inside a string/template/comment. A line
@@ -627,9 +616,8 @@ fn trailing_mutant(ctx: &MutantCtx<'_>, cand: &Candidate, perturbed: &str) -> Op
     let source = ctx.source;
     let eol = cand.line_start - 1;
     let prev_line_start = source[..eol].rfind('\n').map_or(0, |i| i + 1);
-    let prev_content = source[prev_line_start..eol].trim();
-    let last = prev_content.chars().last()?;
-    if FORWARD_BINDING_LINE_ENDS.contains(&last) {
+    // A blank preceding line would make the appended directive own-line, not trailing.
+    if source[prev_line_start..eol].trim().is_empty() {
         return None;
     }
     if !ctx
