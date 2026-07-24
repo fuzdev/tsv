@@ -168,6 +168,12 @@ cargo run --profile corpus -p tsv_debug --features audits ignore_audit ~/dev/zzz
 # directive — unpinnable) FAILS. Keyed by AST position, so every site of a position rolls up to
 # one line; a "covered" position can still appear when an uncovered SUB-PATH of it (e.g. an object
 # property nested in a member chain) doesn't honor.
+# A Union/Intersection candidate is excluded outright (paren-transparently): Rule A freezes only its
+# first member at a single-child head, so the whole-node substring check is the wrong expectation
+# there — the member-level positions (`TSUnionType.types` / `TSIntersectionType.types`) carry that
+# placement. A closed line at a single-child head (e.g. `TSTypeAliasDeclaration.typeAnnotation`)
+# means only its non-composite sites honor; union-typed LIST members (whole-member freezes) also go
+# untested by the skip and ride on the member-freeze fixtures.
 # Scope: JS positions only (the TS `//` directive over code_regions — standalone .ts/.svelte.ts +
 # Svelte <script>/{expr}); CSS `/* prettier-ignore */` and Svelte template `<!-- prettier-ignore -->`
 # are a follow-up; whitespace-perturbation only (a quote/paren-only reformat is invisible — Arm B's
