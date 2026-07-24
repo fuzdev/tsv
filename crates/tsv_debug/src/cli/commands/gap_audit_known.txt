@@ -12,11 +12,12 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 627
+# shapes: 630
 DROPPED	!)⟨⟩!.	annotation,block,jsdoc_cast
 DROPPED	#⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DROPPED	#⟨⟩\	annotation,block,jsdoc_cast,line,multiline
 DROPPED	#⟨⟩private	annotation,block,jsdoc_cast,line,multiline
+DROPPED	&&⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	')⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	')⟨⟩];	annotation,block,jsdoc_cast,line,multiline
@@ -241,6 +242,7 @@ DROPPED	>⟨⟩[]]	annotation,block,jsdoc_cast
 DROPPED	>⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	?.#⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DROPPED	?⟨⟩:	annotation,block,jsdoc_cast,line,multiline
+DROPPED	?⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	IDENT⟨⟩!	annotation,block,jsdoc_cast
 DROPPED	IDENT⟨⟩!!;	annotation,block,jsdoc_cast
 DROPPED	IDENT⟨⟩!()	annotation,block,jsdoc_cast
@@ -440,6 +442,7 @@ DROPPED	{}⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	{}⟨⟩,	annotation,block,jsdoc_cast,line,multiline
 DROPPED	{}⟨⟩:	annotation,block,jsdoc_cast,multiline
 DROPPED	{}⟨⟩␣	multiline
+DROPPED	{⟨⟩IDENT	annotation,block,jsdoc_cast,multiline
 DROPPED	})⟨⟩!.	annotation,block,jsdoc_cast
 DROPPED	})⟨⟩![	annotation,block,jsdoc_cast
 DROPPED	})⟨⟩)	annotation,block,jsdoc_cast,line,multiline

@@ -206,6 +206,19 @@ pub enum DocText {
     /// [`resolve_text`]; behaves identically to the pooled text it replaces in
     /// every doc transform (a `DocNode::Text` is matched generically).
     SourceSpan(Span, u16),
+    /// A format-ignored **verbatim slice** (the `prettier-ignore` freeze) —
+    /// [`SourceSpan`](DocText::SourceSpan) in every mechanical respect (same
+    /// eager width policy, same render resolution against `source`), but
+    /// **layout-opaque**: `will_break` does not report its embedded newlines as
+    /// a forced break. A frozen slice's newlines are *source* layout, not a
+    /// break the enclosing group must honor — prettier's `printIgnored` output
+    /// is a plain string doc its willBreak/propagateBreaks never see, and the
+    /// enclosing containers lay out as if the slice were flat. `fits()` is
+    /// unaffected (it keys on the width slot, where the newline sentinel still
+    /// ends the measured line). Built only via `verbatim_source_span`; genuine
+    /// multi-line content (line-continuation strings, `<pre>` text) must stay
+    /// [`SourceSpan`](DocText::SourceSpan) so it force-breaks.
+    VerbatimSpan(Span, u16),
 }
 
 impl DocText {
@@ -218,7 +231,10 @@ impl DocText {
     #[inline]
     pub const fn cached_width(&self) -> CachedWidth {
         match self {
-            DocText::Static(_, w) | DocText::Pooled(_, w) | DocText::SourceSpan(_, w) => match *w {
+            DocText::Static(_, w)
+            | DocText::Pooled(_, w)
+            | DocText::SourceSpan(_, w)
+            | DocText::VerbatimSpan(_, w) => match *w {
                 TEXT_WIDTH_NOT_COMPUTED => CachedWidth::NotComputed,
                 TEXT_WIDTH_HAS_NEWLINE => CachedWidth::HasNewline,
                 w => CachedWidth::Width(w),
@@ -261,7 +277,7 @@ pub(super) fn resolve_text<'a>(
     match text {
         DocText::Static(s, _) => s,
         DocText::Pooled(span, _) => span.slice(pool),
-        DocText::SourceSpan(span, _) => span.extract(
+        DocText::SourceSpan(span, _) | DocText::VerbatimSpan(span, _) => span.extract(
             source.expect("SourceSpan encountered in Doc but no source provided for resolution"),
         ),
     }

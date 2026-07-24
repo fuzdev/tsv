@@ -371,6 +371,7 @@ fn classify_text(t: &DocText) -> &'static str {
         DocText::Static(..) => "Static",
         DocText::Pooled(..) => "Pooled",
         DocText::SourceSpan(..) => "SourceSpan",
+        DocText::VerbatimSpan(..) => "VerbatimSpan",
     }
 }
 

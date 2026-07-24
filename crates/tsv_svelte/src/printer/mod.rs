@@ -192,7 +192,9 @@ impl<'a> Printer<'a> {
         #[cfg(feature = "comment_check")]
         tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
 
-        self.d().source_span(span, self.source)
+        // `verbatim_source_span`, not `source_span`: a format-ignored slice's
+        // embedded newlines are source layout, opaque to `will_break`.
+        self.d().verbatim_source_span(span, self.source)
     }
 
     /// Get the source code
