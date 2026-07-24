@@ -135,6 +135,11 @@ its tail:
   ([index_signature_key_type_line_comments](../tests/fixtures/typescript/types/type_members/index_signature_key_type_line_comments_prettier_divergence/))
   and value-type
   ([index_signature_value_line_comment](../tests/fixtures/typescript/types/type_members/index_signature_value_line_comment_prettier_divergence/)).
+  **Exception**: an own-line `format-ignore` / `prettier-ignore` directive in the gap
+  is NOT pulled up to trail the `:` — it keeps its authored own-line placement, so the
+  freeze survives a second pass (a head-trailing directive is inert under the placement
+  classification) — see **On single-child type positions** under
+  [§Format-ignore directive](#format-ignore-directive).
 - **Before-`:` key/binding gap** — the complement of the colon→type case: a line
   comment between a key/binding name (or its `?`/`!` marker) and the `:`
   (`prop // c⏎\t\t: T`) keeps the comment after the marker and indents the whole
@@ -1429,6 +1434,48 @@ more defensible:
   `tests/format/typescript/prettier-ignore/prettier-ignore-nested-unions.ts` (an `unknown`
   in the format gate counts); a fixture pins it when the nested-paren freeze is next
   touched.
+
+**On single-child type positions (annotation `:` / alias `=` / constraint `extends` /
+type-parameter default `=` / named-tuple `label:` / mapped-type `]:` value and `[K in ...]`
+key).** The same placement classification honors a directive before a head's single child:
+an own-line or glued directive between the head token and the child freezes the child
+whole — unless the (paren-transparent) child is a union or intersection, in which case the
+member rules above apply unchanged (own-line → first member, glued → whole composite). The
+ordinary fixtures `alias_prettier_ignore_value`, `annotation_prettier_ignore_glued`,
+`annotation_prettier_ignore_union_member`, `named_tuple_prettier_ignore_element`, and
+`mapped_prettier_ignore_signature` (a directive above a mapped type's `[K in ...]: V`
+clause freezes the whole clause — the mapped type's sole-member analog) match prettier.
+tsv diverges where prettier relocates the directive, or where its mapped-type handler
+freezes content the directive doesn't precede:
+
+- Own-line directive kept own-line at a single-child head — ◆comment_preservation
+  ◆prettier_bug — at the annotation `:`, constraint `extends`, default `=`, named-tuple
+  `label:`, and mapped-type `]:` heads, prettier relocates an own-line directive before a
+  non-composite child to trail the head (`let v: // prettier-ignore`) and dedents the
+  frozen slice; tsv keeps the author's own-line placement and freezes the same span. A
+  head-trailing directive is inert under tsv's placement classification, so the relocated
+  form would lose the freeze on tsv's second pass — and prettier's relocated form is not
+  even self-stable: its own second pass loses the freeze at the property-signature,
+  constraint/default, named-tuple, and mapped-value positions (non-idempotent, pinned via
+  each fixture's `audit_signature.txt`). Prettier itself keeps the directive own-line at
+  the alias `=` head and before every union child —
+  [annotation](../tests/fixtures/typescript/types/annotation_prettier_ignore_own_line_prettier_divergence/),
+  [type-param constraint/default](../tests/fixtures/typescript/types/type_param_prettier_ignore_value_prettier_divergence/),
+  [named tuple](../tests/fixtures/typescript/types/named_tuple_prettier_ignore_own_line_prettier_divergence/),
+  [mapped value](../tests/fixtures/typescript/types/mapped_value_prettier_ignore_own_line_prettier_divergence/)
+- Mapped-type key: in-bracket directive freezes the binding only — ◆design_choice — a
+  directive inside the bracket (own-line or glued before `K in ...`) freezes only the
+  binding in tsv, while prettier's mapped-type handler freezes the whole mapped type —
+  including the `]: V` value side and the `[` that *precedes* the directive. The freeze
+  scope follows the directive's position: it freezes the construct it precedes —
+  [mapped key](../tests/fixtures/typescript/types/mapped_prettier_ignore_key_prettier_divergence/)
+- Multi-line frozen value in a width-decided container — ◆design_choice — a glued
+  directive freezing a multi-line annotation value inside a parameter list breaks the
+  list cleanly, one parameter per line; prettier keeps the list flat and glues
+  `, b: c1) {}` onto the frozen slice's last line (its printed-ignored slice is
+  invisible to `willBreak`). The single-child analog of the multiline-member
+  divergences above —
+  [multiline value](../tests/fixtures/typescript/types/annotation_prettier_ignore_multiline_value_prettier_divergence/)
 
 See [directives.md](./directives.md) for the user-facing reference.
 

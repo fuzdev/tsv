@@ -11,7 +11,7 @@
 # never listed — that invariant is absolute, so it always fails the gate.
 #
 # Format: KIND<TAB>POSITION
-# shapes: 105
+# shapes: 91
 UNHONORED	ArrayExpression.elements
 UNHONORED	ArrayPattern.elements
 UNHONORED	ArrowFunctionExpression.body
@@ -71,10 +71,7 @@ UNHONORED	SwitchCase.consequent
 UNHONORED	SwitchStatement.cases
 UNHONORED	SwitchStatement.discriminant
 UNHONORED	TSAsExpression.expression
-UNHONORED	TSAsExpression.typeAnnotation
 UNHONORED	TSCallSignatureDeclaration.parameters
-UNHONORED	TSConditionalType.checkType
-UNHONORED	TSConditionalType.extendsType
 UNHONORED	TSConditionalType.falseType
 UNHONORED	TSConditionalType.trueType
 UNHONORED	TSConstructSignatureDeclaration.parameters
@@ -85,29 +82,18 @@ UNHONORED	TSFunctionType.typeAnnotation
 UNHONORED	TSImportEqualsDeclaration.moduleReference
 UNHONORED	TSIndexSignature.parameters
 UNHONORED	TSIndexSignature.typeAnnotation
-UNHONORED	TSIndexedAccessType.indexType
 UNHONORED	TSIndexedAccessType.objectType
-UNHONORED	TSLiteralType.literal
-UNHONORED	TSMappedType.typeAnnotation
-UNHONORED	TSMappedType.typeParameter
 UNHONORED	TSMethodSignature.parameters
 UNHONORED	TSMethodSignature.typeAnnotation
-UNHONORED	TSNamedTupleMember.elementType
 UNHONORED	TSNonNullExpression.expression
 UNHONORED	TSParameterProperty.parameter
 UNHONORED	TSParenthesizedType.typeAnnotation
 UNHONORED	TSPropertySignature.typeAnnotation
 UNHONORED	TSSatisfiesExpression.expression
-UNHONORED	TSSatisfiesExpression.typeAnnotation
-UNHONORED	TSTypeAliasDeclaration.typeAnnotation
-UNHONORED	TSTypeAnnotation.typeAnnotation
 UNHONORED	TSTypeAssertion.expression
 UNHONORED	TSTypeAssertion.typeAnnotation
 UNHONORED	TSTypeLiteral.members
-UNHONORED	TSTypeParameter.constraint
-UNHONORED	TSTypeParameter.default
 UNHONORED	TSTypePredicate.typeAnnotation
-UNHONORED	TSTypeReference.typeName
 UNHONORED	TemplateLiteral.expressions
 UNHONORED	ThrowStatement.argument
 UNHONORED	TryStatement.handler

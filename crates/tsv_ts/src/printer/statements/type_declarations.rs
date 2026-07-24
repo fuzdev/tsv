@@ -235,8 +235,19 @@ impl<'a> Printer<'a> {
         // any trailing comment) — the shared keyword→value seam the other hang sites use.
         // When no line comment forces a hang, the seam returns the RHS unchanged, so the
         // block-comment / comment-free `=` layouts below are untouched.
-        let (type_start, value_type) =
-            self.keyword_value_stripped_paren_hang(&decl.type_annotation);
+        //
+        // A format-ignore directive in the `=`→RHS gap (own-line or glued) freezes a
+        // non-composite RHS verbatim (`single_child_frozen`; a union/intersection RHS
+        // declines and freezes via its own leading-run walk). The frozen path keeps
+        // the UNWIDENED window — an in-shell directive stays on the ordinary paths —
+        // and the directive itself is emitted by the comment machinery below either
+        // way (own-line comments already keep their own line here).
+        let frozen = self.single_child_frozen(eq_pos + 1, &decl.type_annotation);
+        let (type_start, value_type) = if frozen {
+            (decl.type_annotation.span().start, &decl.type_annotation)
+        } else {
+            self.keyword_value_stripped_paren_hang(&decl.type_annotation)
+        };
         let mut parts: DocBuf = smallvec![d.text(if lead_space { " =" } else { "=" })];
 
         // A leading comment between `=` and the RHS forces the value onto its own
@@ -294,8 +305,13 @@ impl<'a> Printer<'a> {
             // can independently decide whether to break. Built from the unwrapped inner
             // (equal to the RHS when no shell was stripped) plus any trailing comment
             // lifted from the shell; type position, so a trailing block trails the value
-            // inline before the `;` (`defer = false`).
-            let type_doc = self.build_hang_value_doc(&decl.type_annotation, value_type, false);
+            // inline before the `;` (`defer = false`). A frozen RHS is the verbatim
+            // slice instead (redundant parens drop unless the shell holds a comment).
+            let type_doc = if frozen {
+                self.build_frozen_single_child_doc(&decl.type_annotation)
+            } else {
+                self.build_hang_value_doc(&decl.type_annotation, value_type, false)
+            };
             let mut indent_content: DocBuf = smallvec![d.hardline()];
             indent_content.extend(indent_comment_parts);
             indent_content.push(type_doc);
@@ -332,6 +348,17 @@ impl<'a> Printer<'a> {
             // unwrapped type — safe, since we only unwrap when no comments are inside
             // the parens (commented parens stay on the preserve-in-place path).
             let value_type = self.unwrap_redundant_parens(&decl.type_annotation);
+            // A glued directive froze the RHS (own-line took the force-break branch):
+            // every non-composite arm below builds the verbatim slice instead of the
+            // type doc; the union/intersection arms are unreachable when frozen
+            // (`single_child_frozen` declines composites).
+            let build_value = || -> DocId {
+                if frozen {
+                    self.build_frozen_single_child_doc(&decl.type_annotation)
+                } else {
+                    self.build_type_doc(value_type)
+                }
+            };
             // For union/intersection types, build without their own group so they inherit
             // breaking from this context's group.
             if let TSType::Union(u) = value_type {
@@ -388,7 +415,7 @@ impl<'a> Printer<'a> {
                 // `=` line while its head fits and breaks after `=` once the head
                 // overflows. The `fluid` marker keeps the LHS `<…>` inline (see the
                 // intersection arm) rather than breaking the type-param list.
-                let type_doc = self.build_type_doc(value_type);
+                let type_doc = build_value();
                 if should_break_before_conditional_type(cond) {
                     parts.push(hang_after_operator(d, make_rhs(type_doc)));
                 } else {
@@ -402,7 +429,7 @@ impl<'a> Printer<'a> {
                 // (a function type whose header pushes `(` past the width). Either way the
                 // marker's `line` keeps the LHS `<…>` inline instead of breaking the
                 // type-param list.
-                let type_doc = self.build_type_doc(value_type);
+                let type_doc = build_value();
                 parts.push(fluid(make_rhs(type_doc)));
             } else if has_complex_params {
                 // Complex type parameters: use break-lhs layout
@@ -413,7 +440,7 @@ impl<'a> Printer<'a> {
                 //     T extends string,
                 //     U = number,
                 //   > = SomeLongType;
-                let type_doc = self.build_type_doc(value_type);
+                let type_doc = build_value();
                 parts.push(d.text(" "));
                 parts.push(make_rhs(type_doc));
             } else {
@@ -433,7 +460,7 @@ impl<'a> Printer<'a> {
                 //     breaks after `=` (e.g. indexed_access_line_comment).
                 //
                 // A comment-free value that doesn't `will_break` hangs (long case).
-                let type_doc = self.build_type_doc(value_type);
+                let type_doc = build_value();
                 let value_span = value_type.span();
                 let value_has_comments = tsv_lang::has_comments_to_emit_in_range(
                     self.comments,

@@ -1,0 +1,1035 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 535,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an own-line directive before the alias RHS freezes the whole value",
+			"start": 20,
+			"end": 89,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 102,
+			"end": 120,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " function-type value",
+			"start": 135,
+			"end": 157,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 170,
+			"end": 188,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " glued block directive freezes the value it precedes",
+			"start": 211,
+			"end": 265,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 276,
+			"end": 297,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 10
+				},
+				"end": {
+					"line": 13,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line block spelling behaves like the line spelling",
+			"start": 310,
+			"end": 367,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 380,
+			"end": 401,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a multi-line value keeps its verbatim layout",
+			"start": 416,
+			"end": 463,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 476,
+			"end": 494,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 534,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 525,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 27,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 91,
+					"end": 132,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 11
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 96,
+						"end": 97,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 123,
+						"end": 131,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 5,
+								"column": 10
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 124,
+								"end": 130,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 3
+									},
+									"end": {
+										"line": 5,
+										"column": 9
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 124,
+									"end": 125,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 3
+										},
+										"end": {
+											"line": 5,
+											"column": 4
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 125,
+									"end": 130,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 4
+										},
+										"end": {
+											"line": 5,
+											"column": 9
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 129,
+										"end": 130,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 8
+											},
+											"end": {
+												"line": 5,
+												"column": 9
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 129,
+											"end": 130,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 8
+												},
+												"end": {
+													"line": 5,
+													"column": 9
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 102,
+								"end": 120
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line directive before the alias RHS freezes the whole value",
+							"start": 20,
+							"end": 89
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 159,
+					"end": 208,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 19
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 164,
+						"end": 165,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 191,
+						"end": 207,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 2
+							},
+							"end": {
+								"line": 10,
+								"column": 18
+							}
+						},
+						"parameters": [
+							{
+								"type": "Identifier",
+								"start": 192,
+								"end": 198,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 3
+									},
+									"end": {
+										"line": 10,
+										"column": 9
+									}
+								},
+								"name": "a",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 193,
+									"end": 198,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 4
+										},
+										"end": {
+											"line": 10,
+											"column": 9
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 197,
+										"end": 198,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 8
+											},
+											"end": {
+												"line": 10,
+												"column": 9
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 197,
+											"end": 198,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 8
+												},
+												"end": {
+													"line": 10,
+													"column": 9
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								}
+							}
+						],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 200,
+							"end": 207,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 11
+								},
+								"end": {
+									"line": 10,
+									"column": 18
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSVoidKeyword",
+								"start": 203,
+								"end": 207,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 14
+									},
+									"end": {
+										"line": 10,
+										"column": 18
+									}
+								}
+							}
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 170,
+								"end": 188
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " function-type value",
+							"start": 135,
+							"end": 157
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 267,
+					"end": 307,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 41
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 272,
+						"end": 273,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 6
+							},
+							"end": {
+								"line": 13,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 298,
+						"end": 306,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 32
+							},
+							"end": {
+								"line": 13,
+								"column": 40
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 299,
+								"end": 305,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 33
+									},
+									"end": {
+										"line": 13,
+										"column": 39
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 299,
+									"end": 300,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 33
+										},
+										"end": {
+											"line": 13,
+											"column": 34
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 300,
+									"end": 305,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 34
+										},
+										"end": {
+											"line": 13,
+											"column": 39
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 304,
+										"end": 305,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 38
+											},
+											"end": {
+												"line": 13,
+												"column": 39
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 304,
+											"end": 305,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 38
+												},
+												"end": {
+													"line": 13,
+													"column": 39
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " prettier-ignore ",
+								"start": 276,
+								"end": 297
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " glued block directive freezes the value it precedes",
+							"start": 211,
+							"end": 265
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 369,
+					"end": 413,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 11
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 374,
+						"end": 375,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 6
+							},
+							"end": {
+								"line": 16,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 404,
+						"end": 412,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 2
+							},
+							"end": {
+								"line": 18,
+								"column": 10
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 405,
+								"end": 411,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 3
+									},
+									"end": {
+										"line": 18,
+										"column": 9
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 405,
+									"end": 406,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 3
+										},
+										"end": {
+											"line": 18,
+											"column": 4
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 406,
+									"end": 411,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 4
+										},
+										"end": {
+											"line": 18,
+											"column": 9
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 410,
+										"end": 411,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 8
+											},
+											"end": {
+												"line": 18,
+												"column": 9
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 410,
+											"end": 411,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 8
+												},
+												"end": {
+													"line": 18,
+													"column": 9
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " prettier-ignore ",
+								"start": 380,
+								"end": 401
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " own-line block spelling behaves like the line spelling",
+							"start": 310,
+							"end": 367
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 465,
+					"end": 524,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 470,
+						"end": 471,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 6
+							},
+							"end": {
+								"line": 21,
+								"column": 7
+							}
+						},
+						"name": "E"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeLiteral",
+						"start": 497,
+						"end": 523,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 2
+							},
+							"end": {
+								"line": 26,
+								"column": 3
+							}
+						},
+						"members": [
+							{
+								"type": "TSPropertySignature",
+								"start": 502,
+								"end": 509,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 3
+									},
+									"end": {
+										"line": 24,
+										"column": 10
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 502,
+									"end": 503,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 3
+										},
+										"end": {
+											"line": 24,
+											"column": 4
+										}
+									},
+									"name": "x"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 503,
+									"end": 508,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 4
+										},
+										"end": {
+											"line": 24,
+											"column": 9
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 507,
+										"end": 508,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 8
+											},
+											"end": {
+												"line": 24,
+												"column": 9
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 507,
+											"end": 508,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 8
+												},
+												"end": {
+													"line": 24,
+													"column": 9
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								}
+							},
+							{
+								"type": "TSPropertySignature",
+								"start": 514,
+								"end": 519,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 4
+									},
+									"end": {
+										"line": 25,
+										"column": 9
+									}
+								},
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 514,
+									"end": 515,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 4
+										},
+										"end": {
+											"line": 25,
+											"column": 5
+										}
+									},
+									"name": "y"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 515,
+									"end": 518,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 5
+										},
+										"end": {
+											"line": 25,
+											"column": 8
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSLiteralType",
+										"start": 517,
+										"end": 518,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 7
+											},
+											"end": {
+												"line": 25,
+												"column": 8
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 517,
+											"end": 518,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 7
+												},
+												"end": {
+													"line": 25,
+													"column": 8
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 476,
+								"end": 494
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multi-line value keeps its verbatim layout",
+							"start": 416,
+							"end": 463
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
