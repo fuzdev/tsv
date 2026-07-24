@@ -464,27 +464,21 @@ impl<'a> Printer<'a> {
                 // A format-ignore directive in the `:`→element gap freezes a
                 // non-composite element type (`single_child_frozen`; a
                 // union/intersection element declines and freezes via its own walk —
-                // the union hang below already keeps its comments own-line). An
-                // own-line directive keeps its own line — the default emission below
-                // trails the first comment after `:`, a placement that reads as inert
-                // on the second pass — while a glued one stays inline before the slice.
+                // the union hang below already keeps its comments own-line). The
+                // directive — alone on its line by the placement floor — keeps its own
+                // line: the default emission below trails the first comment after `:`,
+                // a placement that reads as inert on the second pass.
                 if let Some(after_colon) = after_colon
                     && self.single_child_frozen(after_colon, n.element_type)
                 {
                     let frozen_doc = self.build_frozen_single_child_doc(n.element_type);
-                    if self.gap_has_own_line_directive(after_colon, type_start) {
-                        parts.push(d.text(":"));
-                        self.append_keyword_value_line_comments(
-                            &mut parts,
-                            after_colon,
-                            type_start,
-                            frozen_doc,
-                        );
-                    } else {
-                        parts.push(d.text(": "));
-                        parts.push(self.build_trailing_comments_hang_next(after_colon, type_start));
-                        parts.push(frozen_doc);
-                    }
+                    parts.push(d.text(":"));
+                    self.append_keyword_value_line_comments(
+                        &mut parts,
+                        after_colon,
+                        type_start,
+                        frozen_doc,
+                    );
                     return d.concat(&parts);
                 }
                 // Comments between `:` and the element type; a line comment breaks so it

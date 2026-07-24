@@ -70,7 +70,7 @@ impl<'a> Printer<'a> {
             // the relocated form would lose the freeze on the second pass. Routed for
             // composite children too: a union child freezes via its own leading-run
             // walk, but the annotation owns the directive's emission either way.
-            if self.gap_has_own_line_directive(colon_end, annotation.type_annotation.span().start) {
+            if self.member_gap_frozen(colon_end, annotation.type_annotation.span().start) {
                 return self.build_annotation_own_line_directive_doc(annotation);
             }
             // Uniform forced-continuation indent (`build_continuation_indent`): the

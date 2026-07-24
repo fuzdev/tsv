@@ -7,9 +7,4 @@
 			K   in   keyof T
 		]:   V;
 	};
-
-	// glued inside the bracket: the binding freezes whole
-	type B = {
-		[/* prettier-ignore */ K   in   keyof T]:   V;
-	};
 </script>

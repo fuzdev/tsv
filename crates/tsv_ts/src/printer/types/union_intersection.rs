@@ -264,16 +264,12 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
-        // Format-ignore leading run (Rule A): a directive in the out-of-span region
-        // before the union freezes the whole node (same-line glued) or its first member
-        // (own-line). Gated on the document-level flag — the in-span `has_comments` gate
-        // below cannot see an out-of-span directive. The `Whole` return must precede the
-        // hug / line-comment / single-member paths; `freeze_first` is applied in the main
-        // loop and the single-member branch.
+        // Format-ignore leading run (Rule A): an alone-on-line directive in the
+        // out-of-span region before the union freezes its first member. Gated on the
+        // document-level flag — the in-span `has_comments` gate below cannot see an
+        // out-of-span directive. `freeze_first` is applied in the main loop and the
+        // single-member branch.
         let leading_freeze = self.union_leading_run_freeze(union);
-        if let Some(LeadingRunFreeze::Whole) = leading_freeze {
-            return self.raw_source_range(union.span.start, union.span.end);
-        }
         let (freeze_first, freeze_first_multiline) =
             LeadingRunFreeze::first_member_flags(leading_freeze);
 
@@ -431,7 +427,7 @@ impl<'a> Printer<'a> {
         // A multi-line frozen member forces the broken one-member-per-line layout (Rule A
         // must-break): a frozen slice is `will_break`-opaque, so the force is explicit.
         // Seeded by the leading-run freeze; the loop ORs in any other frozen multi-line
-        // member (a glued freeze doesn't trip the own-line comment predicates).
+        // member.
         let mut freeze_multiline = freeze_first_multiline;
 
         for (i, t) in union.types.iter().enumerate() {
@@ -439,13 +435,12 @@ impl<'a> Printer<'a> {
             let type_end = t.span().end;
 
             // Rule A member freeze: the first member via a leading-run directive
-            // (`freeze_first`, before `span.start`) or the in-span leading gap after the
-            // `|` (`| /* c */⏎// prettier-ignore⏎member`); a later member via a GLUED
-            // directive in its gap (`a | /* prettier-ignore */ m`) — a later member's
-            // own-line directive routes the union to the line-comment path instead (the
-            // one-sided `union_has_own_line_member_comment` gate — broader than the
-            // intersection's both-sides-isolated gate), so only glued freezes reach
-            // later members here.
+            // (`freeze_first`, before `span.start`) or an alone-on-line directive in the
+            // in-span leading gap after the `|` (`|⏎// prettier-ignore⏎member`). A later
+            // member's alone-on-line directive routes the union to the line-comment path
+            // before this loop (the one-sided `union_has_own_line_member_comment` gate —
+            // broader than the placement floor), so the i>0 half of this ask is expected
+            // never to fire here; it stays for the one-predicate discipline.
             let frozen = self.list_member_frozen(union.span.start, union.types, i, freeze_first);
             if self.frozen_member_forces_break(frozen, t, member_parens) {
                 freeze_multiline = true;
@@ -635,14 +630,10 @@ impl<'a> Printer<'a> {
         let member_parens = union_member_parens(union.types.len());
 
         // Rule A first-member freeze in the forced-multiline path (an in-span comment
-        // routed here, plus a leading-run own-line directive before the union). Recomputed
-        // rather than threaded — gated on `has_format_ignore`, so it costs nothing in the
-        // common case. The `Whole` case never reaches here (returned early in
-        // `build_union_type_doc`).
-        let freeze_first = matches!(
-            self.union_leading_run_freeze(union),
-            Some(LeadingRunFreeze::FirstMember { .. })
-        );
+        // routed here, plus a leading-run alone-on-line directive before the union).
+        // Recomputed rather than threaded — gated on `has_format_ignore`, so it costs
+        // nothing in the common case.
+        let freeze_first = self.union_leading_run_freeze(union).is_some();
 
         for (i, t) in union.types.iter().enumerate() {
             let type_start = t.span().start;
@@ -1133,20 +1124,16 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
-        // Format-ignore leading run (Rule A), symmetric with `build_union_type_doc`: a
-        // same-line glued directive freezes the whole intersection; an own-line directive
-        // freezes only the first member. (There is no whole-intersection arm for the
-        // own-line case — the intersection first member behaves like every other honored
-        // list position.) Gated on the document-level flag; the in-span `has_comments`
+        // Format-ignore leading run (Rule A), symmetric with `build_union_type_doc`: an
+        // alone-on-line directive freezes only the first member. (There is no
+        // whole-intersection arm — the intersection first member behaves like every
+        // other honored list position.) Gated on the document-level flag; the in-span `has_comments`
         // gate below cannot see an out-of-span directive.
         let first_inner = intersection
             .types
             .first()
             .map(|t| unwrap_parenthesized(t).span());
         let leading_freeze = self.leading_run_freeze(intersection.span.start, first_inner);
-        if let Some(LeadingRunFreeze::Whole) = leading_freeze {
-            return self.raw_source_range(intersection.span.start, intersection.span.end);
-        }
         let (freeze_first, freeze_first_multiline) =
             LeadingRunFreeze::first_member_flags(leading_freeze);
 
@@ -1271,8 +1258,8 @@ impl<'a> Printer<'a> {
         }
 
         // Rule A first-member freeze: emit `types[0]` verbatim (paren-transparent). Frozen
-        // via a leading-run directive (`freeze_first`), an own-line directive in the
-        // in-span leading gap after a leading `&`, or a glued directive directly before it.
+        // via a leading-run directive (`freeze_first`) or an alone-on-line directive
+        // in the in-span leading gap after a leading `&`.
         let first_frozen =
             self.list_member_frozen(intersection.span.start, intersection.types, 0, freeze_first);
         if first_frozen {
@@ -1352,7 +1339,7 @@ impl<'a> Printer<'a> {
         // Rule A must-break, as in `build_union_type_doc`: a frozen slice is
         // `will_break`-opaque, so a multi-line frozen member forces the broken layout
         // explicitly. Seeded by the leading-run/first-gap freeze; the loop ORs in any
-        // glued-frozen multi-line later member.
+        // other frozen multi-line member.
         let mut freeze_multiline = freeze_first_multiline
             || self.frozen_member_forces_break(first_frozen, first_type, member_parens);
         for i in 1..intersection.types.len() {
@@ -1457,13 +1444,12 @@ impl<'a> Printer<'a> {
         // `has_format_ignore`; the `Whole` case is returned early upstream). The hoist
         // path (`strip_first_paren_leading`) already relocates the first member's inner
         // line comment, so a freeze there would double-print it — the hoist wins.
-        let freeze_first = matches!(
-            self.leading_run_freeze(
+        let freeze_first = self
+            .leading_run_freeze(
                 intersection.span.start,
                 types.first().map(|t| unwrap_parenthesized(t).span()),
-            ),
-            Some(LeadingRunFreeze::FirstMember { .. })
-        );
+            )
+            .is_some();
         let frozen_first = !strip_first_paren_leading
             && self.list_member_frozen(intersection.span.start, types, 0, freeze_first);
 
@@ -1826,10 +1812,9 @@ impl<'a> Printer<'a> {
         // Rule A member freeze (paren-transparent). The directive itself was emitted by
         // the post-separator run above. Which placements reach this width-decided path
         // is gated by `intersection_has_isolated_member_comment` — a directive isolated
-        // on BOTH sides routes to the line-comment path, so glued directives and
-        // own-line-but-forward-glued ones land here (a narrower routing than the
-        // union's one-sided `is_own_line_comment` gate; the freeze itself is
-        // placement-keyed identically in both families).
+        // on BOTH sides routes to the line-comment path first (a narrower routing than
+        // the union's one-sided `is_own_line_comment` gate); the freeze itself is
+        // placement-keyed identically in both families (alone-on-line only).
         if frozen {
             parts.push(self.build_frozen_member_doc(t, member_parens));
         } else {

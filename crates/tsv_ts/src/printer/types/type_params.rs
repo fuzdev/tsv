@@ -41,9 +41,11 @@ impl<'a> Printer<'a> {
     /// Whether any parameter is Rule-A-frozen with a multi-line slice — the
     /// always-inline path's analog of `build_angle_list_doc`'s
     /// `frozen_forces_break`: `has_expanding_comments_in_type_param_declaration`
-    /// keys on comment SHAPE, which a glued directive never trips, yet the frozen
-    /// member's own span can still cross lines — the `<…>` must expand (a
-    /// `verbatim_source_span` is `will_break`-opaque, so the forcing is explicit).
+    /// keys on comment SHAPE, which a MULTILINE-spelled alone-on-line directive
+    /// doesn't trip (`has_own_line_block_comments_in_bracket_list` skips multiline
+    /// blocks), yet the frozen member's own span can still cross lines — the `<…>`
+    /// must expand (a `verbatim_source_span` is `will_break`-opaque, so the forcing
+    /// is explicit).
     fn has_frozen_multiline_type_param(&self, decl: &TSTypeParameterDeclaration<'_>) -> bool {
         self.has_format_ignore
             && (0..decl.params.len()).any(|i| {
@@ -181,9 +183,10 @@ impl<'a> Printer<'a> {
                     CommentSpacing::Trailing,
                     CommentFilter::BlockOnly,
                 ));
-                // Rule A: a glued directive in the gap freezes this parameter (the
-                // always-inline path; own-line spellings route to the expansion
-                // builder via `has_expanding_comments_in_type_param_declaration`).
+                // Rule A: an alone-on-line directive in the gap freezes this
+                // parameter (the always-inline path; most such spellings route to
+                // the expansion builder via
+                // `has_expanding_comments_in_type_param_declaration` first).
                 let frozen =
                     self.list_item_frozen(decl.span.start + 1, &|j| decl.params[j].span, i);
                 parts.push(self.build_type_parameter_item_doc(param, frozen));
@@ -404,15 +407,14 @@ impl<'a> Printer<'a> {
         shell: &TSType<'_>,
     ) {
         let d = self.d();
-        // A format-ignore directive in the keyword→value gap (own-line or glued)
-        // freezes a non-composite value verbatim (`single_child_frozen`; a
-        // union/intersection value declines and freezes via its own leading-run walk).
-        // Checked against the UNWIDENED gap — the window ends at the shell's own span
-        // start, so an in-shell directive stays on the ordinary paths below. An
-        // own-line directive keeps its own line (`append_keyword_value_line_comments`
-        // already preserves own-line comments); a glued one stays inline before the
-        // slice. A conditional constraint keeps its required parens under the freeze
-        // (the same clarity/`infer` rule as the unfrozen arm below).
+        // An alone-on-line format-ignore directive in the keyword→value gap freezes a
+        // non-composite value verbatim (`single_child_frozen`; a union/intersection
+        // value declines and freezes via its own leading-run walk). Checked against
+        // the UNWIDENED gap — the window ends at the shell's own span start, so an
+        // in-shell directive stays on the ordinary paths below. The directive keeps
+        // its own line (`append_keyword_value_line_comments` already preserves
+        // own-line comments). A conditional constraint keeps its required parens
+        // under the freeze (the same clarity/`infer` rule as the unfrozen arm below).
         if let Some((keyword_end, _)) = comment_range
             && self.single_child_frozen(keyword_end, shell)
         {
@@ -661,9 +663,10 @@ impl<'a> Printer<'a> {
     /// header); the type-argument callers wrap it in a group.
     ///
     /// `item_span`/`item_doc` select the family's item type and per-item printer;
-    /// `item_doc` receives the item's Rule A `frozen` flag (an in-gap glued
-    /// format-ignore directive — own-line spellings route to the expansion builder
-    /// below before this runs) and emits the frozen verbatim slice when set.
+    /// `item_doc` receives the item's Rule A `frozen` flag (an alone-on-line
+    /// format-ignore directive in the item's gap — most spellings route to the
+    /// expansion builder below before this runs) and emits the frozen verbatim
+    /// slice when set.
     /// `frozen_forces_break` is asked only for frozen items: `true` (a multi-line
     /// frozen slice) forces the broken layout — a `verbatim_source_span` is
     /// `will_break`-opaque, so the forcing is explicit, and the emitted hardlines
@@ -708,8 +711,8 @@ impl<'a> Printer<'a> {
                 inner_parts.push(leading);
             }
 
-            // Rule A: a glued directive in this item's gap freezes the item (the
-            // directive itself was just emitted by the gap emitter above).
+            // Rule A: an alone-on-line directive in this item's gap freezes the item
+            // (the directive itself was just emitted by the gap emitter above).
             let frozen = has_comments && self.list_item_frozen(span.start + 1, &item_span, i);
             if frozen && frozen_forces_break(i) {
                 force_break = true;
@@ -834,7 +837,7 @@ impl<'a> Printer<'a> {
                 skip_delim,
             ));
 
-            // Rule A: an own-line (or glued) directive in this item's gap freezes the
+            // Rule A: an alone-on-line directive in this item's gap freezes the
             // item; the directive itself was just emitted by the leading run above.
             // No must-break question here — this layout is already all-hardline.
             let frozen = self.list_item_frozen(span.start + 1, &item_span, i);

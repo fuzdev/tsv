@@ -26,7 +26,9 @@ via `audit_signature.txt`). The same rule at the annotation head:
 `unformatted_ours_spaces.svelte` perturbs whitespace outside the frozen slice; tsv
 normalizes it to input (prettier does not — it relocates the directive).
 
-The glued and union-element placements match prettier — the ordinary
-[named_tuple_prettier_ignore_element](../named_tuple_prettier_ignore_element/) fixture.
+The union-element placement matches prettier — the ordinary
+[named_tuple_prettier_ignore_element](../named_tuple_prettier_ignore_element/) fixture;
+a glued directive is inert
+([type_heads_prettier_ignore_glued_inert](../type_heads_prettier_ignore_glued_inert_prettier_divergence/)).
 
 See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
