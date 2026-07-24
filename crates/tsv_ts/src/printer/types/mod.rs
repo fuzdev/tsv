@@ -48,6 +48,45 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 
+/// A resolved keyword→value head — see [`Printer::keyword_value_head`].
+pub(in crate::printer) struct KeywordValueHead<'t> {
+    /// The head gap's start — the keyword's end. `None` only at a site that PROVED its
+    /// whole construct comment-free and therefore never located the keyword (the
+    /// type-parameter constraint / default, whose `extends` / `=` byte scan is skipped
+    /// on that path — see [`KeywordValueHead::without_gap`]): with no gap there is no
+    /// comment to emit and no directive to honor.
+    pub(in crate::printer) gap_start: Option<u32>,
+    /// Whether an alone-on-line directive in the head gap freezes the child verbatim.
+    pub(in crate::printer) frozen: bool,
+    /// The head gap's end — the window the caller's gate measures AND its leading-run
+    /// emitter claims. The child's own start under a freeze, else the paren-strip hang
+    /// seam's (possibly widened) start.
+    pub(in crate::printer) value_start: u32,
+    /// The head's own child, pre-strip — the freeze slice and the trailing-lift anchor.
+    child: &'t TSType<'t>,
+    /// The type to build: the child itself under a freeze, else the hang seam's
+    /// (possibly paren-stripped) inner.
+    pub(in crate::printer) value_type: &'t TSType<'t>,
+}
+
+impl<'t> KeywordValueHead<'t> {
+    /// The head for a site that proved its construct comment-free and so never located
+    /// its keyword: no gap, hence no freeze (a directive is a comment) and no
+    /// paren-strip probe (the seam only fires on a leading LINE comment) — the window
+    /// collapses to the child's own start and the value is the child itself. Scan-free
+    /// by construction, which is the point: it is the head shape of the path that
+    /// deliberately pays nothing.
+    pub(in crate::printer) fn without_gap(child: &'t TSType<'t>) -> Self {
+        Self {
+            gap_start: None,
+            frozen: false,
+            value_start: child.span().start,
+            child,
+            value_type: child,
+        }
+    }
+}
+
 impl<'a> Printer<'a> {
     //
     // Main Type Doc Builders
@@ -133,30 +172,40 @@ impl<'a> Printer<'a> {
                             CommentSpacing::Leading,
                         ));
                     }
+                    // An alone-on-line format-ignore directive in the `is`→type gap
+                    // freezes a non-composite predicate type verbatim
+                    // (`single_child_frozen`; a union/intersection type declines and
+                    // freezes via its own leading-run walk). The frozen path keeps the
+                    // UNWIDENED window — an in-shell directive stays on the ordinary
+                    // paths — and the directive keeps its own line (an `is`-trailing
+                    // placement is inert, so the relocated form would lose the freeze
+                    // on the second pass). `head.frozen` joins the routing below so a
+                    // block-spelling alone-on-line directive takes the own-line branch.
                     // A redundant paren shell with a leading line-comment run
                     // (`x is (// c\n T)`, and the double-nested form) strips to the same
-                    // hang as bare `x is // c\n T`; route it through the shared keyword→value
-                    // seam so the paren form is idempotent (the outer paren would otherwise
-                    // hide the comment from the gate below). A mixed / trailing shell hoists
-                    // losslessly too — the trailing comment via `build_hang_value_doc`.
-                    let (value_start, value_type) =
-                        self.keyword_value_stripped_paren_hang(type_ann);
+                    // hang as bare `x is // c\n T`; the shared keyword→value seam routes
+                    // it so the paren form is idempotent (the outer paren would otherwise
+                    // hide the comment from the gate below). A mixed / trailing shell
+                    // hoists losslessly too — the trailing comment via
+                    // `build_hang_value_doc`.
+                    let head = is_end.map(|is_end| self.keyword_value_head(is_end, type_ann));
                     // A line comment or multiline block after `is` hangs the predicate
                     // type on the next line; a single-line block comment (own-line,
                     // trailing, or glued) collapses inline (the else branch). Prettier
                     // relocates the collapsed comment before `is`. See
                     // predicate_is_line_comment / predicate_is_own_line_block_comment.
-                    if let Some(is_end) = is_end
-                        && self.comments_force_own_line_between(is_end, value_start)
+                    if let Some((is_end, head)) = is_end.zip(head.as_ref())
+                        && (head.frozen
+                            || self.comments_force_own_line_between(is_end, head.value_start))
                     {
                         // Type position: a trailing block lifted from the shell trails
                         // the type inline before the body `{` (`defer = false`).
-                        let value_doc = self.build_hang_value_doc(type_ann, value_type, false);
+                        let value_doc = self.build_keyword_value_doc(head, false);
                         parts.push(d.text(" is"));
                         self.append_keyword_value_line_comments(
                             &mut parts,
                             is_end,
-                            value_start,
+                            head.value_start,
                             value_doc,
                         );
                     } else {
@@ -368,6 +417,41 @@ impl<'a> Printer<'a> {
                 // keeps a `[`/`]` glyph inside a comment from being read as the bracket).
                 let object_comments = bracket_open
                     .map(|bp| self.build_leading_comments_break_for_line(bracket_area_start, bp));
+                // An alone-on-line format-ignore directive in the `[`→index gap stays
+                // OWN-LINE inside the brackets — the trailing-hang emitter below would
+                // glue it to the `[` (`[// prettier-ignore`), an inert placement that
+                // loses the freeze on the second pass — and freezes a non-composite
+                // index verbatim (`single_child_frozen`; a composite index declines and
+                // freezes via its own leading-run walk). The brackets expand around the
+                // run: `A[⏎⇥// prettier-ignore⏎⇥K⏎]`.
+                if let Some(bp) = bracket_open
+                    && self.member_gap_frozen(bp + 1, index_type_start)
+                {
+                    let index_doc = self.build_routed_child_doc(i.index_type);
+                    let mut parts: DocBuf = smallvec![object_doc];
+                    if let Some(c) = object_comments {
+                        parts.push(c);
+                    }
+                    parts.push(d.text("["));
+                    self.append_keyword_value_line_comments(
+                        &mut parts,
+                        bp + 1,
+                        index_type_start,
+                        index_doc,
+                    );
+                    // Comments in the index→`]` gap trail the index line (a line
+                    // comment rides `line_suffix`, flushing before the `]`'s
+                    // hardline) — this route claims the whole bracket interior, so
+                    // nothing here may go unemitted.
+                    self.push_trailing_comments_in_range(
+                        &mut parts,
+                        i.index_type.span().end,
+                        i.span.end,
+                    );
+                    parts.push(d.hardline());
+                    parts.push(d.text("]"));
+                    return d.concat(&parts);
+                }
                 // A line comment (or multiline block) in the `[`→index gap breaks the
                 // index onto its own line so a `//` can't swallow it
                 // (indexed_access_line_comment). A single-line block comment (own-line,
@@ -412,7 +496,16 @@ impl<'a> Printer<'a> {
                 if let Some(c) = index_comments {
                     parts.push(c);
                 }
-                parts.extend([index_doc, d.text("]")]);
+                parts.push(index_doc);
+                // Comments in the index→`]` gap trail the index — previously unclaimed
+                // by any emitter here, a silent drop. The expanding-union index layout
+                // is comment-gated, so it never carries one of these.
+                self.push_trailing_comments_in_range(
+                    &mut parts,
+                    i.index_type.span().end,
+                    i.span.end,
+                );
+                parts.push(d.text("]"));
                 d.concat(&parts)
             }
             TSType::Rest(r) => {
@@ -742,6 +835,58 @@ impl<'a> Printer<'a> {
         defer: bool,
     ) -> DocId {
         self.with_stripped_paren_trailing(self.build_type_doc(inner), original, inner, defer)
+    }
+
+    /// Resolve a keyword→value head: the freeze verdict and the value window, together.
+    /// The `as`/`satisfies` keyword, the predicate `is`, the mapped-type `]:` value and
+    /// the alias `=` all face the same two-way choice —
+    ///
+    /// - **frozen** (an alone-on-line directive in the gap, `single_child_frozen`): the
+    ///   window is the child's OWN start, deliberately UNWIDENED, so an in-shell
+    ///   directive stays on the ordinary paths (`paren_interior_routed_inner` is the
+    ///   seam that honors those), and the value is the verbatim slice;
+    /// - **not frozen**: the shared paren-strip hang seam
+    ///   ([`Self::keyword_value_stripped_paren_hang`]) picks the window and the value.
+    ///
+    /// One resolver because the two answers must agree: `value_start` is both the gate's
+    /// window end and the emitter's claim end, and a head that derived them separately
+    /// could gate on one window while claiming another — a dropped or double-printed
+    /// comment. [`Self::build_keyword_value_doc`] is the matching value builder.
+    pub(in crate::printer) fn keyword_value_head<'t>(
+        &self,
+        gap_start: u32,
+        child: &'t TSType<'t>,
+    ) -> KeywordValueHead<'t> {
+        let frozen = self.single_child_frozen(gap_start, child);
+        let (value_start, value_type) = if frozen {
+            (child.span().start, child)
+        } else {
+            self.keyword_value_stripped_paren_hang(child)
+        };
+        KeywordValueHead {
+            gap_start: Some(gap_start),
+            frozen,
+            value_start,
+            child,
+            value_type,
+        }
+    }
+
+    /// The value doc for a resolved [`Self::keyword_value_head`]: the frozen verbatim
+    /// slice, or the hung value with any comment lifted from a stripped shell's trailing
+    /// gap appended ([`Self::build_hang_value_doc`] — `defer` per that seam, true at a
+    /// value position). Reads the child off the head, so no caller can pair a head with
+    /// the wrong node.
+    pub(in crate::printer) fn build_keyword_value_doc(
+        &self,
+        head: &KeywordValueHead<'_>,
+        defer: bool,
+    ) -> DocId {
+        if head.frozen {
+            self.build_frozen_single_child_doc(head.child)
+        } else {
+            self.build_hang_value_doc(head.child, head.value_type, defer)
+        }
     }
 
     /// Build a complete import type: the `import(<specifier>)` call plus its

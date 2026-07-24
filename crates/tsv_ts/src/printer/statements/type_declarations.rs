@@ -3,6 +3,7 @@
 
 use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 use crate::ast::internal::{self, TSType};
+use crate::printer::ignore::is_freeze_target;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue};
 use smallvec::smallvec;
@@ -212,6 +213,20 @@ impl<'a> Printer<'a> {
                 let kw_end = q.span.start + "typeof".len() as u32;
                 self.comments_force_own_line_between(kw_end, q.expr_name.span().start)
             }
+            // The `[`→index frozen-route bracket layout (an alone-on-line directive
+            // inside the brackets: `= A[⏎⇥// prettier-ignore⏎⇥K⏎]`) keeps the `[` on
+            // the `=` line — the brackets own the break. Gated on `has_format_ignore`
+            // so the directive-free common case pays no bracket scan.
+            TSType::IndexedAccess(i) if self.has_format_ignore => {
+                let index_start = i.index_type.span().start;
+                self.find_char_outside_comments(i.object_type.span().end, index_start, b'[')
+                    .is_some_and(|bp| self.member_gap_frozen(bp + 1, index_start))
+            }
+            // The paren-interior frozen-route array element
+            // (`= (⏎⇥// prettier-ignore⏎⇥T⏎)[]`) expands its own parens around the
+            // run — the shell owns the break (`paren_interior_routed_inner` self-gates
+            // on `has_format_ignore`).
+            TSType::Array(a) => self.paren_interior_routed_inner(a.element_type).is_some(),
             TSType::Literal(internal::TSLiteralType::TemplateLiteral(t)) => {
                 self.template_literal_type_breaks_for_comment(t)
             }
@@ -242,11 +257,25 @@ impl<'a> Printer<'a> {
         // the UNWIDENED window — an in-shell directive stays on the ordinary paths —
         // and the directive itself is emitted by the comment machinery below either
         // way (own-line comments already keep their own line here).
-        let frozen = self.single_child_frozen(eq_pos + 1, &decl.type_annotation);
-        let (type_start, value_type) = if frozen {
-            (decl.type_annotation.span().start, &decl.type_annotation)
+        let head = self.keyword_value_head(eq_pos + 1, &decl.type_annotation);
+        // An alone-on-line directive INSIDE a redundant paren shell
+        // (`type P = (⏎// prettier-ignore⏎{x:  1});`) hoists with the shell strip:
+        // the widened window routes the whole leading run through the force-break
+        // emission below (the directive keeps its own line) and the paren-stripped
+        // INNER freezes, converging in ONE pass to the same fixed point the bare
+        // authoring holds. Taken only when the inner actually freezes — a composite
+        // inner keeps the ordinary strip-hang seam, where its own leading-run walk
+        // (Rule A) reaches the same directive. It overrides the head seam's window,
+        // the one head that widens past a shell under a freeze.
+        let interior_frozen_inner = if head.frozen {
+            None
         } else {
-            self.keyword_value_stripped_paren_hang(&decl.type_annotation)
+            self.paren_interior_routed_inner(&decl.type_annotation)
+                .filter(|inner| is_freeze_target(inner))
+        };
+        let (type_start, value_type) = match interior_frozen_inner {
+            Some(inner) => (inner.span().start, inner),
+            None => (head.value_start, head.value_type),
         };
         let mut parts: DocBuf = smallvec![d.text(if lead_space { " =" } else { "=" })];
 
@@ -307,10 +336,17 @@ impl<'a> Printer<'a> {
             // lifted from the shell; type position, so a trailing block trails the value
             // inline before the `;` (`defer = false`). A frozen RHS is the verbatim
             // slice instead (redundant parens drop unless the shell holds a comment).
-            let type_doc = if frozen {
-                self.build_frozen_single_child_doc(&decl.type_annotation)
+            let type_doc = if interior_frozen_inner.is_some() {
+                // The frozen paren-stripped inner, with any trailing shell-gap
+                // comment lifted after it so the strip stays lossless.
+                self.with_stripped_paren_trailing(
+                    self.build_frozen_single_child_doc(value_type),
+                    &decl.type_annotation,
+                    value_type,
+                    false,
+                )
             } else {
-                self.build_hang_value_doc(&decl.type_annotation, value_type, false)
+                self.build_keyword_value_doc(&head, false)
             };
             let mut indent_content: DocBuf = smallvec![d.hardline()];
             indent_content.extend(indent_comment_parts);
@@ -352,9 +388,11 @@ impl<'a> Printer<'a> {
             // line or block spelling — always trips `force_break` over the same
             // window (`comments_force_own_line_between` catches every line comment;
             // `block_comment_isolated_own_line_between` is implied by the floor's
-            // two-sided newline checks for a block one).
+            // two-sided newline checks for a block one). The paren-interior freeze
+            // widens the window to the inner's start, so its directive trips the
+            // same gate.
             debug_assert!(
-                !frozen,
+                !head.frozen && interior_frozen_inner.is_none(),
                 "an alone-on-line directive always takes the force-break branch"
             );
             let build_value = || -> DocId { self.build_type_doc(value_type) };
