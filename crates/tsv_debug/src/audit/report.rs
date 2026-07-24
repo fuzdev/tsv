@@ -164,10 +164,11 @@ pub(crate) struct BlankDetail {
 /// `ignore_audit`'s audit-specific detail — the per-position aggregate the envelope carries
 /// verbatim. Like [`BlankDetail`] (kind / count / files), plus the canonical example's `node_type`
 /// (which AST node kind sits at the `{parent}.{field}` position — triage that the flat position key
-/// alone doesn't carry). Both kinds (`UNHONORED` / `PANIC`) are part of the gate — there is no
-/// report-only class — so `gated` is always `true`.
+/// alone doesn't carry). Every kind is part of the gate — there is no report-only class — so
+/// `gated` is always `true`.
 pub(crate) struct IgnoreDetail {
-    /// The verbatim finding-kind label — `UNHONORED` / `PANIC`.
+    /// The verbatim finding-kind label — `UNHONORED` / `TRAILING_FROZEN` / `OVERFROZEN` /
+    /// `UNSTABLE` / `PANIC`.
     pub(crate) kind_label: &'static str,
     /// How many injections hit this position.
     pub(crate) count: usize,
@@ -479,7 +480,8 @@ pub(crate) fn print_json(
                 }),
                 Detail::Ignore(d) => serde_json::json!({
                     "audit": f.audit,
-                    // `gate-failing` (ignore's PANIC) vs `informational` (UNHONORED, ratchet-graded).
+                    // `gate-failing` (ignore's PANIC) vs `informational` (every graded kind,
+                    // ratchet-graded).
                     "severity": f.severity.label(),
                     "kind": d.kind_label,
                     "shape": f.site,

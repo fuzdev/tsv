@@ -412,6 +412,46 @@ pub(crate) fn string_and_template_spans(
     out
 }
 
+/// Byte spans of every **regex literal** in `wire` — a perturbation-exclusion companion to
+/// [`string_and_template_spans`] for consumers whose payload is a *space edit* rather than a
+/// blank line. A regex body's spaces are pattern CONTENT (preserved verbatim by any formatter),
+/// so a doubled space there survives reformatting and reads as a false "preserved". The
+/// blank-injection audits don't need this: a regex literal cannot contain a raw newline, so an
+/// injected blank inside one is a parse error (rejected), never a finding.
+pub(crate) fn regex_literal_spans(source: &str, wire: &serde_json::Value) -> Vec<tsv_lang::Span> {
+    let map = Utf16ToByte::new(source);
+    let mut out = Vec::new();
+    collect_regex(wire, &map, &mut out);
+    out
+}
+
+/// Walk `wire` accumulating regex-literal spans (byte space). See [`regex_literal_spans`].
+fn collect_regex(node: &serde_json::Value, map: &Utf16ToByte, out: &mut Vec<tsv_lang::Span>) {
+    match node {
+        serde_json::Value::Object(obj) => {
+            // A regex literal — the only `Literal` carrying a `regex` property. The full span
+            // brackets the `/` delimiters and flags.
+            if obj.get("type").and_then(serde_json::Value::as_str) == Some("Literal")
+                && obj.get("regex").is_some()
+                && let Some((s, e)) = map.node_byte_span(node)
+            {
+                out.push(tsv_lang::Span::new(s as u32, e as u32));
+            }
+            for (k, v) in obj {
+                if k != "loc" {
+                    collect_regex(v, map, out);
+                }
+            }
+        }
+        serde_json::Value::Array(items) => {
+            for v in items {
+                collect_regex(v, map, out);
+            }
+        }
+        _ => {}
+    }
+}
+
 /// Walk `wire` accumulating the string-literal / template-quasi exclusion spans (byte space).
 /// See [`string_and_template_spans`].
 fn collect_string_template(
