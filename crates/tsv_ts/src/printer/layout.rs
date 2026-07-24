@@ -1,5 +1,5 @@
-//! Shared doc shapes for the "break after an operator/keyword, then hang-indent
-//! the continuation" layout family.
+//! Shared doc shapes: the bracketed list body, and the "break after an
+//! operator/keyword, then hang-indent the continuation" layout family.
 //!
 //! Prettier expresses this family with two distinct mechanisms, and the
 //! difference between them is load-bearing — they are NOT interchangeable:
@@ -24,6 +24,32 @@
 
 use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::{DocArena, DocId};
+
+/// Bracketed list body: `open` + indented `inner` + `close`. Width-decided
+/// (softlines, UNGROUPED — the caller supplies the group if it wants one)
+/// unless `force_break` — a Rule A multi-line frozen member — where hardlines
+/// substitute: they render identically to the broken group AND propagate the
+/// break to every enclosing group (a `verbatim_source_span` is
+/// `will_break`-opaque, so the forcing is explicit rather than propagated
+/// from the slice).
+pub(in crate::printer) fn bracketed_list_body(
+    d: &DocArena,
+    open: &'static str,
+    close: &'static str,
+    inner: DocId,
+    force_break: bool,
+) -> DocId {
+    if force_break {
+        let body = d.concat(&[d.hardline(), inner]);
+        return d.concat(&[d.text(open), d.indent(body), d.hardline(), d.text(close)]);
+    }
+    d.concat(&[
+        d.text(open),
+        d.indent_softline(inner),
+        d.softline(),
+        d.text(close),
+    ])
+}
 
 /// Break-after-operator hanging indent: `group(indent([line, content]))`.
 ///

@@ -4,7 +4,6 @@ use super::Printer;
 use super::helpers::{is_huggable_type, is_simple_type_arg, unwrap_parenthesized};
 use crate::ast::internal::{self, TSType};
 use smallvec::smallvec;
-use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
 impl<'a> Printer<'a> {
@@ -44,17 +43,41 @@ impl<'a> Printer<'a> {
         args: &internal::TSTypeParameterInstantiation<'_>,
         has_comments: bool,
     ) -> DocId {
+        let type_doc = self.build_type_doc(&args.params[0]);
+        self.build_single_type_arg_inline_with(args, has_comments, type_doc)
+    }
+
+    /// [`Self::build_single_type_arg_inline`] with a caller-built argument doc — the
+    /// shared emission for the instantiation curly-hug arm, whose argument doc comes
+    /// from `try_build_hugging_curly_type_doc` rather than `build_type_doc`.
+    /// Applies the Rule A glued-directive freeze itself (swapping `type_doc` for the
+    /// frozen verbatim slice), so every single-argument hug path honors it.
+    pub(in crate::printer) fn build_single_type_arg_inline_with(
+        &self,
+        args: &internal::TSTypeParameterInstantiation<'_>,
+        has_comments: bool,
+        type_doc: DocId,
+    ) -> DocId {
         let d = self.d();
         let param = &args.params[0];
+        // Rule A: a glued directive directly before the sole argument freezes it
+        // whole (own-line spellings route to the expansion builder before this).
+        let frozen =
+            has_comments && self.list_item_frozen(args.span.start + 1, &|_| param.span(), 0);
+        let arg_doc = if frozen {
+            self.build_frozen_list_member_doc(param)
+        } else {
+            type_doc
+        };
         let mut parts = smallvec![d.text("<")];
         if has_comments {
             let after_open = args.span.start + 1; // After the opening `<`
             let before_close = args.span.end - 1; // Before the closing `>`
             self.append_leading_inline_block_comments(&mut parts, after_open, param.span().start);
-            parts.push(self.build_type_doc(param));
+            parts.push(arg_doc);
             self.append_trailing_inline_block_comments(&mut parts, param.span().end, before_close);
         } else {
-            parts.push(self.build_type_doc(param));
+            parts.push(arg_doc);
         }
         parts.push(d.text(">"));
         d.concat(&parts)
@@ -167,80 +190,23 @@ impl<'a> Printer<'a> {
         }
 
         // Matches Prettier's group([<, indent([softline, join([",", line], args)]), softline, >])
-        self.build_type_arguments_doc_multi_arg(args, has_comments)
-    }
-
-    /// Build multi-arg type arguments with group-based breaking.
-    ///
-    /// Matches Prettier's `group([<, indent([softline, join([",", line], args)]), softline, >])`.
-    /// Used by `build_type_arguments_doc` for 2+ type arguments and for a non-hugging
-    /// single argument.
-    /// `has_comments` is the caller's whole-`<…>` window answer. When `false` the whole
-    /// per-argument comment apparatus is dead: every gap is provably comment-free, so
-    /// neither the leading/trailing searches nor the `find_list_comma` byte scan that
-    /// bounds them runs. The scan exists only to bound those ranges — the printed `,` is
-    /// static text — so a comment-free `Map<K, V>` needs no source scanning at all.
-    fn build_type_arguments_doc_multi_arg(
-        &self,
-        args: &internal::TSTypeParameterInstantiation<'_>,
-        has_comments: bool,
-    ) -> DocId {
-        let d = self.d();
-        let mut inner_parts = DocBuf::new();
-        let mut prev_end = args.span.start + 1; // After the opening `<`
-
-        for (i, param) in args.params.iter().enumerate() {
-            let param_start = param.span().start;
-            let is_last = i == args.params.len() - 1;
-
-            let mut arg_parts = DocBuf::new();
-
-            if has_comments {
-                // Add leading block comments before this type argument
-                self.append_leading_inline_block_comments(&mut arg_parts, prev_end, param_start);
-            }
-
-            arg_parts.push(self.build_type_arg_doc(param, true));
-
-            if has_comments {
-                // Add trailing block comments after this type argument (before comma)
-                let param_end = param.span().end;
-                prev_end = if i + 1 < args.params.len() {
-                    let next_start = args.params[i + 1].span().start;
-                    let comma_pos = self.find_list_comma(param_end, next_start);
-                    self.append_trailing_inline_block_comments(
-                        &mut arg_parts,
-                        param_end,
-                        comma_pos,
-                    );
-                    comma_pos + 1 // After comma — leading comments picked up next iteration
+        // via the shared width-decided core; each argument renders in multi-arg
+        // (hugging) mode — also for a non-hugging single argument, preserving the
+        // pre-merge behavior of the type-position path.
+        d.group(self.build_angle_list_doc(
+            args.span,
+            args.params.len(),
+            |i| args.params[i].span(),
+            |i, frozen| {
+                if frozen {
+                    self.build_frozen_list_member_doc(&args.params[i])
                 } else {
-                    let before_close = args.span.end - 1;
-                    self.append_trailing_inline_block_comments(
-                        &mut arg_parts,
-                        param_end,
-                        before_close,
-                    );
-                    before_close
-                };
-            }
-
-            if i > 0 {
-                inner_parts.push(d.line());
-            }
-            inner_parts.push(d.concat(&arg_parts));
-            if !is_last {
-                inner_parts.push(d.text(","));
-            }
-            // Note: type arguments don't get trailing commas (unlike params)
-        }
-
-        d.group(d.concat(&[
-            d.text("<"),
-            d.indent_softline(d.concat(&inner_parts)),
-            d.softline(),
-            d.text(">"),
-        ]))
+                    self.build_type_arg_doc(&args.params[i], true)
+                }
+            },
+            |i| self.frozen_list_member_multiline(&args.params[i]),
+            has_comments,
+        ))
     }
 
     /// Build doc for type arguments with expanding comments (line or own-line block).
@@ -252,6 +218,19 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         // Type-position type arguments render each argument with `build_type_arg_doc`;
         // the layout is shared with call/`new`-expression arguments.
-        self.build_angle_list_with_line_comments(args, true)
+        let is_multi = args.params.len() > 1;
+        self.build_angle_list_with_line_comments(
+            args.span,
+            args.params.len(),
+            |i| args.params[i].span(),
+            |i, frozen| {
+                if frozen {
+                    self.build_frozen_list_member_doc(&args.params[i])
+                } else {
+                    self.build_type_arg_doc(&args.params[i], is_multi)
+                }
+            },
+            true,
+        )
     }
 }

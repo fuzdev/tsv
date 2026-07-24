@@ -19,7 +19,7 @@ use crate::ast::internal::{
 };
 use crate::printer::CommentVec;
 use crate::printer::analysis::has_newline_after_position;
-use crate::printer::layout::hang_after_operator;
+use crate::printer::layout::{bracketed_list_body, hang_after_operator};
 use smallvec::smallvec;
 use tsv_lang::INDENT;
 use tsv_lang::doc::DocBuf;
@@ -1031,7 +1031,11 @@ impl<'a> Printer<'a> {
         // comment there the expansion checks are provably false and the list is
         // plain elements joined by `,` + line (renders identically — the skipped
         // pushes are empty comment docs and the empty after-comma buffer).
-        if !self.has_comments_to_emit_between(t.span.start, t.span.end) {
+        // **On-page**: a layout builder's zero-comment fast gate (an emit-keyed
+        // answer would blind every gate it guards — same axis note as
+        // `build_type_arguments_doc`; equivalent today, since ownership is set only
+        // in expression position and a `[…]` window holds types).
+        if !self.has_comments_on_page_between(t.span.start, t.span.end) {
             let mut parts = DocBuf::new();
             for (i, elem) in t.element_types.iter().enumerate() {
                 if i > 0 {
@@ -1040,8 +1044,7 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(self.build_tuple_element_doc(elem));
             }
-            let inner = d.concat(&[d.softline(), d.concat(&parts)]);
-            return d.group(d.concat(&[d.text("["), d.indent(inner), d.softline(), d.text("]")]));
+            return d.group(bracketed_list_body(d, "[", "]", d.concat(&parts), false));
         }
 
         // Check for comments that force expansion: line comments, multiline block comments,
@@ -1068,6 +1071,7 @@ impl<'a> Printer<'a> {
         // Build element docs with commas, inline block comments, and line breaks
         let mut parts = DocBuf::new();
         let mut prev_end = t.span.start + 1; // After opening `[`
+        let mut force_break = false;
         // Block comment trailing the last element after its source comma — preserved
         // past where the comma was (no trailing comma; prettier relocates before; see
         // conformance_prettier.md §Comment relocation).
@@ -1083,7 +1087,19 @@ impl<'a> Printer<'a> {
                 self.build_inline_comments_between_doc_trailing_space(prev_end, elem.span().start);
             parts.push(leading);
 
-            parts.push(self.build_tuple_element_doc(elem));
+            // Rule A: a glued directive in this element's gap freezes it (the
+            // directive itself was just emitted by the gap emitter above); a
+            // multi-line frozen slice forces the broken layout (a verbatim span is
+            // `will_break`-opaque, so the forcing is explicit).
+            let frozen = self.list_member_frozen(t.span.start + 1, t.element_types, i, false);
+            if frozen {
+                if self.frozen_list_member_multiline(elem) {
+                    force_break = true;
+                }
+                parts.push(self.build_frozen_list_member_doc(elem));
+            } else {
+                parts.push(self.build_tuple_element_doc(elem));
+            }
 
             let elem_end = elem.span().end;
             prev_end = if i + 1 < t.element_types.len() {
@@ -1104,10 +1120,10 @@ impl<'a> Printer<'a> {
         }
 
         // Width-aware breaking: inline if fits, one-per-line if not (no trailing
-        // comma; trailingComma: 'none').
-        let inner = d.concat(&[d.softline(), d.concat(&parts), d.concat(&last_after_comma)]);
-
-        d.group(d.concat(&[d.text("["), d.indent(inner), d.softline(), d.text("]")]))
+        // comma; trailingComma: 'none'). A multi-line frozen element forces the
+        // broken form (see `bracketed_list_body`).
+        let inner = d.concat(&[d.concat(&parts), d.concat(&last_after_comma)]);
+        d.group(bracketed_list_body(d, "[", "]", inner, force_break))
     }
 
     /// Build tuple type with expanding comments (line comments or own-line block comments)
@@ -1136,8 +1152,16 @@ impl<'a> Printer<'a> {
             // bracket-line prefix below).
             let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
             let leading = self.build_leading_comments_multiline(prev_end, elem_start, skip_delim);
-            inner_parts
-                .push(self.build_list_element_group(leading, self.build_tuple_element_doc(elem)));
+            // Rule A: an own-line (or glued) directive in this element's gap freezes
+            // it; the directive itself was just emitted by the leading run above.
+            // No must-break question — this layout is already all-hardline.
+            let frozen = self.list_member_frozen(t.span.start + 1, t.element_types, i, false);
+            let elem_doc = if frozen {
+                self.build_frozen_list_member_doc(elem)
+            } else {
+                self.build_tuple_element_doc(elem)
+            };
+            inner_parts.push(self.build_list_element_group(leading, elem_doc));
 
             if !is_last {
                 let next_start = t.element_types[i + 1].span().start;
