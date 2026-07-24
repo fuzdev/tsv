@@ -52,7 +52,7 @@ an element are treated as ordinary comments.
 
 ## `prettier-ignore` compatibility
 
-Because tsv is a drop-in replacement for prettier, it also honors the
+For compatibility with prettier-authored code, tsv also honors the
 `prettier-ignore` family — `prettier-ignore`, `prettier-ignore-start`, and
 `prettier-ignore-end` — identically. `format-ignore` is the canonical tsv
 spelling; `prettier-ignore` is kept so existing codebases keep working unchanged.

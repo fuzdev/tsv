@@ -1,0 +1,908 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 867,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an own-line directive before an intersection freezes only the FIRST member (Rule A:",
+			"start": 20,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the first member behaves like every honored list position); the separators are",
+			"start": 108,
+			"end": 189,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " parent-owned and the later members reformat normally. prettier instead freezes the",
+			"start": 191,
+			"end": 276,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " WHOLE intersection verbatim (see prettier_variant_frozen) — it has no intersection",
+			"start": 278,
+			"end": 363,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " printer, so its ignore handling is an unmaintained emergent passthrough",
+			"start": 365,
+			"end": 439,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 452,
+			"end": 470,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " non-object members: freezing the first member is a visual no-op, the rest reformat",
+			"start": 504,
+			"end": 589,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 602,
+			"end": 620,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a leading & normalizes away on a multi-member intersection (the first member is a2's",
+			"start": 639,
+			"end": 726,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " sibling, not a one-element wrapper); prettier keeps the authored leading & verbatim",
+			"start": 728,
+			"end": 814,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 827,
+			"end": 845,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 866,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 857,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 441,
+					"end": 501,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 30
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 446,
+						"end": 447,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 6
+							},
+							"end": {
+								"line": 7,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 473,
+						"end": 500,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 2
+							},
+							"end": {
+								"line": 9,
+								"column": 29
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeLiteral",
+								"start": 473,
+								"end": 478,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 7
+									}
+								},
+								"members": [
+									{
+										"type": "TSPropertySignature",
+										"start": 474,
+										"end": 477,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 3
+											},
+											"end": {
+												"line": 9,
+												"column": 6
+											}
+										},
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 474,
+											"end": 475,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 3
+												},
+												"end": {
+													"line": 9,
+													"column": 4
+												}
+											},
+											"name": "a"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 475,
+											"end": 477,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 4
+												},
+												"end": {
+													"line": 9,
+													"column": 6
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSLiteralType",
+												"start": 476,
+												"end": 477,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 5
+													},
+													"end": {
+														"line": 9,
+														"column": 6
+													}
+												},
+												"literal": {
+													"type": "Literal",
+													"start": 476,
+													"end": 477,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 5
+														},
+														"end": {
+															"line": 9,
+															"column": 6
+														}
+													},
+													"value": 1,
+													"raw": "1"
+												}
+											}
+										}
+									}
+								]
+							},
+							{
+								"type": "TSTypeLiteral",
+								"start": 481,
+								"end": 489,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 10
+									},
+									"end": {
+										"line": 9,
+										"column": 18
+									}
+								},
+								"members": [
+									{
+										"type": "TSPropertySignature",
+										"start": 483,
+										"end": 487,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 12
+											},
+											"end": {
+												"line": 9,
+												"column": 16
+											}
+										},
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 483,
+											"end": 484,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 12
+												},
+												"end": {
+													"line": 9,
+													"column": 13
+												}
+											},
+											"name": "b"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 484,
+											"end": 487,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 13
+												},
+												"end": {
+													"line": 9,
+													"column": 16
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSLiteralType",
+												"start": 486,
+												"end": 487,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 15
+													},
+													"end": {
+														"line": 9,
+														"column": 16
+													}
+												},
+												"literal": {
+													"type": "Literal",
+													"start": 486,
+													"end": 487,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 15
+														},
+														"end": {
+															"line": 9,
+															"column": 16
+														}
+													},
+													"value": 2,
+													"raw": "2"
+												}
+											}
+										}
+									}
+								]
+							},
+							{
+								"type": "TSTypeLiteral",
+								"start": 492,
+								"end": 500,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 21
+									},
+									"end": {
+										"line": 9,
+										"column": 29
+									}
+								},
+								"members": [
+									{
+										"type": "TSPropertySignature",
+										"start": 494,
+										"end": 498,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 23
+											},
+											"end": {
+												"line": 9,
+												"column": 27
+											}
+										},
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 494,
+											"end": 495,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 23
+												},
+												"end": {
+													"line": 9,
+													"column": 24
+												}
+											},
+											"name": "c"
+										},
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 495,
+											"end": 498,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 24
+												},
+												"end": {
+													"line": 9,
+													"column": 27
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSLiteralType",
+												"start": 497,
+												"end": 498,
+												"loc": {
+													"start": {
+														"line": 9,
+														"column": 26
+													},
+													"end": {
+														"line": 9,
+														"column": 27
+													}
+												},
+												"literal": {
+													"type": "Literal",
+													"start": 497,
+													"end": 498,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 26
+														},
+														"end": {
+															"line": 9,
+															"column": 27
+														}
+													},
+													"value": 3,
+													"raw": "3"
+												}
+											}
+										}
+									}
+								]
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 452,
+								"end": 470
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line directive before an intersection freezes only the FIRST member (Rule A:",
+							"start": 20,
+							"end": 106
+						},
+						{
+							"type": "Line",
+							"value": " the first member behaves like every honored list position); the separators are",
+							"start": 108,
+							"end": 189
+						},
+						{
+							"type": "Line",
+							"value": " parent-owned and the later members reformat normally. prettier instead freezes the",
+							"start": 191,
+							"end": 276
+						},
+						{
+							"type": "Line",
+							"value": " WHOLE intersection verbatim (see prettier_variant_frozen) — it has no intersection",
+							"start": 278,
+							"end": 363
+						},
+						{
+							"type": "Line",
+							"value": " printer, so its ignore handling is an unmaintained emergent passthrough",
+							"start": 365,
+							"end": 439
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 591,
+					"end": 636,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 15
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 596,
+						"end": 597,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 623,
+						"end": 635,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 2
+							},
+							"end": {
+								"line": 14,
+								"column": 14
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 623,
+								"end": 625,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 4
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 623,
+									"end": 625,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 4
+										}
+									},
+									"name": "a1"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 628,
+								"end": 630,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 7
+									},
+									"end": {
+										"line": 14,
+										"column": 9
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 628,
+									"end": 630,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 7
+										},
+										"end": {
+											"line": 14,
+											"column": 9
+										}
+									},
+									"name": "a2"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 633,
+								"end": 635,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 12
+									},
+									"end": {
+										"line": 14,
+										"column": 14
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 633,
+									"end": 635,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 12
+										},
+										"end": {
+											"line": 14,
+											"column": 14
+										}
+									},
+									"name": "c1"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 602,
+								"end": 620
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " non-object members: freezing the first member is a visual no-op, the rest reformat",
+							"start": 504,
+							"end": 589
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 816,
+					"end": 856,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 10
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 821,
+						"end": 822,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 6
+							},
+							"end": {
+								"line": 18,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 848,
+						"end": 855,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 2
+							},
+							"end": {
+								"line": 20,
+								"column": 9
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 848,
+								"end": 850,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 4
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 848,
+									"end": 850,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 2
+										},
+										"end": {
+											"line": 20,
+											"column": 4
+										}
+									},
+									"name": "a1"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 853,
+								"end": 855,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 7
+									},
+									"end": {
+										"line": 20,
+										"column": 9
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 853,
+									"end": 855,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 7
+										},
+										"end": {
+											"line": 20,
+											"column": 9
+										}
+									},
+									"name": "a2"
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 827,
+								"end": 845
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a leading & normalizes away on a multi-member intersection (the first member is a2's",
+							"start": 639,
+							"end": 726
+						},
+						{
+							"type": "Line",
+							"value": " sibling, not a one-element wrapper); prettier keeps the authored leading & verbatim",
+							"start": 728,
+							"end": 814
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -1298,9 +1298,9 @@ Prettier has multiple stable forms for comment positioning. tsv normalizes to a 
 
 ### Format-ignore directive
 
-A comment can suppress formatting of the construct that follows it. tsv honors its own tool-neutral `format-ignore` family — `<!-- format-ignore -->`, `// format-ignore`, `/* format-ignore */`, and the range markers `format-ignore-start` / `format-ignore-end` — **in addition to** prettier's `prettier-ignore` family, which tsv keeps for drop-in compatibility (corpus files use it). Recognition is centralized in `tsv_lang::is_format_ignore_directive` and the two range predicates, shared across the TypeScript, CSS, and Svelte printers.
+A comment can suppress formatting of the construct that follows it. tsv honors its own tool-neutral `format-ignore` family — `<!-- format-ignore -->`, `// format-ignore`, `/* format-ignore */`, and the range markers `format-ignore-start` / `format-ignore-end` — **in addition to** prettier's `prettier-ignore` family, which tsv keeps for compatibility with prettier-authored code (corpus files use it). Recognition is centralized in `tsv_lang::is_format_ignore_directive` and the two range predicates, shared across the TypeScript, CSS, and Svelte printers.
 
-The `prettier-ignore` family matches prettier exactly (both emit the construct raw), so it needs no divergence fixture of its own. The `format-ignore` family is tsv-native: prettier doesn't recognize it, so prettier reformats the construct while tsv preserves it — that difference is the divergence. Most fixtures pair the spellings in one input: a `prettier-ignore`d construct (preserved by both tools, so unchanged in `output_prettier`) sits beside a `format-ignore`d one (reformatted only by prettier), making the `format-ignore` construct the sole divergence and doubling as a drop-in-compat check. The `basic` (template node) and `js_css` (embedded `<script>` + `<style>`) Svelte fixtures carry this control, as do both standalone fixtures.
+For a whole-construct freeze the `prettier-ignore` family matches prettier (both emit the construct raw), so those need no divergence fixture of their own; the union / intersection type *member* positions are where tsv follows its own rule (cataloged in **On union / intersection type members** below, where tsv freezes the first member of an intersection rather than the whole node, preserves the directive's authored position, holds the union's per-line layout, or stays inert to a trailing directive). The `format-ignore` family is tsv-native: prettier doesn't recognize it, so prettier reformats the construct while tsv preserves it — that difference is the divergence. Most fixtures pair the spellings in one input: a `prettier-ignore`d construct (preserved by both tools, so unchanged in `output_prettier`) sits beside a `format-ignore`d one (reformatted only by prettier), making the `format-ignore` construct the sole divergence and doubling as a prettier-compatibility check. The `basic` (template node) and `js_css` (embedded `<script>` + `<style>`) Svelte fixtures carry this control, as do both standalone fixtures.
 
 - `format-ignore` in `<script>` / `<style>` — ◆design_choice — [js_css](../tests/fixtures/svelte/syntax/format_ignore/js_css_prettier_divergence/)
 - `format-ignore` template element — ◆design_choice — [basic](../tests/fixtures/svelte/syntax/format_ignore/basic_prettier_divergence/)
@@ -1314,6 +1314,64 @@ The first five are Svelte-embedded; the last two pin the **standalone**
 `.ts` / `.css` paths (acorn-typescript / `parseCss` + `tsv_ts` / `tsv_css`
 directly), so the directive is covered in every language outside a Svelte host
 too.
+
+**On union / intersection type members.** The ignore directives also target
+individual **members** of a union or intersection type under one symmetric rule
+(**Rule A — list-item freeze**), where **placement keys the freeze, not the comment's
+spelling** (an own-line block comment behaves like an own-line line comment): an
+own-line directive — in the leading gap or between members — freezes the **following**
+member, the first member and every later member identically, in unions and
+intersections alike; a same-line glued block directive before the value freezes the
+**whole** node; a trailing directive is inert. A redundant paren around a frozen member
+is transparent (the inner node is frozen, the clarity paren re-synthesized outside the
+frozen slice; a fully redundant paren is dropped). This is the same behavior every
+existing honored list position already carries — a directive between `{` and the first
+class member freezes that member, not the body. The ordinary member-freeze fixtures
+`union_prettier_ignore_first_member`, `union_prettier_ignore_between_members`, and
+`union_prettier_ignore_glued_whole` match prettier; tsv diverges where freezing only the
+first intersection member, preserving the author's directive position, holding the
+union's per-line layout, or refusing a *trailing* directive is more defensible:
+
+- First member of an **intersection** — ◆design_choice ◆prettier_bug — an own-line
+  directive freezes only the first member (Rule A), the separators are parent-owned and
+  the later members reformat; a leading `&` on a multi-member intersection normalizes
+  away. Prettier freezes the **whole** intersection verbatim — it has no intersection
+  printer, so its handling is an unmaintained emergent passthrough (and not even a stable
+  contract: the between-members entry below shows it losing the freeze at its own fixed
+  point). tsv keeps `input.svelte`; the fully-frozen `prettier_variant_frozen` is
+  prettier-stable but tsv normalizes it to input —
+  [intersection first member](../tests/fixtures/typescript/types/intersection_prettier_ignore_first_member_prettier_divergence/)
+- Own-line directive between **intersection** members — ◆comment_preservation ◆prettier_bug —
+  tsv keeps the directive own-line and freezes only the following member; prettier
+  relocates it (pass 1 trails the preceding `&`, still freezing the member — the recorded
+  `output_prettier`) and its **fixed point** collapses the intersection inline, floating
+  the directive to the statement end and **losing the freeze** (non-idempotent, pinned via
+  `audit_signature.txt`) — [intersection between members](../tests/fixtures/typescript/types/intersection_prettier_ignore_between_members_prettier_divergence/)
+- Multi-line frozen union member — ◆design_choice — tsv keeps the union broken one member
+  per line (its layout whenever a member spans lines); prettier glues the next member onto
+  the frozen slice's last line (`} | (b1 & b2)`) — [multiline member](../tests/fixtures/typescript/types/union_prettier_ignore_multiline_member_prettier_divergence/)
+- Trailing directive (`| a1&a2 // prettier-ignore`) — ◆design_choice — prettier freezes the
+  **preceding** member backward; tsv is permanently **inert** to a trailing directive (both
+  members reformat normally), honoring a directive only where it **precedes** the node. The
+  `prettier_variant_frozen` control passes today and pins that tsv never starts honoring
+  this position, and that a trailing directive must not freeze the **following** member —
+  [trailing inert](../tests/fixtures/typescript/types/union_prettier_ignore_trailing_inert_prettier_divergence/)
+- `format-ignore` on a union member — ◆design_choice — tsv honors `// format-ignore` at the
+  member position identically to `// prettier-ignore`; prettier recognizes only its own
+  family and reformats the member (paired with a `prettier-ignore` control) —
+  [union format-ignore](../tests/fixtures/typescript/types/union_format_ignore_prettier_divergence/)
+- Frozen member with a paren-**shell** comment — ◆comment_preservation — a frozen
+  **redundant**-paren member whose shell holds a comment (`(/* keep */ a1)`) is kept
+  verbatim WITH its paren, so the comment survives; prettier strips the redundant paren and
+  relocates the comment (`/* keep */ a1`). Comment preservation outranks redundant-paren
+  removal under a freeze —
+  [paren shell comment](../tests/fixtures/typescript/types/union_prettier_ignore_paren_shell_comment_prettier_divergence/)
+- **Single-member** union under a freeze — ◆design_choice — a 1-element union collapses (drops
+  its `|`) when reformatted, so a member-only freeze is non-idempotent. tsv keeps the `|` for a
+  **leaf / object** sole member (`| {a:1}`, idempotent) where prettier drops it (`{a:1}`); a
+  **composite** sole member is transparent (tsv collapses and applies Rule A to the inner
+  Union/Intersection, so `| a1&a2` → `a1 & a2`, the intersection-first-member behavior) —
+  [single member](../tests/fixtures/typescript/types/union_prettier_ignore_single_member_prettier_divergence/)
 
 See [directives.md](./directives.md) for the user-facing reference.
 
