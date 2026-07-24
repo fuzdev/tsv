@@ -163,8 +163,9 @@ The mechanized discovery of unhonored `// prettier-ignore` / `format-ignore` pos
 #   4 trailing inert  — the directive appended to the END of the preceding line instead
 #                       freezes nothing (else TRAILING_FROZEN — the decided placement
 #                       floor: content before a directive on its line ⇒ inert). Skipped
-#                       after an opening delimiter `{`/`[`/`(`/`<`, where trailing is
-#                       decided FORWARD-BINDING (both tools freeze the first member).
+#                       after an opening delimiter `{`/`[`/`(`/`<` — no preceding sibling
+#                       on the line, so "trailing" is the wrong class there: decided
+#                       forward-binding at `{`, an open decision at the rest.
 # Checks 2-4 run only on the span-maximal node beginning on each line — the directive
 # binds to the OUTERMOST construct beginning there, so a narrower same-line candidate
 # would grade that decided wider freeze as a finding. Honoring stays per-candidate.

@@ -42,9 +42,9 @@
 //! 4. **Trailing inertness** ([`IgnoreKind::TrailingFrozen`]) — the directive appended to the
 //!    END of the preceding line instead must freeze nothing: the decided placement floor
 //!    (content before a directive on its line ⇒ inert). Skipped after an opening delimiter
-//!    (`{` / `[` / `(` / `<`), where a trailing directive is decided FORWARD-BINDING, not
-//!    inert — both tools freeze the first member after `{ // prettier-ignore` (prettier
-//!    relocates the directive own-line, tsv preserves its position).
+//!    (`{` / `[` / `(` / `<`), where there is no preceding sibling on the line so "trailing"
+//!    is the wrong classification — decided FORWARD-BINDING at `{` (both tools freeze the
+//!    first member; see [`FORWARD_BINDING_LINE_ENDS`]), an open decision at the rest.
 //!
 //! The companion checks (2–4) run only on the **span-maximal node beginning on each line**: the
 //! directive is inserted above the whole line, so it binds to the OUTERMOST construct beginning
@@ -589,12 +589,15 @@ fn sibling_mutant(
     changed.then_some(out)
 }
 
-/// The characters a preceding line may END with that make a trailing directive FORWARD-BINDING
-/// rather than inert: after an opening delimiter there is no preceding sibling on the line, and
-/// both tools bind the directive to the FIRST member (`{ // prettier-ignore` freezes the first
-/// statement/property — prettier relocates the directive own-line, tsv preserves its position).
-/// The trailing-inertness check skips these placements; everything else — separators, complete
-/// statements, a trailing `=` (the fixture-pinned after-equals decision) — asserts inert.
+/// The characters a preceding line may END with that exempt a placement from the
+/// trailing-inertness assertion: after an opening delimiter there is no preceding sibling on the
+/// line, so "trailing" is the wrong classification. At `{` the forward binding is DECIDED — both
+/// tools freeze the first statement/property after `{ // prettier-ignore` (prettier relocates
+/// the directive own-line, tsv preserves its position; docs/directives.md §Placement). At
+/// `[`/`(`/`<` tsv is inert today while prettier binds forward — an open per-position decision
+/// (generalize the `{` binding vs keep inert), so the skip stays conservative rather than
+/// asserting either answer. Everything else — separators, complete statements, a trailing `=`
+/// (the fixture-pinned after-equals decision) — asserts inert.
 const FORWARD_BINDING_LINE_ENDS: [char; 4] = ['{', '[', '(', '<'];
 
 /// The trailing-inertness mutant: the directive appended to the END of the line preceding the

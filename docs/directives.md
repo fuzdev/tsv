@@ -52,6 +52,12 @@ cases:
   (`type A = // format-ignore`) — does nothing: the surrounding code formats
   normally. tsv only ever honors a directive that *precedes* its target.
 
+One carve-out: a directive trailing an opening `{` that ends its line — a
+block's, an object literal's, a class body's, an interface's, or a type
+literal's (`function f() { // format-ignore`) — has no preceding sibling on its
+line, so it *leads* the first member: that member freezes, and the directive
+stays where the author wrote it.
+
 ### On type-member lists
 
 The directives also target individual **members** of a type-member list — a
@@ -60,6 +66,8 @@ union or intersection, a tuple, a type-parameter declaration
 own-line directive in the list's leading gap or between members freezes the
 **next member** only, and a glued block directive freezes the member it sits
 against — the rest of the list keeps formatting normally, separators included.
+The member freezes **whole**, whatever its shape — a tuple element or type
+argument that is itself a union freezes as one item, operators and all.
 
 ```ts
 type T =
