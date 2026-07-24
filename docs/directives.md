@@ -52,11 +52,13 @@ cases:
   (`type A = // format-ignore`) — does nothing: the surrounding code formats
   normally. tsv only ever honors a directive that *precedes* its target.
 
-### On union and intersection type members
+### On type-member lists
 
-The directives also target individual **members** of a union or intersection
-type: an own-line directive in the list's leading gap or between members freezes
-the **next member** only, and a glued block directive freezes the member it sits
+The directives also target individual **members** of a type-member list — a
+union or intersection, a tuple, a type-parameter declaration
+(`function f<T, U>`), or a type-argument list (`Foo<A, B>`, `fn<A, B>(x)`): an
+own-line directive in the list's leading gap or between members freezes the
+**next member** only, and a glued block directive freezes the member it sits
 against — the rest of the list keeps formatting normally, separators included.
 
 ```ts
@@ -65,6 +67,13 @@ type T =
 	| { x:1, y:2 }   // ← frozen verbatim
 	| B              // ← formatted normally
 	| C;
+
+type U = [
+	a,
+	// format-ignore
+	{ x:1, y:2 },    // ← frozen verbatim; the `,` stays parent-owned
+	b
+];
 ```
 
 A directive glued before the whole value (`type T = /* format-ignore */ A | B`)
