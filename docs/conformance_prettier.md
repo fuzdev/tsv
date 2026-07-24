@@ -1382,6 +1382,14 @@ more defensible:
   `<…>` in tsv (both the width-decided declaration hosts and the always-inline
   method-signature path), while prettier glues the angle brackets around the slice —
   [type-param multiline member](../tests/fixtures/typescript/types/type_params_prettier_ignore_multiline_member_prettier_divergence/)
+- Union-valued **list member** (`[{ a: 1 } | { b: 2 }, c]`, `Foo<{ a: 1 } | { b: 2 }>`) —
+  ◆design_choice — an own-line directive above a tuple element / type argument /
+  type parameter that is itself a union freezes the **whole item** in tsv (Rule A: the
+  container's gap freezes its member, whatever the member's shape — operators and all);
+  prettier's union `types[0]` redirect reaches *into* the item and freezes only the first
+  union member, reformatting the rest. The item-level scope is the consistent reading of
+  the list rule — the directive targets the member the author pointed at, not a fragment
+  of it (fixture at next touch of these positions)
 - Trailing directive (`| ({ x: 1 } & a2) // prettier-ignore`) — ◆design_choice — prettier
   freezes the **preceding** member backward; tsv is permanently **inert** to a trailing
   directive (both members reformat normally), honoring a directive only where it
