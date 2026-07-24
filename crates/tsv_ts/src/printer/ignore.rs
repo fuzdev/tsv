@@ -8,13 +8,20 @@
 // the paren-transparent freeze emitter.
 //
 // **Rule A — list-item freeze** (the single symmetric rule, union and intersection
-// alike): an own-line directive in a member list's leading OR inter-item gap freezes
-// the *following* member — the first member and every later member identically. A
-// same-line glued block directive before the value freezes the *whole* node. A
-// trailing directive is permanently inert. This is the same semantics tsv's existing
-// honored sites already carry (a directive between `{` and the first class member
-// freezes that member, not the body). See docs/conformance_prettier.md §Format-ignore
-// directive for the behavior contract.
+// alike), with a **total, placement-only classification** per directive: an OWN-LINE
+// directive (only whitespace before it on its physical line) in a member list's
+// leading OR inter-item gap freezes the *following* member — the first member and
+// every later member identically. A GLUED directive — on the same line as, and with
+// nothing but spaces/tabs before, the value or member it precedes (block spelling by
+// geometry; a line comment consumes to EOL) — freezes that node *whole*: the whole
+// union/intersection at the leading position, the whole member at a member gap.
+// ANYTHING ELSE — content before the directive on its line and no node glued after it
+// (trailing a member, a separator, or a declaration head; an intervening `|`/`&`
+// breaks the glue, while other comments in the run are transparent) — is permanently
+// inert. This is the same semantics tsv's
+// existing honored sites already carry (a directive between `{` and the first class
+// member freezes that member, not the body). See docs/conformance_prettier.md
+// §Format-ignore directive for the behavior contract.
 //
 // **Gating.** Every entry is gated on the document-level `has_format_ignore` flag, so
 // a document with no directive (≈ all of them) pays nothing. The leading-run walk is a
@@ -50,6 +57,18 @@ pub(in crate::printer) enum LeadingRunFreeze {
     /// set when the frozen slice spans lines, forcing the broken layout (a verbatim
     /// span is `will_break`-opaque, so the forcing is explicit).
     FirstMember { multiline: bool },
+}
+
+impl LeadingRunFreeze {
+    /// The `(freeze_first, multiline)` flag pair of a resolved leading-run freeze.
+    /// The `Whole` arm must already be handled (early-returned) by the caller — it
+    /// maps to `(false, false)` here, same as no freeze at all.
+    pub(in crate::printer) fn first_member_flags(freeze: Option<Self>) -> (bool, bool) {
+        match freeze {
+            Some(Self::FirstMember { multiline }) => (true, multiline),
+            _ => (false, false),
+        }
+    }
 }
 
 impl<'a> Printer<'a> {
@@ -89,6 +108,9 @@ impl<'a> Printer<'a> {
 
     /// The comment whose span ends exactly at `pos`, if any. Comments are sorted by
     /// start and never overlap, so `end` is monotonic and a binary search locates it.
+    /// **In-source axis** (an ownership-blind search over the raw table), like every
+    /// directive-recognition seam in this module — see `member_gap_frozen`'s note for
+    /// why the axes coincide for directives.
     fn comment_ending_at(&self, pos: u32) -> Option<&'a Comment> {
         let idx = self.comments.partition_point(|c| c.span.end < pos);
         self.comments.get(idx).filter(|c| c.span.end == pos)
@@ -113,7 +135,23 @@ impl<'a> Printer<'a> {
         if self.is_same_line(directive.span.end, node_start) {
             Some(LeadingRunFreeze::Whole)
         } else {
-            let multiline = first_inner.is_some_and(|s| self.span_has_newline(s));
+            // Own-line floor, the same one `member_gap_frozen` applies: a FirstMember
+            // freeze requires the directive to lead its physical line. Without it, the
+            // walk's `|`/`&`/`(` transparency lets a NESTED composite member reach a
+            // directive the enclosing list deliberately rejected — one TRAILING a
+            // previous member or a declaration head (`type T = // prettier-ignore⏎ …`)
+            // — and resurrect it as a first-member freeze. Trailing placements are
+            // permanently inert (the classification in the module header).
+            if !has_newline_before_position(self.source, directive.span.start) {
+                return None;
+            }
+            // A multi-line frozen slice makes the caller force the broken layout: a
+            // `verbatim_source_span` is `will_break`-opaque, so the trigger is asked
+            // here instead of propagating from the slice. `is_same_line` reads
+            // `comment_line_breaks`, which stays populated in every printer mode —
+            // the right table for a verbatim slice, whose emitted bytes physically
+            // contain the newlines regardless of mode.
+            let multiline = first_inner.is_some_and(|s| !self.is_same_line(s.start, s.end));
             Some(LeadingRunFreeze::FirstMember { multiline })
         }
     }
@@ -129,11 +167,15 @@ impl<'a> Printer<'a> {
     }
 
     /// True when the gap `[prev_end, member_start)` before a union / intersection member
-    /// carries a LEADING (own-line) format-ignore directive that freezes that member. The
-    /// directive must be **own-line placed** — the first non-whitespace on its physical
-    /// line (`has_newline_before_position`) — so a directive TRAILING the previous member
-    /// or the separator (`{ a: 1 } & // prettier-ignore`) is inert (the wrong-node-misbind
-    /// floor; the `trailing_inert` fixture is its regression pin).
+    /// carries a format-ignore directive that freezes that member — either **own-line
+    /// placed** (the first non-whitespace on its physical line,
+    /// `has_newline_before_position`) or **glued** directly before the member (nothing but
+    /// spaces/tabs and other comments between the directive's end and `member_start` —
+    /// block spelling by geometry). A directive that is neither —
+    /// TRAILING the previous member, the separator (`{ a: 1 } & // prettier-ignore`), or
+    /// sitting before the separator (`a /* prettier-ignore */ | b` — the `|` breaks the
+    /// glue) — is inert (the wrong-node-misbind floor; the `trailing_inert` fixture is its
+    /// regression pin, `glued_member` pins the glued arm).
     ///
     /// The own-line test keys on the directive's own line, NOT on `is_same_line` against
     /// `prev_end`: a blank line injected between `prev_end` and a trailing directive would
@@ -151,14 +193,61 @@ impl<'a> Printer<'a> {
     /// (`owned` ⇒ a bundler annotation or JSDoc cast, never a `format-ignore` directive),
     /// so the to-emit and in-source axes coincide, but naming the in-source one keeps the
     /// module's axis choice single and deliberate (one question, one predicate).
-    pub(in crate::printer) fn member_gap_frozen(&self, prev_end: u32, member_start: u32) -> bool {
+    fn member_gap_frozen(&self, prev_end: u32, member_start: u32) -> bool {
         if !self.has_format_ignore {
             return false;
         }
         comments_in_source_range(self.comments, prev_end, member_start).any(|c| {
             is_format_ignore_directive(c.content(self.source))
-                && has_newline_before_position(self.source, c.span.start)
+                && (has_newline_before_position(self.source, c.span.start)
+                    || self.glued_directly_before(c.span.end, member_start))
         })
+    }
+
+    /// True when everything in `[directive_end, member_start)` is spaces/tabs or comment
+    /// bytes — the directive is GLUED directly before the member. A bare newline or an
+    /// intervening separator (`|`/`&`) breaks the glue, so a pre-separator
+    /// (`a /* d */ | b`) or end-of-line directive stays trailing (inert). OTHER comments
+    /// in the run are transparent (`/* d */ /* other */ member` still freezes): prettier
+    /// honors a directive anywhere in a glued leading run, and the run travels with the
+    /// member either way, so there is no placement signal to preserve by refusing.
+    fn glued_directly_before(&self, directive_end: u32, member_start: u32) -> bool {
+        let bytes = self.source.as_bytes();
+        let ws_only = |lo: u32, hi: u32| {
+            bytes[lo as usize..hi as usize]
+                .iter()
+                .all(|&b| b == b' ' || b == b'\t')
+        };
+        let mut pos = directive_end;
+        for c in comments_in_source_range(self.comments, directive_end, member_start) {
+            if !ws_only(pos, c.span.start) {
+                return false;
+            }
+            pos = c.span.end;
+        }
+        ws_only(pos, member_start)
+    }
+
+    /// [`Self::member_gap_frozen`] for list member `i`, the single home of the
+    /// gap-anchor convention: the FIRST member's gap opens at the container's span
+    /// start (and is the only member `freeze_first` — the out-of-span leading-run
+    /// directive — applies to); a LATER member's gap opens at the previous member's
+    /// RAW span end — never a comma- or trailing-comment-advanced cursor — so a
+    /// directive after the separator still binds forward while the own-line floor
+    /// keeps a trailing directive inert. Every container loop routes through here
+    /// rather than picking its own anchors.
+    pub(in crate::printer) fn list_member_frozen(
+        &self,
+        container_start: u32,
+        types: &[TSType<'_>],
+        i: usize,
+        freeze_first: bool,
+    ) -> bool {
+        if i == 0 {
+            freeze_first || self.member_gap_frozen(container_start, types[0].span().start)
+        } else {
+            self.member_gap_frozen(types[i - 1].span().end, types[i].span().start)
+        }
     }
 
     /// Paren-transparent frozen doc for a union / intersection member. Precedence parens
@@ -184,21 +273,62 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let inner = unwrap_parenthesized(t);
-        // A parenthesized shell holding a comment (`(/* c */ a1)`, `(// c⏎ a1)`) must
-        // freeze the member's WHOLE span verbatim — slicing the inner would drop the
-        // shell comment. Overrides the redundant-paren drop below.
-        if self.frozen_paren_shell_has_comment(t) {
-            return self.raw_source_range(t.span().start, t.span().end);
-        }
-        if !member_parens(inner) {
-            return self.raw_source_range(inner.span().start, inner.span().end);
-        }
-        if matches!(t, TSType::Parenthesized(_)) {
-            self.raw_source_range(t.span().start, t.span().end)
-        } else {
-            let frozen = self.raw_source_range(t.span().start, t.span().end);
+        let slice = self.frozen_member_slice_span(t, member_parens);
+        let frozen = self.raw_source_range(slice.start, slice.end);
+        // Re-synthesize the parens only for a BARE member that needs them; a
+        // source-parenthesized member's slice already covers its own parens.
+        if member_parens(inner) && !matches!(t, TSType::Parenthesized(_)) {
             d.concat(&[d.text("("), frozen, d.text(")")])
+        } else {
+            frozen
         }
+    }
+
+    /// The span of the verbatim slice [`Self::build_frozen_member_doc`] emits for `t`:
+    ///
+    /// - a parenthesized shell holding a comment (`(/* c */ a1)`, `(// c⏎ a1)`) freezes
+    ///   the member's WHOLE span — slicing the inner would drop the shell comment
+    ///   (overrides the redundant-paren drop below);
+    /// - a redundant paren (`member_parens(inner)` false) is dropped — the slice is the
+    ///   paren-stripped inner;
+    /// - a kept, source-parenthesized member freezes whole-span (parens included); a
+    ///   kept, bare member's slice is its own span (the caller re-synthesizes parens).
+    fn frozen_member_slice_span(
+        &self,
+        t: &TSType<'_>,
+        member_parens: fn(&TSType<'_>) -> bool,
+    ) -> Span {
+        let inner = unwrap_parenthesized(t);
+        if self.frozen_paren_shell_has_comment(t) || member_parens(inner) {
+            t.span()
+        } else {
+            inner.span()
+        }
+    }
+
+    /// Whether the frozen slice for member `t` spans lines — the member-freeze
+    /// must-break trigger: a `verbatim_source_span` is `will_break`-opaque, so a caller
+    /// whose layout is width-decided forces the family broken explicitly when a frozen
+    /// member is multi-line (the leading-run analog is `FirstMember.multiline`).
+    fn frozen_member_multiline(
+        &self,
+        t: &TSType<'_>,
+        member_parens: fn(&TSType<'_>) -> bool,
+    ) -> bool {
+        let slice = self.frozen_member_slice_span(t, member_parens);
+        !self.is_same_line(slice.start, slice.end)
+    }
+
+    /// The one spelling of the Rule A must-break OR-tracking at the width-decided call
+    /// sites: a `frozen` member whose slice spans lines forces the family's broken
+    /// layout.
+    pub(in crate::printer) fn frozen_member_forces_break(
+        &self,
+        frozen: bool,
+        t: &TSType<'_>,
+        member_parens: fn(&TSType<'_>) -> bool,
+    ) -> bool {
+        frozen && self.frozen_member_multiline(t, member_parens)
     }
 
     /// Whether a parenthesized member's shell — the bytes between `(` and the inner type,
@@ -239,12 +369,5 @@ impl<'a> Printer<'a> {
             return self.raw_source_range(inner.span().start, inner.span().end);
         }
         d.align(2, self.build_frozen_member_doc(t, member_parens))
-    }
-
-    /// Whether `span` covers a newline in source — the frozen-slice must-break trigger
-    /// (an explicit source scan, since a `verbatim_source_span` is `will_break`-opaque
-    /// and cannot force the enclosing group on its own).
-    fn span_has_newline(&self, span: Span) -> bool {
-        self.source.as_bytes()[span.start as usize..span.end as usize].contains(&b'\n')
     }
 }

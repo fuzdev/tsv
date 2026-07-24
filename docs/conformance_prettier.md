@@ -1317,20 +1317,35 @@ too.
 
 **On union / intersection type members.** The ignore directives also target
 individual **members** of a union or intersection type under one symmetric rule
-(**Rule A — list-item freeze**), where **placement keys the freeze, not the comment's
-spelling** (an own-line block comment behaves like an own-line line comment): an
-own-line directive — in the leading gap or between members — freezes the **following**
-member, the first member and every later member identically, in unions and
-intersections alike; a same-line glued block directive before the value freezes the
-**whole** node; a trailing directive is inert. A redundant paren around a frozen member
+(**Rule A — list-item freeze**) with a **total, placement-only classification** per
+directive — **placement keys the freeze, not the comment's spelling** (an own-line
+block comment behaves like an own-line line comment):
+
+- **own-line** (only whitespace before it on its physical line) — in the leading gap or
+  between members — freezes the **following** member, the first member and every later
+  member identically, in unions and intersections alike;
+- **glued** (with nothing but spaces/tabs — or other comments — between it and the node
+  it precedes; block spelling by geometry, since a line comment consumes to end of line)
+  freezes that node **whole**: the whole union/intersection at the leading position
+  (`type T = /* prettier-ignore */ A | B`), the whole member at a member gap
+  (`a | /* prettier-ignore */ {x:1} | b`, including from anywhere in a glued comment run
+  — an intervening separator or bare newline breaks the glue, so
+  `a /* prettier-ignore */ | b` is not glued);
+- **anything else** — content before the directive on its line and no node glued after
+  it (trailing a member, a separator, or a declaration head) — is **inert**.
+
+A redundant paren around a frozen member
 is transparent (the inner node is frozen, the clarity paren re-synthesized outside the
 frozen slice; a fully redundant paren is dropped). This is the same behavior every
 existing honored list position already carries — a directive between `{` and the first
 class member freezes that member, not the body. The ordinary member-freeze fixtures
-`union_prettier_ignore_first_member`, `union_prettier_ignore_between_members`, and
-`union_prettier_ignore_glued_whole` match prettier; tsv diverges where freezing only the
-first intersection member, preserving the author's directive position, holding the
-union's per-line layout, or refusing a *trailing* directive is more defensible:
+`union_prettier_ignore_first_member`, `union_prettier_ignore_between_members`,
+`union_prettier_ignore_glued_whole`, and `union_prettier_ignore_glued_member` (the
+glued-member arm: leaf + composite + intersection host + comment-run transparency) match
+prettier; tsv diverges
+where freezing only the first intersection member, preserving the author's directive
+position, holding the union's per-line layout, or refusing a *trailing* directive is
+more defensible:
 
 - First member of an **intersection** — ◆design_choice ◆prettier_bug — an own-line
   directive freezes only the first member (Rule A), the separators are parent-owned and
@@ -1350,12 +1365,26 @@ union's per-line layout, or refusing a *trailing* directive is more defensible:
 - Multi-line frozen union member — ◆design_choice — tsv keeps the union broken one member
   per line (its layout whenever a member spans lines); prettier glues the next member onto
   the frozen slice's last line (`} | (b1 & b2)`) — [multiline member](../tests/fixtures/typescript/types/union_prettier_ignore_multiline_member_prettier_divergence/)
-- Trailing directive (`| a1&a2 // prettier-ignore`) — ◆design_choice — prettier freezes the
-  **preceding** member backward; tsv is permanently **inert** to a trailing directive (both
-  members reformat normally), honoring a directive only where it **precedes** the node. The
-  `prettier_variant_frozen` control passes today and pins that tsv never starts honoring
-  this position, and that a trailing directive must not freeze the **following** member —
+- Trailing directive (`| ({ x: 1 } & a2) // prettier-ignore`) — ◆design_choice — prettier
+  freezes the **preceding** member backward; tsv is permanently **inert** to a trailing
+  directive (both members reformat normally), honoring a directive only where it
+  **precedes** the node. The `prettier_variant_frozen` control pins that tsv never starts
+  honoring this position, and that a trailing directive must not freeze the **following**
+  member (both members carry perturbable object interiors so a misbound freeze in either
+  direction is visible) —
   [trailing inert](../tests/fixtures/typescript/types/union_prettier_ignore_trailing_inert_prettier_divergence/)
+- Directive trailing the **alias head** (`type A = // prettier-ignore⏎ { x: 1 } | b`) —
+  ◆design_choice — trailing per the classification (content before it on its line, value
+  on the next line), so tsv is inert: the comment stays where the author put it and the
+  value reformats. Prettier attaches it leading to the value, relocates it **own-line**,
+  and freezes the whole value; the relocated form is then dual-stable (`variant_frozen`) —
+  own-line before the value is a placement tsv honors too —
+  [trailing head](../tests/fixtures/typescript/types/union_prettier_ignore_trailing_head_prettier_divergence/)
+- Directive trailing an **annotation head** (`let v: // prettier-ignore⏎ { y: 2 } | c1`) —
+  ◆design_choice — same inert classification; prettier keeps the directive trailing the
+  `:` but freezes the annotation (no relocation), so its frozen form
+  (`prettier_variant_frozen`) is one tsv normalizes —
+  [trailing annotation head](../tests/fixtures/typescript/types/union_prettier_ignore_trailing_annotation_head_prettier_divergence/)
 - `format-ignore` on a union member — ◆design_choice — tsv honors `// format-ignore` at the
   member position identically to `// prettier-ignore`; prettier recognizes only its own
   family and reformats the member (paired with a `prettier-ignore` control) —
@@ -1366,12 +1395,14 @@ union's per-line layout, or refusing a *trailing* directive is more defensible:
   relocates the comment (`/* keep */ a1`). Comment preservation outranks redundant-paren
   removal under a freeze —
   [paren shell comment](../tests/fixtures/typescript/types/union_prettier_ignore_paren_shell_comment_prettier_divergence/)
-- **Single-member** union under a freeze — ◆design_choice — a 1-element union collapses (drops
-  its `|`) when reformatted, so a member-only freeze is non-idempotent. tsv keeps the `|` for a
-  **leaf / object** sole member (`| {a:1}`, idempotent) where prettier drops it (`{a:1}`); a
-  **composite** sole member is transparent (tsv collapses and applies Rule A to the inner
-  Union/Intersection, so `| a1&a2` → `a1 & a2`, the intersection-first-member behavior) —
-  [single member](../tests/fixtures/typescript/types/union_prettier_ignore_single_member_prettier_divergence/)
+- **Single-member** union or intersection under a freeze — ◆design_choice — a 1-element
+  union/intersection collapses (drops its leading `|`/`&`) when reformatted, so a member-only
+  freeze is non-idempotent. tsv keeps the operator for a **leaf / object** sole member
+  (`| {a:1}`, `& {a:1}` — idempotent) where prettier drops it (`{a:1}`); a **composite** sole
+  member is transparent (tsv collapses and applies Rule A to the inner Union/Intersection, so
+  `| a1&a2` → `a1 & a2`, the opposite family's first-member behavior) —
+  [single member union](../tests/fixtures/typescript/types/union_prettier_ignore_single_member_prettier_divergence/),
+  [single member intersection](../tests/fixtures/typescript/types/intersection_prettier_ignore_single_member_prettier_divergence/)
 
 See [directives.md](./directives.md) for the user-facing reference.
 

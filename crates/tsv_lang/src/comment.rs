@@ -91,9 +91,13 @@ impl Comment {
 // A comment can suppress formatting of the construct that follows it. tsv
 // recognizes its own tool-neutral `format-ignore` family as canonical and
 // prettier's `prettier-ignore` family as a drop-in-compatible alias — both
-// spellings are honored everywhere. These predicates are the single source of
-// truth for the directive set, called by each language printer (the comment
-// types differ across crates, so the shared atom operates on the trimmed text).
+// spellings are honored identically. These predicates are the single source of
+// truth for the directive SET only; whether a recognized directive has any
+// effect is a per-printer PLACEMENT question (own-line / glued placements are
+// honored, trailing ones are inert — see docs/directives.md §Placement and
+// docs/conformance_prettier.md §Format-ignore directive). Called by each
+// language printer (the comment types differ across crates, so the shared atom
+// operates on the trimmed text).
 
 /// Whether `content` is a `format-ignore` / `prettier-ignore` directive — emit
 /// the following construct as raw source instead of formatting it.
