@@ -162,6 +162,19 @@ impl<'a> Printer<'a> {
         // For function types, the annotation span starts at `=` in `=>`
         let arrow_end = return_type.span.start + "=>".len() as u32;
         let type_start = return_type.type_annotation.span().start;
+        // An alone-on-line format-ignore directive in the `=>`→return gap stays
+        // OWN-LINE — the trailing-hang emitter below would relocate it to trail the
+        // `=>` (`=> // prettier-ignore`), an inert placement that loses the freeze on
+        // the second pass — and freezes a non-composite return type verbatim
+        // (`single_child_frozen`; a composite return declines and freezes via its own
+        // leading-run walk, which reaches the directive across the gap's whitespace).
+        // Covers function, constructor, and abstract-constructor types (all route here).
+        if self.member_gap_frozen(arrow_end, type_start) {
+            let value_doc = self.build_routed_child_doc(return_type.type_annotation);
+            let mut parts: DocBuf = smallvec![d.text(arrow)];
+            self.append_keyword_value_line_comments(&mut parts, arrow_end, type_start, value_doc);
+            return d.concat(&parts);
+        }
         // Use break-for-line variant: line comments must force a hardline before
         // the return type so they don't swallow it (`=> // c\nT`, not `=> // c T`).
         // `None` on the comment-free path so none of the five layouts below carries an
@@ -395,18 +408,48 @@ impl<'a> Printer<'a> {
         // return-type gap). A block comment stays inline (`() /* c */ => void`).
         let pre_arrow_line_close =
             after_close.filter(|&ac| self.has_line_comments_between(ac, arrow_start));
-        let return_type_doc =
-            self.build_function_type_return_doc(return_type, pre_arrow_line_close.is_none());
-        let return_type_doc = if let Some(ac) = pre_arrow_line_close {
-            let pre = self.build_trailing_comments_hang_next(ac, arrow_start);
-            d.concat(&[d.text(" "), pre, return_type_doc])
+        // An alone-on-line format-ignore directive in the `)`→`=>` gap freezes the
+        // WHOLE return annotation verbatim — `=> T` is the node the directive
+        // precedes (`build_frozen_span_doc`, the span analog of the single-child
+        // freeze; comments inside the slice ride out verbatim). Emission preserves
+        // each gap comment's own-line-ness: a `)`-trailing comment keeps trailing,
+        // and the directive keeps its own line — the pull-to-trailing hang below
+        // would leave it trailing `)`, an inert placement that loses the freeze on
+        // the second pass.
+        //
+        // Asked of `after_close`, NOT the line-comment-filtered `pre_arrow_line_close`:
+        // PLACEMENT, not spelling, keys honoring, so a BLOCK-spelled directive alone on
+        // its line freezes identically. The line-comment filter answers a LAYOUT
+        // question (must `=>` start a fresh line?), and routing the honoring question
+        // through it silently dropped the block spelling onto the inline path. The
+        // sibling gaps route the same way — the `=>`→return gap above, the `as` /
+        // `satisfies` keyword gap, and the type-predicate `is` gap all OR the freeze
+        // verdict into their routing rather than gating it on the spelling.
+        let frozen_pre_arrow = after_close.filter(|&ac| self.member_gap_frozen(ac, arrow_start));
+        let return_type_doc = if let Some(ac) = frozen_pre_arrow {
+            // Own-line-preserving, the same emitter the routed conditional branches
+            // use: a `)`-trailing comment keeps trailing and the directive keeps its
+            // own line, in source order (the trailing run is the gap's prefix).
+            let (trailing, own_line) = self.build_own_line_preserving_run(ac, arrow_start);
+            let mut pre_parts: DocBuf = smallvec![trailing];
+            pre_parts.extend(own_line);
+            pre_parts.push(d.hardline());
+            pre_parts.push(self.build_frozen_span_doc(return_type.span));
+            d.concat(&pre_parts)
         } else {
-            match after_close {
-                Some(ac) => d.concat(&[
-                    self.build_comments_between(ac, arrow_start, CommentSpacing::Leading),
-                    return_type_doc,
-                ]),
-                None => return_type_doc,
+            let return_type_doc =
+                self.build_function_type_return_doc(return_type, pre_arrow_line_close.is_none());
+            if let Some(ac) = pre_arrow_line_close {
+                let pre = self.build_trailing_comments_hang_next(ac, arrow_start);
+                d.concat(&[d.text(" "), pre, return_type_doc])
+            } else {
+                match after_close {
+                    Some(ac) => d.concat(&[
+                        self.build_comments_between(ac, arrow_start, CommentSpacing::Leading),
+                        return_type_doc,
+                    ]),
+                    None => return_type_doc,
+                }
             }
         };
 

@@ -331,6 +331,53 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Emit every comment in `[start, end)` trailing what precedes it
+    /// ([`Self::build_trailing_comment_doc`] — a block inline, a line comment via
+    /// `line_suffix` so it flushes at end of the rendered line rather than swallowing
+    /// the following token). For a gap whose comments all keep their position and need
+    /// no per-comment routing; a caller that must split the run by position (around a
+    /// separator, by own-line-ness) iterates itself.
+    pub(crate) fn push_trailing_comments_in_range(&self, parts: &mut DocBuf, start: u32, end: u32) {
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
+            parts.push(self.build_trailing_comment_doc(comment));
+        }
+    }
+
+    /// Emit the comment run in `[anchor, end)` PRESERVING each comment's own-line-ness —
+    /// the emission a routed format-ignore directive needs, since the placement that
+    /// earned the freeze is exactly what an ordinary hang emitter would relocate.
+    /// Returns `(trailing, own_line)`: a comment still on `anchor`'s line trails it, and
+    /// every own-line comment keeps its own line, each preceded by a `hardline`. Both
+    /// sinks are the caller's to place — the conditional's `?` arm trails the extends
+    /// line (a separate buffer) while its `:` arm and the function type's pre-arrow gap
+    /// trail into the run they are already building.
+    ///
+    /// A gap's same-line comments are exactly the prefix of its run (position and line
+    /// number are both monotonic), so splitting the run across two sinks preserves
+    /// source order at every call site.
+    ///
+    /// Deliberately NOT [`Self::push_leading_comment_run`]: that seam measures each
+    /// separator against the run's terminal, but what follows this run in the OUTPUT is
+    /// an operator (`?` / `:` / `=>`), not the node the comments lead — so its glue test
+    /// would hug a block comment whose `*/` merely shares a line with that node's start,
+    /// pulling a directive off the own line that earned the freeze. The same-line test
+    /// here is a ROUTING question (trail the previous line vs. sit above the operator's
+    /// line), not a separator question.
+    pub(crate) fn build_own_line_preserving_run(&self, anchor: u32, end: u32) -> (DocId, DocBuf) {
+        let d = self.d();
+        let mut trailing_parts = DocBuf::new();
+        let mut own_line_parts = DocBuf::new();
+        for comment in comments_to_emit_in_range(self.comments, anchor, end) {
+            if self.is_same_line(anchor, comment.span.start) {
+                trailing_parts.push(self.build_trailing_comment_doc(comment));
+            } else {
+                own_line_parts.push(d.hardline());
+                own_line_parts.push(self.build_comment_doc(comment));
+            }
+        }
+        (d.concat(&trailing_parts), own_line_parts)
+    }
+
     /// Emit the **stranded** after-comma block comments in `[comma_pos, next_start)`
     /// trailing the comma (` /* c */`), preserving the author's placement. The
     /// caller pushes the comma before this and handles the remaining (non-stranded)

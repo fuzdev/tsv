@@ -5,7 +5,7 @@
 // - Type parameter instantiation (type arguments): `<T, U>`
 
 use super::helpers::is_simple_type_arg;
-use super::{BlankRule, CommentFilter, CommentSpacing, Printer};
+use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
 use crate::printer::layout::{bracketed_list_body, fluid_after_operator};
 use smallvec::smallvec;
@@ -271,28 +271,24 @@ impl<'a> Printer<'a> {
         let mut prev_end = param.name.span.end;
 
         if let Some(constraint) = &param.constraint {
-            // If the constraint is `(// leading\n T)` — or the double-nested
-            // `((// leading\n T))` — treat the leading line comment inside the parens
-            // as if it were between `extends` and the constraint so it forces the
-            // indent-and-break layout (matching prettier's paren stripping). The deep
-            // window unwraps every redundant layer; a shallow one-level window missed
-            // a comment nested one paren deeper (non-idempotent).
-            let (value_search_end, value_type): (u32, &TSType<'_>) = if has_comments {
-                self.keyword_value_stripped_paren_hang(constraint)
-            } else {
-                (constraint.span().start, constraint)
-            };
-
-            // Find `extends` keyword between name and constraint. A `TSTypeParameter`
-            // constraint is always spelled `extends` — mapped-type `[K in T]` keys use
-            // `in`, but those take a separate `TSMappedTypeParameter`/`build_mapped_type_doc`
-            // path and never reach here, so the keyword is guaranteed present.
-            let comment_range = has_comments.then(|| {
+            // The shared keyword→value head. Resolving it needs the keyword's position,
+            // so the `extends` byte scan comes first — and only on the comment-bearing
+            // path: a comment-free parameter takes the scan-free head, which is why the
+            // keyword position is looked up here rather than unconditionally.
+            //
+            // A `TSTypeParameter` constraint is always spelled `extends` — mapped-type
+            // `[K in T]` keys use `in`, but those take a separate
+            // `TSMappedTypeParameter`/`build_mapped_type_doc` path and never reach here,
+            // so the keyword is guaranteed present. The head's paren-strip arm treats a
+            // leading line comment inside `(// leading⏎ T)` — and the double-nested
+            // `((// leading⏎ T))` — as if it sat between `extends` and the constraint,
+            // so it forces the indent-and-break layout (matching prettier's paren
+            // stripping).
+            let head = if has_comments {
                 #[allow(clippy::expect_used)] // extends always present for a constraint
                 let extends_pos = self
                     .find_keyword_in_range(prev_end, constraint.span().start, "extends")
                     .expect("extends keyword must exist when constraint is present");
-                let extends_end = extends_pos + "extends".len() as u32;
 
                 // Comments between name and `extends`: <T /* c */ extends A>
                 if let Some(pre) = self.build_comments_between_filtered_opt(
@@ -303,34 +299,23 @@ impl<'a> Printer<'a> {
                 ) {
                     parts.push(pre);
                 }
-                (extends_end, value_search_end)
-            });
+                self.keyword_value_head(extends_pos + "extends".len() as u32, constraint)
+            } else {
+                KeywordValueHead::without_gap(constraint)
+            };
 
             parts.push(d.text(" extends"));
-            self.append_keyword_value(
-                &mut parts,
-                comment_range,
-                value_type,
-                GroupId::TypeParameterConstraint,
-                constraint,
-            );
+            self.append_keyword_value(&mut parts, &head, GroupId::TypeParameterConstraint);
             prev_end = constraint.span().end;
         }
 
         if let Some(default) = &param.default {
-            // Same deep-window paren handling as the constraint above: `<T = (// c\n U)>`
-            // (and the double-nested form) strips to the same hang as bare `<T = // c\n U>`,
-            // so substitute the unwrapped inner and widen the gap window to its start. A
-            // mixed / trailing shell hoists losslessly too — the trailing comment is
-            // reattached in `append_keyword_value` via `build_hang_value_doc`.
-            let (value_search_end, value_type): (u32, &TSType<'_>) = if has_comments {
-                self.keyword_value_stripped_paren_hang(default)
-            } else {
-                (default.span().start, default)
-            };
-
-            // Find `=` between previous end and default
-            let comment_range = has_comments.then(|| {
+            // The `=` mirror of the constraint above, same head and same scan gate:
+            // `<T = (// c⏎ U)>` (and the double-nested form) strips to the same hang as
+            // bare `<T = // c⏎ U>`. A mixed / trailing shell hoists losslessly too — the
+            // trailing comment is reattached in `append_keyword_value` via
+            // `build_hang_value_doc`.
+            let head = if has_comments {
                 #[allow(clippy::expect_used)] // = must exist when a default is present
                 let eq_pos = find_char_skipping_comments(
                     self.source.as_bytes(),
@@ -339,7 +324,6 @@ impl<'a> Printer<'a> {
                     b'=',
                 )
                 .expect("= must exist when default is present");
-                let eq_end = (eq_pos + 1) as u32;
 
                 // Comments before `=`: <T extends B /* c */ = C>
                 if let Some(pre) = self.build_comments_between_filtered_opt(
@@ -350,17 +334,13 @@ impl<'a> Printer<'a> {
                 ) {
                     parts.push(pre);
                 }
-                (eq_end, value_search_end)
-            });
+                self.keyword_value_head((eq_pos + 1) as u32, default)
+            } else {
+                KeywordValueHead::without_gap(default)
+            };
 
             parts.push(d.text(" ="));
-            self.append_keyword_value(
-                &mut parts,
-                comment_range,
-                value_type,
-                GroupId::TypeParameterDefault,
-                default,
-            );
+            self.append_keyword_value(&mut parts, &head, GroupId::TypeParameterDefault);
             prev_end = default.span().end;
         }
 
@@ -391,32 +371,34 @@ impl<'a> Printer<'a> {
     /// value is indented exactly when that break fires — Prettier's
     /// `printTypeParameter` pattern.
     ///
-    /// `comment_range` is the `(keyword_end, value_start)` gap to search, or `None`
-    /// when the caller has already proven the whole parameter comment-free — the
-    /// keyword's source position is needed for nothing else, so `None` also spares the
-    /// caller the byte scan that would locate it.
+    /// `head` is the shared keyword→value resolution ([`Printer::keyword_value_head`]):
+    /// the gap window both the gates and the emitters use, the freeze verdict, and the
+    /// (possibly paren-stripped) value plus its pre-strip shell — so this builder can't
+    /// gate on one window while claiming another. Its `gap_start` is `None` when the
+    /// caller proved the parameter comment-free and never located the keyword: no gap,
+    /// no comment arms, no freeze — straight to the width-decided tail.
+    ///
+    /// This site is the head protocol PLUS two rules of its own, which is why it keeps
+    /// its own builder rather than calling `build_keyword_value_doc`: it strips a
+    /// redundant comment-free paren off the value (the cast / annotation heads do not),
+    /// and a conditional constraint keeps clarity parens.
     fn append_keyword_value(
         &self,
         parts: &mut DocBuf,
-        comment_range: Option<(u32, u32)>,
-        value_type: &TSType<'_>,
+        head: &KeywordValueHead<'_>,
         group_id: GroupId,
-        // The original (pre-seam) constraint/default node, so a trailing comment lifted
-        // from a stripped redundant-paren shell (`extends (// c\n T /* t */)`) can be
-        // reattached in the hang branch. Equal to `value_type` when no shell was stripped.
-        shell: &TSType<'_>,
     ) {
         let d = self.d();
         // An alone-on-line format-ignore directive in the keyword→value gap freezes a
-        // non-composite value verbatim (`single_child_frozen`; a union/intersection
-        // value declines and freezes via its own leading-run walk). Checked against
-        // the UNWIDENED gap — the window ends at the shell's own span start, so an
-        // in-shell directive stays on the ordinary paths below. The directive keeps
-        // its own line (`append_keyword_value_line_comments` already preserves
+        // non-composite value verbatim (the head's `frozen`; a union/intersection value
+        // declines and freezes via its own leading-run walk). The head checked the
+        // UNWIDENED gap — its window ends at the shell's own span start under a freeze,
+        // so an in-shell directive stays on the ordinary paths below. The directive
+        // keeps its own line (`append_keyword_value_line_comments` already preserves
         // own-line comments). A conditional constraint keeps its required parens
         // under the freeze (the same clarity/`infer` rule as the unfrozen arm below).
-        if let Some((keyword_end, _)) = comment_range
-            && self.single_child_frozen(keyword_end, shell)
+        if let Some(keyword_end) = head.gap_start
+            && head.frozen
         {
             let member_parens: fn(&TSType<'_>) -> bool =
                 if group_id == GroupId::TypeParameterConstraint {
@@ -424,29 +406,19 @@ impl<'a> Printer<'a> {
                 } else {
                     |_| false
                 };
-            // The single-child must-break: a multi-line frozen slice signals the
-            // enclosing width-decided groups explicitly (`build_frozen_single_child_doc`'s
-            // rationale — a verbatim slice is `will_break`-opaque).
-            let frozen_doc = {
-                let base = self.build_frozen_member_doc(shell, member_parens);
-                if self.frozen_member_forces_break(true, shell, member_parens) {
-                    d.concat(&[base, d.break_parent()])
-                } else {
-                    base
-                }
-            };
-            let child_start = shell.span().start;
-            if self.comments_force_own_line_between(keyword_end, child_start) {
+            let frozen_doc = self.build_frozen_head_doc(head.child, member_parens);
+            // Under a freeze the head's window already ends at the child's own start.
+            if self.comments_force_own_line_between(keyword_end, head.value_start) {
                 self.append_keyword_value_line_comments(
                     parts,
                     keyword_end,
-                    child_start,
+                    head.value_start,
                     frozen_doc,
                 );
             } else {
                 if let Some(comments) = self.build_comments_between_filtered_opt(
                     keyword_end,
-                    child_start,
+                    head.value_start,
                     CommentSpacing::Leading,
                     CommentFilter::All,
                 ) {
@@ -459,7 +431,7 @@ impl<'a> Printer<'a> {
         }
         // Strip redundant comment-free parens so `(A | B)` / `(A & B)` constraints
         // and defaults get the bare hanging layout (prettier strips them too).
-        let value_type = self.unwrap_redundant_parens(value_type);
+        let value_type = self.unwrap_redundant_parens(head.value_type);
         // A *conditional* type used as a constraint keeps its parens: prettier keeps
         // them for clarity, and for an `infer`'s conditional constraint they're
         // outright required (the enclosing conditional's `? :` rebinds without them —
@@ -469,10 +441,10 @@ impl<'a> Printer<'a> {
             && group_id == GroupId::TypeParameterConstraint
         {
             let mut inner: DocBuf = smallvec![d.text(" (")];
-            if let Some((keyword_end, value_start)) = comment_range
+            if let Some(keyword_end) = head.gap_start
                 && let Some(comments) = self.build_comments_between_filtered_opt(
                     keyword_end,
-                    value_start,
+                    head.value_start,
                     CommentSpacing::Leading,
                     CommentFilter::All,
                 )
@@ -484,8 +456,8 @@ impl<'a> Printer<'a> {
             parts.push(d.concat(&inner));
             return;
         }
-        if let Some((keyword_end, value_start)) = comment_range {
-            if self.comments_force_own_line_between(keyword_end, value_start) {
+        if let Some(keyword_end) = head.gap_start {
+            if self.comments_force_own_line_between(keyword_end, head.value_start) {
                 // A line comment or multiline block after the keyword hangs the bound type
                 // on its own line (and expands the `<…>` via the gate in
                 // `has_expanding_comments_in_type_param_declaration`). A
@@ -493,13 +465,18 @@ impl<'a> Printer<'a> {
                 // and keeps `<…>` collapsed (the fall-through below). Type position: a
                 // trailing block lifted from a stripped shell trails the value inline
                 // before the `,`/`>` (`defer = false`).
-                let value_doc = self.build_hang_value_doc(shell, value_type, false);
-                self.append_keyword_value_line_comments(parts, keyword_end, value_start, value_doc);
+                let value_doc = self.build_hang_value_doc(head.child, value_type, false);
+                self.append_keyword_value_line_comments(
+                    parts,
+                    keyword_end,
+                    head.value_start,
+                    value_doc,
+                );
                 return;
             }
             if let Some(comments) = self.build_comments_between_filtered_opt(
                 keyword_end,
-                value_start,
+                head.value_start,
                 CommentSpacing::Leading,
                 CommentFilter::All,
             ) {

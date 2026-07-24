@@ -1400,7 +1400,8 @@ more defensible:
   prettier's union `types[0]` redirect reaches *into* the item and freezes only the first
   union member, reformatting the rest. The item-level scope is the consistent reading of
   the list rule — the directive targets the member the author pointed at, not a fragment
-  of it (fixture at next touch of these positions)
+  of it —
+  [union-valued member](../tests/fixtures/typescript/types/union_valued_member_prettier_ignore_prettier_divergence/)
 - Trailing directive (`| ({ x: 1 } & a2) // prettier-ignore`) — ◆design_choice — prettier
   freezes the **preceding** member backward; tsv is permanently **inert** to a trailing
   directive (both members reformat normally), honoring a directive only where it
@@ -1460,38 +1461,66 @@ more defensible:
 
 **On single-child type positions (annotation `:` / alias `=` / constraint `extends` /
 type-parameter default `=` / named-tuple `label:` / mapped-type `]:` value and `[K in ...]`
-key).** The same placement classification honors a directive before a head's single child:
+key / conditional `?` · `:` branches and `extends` head / function- and constructor-type
+return `=>` / predicate `is` / `as` · `satisfies` / indexed-access `[` index /
+angle-assertion `<` / required-paren interior).** The same placement classification honors
+a directive before a head's single child:
 an own-line directive between the head token and the child freezes the child whole —
 unless the (paren-transparent) child is a union or intersection, in which case the member
 rules above apply unchanged (first member freezes). The ordinary fixtures
 `alias_prettier_ignore_value`, `annotation_prettier_ignore_union_member`,
-`named_tuple_prettier_ignore_element`, and `mapped_prettier_ignore_signature` (a
+`named_tuple_prettier_ignore_element`, `mapped_prettier_ignore_signature` (a
 directive above a mapped type's `[K in ...]: V` clause freezes the whole clause — the
-mapped type's sole-member analog) match prettier. tsv diverges where prettier relocates
+mapped type's sole-member analog), and `angle_prettier_ignore_own_line` (the
+angle-bracket assertion's `<`→type gap, where prettier itself keeps the directive
+own-line and freezes) match prettier. tsv diverges where prettier relocates
 the directive, or where its mapped-type handler freezes content the directive doesn't
 precede:
 
 - Own-line directive kept own-line at a single-child head — ◆comment_preservation
   ◆prettier_bug — at the annotation `:`, constraint `extends`, default `=`, named-tuple
-  `label:`, and mapped-type `]:` heads, prettier relocates an own-line directive before a
+  `label:`, mapped-type `]:`, conditional-branch `?` · `:`, conditional-`extends`,
+  function/constructor-return `)` · `=>`, predicate `is`, `as` · `satisfies`, and
+  indexed-access `[` heads, prettier relocates an own-line directive before a
   non-composite child to trail the head (`let v: // prettier-ignore`) and dedents the
   frozen slice; tsv keeps the author's own-line placement and freezes the same span. A
   head-trailing directive is inert under tsv's placement classification, so the relocated
   form would lose the freeze on tsv's second pass — and prettier's relocated form is not
   even self-stable: its own second pass loses the freeze at the property-signature,
-  constraint/default, named-tuple, and mapped-value positions (non-idempotent, pinned via
-  each fixture's `audit_signature.txt`). Prettier itself keeps the directive own-line at
-  the alias `=` head and before every union child —
+  constraint/default, named-tuple, mapped-value, conditional-`extends`, indexed-index,
+  and `as`/`satisfies` positions, and the predicate position crosses three forms before
+  settling (trail `is` → trail the body's `{` → lead `return`) — all non-idempotent,
+  pinned via each fixture's `audit_signature.txt`. (The conditional-branch and return-`=>`
+  relocations are the self-stable minority; the return-`)` gap — whose child is the whole
+  `=> T` annotation rather than a type — relocates non-idempotently but never loses the
+  freeze, its second pass only rejoining the `=> T` onto the `)` line.) Prettier itself
+  keeps the directive own-line
+  at the alias `=` and assertion `<` heads and before every union child —
   [annotation](../tests/fixtures/typescript/types/annotation_prettier_ignore_own_line_prettier_divergence/),
   [type-param constraint/default](../tests/fixtures/typescript/types/type_param_prettier_ignore_value_prettier_divergence/),
   [named tuple](../tests/fixtures/typescript/types/named_tuple_prettier_ignore_own_line_prettier_divergence/),
-  [mapped value](../tests/fixtures/typescript/types/mapped_value_prettier_ignore_own_line_prettier_divergence/)
+  [mapped value](../tests/fixtures/typescript/types/mapped_value_prettier_ignore_own_line_prettier_divergence/),
+  [conditional branches](../tests/fixtures/typescript/types/conditional_prettier_ignore_branch_prettier_divergence/),
+  [conditional extends](../tests/fixtures/typescript/types/conditional_prettier_ignore_extends_prettier_divergence/),
+  [fn/ctor return](../tests/fixtures/typescript/types/function_type_prettier_ignore_return_prettier_divergence/),
+  [predicate](../tests/fixtures/typescript/types/type_predicate_prettier_ignore_type_prettier_divergence/),
+  [as/satisfies](../tests/fixtures/typescript/expressions/as_satisfies_prettier_ignore_type_prettier_divergence/),
+  [indexed index](../tests/fixtures/typescript/types/indexed_access_prettier_ignore_index_prettier_divergence/)
 - Mapped-type key: in-bracket directive freezes the binding only — ◆design_choice — an
   own-line directive inside the bracket, before `K in ...`, freezes only the binding in
   tsv, while prettier's mapped-type handler freezes the whole mapped type — including
   the `]: V` value side and the `[` that *precedes* the directive. The freeze scope
   follows the directive's position: it freezes the construct it precedes —
   [mapped key](../tests/fixtures/typescript/types/mapped_prettier_ignore_key_prettier_divergence/)
+- Required-paren interior: the directive freezes the inner child only — ◆design_choice
+  ◆comment_preservation — an own-line directive inside a **required** paren (an array
+  type's function-type element) freezes the inner function type it precedes — Rule A's
+  child scope — with the directive kept own-line inside the parens and the paren + `[]`
+  re-synthesized outside the frozen slice. Prettier freezes the **whole**
+  `((…) => void)[]` unit instead and relocates the directive out of the parens to trail
+  the alias `=` (own-line under it at its 2-pass fixed point, freeze intact, pinned via
+  `audit_signature.txt`) —
+  [required paren interior](../tests/fixtures/typescript/types/array_element_paren_prettier_ignore_interior_prettier_divergence/)
 
 See [directives.md](./directives.md) for the user-facing reference.
 

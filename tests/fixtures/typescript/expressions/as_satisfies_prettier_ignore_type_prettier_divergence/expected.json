@@ -1,0 +1,515 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 235,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an own-line directive after `as` stays own-line and freezes the type",
+			"start": 20,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 114,
+			"end": 132,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " satisfies host",
+			"start": 147,
+			"end": 164,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 194,
+			"end": 212,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 234,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 225,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 93,
+					"end": 144,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 99,
+							"end": 143,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 99,
+								"end": 100,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 103,
+								"end": 143,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 103,
+									"end": 108,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 11
+										},
+										"end": {
+											"line": 3,
+											"column": 16
+										}
+									},
+									"name": "value"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeLiteral",
+									"start": 135,
+									"end": 143,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 10
+										}
+									},
+									"members": [
+										{
+											"type": "TSPropertySignature",
+											"start": 136,
+											"end": 142,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 3
+												},
+												"end": {
+													"line": 5,
+													"column": 9
+												}
+											},
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 136,
+												"end": 137,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 3
+													},
+													"end": {
+														"line": 5,
+														"column": 4
+													}
+												},
+												"name": "x"
+											},
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 137,
+												"end": 142,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 4
+													},
+													"end": {
+														"line": 5,
+														"column": 9
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSLiteralType",
+													"start": 141,
+													"end": 142,
+													"loc": {
+														"start": {
+															"line": 5,
+															"column": 8
+														},
+														"end": {
+															"line": 5,
+															"column": 9
+														}
+													},
+													"literal": {
+														"type": "Literal",
+														"start": 141,
+														"end": 142,
+														"loc": {
+															"start": {
+																"line": 5,
+																"column": 8
+															},
+															"end": {
+																"line": 5,
+																"column": 9
+															}
+														},
+														"value": 1,
+														"raw": "1"
+													}
+												}
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 114,
+											"end": 132
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line directive after `as` stays own-line and freezes the type",
+							"start": 20,
+							"end": 91
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 166,
+					"end": 224,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 11
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 172,
+							"end": 223,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 10
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 172,
+								"end": 173,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "TSSatisfiesExpression",
+								"start": 176,
+								"end": 223,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 11
+									},
+									"end": {
+										"line": 10,
+										"column": 10
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 176,
+									"end": 181,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 11
+										},
+										"end": {
+											"line": 8,
+											"column": 16
+										}
+									},
+									"name": "value"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeLiteral",
+									"start": 215,
+									"end": 223,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 10
+										}
+									},
+									"members": [
+										{
+											"type": "TSPropertySignature",
+											"start": 216,
+											"end": 222,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 3
+												},
+												"end": {
+													"line": 10,
+													"column": 9
+												}
+											},
+											"computed": false,
+											"key": {
+												"type": "Identifier",
+												"start": 216,
+												"end": 217,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 3
+													},
+													"end": {
+														"line": 10,
+														"column": 4
+													}
+												},
+												"name": "x"
+											},
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 217,
+												"end": 222,
+												"loc": {
+													"start": {
+														"line": 10,
+														"column": 4
+													},
+													"end": {
+														"line": 10,
+														"column": 9
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSLiteralType",
+													"start": 221,
+													"end": 222,
+													"loc": {
+														"start": {
+															"line": 10,
+															"column": 8
+														},
+														"end": {
+															"line": 10,
+															"column": 9
+														}
+													},
+													"literal": {
+														"type": "Literal",
+														"start": 221,
+														"end": 222,
+														"loc": {
+															"start": {
+																"line": 10,
+																"column": 8
+															},
+															"end": {
+																"line": 10,
+																"column": 9
+															}
+														},
+														"value": 2,
+														"raw": "2"
+													}
+												}
+											}
+										}
+									],
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 194,
+											"end": 212
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " satisfies host",
+							"start": 147,
+							"end": 164
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
