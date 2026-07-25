@@ -3,14 +3,16 @@
  *
  * The `parse_*_no_locations` exports emit a span-only AST: every node keeps its
  * `start`/`end` (UTF-16 code-unit offsets) but drops the per-node `loc`
- * (line/column) object (Svelte also drops `name_loc`). Line/column is a pure
- * function of an offset plus the source, so a consumer holding only the span-only
- * wire recovers `loc` on demand — no re-parse. This module is that reconstruction,
- * shipped so callers don't reimplement the line rules.
+ * (line/column) object (Svelte also drops the element/attribute/directive
+ * `name_loc`). Line/column is a pure function of an offset plus the source, so a
+ * consumer holding only the span-only wire recovers both on demand — no re-parse.
+ * This module is that reconstruction, shipped so callers don't reimplement the
+ * line rules.
  *
  * Two entry points:
  * - `reconstruct_locations(ast, source)` — one-shot: build the line table once,
- *   walk the tree, add `loc` to every node, return the (mutated) ast.
+ *   walk the tree, add `loc` to every node (and `name_loc` back to the Svelte
+ *   nodes that carry one), return the (mutated) ast.
  * - `create_locator(source)` — amortized: hold the prebuilt line table and expose
  *   `loc_of(node)` (single node) and `reconstruct(ast)` (whole tree). Prefer this
  *   for heavy sparse use; the bare `loc_of(node, source)` convenience rebuilds the
@@ -29,19 +31,34 @@
  * **Svelte is approximate** — reconstruct where you have the source, but be aware
  * of three deliberate divergences from Svelte's own wire (this module does NOT
  * replicate Svelte's parser quirks):
- * - `name_loc` is not recovered — it's dropped entirely from the span-only Svelte
- *   wire, and an element/attribute/directive name span is a Svelte-specific field
- *   with no offset on the node to derive it from.
  * - The `<script>`/`<style>` `Program` `loc` is Svelte's *tag-position* override
  *   (`read_script`), not the content offset the node's `start`/`end` carry, so the
  *   reconstructed `Program` `loc` is the content position, not Svelte's.
  * - Destructure patterns in `{#each … as …}` / `{:then}` / `{:catch}` / `{@const}`
  *   carry a `+1` column in Svelte's wire (parsed under a synthetic `(`); the
  *   reconstruction is the true offset, so it reads one column earlier.
+ * - A root **in-tag** comment — one written between an element's attributes, which
+ *   Svelte's template reader collects — carries a `character` field in its `loc`.
+ *   Nothing on the span-only node distinguishes it from a `<script>` comment, so it
+ *   reconstructs in the plain `{line, column}` shape.
  * - Additionally, Svelte's own wire carries `loc` *only* on embedded ECMAScript
  *   nodes (script + template expressions); this walk adds `loc` to the template
  *   nodes (elements, text, blocks) too, so the result is a superset. Everything
  *   outside the three cases above reconstructs exactly.
+ *
+ * **Svelte `name_loc` is exact.** The name span is a function of the node's own
+ * `start`/`end` + type — a tag name is the run after `<`, an attribute name starts
+ * at the node (a shorthand `{x}` names its braces interior, padding included), and
+ * a directive names its whole head token (`on:click|preventDefault`) — so the walk
+ * restores `name_loc` (`{line, column, character}` endpoints) on every element,
+ * attribute, and directive that carries one, matching Svelte's wire.
+ *
+ * That same name shape reaches a few identifiers: Svelte reports `{line, column,
+ * character}` on the ones its own reader creates — a shorthand attribute's
+ * expansion (`{x}`), a snippet name, and a simple-identifier block pattern
+ * (`{#each … as x}`, `{:then x}`, `{:catch x}`, `{@const x = …}`) — so the walk
+ * gives those the `character` field too. The one `character`-bearing shape it can't
+ * reach is the in-tag comment above.
  *
  * **CSS is a no-op** — `parse_css` emits no `loc` (nothing to reconstruct), so
  * `reconstruct_locations` returns a CSS tree unchanged.
@@ -135,23 +152,191 @@ function infer_language(ast) {
 }
 
 /**
- * Walk `value`, adding a `loc` object to every node with numeric `start`/`end`.
- * Mutates in place. Skips the `loc` key it writes so it never re-walks its own
- * output.
+ * Where a Svelte node's `name_loc` span sits, by node type — one lookup for the
+ * walk's hottest question (most nodes carry no `name_loc`, and `Identifier` has a
+ * `name` field without one):
+ * - `element` — the tag-name run right after the opening `<`.
+ * - `directive` — the whole head token (`on:click|preventDefault`: prefix, name,
+ *   and modifiers), from the node start to the first name terminator. `in:`/`out:`
+ *   are `TransitionDirective`, so they need no entry of their own.
+ * - `attribute` — the name run at the node start, or a shorthand's braces interior.
+ * @type {Map<string, 'element' | 'directive' | 'attribute'>}
+ */
+const NAME_LOC_KINDS = new Map([
+	['RegularElement', 'element'],
+	['Component', 'element'],
+	['SvelteHead', 'element'],
+	['SvelteWindow', 'element'],
+	['SvelteBody', 'element'],
+	['SvelteDocument', 'element'],
+	['SvelteElement', 'element'],
+	['SvelteComponent', 'element'],
+	['SvelteSelf', 'element'],
+	['SlotElement', 'element'],
+	['SvelteFragment', 'element'],
+	['SvelteBoundary', 'element'],
+	['TitleElement', 'element'],
+	['OnDirective', 'directive'],
+	['BindDirective', 'directive'],
+	['ClassDirective', 'directive'],
+	['StyleDirective', 'directive'],
+	['UseDirective', 'directive'],
+	['TransitionDirective', 'directive'],
+	['AnimateDirective', 'directive'],
+	['LetDirective', 'directive'],
+	['Attribute', 'attribute'],
+]);
+
+/**
+ * The chars that end an attribute/directive name run — tsv's parse of Svelte's
+ * `read_tag` (`regex_token_ending_character = /[\s=/>"']/`), whose ASCII-only
+ * whitespace set it mirrors exactly, so the derived span always agrees with the
+ * wire it reconstructs. (A Unicode space inside a name run, which Svelte's `\s`
+ * would end the run on, is the one shape where both read it as a name char.)
+ */
+const NAME_TERMINATORS = ' \t\n\r\v\f=/>"\'';
+
+/**
+ * Whether an `Attribute` is the shorthand form (`{x}`, padding included: `{ x }`),
+ * whose name is its braces interior rather than a run at the node start. A
+ * `<script>`/`<style>` attribute name is a literal run that can itself be braced
+ * (`<script {x}>`, name `{x}`), so a verbatim name at the node start is not one.
+ * @param {any} node
+ * @param {string} source
+ * @returns {boolean}
+ */
+function is_shorthand_attribute(node, source) {
+	if (typeof node.name !== 'string' || typeof node.start !== 'number') return false;
+	return source[node.start] === '{' && !source.startsWith(node.name, node.start);
+}
+
+/**
+ * The `[start, end]` UTF-16 offsets a Svelte node's `name_loc` covers, or `null`
+ * for a node type that carries none.
+ * @param {any} node
+ * @param {string} source
+ * @returns {[number, number] | null}
+ */
+function name_span_of(node, source) {
+	const kind = NAME_LOC_KINDS.get(node.type);
+	if (kind === undefined || typeof node.name !== 'string') return null;
+	if (kind === 'element') {
+		const start = node.start + 1; // the tag name follows `<`
+		return [start, start + node.name.length];
+	}
+	if (kind === 'directive') {
+		let end = node.start;
+		while (end < node.end && !NAME_TERMINATORS.includes(source[end])) end++;
+		return [node.start, end];
+	}
+	if (is_shorthand_attribute(node, source)) return [node.start + 1, node.end - 1];
+	return [node.start, node.start + node.name.length];
+}
+
+/**
+ * The `Identifier` a shorthand attribute expands to (`{x}` → `x`), or `null`.
+ * @param {any} node - a shorthand `Attribute`.
+ * @returns {any | null}
+ */
+function shorthand_identifier_of(node) {
+	// a shorthand's `value` is the bare `ExpressionTag`; a quoted value is an array
+	const tag = Array.isArray(node.value)
+		? node.value.find((v) => v?.type === 'ExpressionTag')
+		: node.value;
+	if (tag?.type !== 'ExpressionTag') return null;
+	return tag.expression?.type === 'Identifier' ? tag.expression : null;
+}
+
+/**
+ * A `name_loc` endpoint — line/column plus the offset itself, the extra
+ * `character` field Svelte's `name_loc` carries and `loc` does not.
+ * @param {number} offset
+ * @param {number[]} starts
+ * @returns {{line: number, column: number, character: number}}
+ */
+function name_loc_at(offset, starts) {
+	const { line, column } = loc_at(offset, starts);
+	return { line, column, character: offset };
+}
+
+/**
+ * Overwrite `node`'s plain `loc` with the name-shaped one, if it's an identifier.
+ * @param {any} node
+ * @param {number[]} starts
+ * @mutates node
+ */
+function stamp_name_shaped_loc(node, starts) {
+	if (node?.type !== 'Identifier' || typeof node.start !== 'number') return;
+	node.loc = { start: name_loc_at(node.start, starts), end: name_loc_at(node.end, starts) };
+}
+
+/**
+ * Give the identifiers under `node` the name-shaped `loc` — the `{line, column,
+ * character}` endpoints Svelte reports on the ones its own reader creates, rather
+ * than the plain `{line, column}` an acorn-parsed node carries. Those are a
+ * shorthand attribute's expansion (`{x}`), a snippet name, and a block pattern
+ * that is a simple identifier (`{#each … as x}`, `{:then x}`, `{:catch x}`,
+ * `{@const x = …}` — a destructure pattern takes the `+1`-column quirk instead).
+ * @param {any} node
+ * @param {number[]} starts
+ * @param {string} source
+ * @mutates node
+ */
+function stamp_character_locs(node, starts, source) {
+	switch (node.type) {
+		case 'Attribute':
+			if (is_shorthand_attribute(node, source)) {
+				stamp_name_shaped_loc(shorthand_identifier_of(node), starts);
+			}
+			return;
+		case 'SnippetBlock':
+			stamp_name_shaped_loc(node.expression, starts);
+			return;
+		case 'EachBlock':
+			stamp_name_shaped_loc(node.context, starts);
+			return;
+		case 'AwaitBlock':
+			stamp_name_shaped_loc(node.value, starts);
+			stamp_name_shaped_loc(node.error, starts);
+			return;
+		case 'ConstTag':
+			for (const d of node.declaration?.declarations ?? []) stamp_name_shaped_loc(d?.id, starts);
+	}
+}
+
+/**
+ * Walk `value`, adding a `loc` object to every node with numeric `start`/`end` —
+ * and, for a Svelte tree, a `name_loc` to every element, attribute, and directive
+ * that carries one. Mutates in place. Skips the keys it writes so it never
+ * re-walks its own output.
  * @param {any} value
  * @param {number[]} starts
+ * @param {string} source
+ * @param {boolean} is_svelte
  */
-function walk_add_loc(value, starts) {
+function walk_add_loc(value, starts, source, is_svelte) {
 	if (Array.isArray(value)) {
-		for (const v of value) walk_add_loc(v, starts);
+		for (const v of value) walk_add_loc(v, starts, source, is_svelte);
 	} else if (value && typeof value === 'object') {
 		if (typeof value.start === 'number' && typeof value.end === 'number') {
 			value.loc = { start: loc_at(value.start, starts), end: loc_at(value.end, starts) };
+			if (is_svelte) {
+				const span = name_span_of(value, source);
+				if (span) {
+					value.name_loc = {
+						start: name_loc_at(span[0], starts),
+						end: name_loc_at(span[1], starts),
+					};
+				}
+			}
 		}
 		for (const key of Object.keys(value)) {
-			if (key === 'loc') continue;
-			walk_add_loc(value[key], starts);
+			if (key === 'loc' || key === 'name_loc') continue;
+			walk_add_loc(value[key], starts, source, is_svelte);
 		}
+		// Re-stamp the identifiers Svelte gives the name-shaped `loc`, after the walk
+		// above wrote them the plain shape.
+		if (is_svelte) stamp_character_locs(value, starts, source);
 	}
 }
 
@@ -170,6 +355,7 @@ export function create_locator(source, opts) {
 	const language = opts?.language ?? 'typescript';
 	const starts = build_line_starts(source, rule_for(language));
 	const is_css = language === 'css';
+	const is_svelte = language === 'svelte';
 	return {
 		loc_of(node) {
 			if (!node || typeof node.start !== 'number' || typeof node.end !== 'number') {
@@ -179,7 +365,7 @@ export function create_locator(source, opts) {
 		},
 		reconstruct(ast) {
 			// CSS has no `loc` in the wire — nothing to reconstruct.
-			if (!is_css) walk_add_loc(ast, starts);
+			if (!is_css) walk_add_loc(ast, starts, source, is_svelte);
 			return ast;
 		},
 	};
@@ -187,9 +373,10 @@ export function create_locator(source, opts) {
 
 /**
  * Add a `loc: {start, end}` line/column object to every node of a span-only wire,
- * derived from each node's `start`/`end` offsets + `source`. Builds the line-start
- * table once, **mutates `ast` in place**, and returns it. `structuredClone(ast)`
- * first if you need the input untouched.
+ * derived from each node's `start`/`end` offsets + `source` — and, for a Svelte
+ * tree, the `name_loc` its elements, attributes, and directives carry. Builds the
+ * line-start table once, **mutates `ast` in place**, and returns it.
+ * `structuredClone(ast)` first if you need the input untouched.
  *
  * Exact for TypeScript; approximate for Svelte; a no-op for CSS — see the module
  * doc for the specifics.
@@ -200,7 +387,8 @@ export function create_locator(source, opts) {
  * @param {{language?: 'typescript' | 'svelte' | 'css'}} [opts] - line rule
  *   selector; inferred from the root node (`Root`/`Program`/`StyleSheetFile`) when
  *   omitted.
- * @returns {any} the same `ast`, now with `loc` on every node.
+ * @returns {any} the same `ast`, now with `loc` on every node (plus `name_loc` on
+ *   the Svelte nodes that carry one).
  */
 export function reconstruct_locations(ast, source, opts) {
 	const language = opts?.language ?? infer_language(ast);

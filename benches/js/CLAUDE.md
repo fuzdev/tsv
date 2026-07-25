@@ -1619,7 +1619,10 @@ CWD-relative).
   `loc` from `start`/`end` (UTF-16 offsets) + source via the ECMAScript (TS) / LF-only
   (Svelte) line rules, and assert equality. TS is 100% exact; the two Svelte non-derivable
   cases (the `<script>` `Program` tag-position override, the destructure `+1`-column quirk)
-  are classified, not failed. Exits 1 on any unexplained mismatch. The reference
+  are classified, not failed. Svelte's `name_loc` is gated the same way — the name span is
+  derived from each node's own `start`/`end` + type (tag run after `<`, attribute name at
+  the node, directive head token) and both it and its line/column must match the oracle.
+  Exits 1 on any unexplained mismatch. The reference
   reconstruction a `no-locations` consumer would use. Run:
   `deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys benches/js/diagnostics/no_locations_parity.ts`
 - `diagnostics/reconstruct_vs_materialize.ts` — the **perf** sibling of the parity

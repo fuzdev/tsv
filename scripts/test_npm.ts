@@ -228,10 +228,15 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 	it('reconstruct_locations matches Svelte acorn-node loc, except the documented quirks', () => {
 		// No destructure pattern here, so the Svelte +1-column quirk can't appear;
 		// the `<script>` Program loc (Svelte's tag-position override) is skipped.
-		const sv = '<script>\nconst x = 1;\n</script>\n\n<div class="a">{x}</div>';
+		// Covers each `name_loc` shape (tag name, attribute, shorthand padded and
+		// not, a directive head with modifiers) and each identifier Svelte gives the
+		// name-shaped `loc` (shorthand expansion, snippet name, block patterns).
+		const sv =
+			'<script>\nconst x = 1;\n</script>\n\n<div class="a" on:click|preventDefault={x} {x} { x }>\n\t<svelte:head><title>t</title></svelte:head>\n\t{@const y = x}\n\t{#each [x] as item}{item}{/each}\n\t{#await x}p{:then value}{value}{:catch err}{err}{/await}\n</div>\n{#snippet row(a)}{a}{/snippet}';
 		const full = node_entry.parse_svelte(sv);
 		const recon = node_entry.reconstruct_locations(node_entry.parse_svelte_no_locations(sv), sv);
 		let checked = 0;
+		let name_locs_checked = 0;
 		const walk = (r: any, f: any): void => {
 			if (Array.isArray(f)) {
 				f.forEach((x, i) => walk(r[i], x));
@@ -242,6 +247,12 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 					assert.deepEqual(r.loc, f.loc, `loc mismatch at ${f.type}@${f.start}`);
 					checked++;
 				}
+				// `name_loc` (elements, attributes, directives) is exact — its span is a
+				// function of the node's own start/end + type.
+				if (f.name_loc) {
+					assert.deepEqual(r.name_loc, f.name_loc, `name_loc mismatch at ${f.type}@${f.start}`);
+					name_locs_checked++;
+				}
 				for (const k of Object.keys(f)) {
 					if (k === 'loc' || k === 'name_loc') continue;
 					walk(r[k], f[k]);
@@ -250,6 +261,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		};
 		walk(recon, full);
 		assert.ok(checked > 0, 'expected at least one acorn node to compare');
+		assert.ok(name_locs_checked > 0, 'expected at least one name_loc to compare');
 		// The walk is a superset: it adds `loc` to template nodes Svelte's wire omits.
 		assert.ok(recon.loc, 'reconstruct added loc to the Root (template node)');
 	});
