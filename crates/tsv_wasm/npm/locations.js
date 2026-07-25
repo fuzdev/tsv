@@ -48,8 +48,9 @@
  *
  * **Svelte `name_loc` is exact.** The name span is a function of the node's own
  * `start`/`end` + type — a tag name is the run after `<`, an attribute name starts
- * at the node (a shorthand `{x}` names its braces interior, padding included), and
- * a directive names its whole head token (`on:click|preventDefault`) — so the walk
+ * at the node (a shorthand `{x}` names the identifier inside the braces, so `{ x }`
+ * excludes the padding), and a directive names its whole head token
+ * (`on:click|preventDefault`) — so the walk
  * restores `name_loc` (`{line, column, character}` endpoints) on every element,
  * attribute, and directive that carries one, matching Svelte's wire.
  *
@@ -114,12 +115,15 @@ function build_line_starts(source, rule) {
 }
 
 /**
- * Line/column for a UTF-16 offset, via binary search over the line-start table.
+ * Index into `starts` of the line containing `offset` — the rightmost start `<=`
+ * it, by binary search. The two point shapes (`loc`'s `{line, column}` and
+ * `name_loc`'s `{line, column, character}`) build on it directly, so neither has
+ * to construct the other's object and discard it.
  * @param {number} offset
  * @param {number[]} starts
- * @returns {{line: number, column: number}}
+ * @returns {number}
  */
-function loc_at(offset, starts) {
+function line_index_at(offset, starts) {
 	let lo = 0;
 	let hi = starts.length - 1;
 	while (lo < hi) {
@@ -127,7 +131,18 @@ function loc_at(offset, starts) {
 		if (starts[mid] <= offset) lo = mid;
 		else hi = mid - 1;
 	}
-	return { line: lo + 1, column: offset - starts[lo] };
+	return lo;
+}
+
+/**
+ * Line/column for a UTF-16 offset.
+ * @param {number} offset
+ * @param {number[]} starts
+ * @returns {{line: number, column: number}}
+ */
+function loc_at(offset, starts) {
+	const i = line_index_at(offset, starts);
+	return { line: i + 1, column: offset - starts[i] };
 }
 
 /**
@@ -159,7 +174,8 @@ function infer_language(ast) {
  * - `directive` — the whole head token (`on:click|preventDefault`: prefix, name,
  *   and modifiers), from the node start to the first name terminator. `in:`/`out:`
  *   are `TransitionDirective`, so they need no entry of their own.
- * - `attribute` — the name run at the node start, or a shorthand's braces interior.
+ * - `attribute` — the name run at the node start, or a shorthand's identifier
+ *   inside the braces.
  * @type {Map<string, 'element' | 'directive' | 'attribute'>}
  */
 const NAME_LOC_KINDS = new Map([
@@ -197,10 +213,10 @@ const NAME_LOC_KINDS = new Map([
 const NAME_TERMINATORS = ' \t\n\r\v\f=/>"\'';
 
 /**
- * Whether an `Attribute` is the shorthand form (`{x}`, padding included: `{ x }`),
- * whose name is its braces interior rather than a run at the node start. A
- * `<script>`/`<style>` attribute name is a literal run that can itself be braced
- * (`<script {x}>`, name `{x}`), so a verbatim name at the node start is not one.
+ * Whether an `Attribute` is the shorthand form (`{x}`, or padded: `{ x }`), whose
+ * name sits inside the braces rather than at the node start. A `<script>`/`<style>`
+ * attribute name is a literal run that can itself be braced (`<script {x}>`, name
+ * `{x}`), so a verbatim name at the node start is not one.
  * @param {any} node
  * @param {string} source
  * @returns {boolean}
@@ -229,7 +245,14 @@ function name_span_of(node, source) {
 		while (end < node.end && !NAME_TERMINATORS.includes(source[end])) end++;
 		return [node.start, end];
 	}
-	if (is_shorthand_attribute(node, source)) return [node.start + 1, node.end - 1];
+	if (is_shorthand_attribute(node, source)) {
+		// `{ x }` names just the `x` — Svelte's reader ate the padding before reading the
+		// identifier. The padding is whitespace, so the first occurrence of the name at or
+		// after the `{` IS the identifier, whichever whitespace chars the padding used.
+		const name_start = source.indexOf(node.name, node.start + 1);
+		if (name_start < 0 || name_start >= node.end) return null;
+		return [name_start, name_start + node.name.length];
+	}
 	return [node.start, node.start + node.name.length];
 }
 
@@ -255,8 +278,8 @@ function shorthand_identifier_of(node) {
  * @returns {{line: number, column: number, character: number}}
  */
 function name_loc_at(offset, starts) {
-	const { line, column } = loc_at(offset, starts);
-	return { line, column, character: offset };
+	const i = line_index_at(offset, starts);
+	return { line: i + 1, column: offset - starts[i], character: offset };
 }
 
 /**
@@ -266,7 +289,8 @@ function name_loc_at(offset, starts) {
  * @mutates node
  */
 function stamp_name_shaped_loc(node, starts) {
-	if (node?.type !== 'Identifier' || typeof node.start !== 'number') return;
+	if (node?.type !== 'Identifier') return;
+	if (typeof node.start !== 'number' || typeof node.end !== 'number') return;
 	node.loc = { start: name_loc_at(node.start, starts), end: name_loc_at(node.end, starts) };
 }
 
