@@ -146,6 +146,29 @@ normally hug (`fn({ a, b }: T)`) expands instead, so the directive keeps its own
 line. A directive written *between* a parameter's decorators and its binding
 freezes just the binding, leaving the decorators to format normally.
 
+### On argument and element lists
+
+Call, `new`, and dynamic-`import()` **arguments** and array literal / array
+pattern **elements** are member lists too, under the same rule: an own-line
+directive after the `(` / `[` or between two items freezes the **next item**
+only.
+
+```ts
+fn(
+	a,
+	// format-ignore
+	{ x:1,  y:2 },   // ← frozen verbatim; the `,` stays parent-owned
+	b
+);
+```
+
+A spread or rest `...` is part of what the directive precedes, so it rides inside
+the frozen slice (`...  a  .  b` is kept verbatim). An argument that needs
+clarity parens keeps them around the frozen slice (`(a = b  +  c)`). An
+argument or element that would normally hug (`fn({ a, b })`, `new A([a, b])`)
+expands instead, so the directive keeps its own line. An array hole contributes
+only its comma, so the element after one still freezes.
+
 ## `format-ignore-start` / `format-ignore-end`
 
 In Svelte templates, a pair of range markers preserves every node between them:

@@ -4,6 +4,7 @@
 // Jest, Mocha, Jasmine, Playwright, Vitest patterns
 
 use super::super::Printer;
+use super::arg_comments::has_inter_argument_comments_slice;
 use crate::ast::internal::{self, IdentName};
 use smallvec::SmallVec;
 use tsv_lang::doc::arena::DocId;
@@ -123,6 +124,64 @@ fn get_member_chain_parts<'a>(
         }
         _ => None,
     }
+}
+
+/// Whether the test-call FLAT layout applies to `call` — [`is_test_call`] plus the one
+/// thing that layout cannot do: print a comment sitting in an argument gap.
+///
+/// The flat layout joins the argument docs with `", "` and appends a trailing-comment
+/// suffix after the last argument; it never opens the `(`→first-argument gap or any
+/// inter-argument gap, so a comment there is DROPPED outright (the hazard-4 shape in
+/// docs/comments.md — an alternate-layout builder that emits only its children's docs).
+/// A layout that cannot print a comment must not be chosen for a call that has one, so
+/// such a call falls through and expands like any other.
+///
+/// **To-emit axis**, deliberately: a GLUED block comment is owned by the argument it
+/// precedes and rides inside that argument's own doc, so the flat layout does print it
+/// — and keeping the flat layout there matches prettier. The question here is exactly
+/// "would a comment be dropped?", which is the to-emit axis's question. A comment
+/// trailing the whole call is likewise fine — the layout emits that itself.
+///
+/// Both routing sites ask this rather than [`is_test_call`] (`calls/mod.rs`'s
+/// chain-bypass and `call_formatting.rs`'s layout branch), so they cannot disagree about
+/// which calls take the flat form. See conformance_prettier.md §Comment relocation.
+pub(super) fn test_call_flat_layout_applies(
+    call: &internal::CallExpression<'_>,
+    printer: &Printer<'_>,
+    paren_open: u32,
+) -> bool {
+    if !is_test_call(call, printer) {
+        return false;
+    }
+    // Zero-comment fast gate: ONE binary search over `[paren_open, last argument's start)`,
+    // which strictly contains every gap the check below looks at — the `(`→first-argument
+    // gap and each inter-argument gap all end at or before the last argument. So with no
+    // comment in it they are provably all empty.
+    //
+    // The window deliberately stops at the LAST argument rather than at the call's end: the
+    // last argument of a test call is its callback body, which is where a test file's
+    // comments overwhelmingly live, so a gate spanning it fires on nearly every call and
+    // gates nothing. Canonical reference: `build_params_doc_with_comments`.
+    let Some(last_start) = call.arguments.last().map(|a| a.span().start) else {
+        return true;
+    };
+    !(printer.has_comments_to_emit_between(paren_open, last_start)
+        && test_call_gaps_have_comments(call, printer, paren_open))
+}
+
+/// Whether any argument gap of `call` holds a comment this call would have to emit —
+/// the `(`→first-argument gap or an inter-argument gap. Only the gaps, never an
+/// argument's interior: a comment inside an argument is printed by that argument's own
+/// doc.
+fn test_call_gaps_have_comments(
+    call: &internal::CallExpression<'_>,
+    printer: &Printer<'_>,
+    paren_open: u32,
+) -> bool {
+    call.arguments
+        .first()
+        .is_some_and(|first| printer.has_comments_to_emit_between(paren_open, first.span().start))
+        || has_inter_argument_comments_slice(call.arguments, printer)
 }
 
 /// Check if a call expression is a test function call that should stay on one line

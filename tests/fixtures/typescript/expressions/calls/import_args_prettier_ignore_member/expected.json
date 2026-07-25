@@ -1,0 +1,911 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 562,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an own-line directive before the source argument freezes it",
+			"start": 20,
+			"end": 82,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 104,
+			"end": 122,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " with an options argument too",
+			"start": 146,
+			"end": 177,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 199,
+			"end": 217,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line directive in the source→options gap freezes the options argument",
+			"start": 249,
+			"end": 328,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 359,
+			"end": 377,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 2
+				},
+				"end": {
+					"line": 18,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line block spelling freezes identically",
+			"start": 415,
+			"end": 464,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 495,
+			"end": 516,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 2
+				},
+				"end": {
+					"line": 25,
+					"column": 23
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 561,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 552,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 84,
+					"end": 143,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 90,
+							"end": 142,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 90,
+								"end": 91,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 94,
+								"end": 142,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "BinaryExpression",
+									"start": 125,
+									"end": 139,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 16
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 125,
+										"end": 129,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 2
+											},
+											"end": {
+												"line": 5,
+												"column": 6
+											}
+										},
+										"name": "base"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 134,
+										"end": 139,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 11
+											},
+											"end": {
+												"line": 5,
+												"column": 16
+											}
+										},
+										"value": "./a",
+										"raw": "'./a'"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 104,
+											"end": 122
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line directive before the source argument freezes it",
+							"start": 20,
+							"end": 82
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 179,
+					"end": 246,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 185,
+							"end": 245,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 185,
+								"end": 186,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 189,
+								"end": 245,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 11
+									},
+									"end": {
+										"line": 13,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "BinaryExpression",
+									"start": 220,
+									"end": 234,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 16
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 220,
+										"end": 224,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 6
+											}
+										},
+										"name": "base"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Literal",
+										"start": 229,
+										"end": 234,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 11
+											},
+											"end": {
+												"line": 11,
+												"column": 16
+											}
+										},
+										"value": "./a",
+										"raw": "'./a'"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " prettier-ignore",
+											"start": 199,
+											"end": 217
+										}
+									]
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 238,
+										"end": 242,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 6
+											}
+										},
+										"name": "opts"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " with an options argument too",
+							"start": 146,
+							"end": 177
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 330,
+					"end": 412,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 336,
+							"end": 411,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 20,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 336,
+								"end": 337,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 340,
+								"end": 411,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 11
+									},
+									"end": {
+										"line": 20,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 350,
+									"end": 355,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'"
+								},
+								"arguments": [
+									{
+										"type": "ObjectExpression",
+										"start": 380,
+										"end": 408,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 2
+											},
+											"end": {
+												"line": 19,
+												"column": 30
+											}
+										},
+										"properties": [
+											{
+												"type": "Property",
+												"start": 382,
+												"end": 406,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 4
+													},
+													"end": {
+														"line": 19,
+														"column": 28
+													}
+												},
+												"method": false,
+												"shorthand": false,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 382,
+													"end": 386,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 4
+														},
+														"end": {
+															"line": 19,
+															"column": 8
+														}
+													},
+													"name": "with"
+												},
+												"value": {
+													"type": "ObjectExpression",
+													"start": 388,
+													"end": 406,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 10
+														},
+														"end": {
+															"line": 19,
+															"column": 28
+														}
+													},
+													"properties": [
+														{
+															"type": "Property",
+															"start": 390,
+															"end": 404,
+															"loc": {
+																"start": {
+																	"line": 19,
+																	"column": 12
+																},
+																"end": {
+																	"line": 19,
+																	"column": 26
+																}
+															},
+															"method": false,
+															"shorthand": false,
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 390,
+																"end": 394,
+																"loc": {
+																	"start": {
+																		"line": 19,
+																		"column": 12
+																	},
+																	"end": {
+																		"line": 19,
+																		"column": 16
+																	}
+																},
+																"name": "type"
+															},
+															"value": {
+																"type": "Literal",
+																"start": 398,
+																"end": 404,
+																"loc": {
+																	"start": {
+																		"line": 19,
+																		"column": 20
+																	},
+																	"end": {
+																		"line": 19,
+																		"column": 26
+																	}
+																},
+																"value": "json",
+																"raw": "'json'"
+															},
+															"kind": "init"
+														}
+													]
+												},
+												"kind": "init"
+											}
+										],
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " prettier-ignore",
+												"start": 359,
+												"end": 377
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line directive in the source→options gap freezes the options argument",
+							"start": 249,
+							"end": 328
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 466,
+					"end": 551,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 472,
+							"end": 550,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 7
+								},
+								"end": {
+									"line": 27,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 472,
+								"end": 473,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 7
+									},
+									"end": {
+										"line": 23,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ImportExpression",
+								"start": 476,
+								"end": 550,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 11
+									},
+									"end": {
+										"line": 27,
+										"column": 2
+									}
+								},
+								"source": {
+									"type": "Literal",
+									"start": 486,
+									"end": 491,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 2
+										},
+										"end": {
+											"line": 24,
+											"column": 7
+										}
+									},
+									"value": "./a",
+									"raw": "'./a'"
+								},
+								"arguments": [
+									{
+										"type": "ObjectExpression",
+										"start": 519,
+										"end": 547,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 2
+											},
+											"end": {
+												"line": 26,
+												"column": 30
+											}
+										},
+										"properties": [
+											{
+												"type": "Property",
+												"start": 521,
+												"end": 545,
+												"loc": {
+													"start": {
+														"line": 26,
+														"column": 4
+													},
+													"end": {
+														"line": 26,
+														"column": 28
+													}
+												},
+												"method": false,
+												"shorthand": false,
+												"computed": false,
+												"key": {
+													"type": "Identifier",
+													"start": 521,
+													"end": 525,
+													"loc": {
+														"start": {
+															"line": 26,
+															"column": 4
+														},
+														"end": {
+															"line": 26,
+															"column": 8
+														}
+													},
+													"name": "with"
+												},
+												"value": {
+													"type": "ObjectExpression",
+													"start": 527,
+													"end": 545,
+													"loc": {
+														"start": {
+															"line": 26,
+															"column": 10
+														},
+														"end": {
+															"line": 26,
+															"column": 28
+														}
+													},
+													"properties": [
+														{
+															"type": "Property",
+															"start": 529,
+															"end": 543,
+															"loc": {
+																"start": {
+																	"line": 26,
+																	"column": 12
+																},
+																"end": {
+																	"line": 26,
+																	"column": 26
+																}
+															},
+															"method": false,
+															"shorthand": false,
+															"computed": false,
+															"key": {
+																"type": "Identifier",
+																"start": 529,
+																"end": 533,
+																"loc": {
+																	"start": {
+																		"line": 26,
+																		"column": 12
+																	},
+																	"end": {
+																		"line": 26,
+																		"column": 16
+																	}
+																},
+																"name": "type"
+															},
+															"value": {
+																"type": "Literal",
+																"start": 537,
+																"end": 543,
+																"loc": {
+																	"start": {
+																		"line": 26,
+																		"column": 20
+																	},
+																	"end": {
+																		"line": 26,
+																		"column": 26
+																	}
+																},
+																"value": "json",
+																"raw": "'json'"
+															},
+															"kind": "init"
+														}
+													]
+												},
+												"kind": "init"
+											}
+										],
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " prettier-ignore ",
+												"start": 495,
+												"end": 516
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line block spelling freezes identically",
+							"start": 415,
+							"end": 464
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

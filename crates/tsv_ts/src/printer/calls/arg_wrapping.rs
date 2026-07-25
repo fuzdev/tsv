@@ -450,8 +450,13 @@ pub(crate) fn build_args_split_last(
     // reaching `printArrowFunctionSignatures`.
     let arg_docs: DocBuf = arguments
         .iter()
-        .map(|arg| {
-            if is_curried_arrow_chain(arg) {
+        .enumerate()
+        .map(|(i, arg)| {
+            // Rule A first: an own-line directive in this argument's gap freezes it
+            // verbatim, so no layout context applies to it.
+            if let Some(frozen) = printer.args_frozen_span(paren_open, arguments, i) {
+                printer.build_frozen_arg_doc(arg, frozen)
+            } else if is_curried_arrow_chain(arg) {
                 printer
                     .build_with_arrow_chain_context(ArrowChainContext::CallArgOrBinaryish, || {
                         printer.build_arg_expression_doc(arg)
@@ -763,10 +768,18 @@ pub(crate) fn build_arrow_call_body_states(
 /// When `use_hardline` is true, separators are hardlines (forced expansion).
 /// When false, separators are soft lines (break only when the group breaks).
 /// Trailing line comments always force a hardline regardless of this setting.
+///
+/// `leading_gap_claimed` says the caller has already emitted the `(`→first-argument gap
+/// itself (the `new` paren-line-prefix path does), so this builder must not print it a
+/// second time. It stays a separate flag rather than a narrowed `paren_open` because
+/// `paren_open` also anchors the first argument's FREEZE window: a directive alone on its
+/// line inside an already-emitted gap still freezes the first argument, and passing the
+/// first argument's own start as `paren_open` would leave that window empty.
 pub(crate) fn build_args_joined_with_comments(
     printer: &Printer<'_>,
     arguments: &[internal::Expression<'_>],
     paren_open: u32,
+    leading_gap_claimed: bool,
     use_hardline: bool,
     build_arg: impl Fn(&Printer<'_>, &internal::Expression<'_>) -> DocId,
 ) -> DocId {
@@ -775,7 +788,9 @@ pub(crate) fn build_args_joined_with_comments(
 
     // Leading comments before first arg (e.g., `fn(/* c */ arg)`)
     let first_arg_start = arguments[0].span().start;
-    emit_first_arg_leading_comments(printer, &mut parts, paren_open, first_arg_start);
+    if !leading_gap_claimed {
+        emit_first_arg_leading_comments(printer, &mut parts, paren_open, first_arg_start);
+    }
 
     let no_comment_sep = if use_hardline {
         d.comma_hardline()
@@ -784,7 +799,15 @@ pub(crate) fn build_args_joined_with_comments(
     };
 
     for (i, arg) in arguments.iter().enumerate() {
-        parts.push(build_arg(printer, arg));
+        // An own-line format-ignore directive in this argument's gap freezes it verbatim
+        // (Rule A), ahead of the caller's ordinary item builder — the frozen slice is the
+        // same whichever builder the caller supplies. This loop can't route through
+        // `build_arg_item_doc`: the ordinary arm is the caller's closure, not the standard
+        // argument builder.
+        parts.push(match printer.args_frozen_span(paren_open, arguments, i) {
+            Some(frozen) => printer.build_frozen_arg_doc(arg, frozen),
+            None => build_arg(printer, arg),
+        });
 
         if i < arguments.len() - 1 {
             let arg_end = arg.span().end;
@@ -942,12 +965,22 @@ pub(super) fn try_hug_multiline_template_arg(
 /// Handles comments in the gaps; a gap without comments preserves its blank
 /// line at the top of the next iteration. The caller wraps the result with
 /// `wrap_call_with_hard_breaks`.
+///
+/// The per-argument loop below only opens the gaps BETWEEN arguments (each via the
+/// previous argument's end), so the `(`→first-argument gap is emitted up front or its
+/// comments are DROPPED — the hazard-4 shape in docs/comments.md. Reachable from the
+/// `new` cascade, whose comment paths do not preempt this one the way the plain call's do;
+/// `blanks:audit` found it by injecting a blank line beside a leading comment.
 pub(super) fn build_args_with_blank_lines(
     printer: &Printer<'_>,
     args: &[internal::Expression<'_>],
+    paren_open: u32,
 ) -> DocId {
     let d = printer.d();
     let mut arg_parts = DocBuf::new();
+    if let Some(first) = args.first() {
+        emit_first_arg_leading_comments(printer, &mut arg_parts, paren_open, first.span().start);
+    }
     // Whether the gap just closed — between `args[i - 1]` and `args[i]` — carries an
     // author blank line. Computed once at the bottom of the previous iteration (the
     // no-comment branch below) and reused here, since the top of this iteration and
@@ -973,8 +1006,9 @@ pub(super) fn build_args_with_blank_lines(
         // Argument-context builder so a binary/logical chain (or conditional) keeps
         // its continuation indent, and an assignment gets clarity parens — same as
         // the no-blank-line path; the blank-line forced expansion is just another
-        // reason the args break.
-        arg_parts.push(printer.build_arg_expression_doc(arg));
+        // reason the args break. An own-line directive in this argument's gap freezes
+        // it verbatim (Rule A).
+        arg_parts.push(printer.build_arg_item_doc(paren_open, args, i));
 
         if i < args.len() - 1 {
             let arg_end = arg.span().end;

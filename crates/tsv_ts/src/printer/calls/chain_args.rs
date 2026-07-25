@@ -540,7 +540,11 @@ fn build_chain_args_force_expand(
             }
         }
 
-        arg_parts.push(printer.build_arg_expression_doc(arg));
+        // An own-line format-ignore directive in this argument's gap freezes it verbatim
+        // (Rule A). The three hugging special cases above all decline once a comment
+        // forces expansion, so this is the only argument builder a directive reaches in
+        // the chain family.
+        arg_parts.push(printer.build_arg_item_doc(paren_open, call.arguments, i));
 
         // Handle trailing comments and comma placement
         let arg_end = arg.span().end;

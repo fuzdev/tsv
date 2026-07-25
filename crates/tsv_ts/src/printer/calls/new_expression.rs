@@ -130,7 +130,26 @@ impl<'a> Printer<'a> {
             && new_has_comments
             && has_trailing_comments_slice(new_expr.arguments, new_expr.span.end, self);
 
-        if new_expr.arguments.len() == 1 && !single_arg_has_trailing_comment {
+        // A comment in the `(`→argument gap that this expression would have to EMIT
+        // disqualifies the three hug arms below (object / array / function expression):
+        // they emit the argument's doc alone, with no gap emitter, so the comment would be
+        // DROPPED (the hazard-4 shape in docs/comments.md). Such a call falls through to
+        // the comment-aware paths and expands, matching prettier.
+        //
+        // **To-emit axis**, deliberately: a GLUED block comment is owned by the argument
+        // and rides inside its doc, so the hug does print it — and hugging there matches
+        // prettier (`new A(/* c */ { a: 1 })`). The question is exactly "would a comment be
+        // dropped?". The arrow arm asks the wider ON-PAGE question for its own reason (an
+        // owned comment must still defeat the hug, per prettier's `couldExpandArg`), which
+        // is why the gate sits on the three arms rather than on the outer guard.
+        let single_arg_leading_emit_comment = new_expr.arguments.len() == 1
+            && new_has_comments
+            && self.has_comments_to_emit_between(paren_open, new_expr.arguments[0].span().start);
+
+        if new_expr.arguments.len() == 1
+            && !single_arg_has_trailing_comment
+            && !single_arg_leading_emit_comment
+        {
             match &new_expr.arguments[0] {
                 // Object literal: hug it
                 internal::Expression::ObjectExpression(_) => {
@@ -323,6 +342,7 @@ impl<'a> Printer<'a> {
                 self,
                 new_expr.arguments,
                 paren_open,
+                false,
                 true,
                 #[allow(clippy::redundant_closure_for_method_calls)]
                 |p, a| p.build_arg_expression_doc(a),
@@ -355,6 +375,7 @@ impl<'a> Printer<'a> {
                 self,
                 new_expr.arguments,
                 paren_open,
+                false,
                 true,
                 #[allow(clippy::redundant_closure_for_method_calls)]
                 |p, a| p.build_arg_expression_doc(a),
@@ -372,7 +393,7 @@ impl<'a> Printer<'a> {
             .any(|window| self.is_next_line_empty(window[0].span().end, window[1].span().start));
 
         if has_blank_lines {
-            let arg_doc = build_args_with_blank_lines(self, new_expr.arguments);
+            let arg_doc = build_args_with_blank_lines(self, new_expr.arguments, paren_open);
             return wrap_call_with_hard_breaks(d, callee_with_types, arg_doc);
         }
 
@@ -438,8 +459,9 @@ impl<'a> Printer<'a> {
                 // Build the argument with the argument-context builder so a binary/
                 // logical chain (or conditional) keeps its continuation indent in this
                 // trailing-line-comment path — matching the no-comment path (the
-                // call/member-chain comment paths do the same).
-                arg_parts.push(self.build_arg_expression_doc(arg));
+                // call/member-chain comment paths do the same). An own-line directive in
+                // this argument's gap freezes it verbatim (Rule A).
+                arg_parts.push(self.build_arg_item_doc(paren_open, new_expr.arguments, i));
 
                 // Check for comments after this argument
                 if i < new_expr.arguments.len() - 1 {
@@ -489,10 +511,8 @@ impl<'a> Printer<'a> {
         if has_trailing_block_only {
             // Build args with trailing block comment
             let last_idx = new_expr.arguments.len() - 1;
-            let mut arg_docs: DocBuf = new_expr
-                .arguments
-                .iter()
-                .map(|arg| self.build_arg_expression_doc(arg))
+            let mut arg_docs: DocBuf = (0..new_expr.arguments.len())
+                .map(|i| self.build_arg_item_doc(paren_open, new_expr.arguments, i))
                 .collect();
 
             // Prepend leading comments before the first arg (e.g. `new Foo(/* c */ a /* t */)`);
@@ -762,7 +782,8 @@ impl<'a> Printer<'a> {
                 inner.push(build_args_joined_with_comments(
                     self,
                     new_expr.arguments,
-                    first_arg_start,
+                    paren_open,
+                    true,
                     true,
                     #[allow(clippy::redundant_closure_for_method_calls)]
                     |p, a| p.build_arg_expression_doc(a),
@@ -784,6 +805,7 @@ impl<'a> Printer<'a> {
                 self,
                 new_expr.arguments,
                 paren_open,
+                false,
                 false,
                 #[allow(clippy::redundant_closure_for_method_calls)]
                 |p, a| p.build_arg_expression_doc(a),

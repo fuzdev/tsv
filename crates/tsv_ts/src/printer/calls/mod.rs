@@ -51,6 +51,17 @@ use arg_comments::{any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
 use tsv_lang::doc::arena::DocId;
 
+/// The position the call's `(` follows — the end of the type-argument list when the call
+/// has one (`fn<T>(a)`), else the callee's end. Every argument-gap window in this family
+/// opens here: the leading-argument comment scans, and Rule A's first-argument freeze
+/// window ([`Printer::args_frozen_span`]). One spelling, so a caller can't accidentally
+/// open the window at the callee and swallow the type arguments' own comments.
+pub(super) fn call_paren_open(call: &internal::CallExpression<'_>) -> u32 {
+    call.type_arguments
+        .as_ref()
+        .map_or_else(|| call.callee.span().end, |ta| ta.span.end)
+}
+
 /// Check if a chain expression contains any call expressions
 fn chain_has_calls(expr: &internal::Expression<'_>) -> bool {
     match expr {
@@ -160,7 +171,7 @@ impl<'a> Printer<'a> {
         // if they exceed print width. Must check BEFORE chain routing, because
         // memberish callees like `it.skip(...)` would otherwise be routed through
         // the chain path which doesn't know about test call special-casing.
-        if test_patterns::is_test_call(call, self) {
+        if test_patterns::test_call_flat_layout_applies(call, self, call_paren_open(call)) {
             return self.build_call_doc_with_wrapping(call);
         }
 

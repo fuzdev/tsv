@@ -986,6 +986,7 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Call arg after-comma block, **stranded** (newline before the next arg) → Block relocated before the comma (tsv respects the newline and keeps the stranded block on the comma line). A block instead **hugging** the next arg leads it (`C`) and both formatters agree (plain match) — [stranded](../tests/fixtures/typescript/expressions/calls/nonlast_arg_after_comma_block_stranded_prettier_divergence/), [import](../tests/fixtures/typescript/expressions/calls/import_inter_arg_stranded_prettier_divergence/) (dynamic `import()` source→options gap; hugging match at [import_inter_arg_comment](../tests/fixtures/typescript/expressions/calls/import_inter_arg_comment/))
 - Comma-separated-item after-comma block, **stranded** (newline before the next item) → Block relocated before the comma; tsv keeps the stranded block on the comma line (`a, /* c */⏎ b`), a before-comma and a stranded after-comma block in the same gap each preserved independently. One rule (`is_stranded_after_comma_block`) across every comma-separated site: a block **hugging** the next item leads it (both formatters agree); a **stranded** block stays trailing the comma. The stranded block is a **stable** form only when the items sit on separate lines: the multi-declarator statement always breaks its declarators, while the for-init, heritage (`extends`/`implements`), and function-parameter-list gaps collapse to one line when they fit (there the block hugs the next item and both agree) and diverge the same way only once the items wrap. The regular heritage [interface](../tests/fixtures/typescript/declarations/interface/heritage_item_after_comma_block/) / [class](../tests/fixtures/typescript/declarations/class/heritage/heritage_item_after_comma_block/) fixtures pin the hugging case (leads the next item, matching prettier). Function-parameter lists trail the comma like every other site (function declarations, methods, arrows, constructors, Svelte `{#snippet}` params, plus function/constructor **types** via their separate printer). Stranded fixtures: [declarator](../tests/fixtures/typescript/declarations/variable/multiple/after_comma_block_stranded_prettier_divergence/), [for-init](../tests/fixtures/typescript/statements/for/init_after_comma_block_stranded_prettier_divergence/), heritage [interface](../tests/fixtures/typescript/declarations/interface/heritage_item_after_comma_block_stranded_prettier_divergence/) / [class](../tests/fixtures/typescript/declarations/class/heritage/heritage_item_after_comma_block_stranded_prettier_divergence/), function-param [param](../tests/fixtures/typescript/syntax/comments/param_after_comma_block_stranded_prettier_divergence/), function/constructor-type [param](../tests/fixtures/typescript/types/function_type/param_after_comma_block_stranded_prettier_divergence/)
 - Call open paren `(` trailing → Onto its own line — [open_paren_comment](../tests/fixtures/typescript/expressions/calls/open_paren_comment_prettier_divergence/), [chain](../tests/fixtures/typescript/expressions/calls/chain_open_paren_comment_prettier_divergence/), [new](../tests/fixtures/typescript/expressions/calls/new_open_paren_comment_prettier_divergence/)
+- Test-call (`it`/`test`/`describe`) argument-gap comment → Kept on the flat one-line layout, relocated onto the `(` line (leading gap) or past the previous argument (inter-argument gap), and prettier's own later passes then re-bind an inter-argument comment **into the callback body** (pass 2 `() => { // c`, pass 3 its own line inside the body — `audit_signature.txt` pins the chain). tsv gives up the flat layout for a call whose gaps hold a comment to emit: it expands like any other call and every comment keeps its line. Also a content-loss fix — the flat layout has no gap emitter at all, so those comments were dropped ([comments.md](./comments.md) hazard 4). A **glued** block comment is owned by its argument and rides inside that argument's doc, so it keeps the flat layout and matches prettier; so does a comment trailing the whole call — [test_call_arg_comment](../tests/fixtures/typescript/expressions/calls/test_call_arg_comment_prettier_divergence/)
 - Object literal `{` trailing → Onto its own line — [open_brace_comment](../tests/fixtures/typescript/expressions/objects/open_brace_comment_prettier_divergence/)
 - Array literal `[` trailing → Onto its own line — [open_bracket_comment](../tests/fixtures/typescript/expressions/arrays/open_bracket_comment_prettier_divergence/)
 - Block body `{` trailing → Onto its own line — [block_open_brace_comment](../tests/fixtures/typescript/statements/block_open_brace_comment_prettier_divergence/)
@@ -1599,6 +1600,30 @@ position, and under the standing glued classification:
   multi-line frozen parameter, keeps the list flat around the frozen slice
   (`prettier_variant_frozen` pins its stable form) —
   [params glued](../tests/fixtures/typescript/declarations/function/params_prettier_ignore_glued_inert_prettier_divergence/)
+
+**On argument and element lists.** Rule A again, unchanged: an own-line directive in the
+`(`→first-argument / `[`→first-element gap or between two items freezes the **following
+item** — a call's, a `new`'s and a dynamic `import()`'s arguments, and an array literal's
+or array pattern's elements. The slice is the item's own node span, so a spread or rest
+`...` rides inside it (the `...` is part of what the directive precedes), and an argument
+needing clarity parens keeps them around the frozen slice (`(a = b  +  c)`). A lone
+huggable argument expands rather than hugging, for the same reason as a lone parameter.
+An array hole contributes only its comma, so the element after one still freezes.
+Two node-level facts ride with the slice, both because the printed form of an argument is
+wider than its own span: a block comment **glued** before the item is OWNED by it and would
+travel inside the doc the slice replaces, so the freeze claims it; and a
+`SequenceExpression` prints its own grouping parens (`fn((0, 1))` passes ONE argument), so
+the freeze re-synthesizes those too. Prettier agrees at every one of these positions, so the
+ordinary fixtures `calls/args_prettier_ignore_member`,
+`calls/chained/args_prettier_ignore_member`, `calls/import_args_prettier_ignore_member`,
+`new/args_prettier_ignore_member`, `arrays/elements_prettier_ignore_member`,
+`patterns/prettier_ignore_element`, `parenthesized/jsdoc_cast_prettier_ignore_interior` (the
+directive inside a JSDoc cast's own parens, which freezes the cast's inner), and the Svelte
+`expressions/call_args_prettier_ignore_member` (the embedded-TS route, where the frozen
+slice is a raw range in host coordinates) all **match** prettier — no divergence in this
+family. The one place the two tools part is the flat **test-call** layout, and that is a
+comment-position question rather than a freeze one: see §Comment relocation's test-call
+entry.
 
 See [directives.md](./directives.md) for the user-facing reference.
 
