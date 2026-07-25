@@ -203,7 +203,7 @@ impl<'a> Printer<'a> {
 
                 // Build property doc — a preceding format-ignore directive keeps the
                 // property's source verbatim (trailing comment/comma handled normally)
-                let prop_doc = if self.has_format_ignore_in_range(search_start, prop_start) {
+                let prop_doc = if self.member_gap_frozen(search_start, prop_start) {
                     self.raw_source_doc(prop.span())
                 } else {
                     self.build_object_property_doc(prop, has_comments)
@@ -365,18 +365,25 @@ impl<'a> Printer<'a> {
         obj: &internal::ObjectExpression<'_>,
     ) -> DocId {
         let d = self.d();
+        // A commented object hands off to `build_object_doc` wholesale: the loop below
+        // emits property docs only, so every structural comment — the `{`→first-property
+        // gap, the inter-property gaps, the trailing gap before `}`, and a dangling
+        // comment in an empty `{}` — would be DROPPED here (content loss, not
+        // relocation), which is why the gate also precedes the empty-object arm. The
+        // forced-hardline form the caller wants for its `fits()` measurement is only ever
+        // needed on the comment-free path, and that is exactly where the two agree.
+        // **on page**, in lockstep with the twin gate in `build_object_doc`.
+        if self.has_comments_on_page_between(obj.span.start, obj.span.end) {
+            return self.build_object_doc(obj);
+        }
         if obj.properties.is_empty() {
             return d.text("{}");
         }
 
-        // Object-wide comment-presence flag (one binary search); gates the per-property
-        // key→value comment queries in build_property_doc. **on page**, in lockstep with
-        // the twin gate in `build_object_doc` — it short-circuits layout work too.
-        let has_comments = self.has_comments_on_page_between(obj.span.start, obj.span.end);
-
         let mut parts: DocBuf = DocBuf::new();
         for (i, prop) in obj.properties.iter().enumerate() {
-            let prop_doc = self.build_object_property_doc(prop, has_comments);
+            // Comment-free past the gate, so the per-property comment queries are dead.
+            let prop_doc = self.build_object_property_doc(prop, false);
             parts.push(prop_doc);
 
             if i < obj.properties.len() - 1 {

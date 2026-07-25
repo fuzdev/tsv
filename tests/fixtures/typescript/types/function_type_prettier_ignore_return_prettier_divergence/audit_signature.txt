@@ -1,0 +1,29 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// an own-line directive after `=>` stays own-line and freezes the return type
+	type A = () => // prettier-ignore
+	{x:   1};
+
+	// constructor-type host
+	type B = new () => // prettier-ignore
+	{x:   2};
+
+	// abstract-constructor-type host
+	type C = abstract new () => // prettier-ignore
+	{x:   3};
+
+	// control: a plain comment keeps the trailing relocation
+	type D = () => // c
+	{ x: 1 };
+
+	// placement, not spelling: a BLOCK directive alone on its line in the `)`→`=>` gap
+	type E = () /* prettier-ignore */ => {x:   4};
+</script>

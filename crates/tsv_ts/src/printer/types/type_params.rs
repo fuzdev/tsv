@@ -5,10 +5,11 @@
 // - Type parameter instantiation (type arguments): `<T, U>`
 
 use super::helpers::is_simple_type_arg;
-use super::{BlankRule, CommentFilter, CommentSpacing, Printer};
+use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
-use crate::printer::layout::fluid_after_operator;
+use crate::printer::layout::{bracketed_list_body, fluid_after_operator};
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
@@ -20,23 +21,37 @@ impl<'a> Printer<'a> {
     //
 
     /// Build doc for type parameter declaration: `<T, U extends V = W>`
-    /// Non-wrapping version - always inline, unless expanding comments force multiline
+    /// Non-wrapping version - always inline, unless expanding comments (or a
+    /// multi-line frozen parameter) force multiline
     pub(in crate::printer) fn build_type_parameter_declaration_doc(
         &self,
         decl: &TSTypeParameterDeclaration<'_>,
     ) -> DocId {
-        if self.has_expanding_comments_in_type_param_declaration(decl) {
+        if self.has_expanding_comments_in_type_param_declaration(decl)
+            || self.has_frozen_multiline_type_param(decl)
+        {
             return self.build_type_parameter_declaration_doc_with_line_comments(decl);
         }
 
         let d = self.d();
-        let (param_docs, deferred_after) = self.build_type_parameter_docs_with_comments(decl);
-        d.concat(&[
-            d.text("<"),
-            d.join(param_docs, ", "),
-            deferred_after,
-            d.text(">"),
-        ])
+        let param_docs = self.build_type_parameter_docs_with_comments(decl);
+        d.concat(&[d.text("<"), d.join(param_docs, ", "), d.text(">")])
+    }
+
+    /// Whether any parameter is Rule-A-frozen with a multi-line slice — the
+    /// always-inline path's analog of `build_angle_list_doc`'s
+    /// `frozen_forces_break`: `has_expanding_comments_in_type_param_declaration`
+    /// keys on comment SHAPE, which a MULTILINE-spelled alone-on-line directive
+    /// doesn't trip (`has_own_line_block_comments_in_bracket_list` skips multiline
+    /// blocks), yet the frozen member's own span can still cross lines — the `<…>`
+    /// must expand (a `verbatim_source_span` is `will_break`-opaque, so the forcing
+    /// is explicit).
+    fn has_frozen_multiline_type_param(&self, decl: &TSTypeParameterDeclaration<'_>) -> bool {
+        self.has_format_ignore
+            && (0..decl.params.len()).any(|i| {
+                self.list_item_frozen(decl.span.start + 1, &|j| decl.params[j].span, i)
+                    && !self.is_same_line(decl.params[i].span.start, decl.params[i].span.end)
+            })
     }
 
     /// Build doc for type parameter declaration with wrapping support
@@ -64,74 +79,45 @@ impl<'a> Printer<'a> {
             return self.build_type_parameter_declaration_doc_with_line_comments(decl);
         }
 
-        let (param_docs, deferred_after) = self.build_type_parameter_docs_with_comments(decl);
-        let inner = d.concat(&[d.join_doc(param_docs, d.comma_line()), deferred_after]);
-        d.concat(&[
-            d.text("<"),
-            d.indent_softline(inner),
-            d.softline(),
-            d.text(">"),
-        ])
+        // On-page: a layout builder's zero-comment fast gate (same axis note as
+        // `build_type_arguments_doc`).
+        let has_comments = self.has_comments_on_page_between(decl.span.start, decl.span.end);
+        self.build_angle_list_doc(
+            decl.span,
+            decl.params.len(),
+            |i| decl.params[i].span,
+            |i, frozen| self.build_type_parameter_item_doc(&decl.params[i], frozen),
+            |i| !self.is_same_line(decl.params[i].span.start, decl.params[i].span.end),
+            has_comments,
+        )
     }
 
-    /// Build doc for type parameter declaration with expanding comments
+    /// A type-parameter list item: the frozen verbatim slice under a Rule A
+    /// format-ignore freeze (a `TSTypeParameter` has no paren shell, so the slice is
+    /// its whole span), the ordinary parameter doc otherwise.
+    fn build_type_parameter_item_doc(&self, param: &TSTypeParameter<'_>, frozen: bool) -> DocId {
+        if frozen {
+            self.raw_source_range(param.span.start, param.span.end)
+        } else {
+            self.build_type_parameter_doc(param)
+        }
+    }
+
+    /// Build doc for type parameter declaration with expanding comments.
+    ///
+    /// A single-param leading line comment does NOT hug here (unlike the
+    /// type-argument builders): `function f<// c⏎T>()` fully expands.
     pub(in crate::printer) fn build_type_parameter_declaration_doc_with_line_comments(
         &self,
         decl: &TSTypeParameterDeclaration<'_>,
     ) -> DocId {
-        let d = self.d();
-        let mut inner_parts = DocBuf::new();
-        let mut prev_end = decl.span.start + 1; // After the opening `<`
-
-        // A line comment trailing the opening `<` is kept on the `<` line (divergence
-        // from prettier, which relocates it to its own line as the first param's
-        // leading comment). See conformance_prettier.md §Comment relocation
-        // (Type-parameter `<` trailing). Same mechanism as the object/array/block
-        // and call-`(` open-delimiter family.
-        let first_start = decl.params[0].span.start; // caller guarantees non-empty
-        let (angle_prefix, angle_pull_pos) =
-            self.delimiter_line_comment_prefix(decl.span.start, first_start);
-
-        for (i, param) in decl.params.iter().enumerate() {
-            let param_start = param.span.start;
-            let param_end = param.span.end;
-            let is_last = i == decl.params.len() - 1;
-
-            // Leading comments (after previous comma or `<`); for the first param,
-            // exclude comments already pulled onto the `<` line.
-            let skip_delim = if i == 0 { angle_pull_pos } else { None };
-            inner_parts.extend(self.build_leading_comments_multiline(
-                prev_end,
-                param_start,
-                skip_delim,
-            ));
-
-            inner_parts.push(self.build_type_parameter_doc(param));
-
-            if !is_last {
-                let next_start = decl.params[i + 1].span.start;
-                prev_end = self.emit_multiline_comma_with_comments(
-                    &mut inner_parts,
-                    param_end,
-                    next_start,
-                    BlankRule::None,
-                );
-            } else {
-                // Last param: no trailing comma under `trailingComma: 'none'`, then
-                // comments before `>`.
-                let before_close = decl.span.end - 1;
-                inner_parts.extend(self.build_trailing_comments_multiline(param_end, before_close));
-                prev_end = before_close;
-            }
-        }
-
-        d.concat(&[
-            d.text("<"),
-            d.concat(&angle_prefix),
-            d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])),
-            d.hardline(),
-            d.text(">"),
-        ])
+        self.build_angle_list_with_line_comments(
+            decl.span,
+            decl.params.len(),
+            |i| decl.params[i].span,
+            |i, frozen| self.build_type_parameter_item_doc(&decl.params[i], frozen),
+            false,
+        )
     }
 
     /// Check for expanding comments in type param declarations: line comments,
@@ -173,20 +159,19 @@ impl<'a> Printer<'a> {
 
     /// Build enriched param docs with surrounding block comments from the declaration.
     /// Comments outside param spans (e.g., `</* c */ T /* c */>`) are captured here.
-    /// Uses comma position to split: comments before comma = trailing, after = leading.
-    /// Returns the per-param docs and a deferred doc for a block comment trailing
-    /// the last param after its source comma — emitted by the caller past where the
-    /// comma was (no trailing comma; trailingComma: 'none') so the comment is preserved
-    /// after it rather than relocated before (prettier relocates; see conformance_prettier.md).
+    /// Only inline block comments can reach this path (the caller routes line and
+    /// own-line comments to the expansion builder first), so the last param's
+    /// trailing gap is one Leading-spaced range up to `>` — a comment past a source
+    /// comma stays after where the comma was (no trailing comma emitted;
+    /// trailingComma: 'none'), the same shape as `build_angle_list_doc`'s last-item
+    /// arm.
     fn build_type_parameter_docs_with_comments(
         &self,
         decl: &TSTypeParameterDeclaration<'_>,
-    ) -> (DocBuf, DocId) {
+    ) -> DocBuf {
         let d = self.d();
         let mut prev_end = decl.span.start + 1; // After `<`
-        let mut deferred_after = d.empty();
-        let param_docs = decl
-            .params
+        decl.params
             .iter()
             .enumerate()
             .map(|(i, param)| {
@@ -198,7 +183,13 @@ impl<'a> Printer<'a> {
                     CommentSpacing::Trailing,
                     CommentFilter::BlockOnly,
                 ));
-                parts.push(self.build_type_parameter_doc(param));
+                // Rule A: an alone-on-line directive in the gap freezes this
+                // parameter (the always-inline path; most such spellings route to
+                // the expansion builder via
+                // `has_expanding_comments_in_type_param_declaration` first).
+                let frozen =
+                    self.list_item_frozen(decl.span.start + 1, &|j| decl.params[j].span, i);
+                parts.push(self.build_type_parameter_item_doc(param, frozen));
 
                 if i + 1 < decl.params.len() {
                     // Find comma between this param and next
@@ -213,40 +204,17 @@ impl<'a> Printer<'a> {
                     ));
                     prev_end = comma_pos + 1; // After comma
                 } else {
-                    // Last param: split trailing block comments around a source comma.
-                    // Before-comma stay with the param; after-comma are deferred past
-                    // where the comma was by the caller (no trailing comma).
-                    let before_close = decl.span.end - 1;
-                    match self
-                        .find_comma_after(param.span.end)
-                        .filter(|cp| *cp < before_close)
-                    {
-                        Some(comma_pos) => {
-                            parts.push(self.build_comments_between_filtered(
-                                param.span.end,
-                                comma_pos,
-                                CommentSpacing::Leading,
-                                CommentFilter::BlockOnly,
-                            ));
-                            deferred_after = self.build_comments_between_filtered(
-                                comma_pos,
-                                before_close,
-                                CommentSpacing::Leading,
-                                CommentFilter::BlockOnly,
-                            );
-                        }
-                        None => parts.push(self.build_comments_between_filtered(
-                            param.span.end,
-                            before_close,
-                            CommentSpacing::Leading,
-                            CommentFilter::BlockOnly,
-                        )),
-                    }
+                    // Last param: trailing comments before `>`
+                    parts.push(self.build_comments_between_filtered(
+                        param.span.end,
+                        decl.span.end - 1,
+                        CommentSpacing::Leading,
+                        CommentFilter::BlockOnly,
+                    ));
                 }
                 d.concat(&parts)
             })
-            .collect();
-        (param_docs, deferred_after)
+            .collect()
     }
 
     /// Build doc for a single type parameter
@@ -303,28 +271,24 @@ impl<'a> Printer<'a> {
         let mut prev_end = param.name.span.end;
 
         if let Some(constraint) = &param.constraint {
-            // If the constraint is `(// leading\n T)` — or the double-nested
-            // `((// leading\n T))` — treat the leading line comment inside the parens
-            // as if it were between `extends` and the constraint so it forces the
-            // indent-and-break layout (matching prettier's paren stripping). The deep
-            // window unwraps every redundant layer; a shallow one-level window missed
-            // a comment nested one paren deeper (non-idempotent).
-            let (value_search_end, value_type): (u32, &TSType<'_>) = if has_comments {
-                self.keyword_value_stripped_paren_hang(constraint)
-            } else {
-                (constraint.span().start, constraint)
-            };
-
-            // Find `extends` keyword between name and constraint. A `TSTypeParameter`
-            // constraint is always spelled `extends` — mapped-type `[K in T]` keys use
-            // `in`, but those take a separate `TSMappedTypeParameter`/`build_mapped_type_doc`
-            // path and never reach here, so the keyword is guaranteed present.
-            let comment_range = has_comments.then(|| {
+            // The shared keyword→value head. Resolving it needs the keyword's position,
+            // so the `extends` byte scan comes first — and only on the comment-bearing
+            // path: a comment-free parameter takes the scan-free head, which is why the
+            // keyword position is looked up here rather than unconditionally.
+            //
+            // A `TSTypeParameter` constraint is always spelled `extends` — mapped-type
+            // `[K in T]` keys use `in`, but those take a separate
+            // `TSMappedTypeParameter`/`build_mapped_type_doc` path and never reach here,
+            // so the keyword is guaranteed present. The head's paren-strip arm treats a
+            // leading line comment inside `(// leading⏎ T)` — and the double-nested
+            // `((// leading⏎ T))` — as if it sat between `extends` and the constraint,
+            // so it forces the indent-and-break layout (matching prettier's paren
+            // stripping).
+            let head = if has_comments {
                 #[allow(clippy::expect_used)] // extends always present for a constraint
                 let extends_pos = self
                     .find_keyword_in_range(prev_end, constraint.span().start, "extends")
                     .expect("extends keyword must exist when constraint is present");
-                let extends_end = extends_pos + "extends".len() as u32;
 
                 // Comments between name and `extends`: <T /* c */ extends A>
                 if let Some(pre) = self.build_comments_between_filtered_opt(
@@ -335,34 +299,23 @@ impl<'a> Printer<'a> {
                 ) {
                     parts.push(pre);
                 }
-                (extends_end, value_search_end)
-            });
+                self.keyword_value_head(extends_pos + "extends".len() as u32, constraint)
+            } else {
+                KeywordValueHead::without_gap(constraint)
+            };
 
             parts.push(d.text(" extends"));
-            self.append_keyword_value(
-                &mut parts,
-                comment_range,
-                value_type,
-                GroupId::TypeParameterConstraint,
-                constraint,
-            );
+            self.append_keyword_value(&mut parts, &head, GroupId::TypeParameterConstraint);
             prev_end = constraint.span().end;
         }
 
         if let Some(default) = &param.default {
-            // Same deep-window paren handling as the constraint above: `<T = (// c\n U)>`
-            // (and the double-nested form) strips to the same hang as bare `<T = // c\n U>`,
-            // so substitute the unwrapped inner and widen the gap window to its start. A
-            // mixed / trailing shell hoists losslessly too — the trailing comment is
-            // reattached in `append_keyword_value` via `build_hang_value_doc`.
-            let (value_search_end, value_type): (u32, &TSType<'_>) = if has_comments {
-                self.keyword_value_stripped_paren_hang(default)
-            } else {
-                (default.span().start, default)
-            };
-
-            // Find `=` between previous end and default
-            let comment_range = has_comments.then(|| {
+            // The `=` mirror of the constraint above, same head and same scan gate:
+            // `<T = (// c⏎ U)>` (and the double-nested form) strips to the same hang as
+            // bare `<T = // c⏎ U>`. A mixed / trailing shell hoists losslessly too — the
+            // trailing comment is reattached in `append_keyword_value` via
+            // `build_hang_value_doc`.
+            let head = if has_comments {
                 #[allow(clippy::expect_used)] // = must exist when a default is present
                 let eq_pos = find_char_skipping_comments(
                     self.source.as_bytes(),
@@ -371,7 +324,6 @@ impl<'a> Printer<'a> {
                     b'=',
                 )
                 .expect("= must exist when default is present");
-                let eq_end = (eq_pos + 1) as u32;
 
                 // Comments before `=`: <T extends B /* c */ = C>
                 if let Some(pre) = self.build_comments_between_filtered_opt(
@@ -382,17 +334,13 @@ impl<'a> Printer<'a> {
                 ) {
                     parts.push(pre);
                 }
-                (eq_end, value_search_end)
-            });
+                self.keyword_value_head((eq_pos + 1) as u32, default)
+            } else {
+                KeywordValueHead::without_gap(default)
+            };
 
             parts.push(d.text(" ="));
-            self.append_keyword_value(
-                &mut parts,
-                comment_range,
-                value_type,
-                GroupId::TypeParameterDefault,
-                default,
-            );
+            self.append_keyword_value(&mut parts, &head, GroupId::TypeParameterDefault);
             prev_end = default.span().end;
         }
 
@@ -423,25 +371,67 @@ impl<'a> Printer<'a> {
     /// value is indented exactly when that break fires — Prettier's
     /// `printTypeParameter` pattern.
     ///
-    /// `comment_range` is the `(keyword_end, value_start)` gap to search, or `None`
-    /// when the caller has already proven the whole parameter comment-free — the
-    /// keyword's source position is needed for nothing else, so `None` also spares the
-    /// caller the byte scan that would locate it.
+    /// `head` is the shared keyword→value resolution ([`Printer::keyword_value_head`]):
+    /// the gap window both the gates and the emitters use, the freeze verdict, and the
+    /// (possibly paren-stripped) value plus its pre-strip shell — so this builder can't
+    /// gate on one window while claiming another. Its `gap_start` is `None` when the
+    /// caller proved the parameter comment-free and never located the keyword: no gap,
+    /// no comment arms, no freeze — straight to the width-decided tail.
+    ///
+    /// This site is the head protocol PLUS two rules of its own, which is why it keeps
+    /// its own builder rather than calling `build_keyword_value_doc`: it strips a
+    /// redundant comment-free paren off the value (the cast / annotation heads do not),
+    /// and a conditional constraint keeps clarity parens.
     fn append_keyword_value(
         &self,
         parts: &mut DocBuf,
-        comment_range: Option<(u32, u32)>,
-        value_type: &TSType<'_>,
+        head: &KeywordValueHead<'_>,
         group_id: GroupId,
-        // The original (pre-seam) constraint/default node, so a trailing comment lifted
-        // from a stripped redundant-paren shell (`extends (// c\n T /* t */)`) can be
-        // reattached in the hang branch. Equal to `value_type` when no shell was stripped.
-        shell: &TSType<'_>,
     ) {
         let d = self.d();
+        // An alone-on-line format-ignore directive in the keyword→value gap freezes a
+        // non-composite value verbatim (the head's `frozen`; a union/intersection value
+        // declines and freezes via its own leading-run walk). The head checked the
+        // UNWIDENED gap — its window ends at the shell's own span start under a freeze,
+        // so an in-shell directive stays on the ordinary paths below. The directive
+        // keeps its own line (`append_keyword_value_line_comments` already preserves
+        // own-line comments). A conditional constraint keeps its required parens
+        // under the freeze (the same clarity/`infer` rule as the unfrozen arm below).
+        if let Some(keyword_end) = head.gap_start
+            && head.frozen
+        {
+            let member_parens: fn(&TSType<'_>) -> bool =
+                if group_id == GroupId::TypeParameterConstraint {
+                    |t| matches!(t, TSType::Conditional(_))
+                } else {
+                    |_| false
+                };
+            let frozen_doc = self.build_frozen_head_doc(head.child, member_parens);
+            // Under a freeze the head's window already ends at the child's own start.
+            if self.comments_force_own_line_between(keyword_end, head.value_start) {
+                self.append_keyword_value_line_comments(
+                    parts,
+                    keyword_end,
+                    head.value_start,
+                    frozen_doc,
+                );
+            } else {
+                if let Some(comments) = self.build_comments_between_filtered_opt(
+                    keyword_end,
+                    head.value_start,
+                    CommentSpacing::Leading,
+                    CommentFilter::All,
+                ) {
+                    parts.push(comments);
+                }
+                parts.push(d.text(" "));
+                parts.push(frozen_doc);
+            }
+            return;
+        }
         // Strip redundant comment-free parens so `(A | B)` / `(A & B)` constraints
         // and defaults get the bare hanging layout (prettier strips them too).
-        let value_type = self.unwrap_redundant_parens(value_type);
+        let value_type = self.unwrap_redundant_parens(head.value_type);
         // A *conditional* type used as a constraint keeps its parens: prettier keeps
         // them for clarity, and for an `infer`'s conditional constraint they're
         // outright required (the enclosing conditional's `? :` rebinds without them —
@@ -451,10 +441,10 @@ impl<'a> Printer<'a> {
             && group_id == GroupId::TypeParameterConstraint
         {
             let mut inner: DocBuf = smallvec![d.text(" (")];
-            if let Some((keyword_end, value_start)) = comment_range
+            if let Some(keyword_end) = head.gap_start
                 && let Some(comments) = self.build_comments_between_filtered_opt(
                     keyword_end,
-                    value_start,
+                    head.value_start,
                     CommentSpacing::Leading,
                     CommentFilter::All,
                 )
@@ -466,21 +456,27 @@ impl<'a> Printer<'a> {
             parts.push(d.concat(&inner));
             return;
         }
-        if let Some((keyword_end, value_start)) = comment_range {
-            if self.comments_force_own_line_between(keyword_end, value_start) {
+        if let Some(keyword_end) = head.gap_start {
+            if self.comments_force_own_line_between(keyword_end, head.value_start) {
                 // A line comment or multiline block after the keyword hangs the bound type
-                // on its own line (and expands the `<…>` via the gate at :163). A
+                // on its own line (and expands the `<…>` via the gate in
+                // `has_expanding_comments_in_type_param_declaration`). A
                 // single-line block comment (own-line, trailing, or glued) collapses inline
                 // and keeps `<…>` collapsed (the fall-through below). Type position: a
                 // trailing block lifted from a stripped shell trails the value inline
                 // before the `,`/`>` (`defer = false`).
-                let value_doc = self.build_hang_value_doc(shell, value_type, false);
-                self.append_keyword_value_line_comments(parts, keyword_end, value_start, value_doc);
+                let value_doc = self.build_hang_value_doc(head.child, value_type, false);
+                self.append_keyword_value_line_comments(
+                    parts,
+                    keyword_end,
+                    head.value_start,
+                    value_doc,
+                );
                 return;
             }
             if let Some(comments) = self.build_comments_between_filtered_opt(
                 keyword_end,
-                value_start,
+                head.value_start,
                 CommentSpacing::Leading,
                 CommentFilter::All,
             ) {
@@ -567,7 +563,10 @@ impl<'a> Printer<'a> {
         if inst.params.len() == 1
             && let Some(type_doc) = self.try_build_hugging_curly_type_doc(&inst.params[0])
         {
-            return d.concat(&[d.text("<"), type_doc, d.text(">")]);
+            // The `<`→arg / arg→`>` gaps may hold inline block comments (a glued
+            // format-ignore directive included) — the shared single-arg emission
+            // preserves them (and applies the freeze) instead of dropping them.
+            return self.build_single_type_arg_inline_with(inst, has_comments, type_doc);
         }
 
         // A single *simple* or *hugged-union* type argument inlines atomically: no
@@ -591,71 +590,23 @@ impl<'a> Printer<'a> {
             return self.build_single_type_arg_inline(inst, has_comments);
         }
 
-        // Build params with commas and line breaks
+        // Multi-argument (or non-hugging single) tail: the shared width-decided core.
         // The doc printer's look-ahead (fits_with_lookahead) handles the decision
         // of whether to break based on what follows the type params.
-        let mut param_parts = DocBuf::new();
-        let mut prev_end = inst.span.start + 1; // After the opening `<`
-
-        for (i, param) in inst.params.iter().enumerate() {
-            let param_start = param.span().start;
-
-            if i > 0 {
-                param_parts.push(d.text(","));
-                param_parts.push(d.line());
-            }
-
-            // Add leading block comments (after previous comma or `<`)
-            if has_comments
-                && let Some(leading) = self.build_comments_between_filtered_opt(
-                    prev_end,
-                    param_start,
-                    CommentSpacing::Trailing,
-                    CommentFilter::BlockOnly,
-                )
-            {
-                param_parts.push(leading);
-            }
-
-            param_parts.push(self.build_type_doc(param));
-
-            // The `,` below is re-emitted as static text, so `find_list_comma` exists
-            // only to bound the comment ranges — a comment-free `<…>` never scans.
-            if has_comments {
-                let param_end = param.span().end;
-                if i + 1 < inst.params.len() {
-                    // Find comma between this param and next
-                    let next_start = inst.params[i + 1].span().start;
-                    let comma_pos = self.find_list_comma(param_end, next_start);
-                    // Trailing block comments (before comma)
-                    if let Some(trailing) = self.build_comments_between_filtered_opt(
-                        param_end,
-                        comma_pos,
-                        CommentSpacing::Leading,
-                        CommentFilter::BlockOnly,
-                    ) {
-                        param_parts.push(trailing);
-                    }
-                    prev_end = comma_pos + 1; // After comma
-                } else if let Some(trailing) = self.build_comments_between_filtered_opt(
-                    // Last param: trailing comments before `>`
-                    param_end,
-                    inst.span.end - 1,
-                    CommentSpacing::Leading,
-                    CommentFilter::BlockOnly,
-                ) {
-                    param_parts.push(trailing);
+        d.group(self.build_angle_list_doc(
+            inst.span,
+            inst.params.len(),
+            |i| inst.params[i].span(),
+            |i, frozen| {
+                if frozen {
+                    self.build_frozen_list_member_doc(&inst.params[i])
+                } else {
+                    self.build_type_doc(&inst.params[i])
                 }
-            }
-        }
-
-        // Wrap in group with angle brackets and optional breaks
-        d.group(d.concat(&[
-            d.text("<"),
-            d.indent_softline(d.concat(&param_parts)),
-            d.softline(),
-            d.text(">"),
-        ]))
+            },
+            |i| self.frozen_list_member_multiline(&inst.params[i]),
+            has_comments,
+        ))
     }
 
     /// Build type parameter instantiation with line comments
@@ -665,56 +616,173 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         // Call/`new`-expression type arguments render each argument with
         // `build_type_doc`; the layout is shared with type-position arguments.
-        self.build_angle_list_with_line_comments(inst, false)
+        self.build_angle_list_with_line_comments(
+            inst.span,
+            inst.params.len(),
+            |i| inst.params[i].span(),
+            |i, frozen| {
+                if frozen {
+                    self.build_frozen_list_member_doc(&inst.params[i])
+                } else {
+                    self.build_type_doc(&inst.params[i])
+                }
+            },
+            true,
+        )
+    }
+
+    /// The shared width-decided angle-list body: `<` + softline-indented,
+    /// comma-separated items with their inline block comments + `>` — the one core
+    /// behind all three `<…>` families (type-parameter declarations, call/`new`
+    /// instantiations, and type-position type arguments), which previously
+    /// hand-rolled this layout independently. Returns the UNGROUPED concat: the
+    /// declaration's callers control the group themselves (e.g. the interface
+    /// header); the type-argument callers wrap it in a group.
+    ///
+    /// `item_span`/`item_doc` select the family's item type and per-item printer;
+    /// `item_doc` receives the item's Rule A `frozen` flag (an alone-on-line
+    /// format-ignore directive in the item's gap — most spellings route to the
+    /// expansion builder below before this runs) and emits the frozen verbatim
+    /// slice when set.
+    /// `frozen_forces_break` is asked only for frozen items: `true` (a multi-line
+    /// frozen slice) forces the broken layout — a `verbatim_source_span` is
+    /// `will_break`-opaque, so the forcing is explicit, and the emitted hardlines
+    /// propagate the break to the caller's group.
+    /// `has_comments` is the caller's whole-`<…>` window answer (on-page — a layout
+    /// builder's zero-comment fast gate): `false` proves every gap below is
+    /// comment-free, so neither the comment searches nor the `find_list_comma` byte
+    /// scans that bound them run — a comment-free `<T, U>` builds with no source
+    /// scanning at all (the printed `,` is static text). Line comments and own-line
+    /// blocks never reach here (each family's expansion predicate routes them to
+    /// [`Self::build_angle_list_with_line_comments`] first), so only inline block
+    /// comments remain to preserve.
+    pub(in crate::printer) fn build_angle_list_doc(
+        &self,
+        span: Span,
+        count: usize,
+        item_span: impl Fn(usize) -> Span,
+        item_doc: impl Fn(usize, bool) -> DocId,
+        frozen_forces_break: impl Fn(usize) -> bool,
+        has_comments: bool,
+    ) -> DocId {
+        let d = self.d();
+        let mut inner_parts = DocBuf::new();
+        let mut prev_end = span.start + 1; // After the opening `<`
+        let mut force_break = false;
+
+        for i in 0..count {
+            if i > 0 {
+                inner_parts.push(d.text(","));
+                inner_parts.push(d.line());
+            }
+
+            // Leading block comments (after the previous comma or `<`)
+            if has_comments
+                && let Some(leading) = self.build_comments_between_filtered_opt(
+                    prev_end,
+                    item_span(i).start,
+                    CommentSpacing::Trailing,
+                    CommentFilter::BlockOnly,
+                )
+            {
+                inner_parts.push(leading);
+            }
+
+            // Rule A: an alone-on-line directive in this item's gap freezes the item
+            // (the directive itself was just emitted by the gap emitter above).
+            let frozen = has_comments && self.list_item_frozen(span.start + 1, &item_span, i);
+            if frozen && frozen_forces_break(i) {
+                force_break = true;
+            }
+
+            inner_parts.push(item_doc(i, frozen));
+
+            if has_comments {
+                let item_end = item_span(i).end;
+                if i + 1 < count {
+                    // Find comma between this item and the next
+                    let next_start = item_span(i + 1).start;
+                    let comma_pos = self.find_list_comma(item_end, next_start);
+                    // Trailing block comments (before the comma)
+                    if let Some(trailing) = self.build_comments_between_filtered_opt(
+                        item_end,
+                        comma_pos,
+                        CommentSpacing::Leading,
+                        CommentFilter::BlockOnly,
+                    ) {
+                        inner_parts.push(trailing);
+                    }
+                    prev_end = comma_pos + 1; // After comma
+                } else if let Some(trailing) = self.build_comments_between_filtered_opt(
+                    // Last item: trailing comments before `>` (including past a source
+                    // comma — trailingComma 'none' emits none, so the comment stays
+                    // after where it was rather than relocating before it).
+                    item_end,
+                    span.end - 1,
+                    CommentSpacing::Leading,
+                    CommentFilter::BlockOnly,
+                ) {
+                    inner_parts.push(trailing);
+                }
+            }
+        }
+
+        bracketed_list_body(d, "<", ">", d.concat(&inner_parts), force_break)
     }
 
     /// Render a type-argument list `<…>` that breaks onto multiple lines because it
-    /// carries comments — the shared body behind the call/`new`-expression
-    /// ([`Self::build_type_parameter_instantiation_doc_with_line_comments`]) and type-position
-    /// ([`Self::build_type_arguments_doc_with_line_comments`]) printers. `type_position`
-    /// selects the per-argument doc builder (`build_type_arg_doc` vs `build_type_doc`).
+    /// carries comments — the shared body behind all three angle-list families: the
+    /// call/`new`-expression ([`Self::build_type_parameter_instantiation_doc_with_line_comments`]),
+    /// type-position ([`Self::build_type_arguments_doc_with_line_comments`]), and
+    /// type-parameter-declaration
+    /// ([`Self::build_type_parameter_declaration_doc_with_line_comments`]) printers.
+    /// `item_span`/`item_doc` select the family's item type and per-item printer.
     ///
-    /// A single argument with a leading *line* comment hugs `<`/`>` (`foo<// c\n A>`) —
-    /// a deliberate divergence (prettier expands; see
-    /// `type_position_parens_leading_line_comment`). Every other comment-bearing form —
-    /// a single-argument own-line *block* comment, or any multi-argument list — fully
-    /// expands the list, matching prettier. The own-line block must NOT hug, or the
-    /// emitted `</* c */⏎T>` re-collapses on the next pass (non-idempotent). A block
-    /// trailing/glued to the argument never reaches here (it doesn't trip
-    /// `has_own_line_block_comments_in_bracket_list`) and collapses inline.
+    /// With `hug_single_leading_line`, a single argument with a leading *line*
+    /// comment hugs `<`/`>` (`foo<// c\n A>`) — a deliberate divergence (prettier
+    /// expands; see `type_position_parens_leading_line_comment`). The declaration
+    /// family passes `false` (it fully expands that shape). Every other
+    /// comment-bearing form — a single-argument own-line *block* comment, or any
+    /// multi-argument list — fully expands the list, matching prettier. The
+    /// own-line block must NOT hug, or the emitted `</* c */⏎T>` re-collapses on
+    /// the next pass (non-idempotent). A block trailing/glued to the argument never
+    /// reaches here (it doesn't trip `has_own_line_block_comments_in_bracket_list`)
+    /// and collapses inline.
     pub(in crate::printer) fn build_angle_list_with_line_comments(
         &self,
-        inst: &internal::TSTypeParameterInstantiation<'_>,
-        type_position: bool,
+        span: Span,
+        count: usize,
+        item_span: impl Fn(usize) -> Span,
+        item_doc: impl Fn(usize, bool) -> DocId,
+        hug_single_leading_line: bool,
     ) -> DocId {
         let d = self.d();
-        let is_multi = inst.params.len() > 1;
 
         // Single-arg leading *line* comment hugs `<`/`>`.
-        if !is_multi {
-            let param = &inst.params[0];
-            let param_start = param.span().start;
-            let has_line = self.has_line_comments_between(inst.span.start + 1, param_start);
-            let before_close = inst.span.end - 1;
+        if hug_single_leading_line && count == 1 {
+            let param_start = item_span(0).start;
+            let has_line = self.has_line_comments_between(span.start + 1, param_start);
+            let before_close = span.end - 1;
             let has_trailing = tsv_lang::has_comments_to_emit_in_range(
                 self.comments,
-                param.span().end,
+                item_span(0).end,
                 before_close,
             );
-            if has_line && !has_trailing {
+            // A FROZEN argument must not hug: the hug pulls the leading run onto the
+            // `<` line, which would relocate an own-line directive to a trailing-`<`
+            // placement the classification reads as inert — the freeze would be lost
+            // on the second pass. Fall through to the full expansion instead, where
+            // an own-line directive stays own-line (the same keep-own-line rule the
+            // union in-span freeze carries).
+            if has_line && !has_trailing && !self.list_item_frozen(span.start + 1, &item_span, 0) {
                 let leading =
                     // `None`: this hug path emits no delimiter-line prefix, so nothing
                     // was pulled onto the `<` line to exclude here.
-                    self.build_leading_comments_multiline(inst.span.start + 1, param_start, None);
+                    self.build_leading_comments_multiline(span.start + 1, param_start, None);
                 if !leading.is_empty() {
-                    let param_doc = if type_position {
-                        self.build_type_arg_doc(param, is_multi)
-                    } else {
-                        self.build_type_doc(param)
-                    };
                     let mut parts: DocBuf = smallvec![d.text("<")];
                     parts.extend(leading);
-                    parts.push(param_doc);
+                    parts.push(item_doc(0, false));
                     parts.push(d.text(">"));
                     return d.concat(&parts);
                 }
@@ -724,17 +792,17 @@ impl<'a> Printer<'a> {
         // Full multiline expansion (multi-arg, or single-arg own-line block). A
         // comment trailing `<` on its own line is kept on the `<` line (divergence —
         // prettier relocates it to lead the first argument).
-        let first_param_start = inst.params[0].span().start;
+        let first_param_start = item_span(0).start;
         let (angle_line_prefix, delimiter_pull_pos) =
-            self.delimiter_line_comment_prefix(inst.span.start, first_param_start);
+            self.delimiter_line_comment_prefix(span.start, first_param_start);
 
         let mut inner_parts = DocBuf::new();
-        let mut prev_end = inst.span.start + 1; // After the opening `<`
+        let mut prev_end = span.start + 1; // After the opening `<`
 
-        for (i, param) in inst.params.iter().enumerate() {
-            let param_start = param.span().start;
-            let param_end = param.span().end;
-            let is_last = i == inst.params.len() - 1;
+        for i in 0..count {
+            let param_start = item_span(i).start;
+            let param_end = item_span(i).end;
+            let is_last = i == count - 1;
 
             // Leading comments (after previous comma or `<`). For the first arg,
             // drop comments pulled onto the `<` line (emitted as the angle-line
@@ -746,14 +814,14 @@ impl<'a> Printer<'a> {
                 skip_delim,
             ));
 
-            inner_parts.push(if type_position {
-                self.build_type_arg_doc(param, is_multi)
-            } else {
-                self.build_type_doc(param)
-            });
+            // Rule A: an alone-on-line directive in this item's gap freezes the
+            // item; the directive itself was just emitted by the leading run above.
+            // No must-break question here — this layout is already all-hardline.
+            let frozen = self.list_item_frozen(span.start + 1, &item_span, i);
+            inner_parts.push(item_doc(i, frozen));
 
             if !is_last {
-                let next_start = inst.params[i + 1].span().start;
+                let next_start = item_span(i + 1).start;
                 prev_end = self.emit_multiline_comma_with_comments(
                     &mut inner_parts,
                     param_end,
@@ -762,7 +830,7 @@ impl<'a> Printer<'a> {
                 );
             } else {
                 // Last param: trailing comments before `>`
-                let before_close = inst.span.end - 1;
+                let before_close = span.end - 1;
                 inner_parts.extend(self.build_trailing_comments_multiline(param_end, before_close));
                 prev_end = before_close;
             }

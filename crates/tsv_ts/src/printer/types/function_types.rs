@@ -162,6 +162,19 @@ impl<'a> Printer<'a> {
         // For function types, the annotation span starts at `=` in `=>`
         let arrow_end = return_type.span.start + "=>".len() as u32;
         let type_start = return_type.type_annotation.span().start;
+        // An alone-on-line format-ignore directive in the `=>`→return gap stays
+        // OWN-LINE — the trailing-hang emitter below would relocate it to trail the
+        // `=>` (`=> // prettier-ignore`), an inert placement that loses the freeze on
+        // the second pass — and freezes a non-composite return type verbatim
+        // (`single_child_frozen`; a composite return declines and freezes via its own
+        // leading-run walk, which reaches the directive across the gap's whitespace).
+        // Covers function, constructor, and abstract-constructor types (all route here).
+        if self.member_gap_frozen(arrow_end, type_start) {
+            let value_doc = self.build_routed_child_doc(return_type.type_annotation);
+            let mut parts: DocBuf = smallvec![d.text(arrow)];
+            self.append_keyword_value_line_comments(&mut parts, arrow_end, type_start, value_doc);
+            return d.concat(&parts);
+        }
         // Use break-for-line variant: line comments must force a hardline before
         // the return type so they don't swallow it (`=> // c\nT`, not `=> // c T`).
         // `None` on the comment-free path so none of the five layouts below carries an
@@ -395,18 +408,48 @@ impl<'a> Printer<'a> {
         // return-type gap). A block comment stays inline (`() /* c */ => void`).
         let pre_arrow_line_close =
             after_close.filter(|&ac| self.has_line_comments_between(ac, arrow_start));
-        let return_type_doc =
-            self.build_function_type_return_doc(return_type, pre_arrow_line_close.is_none());
-        let return_type_doc = if let Some(ac) = pre_arrow_line_close {
-            let pre = self.build_trailing_comments_hang_next(ac, arrow_start);
-            d.concat(&[d.text(" "), pre, return_type_doc])
+        // An alone-on-line format-ignore directive in the `)`→`=>` gap freezes the
+        // WHOLE return annotation verbatim — `=> T` is the node the directive
+        // precedes (`build_frozen_span_doc`, the span analog of the single-child
+        // freeze; comments inside the slice ride out verbatim). Emission preserves
+        // each gap comment's own-line-ness: a `)`-trailing comment keeps trailing,
+        // and the directive keeps its own line — the pull-to-trailing hang below
+        // would leave it trailing `)`, an inert placement that loses the freeze on
+        // the second pass.
+        //
+        // Asked of `after_close`, NOT the line-comment-filtered `pre_arrow_line_close`:
+        // PLACEMENT, not spelling, keys honoring, so a BLOCK-spelled directive alone on
+        // its line freezes identically. The line-comment filter answers a LAYOUT
+        // question (must `=>` start a fresh line?), and routing the honoring question
+        // through it silently dropped the block spelling onto the inline path. The
+        // sibling gaps route the same way — the `=>`→return gap above, the `as` /
+        // `satisfies` keyword gap, and the type-predicate `is` gap all OR the freeze
+        // verdict into their routing rather than gating it on the spelling.
+        let frozen_pre_arrow = after_close.filter(|&ac| self.member_gap_frozen(ac, arrow_start));
+        let return_type_doc = if let Some(ac) = frozen_pre_arrow {
+            // Own-line-preserving, the same emitter the routed conditional branches
+            // use: a `)`-trailing comment keeps trailing and the directive keeps its
+            // own line, in source order (the trailing run is the gap's prefix).
+            let (trailing, own_line) = self.build_own_line_preserving_run(ac, arrow_start);
+            let mut pre_parts: DocBuf = smallvec![trailing];
+            pre_parts.extend(own_line);
+            pre_parts.push(d.hardline());
+            pre_parts.push(self.build_frozen_span_doc(return_type.span));
+            d.concat(&pre_parts)
         } else {
-            match after_close {
-                Some(ac) => d.concat(&[
-                    self.build_comments_between(ac, arrow_start, CommentSpacing::Leading),
-                    return_type_doc,
-                ]),
-                None => return_type_doc,
+            let return_type_doc =
+                self.build_function_type_return_doc(return_type, pre_arrow_line_close.is_none());
+            if let Some(ac) = pre_arrow_line_close {
+                let pre = self.build_trailing_comments_hang_next(ac, arrow_start);
+                d.concat(&[d.text(" "), pre, return_type_doc])
+            } else {
+                match after_close {
+                    Some(ac) => d.concat(&[
+                        self.build_comments_between(ac, arrow_start, CommentSpacing::Leading),
+                        return_type_doc,
+                    ]),
+                    None => return_type_doc,
+                }
             }
         };
 
@@ -427,30 +470,64 @@ impl<'a> Printer<'a> {
     // Signature Helpers (shared with type members)
     //
 
+    /// The params' close paren (the position just past the `)`) bounding a `)`→return-type
+    /// gap, resolved ONCE for the two consumers keyed on it — the frozen route
+    /// ([`Self::build_frozen_return_type_doc`]) and the gap's comment prefix
+    /// ([`Self::build_close_paren_to_return_type_comments`]) — so neither walks the
+    /// parameter list the other just walked. A caller that already located its close paren
+    /// for other boundaries (a function declaration, whose scan also bounds the params'
+    /// trailing comments) passes it to those two directly and skips this.
+    ///
+    /// Depth-tracked (skips nested parens / comments) — the naive first-`)` scan mis-fires
+    /// on complex params and pulls real param-trailing comments into the gap
+    /// (duplication).
+    ///
+    /// That scan walks the whole parameter list byte by byte, and it exists ONLY to bound
+    /// the two comment-keyed questions above, so it is skipped when the WIDER
+    /// `(`→return-type window holds no comment TO EMIT: the `)`→`:` window is contained in
+    /// it, so the emitter's loop could not have run, and no *honorable* directive can sit
+    /// in the gap either — the freeze needs the directive alone on its line, so a newline
+    /// follows it, so it is not glued, so it is never `owned_by_node` and always in the
+    /// to-emit set (`member_gap_frozen`'s in-source axis and this to-emit gate agree for
+    /// exactly that reason). Either way a `None` close paren yields the same empty doc and
+    /// the same declined freeze. One binary search replaces a per-signature byte walk on
+    /// the common (comment-free) path.
+    pub(in crate::printer) fn return_type_close_paren(
+        &self,
+        paren_pos: Option<u32>,
+        return_type_start: u32,
+    ) -> Option<u32> {
+        paren_pos
+            .filter(|&p| self.has_comments_to_emit_between(p, return_type_start))
+            .and_then(|p| self.find_closing_paren(p, return_type_start))
+    }
+
+    /// The frozen return-type route for a `)`→`:` gap: an alone-on-line format-ignore
+    /// directive there freezes the whole `: type` annotation and keeps its own line
+    /// ([`Self::build_frozen_annotation_head_doc`]), replacing the ordinary
+    /// prefix-plus-annotation emission of all three hosts — a function/method
+    /// declaration, an arrow, and a type-member signature. Without it the gap's first
+    /// comment trails `)` (`build_close_paren_to_return_type_comments`), which is inert
+    /// under the placement classification and would lose the freeze on the second pass.
+    ///
+    /// Takes the already-located `close_paren_after` (via
+    /// [`Self::return_type_close_paren`] where the caller doesn't have one), so it shares
+    /// that scan with the comment emitter below rather than running a second one.
+    pub(in crate::printer) fn build_frozen_return_type_doc(
+        &self,
+        close_paren_after: Option<u32>,
+        return_type: &internal::TSTypeAnnotation<'_>,
+    ) -> Option<DocId> {
+        self.build_frozen_annotation_head_doc(close_paren_after?, return_type)
+    }
+
     /// Emit any comments in the `)`→return-type gap, so the caller can append the
-    /// `: type` after this prefix.
+    /// `: type` after this prefix (`close_paren_after` = the position just past the `)`).
     ///
     /// A **block** comment stays inline with a trailing space, and prettier adds a
     /// space before `:` when one precedes it (`m(a) /* c */ : void`). A **line**
     /// comment forces the return-type `:` onto the next line (`m(a) // c⏎: void`)
-    /// so it isn't swallowed — see `build_close_paren_to_return_type_comments`.
-    /// Returns an empty doc when there is no such comment.
-    pub(in crate::printer) fn build_paren_to_return_type_comments(
-        &self,
-        paren_pos: Option<u32>,
-        return_type_start: u32,
-    ) -> DocId {
-        // Depth-tracked close paren (skips nested parens / comments) — the naive
-        // first-`)` scan mis-fires on complex params and pulls real param-trailing
-        // comments into this range (duplication).
-        let close_paren_after =
-            paren_pos.and_then(|p| self.find_closing_paren(p, return_type_start));
-        self.build_close_paren_to_return_type_comments(close_paren_after, return_type_start)
-    }
-
-    /// `build_paren_to_return_type_comments` for callers that already located the
-    /// params' close paren (`close_paren_after` = position just past the `)`) —
-    /// reuses that scan instead of re-running it.
+    /// so it isn't swallowed. Returns an empty doc when there is no such comment.
     pub(in crate::printer) fn build_close_paren_to_return_type_comments(
         &self,
         close_paren_after: Option<u32>,
@@ -483,20 +560,19 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Build return type annotation with comment handling between `)` and `:`
-    /// Used by MethodSignature, CallSignature, ConstructSignature (type-literal and
-    /// interface members) and the declare-function signature.
+    /// [`Self::build_function_return_type_doc`] for a caller that has only the params'
+    /// `(` — it locates the close paren once ([`Self::return_type_close_paren`]) and
+    /// hands it on. Used by MethodSignature, CallSignature, ConstructSignature
+    /// (type-literal and interface members) and the declare-function signature.
     pub(in crate::printer) fn build_signature_return_type_doc(
         &self,
         paren_pos: Option<u32>,
         return_type: &internal::TSTypeAnnotation<'_>,
     ) -> DocId {
-        let d = self.d();
-        let prefix = self.build_paren_to_return_type_comments(paren_pos, return_type.span.start);
-        d.concat(&[
-            prefix,
-            self.build_type_annotation_doc_for_return_type(return_type),
-        ])
+        self.build_function_return_type_doc(
+            self.return_type_close_paren(paren_pos, return_type.span.start),
+            return_type,
+        )
     }
 
     /// Wrap the parameter list and return-type annotation of a type-member
@@ -548,17 +624,20 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&sig_parts))
     }
 
-    /// Build a function-declaration return type (`: T`) with `)`→`:` comment
-    /// handling, using the return-type type variant (wraps unions/intersections so
-    /// params break first). Sibling of `build_signature_return_type_doc`, which
-    /// serves type-member signatures and uses the plain type variant. The caller
-    /// supplies the already-located close paren (position just past the `)`).
+    /// Build a return type (`: T`) with `)`→`:` comment handling, using the return-type
+    /// type variant (wraps unions/intersections so params break first). The caller
+    /// supplies the already-located close paren (position just past the `)`); the
+    /// `(`-only twin is [`Self::build_signature_return_type_doc`].
     pub(in crate::printer) fn build_function_return_type_doc(
         &self,
         close_paren_after: Option<u32>,
         return_type: &internal::TSTypeAnnotation<'_>,
     ) -> DocId {
         let d = self.d();
+        // The frozen `)`→`:` route, on the close paren this caller already located.
+        if let Some(frozen) = self.build_frozen_return_type_doc(close_paren_after, return_type) {
+            return frozen;
+        }
         let prefix = self
             .build_close_paren_to_return_type_comments(close_paren_after, return_type.span.start);
         d.concat(&[
@@ -616,7 +695,7 @@ impl<'a> Printer<'a> {
         // check is a source blank-line test independent of comments and stays outside
         // the gate. Mirrors `build_params_doc_with_comments`'s fast gate.
         let window_start = paren_pos.map_or_else(|| params[0].span().start, |p| p + 1);
-        let comments_present = self.has_comments_to_emit_between(window_start, end_boundary);
+        let comments_present = self.has_comments_on_page_between(window_start, end_boundary);
         // A line comment trailing `(` (`(// c\n p`), or an own-line block comment in
         // the `(`→first-param gap, forces multiline (else the inline path below lets a
         // line comment swallow the following tokens, `(// c p: T)`; mirrors
@@ -624,29 +703,8 @@ impl<'a> Printer<'a> {
         // left between two params also forces multiline (preserved by the separator
         // emission below) — same as regular function params; prettier keeps the blank
         // in every parameter-list position.
-        let force_multiline = self.has_blank_line_between_params(params)
-            // An own-line comment BETWEEN two params forces multiline, the same as one in
-            // the `(`→first-param gap below. Shared with the value-level router rather than
-            // re-derived here — the between-params case used to be reached only by accident,
-            // via a blank-line check that miscounted a comment's own two newlines as a blank.
-            || (comments_present
-                && self.has_leading_own_line_comment_in_params(params, paren_pos.map(|p| p + 1)))
-            || (comments_present
-                && (self.has_line_comments_in_delimited_list(
-                    params,
-                    internal::Expression::span,
-                    end_boundary,
-                ) || paren_pos.is_some_and(|p| {
-                    let first_start = params[0].span().start;
-                    self.has_line_comments_between(p + 1, first_start)
-                        || self.has_own_line_block_comment_after(p, p + 1, first_start)
-                }) || params.last().is_some_and(|last| {
-                    self.has_own_line_block_comment_after(
-                        last.span().end,
-                        last.span().end,
-                        end_boundary,
-                    )
-                })));
+        let force_multiline =
+            self.type_params_force_multiline(params, paren_pos, end_boundary, comments_present);
 
         if force_multiline {
             // Hardline params layout, shared with the function/constructor-type path.
@@ -677,7 +735,7 @@ impl<'a> Printer<'a> {
                 param_parts.push(d.text(","));
                 param_parts.push(d.line());
             }
-            param_parts.push(self.build_function_type_param_expression_doc(param));
+            param_parts.push(self.build_function_type_param_item_doc(paren_pos, params, i));
 
             // Handle trailing comments after this param — gated by the window check
             // (each param→next-boundary gap is inside the window).
@@ -707,6 +765,77 @@ impl<'a> Printer<'a> {
         // signature breaks the PARAMS before the return-type generic breaks (matching
         // build_params_doc_with_comments for class/function signatures, and prettier).
         d.concat(&parts)
+    }
+
+    /// Whether a type-side parameter list must take the hardline layout
+    /// ([`Self::build_type_params_multiline_parts`]) rather than a width-decided one.
+    /// The single statement of that decision for both type-side hosts — the type-member
+    /// signature path ([`Self::build_signature_params_doc`]) and the
+    /// function/constructor-type path ([`Self::build_function_params_doc`]) — which
+    /// share the layout emitter and so must share the question that routes to it.
+    ///
+    /// The legs, in the order they can fire: an author blank line between two params
+    /// (comment-independent, so it is asked first and outside the gate); then, only in a
+    /// comment-bearing window, an own-line comment leading any param, a line comment
+    /// anywhere in the delimited list, a line comment or own-line block in the
+    /// `(`→first-param gap, and an own-line block after the last param. Each of these
+    /// would otherwise be swallowed or collapsed by an inline layout.
+    ///
+    /// `comments_present` is the caller's window gate (its window is a superset of every
+    /// range asked here), so a comment-free list pays one blank-line scan and nothing else.
+    fn type_params_force_multiline(
+        &self,
+        params: &[internal::Expression<'_>],
+        paren_pos: Option<u32>,
+        end_boundary: u32,
+        comments_present: bool,
+    ) -> bool {
+        if self.has_blank_line_between_params(params) {
+            return true;
+        }
+        if !comments_present {
+            return false;
+        }
+        self.has_leading_own_line_comment_in_params(params, paren_pos.map(|p| p + 1))
+            || self.has_line_comments_in_delimited_list(
+                params,
+                internal::Expression::span,
+                end_boundary,
+            )
+            || paren_pos.is_some_and(|p| {
+                params.first().is_some_and(|first| {
+                    let first_start = first.span().start;
+                    self.has_line_comments_between(p + 1, first_start)
+                        || self.has_own_line_block_comment_after(p, p + 1, first_start)
+                })
+            })
+            || params.last().is_some_and(|last| {
+                self.has_own_line_block_comment_after(
+                    last.span().end,
+                    last.span().end,
+                    end_boundary,
+                )
+            })
+    }
+
+    /// A type-side parameter list item: the freeze-aware layer over
+    /// [`Self::build_function_type_param_expression_doc`]. An alone-on-line
+    /// format-ignore directive leading parameter `i` freezes it verbatim (Rule A).
+    /// Shared by all three type-side loops — the signature path, the
+    /// function/constructor-type path, and their common multiline layout — so the
+    /// placement question is asked once per position. The value-side twin is
+    /// `build_function_parameter_item_doc` (type-side parameters carry no decorators,
+    /// so they have only the one freeze position).
+    fn build_function_type_param_item_doc(
+        &self,
+        paren_pos: Option<u32>,
+        params: &[internal::Expression<'_>],
+        i: usize,
+    ) -> DocId {
+        self.param_frozen_span(paren_pos, params, i).map_or_else(
+            || self.build_function_type_param_expression_doc(&params[i]),
+            |frozen| self.build_frozen_span_doc(frozen),
+        )
     }
 
     /// Build a Doc for a function type parameter expression with wrapping type annotations.
@@ -784,45 +913,19 @@ impl<'a> Printer<'a> {
             // each is provably empty/false.
             let window_has_comments = {
                 let window_start = paren_pos.unwrap_or(0);
-                self.has_comments_to_emit_between(window_start, end_boundary)
+                self.has_comments_on_page_between(window_start, end_boundary)
             };
 
-            let has_line_comments = window_has_comments
-                && self.has_line_comments_in_delimited_list(
-                    params,
-                    internal::Expression::span,
-                    end_boundary,
-                );
-            // Also check for own-line block comments after the last param
-            let has_own_line_block_after_last = window_has_comments
-                && params.last().is_some_and(|last| {
-                    self.has_own_line_block_comment_after(
-                        last.span().end,
-                        last.span().end,
-                        end_boundary,
-                    )
-                });
-            // A line comment trailing `(` (`(// c\n p`), or an own-line block comment
-            // in the `(`→first-param gap (`(\n/* c */\n p`), forces multiline.
-            // `has_line_comments_in_delimited_list` skips this leading gap, and the
-            // inline path below emits these with trailing spacing — a line comment
-            // swallows the following tokens, a block comment collapses inline. Route
-            // to the hardline path so they land on their own line (matches prettier).
-            let has_leading_gap_forcing = window_has_comments
-                && paren_pos.is_some_and(|p| {
-                    let first_start = params[0].span().start;
-                    self.has_line_comments_between(p + 1, first_start)
-                        || self.has_own_line_block_comment_after(p, p + 1, first_start)
-                });
-            // A blank line between two params also forces multiline (preserved by the
-            // hardline path) — same as regular function params; prettier keeps it.
-            if has_line_comments
-                || has_own_line_block_after_last
-                || has_leading_gap_forcing
-                || self.has_blank_line_between_params(params)
-                // Same between-params own-line rule as the router above.
-                || self.has_leading_own_line_comment_in_params(params, paren_pos.map(|p| p + 1))
-            {
+            // The hardline layout and the decision that routes to it are both shared with
+            // the signature path: a line comment anywhere in the list or the `(` gap would
+            // be swallowed by the inline path below, an own-line block would collapse into
+            // it, and an author blank line must survive.
+            if self.type_params_force_multiline(
+                params,
+                paren_pos,
+                end_boundary,
+                window_has_comments,
+            ) {
                 return self.build_type_params_multiline_parts(params, paren_pos);
             }
 
@@ -944,7 +1047,7 @@ impl<'a> Printer<'a> {
                         p.span().start,
                     ));
 
-                    param_parts.push(self.build_function_type_param_expression_doc(p));
+                    param_parts.push(self.build_function_type_param_item_doc(paren_pos, params, i));
 
                     // Trailing block comments (before comma or `)`)
                     let param_end = p.span().end;
@@ -1026,7 +1129,7 @@ impl<'a> Printer<'a> {
                 skip_delim,
             ));
 
-            inner_parts.push(self.build_function_type_param_expression_doc(p));
+            inner_parts.push(self.build_function_type_param_item_doc(paren_pos, params, i));
 
             if !is_last {
                 let next_start = params[i + 1].span().start;

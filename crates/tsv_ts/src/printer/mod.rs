@@ -34,6 +34,7 @@ mod class_common;
 mod comments;
 mod decorators;
 mod expressions;
+mod ignore;
 mod layout;
 mod needs_parens;
 mod program;
@@ -45,10 +46,11 @@ mod types;
 pub use analysis::conditional_should_break_after_op;
 pub(crate) use analysis::{
     PatternContext, build_entity_name_doc, container_may_have_multiline_content,
-    has_multiline_content, has_newline_before_position, is_brace_block_multiline,
-    is_effectively_empty_body, is_module_path_fluid_call, is_multiline_string_literal,
-    is_multiline_template_expression, is_pure_property_chain, is_string_literal,
-    next_printed_stmt_start, object_pattern_should_expand, template_literal_has_newlines,
+    has_multiline_content, has_newline_after_position, has_newline_before_position,
+    is_brace_block_multiline, is_effectively_empty_body, is_module_path_fluid_call,
+    is_multiline_string_literal, is_multiline_template_expression, is_pure_property_chain,
+    is_string_literal, next_printed_stmt_start, object_pattern_should_expand,
+    template_literal_has_newlines,
 };
 pub(crate) use comments::{
     CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
@@ -73,8 +75,7 @@ use tsv_lang::{
         self,
         arena::{DocArena, DocId},
     },
-    has_comments_to_emit_in_range, has_line_comments_in_range, is_format_ignore_directive,
-    printing,
+    has_comments_to_emit_in_range, has_line_comments_in_range, printing,
     source_scan::{TriviaProfile, skip_trivia},
 };
 
@@ -124,9 +125,10 @@ pub struct Printer<'a> {
     pub(crate) has_owned_comments: bool,
     /// Whether any comment in this document is a `format-ignore` directive.
     /// Document-level presence flag (from `PrinterInputs`), computed once per document —
-    /// never here (the `.svelte` per-`{expr}` trap). Gates `has_format_ignore_in_range` so
-    /// a document with no format-ignore directive (~all of them) skips the per-node range
-    /// scan + directive-string match entirely.
+    /// never here (the `.svelte` per-`{expr}` trap). Gates every entry of the
+    /// format-ignore seam (`printer/ignore.rs`) so a document with no format-ignore
+    /// directive (~all of them) skips the per-node range scan + directive-string match
+    /// entirely — each entry reads this flag before any span arithmetic behind it.
     pub(crate) has_format_ignore: bool,
     /// Precomputed line break positions for O(log n) line boundary lookups —
     /// the *layout* table.
@@ -1199,22 +1201,6 @@ impl<'a> Printer<'a> {
             .unwrap_or(fallback)
     }
 
-    /// Check if any comment in the range is a format-ignore directive.
-    /// Used to emit the next node as raw source text instead of formatting.
-    ///
-    /// Axis-free: ownership binds only a *bundler annotation* (`@__NAME__`) or a JSDoc cast,
-    /// and neither is a format-ignore directive — no owned comment can ever match this
-    /// predicate, so skipping and counting give the same answer.
-    fn has_format_ignore_in_range(&self, start: u32, end: u32) -> bool {
-        // Document-level short-circuit: no format-ignore directive anywhere in the
-        // document ⇒ none in any sub-range, so skip the range scan + directive match.
-        if !self.has_format_ignore {
-            return false;
-        }
-        comments_to_emit_in_range(self.comments, start, end)
-            .any(|c| is_format_ignore_directive(c.content(self.source)))
-    }
-
     /// Emit a node's source span verbatim. Used to round-trip the source of a
     /// format-ignored node (statement, block statement, object/pattern
     /// property, class/enum/interface/type-literal member) instead of
@@ -1231,8 +1217,10 @@ impl<'a> Printer<'a> {
     /// the surrounding loop emits itself (e.g. a type-literal member's `;`), so
     /// the terminator isn't duplicated.
     ///
-    /// Emitted as a `source_span` over the whitespace-trimmed sub-span — an
-    /// ignored region can be large, and the verbatim slice needs no pool copy.
+    /// Emitted as a `verbatim_source_span` over the whitespace-trimmed sub-span —
+    /// an ignored region can be large, and the verbatim slice needs no pool copy;
+    /// the variant keeps the frozen slice's embedded newlines opaque to
+    /// `will_break` (source layout, not a break the enclosing group must honor).
     fn raw_source_range(&self, start: u32, end: u32) -> DocId {
         let trimmed = self.source[start as usize..end as usize].trim_end();
         let span = Span {
@@ -1244,7 +1232,7 @@ impl<'a> Printer<'a> {
         #[cfg(feature = "comment_check")]
         tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
 
-        self.d().source_span(span, self.source)
+        self.d().verbatim_source_span(span, self.source)
     }
 
     /// Emit an identifier-name doc node — the doc-side name-emission seam.

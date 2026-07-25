@@ -420,7 +420,16 @@ impl<'a> Printer<'a> {
         let type_end = type_assert.type_annotation.span().end;
         let expr_start = type_assert.expression.span().start;
         let close_angle = self.find_assertion_close_angle(type_end, expr_start);
-        let type_doc = self.build_type_doc(type_assert.type_annotation);
+        // An alone-on-line format-ignore directive in the `<`→type gap freezes a
+        // non-composite cast type verbatim (`single_child_frozen`; a composite
+        // declines and freezes via its own leading-run walk). The broken-cast path
+        // below already keeps the directive own-line (`build_leading_comments_multiline`),
+        // so the freeze slots in as the type doc.
+        let type_doc = if self.single_child_frozen(angle_end, type_assert.type_annotation) {
+            self.build_frozen_single_child_doc(type_assert.type_annotation)
+        } else {
+            self.build_type_doc(type_assert.type_annotation)
+        };
 
         // Comments in the cast stay where the author wrote them. Block comments hug
         // inline (`</* c */ T>`, `<T /* c */>`, `<T>/* c */ expr`); a `//` runs to
@@ -625,26 +634,40 @@ impl<'a> Printer<'a> {
         // See as_satisfies_value_line_comment / as_satisfies_value_own_line_block_comment.
         if let Some(kw_pos) = keyword_pos {
             let kw_end = kw_pos + keyword.len() as u32;
+            // An alone-on-line format-ignore directive in the keyword→type gap freezes
+            // a non-composite cast type verbatim (`single_child_frozen`; a
+            // union/intersection type declines and freezes via its own leading-run
+            // walk). The frozen path keeps the UNWIDENED window — an in-shell
+            // directive stays on the ordinary paths — and the directive keeps its own
+            // line (`append_keyword_value_line_comments` preserves own-line comments;
+            // a keyword-trailing placement is inert, so the relocated form would lose
+            // the freeze on the second pass). `head.frozen` joins the routing below so
+            // a block-spelling alone-on-line directive takes the own-line branch too.
             // A redundant paren shell holding a leading line-comment run (`x as (// c\n A)`,
             // and the double-nested form) strips to the same hang the bare `x as // c\n A`
-            // settles on — route it through the shared keyword→value seam so the paren form
-            // is idempotent. Without this the gate below measures the OUTER paren and the
+            // settles on — the shared keyword→value seam routes it so the paren form is
+            // idempotent. Without this the gate below measures the OUTER paren and the
             // comment inside it is invisible, so the inline path relocates it at a differing
             // indent (a non-idempotency). A mixed (leading block) or trailing shell hoists
             // losslessly too — the leading run below, the trailing comment via
             // `with_stripped_paren_trailing`.
-            let (value_start, value_type) = self.keyword_value_stripped_paren_hang(type_annotation);
+            let head = self.keyword_value_head(kw_end, type_annotation);
             // A line comment or multiline block hangs the type on its own line; a
             // single-line block comment collapses inline (the fall-through below).
             // Prettier relocates the collapsed comment before the keyword instead.
-            if self.comments_force_own_line_between(kw_end, value_start) {
+            if head.frozen || self.comments_force_own_line_between(kw_end, head.value_start) {
                 parts.push(d.text(" "));
                 parts.push(d.text(keyword));
                 // A cast is a value position: a trailing block lifted from the shell
                 // defers past the statement `;` (`x as // c\n\tA; /* t */`), matching the
                 // declarator's own value→`;` trailing handling — so `defer = true`.
-                let type_doc = self.build_hang_value_doc(type_annotation, value_type, true);
-                self.append_keyword_value_line_comments(&mut parts, kw_end, value_start, type_doc);
+                let type_doc = self.build_keyword_value_doc(&head, true);
+                self.append_keyword_value_line_comments(
+                    &mut parts,
+                    kw_end,
+                    head.value_start,
+                    type_doc,
+                );
                 return d.concat(&parts);
             }
         }

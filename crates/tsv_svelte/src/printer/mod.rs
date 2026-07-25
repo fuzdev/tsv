@@ -71,7 +71,7 @@ pub(crate) struct Printer<'a> {
     has_owned_comments: bool,
     /// Whether any of `comments` is a `format-ignore` directive. Computed once per document
     /// at construction and handed to `tsv_ts` via `ts_inputs()`, so the embedded
-    /// `has_format_ignore_in_range` short-circuits per `{expr}` without an O(comments)
+    /// `member_gap_frozen` short-circuits per `{expr}` without an O(comments)
     /// rescan there — the same per-`{expr}` trap `has_owned_comments` documents.
     has_format_ignore: bool,
     /// Precomputed line break positions (byte offsets of '\n' in source)
@@ -192,7 +192,9 @@ impl<'a> Printer<'a> {
         #[cfg(feature = "comment_check")]
         tsv_lang::comment_ledger::record_verbatim_range(self.source, span.start, span.end);
 
-        self.d().source_span(span, self.source)
+        // `verbatim_source_span`, not `source_span`: a format-ignored slice's
+        // embedded newlines are source layout, opaque to `will_break`.
+        self.d().verbatim_source_span(span, self.source)
     }
 
     /// Get the source code

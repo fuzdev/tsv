@@ -1,0 +1,4 @@
+<span>
+	{'aaaaaaaa\
+bbbbbbbb'}
+</span>

@@ -19,12 +19,32 @@ use crate::ast::internal::{
 };
 use crate::printer::CommentVec;
 use crate::printer::analysis::has_newline_after_position;
-use crate::printer::layout::hang_after_operator;
+use crate::printer::layout::{bracketed_list_body, hang_after_operator};
 use smallvec::smallvec;
+use tsv_lang::Comment;
 use tsv_lang::INDENT;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
+
+/// Whether each conditional branch gap holds an alone-on-line format-ignore directive
+/// — the ROUTING verdicts, resolved by `build_conditional_type_doc`'s break gate (the
+/// directive forces the broken layout) and handed to the broken builder rather than
+/// re-derived there, so the gate and the emission can never disagree about a branch.
+#[derive(Clone, Copy)]
+struct BranchRoutes {
+    /// The `extends`-type→true-branch gap (the `?` inside the window).
+    true_route: bool,
+    /// The true-branch→false-branch gap (the `:` inside the window).
+    false_route: bool,
+}
+
+impl BranchRoutes {
+    /// Whether either branch is routed — the break-gate term.
+    fn any(self) -> bool {
+        self.true_route || self.false_route
+    }
+}
 
 impl<'a> Printer<'a> {
     //
@@ -109,38 +129,58 @@ impl<'a> Printer<'a> {
         let has_trailing_line_comment_on_true =
             colon_pos.is_some_and(|c| self.has_line_comments_between(true_type_end, c));
 
-        let needs_breaking = has_breaking_comments_around_question
-            || has_breaking_comments_after_colon
-            || has_trailing_line_comment_on_true;
-
-        if needs_breaking {
-            return self.build_conditional_type_doc_with_line_comments(c);
-        }
-
-        // Build true_type doc: if it's a conditional (possibly wrapped in parens), don't wrap in group
-        // Add parens for readability only when flat (single-line), not when broken (multi-line)
-        let true_type_doc = if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type) {
-            // Nested conditional in true position:
-            // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
-            // - Broken: no parens (the line breaks provide clarity)
-            let inner_doc = self.build_conditional_type_doc_inner(inner);
-            if d.will_break(inner_doc) {
-                // Inner doc forces breaking — use broken layout directly
-                inner_doc
-            } else {
-                d.if_break(inner_doc, d.parens(inner_doc))
-            }
-        } else {
-            self.build_type_doc(c.true_type)
+        // An alone-on-line format-ignore directive in either branch gap (previous
+        // node's span end → branch span start, the `?`/`:` inside the window) forces
+        // the broken layout: the own-line-preserving emission + freeze live there,
+        // and the flat path's trailing emitters would relocate the directive to an
+        // inert placement. A block-spelling directive is the only shape the terms
+        // above miss (a line directive already breaks as a line comment). Resolved
+        // once and handed to the broken builder, which routes each branch on it.
+        let routes = BranchRoutes {
+            true_route: self.member_gap_frozen(extends_type_end, true_type_start),
+            false_route: self.member_gap_frozen(true_type_end, false_type_start),
         };
 
-        // Build false_type doc: if it's a conditional, don't wrap in group
-        // No parens needed for nested conditionals in false position (right-associative)
-        let false_type_doc = if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type)
-        {
-            self.build_conditional_type_doc_inner(inner)
-        } else {
-            self.build_type_doc(c.false_type)
+        let needs_breaking = has_breaking_comments_around_question
+            || has_breaking_comments_after_colon
+            || has_trailing_line_comment_on_true
+            || routes.any();
+
+        if needs_breaking {
+            return self.build_conditional_type_doc_with_line_comments(c, routes);
+        }
+
+        // Branch docs, built lazily inside the arms: a union / intersection branch
+        // rebuilds its doc from parts and never consults the one built here (see
+        // `build_conditional_branch_tail_doc`).
+        //
+        // true_type: if it's a conditional (possibly wrapped in parens), don't wrap in group.
+        // Add parens for readability only when flat (single-line), not when broken (multi-line).
+        let true_type_doc = || {
+            if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type) {
+                // Nested conditional in true position:
+                // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
+                // - Broken: no parens (the line breaks provide clarity)
+                let inner_doc = self.build_conditional_type_doc_inner(inner);
+                if d.will_break(inner_doc) {
+                    // Inner doc forces breaking — use broken layout directly
+                    inner_doc
+                } else {
+                    d.if_break(inner_doc, d.parens(inner_doc))
+                }
+            } else {
+                self.build_type_doc(c.true_type)
+            }
+        };
+
+        // false_type: if it's a conditional, don't wrap in group.
+        // No parens needed for nested conditionals in false position (right-associative).
+        let false_type_doc = || {
+            if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type) {
+                self.build_conditional_type_doc_inner(inner)
+            } else {
+                self.build_type_doc(c.false_type)
+            }
         };
 
         // Comments trailing on extends_type (between extends_type and ?). The mirror
@@ -244,7 +284,7 @@ impl<'a> Printer<'a> {
         &self,
         op: &'static str,
         branch_type: &TSType<'_>,
-        branch_doc: DocId,
+        branch_doc: impl FnOnce() -> DocId,
         op_pos: Option<u32>,
         branch_start: u32,
     ) -> DocId {
@@ -296,10 +336,14 @@ impl<'a> Printer<'a> {
     /// lands the branch one level past the operator, except for a
     /// nested-conditional branch, which levels itself (the run's own
     /// `indent(line)` separator shifts only its first line).
+    ///
+    /// `branch_doc` is a THUNK because the union and intersection arms rebuild the
+    /// branch from parts and never consult it — building eagerly left a dead subtree in
+    /// the arena for every such branch (build-once-reuse).
     fn build_conditional_branch_tail_doc(
         &self,
         branch_type: &TSType<'_>,
-        branch_doc: DocId,
+        branch_doc: impl FnOnce() -> DocId,
         on_new_line: bool,
         run: Option<DocId>,
     ) -> DocId {
@@ -319,10 +363,6 @@ impl<'a> Printer<'a> {
                 d.concat(&[d.text(" "), d.indent(self.prepend_opt(run, inner))])
             }
         };
-        // TODO: the Union/Intersection arms below rebuild their doc bare and ignore
-        // `branch_doc`, so the caller's pre-built `build_type_doc` subtree is dead
-        // for those branches — build the branch docs lazily (or match on the shape
-        // before building) to drop the double build
         match self.unwrap_redundant_parens(branch_type) {
             // `union_prints_hugged`, not the bare syntactic `union_hug_shape` — see
             // `build_conditional_check_doc`; here a bare ask left the members one indent
@@ -345,6 +385,7 @@ impl<'a> Printer<'a> {
             // indented, branch never), so adding an indent here would double it.
             // Guarded by `conditional/branch_nested_chain`.
             TSType::Conditional(_) => {
+                let branch_doc = branch_doc();
                 if on_new_line {
                     d.concat(&[d.hardline(), d.text(INDENT), branch_doc])
                 } else {
@@ -352,6 +393,7 @@ impl<'a> Printer<'a> {
                 }
             }
             _ => {
+                let branch_doc = branch_doc();
                 if on_new_line {
                     // Literal tab text (not d.indent) shifts only the first line
                     // without increasing the structural indent level for nested
@@ -387,10 +429,25 @@ impl<'a> Printer<'a> {
         // prettier relocates the collapsed comment before `extends`. See
         // check_extends_line_comment / extends_own_line_block_comment.
         if self.comments_force_own_line_between(extends_kw_end, extends_type_start) {
-            let value_doc = self.build_type_doc_maybe_parens(
-                c.extends_type,
-                type_needs_parens_for_conditional_extends,
-            );
+            // An alone-on-line format-ignore directive in the `extends`→type gap
+            // freezes a non-composite extends type verbatim (`single_child_frozen`;
+            // a union/intersection extends type declines and freezes via its own
+            // leading-run walk). This emitter already keeps the directive own-line
+            // (a keyword-trailing placement is inert, so the relocated form would
+            // lose the freeze on the second pass). The required-paren rule matches
+            // the unfrozen arm (`type_needs_parens_for_conditional_extends`); the
+            // head builder carries the multi-line must-break.
+            let value_doc = if self.single_child_frozen(extends_kw_end, c.extends_type) {
+                self.build_frozen_head_doc(
+                    c.extends_type,
+                    type_needs_parens_for_conditional_extends,
+                )
+            } else {
+                self.build_type_doc_maybe_parens(
+                    c.extends_type,
+                    type_needs_parens_for_conditional_extends,
+                )
+            };
             let mut parts = smallvec![];
             self.append_keyword_value_line_comments(
                 &mut parts,
@@ -530,7 +587,11 @@ impl<'a> Printer<'a> {
     /// Build conditional type doc when comments force a breaking layout.
     /// This handles: line comments, multiline block comments, and comments
     /// before `?` or `:` operators.
-    fn build_conditional_type_doc_with_line_comments(&self, c: &TSConditionalType<'_>) -> DocId {
+    fn build_conditional_type_doc_with_line_comments(
+        &self,
+        c: &TSConditionalType<'_>,
+        routes: BranchRoutes,
+    ) -> DocId {
         let d = self.d();
 
         let extends_type_end = c.extends_type.span().end;
@@ -538,32 +599,42 @@ impl<'a> Printer<'a> {
         let true_type_end = c.true_type.span().end;
         let false_type_start = c.false_type.span().start;
 
+        // An alone-on-line format-ignore directive in a branch gap (previous node's
+        // span end → branch span start, the `?`/`:` inside the window) ROUTES that
+        // branch's emission own-line and freezes the branch child verbatim. The
+        // default emitters below trail-relocate every pre-operator comment onto the
+        // extends/true line — an inert placement that would lose the freeze on the
+        // second pass.
+        //
+        // The branch freezes WHOLE even when the child is a union or intersection —
+        // the one head where composite-transparency (`single_child_frozen`, which
+        // declines so the member rules apply instead) would be wrong. Those rules
+        // only reach a directive the composite's OWN leading run finds, and that run
+        // crosses whitespace and the transparent `|` / `&` / `(` alone: the interposing
+        // `?` / `:` token stops it. Declining here would freeze nothing at all.
+        //
+        // So route and freeze coincide — the caller's gate already answered the gap
+        // question for this exact window, and no freeze-TARGET arm is left to ask, so
+        // `true_route` / `false_route` ARE the freeze verdicts.
+        let BranchRoutes {
+            true_route,
+            false_route,
+        } = routes;
+
         // Detect leading line comments inside parens around true_type / false_type
         // for relocation: prettier moves them to trail extends_type / true_type
         // (e.g., `extends b ? (// c\n  C) : D` → `extends b // c\n  ? C\n  : D`).
-        let true_paren_leading_line_comments: CommentVec<'_> =
-            self.stripped_paren_leading_line_comments(c.true_type);
-        let false_paren_leading_line_comments: CommentVec<'_> =
-            self.stripped_paren_leading_line_comments(c.false_type);
-
-        // Build branch type docs (same nested-conditional logic as non-breaking path).
-        // When we relocated leading line comments from a parenthesized wrapper (any
-        // nesting depth), build the fully-unwrapped inner type directly so the
-        // relocated comments aren't emitted twice.
-        let true_type_doc = if !true_paren_leading_line_comments.is_empty() {
-            self.build_type_doc(unwrap_parenthesized(c.true_type))
-        } else if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type) {
-            self.build_conditional_type_doc_inner(inner)
+        // A FROZEN branch freezes its whole shell verbatim (shell comments ride the
+        // slice), so it must not also collect them for relocation (print-once).
+        let true_paren_leading_line_comments: CommentVec<'_> = if true_route {
+            CommentVec::new()
         } else {
-            self.build_type_doc(c.true_type)
+            self.stripped_paren_leading_line_comments(c.true_type)
         };
-
-        let false_type_doc = if !false_paren_leading_line_comments.is_empty() {
-            self.build_type_doc(unwrap_parenthesized(c.false_type))
-        } else if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type) {
-            self.build_conditional_type_doc_inner(inner)
+        let false_paren_leading_line_comments: CommentVec<'_> = if false_route {
+            CommentVec::new()
         } else {
-            self.build_type_doc(c.false_type)
+            self.stripped_paren_leading_line_comments(c.false_type)
         };
 
         // Find `extends` keyword position (reused for both extends_type_doc and comments_before_extends)
@@ -580,68 +651,112 @@ impl<'a> Printer<'a> {
 
         let extends_type_doc = self.build_conditional_type_extends_doc(c, extends_kw_end);
 
-        // Split comments around the `?` token by position so trailing line
-        // comments on extends_type (e.g., `b // comment\n? c`) stay on
-        // extends_type's line rather than being relocated past `?`.
-        let q_pos = self.find_char_outside_comments(extends_type_end, true_type_start, b'?');
-        let (before_q_end, after_q_start) = match q_pos {
-            Some(q) => (q, q + 1),
-            None => (true_type_start, extends_type_end),
-        };
-
-        // Comments BEFORE the `?` token — emit as trailing on extends_type
-        // (before the hardline that ends extends_type's line). Also includes
-        // relocated leading line comments from inside true_type's parens.
         let mut trailing_on_extends_parts: DocBuf = DocBuf::new();
-        for comment in comments_to_emit_in_range(self.comments, extends_type_end, before_q_end) {
-            trailing_on_extends_parts.push(self.build_trailing_comment_doc(comment));
-        }
-        for comment in &true_paren_leading_line_comments {
-            trailing_on_extends_parts.push(self.build_trailing_line_comment_doc(comment));
-        }
-
         let mut q_parts = DocBuf::new();
 
-        // ? on new line
-        q_parts.push(d.hardline());
-        q_parts.push(d.text("?"));
+        if true_route {
+            let (trailing, branch) = self.build_routed_conditional_branch(
+                extends_type_end,
+                true_type_start,
+                &true_paren_leading_line_comments,
+                "?",
+                self.build_frozen_single_child_doc(c.true_type),
+            );
+            trailing_on_extends_parts.push(trailing);
+            q_parts.push(branch);
+        } else {
+            // Split comments around the `?` token by position so trailing line
+            // comments on extends_type (e.g., `b // comment\n? c`) stay on
+            // extends_type's line rather than being relocated past `?`.
+            let q_pos = self.find_char_outside_comments(extends_type_end, true_type_start, b'?');
+            let (before_q_end, after_q_start) = match q_pos {
+                Some(q) => (q, q + 1),
+                None => (true_type_start, extends_type_end),
+            };
 
-        // Comments AFTER the `?` token — emit between `?` and the true branch.
-        let needs_indent_before_true =
-            self.push_conditional_branch_gap_comments(&mut q_parts, after_q_start, true_type_start);
-        q_parts.push(self.build_conditional_branch_tail_doc(
-            c.true_type,
-            true_type_doc,
-            needs_indent_before_true,
-            None,
-        ));
-
-        // Comments trailing on true_type (between true_type and :) — preserve position.
-        // Also includes relocated leading line comments from inside false_type's parens.
-        let colon = self.find_char_outside_comments(true_type_end, false_type_start, b':');
-        if let Some(c_pos) = colon {
-            for comment in comments_to_emit_in_range(self.comments, true_type_end, c_pos) {
-                q_parts.push(self.build_trailing_comment_doc(comment));
+            // Comments BEFORE the `?` token — emit as trailing on extends_type
+            // (before the hardline that ends extends_type's line). Also includes
+            // relocated leading line comments from inside true_type's parens.
+            for comment in comments_to_emit_in_range(self.comments, extends_type_end, before_q_end)
+            {
+                trailing_on_extends_parts.push(self.build_trailing_comment_doc(comment));
             }
-        }
-        for comment in &false_paren_leading_line_comments {
-            q_parts.push(self.build_trailing_line_comment_doc(comment));
+            for comment in &true_paren_leading_line_comments {
+                trailing_on_extends_parts.push(self.build_trailing_line_comment_doc(comment));
+            }
+
+            // ? on new line
+            q_parts.push(d.hardline());
+            q_parts.push(d.text("?"));
+
+            // Comments AFTER the `?` token — emit between `?` and the true branch.
+            let needs_indent_before_true = self.push_conditional_branch_gap_comments(
+                &mut q_parts,
+                after_q_start,
+                true_type_start,
+            );
+            q_parts.push(self.build_conditional_branch_tail_doc(
+                c.true_type,
+                || {
+                    self.build_relocated_conditional_branch_doc(
+                        c.true_type,
+                        &true_paren_leading_line_comments,
+                    )
+                },
+                needs_indent_before_true,
+                None,
+            ));
         }
 
-        // : on new line
-        q_parts.push(d.hardline());
-        q_parts.push(d.text(":"));
+        if false_route {
+            // The `:` branch mirrors the routed `?` emission, except that its
+            // same-line comments trail the TRUE branch's line — already inside
+            // `q_parts` — instead of a separate buffer.
+            let (trailing, branch) = self.build_routed_conditional_branch(
+                true_type_end,
+                false_type_start,
+                &false_paren_leading_line_comments,
+                ":",
+                self.build_frozen_single_child_doc(c.false_type),
+            );
+            q_parts.push(trailing);
+            q_parts.push(branch);
+        } else {
+            // Comments trailing on true_type (between true_type and :) — preserve position.
+            // Also includes relocated leading line comments from inside false_type's parens.
+            let colon = self.find_char_outside_comments(true_type_end, false_type_start, b':');
+            if let Some(c_pos) = colon {
+                for comment in comments_to_emit_in_range(self.comments, true_type_end, c_pos) {
+                    q_parts.push(self.build_trailing_comment_doc(comment));
+                }
+            }
+            for comment in &false_paren_leading_line_comments {
+                q_parts.push(self.build_trailing_line_comment_doc(comment));
+            }
 
-        // Comments after : only (between : and false_type)
-        let colon_end = colon.map_or(true_type_end, |c| c + 1);
-        let needs_indent_before_false =
-            self.push_conditional_branch_gap_comments(&mut q_parts, colon_end, false_type_start);
-        q_parts.push(self.build_conditional_branch_tail_doc(
-            c.false_type,
-            false_type_doc,
-            needs_indent_before_false,
-            None,
-        ));
+            // : on new line
+            q_parts.push(d.hardline());
+            q_parts.push(d.text(":"));
+
+            // Comments after : only (between : and false_type)
+            let colon_end = colon.map_or(true_type_end, |c| c + 1);
+            let needs_indent_before_false = self.push_conditional_branch_gap_comments(
+                &mut q_parts,
+                colon_end,
+                false_type_start,
+            );
+            q_parts.push(self.build_conditional_branch_tail_doc(
+                c.false_type,
+                || {
+                    self.build_relocated_conditional_branch_doc(
+                        c.false_type,
+                        &false_paren_leading_line_comments,
+                    )
+                },
+                needs_indent_before_false,
+                None,
+            ));
+        }
 
         // Comments between check_type and `extends` keyword (reuses extends_kw_start from above)
         let comments_before_extends =
@@ -658,6 +773,70 @@ impl<'a> Printer<'a> {
             trailing_on_extends_doc,
             d.indent(d.concat(&q_parts)),
         ])
+    }
+
+    /// The ordinarily-built doc for a conditional branch in the BREAKING layout, shared
+    /// by the `?` and `:` arms (same nested-conditional logic as the non-breaking path).
+    /// When leading line comments were relocated out of a parenthesized wrapper (any
+    /// nesting depth, `paren_leading` non-empty), the doc is built from the
+    /// fully-unwrapped inner so those comments aren't emitted twice.
+    ///
+    /// Built lazily by [`Self::build_conditional_branch_tail_doc`], whose union /
+    /// intersection arms rebuild the branch from parts and would discard it.
+    fn build_relocated_conditional_branch_doc(
+        &self,
+        branch: &TSType<'_>,
+        paren_leading: &CommentVec<'_>,
+    ) -> DocId {
+        if !paren_leading.is_empty() {
+            self.build_type_doc(unwrap_parenthesized(branch))
+        } else if let TSType::Conditional(inner) = unwrap_parenthesized(branch) {
+            self.build_conditional_type_doc_inner(inner)
+        } else {
+            self.build_type_doc(branch)
+        }
+    }
+
+    /// The routed branch-gap emission shared by the `?` and `:` arms of
+    /// [`Self::build_conditional_type_doc_with_line_comments`], for a gap holding an
+    /// alone-on-line format-ignore directive: own-line-preserving
+    /// ([`Self::build_own_line_preserving_run`]), so the placement that earned the
+    /// freeze survives.
+    ///
+    /// Returns `(trailing, branch)` — the caller places them, since the two arms differ
+    /// only in where a same-line comment goes (the `?` arm's trails the extends line, a
+    /// separate buffer; the `:` arm's trails the true branch, already inside `q_parts`).
+    /// Every own-line comment (the directive among them) sits ABOVE the operator's
+    /// line, and the branch follows the operator on that line. The whole gap
+    /// `[gap_start, branch_start)` is claimed here, both sides of the operator, so no
+    /// comment is emitted twice (print-once). A routed composite's stripped-shell
+    /// leading line comments (`paren_leading`) join the own-line run.
+    ///
+    /// `branch_doc` is the frozen verbatim slice — a routed branch always freezes — so
+    /// the branch tail is spelled out here rather than taken from
+    /// [`Self::build_conditional_branch_tail_doc`], whose union / intersection arms
+    /// rebuild their doc from parts and would discard it. The shape is that function's
+    /// `_` arm: a space, then the branch one level past the operator (an `indent` a
+    /// verbatim span carries no doc lines to consume, kept so the two read alike).
+    fn build_routed_conditional_branch(
+        &self,
+        gap_start: u32,
+        branch_start: u32,
+        paren_leading: &CommentVec<'_>,
+        operator: &'static str,
+        branch_doc: DocId,
+    ) -> (DocId, DocId) {
+        let d = self.d();
+        let (trailing, mut parts) = self.build_own_line_preserving_run(gap_start, branch_start);
+        for comment in paren_leading {
+            parts.push(d.hardline());
+            parts.push(self.build_comment_doc(comment));
+        }
+        parts.push(d.hardline());
+        parts.push(d.text(operator));
+        parts.push(d.text(" "));
+        parts.push(d.indent(branch_doc));
+        (trailing, d.concat(&parts))
     }
 
     //
@@ -741,6 +920,30 @@ impl<'a> Printer<'a> {
             body_parts.push(d.text(" "));
         }
 
+        // Whole-signature freeze: an alone-on-line format-ignore directive between `{`
+        // and the `[` (`mapped_gap_frozen`) freezes the whole `[K in ...]: V` clause,
+        // the mapped type's sole-member analog of Rule A. The braces and the member
+        // `;` stay parent-emitted outside the slice, and the directive itself was
+        // just emitted with the leading comments. A `readonly` modifier declines for
+        // now — the slice would need the modifier's own start position.
+        // TODO: extend the freeze slice to a `readonly`/`+`/`-` modifier.
+        if m.readonly.is_none()
+            && let Some(type_ann) = &m.type_annotation
+            && self.mapped_gap_frozen(content_start, bracket_pos)
+        {
+            let type_end = type_ann.span().end;
+            body_parts.push(self.raw_source_range(bracket_pos, type_end));
+            let body_end = m.span.end.saturating_sub(1); // before `}`
+            for comment in comments_to_emit_in_range(self.comments, type_end, body_end) {
+                body_parts.push(self.build_trailing_comment_doc(comment));
+            }
+            return self.build_mapped_type_shell(
+                source_is_multiline,
+                &leading_comments[..leading_own_line_end],
+                &body_parts,
+            );
+        }
+
         // readonly modifier: `readonly`, `+readonly`, or `-readonly`
         if let Some(readonly) = m.readonly {
             body_parts.push(d.text(match readonly {
@@ -755,29 +958,43 @@ impl<'a> Printer<'a> {
         // the `[`→key gap can break the whole `[…]` (mirrors `build_computed_key_bracket_doc`).
         let mut interior_parts: DocBuf = smallvec![];
 
-        interior_parts
-            .push(self.ident_name_doc(m.type_parameter.name, m.type_parameter.span.start));
-        // Comments around `in` keyword: `key /* c1 */ in /* c2 */ Constraint`
-        let name_len =
-            self.with_ident_name_at(m.type_parameter.name, m.type_parameter.span.start, str::len);
-        let name_end = m.type_parameter.span.start + name_len as u32;
-        let constraint_start = m.type_parameter.constraint.span().start;
-        // Find `i` of `in` keyword, skipping comments before it
-        let in_start = find_char_skipping_comments(
-            self.source.as_bytes(),
-            name_end as usize,
-            constraint_start as usize,
-            b'i',
-        );
-        let in_end = in_start.map_or(name_end, |p| (p + "in".len()) as u32);
-        let in_start = in_start.map_or(name_end, |p| p as u32);
-        // Comments between key name and `in` keyword
-        // Comment gaps break a line comment onto its own line so it can't swallow the
-        // following `in`/constraint.
-        interior_parts.push(self.build_leading_comments_break_for_line(name_end, in_start));
-        interior_parts.push(d.text(" in "));
-        interior_parts.push(self.build_trailing_comments_hang_next(in_end, constraint_start));
-        interior_parts.push(self.build_type_doc(m.type_parameter.constraint));
+        // Binding freeze: an alone-on-line format-ignore directive inside the
+        // bracket (`mapped_gap_frozen` over the `[`→key gap) freezes
+        // just the `K in ...` binding — the value keeps formatting normally, and the
+        // directive itself is emitted by the bracket's own comment machinery (the
+        // line-comment break shell, or the inline loop below).
+        if self.mapped_gap_frozen(bracket_pos + 1, param_name_start) {
+            interior_parts.push(
+                self.raw_source_range(param_name_start, m.type_parameter.constraint.span().end),
+            );
+        } else {
+            interior_parts
+                .push(self.ident_name_doc(m.type_parameter.name, m.type_parameter.span.start));
+            // Comments around `in` keyword: `key /* c1 */ in /* c2 */ Constraint`
+            let name_len = self.with_ident_name_at(
+                m.type_parameter.name,
+                m.type_parameter.span.start,
+                str::len,
+            );
+            let name_end = m.type_parameter.span.start + name_len as u32;
+            let constraint_start = m.type_parameter.constraint.span().start;
+            // Find `i` of `in` keyword, skipping comments before it
+            let in_start = find_char_skipping_comments(
+                self.source.as_bytes(),
+                name_end as usize,
+                constraint_start as usize,
+                b'i',
+            );
+            let in_end = in_start.map_or(name_end, |p| (p + "in".len()) as u32);
+            let in_start = in_start.map_or(name_end, |p| p as u32);
+            // Comments between key name and `in` keyword
+            // Comment gaps break a line comment onto its own line so it can't swallow the
+            // following `in`/constraint.
+            interior_parts.push(self.build_leading_comments_break_for_line(name_end, in_start));
+            interior_parts.push(d.text(" in "));
+            interior_parts.push(self.build_trailing_comments_hang_next(in_end, constraint_start));
+            interior_parts.push(self.build_type_doc(m.type_parameter.constraint));
+        }
 
         // as clause: `as NewKeyType`
         // Track the end of the last element inside brackets (for bracket-close comments)
@@ -871,22 +1088,29 @@ impl<'a> Printer<'a> {
             body_parts.push(d.text(":"));
 
             // A redundant paren shell with a leading line-comment run (`]: (// c\n V)`)
-            // strips to the same hang as bare `]: // c\n V`; route it through the shared
-            // keyword→value seam so the paren form is idempotent (the outer paren would
+            // strips to the same hang as bare `]: // c\n V`; the shared keyword→value
+            // seam routes it so the paren form is idempotent (the outer paren would
             // otherwise hide the comment from the gate). A mixed / trailing shell hoists
             // losslessly too — the trailing comment via `build_hang_value_doc`.
-            let (value_start, value_type) = self.keyword_value_stripped_paren_hang(type_ann);
+            //
+            // A format-ignore directive in the `]:`→value gap freezes a non-composite
+            // value verbatim (`single_child_frozen`; a union/intersection value
+            // declines and freezes via its own walk). The frozen path keeps the
+            // UNWIDENED window so an in-shell directive stays on the ordinary paths.
+            let head = self.keyword_value_head(bracket_close, type_ann);
             // A line comment after `:` stays trailing it, with the value type on
             // the next line (preserve-in-place; prettier relocates the comment to
             // trail the member `;`).
-            if self.has_line_comments_between(bracket_close, value_start) {
+            if self.has_line_comments_between(bracket_close, head.value_start) {
                 // Type position: a trailing block lifted from the shell trails the value
-                // inline before the member `;` (`defer = false`).
-                let value_doc = self.build_hang_value_doc(type_ann, value_type, false);
+                // inline before the member `;` (`defer = false`). A frozen value is the
+                // verbatim slice; the own-line directive keeps its own line here
+                // (`append_keyword_value_line_comments` preserves own-line comments).
+                let value_doc = self.build_keyword_value_doc(&head, false);
                 self.append_keyword_value_line_comments(
                     &mut body_parts,
                     bracket_close,
-                    value_start,
+                    head.value_start,
                     value_doc,
                 );
             } else {
@@ -926,7 +1150,13 @@ impl<'a> Printer<'a> {
                     }
                     _ => {
                         body_parts.push(d.text(" "));
-                        body_parts.push(self.build_type_doc(type_ann));
+                        // An alone-on-line BLOCK directive froze the value (the
+                        // line-comment branch above catches only `//` spellings).
+                        if head.frozen {
+                            body_parts.push(self.build_frozen_single_child_doc(type_ann));
+                        } else {
+                            body_parts.push(self.build_type_doc(type_ann));
+                        }
                     }
                 }
             }
@@ -950,17 +1180,35 @@ impl<'a> Printer<'a> {
             }
         }
 
+        self.build_mapped_type_shell(
+            source_is_multiline,
+            &leading_comments[..leading_own_line_end],
+            &body_parts,
+        )
+    }
+
+    /// The mapped type's brace shell around an already-built member body: own-line
+    /// leading comments each take their own line before the body, then the member `;`
+    /// and `}` — hardlines in the multi-line-source form, a width-decided group with
+    /// bracketSpacing boundaries and an `if_break` `;` in the one-line form.
+    fn build_mapped_type_shell(
+        &self,
+        source_is_multiline: bool,
+        own_line_leading: &[&Comment],
+        body_parts: &[DocId],
+    ) -> DocId {
+        let d = self.d();
         if source_is_multiline {
             // Multi-line source: preserve multi-line format with hardlines.
             // Own-line leading comments each take their own line before `[`; the
             // node-adjacent inline block comment (if any) already leads `body_parts`.
             let mut inner_parts: DocBuf = smallvec![];
-            for comment in &leading_comments[..leading_own_line_end] {
+            for comment in own_line_leading {
                 inner_parts.push(d.hardline());
                 inner_parts.push(self.build_comment_doc(comment));
             }
             inner_parts.push(d.hardline());
-            inner_parts.push(d.concat(&body_parts));
+            inner_parts.push(d.concat(body_parts));
             inner_parts.push(d.text(";"));
 
             d.concat(&[
@@ -975,7 +1223,7 @@ impl<'a> Printer<'a> {
             // newline when broken. An own-line leading comment (a line comment, or a
             // non-adjacent block) forces the break via its `hardline`.
             let mut all_parts: DocBuf = smallvec![];
-            for comment in &leading_comments[..leading_own_line_end] {
+            for comment in own_line_leading {
                 all_parts.push(d.hardline());
                 all_parts.push(self.build_comment_doc(comment));
             }
@@ -1031,7 +1279,11 @@ impl<'a> Printer<'a> {
         // comment there the expansion checks are provably false and the list is
         // plain elements joined by `,` + line (renders identically — the skipped
         // pushes are empty comment docs and the empty after-comma buffer).
-        if !self.has_comments_to_emit_between(t.span.start, t.span.end) {
+        // **On-page**: a layout builder's zero-comment fast gate (an emit-keyed
+        // answer would blind every gate it guards — same axis note as
+        // `build_type_arguments_doc`; equivalent today, since ownership is set only
+        // in expression position and a `[…]` window holds types).
+        if !self.has_comments_on_page_between(t.span.start, t.span.end) {
             let mut parts = DocBuf::new();
             for (i, elem) in t.element_types.iter().enumerate() {
                 if i > 0 {
@@ -1040,8 +1292,7 @@ impl<'a> Printer<'a> {
                 }
                 parts.push(self.build_tuple_element_doc(elem));
             }
-            let inner = d.concat(&[d.softline(), d.concat(&parts)]);
-            return d.group(d.concat(&[d.text("["), d.indent(inner), d.softline(), d.text("]")]));
+            return d.group(bracketed_list_body(d, "[", "]", d.concat(&parts), false));
         }
 
         // Check for comments that force expansion: line comments, multiline block comments,
@@ -1068,6 +1319,7 @@ impl<'a> Printer<'a> {
         // Build element docs with commas, inline block comments, and line breaks
         let mut parts = DocBuf::new();
         let mut prev_end = t.span.start + 1; // After opening `[`
+        let mut force_break = false;
         // Block comment trailing the last element after its source comma — preserved
         // past where the comma was (no trailing comma; prettier relocates before; see
         // conformance_prettier.md §Comment relocation).
@@ -1083,7 +1335,19 @@ impl<'a> Printer<'a> {
                 self.build_inline_comments_between_doc_trailing_space(prev_end, elem.span().start);
             parts.push(leading);
 
-            parts.push(self.build_tuple_element_doc(elem));
+            // Rule A: an alone-on-line directive in this element's gap freezes it
+            // (the directive itself was just emitted by the gap emitter above); a
+            // multi-line frozen slice forces the broken layout (a verbatim span is
+            // `will_break`-opaque, so the forcing is explicit).
+            let frozen = self.list_member_frozen(t.span.start + 1, t.element_types, i, false);
+            if frozen {
+                if self.frozen_list_member_multiline(elem) {
+                    force_break = true;
+                }
+                parts.push(self.build_frozen_list_member_doc(elem));
+            } else {
+                parts.push(self.build_tuple_element_doc(elem));
+            }
 
             let elem_end = elem.span().end;
             prev_end = if i + 1 < t.element_types.len() {
@@ -1104,10 +1368,10 @@ impl<'a> Printer<'a> {
         }
 
         // Width-aware breaking: inline if fits, one-per-line if not (no trailing
-        // comma; trailingComma: 'none').
-        let inner = d.concat(&[d.softline(), d.concat(&parts), d.concat(&last_after_comma)]);
-
-        d.group(d.concat(&[d.text("["), d.indent(inner), d.softline(), d.text("]")]))
+        // comma; trailingComma: 'none'). A multi-line frozen element forces the
+        // broken form (see `bracketed_list_body`).
+        let inner = d.concat(&[d.concat(&parts), d.concat(&last_after_comma)]);
+        d.group(bracketed_list_body(d, "[", "]", inner, force_break))
     }
 
     /// Build tuple type with expanding comments (line comments or own-line block comments)
@@ -1136,8 +1400,16 @@ impl<'a> Printer<'a> {
             // bracket-line prefix below).
             let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
             let leading = self.build_leading_comments_multiline(prev_end, elem_start, skip_delim);
-            inner_parts
-                .push(self.build_list_element_group(leading, self.build_tuple_element_doc(elem)));
+            // Rule A: an alone-on-line directive in this element's gap freezes
+            // it; the directive itself was just emitted by the leading run above.
+            // No must-break question — this layout is already all-hardline.
+            let frozen = self.list_member_frozen(t.span.start + 1, t.element_types, i, false);
+            let elem_doc = if frozen {
+                self.build_frozen_list_member_doc(elem)
+            } else {
+                self.build_tuple_element_doc(elem)
+            };
+            inner_parts.push(self.build_list_element_group(leading, elem_doc));
 
             if !is_last {
                 let next_start = t.element_types[i + 1].span().start;
@@ -1181,6 +1453,30 @@ impl<'a> Printer<'a> {
         // `build_expanded_parenthesized_union_opt`.
         if let Some(union_doc) = self.build_expanded_parenthesized_union_opt(arr.element_type) {
             return d.concat(&[union_doc, d.text("[]")]);
+        }
+        // An alone-on-line format-ignore directive INSIDE a paren-shell element
+        // (`(⏎⇥// prettier-ignore⏎⇥(a: T) => void⏎)[]`) freezes the fully-unwrapped
+        // inner only (`paren_interior_routed_inner`; a composite inner declines and freezes
+        // via its own `(`-transparent leading-run walk). The parens expand around the
+        // own-line run — the fall-through below would glue the synthesized `(` onto
+        // the comment with a cascading over-break — and are always kept: the shell
+        // holds a comment, and comment preservation outranks redundant-paren removal
+        // under a freeze. Trailing shell-gap comments are lifted after the inner
+        // (`with_stripped_paren_trailing`), so every shell comment prints once.
+        if let Some(inner) = self.paren_interior_routed_inner(arr.element_type) {
+            let inner_doc = self.build_routed_child_doc(inner);
+            let value_doc =
+                self.with_stripped_paren_trailing(inner_doc, arr.element_type, inner, false);
+            let mut parts: DocBuf = smallvec![d.text("(")];
+            self.append_keyword_value_line_comments(
+                &mut parts,
+                arr.element_type.span().start + 1,
+                inner.span().start,
+                value_doc,
+            );
+            parts.push(d.hardline());
+            parts.push(d.text(")[]"));
+            return d.concat(&parts);
         }
         let needs_parens = type_needs_parens_for_array_element(arr.element_type);
         let element_doc = self.build_type_doc(arr.element_type);

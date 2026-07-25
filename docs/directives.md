@@ -36,6 +36,116 @@ breaks, and alignment; everything else in the file is formatted normally.
 The comment delimiters follow the host language — `//` or `/* … */` in
 TypeScript, `/* … */` in CSS, and `<!-- … -->` in Svelte templates.
 
+### Placement
+
+Where the comment sits decides what it freezes. The rule is total and has no
+exceptions:
+
+- **On its own line** (the only thing on its line, whitespace aside): the
+  directive freezes the construct that follows it.
+- **Anywhere else it is inert.** A directive sharing its line with anything
+  else — trailing a statement, a list member, a separator, an opening `{`
+  (`function f() { // format-ignore`), or a declaration head
+  (`type A = // format-ignore`), or glued directly before a value
+  (`let v: /* format-ignore */ {…}`) — is an ordinary comment: the surrounding
+  code formats normally.
+
+To freeze a construct, put the directive alone on the line above it.
+
+### On type-member lists
+
+The directives also target individual **members** of a type-member list — a
+union or intersection, a tuple, a type-parameter declaration
+(`function f<T, U>`), or a type-argument list (`Foo<A, B>`, `fn<A, B>(x)`): an
+own-line directive in the list's leading gap or between members freezes the
+**next member** only — the rest of the list keeps formatting normally,
+separators included. The member freezes **whole**, whatever its shape — a tuple
+element or type argument that is itself a union freezes as one item, operators
+and all.
+
+```ts
+type T =
+	// format-ignore
+	| { x:1, y:2 }   // ← frozen verbatim
+	| B              // ← formatted normally
+	| C;
+
+type U = [
+	a,
+	// format-ignore
+	{ x:1, y:2 },    // ← frozen verbatim; the `,` stays parent-owned
+	b
+];
+```
+
+### On type heads
+
+The same placement rule works between a head token and the single type it
+introduces — a type annotation's `:`, a type alias's `=`, a type parameter's
+`extends` constraint or `=` default, a named tuple member's `label:`, and a
+mapped type's `]:` value. An own-line directive there freezes the type that
+follows (a union or intersection child follows the member rules above
+instead), and the directive stays where the author put it:
+
+```ts
+let v:
+	// format-ignore
+	{ x:1,  y:2 };   // ← frozen verbatim
+```
+
+Inside a mapped type, a directive above the `[K in ...]: V` clause freezes the
+whole clause; a directive inside the bracket freezes just the `K in ...`
+binding.
+
+### On annotation heads
+
+A directive can also sit on the other side of a `:` — in the gap *before* it,
+between a head and its annotation. That reaches four heads: a binding (class
+property, parameter, variable, index-signature key), a property signature, an
+index signature's value `:`, and a signature's return type. The whole `: type`
+freezes there, since that is what the directive precedes — a union or
+intersection value included, and an optional `?` marker too:
+
+```ts
+interface I {
+	a
+		// format-ignore
+		: { x:1,  y:2 };   // ← the whole `: { … }` frozen verbatim
+}
+
+function fn()
+	// format-ignore
+	: { x:1,  y:2 } {
+	return { x: 1, y: 2 };
+}
+```
+
+Such a gap only exists when a line comment already pushed the `:` onto its own
+line, so this is a rare shape in practice.
+
+### On parameter lists
+
+A parameter list is a member list too, so the same rule applies: an own-line
+directive after the `(` or between two parameters freezes the **next parameter**
+only. The whole parameter freezes — its modifiers, decorators, `?`, default,
+rest `...`, and type annotation are all part of what the directive precedes:
+
+```ts
+function fn(
+	p: T,
+	// format-ignore
+	q: { x:1,  y:2 },   // ← frozen verbatim; the `,` stays parent-owned
+	r: U
+) {}
+```
+
+Every parameter list is covered — functions, methods, arrows, `{#snippet}`
+parameters, method / call / construct signatures, function and constructor
+types, and an index signature's `[key: T]`. A single parameter that would
+normally hug (`fn({ a, b }: T)`) expands instead, so the directive keeps its own
+line. A directive written *between* a parameter's decorators and its binding
+freezes just the binding, leaving the decorators to format normally.
+
 ## `format-ignore-start` / `format-ignore-end`
 
 In Svelte templates, a pair of range markers preserves every node between them:
@@ -52,11 +162,12 @@ an element are treated as ordinary comments.
 
 ## `prettier-ignore` compatibility
 
-Because tsv is a drop-in replacement for prettier, it also honors the
+For compatibility with prettier-authored code, tsv also honors the
 `prettier-ignore` family — `prettier-ignore`, `prettier-ignore-start`, and
 `prettier-ignore-end` — identically. `format-ignore` is the canonical tsv
 spelling; `prettier-ignore` is kept so existing codebases keep working unchanged.
-Either spelling works in any position.
+The two spellings are honored identically at every honored position — which
+positions are honored is decided by [placement](#placement), never by spelling.
 
 ## See also
 

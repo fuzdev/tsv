@@ -778,10 +778,18 @@ impl<'a> Printer<'a> {
         params_start: Option<u32>,
     ) -> DocId {
         let d = self.d();
+        // One depth-tracked close-`)` scan feeds both `)`→`:` questions below.
+        let close_paren_after = self.return_type_close_paren(params_start, annotation.span.start);
+        // An alone-on-line format-ignore directive in the `)`→`:` gap freezes the whole
+        // `: type` annotation and keeps its own line — before the function-type paren
+        // wrapping below, which would rebuild a frozen type from parts.
+        if let Some(frozen) = self.build_frozen_return_type_doc(close_paren_after, annotation) {
+            return frozen;
+        }
         // Preserve a block comment between `)` and the return type `:`
         // (`(x) /* c */ : T => ...`); prettier adds a space before `:`.
-        let comment_prefix =
-            self.build_paren_to_return_type_comments(params_start, annotation.span.start);
+        let comment_prefix = self
+            .build_close_paren_to_return_type_comments(close_paren_after, annotation.span.start);
 
         // Function types need parentheses to disambiguate from the arrow's `=>`
         // Example: `(x: T): ((y: T) => U) =>` not `(x: T): (y: T) => U =>`
@@ -1220,6 +1228,26 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
+    /// A value-side parameter list item: the freeze-aware layer over
+    /// `build_function_parameter_doc`. An alone-on-line format-ignore directive in
+    /// parameter `i`'s leading gap freezes the parameter verbatim (Rule A); one written
+    /// between its decorators and its binding freezes just the binding. The type-side
+    /// twin is `build_function_type_param_item_doc`.
+    fn build_function_parameter_item_doc(
+        &self,
+        params_start: Option<u32>,
+        params: &[internal::Expression<'_>],
+        i: usize,
+    ) -> DocId {
+        let param = &params[i];
+        if let Some(frozen) = self.param_frozen_span(params_start, params, i) {
+            return self.build_frozen_span_doc(frozen);
+        }
+        self.build_frozen_param_binding_doc(param)
+            // FunctionParameter context for object patterns
+            .unwrap_or_else(|| self.build_function_parameter_doc(param))
+    }
+
     /// Shared implementation for building params doc with comment handling
     ///
     /// Used by arrow functions, function expressions, function declarations, and class methods.
@@ -1241,15 +1269,21 @@ impl<'a> Printer<'a> {
         // Zero-comment fast gate: one binary search over the whole params window.
         // Every comment sub-query below (the hug/force-break predicates and the
         // per-gap lookups in the build loop) is bounded within
-        // [window_start, window_end], and `comments_to_emit_in_range` only yields comments
-        // fully inside its range — so when no comment lies inside the window, every
+        // [window_start, window_end] — so when no comment lies inside the window, every
         // sub-query is provably empty/false. Skip them all, including the per-gap
         // `find_comma_after` trivia scans, whose results feed only comment placement.
+        //
+        // **On page**, not to-emit: this gate guards layout decisions (the single-pattern
+        // hug, the force-break legs, the blank-line scan's comment-aware bound), and an
+        // owned comment still occupies the page for every one of them. An emit-keyed gate
+        // here would make an owned comment vanish from a decision it is visibly part of
+        // (`Printer::has_comments_on_page_between`). The sub-queries stay emit-keyed —
+        // they answer "what must *this* caller print", which is the other question.
         let comments_present = {
             let window_start = params_start.unwrap_or_else(|| params[0].span().start);
             let last_end = params[params.len() - 1].span().end;
             let window_end = trailing_comments_end.map_or(last_end, |end| end.max(last_end));
-            self.has_comments_to_emit_between(window_start, window_end)
+            self.has_comments_on_page_between(window_start, window_end)
         };
 
         // Prettier's shouldHugFunctionParameters: single param that's an object/array pattern
@@ -1345,6 +1379,11 @@ impl<'a> Printer<'a> {
         // Block comment trailing the last param after its source comma — emitted past
         // where the comma was, after the loop (no trailing comma; trailingComma: 'none').
         let mut last_after_comma_docs: DocBuf = DocBuf::new();
+        // The comma closing the PREVIOUS param, carried across the iteration rather than
+        // re-scanned: the gap `params[i-1].end → params[i].start` holds exactly one comma,
+        // and iteration `i-1` already located it as its own `comma_pos`. Scanning it again
+        // as this iteration's `prev_comma_pos` would ask the same source range twice.
+        let mut prev_comma_pos: Option<u32> = None;
         for (i, param) in params.iter().enumerate() {
             let param_start = param.span().start;
             let is_last = i == params.len() - 1;
@@ -1362,9 +1401,9 @@ impl<'a> Printer<'a> {
             // shared by the separator and the leading-comment emitter below. They are the
             // whole input to that split, so two derivations of them are two answers — the
             // separator would measure its gap against a boundary the emitter never agrees to.
-            let prev_comma_pos = (i > 0)
-                .then(|| self.find_comma_after(params[i - 1].span().end))
-                .flatten();
+            // (`prev_comma_pos` is carried from the previous iteration; both consumers sit
+            // under `comments_present`, so a comment-free list never locates a comma at all.)
+            //
             // The first param excludes any comment already pulled onto the `(`
             // line by `delimiter_line_comment_prefix`, so it isn't emitted twice.
             let skip_delim = if i == 0 { paren_pull_pos } else { None };
@@ -1417,8 +1456,7 @@ impl<'a> Printer<'a> {
                 ));
             }
 
-            // Use FunctionParameter context for object patterns
-            inner_parts.push(self.build_function_parameter_doc(param));
+            inner_parts.push(self.build_function_parameter_item_doc(params_start, params, i));
 
             // Handle trailing same-line comments
             let search_end = if is_last {
@@ -1429,15 +1467,16 @@ impl<'a> Printer<'a> {
 
             // Find comma position. For the last param, locate a source trailing
             // comma (within the trailing range) so an after-comma block comment is
-            // preserved after the comma rather than relocated before it.
+            // preserved after the comma rather than relocated before it — bounded at
+            // that range, since a last param usually has NO comma and an unbounded
+            // scan would run to the next comma anywhere later in the file.
             // Consumed only by comment placement, so the zero-comment gate skips the scan.
             let comma_pos = if !comments_present {
                 None
-            } else if !is_last {
-                self.find_comma_after(param.span().end)
+            } else if is_last {
+                self.find_comma_in_range(param.span().end, search_end)
             } else {
                 self.find_comma_after(param.span().end)
-                    .filter(|cp| *cp < search_end)
             };
 
             // Collect same-line comments
@@ -1513,6 +1552,8 @@ impl<'a> Printer<'a> {
                     prev_own = comment.span.end;
                 }
             }
+
+            prev_comma_pos = comma_pos;
         }
 
         // No group - outer signature group controls breaking

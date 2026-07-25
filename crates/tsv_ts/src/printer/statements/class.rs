@@ -313,12 +313,12 @@ impl<'a> Printer<'a> {
 
             // A preceding format-ignore directive keeps the member's source verbatim.
             // The member span includes its trailing `;`.
-            let member_doc =
-                if body_has_comments && self.has_format_ignore_in_range(prev_end, member_start) {
-                    self.raw_source_doc(member.span())
-                } else {
-                    self.build_class_member_doc(member)
-                };
+            let member_doc = if body_has_comments && self.member_gap_frozen(prev_end, member_start)
+            {
+                self.raw_source_doc(member.span())
+            } else {
+                self.build_class_member_doc(member)
+            };
             member_parts.push(member_doc);
 
             // Handle trailing inline comments on same line after member, and
@@ -496,25 +496,42 @@ impl<'a> Printer<'a> {
             parts.push(self.build_property_key_doc(&prop.key));
         }
 
-        // Optional/definite modifier after key, with comment extraction.
-        // `push_modifier_marker_doc` also captures comments between key and marker
-        // (e.g., `a /* c */? = 1;`); `None` simply has no marker to emit.
-        let after_modifier = match prop.modifier {
-            internal::PropertyModifier::None => key_region_end,
-            internal::PropertyModifier::Optional => {
-                self.push_modifier_marker_doc(&mut parts, key_region_end, b'?')
-            }
-            internal::PropertyModifier::Definite => {
-                self.push_modifier_marker_doc(&mut parts, key_region_end, b'!')
-            }
+        // The modifier's marker byte, derived once so the freeze below and the emission
+        // that follows it can never disagree about which marker this property carries.
+        let marker = match prop.modifier {
+            internal::PropertyModifier::None => None,
+            internal::PropertyModifier::Optional => Some(b'?'),
+            internal::PropertyModifier::Definite => Some(b'!'),
         };
 
-        // Type annotation - width-aware wrapping for generics and union types,
-        // handling a before-`:` comment between the modifier (or key) and `:`
-        // (`c! /* c */ : number`) — line → indented continuation, block → inline.
-        if let Some(type_ann) = &prop.type_annotation {
-            parts.push(self.build_binding_type_annotation_doc(after_modifier, type_ann, true));
-        }
+        // An alone-on-line format-ignore directive in the key→marker gap precedes the whole
+        // `?: type` / `!: type` tail, so the freeze starts at the marker and swallows it —
+        // neither the marker nor the annotation is emitted separately then. A directive
+        // AFTER the marker declines here and is routed by the annotation head's own ask.
+        let after_modifier = if let Some((frozen, tail_end)) = self
+            .build_frozen_marker_annotation_tail(
+                key_region_end,
+                marker,
+                prop.type_annotation.as_ref(),
+            ) {
+            parts.push(frozen);
+            tail_end
+        } else {
+            // Optional/definite modifier after key, with comment extraction.
+            // `push_modifier_marker_doc` also captures comments between key and marker
+            // (e.g., `a /* c */? = 1;`); `None` simply has no marker to emit.
+            let after_marker = match marker {
+                Some(marker) => self.push_modifier_marker_doc(&mut parts, key_region_end, marker),
+                None => key_region_end,
+            };
+            // Type annotation - width-aware wrapping for generics and union types,
+            // handling a before-`:` comment between the modifier (or key) and `:`
+            // (`c! /* c */ : number`) — line → indented continuation, block → inline.
+            if let Some(type_ann) = &prop.type_annotation {
+                parts.push(self.build_binding_type_annotation_doc(after_marker, type_ann, true));
+            }
+            after_marker
+        };
 
         // Value if present - use assignment layout (matches prettier's printAssignment)
         if let Some(value) = &prop.value {

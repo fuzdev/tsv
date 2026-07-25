@@ -1,0 +1,16 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2 (fixed point)%%
+<script lang="ts">
+	// an own-line directive between intersection members: tsv freezes only the following
+	// member and keeps the directive own-line; prettier relocates it (trailing the preceding
+	// & on pass 1) and its fixed point collapses the intersection inline, floating the
+	// directive to the statement end and LOSING the freeze
+	type I = { a: 1 } & { b: 2 } & { c: 3 }; // prettier-ignore
+</script>

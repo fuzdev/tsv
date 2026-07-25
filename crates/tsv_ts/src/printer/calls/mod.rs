@@ -202,7 +202,7 @@ impl<'a> Printer<'a> {
         // expression verbatim from source — preserving inner call args (numbers,
         // etc.) that the chain formatter would otherwise reformat. Mirrors
         // prettier's `hasPrettierIgnore` → verbatim-print behavior.
-        if self.has_format_ignore_in_range(member.object.span().end, member.property.span().start) {
+        if self.member_gap_frozen(member.object.span().end, member.property.span().start) {
             return self.raw_source_doc(member.span);
         }
 

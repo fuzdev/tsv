@@ -8,6 +8,12 @@
  * offsets + source, and asserts they match — so a consumer holding only the
  * no-locations wire can recover exact acorn/svelte `loc` on demand.
  *
+ * Svelte's `name_loc` gets the same treatment. Its name span isn't a node
+ * `start`/`end`, but it is a function of them plus the node type — the tag-name run
+ * after `<`, an attribute name at the node start (a shorthand `{x}` naming the
+ * identifier inside its braces), a directive's whole head token — so this file
+ * derives the span and gates both it and its line/column against the oracle wire.
+ *
  * Line rules (mirrored from `tsv_lang::LocationTracker`):
  * - TypeScript / `.ts`: ECMAScript LineTerminators — \n, \r, \r\n (ONE), U+2028,
  *   U+2029 (`new_ecmascript_with_map`).
@@ -71,40 +77,77 @@ interface Tally {
 	mismatch: number;
 	name_loc_exact: number;
 	name_loc_mismatch: number;
-	prefix_ok: number;
-	prefix_off: number;
+	name_span_exact: number;
+	name_span_mismatch: number;
 }
 
-// Svelte name offset = node.start + a fixed per-node-type prefix (the STRETCH
-// claim: the name span is derivable even without name_loc). Prefix = the bytes
-// before the name: `<` for elements, the directive keyword + `:`, `{` for shorthand.
-const NAME_PREFIX: Record<string, number> = {
-	RegularElement: 1,
-	Component: 1,
-	SvelteElement: 1,
-	SvelteComponent: 1,
-	SvelteSelf: 1,
-	SvelteWindow: 1,
-	SvelteDocument: 1,
-	SvelteBody: 1,
-	SvelteHead: 1,
-	SvelteFragment: 1,
-	SvelteBoundary: 1,
-	TitleElement: 1,
-	SlotElement: 1,
-	Attribute: 0,
-	ShorthandAttribute: 1,
-	OnDirective: 3, // on:
-	BindDirective: 5, // bind:
-	ClassDirective: 6, // class:
-	StyleDirective: 6, // style:
-	UseDirective: 4, // use:
-	TransitionDirective: 11, // transition:
-	InDirective: 3, // in:
-	OutDirective: 4, // out:
-	AnimateDirective: 8, // animate:
-	LetDirective: 4, // let:
-};
+// The Svelte name span is derivable from the node's own start/end + type, so the
+// no-locations wire keeps `name_loc` recoverable too. Re-derived here rather than
+// imported from the shipped helper (crates/tsv_wasm/npm/locations.js) — this file
+// is the independent oracle that gates it.
+
+/** Node types whose name is the tag-name run right after `<`. */
+const ELEMENT_NAME_TYPES = new Set([
+	'RegularElement',
+	'Component',
+	'SvelteHead',
+	'SvelteWindow',
+	'SvelteBody',
+	'SvelteDocument',
+	'SvelteElement',
+	'SvelteComponent',
+	'SvelteSelf',
+	'SlotElement',
+	'SvelteFragment',
+	'SvelteBoundary',
+	'TitleElement',
+]);
+
+/** Node types whose name span is the whole directive head (`on:click|preventDefault`). */
+const DIRECTIVE_NAME_TYPES = new Set([
+	'OnDirective',
+	'BindDirective',
+	'ClassDirective',
+	'StyleDirective',
+	'UseDirective',
+	'TransitionDirective', // `in:`/`out:` too — Svelte has no In/OutDirective type
+	'AnimateDirective',
+	'LetDirective',
+]);
+
+/**
+ * The chars that end an attribute/directive name run — tsv's parse of Svelte's
+ * `read_tag` (`/[\s=/>"']/`), ASCII whitespace only.
+ */
+const NAME_TERMINATORS = ' \t\n\r\v\f=/>"\'';
+
+/** The `[start, end]` offsets a node's `name_loc` covers, or null if it carries none. */
+function name_span_of(node: Record<string, unknown>, source: string): [number, number] | null {
+	const { type, name, start, end } = node as {
+		type: string;
+		name?: string;
+		start?: number;
+		end?: number;
+	};
+	if (typeof name !== 'string' || typeof start !== 'number' || typeof end !== 'number') return null;
+	if (ELEMENT_NAME_TYPES.has(type)) return [start + 1, start + 1 + name.length];
+	if (DIRECTIVE_NAME_TYPES.has(type)) {
+		let head_end = start;
+		while (head_end < end && !NAME_TERMINATORS.includes(source[head_end])) head_end++;
+		return [start, head_end];
+	}
+	if (type === 'Attribute') {
+		// a shorthand `{x}` names the identifier inside the braces, so a padded `{ x }`
+		// excludes the padding — unlike a `<script>` attribute, whose literal name can
+		// itself be braced (`<script {x}>`, name `{x}`)
+		if (source[start] === '{' && !source.startsWith(name, start)) {
+			const name_start = source.indexOf(name, start + 1);
+			return name_start < 0 || name_start >= end ? null : [name_start, name_start + name.length];
+		}
+		return [start, start + name.length];
+	}
+	return null;
+}
 
 function check_node(
 	node: Record<string, unknown>,
@@ -140,24 +183,31 @@ function check_node(
 	}
 	// Svelte name_loc: its `character` sub-field is the name offset; line/column
 	// must reconstruct from it exactly (the spine carries no pattern quirk).
-	const nl = node.name_loc as { start?: { line: number; column: number; character: number } } | undefined;
-	if (nl?.start) {
+	const nl = node.name_loc as
+		| {
+				start?: { line: number; column: number; character: number };
+				end?: { line: number; column: number; character: number };
+		  }
+		| undefined;
+	if (nl?.start && nl.end) {
 		const got = loc_at(nl.start.character, starts);
 		if (got.line === nl.start.line && got.column === nl.start.column) t.name_loc_exact++;
 		else t.name_loc_mismatch++;
-		// Report-only heuristic: the name offset ≈ node.start + a per-type prefix.
-		// Approximate (some node spans lead with a space, so this is off by one) —
-		// a consumer needing the exact name span in the no-loc wire recovers it by
-		// searching the name string within [start,end], not by a fixed prefix. Not
-		// a gate; just surfaces how close the simple rule gets.
-		const prefix = NAME_PREFIX[node.type as string];
-		if (prefix !== undefined && typeof node.start === 'number' && node.start + prefix === nl.start.character) {
-			t.prefix_ok++;
+		// The name span itself — the part a no-loc consumer has to derive, since the
+		// wire drops `name_loc` whole. Per-type rule (tag name after `<`, attribute
+		// name at the node, directive head run), gated like `loc`.
+		const span = name_span_of(node, source);
+		if (span && span[0] === nl.start.character && span[1] === nl.end.character) {
+			t.name_span_exact++;
 		} else {
-			t.prefix_off++;
+			t.name_span_mismatch++;
+			if (t.name_span_mismatch <= 5) {
+				console.error(
+					`  name span mismatch ${node.type as string} @${node.start}: got ${span ? `[${span[0]},${span[1]}]` : 'null'} want [${nl.start.character},${nl.end.character}]`,
+				);
+			}
 		}
 	}
-	void source;
 }
 
 function walk(value: unknown, starts: number[], is_svelte: boolean, source: string, t: Tally): void {
@@ -187,8 +237,8 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 		mismatch: 0,
 		name_loc_exact: 0,
 		name_loc_mismatch: 0,
-		prefix_ok: 0,
-		prefix_off: 0,
+		name_span_exact: 0,
+		name_span_mismatch: 0,
 	};
 	let checked = 0;
 	for (const f of by_lang[language] ?? []) {
@@ -215,10 +265,10 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 	);
 	if (is_svelte) {
 		console.error(
-			`  name_loc line/col: exact ${t.name_loc_exact}, MISMATCH ${t.name_loc_mismatch}; name-offset≈start+prefix (report-only): ok ${t.prefix_ok}, off ${t.prefix_off}`,
+			`  name_loc: line/col exact ${t.name_loc_exact}, MISMATCH ${t.name_loc_mismatch}; name span exact ${t.name_span_exact}, MISMATCH ${t.name_span_mismatch}`,
 		);
 	}
-	if (t.mismatch > 0 || t.name_loc_mismatch > 0) any_mismatch = true;
+	if (t.mismatch > 0 || t.name_loc_mismatch > 0 || t.name_span_mismatch > 0) any_mismatch = true;
 }
 
 if (any_mismatch) {

@@ -64,6 +64,22 @@ impl<'a> Printer<'a> {
 
         // Check if there's a line comment between : and the type
         if gap_has_comments && self.has_line_comments_between(colon_end, type_start) {
+            // An own-line format-ignore directive in the gap must stay OWN-LINE — the
+            // continuation indent below trails the first comment after `:`, and a
+            // head-trailing directive is inert under the placement classification, so
+            // the relocated form would lose the freeze on the second pass. Routed for
+            // composite children too: a union child freezes via its own leading-run
+            // walk, but the annotation owns the directive's emission either way. An
+            // in-shell directive (`: (⏎// prettier-ignore⏎ T)`) routes the same way —
+            // the shell strips and the paren-stripped inner freezes
+            // (`paren_interior_routed_inner`).
+            if self.member_gap_frozen(colon_end, annotation.type_annotation.span().start)
+                || self
+                    .paren_interior_routed_inner(annotation.type_annotation)
+                    .is_some()
+            {
+                return self.build_annotation_own_line_directive_doc(annotation);
+            }
             // Uniform forced-continuation indent (`build_continuation_indent`): the
             // first comment trails `:` on its line, then the remaining comments and the
             // type drop one indent level so the continuation reads as part of this
@@ -128,6 +144,43 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Emit `: <comments> <value>` for an annotation whose head→type gap holds an
+    /// own-line format-ignore directive. The whole run keeps its own-line placement
+    /// (`append_keyword_value_line_comments` — same-line comments trail `:`, own-line
+    /// comments and the value drop into the indent), and a non-composite type is
+    /// frozen verbatim (`single_child_frozen`); a union/intersection child builds
+    /// normally and freezes via its own leading-run walk (Rule A). An IN-SHELL
+    /// directive (`paren_interior_routed_inner`) strips the shell — the window widens to the
+    /// paren-stripped inner's start, handing the whole leading run to the emitter —
+    /// and freezes the inner, converging in one pass to the fixed point the bare
+    /// authoring holds; trailing shell-gap comments are lifted after the value
+    /// (lossless strip).
+    fn build_annotation_own_line_directive_doc(
+        &self,
+        annotation: &internal::TSTypeAnnotation<'_>,
+    ) -> DocId {
+        let d = self.d();
+        let colon_end = annotation.span.start + 1;
+        let child = annotation.type_annotation;
+        let (gap_end, value_doc) = if self.single_child_frozen(colon_end, child) {
+            (
+                child.span().start,
+                self.build_frozen_single_child_doc(child),
+            )
+        } else if let Some(inner) = self.paren_interior_routed_inner(child) {
+            let inner_doc = self.build_routed_child_doc(inner);
+            (
+                inner.span().start,
+                self.with_stripped_paren_trailing(inner_doc, child, inner, false),
+            )
+        } else {
+            (child.span().start, self.build_type_doc(child))
+        };
+        let mut parts: DocBuf = smallvec![d.text(":")];
+        self.append_keyword_value_line_comments(&mut parts, colon_end, gap_end, value_doc);
+        d.concat(&parts)
+    }
+
     /// Emit `: <block-comments> <type>` for a simple annotation — the fall-through
     /// shared by `build_type_annotation_doc`'s `_` match arm and
     /// `build_type_annotation_doc_with_wrapping` (once its wrapping-TypeReference /
@@ -158,7 +211,14 @@ impl<'a> Printer<'a> {
                 CommentSpacing::Trailing,
             ));
         }
-        parts.push(self.build_type_doc(ty));
+        // A glued format-ignore directive in the gap freezes a non-composite type
+        // verbatim (`let v: /* format-ignore */ {x:   1}` — the directive itself was
+        // just emitted inline above; own-line directives took the own-line branch).
+        if gap_has_comments && self.single_child_frozen(colon_end, ty) {
+            parts.push(self.build_frozen_single_child_doc(ty));
+        } else {
+            parts.push(self.build_type_doc(ty));
+        }
         d.concat(&parts)
     }
 
@@ -234,6 +294,19 @@ impl<'a> Printer<'a> {
             self.keyword_value_stripped_paren_hang(annotation.type_annotation);
         if has_comments && self.has_line_comments_between(colon_end, line_comment_probe_end) {
             return self.build_type_annotation_doc(annotation);
+        }
+
+        // A glued format-ignore directive freezes a non-composite type verbatim —
+        // checked before the TypeReference-with-args branch below would rebuild a
+        // frozen `Foo<...>` from parts (own-line directives are line comments, already
+        // delegated above; composites decline and freeze via their own walk).
+        if has_comments && self.single_child_frozen(colon_end, annotation.type_annotation) {
+            return self.build_simple_type_annotation_doc(
+                colon_end,
+                type_start,
+                annotation.type_annotation,
+                true,
+            );
         }
 
         // Handle TypeReference with type arguments - use wrapping version when appropriate
@@ -385,6 +458,45 @@ impl<'a> Printer<'a> {
         // Extract comments between `:` and the type (e.g., `: & /* c */ A`)
         if intersection.types.len() == 1 {
             let first_type_start = intersection.types[0].span().start;
+            // A LINE comment in the `:`→member window (it sits in the intersection's
+            // leading-`&` gap — a comment before the span would have routed to
+            // `build_type_annotation_doc`'s line-comment branch instead): emit the
+            // one-pass fixed point of the reparsed, `&`-less authoring. An own-line
+            // directive keeps its own line and freezes the member (Rule A — a
+            // head-trailing relocation is inert, losing the freeze on pass 2),
+            // mirroring `build_annotation_own_line_directive_doc`; a plain line
+            // comment hangs the member via the uniform continuation indent
+            // (`let v: // c⏎⇥{ x: 1 };`). The inline path below would relocate the
+            // comment to trail `:` with the member at column 0 — a 2-pass transient,
+            // and a lost freeze for a directive.
+            if self.has_line_comments_between(colon_end, first_type_start) {
+                let child = &intersection.types[0];
+                if self.member_gap_frozen(colon_end, first_type_start) {
+                    let value_doc = if self.single_child_frozen(colon_end, child) {
+                        self.build_frozen_single_child_doc(child)
+                    } else {
+                        // Composite-transparent: a union/intersection sole member
+                        // builds normally and freezes via its own leading-run walk.
+                        self.build_type_doc(child)
+                    };
+                    let mut parts: DocBuf = smallvec![d.text(":")];
+                    self.append_keyword_value_line_comments(
+                        &mut parts,
+                        colon_end,
+                        first_type_start,
+                        value_doc,
+                    );
+                    return d.concat(&parts);
+                }
+                return d.concat(&[
+                    d.text(":"),
+                    self.build_continuation_indent(
+                        colon_end,
+                        first_type_start,
+                        self.build_type_doc(child),
+                    ),
+                ]);
+            }
             let mut parts: DocBuf = smallvec![d.text(": ")];
             if let Some(comments_doc) = self
                 .build_inline_comments_between_doc_trailing_space_opt(colon_end, first_type_start)
