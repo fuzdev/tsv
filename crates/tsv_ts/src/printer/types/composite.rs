@@ -19,7 +19,6 @@ use crate::ast::internal::{
 };
 use crate::printer::CommentVec;
 use crate::printer::analysis::has_newline_after_position;
-use crate::printer::ignore::is_freeze_target;
 use crate::printer::layout::{bracketed_list_body, hang_after_operator};
 use smallvec::smallvec;
 use tsv_lang::Comment;
@@ -151,30 +150,37 @@ impl<'a> Printer<'a> {
             return self.build_conditional_type_doc_with_line_comments(c, routes);
         }
 
-        // Build true_type doc: if it's a conditional (possibly wrapped in parens), don't wrap in group
-        // Add parens for readability only when flat (single-line), not when broken (multi-line)
-        let true_type_doc = if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type) {
-            // Nested conditional in true position:
-            // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
-            // - Broken: no parens (the line breaks provide clarity)
-            let inner_doc = self.build_conditional_type_doc_inner(inner);
-            if d.will_break(inner_doc) {
-                // Inner doc forces breaking — use broken layout directly
-                inner_doc
+        // Branch docs, built lazily inside the arms: a union / intersection branch
+        // rebuilds its doc from parts and never consults the one built here (see
+        // `build_conditional_branch_tail_doc`).
+        //
+        // true_type: if it's a conditional (possibly wrapped in parens), don't wrap in group.
+        // Add parens for readability only when flat (single-line), not when broken (multi-line).
+        let true_type_doc = || {
+            if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type) {
+                // Nested conditional in true position:
+                // - Flat: add parens for readability: `T extends A ? (T extends B ? C : D) : E`
+                // - Broken: no parens (the line breaks provide clarity)
+                let inner_doc = self.build_conditional_type_doc_inner(inner);
+                if d.will_break(inner_doc) {
+                    // Inner doc forces breaking — use broken layout directly
+                    inner_doc
+                } else {
+                    d.if_break(inner_doc, d.parens(inner_doc))
+                }
             } else {
-                d.if_break(inner_doc, d.parens(inner_doc))
+                self.build_type_doc(c.true_type)
             }
-        } else {
-            self.build_type_doc(c.true_type)
         };
 
-        // Build false_type doc: if it's a conditional, don't wrap in group
-        // No parens needed for nested conditionals in false position (right-associative)
-        let false_type_doc = if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type)
-        {
-            self.build_conditional_type_doc_inner(inner)
-        } else {
-            self.build_type_doc(c.false_type)
+        // false_type: if it's a conditional, don't wrap in group.
+        // No parens needed for nested conditionals in false position (right-associative).
+        let false_type_doc = || {
+            if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type) {
+                self.build_conditional_type_doc_inner(inner)
+            } else {
+                self.build_type_doc(c.false_type)
+            }
         };
 
         // Comments trailing on extends_type (between extends_type and ?). The mirror
@@ -278,7 +284,7 @@ impl<'a> Printer<'a> {
         &self,
         op: &'static str,
         branch_type: &TSType<'_>,
-        branch_doc: DocId,
+        branch_doc: impl FnOnce() -> DocId,
         op_pos: Option<u32>,
         branch_start: u32,
     ) -> DocId {
@@ -330,10 +336,14 @@ impl<'a> Printer<'a> {
     /// lands the branch one level past the operator, except for a
     /// nested-conditional branch, which levels itself (the run's own
     /// `indent(line)` separator shifts only its first line).
+    ///
+    /// `branch_doc` is a THUNK because the union and intersection arms rebuild the
+    /// branch from parts and never consult it — building eagerly left a dead subtree in
+    /// the arena for every such branch (build-once-reuse).
     fn build_conditional_branch_tail_doc(
         &self,
         branch_type: &TSType<'_>,
-        branch_doc: DocId,
+        branch_doc: impl FnOnce() -> DocId,
         on_new_line: bool,
         run: Option<DocId>,
     ) -> DocId {
@@ -353,10 +363,6 @@ impl<'a> Printer<'a> {
                 d.concat(&[d.text(" "), d.indent(self.prepend_opt(run, inner))])
             }
         };
-        // TODO: the Union/Intersection arms below rebuild their doc bare and ignore
-        // `branch_doc`, so the caller's pre-built `build_type_doc` subtree is dead
-        // for those branches — build the branch docs lazily (or match on the shape
-        // before building) to drop the double build
         match self.unwrap_redundant_parens(branch_type) {
             // `union_prints_hugged`, not the bare syntactic `union_hug_shape` — see
             // `build_conditional_check_doc`; here a bare ask left the members one indent
@@ -379,6 +385,7 @@ impl<'a> Printer<'a> {
             // indented, branch never), so adding an indent here would double it.
             // Guarded by `conditional/branch_nested_chain`.
             TSType::Conditional(_) => {
+                let branch_doc = branch_doc();
                 if on_new_line {
                     d.concat(&[d.hardline(), d.text(INDENT), branch_doc])
                 } else {
@@ -386,6 +393,7 @@ impl<'a> Printer<'a> {
                 }
             }
             _ => {
+                let branch_doc = branch_doc();
                 if on_new_line {
                     // Literal tab text (not d.indent) shifts only the first line
                     // without increasing the structural indent level for nested
@@ -593,60 +601,40 @@ impl<'a> Printer<'a> {
 
         // An alone-on-line format-ignore directive in a branch gap (previous node's
         // span end → branch span start, the `?`/`:` inside the window) ROUTES that
-        // branch's emission own-line and freezes a non-composite branch child
-        // verbatim (`single_child_frozen`; a composite child declines — nothing
-        // freezes, but the directive still keeps its authored own-line placement:
-        // the routing is about the directive's own position, not the freeze target).
-        // The default emitters below trail-relocate every pre-operator comment onto
-        // the extends/true line — an inert placement that would lose the freeze on
-        // the second pass.
-        // The route (resolved by the caller's gate) already answered the gap question
-        // for this exact window, so only the freeze-TARGET arm is left to ask.
+        // branch's emission own-line and freezes the branch child verbatim. The
+        // default emitters below trail-relocate every pre-operator comment onto the
+        // extends/true line — an inert placement that would lose the freeze on the
+        // second pass.
+        //
+        // The branch freezes WHOLE even when the child is a union or intersection —
+        // the one head where composite-transparency (`single_child_frozen`, which
+        // declines so the member rules apply instead) would be wrong. Those rules
+        // only reach a directive the composite's OWN leading run finds, and that run
+        // crosses whitespace and the transparent `|` / `&` / `(` alone: the interposing
+        // `?` / `:` token stops it. Declining here would freeze nothing at all.
+        //
+        // So route and freeze coincide — the caller's gate already answered the gap
+        // question for this exact window, and no freeze-TARGET arm is left to ask, so
+        // `true_route` / `false_route` ARE the freeze verdicts.
         let BranchRoutes {
             true_route,
             false_route,
         } = routes;
-        let true_frozen = true_route && is_freeze_target(c.true_type);
-        let false_frozen = false_route && is_freeze_target(c.false_type);
 
         // Detect leading line comments inside parens around true_type / false_type
         // for relocation: prettier moves them to trail extends_type / true_type
         // (e.g., `extends b ? (// c\n  C) : D` → `extends b // c\n  ? C\n  : D`).
         // A FROZEN branch freezes its whole shell verbatim (shell comments ride the
         // slice), so it must not also collect them for relocation (print-once).
-        let true_paren_leading_line_comments: CommentVec<'_> = if true_frozen {
+        let true_paren_leading_line_comments: CommentVec<'_> = if true_route {
             CommentVec::new()
         } else {
             self.stripped_paren_leading_line_comments(c.true_type)
         };
-        let false_paren_leading_line_comments: CommentVec<'_> = if false_frozen {
+        let false_paren_leading_line_comments: CommentVec<'_> = if false_route {
             CommentVec::new()
         } else {
             self.stripped_paren_leading_line_comments(c.false_type)
-        };
-
-        // Build branch type docs (same nested-conditional logic as non-breaking path).
-        // When we relocated leading line comments from a parenthesized wrapper (any
-        // nesting depth), build the fully-unwrapped inner type directly so the
-        // relocated comments aren't emitted twice.
-        let true_type_doc = if true_frozen {
-            self.build_frozen_single_child_doc(c.true_type)
-        } else if !true_paren_leading_line_comments.is_empty() {
-            self.build_type_doc(unwrap_parenthesized(c.true_type))
-        } else if let TSType::Conditional(inner) = unwrap_parenthesized(c.true_type) {
-            self.build_conditional_type_doc_inner(inner)
-        } else {
-            self.build_type_doc(c.true_type)
-        };
-
-        let false_type_doc = if false_frozen {
-            self.build_frozen_single_child_doc(c.false_type)
-        } else if !false_paren_leading_line_comments.is_empty() {
-            self.build_type_doc(unwrap_parenthesized(c.false_type))
-        } else if let TSType::Conditional(inner) = unwrap_parenthesized(c.false_type) {
-            self.build_conditional_type_doc_inner(inner)
-        } else {
-            self.build_type_doc(c.false_type)
         };
 
         // Find `extends` keyword position (reused for both extends_type_doc and comments_before_extends)
@@ -672,8 +660,7 @@ impl<'a> Printer<'a> {
                 true_type_start,
                 &true_paren_leading_line_comments,
                 "?",
-                c.true_type,
-                true_type_doc,
+                self.build_frozen_single_child_doc(c.true_type),
             );
             trailing_on_extends_parts.push(trailing);
             q_parts.push(branch);
@@ -710,7 +697,12 @@ impl<'a> Printer<'a> {
             );
             q_parts.push(self.build_conditional_branch_tail_doc(
                 c.true_type,
-                true_type_doc,
+                || {
+                    self.build_relocated_conditional_branch_doc(
+                        c.true_type,
+                        &true_paren_leading_line_comments,
+                    )
+                },
                 needs_indent_before_true,
                 None,
             ));
@@ -725,8 +717,7 @@ impl<'a> Printer<'a> {
                 false_type_start,
                 &false_paren_leading_line_comments,
                 ":",
-                c.false_type,
-                false_type_doc,
+                self.build_frozen_single_child_doc(c.false_type),
             );
             q_parts.push(trailing);
             q_parts.push(branch);
@@ -756,7 +747,12 @@ impl<'a> Printer<'a> {
             );
             q_parts.push(self.build_conditional_branch_tail_doc(
                 c.false_type,
-                false_type_doc,
+                || {
+                    self.build_relocated_conditional_branch_doc(
+                        c.false_type,
+                        &false_paren_leading_line_comments,
+                    )
+                },
                 needs_indent_before_false,
                 None,
             ));
@@ -779,6 +775,28 @@ impl<'a> Printer<'a> {
         ])
     }
 
+    /// The ordinarily-built doc for a conditional branch in the BREAKING layout, shared
+    /// by the `?` and `:` arms (same nested-conditional logic as the non-breaking path).
+    /// When leading line comments were relocated out of a parenthesized wrapper (any
+    /// nesting depth, `paren_leading` non-empty), the doc is built from the
+    /// fully-unwrapped inner so those comments aren't emitted twice.
+    ///
+    /// Built lazily by [`Self::build_conditional_branch_tail_doc`], whose union /
+    /// intersection arms rebuild the branch from parts and would discard it.
+    fn build_relocated_conditional_branch_doc(
+        &self,
+        branch: &TSType<'_>,
+        paren_leading: &CommentVec<'_>,
+    ) -> DocId {
+        if !paren_leading.is_empty() {
+            self.build_type_doc(unwrap_parenthesized(branch))
+        } else if let TSType::Conditional(inner) = unwrap_parenthesized(branch) {
+            self.build_conditional_type_doc_inner(inner)
+        } else {
+            self.build_type_doc(branch)
+        }
+    }
+
     /// The routed branch-gap emission shared by the `?` and `:` arms of
     /// [`Self::build_conditional_type_doc_with_line_comments`], for a gap holding an
     /// alone-on-line format-ignore directive: own-line-preserving
@@ -793,13 +811,19 @@ impl<'a> Printer<'a> {
     /// `[gap_start, branch_start)` is claimed here, both sides of the operator, so no
     /// comment is emitted twice (print-once). A routed composite's stripped-shell
     /// leading line comments (`paren_leading`) join the own-line run.
+    ///
+    /// `branch_doc` is the frozen verbatim slice — a routed branch always freezes — so
+    /// the branch tail is spelled out here rather than taken from
+    /// [`Self::build_conditional_branch_tail_doc`], whose union / intersection arms
+    /// rebuild their doc from parts and would discard it. The shape is that function's
+    /// `_` arm: a space, then the branch one level past the operator (an `indent` a
+    /// verbatim span carries no doc lines to consume, kept so the two read alike).
     fn build_routed_conditional_branch(
         &self,
         gap_start: u32,
         branch_start: u32,
         paren_leading: &CommentVec<'_>,
         operator: &'static str,
-        branch: &TSType<'_>,
         branch_doc: DocId,
     ) -> (DocId, DocId) {
         let d = self.d();
@@ -810,7 +834,8 @@ impl<'a> Printer<'a> {
         }
         parts.push(d.hardline());
         parts.push(d.text(operator));
-        parts.push(self.build_conditional_branch_tail_doc(branch, branch_doc, false, None));
+        parts.push(d.text(" "));
+        parts.push(d.indent(branch_doc));
         (trailing, d.concat(&parts))
     }
 

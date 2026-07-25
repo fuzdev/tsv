@@ -60,10 +60,11 @@ pub struct PrinterInputs<'a> {
     /// Svelte-embedded TS, parsed eagerly), so the flag is stable before any printing.
     pub has_owned_comments: bool,
     /// Whether any comment in this document is a `format-ignore` directive.
-    /// A document-level presence flag that short-circuits `has_format_ignore_in_range`,
-    /// which otherwise runs a range binary search + directive-string match once per
-    /// top-level statement / member expression / object property — concluding "no
-    /// format-ignore" for the ~all documents that have none.
+    /// A document-level presence flag that short-circuits every entry of the
+    /// format-ignore seam (`printer/ignore.rs`), which otherwise runs a range binary
+    /// search + directive-string match once per top-level statement / member expression /
+    /// object property / list member / type head — concluding "no format-ignore" for the
+    /// ~all documents that have none.
     ///
     /// **Compute this once per document, from the parsed comment list** (e.g.
     /// `comments.iter().any(|c| is_format_ignore_directive(c.content(source)))`), and pass

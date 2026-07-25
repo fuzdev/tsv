@@ -818,13 +818,12 @@ impl<'a> Printer<'a> {
                 // `;`); the loop's semicolon handling below re-adds the `;`.
                 // (A directive is itself a comment, so the gate is exact.)
                 let mut deferred = DocBuf::new();
-                let member_doc = if comments_present
-                    && self.has_format_ignore_in_range(prev_end, m.span().start)
-                {
-                    self.raw_source_range(m.span().start, member_content_end)
-                } else {
-                    self.build_type_member_doc_inner(m, &mut deferred)
-                };
+                let member_doc =
+                    if comments_present && self.member_gap_frozen(prev_end, m.span().start) {
+                        self.raw_source_range(m.span().start, member_content_end)
+                    } else {
+                        self.build_type_member_doc_inner(m, &mut deferred)
+                    };
                 member_parts.push(member_doc);
 
                 // Handle trailing comments - preserve position relative to semicolon

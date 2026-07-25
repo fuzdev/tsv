@@ -332,6 +332,11 @@ impl<'a> Printer<'a> {
     /// before `:`: index-signature keys, class properties, variable bindings, and
     /// function parameters/identifiers. (Property signatures handle the gap inline:
     /// their non-optional block form omits that space.)
+    ///
+    /// An alone-on-line format-ignore directive in the gap freezes the whole `: type`
+    /// annotation and keeps its own line (`build_frozen_annotation_head_doc`), asked
+    /// before the annotation doc is built at all — the frozen route emits a verbatim
+    /// slice, so the built doc would only be discarded.
     pub(crate) fn build_binding_type_annotation_doc(
         &self,
         marker_end: u32,
@@ -340,6 +345,9 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let colon_pos = type_ann.span.start;
+        if let Some(frozen) = self.build_frozen_annotation_head_doc(marker_end, type_ann) {
+            return frozen;
+        }
         let type_doc = if wrap {
             self.build_type_annotation_doc_wrapping(type_ann)
         } else {
