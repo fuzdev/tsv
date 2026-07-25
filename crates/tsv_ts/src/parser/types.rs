@@ -820,7 +820,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///   or, for a bare single parameter, a `)` then `=>`.
     ///
     /// This mirrors acorn-typescript's `tsIsUnambiguouslyStartOfFunctionType`
-    /// lookahead, which likewise runs only at full-type positions.
+    /// lookahead, which likewise runs only at full-type positions. Its byte-scan
+    /// twin — the same rule asked *before* the parser commits to a type, by the
+    /// arrow-vs-parenthesized-expression lookahead — is
+    /// `expression_lookahead::paren_starts_function_type`; the two must move
+    /// together.
     ///
     /// [`is_definitely_type_start`]: Self::is_definitely_type_start
     fn paren_starts_function_type_params(&mut self, paren_offset: usize) -> bool {

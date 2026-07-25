@@ -76,7 +76,7 @@ export class DprintImplementation implements TsvImplementation {
 		// `singleQuote: true`, which still switches quotes to avoid escaping.
 		this._formatter.setConfig(
 			{ lineWidth: 100, indentWidth: 2, useTabs: true },
-			{ quoteStyle: 'preferSingle', trailingCommas: 'never' },
+			{ quoteStyle: 'preferSingle', trailingCommas: 'never' }
 		);
 
 		// Assert the config actually LANDED. dprint reports an unrecognized key as
@@ -119,7 +119,7 @@ export class DprintImplementation implements TsvImplementation {
 		// synthetic-filepath treatment lib/biome.ts gives the language.
 		return this._formatter.formatText({
 			filePath: `file${LANGUAGE_EXTENSIONS[language]}`,
-			fileText: source,
+			fileText: source
 		});
 	}
 

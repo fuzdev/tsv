@@ -1,0 +1,1503 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 677,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " The `:` closes the ternary — the arrow after it is the alternate, not this paren's body",
+			"start": 20,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The arrow sits past a second `?`, in the nested ternary's alternate",
+			"start": 148,
+			"end": 218,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The parenthesized consequent itself opens with `(`",
+			"start": 271,
+			"end": 324,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The `:` does annotate a signature here — plain return type",
+			"start": 374,
+			"end": 435,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An annotated arrow as the ternary consequent",
+			"start": 464,
+			"end": 511,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Conditional type as the return type — its `?` and `:` belong to the type",
+			"start": 547,
+			"end": 622,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 76
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 676,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 667,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 112,
+					"end": 145,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 34
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 118,
+							"end": 144,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 33
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 118,
+								"end": 120,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "s1"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 123,
+								"end": 144,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 12
+									},
+									"end": {
+										"line": 3,
+										"column": 33
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 123,
+									"end": 124,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 12
+										},
+										"end": {
+											"line": 3,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "SequenceExpression",
+									"start": 128,
+									"end": 132,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 17
+										},
+										"end": {
+											"line": 3,
+											"column": 21
+										}
+									},
+									"expressions": [
+										{
+											"type": "Identifier",
+											"start": 128,
+											"end": 129,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 17
+												},
+												"end": {
+													"line": 3,
+													"column": 18
+												}
+											},
+											"name": "b"
+										},
+										{
+											"type": "Identifier",
+											"start": 131,
+											"end": 132,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 20
+												},
+												"end": {
+													"line": 3,
+													"column": 21
+												}
+											},
+											"name": "c"
+										}
+									]
+								},
+								"alternate": {
+									"type": "ArrowFunctionExpression",
+									"start": 136,
+									"end": 144,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 25
+										},
+										"end": {
+											"line": 3,
+											"column": 33
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 137,
+											"end": 138,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 26
+												},
+												"end": {
+													"line": 3,
+													"column": 27
+												}
+											},
+											"name": "p"
+										}
+									],
+									"body": {
+										"type": "Literal",
+										"start": 143,
+										"end": 144,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 32
+											},
+											"end": {
+												"line": 3,
+												"column": 33
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The `:` closes the ternary — the arrow after it is the alternate, not this paren's body",
+							"start": 20,
+							"end": 110
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 220,
+					"end": 268,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 49
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 226,
+							"end": 267,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 48
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 226,
+								"end": 228,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 9
+									}
+								},
+								"name": "s2"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 231,
+								"end": 267,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 12
+									},
+									"end": {
+										"line": 6,
+										"column": 48
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 231,
+									"end": 232,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 12
+										},
+										"end": {
+											"line": 6,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "LogicalExpression",
+									"start": 235,
+									"end": 248,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 16
+										},
+										"end": {
+											"line": 6,
+											"column": 29
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 235,
+										"end": 236,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 16
+											},
+											"end": {
+												"line": 6,
+												"column": 17
+											}
+										},
+										"name": "b"
+									},
+									"operator": "||",
+									"right": {
+										"type": "LogicalExpression",
+										"start": 241,
+										"end": 247,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 22
+											},
+											"end": {
+												"line": 6,
+												"column": 28
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 241,
+											"end": 242,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 22
+												},
+												"end": {
+													"line": 6,
+													"column": 23
+												}
+											},
+											"name": "c"
+										},
+										"operator": "??",
+										"right": {
+											"type": "Identifier",
+											"start": 246,
+											"end": 247,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 27
+												},
+												"end": {
+													"line": 6,
+													"column": 28
+												}
+											},
+											"name": "d"
+										}
+									}
+								},
+								"alternate": {
+									"type": "ConditionalExpression",
+									"start": 251,
+									"end": 267,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 32
+										},
+										"end": {
+											"line": 6,
+											"column": 48
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 251,
+										"end": 252,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 32
+											},
+											"end": {
+												"line": 6,
+												"column": 33
+											}
+										},
+										"name": "e"
+									},
+									"consequent": {
+										"type": "ArrowFunctionExpression",
+										"start": 255,
+										"end": 263,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 36
+											},
+											"end": {
+												"line": 6,
+												"column": 44
+											}
+										},
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 256,
+												"end": 257,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 37
+													},
+													"end": {
+														"line": 6,
+														"column": 38
+													}
+												},
+												"name": "p"
+											}
+										],
+										"body": {
+											"type": "Literal",
+											"start": 262,
+											"end": 263,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 43
+												},
+												"end": {
+													"line": 6,
+													"column": 44
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 266,
+										"end": 267,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 47
+											},
+											"end": {
+												"line": 6,
+												"column": 48
+											}
+										},
+										"name": "f"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The arrow sits past a second `?`, in the nested ternary's alternate",
+							"start": 148,
+							"end": 218
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 326,
+					"end": 371,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 46
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 332,
+							"end": 370,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 45
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 332,
+								"end": 334,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 9
+									}
+								},
+								"name": "s3"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 337,
+								"end": 370,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 12
+									},
+									"end": {
+										"line": 9,
+										"column": 45
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 337,
+									"end": 338,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 12
+										},
+										"end": {
+											"line": 9,
+											"column": 13
+										}
+									},
+									"name": "z"
+								},
+								"consequent": {
+									"type": "LogicalExpression",
+									"start": 341,
+									"end": 359,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 16
+										},
+										"end": {
+											"line": 9,
+											"column": 34
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 341,
+										"end": 342,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 16
+											},
+											"end": {
+												"line": 9,
+												"column": 17
+											}
+										},
+										"name": "x"
+									},
+									"operator": "||",
+									"right": {
+										"type": "LogicalExpression",
+										"start": 347,
+										"end": 358,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 22
+											},
+											"end": {
+												"line": 9,
+												"column": 33
+											}
+										},
+										"left": {
+											"type": "SequenceExpression",
+											"start": 348,
+											"end": 352,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 23
+												},
+												"end": {
+													"line": 9,
+													"column": 27
+												}
+											},
+											"expressions": [
+												{
+													"type": "Identifier",
+													"start": 348,
+													"end": 349,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 23
+														},
+														"end": {
+															"line": 9,
+															"column": 24
+														}
+													},
+													"name": "a"
+												},
+												{
+													"type": "Identifier",
+													"start": 351,
+													"end": 352,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 26
+														},
+														"end": {
+															"line": 9,
+															"column": 27
+														}
+													},
+													"name": "b"
+												}
+											]
+										},
+										"operator": "??",
+										"right": {
+											"type": "Identifier",
+											"start": 357,
+											"end": 358,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 32
+												},
+												"end": {
+													"line": 9,
+													"column": 33
+												}
+											},
+											"name": "c"
+										}
+									}
+								},
+								"alternate": {
+									"type": "ArrowFunctionExpression",
+									"start": 362,
+									"end": 370,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 37
+										},
+										"end": {
+											"line": 9,
+											"column": 45
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 363,
+											"end": 364,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 38
+												},
+												"end": {
+													"line": 9,
+													"column": 39
+												}
+											},
+											"name": "p"
+										}
+									],
+									"body": {
+										"type": "Literal",
+										"start": 369,
+										"end": 370,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 44
+											},
+											"end": {
+												"line": 9,
+												"column": 45
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The parenthesized consequent itself opens with `(`",
+							"start": 271,
+							"end": 324
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 437,
+					"end": 461,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 25
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 443,
+							"end": 460,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 24
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 443,
+								"end": 446,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 10
+									}
+								},
+								"name": "fn1"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 449,
+								"end": 460,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 13
+									},
+									"end": {
+										"line": 12,
+										"column": 24
+									}
+								},
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 452,
+									"end": 455,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 16
+										},
+										"end": {
+											"line": 12,
+											"column": 19
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 454,
+										"end": 455,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 18
+											},
+											"end": {
+												"line": 12,
+												"column": 19
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 454,
+											"end": 455,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 18
+												},
+												"end": {
+													"line": 12,
+													"column": 19
+												}
+											},
+											"name": "T"
+										}
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 450,
+										"end": 451,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 14
+											},
+											"end": {
+												"line": 12,
+												"column": 15
+											}
+										},
+										"name": "p"
+									}
+								],
+								"body": {
+									"type": "Literal",
+									"start": 459,
+									"end": 460,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 23
+										},
+										"end": {
+											"line": 12,
+											"column": 24
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The `:` does annotate a signature here — plain return type",
+							"start": 374,
+							"end": 435
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 513,
+					"end": 544,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 519,
+							"end": 543,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 519,
+								"end": 521,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 9
+									}
+								},
+								"name": "s4"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 524,
+								"end": 543,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 12
+									},
+									"end": {
+										"line": 15,
+										"column": 31
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 524,
+									"end": 525,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 12
+										},
+										"end": {
+											"line": 15,
+											"column": 13
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "ArrowFunctionExpression",
+									"start": 528,
+									"end": 539,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 16
+										},
+										"end": {
+											"line": 15,
+											"column": 27
+										}
+									},
+									"returnType": {
+										"type": "TSTypeAnnotation",
+										"start": 531,
+										"end": 534,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 19
+											},
+											"end": {
+												"line": 15,
+												"column": 22
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 533,
+											"end": 534,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 21
+												},
+												"end": {
+													"line": 15,
+													"column": 22
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 533,
+												"end": 534,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 21
+													},
+													"end": {
+														"line": 15,
+														"column": 22
+													}
+												},
+												"name": "T"
+											}
+										}
+									},
+									"id": null,
+									"expression": true,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "Identifier",
+											"start": 529,
+											"end": 530,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 17
+												},
+												"end": {
+													"line": 15,
+													"column": 18
+												}
+											},
+											"name": "p"
+										}
+									],
+									"body": {
+										"type": "Literal",
+										"start": 538,
+										"end": 539,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 26
+											},
+											"end": {
+												"line": 15,
+												"column": 27
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 542,
+									"end": 543,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 30
+										},
+										"end": {
+											"line": 15,
+											"column": 31
+										}
+									},
+									"name": "d"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An annotated arrow as the ternary consequent",
+							"start": 464,
+							"end": 511
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 624,
+					"end": 666,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 43
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 630,
+							"end": 665,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 42
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 630,
+								"end": 633,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 10
+									}
+								},
+								"name": "fn2"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 636,
+								"end": 665,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 13
+									},
+									"end": {
+										"line": 18,
+										"column": 42
+									}
+								},
+								"returnType": {
+									"type": "TSTypeAnnotation",
+									"start": 639,
+									"end": 660,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 16
+										},
+										"end": {
+											"line": 18,
+											"column": 37
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSConditionalType",
+										"start": 641,
+										"end": 660,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 18
+											},
+											"end": {
+												"line": 18,
+												"column": 37
+											}
+										},
+										"checkType": {
+											"type": "TSTypeReference",
+											"start": 641,
+											"end": 642,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 18
+												},
+												"end": {
+													"line": 18,
+													"column": 19
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 641,
+												"end": 642,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 18
+													},
+													"end": {
+														"line": 18,
+														"column": 19
+													}
+												},
+												"name": "A"
+											}
+										},
+										"extendsType": {
+											"type": "TSTypeReference",
+											"start": 651,
+											"end": 652,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 28
+												},
+												"end": {
+													"line": 18,
+													"column": 29
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 651,
+												"end": 652,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 28
+													},
+													"end": {
+														"line": 18,
+														"column": 29
+													}
+												},
+												"name": "B"
+											}
+										},
+										"trueType": {
+											"type": "TSTypeReference",
+											"start": 655,
+											"end": 656,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 32
+												},
+												"end": {
+													"line": 18,
+													"column": 33
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 655,
+												"end": 656,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 32
+													},
+													"end": {
+														"line": 18,
+														"column": 33
+													}
+												},
+												"name": "C"
+											}
+										},
+										"falseType": {
+											"type": "TSTypeReference",
+											"start": 659,
+											"end": 660,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 36
+												},
+												"end": {
+													"line": 18,
+													"column": 37
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 659,
+												"end": 660,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 36
+													},
+													"end": {
+														"line": 18,
+														"column": 37
+													}
+												},
+												"name": "D"
+											}
+										}
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 637,
+										"end": 638,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 14
+											},
+											"end": {
+												"line": 18,
+												"column": 15
+											}
+										},
+										"name": "p"
+									}
+								],
+								"body": {
+									"type": "Identifier",
+									"start": 664,
+									"end": 665,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 41
+										},
+										"end": {
+											"line": 18,
+											"column": 42
+										}
+									},
+									"name": "e"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Conditional type as the return type — its `?` and `:` belong to the type",
+							"start": 547,
+							"end": 622
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

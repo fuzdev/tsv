@@ -30,10 +30,10 @@ const non_standard_css: Array<[string, string, string]> = [
 	[
 		'scss nested props',
 		'.funky {\n  font: {\n    family: fantasy;\n  }\n}\n',
-		'css_scss_nested_props',
+		'css_scss_nested_props'
 	],
 	['ie hacks', '.class {\n*zoom: 1;_width: 200px;\n}\n', 'css_ie_hacks'],
-	['range marker', '.x{}<<<PRETTIER_RANGE_END>>>\n', 'range_marker'],
+	['range marker', '.x{}<<<PRETTIER_RANGE_END>>>\n', 'range_marker']
 ];
 
 for (const [label, content, expected_pattern] of non_standard_css) {
@@ -52,7 +52,7 @@ const genuine_gaps: Array<[string, string]> = [
 	['url query string', 'a { background: url(/path?query=1); }\n'],
 	['unicode-range wildcard', '@font-face { unicode-range: U+4??; }\n'],
 	['universal namespace', '*|* {}\n'],
-	['attr function value', 'a[id=func("foo")] {}\n'],
+	['attr function value', 'a[id=func("foo")] {}\n']
 ];
 
 for (const [label, content] of genuine_gaps) {
@@ -99,8 +99,8 @@ const js_proposals: Array<[string, string, string]> = [
 	[
 		'source-phase binding-named-source',
 		'import source source from "x";\n',
-		'js_source_phase_import',
-	],
+		'js_source_phase_import'
+	]
 ];
 
 for (const [label, content, expected_pattern] of js_proposals) {
@@ -121,7 +121,7 @@ const js_must_stay_error: Array<[string, string]> = [
 	// Standard default import whose binding happens to be named `source`.
 	['standard default import named source', 'import source from "x";\n'],
 	// `|>` inside a regex alternation (`>` literal after `|`) is not the operator.
-	['gt-after-pipe in regex', 'const re = /a\\/>|>b/;\n'],
+	['gt-after-pipe in regex', 'const re = /a\\/>|>b/;\n']
 ];
 
 for (const [label, content] of js_must_stay_error) {

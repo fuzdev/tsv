@@ -31,10 +31,10 @@ function coverage_pct(processed: number, total: number): number {
  * (`name processed/total (pct%)`) lives in exactly one place.
  */
 function format_coverage_line(
-	rows: ReadonlyArray<{ name: string; processed: number; total: number }>,
+	rows: ReadonlyArray<{ name: string; processed: number; total: number }>
 ): string {
 	const parts = rows.map(
-		(e) => `${e.name} ${e.processed}/${e.total} (${coverage_pct(e.processed, e.total)}%)`,
+		(e) => `${e.name} ${e.processed}/${e.total} (${coverage_pct(e.processed, e.total)}%)`
 	);
 	return `**Coverage:** ${parts.join(', ')}`;
 }
@@ -49,7 +49,7 @@ function create_bar(value: number, max: number, width = 40): string {
 const CANONICAL_PARSERS: Record<Language, string> = {
 	svelte: 'svelte/compiler',
 	typescript: 'acorn-typescript',
-	css: 'svelte/compiler',
+	css: 'svelte/compiler'
 };
 
 /** Known canonical formatter name */
@@ -82,7 +82,7 @@ const DISPLAY_ORDER = [
 	'dprint-wasm',
 	'oxc-parser',
 	'oxc-parser-wasm',
-	'oxfmt',
+	'oxfmt'
 ];
 
 /** Sort results by stable display order */
@@ -100,7 +100,7 @@ function sort_by_display_order(results: BenchmarkResult[]): BenchmarkResult[] {
 /** Generate the summary report */
 export function generate_summary_report(
 	all_group_results: GroupResults[],
-	languages: Language[],
+	languages: Language[]
 ): string {
 	const lines: string[] = [];
 
@@ -167,23 +167,24 @@ export function generate_summary_report(
 		// Show canonical first (baseline)
 		if (canonical_result) {
 			lines.push(
-				`    ${canonical_result.name.padEnd(max_name_len)} ${
-					create_bar(canonical_result.stats.mean_ns, max_time)
-				} ${fmt(canonical_result.stats.mean_ns)}`,
+				`    ${canonical_result.name.padEnd(max_name_len)} ${create_bar(
+					canonical_result.stats.mean_ns,
+					max_time
+				)} ${fmt(canonical_result.stats.mean_ns)}`
 			);
 		}
 
 		// Show alternatives in stable display order (tsv variants, then third-party)
 		const alternatives = sort_by_display_order(
-			main_results.filter((r) => r.name !== canonical_name),
+			main_results.filter((r) => r.name !== canonical_name)
 		);
 
 		for (const result of alternatives) {
 			const comparison = format_comparison(baseline, result.stats.mean_ns);
 			lines.push(
-				`    ${result.name.padEnd(max_name_len)} ${create_bar(result.stats.mean_ns, max_time)} ${
-					fmt(result.stats.mean_ns)
-				} ${comparison}`,
+				`    ${result.name.padEnd(max_name_len)} ${create_bar(result.stats.mean_ns, max_time)} ${fmt(
+					result.stats.mean_ns
+				)} ${comparison}`
 			);
 		}
 
@@ -191,19 +192,18 @@ export function generate_summary_report(
 		// apples-to-apples comparison with oxc's span-only default AST (plain
 		// `tsv-json` carries the richer loc-bearing drop-in AST oxc omits). Emitted
 		// only where both rows exist (TS/JS — oxc doesn't parse svelte/css).
-		for (
-			const [noloc, oxc] of [
-				['tsv-json-no-locations', 'oxc-parser'],
-				['tsv_wasm-json-no-locations', 'oxc-parser-wasm'],
-			] as const
-		) {
+		for (const [noloc, oxc] of [
+			['tsv-json-no-locations', 'oxc-parser'],
+			['tsv_wasm-json-no-locations', 'oxc-parser-wasm']
+		] as const) {
 			const noloc_result = results.find((r) => r.name === noloc);
 			const oxc_result = results.find((r) => r.name === oxc);
 			if (noloc_result && oxc_result) {
 				lines.push(
-					`      ↳ ${noloc} vs ${oxc}: ${
-						format_comparison(oxc_result.stats.mean_ns, noloc_result.stats.mean_ns)
-					} (payload-matched, span-only)`,
+					`      ↳ ${noloc} vs ${oxc}: ${format_comparison(
+						oxc_result.stats.mean_ns,
+						noloc_result.stats.mean_ns
+					)} (payload-matched, span-only)`
 				);
 			}
 		}
@@ -217,9 +217,10 @@ export function generate_summary_report(
 			if (json_result) {
 				const json_overhead = json_result.stats.mean_ns / internal_result.stats.mean_ns;
 				lines.push(
-					`    ${internal_result.name.padEnd(max_name_len)} ${
-						create_bar(internal_result.stats.mean_ns, max_time)
-					} ${fmt(internal_result.stats.mean_ns)} (${json_overhead.toFixed(1)}x JSON overhead)`,
+					`    ${internal_result.name.padEnd(max_name_len)} ${create_bar(
+						internal_result.stats.mean_ns,
+						max_time
+					)} ${fmt(internal_result.stats.mean_ns)} (${json_overhead.toFixed(1)}x JSON overhead)`
 				);
 			}
 		}
@@ -248,22 +249,23 @@ export function generate_summary_report(
 
 		// Show canonical first (baseline)
 		lines.push(
-			`    ${canonical_result.name.padEnd(max_name_len)} ${
-				create_bar(canonical_result.stats.mean_ns, max_time)
-			} ${fmt(canonical_result.stats.mean_ns)}`,
+			`    ${canonical_result.name.padEnd(max_name_len)} ${create_bar(
+				canonical_result.stats.mean_ns,
+				max_time
+			)} ${fmt(canonical_result.stats.mean_ns)}`
 		);
 
 		// Show alternatives in stable display order (tsv variants, then third-party)
 		const alternatives = sort_by_display_order(
-			results.filter((r) => r.name !== CANONICAL_FORMATTER),
+			results.filter((r) => r.name !== CANONICAL_FORMATTER)
 		);
 
 		for (const result of alternatives) {
 			const comparison = format_comparison(baseline, result.stats.mean_ns);
 			lines.push(
-				`    ${result.name.padEnd(max_name_len)} ${create_bar(result.stats.mean_ns, max_time)} ${
-					fmt(result.stats.mean_ns)
-				} ${comparison}`,
+				`    ${result.name.padEnd(max_name_len)} ${create_bar(result.stats.mean_ns, max_time)} ${fmt(
+					result.stats.mean_ns
+				)} ${comparison}`
 			);
 		}
 	}
@@ -281,7 +283,7 @@ export function generate_skipped_files_report(
 	skipped_files: Map<string, Map<string, string>>,
 	max_error_length = 200,
 	verbose = false,
-	task_tracking_by_group?: Map<string, Map<string, string>>,
+	task_tracking_by_group?: Map<string, Map<string, string>>
 ): string | null {
 	if (skipped_files.size === 0) return null;
 
@@ -371,9 +373,8 @@ export function generate_skipped_files_report(
 		const failed_in = is_universal_tsv_failure(lang, benchmarks)
 			? 'all tsv variants'
 			: benchmarks.map((b) => tracking_key_display(b, task_tracking_by_group)).join(', ');
-		const prefix = benchmarks.length === 1
-			? 'Failed in'
-			: `Failed in ${benchmarks.length} benchmarks`;
+		const prefix =
+			benchmarks.length === 1 ? 'Failed in' : `Failed in ${benchmarks.length} benchmarks`;
 		lines.push(`  ${prefix}: ${failed_in}`);
 		lines.push('');
 	}
@@ -405,7 +406,7 @@ export function generate_versions_info(versions: {
 	lines.push('-'.repeat(80));
 	lines.push('Versions:');
 	lines.push(
-		`  svelte@${versions.svelte}, acorn@${versions.acorn}, @sveltejs/acorn-typescript@${versions.acorn_ts}`,
+		`  svelte@${versions.svelte}, acorn@${versions.acorn}, @sveltejs/acorn-typescript@${versions.acorn_ts}`
 	);
 	lines.push(`  prettier@${versions.prettier}, prettier-plugin-svelte@${versions.prettier_svelte}`);
 
@@ -443,7 +444,7 @@ function lookup_iterated(
 	group_name: string,
 	display_name: string,
 	iterated_counts: Map<string, number> | undefined,
-	task_tracking_by_group: Map<string, Map<string, string>> | undefined,
+	task_tracking_by_group: Map<string, Map<string, string>> | undefined
 ): number | undefined {
 	if (!iterated_counts || !task_tracking_by_group) return undefined;
 	const tracking_key = task_tracking_by_group.get(group_name)?.get(display_name);
@@ -468,7 +469,7 @@ function format_ratio(r: number): string {
  */
 export function generate_group_bench_table_markdown(
 	results: BenchmarkResult[],
-	baseline: string | undefined,
+	baseline: string | undefined
 ): string {
 	if (results.length === 0) return '(no results)';
 
@@ -510,7 +511,7 @@ export function generate_group_bench_table_markdown(
 		`p99 (${unit_str})`,
 		`min (${unit_str})`,
 		`max (${unit_str})`,
-		vs_header,
+		vs_header
 	]);
 
 	for (let row_index = 0; row_index < results.length; row_index++) {
@@ -534,7 +535,7 @@ export function generate_group_bench_table_markdown(
 			tail_cell(r.stats.p99_ns),
 			fmt(r.stats.min_ns),
 			fmt(r.stats.max_ns),
-			vs_cell,
+			vs_cell
 		]);
 	}
 
@@ -563,7 +564,7 @@ function build_comparison_data(
 	all_group_results: GroupResults[],
 	languages: Language[],
 	iterated_counts: Map<string, number> | undefined,
-	task_tracking_by_group: Map<string, Map<string, string>> | undefined,
+	task_tracking_by_group: Map<string, Map<string, string>> | undefined
 ): ComparisonSection[] {
 	function get_mean_ns(group_name: string, task_name: string): number | null {
 		const group = all_group_results.find((g) => g.name === group_name);
@@ -588,7 +589,7 @@ function build_comparison_data(
 		if (tsv_ns === null || prettier_ns === null) continue;
 
 		const comparisons: ComparisonRow['comparisons'] = [
-			{ name: 'prettier', ratio: ratio(tsv_ns, prettier_ns) },
+			{ name: 'prettier', ratio: ratio(tsv_ns, prettier_ns) }
 		];
 		const oxfmt_ns = get_mean_ns(group_name, 'oxfmt');
 		if (oxfmt_ns !== null) comparisons.push({ name: 'oxfmt', ratio: ratio(tsv_ns, oxfmt_ns) });
@@ -597,7 +598,7 @@ function build_comparison_data(
 			operation: 'format',
 			language: lang,
 			files: lookup_iterated(group_name, 'tsv', iterated_counts, task_tracking_by_group),
-			comparisons,
+			comparisons
 		});
 	}
 
@@ -609,7 +610,7 @@ function build_comparison_data(
 		if (tsv_ns === null || canonical_ns === null) continue;
 
 		const comparisons: ComparisonRow['comparisons'] = [
-			{ name: 'svelte', ratio: ratio(tsv_ns, canonical_ns) },
+			{ name: 'svelte', ratio: ratio(tsv_ns, canonical_ns) }
 		];
 		const oxc_ns = get_mean_ns(group_name, 'oxc-parser');
 		if (oxc_ns !== null) comparisons.push({ name: 'oxc-parser', ratio: ratio(tsv_ns, oxc_ns) });
@@ -618,7 +619,7 @@ function build_comparison_data(
 			operation: 'parse',
 			language: lang,
 			files: lookup_iterated(group_name, 'tsv-json', iterated_counts, task_tracking_by_group),
-			comparisons,
+			comparisons
 		});
 	}
 
@@ -636,7 +637,7 @@ function build_comparison_data(
 		if (tsv_wasm_ns === null || prettier_ns === null) continue;
 
 		const comparisons: ComparisonRow['comparisons'] = [
-			{ name: 'prettier', ratio: ratio(tsv_wasm_ns, prettier_ns) },
+			{ name: 'prettier', ratio: ratio(tsv_wasm_ns, prettier_ns) }
 		];
 		const biome_ns = get_mean_ns(group_name, 'biome-wasm');
 		if (biome_ns !== null) {
@@ -653,7 +654,7 @@ function build_comparison_data(
 			operation: 'format',
 			language: lang,
 			files: lookup_iterated(group_name, 'tsv_wasm', iterated_counts, task_tracking_by_group),
-			comparisons,
+			comparisons
 		});
 	}
 
@@ -665,7 +666,7 @@ function build_comparison_data(
 		if (tsv_wasm_ns === null || canonical_ns === null) continue;
 
 		const comparisons: ComparisonRow['comparisons'] = [
-			{ name: 'svelte', ratio: ratio(tsv_wasm_ns, canonical_ns) },
+			{ name: 'svelte', ratio: ratio(tsv_wasm_ns, canonical_ns) }
 		];
 		const oxc_wasm_ns = get_mean_ns(group_name, 'oxc-parser-wasm');
 		if (oxc_wasm_ns !== null) {
@@ -676,7 +677,7 @@ function build_comparison_data(
 			operation: 'parse',
 			language: lang,
 			files: lookup_iterated(group_name, 'tsv_wasm-json', iterated_counts, task_tracking_by_group),
-			comparisons,
+			comparisons
 		});
 	}
 
@@ -699,13 +700,13 @@ export function generate_comparison_summary(
 	all_group_results: GroupResults[],
 	languages: Language[],
 	iterated_counts?: Map<string, number>,
-	task_tracking_by_group?: Map<string, Map<string, string>>,
+	task_tracking_by_group?: Map<string, Map<string, string>>
 ): string {
 	const sections = build_comparison_data(
 		all_group_results,
 		languages,
 		iterated_counts,
-		task_tracking_by_group,
+		task_tracking_by_group
 	);
 	const lines: string[] = [];
 
@@ -736,39 +737,30 @@ export function generate_comparison_summary(
 	}
 
 	// Fairness notes (only shown when oxc-parser data is present)
-	const has_native_oxc = sections.some((s) =>
-		s.label === 'tsv' &&
-		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser'))
+	const has_native_oxc = sections.some(
+		(s) =>
+			s.label === 'tsv' && s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser'))
 	);
-	const has_wasm_oxc = sections.some((s) =>
-		s.label === 'tsv_wasm' &&
-		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser-wasm'))
+	const has_wasm_oxc = sections.some(
+		(s) =>
+			s.label === 'tsv_wasm' &&
+			s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser-wasm'))
 	);
 
 	lines.push('');
 	lines.push('  (`Nx` = self is N× faster; `(Mf)` = files the timing reflects)');
 	lines.push('  (parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts)');
 	if (has_native_oxc || has_wasm_oxc) {
+		lines.push('  (oxc-parser — native and wasm — serializes the AST to JSON in Rust and');
 		lines.push(
-			'  (oxc-parser — native and wasm — serializes the AST to JSON in Rust and',
+			'   deserializes in JS, the same eager materialization as tsv-json — apples-to-apples)'
 		);
-		lines.push(
-			'   deserializes in JS, the same eager materialization as tsv-json — apples-to-apples)',
-		);
-		lines.push(
-			'  (tsv-internal/tsv_wasm-internal are parse-only, no JS materialization;',
-		);
-		lines.push(
-			'   oxc has no comparably cheap mode, so they have no oxc counterpart)',
-		);
+		lines.push('  (tsv-internal/tsv_wasm-internal are parse-only, no JS materialization;');
+		lines.push('   oxc has no comparably cheap mode, so they have no oxc counterpart)');
 	}
 	lines.push('  (format groups include parse time — each formatter parses internally)');
-	lines.push(
-		'  (oxfmt formats JS/TS natively; its css/svelte rows route through its BUNDLED',
-	);
-	lines.push(
-		'   prettier — native-vs-native reads apply to the typescript group only)',
-	);
+	lines.push('  (oxfmt formats JS/TS natively; its css/svelte rows route through its BUNDLED');
+	lines.push('   prettier — native-vs-native reads apply to the typescript group only)');
 
 	return lines.join('\n');
 }
@@ -783,13 +775,13 @@ export function generate_comparison_markdown(
 	all_group_results: GroupResults[],
 	languages: Language[],
 	iterated_counts?: Map<string, number>,
-	task_tracking_by_group?: Map<string, Map<string, string>>,
+	task_tracking_by_group?: Map<string, Map<string, string>>
 ): string | null {
 	const sections = build_comparison_data(
 		all_group_results,
 		languages,
 		iterated_counts,
-		task_tracking_by_group,
+		task_tracking_by_group
 	);
 	if (sections.length === 0) return null;
 
@@ -813,31 +805,32 @@ export function generate_comparison_markdown(
 	}
 
 	// Fairness notes (only shown when oxc-parser data is present)
-	const has_native_oxc = sections.some((s) =>
-		s.label === 'tsv' &&
-		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser'))
+	const has_native_oxc = sections.some(
+		(s) =>
+			s.label === 'tsv' && s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser'))
 	);
-	const has_wasm_oxc = sections.some((s) =>
-		s.label === 'tsv_wasm' &&
-		s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser-wasm'))
+	const has_wasm_oxc = sections.some(
+		(s) =>
+			s.label === 'tsv_wasm' &&
+			s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser-wasm'))
 	);
 
 	const notes: string[] = [
 		'`Nx` is speedup — self is N× faster than the named opponent',
 		"`(Mf)` is the self impl's iterated count (per-group intersection in default mode; per-impl success set in `BENCH_MODE=union`)",
-		'Parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts',
+		'Parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts'
 	];
 	if (has_native_oxc || has_wasm_oxc) {
 		notes.push(
-			'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json/tsv_wasm-json, so these parse rows are apples-to-apples',
+			'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json/tsv_wasm-json, so these parse rows are apples-to-apples'
 		);
 		notes.push(
-			'tsv-internal/tsv_wasm-internal are parse-only (no JS materialization) and have no oxc counterpart — oxc exposes no comparably cheap mode (its JS API always serializes; experimentalLazy is setup-dominated)',
+			'tsv-internal/tsv_wasm-internal are parse-only (no JS materialization) and have no oxc counterpart — oxc exposes no comparably cheap mode (its JS API always serializes; experimentalLazy is setup-dominated)'
 		);
 	}
 	notes.push('Format groups include parse time — each formatter parses internally');
 	notes.push(
-		'oxfmt formats JS/TS natively; its css/svelte rows route through its bundled prettier (+ svelte plugin, with the embedded `<script>` formatted natively), so `tsv` vs `oxfmt` is native-vs-native on typescript only',
+		'oxfmt formats JS/TS natively; its css/svelte rows route through its bundled prettier (+ svelte plugin, with the embedded `<script>` formatted natively), so `tsv` vs `oxfmt` is native-vs-native on typescript only'
 	);
 
 	lines.push('_' + notes.join('. ') + '._');
@@ -862,7 +855,7 @@ export interface EffectiveCorpusEntry {
 export function generate_group_throughput_markdown(
 	results: BenchmarkResult[],
 	tracking: Map<string, string> | undefined,
-	effective_corpus_bytes: Map<string, number>,
+	effective_corpus_bytes: Map<string, number>
 ): string | null {
 	if (!tracking || results.length === 0) return null;
 	const parts: string[] = [];
@@ -885,7 +878,7 @@ export function generate_group_throughput_markdown(
  * varying counts, so this returns null to avoid duplicating that info.
  */
 export function generate_group_files_markdown(
-	iterated_counts: Map<string, number> | undefined,
+	iterated_counts: Map<string, number> | undefined
 ): string | null {
 	if (!iterated_counts || iterated_counts.size === 0) return null;
 	const values = [...iterated_counts.values()];
@@ -902,7 +895,7 @@ export function generate_group_files_markdown(
 export function generate_group_coverage_markdown(
 	results: BenchmarkResult[],
 	tracking: Map<string, string> | undefined,
-	effective_corpus_size: Map<string, EffectiveCorpusEntry>,
+	effective_corpus_size: Map<string, EffectiveCorpusEntry>
 ): string | null {
 	if (!tracking || results.length === 0) return null;
 	const entries: { name: string; processed: number; total: number }[] = [];
@@ -934,7 +927,7 @@ export function generate_coverage_only_markdown(
 	languages: readonly Language[],
 	operations: readonly ('parse' | 'format')[],
 	task_tracking: Map<string, Map<string, string>>,
-	effective_corpus_size: Map<string, EffectiveCorpusEntry>,
+	effective_corpus_size: Map<string, EffectiveCorpusEntry>
 ): string[] {
 	const lines: string[] = [];
 	for (const language of languages) {
@@ -973,7 +966,7 @@ export function generate_json_overhead_note(results: BenchmarkResult[]): string 
 	// is setup-dominated — see oxc.ts), so there's no oxc pair to show here.
 	const pairs = [
 		['tsv-internal', 'tsv-json'],
-		['tsv_wasm-internal', 'tsv_wasm-json'],
+		['tsv_wasm-internal', 'tsv_wasm-json']
 	] as const;
 	const notes: string[] = [];
 	for (const [internal_name, json_name] of pairs) {
@@ -1038,7 +1031,7 @@ function tsv_universal_set(lang: Exclude<SkipLang, 'other'>): Set<string> {
 		`parse/${lang}/native-internal`,
 		`parse/${lang}/wasm-internal`,
 		`format/${lang}/native`,
-		`format/${lang}/wasm`,
+		`format/${lang}/wasm`
 	]);
 }
 
@@ -1057,7 +1050,7 @@ function is_universal_tsv_failure(lang: SkipLang, benchmarks: string[]): boolean
  */
 function tracking_key_display(
 	tracking_key: string,
-	task_tracking_by_group: Map<string, Map<string, string>> | undefined,
+	task_tracking_by_group: Map<string, Map<string, string>> | undefined
 ): string {
 	if (!task_tracking_by_group) return tracking_key;
 	const parts = tracking_key.split('/');
@@ -1075,7 +1068,7 @@ export function generate_skipped_files_markdown(
 	skipped_files: Map<string, Map<string, string>>,
 	max_error_length = 200,
 	verbose = false,
-	task_tracking_by_group?: Map<string, Map<string, string>>,
+	task_tracking_by_group?: Map<string, Map<string, string>>
 ): string | null {
 	if (skipped_files.size === 0) return null;
 
@@ -1126,7 +1119,7 @@ export function generate_skipped_files_markdown(
 	const by_lang = {
 		svelte: all_errors.filter((e) => e.lang === 'svelte').sort(sort_fn),
 		typescript: all_errors.filter((e) => e.lang === 'typescript').sort(sort_fn),
-		css: all_errors.filter((e) => e.lang === 'css').sort(sort_fn),
+		css: all_errors.filter((e) => e.lang === 'css').sort(sort_fn)
 	};
 
 	// Per-benchmark skip totals, sorted descending. Lets the reader see
@@ -1140,7 +1133,7 @@ export function generate_skipped_files_markdown(
 	const lines: string[] = [];
 	lines.push('## Skipped Files\n');
 	lines.push(
-		`${all_errors.length} unique file+error combinations — Svelte ${by_lang.svelte.length}, TypeScript ${by_lang.typescript.length}, CSS ${by_lang.css.length}.\n`,
+		`${all_errors.length} unique file+error combinations — Svelte ${by_lang.svelte.length}, TypeScript ${by_lang.typescript.length}, CSS ${by_lang.css.length}.\n`
 	);
 
 	if (per_bench.length > 0) {
@@ -1153,7 +1146,7 @@ export function generate_skipped_files_markdown(
 
 	if (!verbose) {
 		lines.push(
-			'_Per-file detail omitted. Re-run with `--verbose` to include error messages and failure sets per file._',
+			'_Per-file detail omitted. Re-run with `--verbose` to include error messages and failure sets per file._'
 		);
 		return lines.join('\n').trimEnd();
 	}
@@ -1167,18 +1160,15 @@ export function generate_skipped_files_markdown(
 		const failed_in = is_universal_tsv_failure(e.lang, e.benchmarks)
 			? 'all tsv variants'
 			: e.benchmarks.map((b) => tracking_key_display(b, task_tracking_by_group)).join(', ');
-		return [
-			`- \`${e.file_path}\``,
-			`  - Error: ${display_error}`,
-			`  - Failed in: ${failed_in}`,
-		];
+		return [`- \`${e.file_path}\``, `  - Error: ${display_error}`, `  - Failed in: ${failed_in}`];
 	}
 
 	function render_bucket(label: string, entries: FileError[]): void {
 		if (entries.length === 0) return;
-		const more = entries.length > TOP_N_PER_LANG
-			? ` (showing top ${TOP_N_PER_LANG} of ${entries.length}, sorted rarest failure-set first)`
-			: '';
+		const more =
+			entries.length > TOP_N_PER_LANG
+				? ` (showing top ${TOP_N_PER_LANG} of ${entries.length}, sorted rarest failure-set first)`
+				: '';
 		lines.push(`### ${label}${more}\n`);
 		for (const e of entries.slice(0, TOP_N_PER_LANG)) {
 			lines.push(...render_entry(e));
@@ -1204,7 +1194,7 @@ export function generate_skipped_files_markdown(
  */
 export function generate_effective_corpus_report(
 	effective_corpus_size: Map<string, EffectiveCorpusEntry>,
-	task_tracking_by_group?: Map<string, Map<string, string>>,
+	task_tracking_by_group?: Map<string, Map<string, string>>
 ): string | null {
 	// Check if any benchmarks had skipped files
 	let has_skips = false;
@@ -1269,7 +1259,7 @@ export function generate_effective_corpus_report(
 		for (const [label, entry] of entries) {
 			const pct = coverage_pct(entry.processed, entry.total);
 			lines.push(
-				`    ${label.padEnd(max_label_len)} ${entry.processed}/${entry.total} files (${pct}%)`,
+				`    ${label.padEnd(max_label_len)} ${entry.processed}/${entry.total} files (${pct}%)`
 			);
 		}
 		lines.push('');

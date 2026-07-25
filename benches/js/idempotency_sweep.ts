@@ -35,8 +35,20 @@ console.error(`idempotency sweep over ${dirs.length} corpus directories\n`);
 
 const { status } = spawnSync(
 	'cargo',
-	['run', '--profile', 'corpus', '-q', '-p', 'tsv_debug', '--', 'fuzz', '--iterations', '0', ...dirs],
-	{ stdio: 'inherit' },
+	[
+		'run',
+		'--profile',
+		'corpus',
+		'-q',
+		'-p',
+		'tsv_debug',
+		'--',
+		'fuzz',
+		'--iterations',
+		'0',
+		...dirs
+	],
+	{ stdio: 'inherit' }
 );
 
 process.exit(status ?? 1);

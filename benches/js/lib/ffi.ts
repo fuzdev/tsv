@@ -34,80 +34,80 @@ import type { Language, ParseGoal, TsvImplementation } from './types.ts';
 const symbols = {
 	tsv_parse_svelte: {
 		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	tsv_parse_internal_svelte: {
 		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	tsv_format_svelte: {
 		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	tsv_parse_typescript: {
 		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	tsv_parse_internal_typescript: {
 		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	tsv_format_typescript: {
 		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	tsv_parse_css: {
 		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	tsv_parse_internal_css: {
 		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	// no-locations parse (span-only wire) — svelte + typescript only (CSS emits no `loc`)
 	tsv_parse_svelte_no_locations: {
 		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	tsv_parse_typescript_no_locations: {
 		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	// goal-aware TS parse (extra `u32` goal: 0 = Module, 1 = Script) — the
 	// conformance surface's test262 files
 	tsv_parse_typescript_with_goal: {
 		parameters: ['pointer', 'usize', 'u32', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	tsv_parse_typescript_no_locations_with_goal: {
 		parameters: ['pointer', 'usize', 'u32', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	tsv_parse_internal_typescript_with_goal: {
 		parameters: ['pointer', 'usize', 'u32', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	tsv_format_css: {
 		parameters: ['pointer', 'usize', 'pointer'],
-		result: 'pointer',
+		result: 'pointer'
 	},
 	tsv_free: {
 		parameters: ['pointer', 'usize'],
-		result: 'void',
-	},
+		result: 'void'
+	}
 } as const;
 
 type FfiFn = (
 	source: Deno.PointerValue,
 	len: number | bigint,
-	out_len: Deno.PointerValue,
+	out_len: Deno.PointerValue
 ) => Deno.PointerValue;
 /** Goal-aware TS parse symbol: an extra `u32` goal (0 = Module, 1 = Script). */
 type FfiGoalFn = (
 	source: Deno.PointerValue,
 	len: number | bigint,
 	goal: number,
-	out_len: Deno.PointerValue,
+	out_len: Deno.PointerValue
 ) => Deno.PointerValue;
 type LibSymbols = Deno.DynamicLibrary<typeof symbols>['symbols'];
 
@@ -177,7 +177,7 @@ export class NativeImplementation implements TsvImplementation {
 				`Native library not found at ${lib_path}. ` +
 					`Run 'cargo build -p tsv_ffi --${
 						profile === 'release' ? 'release' : `profile ${profile}`
-					}' first.`,
+					}' first.`
 			);
 		}
 
@@ -194,7 +194,7 @@ export class NativeImplementation implements TsvImplementation {
 			out_len_ptr: Deno.UnsafePointer.of(out_len_buffer),
 			source_buffer,
 			source_ptr: Deno.UnsafePointer.of(source_buffer),
-			result_buffer: new Uint8Array(new ArrayBuffer(INITIAL_BUFFER_CAPACITY)),
+			result_buffer: new Uint8Array(new ArrayBuffer(INITIAL_BUFFER_CAPACITY))
 		};
 	}
 
@@ -208,11 +208,11 @@ export class NativeImplementation implements TsvImplementation {
 		const max_bytes = source.length * 3;
 		if (max_bytes > m.source_buffer.length) {
 			m.source_buffer = new Uint8Array(
-				new ArrayBuffer(next_capacity(max_bytes, m.source_buffer.length)),
+				new ArrayBuffer(next_capacity(max_bytes, m.source_buffer.length))
 			);
 			m.source_ptr = Deno.UnsafePointer.of(m.source_buffer);
 		}
-		const {read, written} = this.encoder.encodeInto(source, m.source_buffer);
+		const { read, written } = this.encoder.encodeInto(source, m.source_buffer);
 		if (read !== source.length) {
 			throw new Error(`encodeInto consumed ${read} of ${source.length} source units`);
 		}
@@ -227,7 +227,7 @@ export class NativeImplementation implements TsvImplementation {
 		const result_byte_count = Number(result_len);
 		if (result_byte_count > m.result_buffer.length) {
 			m.result_buffer = new Uint8Array(
-				new ArrayBuffer(next_capacity(result_byte_count, m.result_buffer.length)),
+				new ArrayBuffer(next_capacity(result_byte_count, m.result_buffer.length))
 			);
 		}
 
@@ -253,11 +253,11 @@ export class NativeImplementation implements TsvImplementation {
 		const max_bytes = source.length * 3;
 		if (max_bytes > m.source_buffer.length) {
 			m.source_buffer = new Uint8Array(
-				new ArrayBuffer(next_capacity(max_bytes, m.source_buffer.length)),
+				new ArrayBuffer(next_capacity(max_bytes, m.source_buffer.length))
 			);
 			m.source_ptr = Deno.UnsafePointer.of(m.source_buffer);
 		}
-		const {read, written} = this.encoder.encodeInto(source, m.source_buffer);
+		const { read, written } = this.encoder.encodeInto(source, m.source_buffer);
 		if (read !== source.length) {
 			throw new Error(`encodeInto consumed ${read} of ${source.length} source units`);
 		}
@@ -271,7 +271,7 @@ export class NativeImplementation implements TsvImplementation {
 		const result_byte_count = Number(result_len);
 		if (result_byte_count > m.result_buffer.length) {
 			m.result_buffer = new Uint8Array(
-				new ArrayBuffer(next_capacity(result_byte_count, m.result_buffer.length)),
+				new ArrayBuffer(next_capacity(result_byte_count, m.result_buffer.length))
 			);
 		}
 
@@ -315,7 +315,7 @@ export class NativeImplementation implements TsvImplementation {
 		return {
 			svelte: this.symbols.tsv_parse_svelte as FfiFn,
 			typescript: this.symbols.tsv_parse_typescript as FfiFn,
-			css: this.symbols.tsv_parse_css as FfiFn,
+			css: this.symbols.tsv_parse_css as FfiFn
 		};
 	}
 
@@ -323,7 +323,7 @@ export class NativeImplementation implements TsvImplementation {
 		return {
 			svelte: this.symbols.tsv_parse_internal_svelte as FfiFn,
 			typescript: this.symbols.tsv_parse_internal_typescript as FfiFn,
-			css: this.symbols.tsv_parse_internal_css as FfiFn,
+			css: this.symbols.tsv_parse_internal_css as FfiFn
 		};
 	}
 
@@ -331,7 +331,7 @@ export class NativeImplementation implements TsvImplementation {
 	private get parse_no_locations_fns(): Partial<Record<Language, FfiFn>> {
 		return {
 			svelte: this.symbols.tsv_parse_svelte_no_locations as FfiFn,
-			typescript: this.symbols.tsv_parse_typescript_no_locations as FfiFn,
+			typescript: this.symbols.tsv_parse_typescript_no_locations as FfiFn
 		};
 	}
 
@@ -339,14 +339,15 @@ export class NativeImplementation implements TsvImplementation {
 		return {
 			svelte: this.symbols.tsv_format_svelte as FfiFn,
 			typescript: this.symbols.tsv_format_typescript as FfiFn,
-			css: this.symbols.tsv_format_css as FfiFn,
+			css: this.symbols.tsv_format_css as FfiFn
 		};
 	}
 
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
-		const result = goal && language === 'typescript'
-			? this.call_ffi_goal(this.symbols.tsv_parse_typescript_with_goal as FfiGoalFn, source, goal)
-			: this.call_ffi(this.parse_fns[language], source);
+		const result =
+			goal && language === 'typescript'
+				? this.call_ffi_goal(this.symbols.tsv_parse_typescript_with_goal as FfiGoalFn, source, goal)
+				: this.call_ffi(this.parse_fns[language], source);
 		const parsed = JSON.parse(result);
 		if (parsed.error) {
 			throw new Error(parsed.error);
@@ -355,13 +356,14 @@ export class NativeImplementation implements TsvImplementation {
 	}
 
 	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
-		const result = goal && language === 'typescript'
-			? this.call_ffi_goal(
-				this.symbols.tsv_parse_internal_typescript_with_goal as FfiGoalFn,
-				source,
-				goal,
-			)
-			: this.call_ffi(this.parse_internal_fns[language], source);
+		const result =
+			goal && language === 'typescript'
+				? this.call_ffi_goal(
+						this.symbols.tsv_parse_internal_typescript_with_goal as FfiGoalFn,
+						source,
+						goal
+					)
+				: this.call_ffi(this.parse_internal_fns[language], source);
 		this.check_error(result);
 	}
 
@@ -371,7 +373,7 @@ export class NativeImplementation implements TsvImplementation {
 			result = this.call_ffi_goal(
 				this.symbols.tsv_parse_typescript_no_locations_with_goal as FfiGoalFn,
 				source,
-				goal,
+				goal
 			);
 		} else {
 			const fn = this.parse_no_locations_fns[language];

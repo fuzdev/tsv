@@ -162,11 +162,21 @@ deno task doctor         # one-pass setup check: runtimes, canonical pins + chec
 deno task typecheck      # cargo check
 deno task test           # cargo test
 deno task lint           # cargo clippy
-cargo fmt                # format Rust code — the only autoformatter in this repo
-# Non-Rust files (TS/MD/JSON) are hand-maintained: tsv ships NO prettier or deno
-# fmt config. Never run `deno fmt` or `prettier` on the repo — with no config they
-# reformat to their own defaults (spaces, double quotes) and churn every file. The
-# fixture/corpus prettier oracles pass options inline, so they're unaffected.
+cargo fmt                # format Rust code
+tsv format .             # format the repo's own TS/JS — tsv formats itself (`--check` in the gate)
+# tsv and cargo fmt are the repo's ONLY autoformatters, and they partition it:
+# `cargo fmt` owns Rust, `tsv format` owns TS/JS. Markdown and JSON stay
+# hand-maintained — nothing formats them.
+#
+# Never run `deno fmt` or `prettier` on the repo: tsv ships NO prettier or deno
+# fmt config, so with no config they reformat to their own defaults (spaces,
+# double quotes) and churn every file. The fixture/corpus prettier oracles pass
+# options inline, so they're unaffected.
+#
+# `tsv format` on a DIRECTORY is safe — the root `.formatignore` prunes
+# tests/fixtures/ and tests/fixtures_compile/, whose files are deliberately not
+# format fixed points. Never name a file under tests/ explicitly: an explicit
+# file argument bypasses the ignore files and would destroy the fixture's claim.
 
 cargo test --workspace test_typescript_parser_literal  # run specific test by name
 cargo test --workspace --test fixtures_tests           # fixture validation tests
@@ -196,6 +206,7 @@ deno task compile:validation         # validation-suite RATCHET over Svelte's ow
 deno task compile:validation:update  # regenerate that snapshot after fixing a finding (or newly refusing a shape); refuses a narrowed run, and never pins a MISMATCH
 deno task compile:fuzz               # differential compile fuzzer over feature cross-products — a discovery tool with an open work list, currently RED by design (sidecar-dependent, on demand; ./docs/compile_tooling.md)
 deno task pins:audit                 # canonical-oracle version sync (gated in `deno task check`): (1) pin agreement — sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical; (2) checkout alignment — a PRESENT ../svelte or ../acorn-typescript checkout must match its pin (absent → skipped, so clean machines pass)
+deno task format:audit               # tsv formats its own TS/JS — `tsv format --check .` over the repo (gated in `deno task check`). Fails on EITHER a would-change file (exit 1) or a parse error (exit 2); no other gate covers this, since the corpus gates read OTHER repos
 deno task scan:audit                 # no new raw find/rfind/match_indices substring scans over source (gated in `deno task check`; ./docs/audits.md)
 deno task fanout:audit               # no super-linear doc-node fanout — the per-layout-candidate rebuild blowup (gated in `deno task check`; ./docs/audits.md)
 deno task roundtrip:audit            # format(tests/fixtures) must reparse — pure-Rust tripwire, real yield on external corpora (gated in `deno task check`; ./docs/audits.md)
@@ -884,7 +895,8 @@ deno task metrics                          # shorthand
 
 **Audits** — the standing correctness gates and discovery harnesses: line-comment swallow,
 the print-once comment ledger, gap/blank injection, build-fanout, raw-find scan,
-authoring-independence, format→reparse round-trip, comment↔token binding,
+self-format (tsv over its own TS/JS), authoring-independence, format→reparse round-trip,
+comment↔token binding,
 render-equivalence, layout-neutrality, the seeded mutational fuzzer, the F1 idempotency
 sweep, the `audit:corpus` bundle, the `lex_diff` differential lexer harness, and the two
 compiler audits (compile-fixture divergence integrity, the canonicalizer). Each is

@@ -21,7 +21,7 @@ const ITERS = 5;
 
 const [files, impls] = await Promise.all([
 	new DevReposLoader('gates').load((m) => console.error(m)),
-	init_implementations({ logger: (m) => console.error(m) }),
+	init_implementations({ logger: (m) => console.error(m) })
 ]);
 const ts = group_by_language(files).typescript;
 if (!impls.native) throw new Error('native FFI not built');
@@ -85,27 +85,27 @@ console.error(`wire JSON size (one pass, UTF-8 bytes): ${wire_mb.toFixed(1)} MB\
 console.error(`native parse total          ${ms(native_total)} ms`);
 console.error(`native parse_internal       ${ms(native_internal)} ms  (pure parse)`);
 console.error(
-	`  -> native materialization ${
-		ms(native_total - native_internal)
-	} ms  (convert+translate+to_string+copy+JSON.parse)`,
+	`  -> native materialization ${ms(
+		native_total - native_internal
+	)} ms  (convert+translate+to_string+copy+JSON.parse)`
 );
 console.error(`wasm   parse total          ${ms(wasm_total)} ms`);
 console.error(`wasm   parse_internal       ${ms(wasm_internal)} ms  (pure parse)`);
 console.error(
-	`  -> wasm materialization   ${
-		ms(wasm_total - wasm_internal)
-	} ms  (to_string+boundary+JSON.parse)`,
+	`  -> wasm materialization   ${ms(
+		wasm_total - wasm_internal
+	)} ms  (to_string+boundary+JSON.parse)`
 );
 console.error(`\nJS-side only:`);
 console.error(`  JSON.parse(wire)          ${ms(js_jsonparse)} ms`);
 console.error(`  JSON.stringify(obj)       ${ms(js_jsonstringify)} ms`);
 console.error(
-	`\nwasm matz / native matz = ${
-		((wasm_total - wasm_internal) / (native_total - native_internal)).toFixed(2)
-	}x`,
+	`\nwasm matz / native matz = ${(
+		(wasm_total - wasm_internal) / (native_total - native_internal)
+	).toFixed(2)}x`
 );
 console.error(
-	`JS JSON.parse as share of native matz = ${
-		((js_jsonparse / (native_total - native_internal)) * 100).toFixed(0)
-	}%`,
+	`JS JSON.parse as share of native matz = ${(
+		(js_jsonparse / (native_total - native_internal)) * 100
+	).toFixed(0)}%`
 );
