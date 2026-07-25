@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 190,
+	"end": 501,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,136 @@
 					"column": 20
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line block comment keeps its own line and breaks the bracket",
+			"start": 181,
+			"end": 251,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " e ",
+			"start": 270,
+			"end": 277,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 3
+				},
+				"end": {
+					"line": 17,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a glued run leads the key inline",
+			"start": 303,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " f ",
+			"start": 353,
+			"end": 360,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 3
+				},
+				"end": {
+					"line": 23,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " g ",
+			"start": 361,
+			"end": 368,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 11
+				},
+				"end": {
+					"line": 23,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an author blank line before the key is preserved",
+			"start": 388,
+			"end": 439,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " h ",
+			"start": 458,
+			"end": 465,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 3
+				},
+				"end": {
+					"line": 28,
+					"column": 10
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 189,
+		"end": 500,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 180,
+			"end": 491,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 14,
+					"line": 33,
 					"column": 9
 				}
 			},
@@ -758,6 +870,534 @@
 							}
 						]
 					}
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 253,
+					"end": 301,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 259,
+						"end": 260,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 7
+							},
+							"end": {
+								"line": 15,
+								"column": 8
+							}
+						},
+						"name": "E"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 261,
+						"end": 301,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 9
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSIndexSignature",
+								"start": 265,
+								"end": 298,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 7
+									}
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 281,
+										"end": 290,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 3
+											},
+											"end": {
+												"line": 18,
+												"column": 12
+											}
+										},
+										"name": "k",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 282,
+											"end": 290,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 4
+												},
+												"end": {
+													"line": 18,
+													"column": 12
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 284,
+												"end": 290,
+												"loc": {
+													"start": {
+														"line": 18,
+														"column": 6
+													},
+													"end": {
+														"line": 18,
+														"column": 12
+													}
+												}
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " e ",
+												"start": 270,
+												"end": 277
+											}
+										]
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 294,
+									"end": 297,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 3
+										},
+										"end": {
+											"line": 19,
+											"column": 6
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 296,
+										"end": 297,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 5
+											},
+											"end": {
+												"line": 19,
+												"column": 6
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 296,
+											"end": 297,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 5
+												},
+												"end": {
+													"line": 19,
+													"column": 6
+												}
+											},
+											"name": "T"
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line block comment keeps its own line and breaks the bracket",
+							"start": 181,
+							"end": 251
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 340,
+					"end": 386,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 346,
+						"end": 347,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 7
+							},
+							"end": {
+								"line": 22,
+								"column": 8
+							}
+						},
+						"name": "F"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 348,
+						"end": 386,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 9
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSIndexSignature",
+								"start": 352,
+								"end": 383,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 33
+									}
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 369,
+										"end": 378,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 19
+											},
+											"end": {
+												"line": 23,
+												"column": 28
+											}
+										},
+										"name": "k",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 370,
+											"end": 378,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 20
+												},
+												"end": {
+													"line": 23,
+													"column": 28
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 372,
+												"end": 378,
+												"loc": {
+													"start": {
+														"line": 23,
+														"column": 22
+													},
+													"end": {
+														"line": 23,
+														"column": 28
+													}
+												}
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " f ",
+												"start": 353,
+												"end": 360
+											},
+											{
+												"type": "Block",
+												"value": " g ",
+												"start": 361,
+												"end": 368
+											}
+										]
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 379,
+									"end": 382,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 29
+										},
+										"end": {
+											"line": 23,
+											"column": 32
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 381,
+										"end": 382,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 31
+											},
+											"end": {
+												"line": 23,
+												"column": 32
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 381,
+											"end": 382,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 31
+												},
+												"end": {
+													"line": 23,
+													"column": 32
+												}
+											},
+											"name": "T"
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a glued run leads the key inline",
+							"start": 303,
+							"end": 338
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 441,
+					"end": 490,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 447,
+						"end": 448,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 7
+							},
+							"end": {
+								"line": 26,
+								"column": 8
+							}
+						},
+						"name": "G"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 449,
+						"end": 490,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 9
+							},
+							"end": {
+								"line": 32,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "TSIndexSignature",
+								"start": 453,
+								"end": 487,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 31,
+										"column": 7
+									}
+								},
+								"parameters": [
+									{
+										"type": "Identifier",
+										"start": 470,
+										"end": 479,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 3
+											},
+											"end": {
+												"line": 30,
+												"column": 12
+											}
+										},
+										"name": "k",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 471,
+											"end": 479,
+											"loc": {
+												"start": {
+													"line": 30,
+													"column": 4
+												},
+												"end": {
+													"line": 30,
+													"column": 12
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSStringKeyword",
+												"start": 473,
+												"end": 479,
+												"loc": {
+													"start": {
+														"line": 30,
+														"column": 6
+													},
+													"end": {
+														"line": 30,
+														"column": 12
+													}
+												}
+											}
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " h ",
+												"start": 458,
+												"end": 465
+											}
+										]
+									}
+								],
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 483,
+									"end": 486,
+									"loc": {
+										"start": {
+											"line": 31,
+											"column": 3
+										},
+										"end": {
+											"line": 31,
+											"column": 6
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 485,
+										"end": 486,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 5
+											},
+											"end": {
+												"line": 31,
+												"column": 6
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 485,
+											"end": 486,
+											"loc": {
+												"start": {
+													"line": 31,
+													"column": 5
+												},
+												"end": {
+													"line": 31,
+													"column": 6
+												}
+											},
+											"name": "T"
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank line before the key is preserved",
+							"start": 388,
+							"end": 439
+						}
+					]
 				}
 			],
 			"sourceType": "module"

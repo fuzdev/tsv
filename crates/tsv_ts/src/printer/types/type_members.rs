@@ -11,6 +11,7 @@ use super::super::comments_to_emit_in_range;
 use super::CommentSpacing;
 use super::Printer;
 use crate::ast::internal::{self, TSTypeElement};
+use crate::printer::LeadingGlue;
 use crate::printer::analysis::skip_identifier_at;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
@@ -453,9 +454,12 @@ impl<'a> Printer<'a> {
     /// false for type-element members).
     ///
     /// Comment handling at each gap: keyword→`[` (`readonly /* c */ [k]`, bounded
-    /// at `[`), `[`→key (`[/* c */ k]` block hugs `[`; a line comment on the `[`
-    /// line stays there and breaks the bracket — `[ // c⏎k]`, a `_prettier_divergence`;
-    /// an own-line comment stays on its own line inside), key→`:` (`[k /* c */ : T]` block inline;
+    /// at `[`), `[`→key (the shared leading-comment run, keyed on what follows the
+    /// `*/`: a glued block leads the key inline — `[/* c */ k]` — a newline after the
+    /// `*/` takes the soft `line` so the key pulls up only while the bracket fits, and
+    /// an own-line comment keeps its own line inside with any author blank preserved;
+    /// a line comment on the `[` line stays there and breaks the bracket —
+    /// `[ // c⏎k]`, a `_prettier_divergence`), key→`:` (`[k /* c */ : T]` block inline;
     /// `[k // c⏎: T]` line forces a hardline that breaks the bracket, so the `//`
     /// can't swallow the `: T`), type→`]` (`[k: T /* c */]` block inline; a line
     /// comment breaks the bracket and is preserved before `]` — same-line trailing
@@ -511,6 +515,17 @@ impl<'a> Printer<'a> {
             .parameters
             .iter()
             .map(|param| {
+                // An alone-on-line directive in the `[`→key gap freezes the key
+                // parameter it precedes (Rule A) — the `]: V` value side, which the
+                // directive does not precede, keeps formatting. The gap is asked
+                // directly rather than through `list_item_frozen`: an index signature
+                // has exactly one parameter (a second is a parse error), so there is no
+                // inter-item gap and the `[` anchor is the only one.
+                if bracket_open_pos
+                    .is_some_and(|open| self.member_gap_frozen(open + 1, param.span.start))
+                {
+                    return self.build_frozen_span_doc(param.span);
+                }
                 let mut param_parts: DocBuf = smallvec![self.identifier_name_doc(param)];
                 if let Some(type_ann) = param.type_annotation() {
                     // The `: keyType` annotation, handling a before-`:` comment between
@@ -539,13 +554,12 @@ impl<'a> Printer<'a> {
         // Flat: [key: type]
         // Break: [\n\tkey: type\n]
         //
-        // `[`→key comment placement: a block comment hugs `[` inline
-        // (`[/* c */ k: string]`); a line comment the author wrote *on the `[` line*
+        // `[`→key comment placement: a line comment the author wrote *on the `[` line*
         // stays on that line (`[ // c\n\tk: string\n]`) and forces the bracket to
         // break — a divergence from prettier, which relocates it to its own line as
         // the key's leading comment (conformance_prettier.md §Comment relocation,
-        // "Object/array/block open-delimiter trailing"). A comment on its own line
-        // stays on its own line inside the brackets in both formatters. A comment in
+        // "Object/array/block open-delimiter trailing"). Every other comment in the
+        // gap is the leading run below, which both formatters agree on. A comment in
         // the param→`]` gap (`[key: string /* c */]`) trails the contents.
         let (bracket_line_prefix, bracket_pull_pos) = match (bracket_open_pos, first_param_start) {
             (Some(open), Some(key_start)) => self.delimiter_line_comment_prefix(open, key_start),
@@ -559,20 +573,24 @@ impl<'a> Printer<'a> {
         // guard is needed here (unlike `trailing_comment` below, which has no such net).
         let lead_comment = match (bracket_open_pos, first_param_start) {
             (Some(open), Some(key_start)) => {
+                // The shared leading-comment emitter, so the `[`→key gap gets the one
+                // rule: a block glued to what follows leads the key inline
+                // (`[/* c */ k: string]`, and a run the author glued stays glued), a
+                // block with a newline after its `*/` takes the soft `line` (the key
+                // pulls up when the bracket group fits and drops below when it breaks),
+                // and an own-line comment or any line comment takes the
+                // blank-preserving hardline — which also breaks the bracket group.
                 let mut lead_parts = DocBuf::new();
-                for comment in comments_to_emit_in_range(self.comments, open + 1, key_start) {
-                    if let Some(dpos) = bracket_pull_pos
-                        && self.comment_on_delimiter_line(dpos, comment)
-                    {
-                        continue;
-                    }
-                    lead_parts.push(self.build_comment_doc(comment));
-                    if comment.is_block {
-                        lead_parts.push(d.text(" "));
-                    } else {
-                        lead_parts.push(d.hardline());
-                    }
-                }
+                self.push_leading_comment_run(
+                    &mut lead_parts,
+                    comments_to_emit_in_range(self.comments, open + 1, key_start).filter(|c| {
+                        !bracket_pull_pos
+                            .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c))
+                    }),
+                    key_start,
+                    LeadingGlue::Adjacent,
+                    d.empty(),
+                );
                 (!lead_parts.is_empty()).then(|| d.concat(&lead_parts))
             }
             _ => None,
