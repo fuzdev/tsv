@@ -54,7 +54,7 @@
 
 	// an identifier that merely starts with `extends` is a fresh statement on the next
 	// line (ASI), not a type constraint
-	const a31 = a < b;
+	const a31 = a < b
 	extendsFoo();
 
 	// genuine instantiation with a literal/keyword/object/tuple/numeric type arg, or a

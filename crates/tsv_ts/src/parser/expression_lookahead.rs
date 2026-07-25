@@ -8,7 +8,7 @@
 //
 // All functions operate on byte slices for performance (no tokenization needed).
 
-use super::scan::{is_identifier_start, skip_identifier, skip_whitespace_and_comments};
+use super::scan::{is_identifier_start, is_word_at, skip_identifier, skip_whitespace_and_comments};
 use tsv_lang::source_scan::{TriviaProfile, is_regex_start, skip_regex_literal, skip_trivia};
 
 /// `<` at `pos` is `<=` comparison operator, not an angle bracket open
@@ -430,17 +430,10 @@ fn paren_list_then_arrow(bytes: &[u8], paren: usize) -> bool {
 /// past the `abstract` keyword.
 pub(super) fn is_construct_type_start(bytes: &[u8], pos: usize) -> bool {
     // Whole-word `new` (not an identifier like `newType`).
-    if !bytes[pos..].starts_with(b"new") {
+    if !is_word_at(bytes, pos, b"new") {
         return false;
     }
-    let after_new = pos + b"new".len();
-    if bytes
-        .get(after_new)
-        .is_some_and(|&b| b.is_ascii_alphanumeric() || b == b'_' || b == b'$')
-    {
-        return false;
-    }
-    let paren = skip_whitespace_and_comments(bytes, after_new);
+    let paren = skip_whitespace_and_comments(bytes, pos + b"new".len());
     if bytes.get(paren) != Some(&b'(') {
         return false;
     }

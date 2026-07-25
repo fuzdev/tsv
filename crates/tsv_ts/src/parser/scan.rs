@@ -96,6 +96,20 @@ pub(super) fn is_identifier_continue(b: u8) -> bool {
     b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127
 }
 
+/// Check if `word` sits at `pos` as a whole identifier, not as the prefix of a longer
+/// one — `is_word_at(b"extendsFoo", 0, b"extends")` is false.
+///
+/// A bare `starts_with` is the trap this exists to close: the byte after the word decides
+/// whether a lookahead is looking at a keyword or at an ordinary identifier that happens
+/// to share its opening bytes.
+#[inline]
+pub(super) fn is_word_at(bytes: &[u8], pos: usize, word: &[u8]) -> bool {
+    bytes[pos..].starts_with(word)
+        && bytes
+            .get(pos + word.len())
+            .is_none_or(|&b| !is_identifier_continue(b))
+}
+
 /// Skip an identifier, returning position after the identifier
 /// Assumes `pos` is at the start of an identifier
 #[inline]

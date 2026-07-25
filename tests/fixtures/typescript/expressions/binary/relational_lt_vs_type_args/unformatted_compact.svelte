@@ -34,6 +34,29 @@
 	const a21=x<y>{a:1};
 	const a22=x<y>typeof c;
 
+	// an indexed member access after `<` is a comparison operand, not an indexed access
+	// type; the `,` that follows it belongs to the enclosing argument, element, or
+	// property list, whatever the index is
+	fn(a<B[c],d,);
+	fn(a<B['k'],d);
+	fn(a<B[typeof c],d);
+	const a23=[a<B[c],d];
+	const a24={a:b<C[d],e:f};
+	const a25=(a<B[c],d);
+	const a26=a<B.C[d];
+	const a27=a<B[c][e];
+
+	// a `>` or a shift operator after the indexed operand continues the comparison
+	// chain — the `>` run belongs to the operator, not to a type-argument close
+	const a28=a<B[c]>d;
+	const a29=a<B[c]>>d;
+	const a30=a<B[c]>>>d;
+
+	// an identifier that merely starts with `extends` is a fresh statement on the next
+	// line (ASI), not a type constraint
+	const a31=a<b;
+	extendsFoo();
+
 	// genuine instantiation with a literal/keyword/object/tuple/numeric type arg, or a
 	// function type with an optional param, still parses as type arguments
 	const b1=fn<'b'>();
@@ -56,4 +79,14 @@
 	// a template literal after the closing `>` is a tagged template on the
 	// instantiation, not a comparison
 	const b15=fn<A>`b`;
+
+	// an indexed access, array, or conditional type argument still parses as type
+	// arguments — the closing `>` is followed by a call
+	const b16=fn<A[]>();
+	const b17=fn<A['b']>();
+	const b18=fn<A[B],C>();
+	const b19=fn<A[keyof B]>();
+	const b20=fn<A[typeof b]>();
+	const b21=fn<A[B][C]>();
+	const b22=fn<T extends U?A:B>();
 </script>

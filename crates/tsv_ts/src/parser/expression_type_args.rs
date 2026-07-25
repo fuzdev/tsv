@@ -6,7 +6,7 @@ use super::expression_lookahead::{
     is_construct_type_start, is_function_type_start, is_generic_function_type_start,
     scan_for_closing_angle_bracket,
 };
-use super::scan::{is_identifier_start, skip_identifier, skip_whitespace_and_comments};
+use super::scan::{is_identifier_start, is_word_at, skip_identifier, skip_whitespace_and_comments};
 
 impl<'a, 'arena> Parser<'a, 'arena> {
     /// Check if current position starts type arguments: `<Type, ...>`
@@ -170,11 +170,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // starting at `pos` is equivalent to starting past the separator.)
             b'>' | b'<' | b',' | b'|' | b'&' => scan_for_closing_angle_bracket(bytes, pos),
 
-            // Indexed type vs array access: `T[K]` vs `arr[0]`
-            b'[' => self.check_indexed_type_pattern(bytes, pos),
+            // Indexed type vs array access: `T[K]` vs `arr[0]`. Confirmed by the same
+            // closing-`>` scan as the arms above — `T[K]` shaped bytes are equally a
+            // member access on a comparison's right operand, so only the matching `>`
+            // (and its follow token) tells them apart: `f(a < B[c], d)` and
+            // `a < B[c] > d` stay comparisons, `f<A[B], C>(x)` is an instantiation.
+            b'[' => {
+                self.check_indexed_type_pattern(bytes, pos)
+                    && scan_for_closing_angle_bracket(bytes, pos)
+            }
 
-            // Type constraint: `T extends U`
-            b'e' if bytes[pos..].starts_with(b"extends") => true,
+            // Type constraint: `T extends U`. Whole-word — an identifier that merely
+            // starts with `extends` is an ordinary operand (`a < b` ⏎ `extendsFoo()`,
+            // where ASI ends the statement) — and confirmed by the closing-`>` scan
+            // like every sibling arm.
+            b'e' if is_word_at(bytes, pos, b"extends") => {
+                scan_for_closing_angle_bracket(bytes, pos)
+            }
 
             _ => false,
         }
@@ -184,7 +196,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// - `arr[0]`: numeric index → array access
     /// - `arr[i]` followed by `<` or `;`: array access
-    /// - `T[K]` followed by `>` or `,`: indexed type
+    /// - `T[K]` followed by `>`, `,`, or another `[`: indexed type
     /// - `T["key"]`, `T[keyof U]`, `T[typeof x]`: indexed type
     /// - `a[b - 1]`: complex expression → array access (default)
     fn check_indexed_type_pattern(&self, bytes: &[u8], pos: usize) -> bool {
@@ -216,8 +228,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let after_bracket = skip_whitespace_and_comments(bytes, after_id);
             if after_bracket < bytes.len() && bytes[after_bracket] == b']' {
                 let after_close = skip_whitespace_and_comments(bytes, after_bracket + 1);
-                // Type args end with `>` or continue with `,`
-                if after_close < bytes.len() && matches!(bytes[after_close], b'>' | b',') {
+                // Type args end with `>`, continue with `,`, or chain another index
+                // group (`T[K][J]`) — the caller's closing-`>` scan arbitrates all three
+                if after_close < bytes.len() && matches!(bytes[after_close], b'>' | b',' | b'[') {
                     return true;
                 }
                 return false;
