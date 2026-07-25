@@ -1571,6 +1571,35 @@ trail the head:
   so the directive fixture keeps the single-directive shape and the multi-comment
   interaction rides the other three heads.
 
+**On parameter lists.** A parameter list is a member list like any other, and Rule A
+applies to it unchanged: an own-line directive in the `(`→first-parameter gap or between
+two parameters freezes the **following parameter**, whatever its form — the slice covers
+a parameter property's modifiers (`public p = 1`), a rest parameter's `...`, an optional
+`?`, a default, and any parameter decorators, since all of them are part of the parameter
+the directive precedes. A lone huggable parameter expands rather than hugging, because a
+hug would pull the directive off its own line and make it inert. Every host shares this:
+function declarations, function expressions and methods, arrows, `{#snippet}`
+parameters, method / call / construct signatures, function and constructor types, and an
+index signature's `[`→key gap. Prettier agrees at all of them, so the ordinary fixtures
+`params_prettier_ignore_member`, `signature_params_prettier_ignore_member`,
+`index_signature_prettier_ignore_key`, and the Svelte
+`snippet/params_prettier_ignore_member` **match** prettier. tsv diverges at one interior
+position, and under the standing glued classification:
+
+- Directive between a parameter's **decorators** and its **binding** —
+  ◆design_choice ◆comment_preservation ◆prettier_bug — tsv freezes the binding, the node
+  the directive precedes, with the decorators printing normally outside the frozen slice.
+  Prettier freezes nothing at a parameter property, and at a plain binding it re-binds
+  the directive *past the name* (trailing `c`, freezing only the `: T` annotation) — a
+  form whose own second pass floats the directive up to trail the last decorator and
+  loses the freeze (non-idempotent, pinned via `audit_signature.txt`) —
+  [parameter binding](../tests/fixtures/typescript/typescript_specific/decorators/parameter_prettier_ignore_binding_prettier_divergence/)
+- **Glued directive is inert** in a parameter list too — ◆design_choice — the same
+  exception-free placement rule; prettier honors the glued placement and, for a
+  multi-line frozen parameter, keeps the list flat around the frozen slice
+  (`prettier_variant_frozen` pins its stable form) —
+  [params glued](../tests/fixtures/typescript/declarations/function/params_prettier_ignore_glued_inert_prettier_divergence/)
+
 See [directives.md](./directives.md) for the user-facing reference.
 
 ---
