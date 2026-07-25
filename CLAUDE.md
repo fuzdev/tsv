@@ -1016,7 +1016,7 @@ whole builder is an **on-page** question (an emit-keyed one blinds every layout 
 guards); a **blank-line scan** is an **in-source** question (step over every comment in
 the gap via `blank_scan_start` / `blank_scan_end`, not just the ones this caller emits).
 
-⚠️ **Three hazards, all of which have bitten** (full text + war stories in
+⚠️ **Four hazards, all of which have bitten** (full text + war stories in
 ./docs/comments.md): (1) an owned comment nothing prints is a DROPPED comment — a builder
 that *reassembles* a node instead of routing through `build_expression_doc` must claim it
 on its own seam (`prepend_owned_leading_comment_at`); (2) an owned comment travels
@@ -1024,9 +1024,16 @@ on its own seam (`prepend_owned_leading_comment_at`); (2) an owned comment trave
 (`owned_leading_comment_hangs_value`, the single seam for that question); (3) a region the
 parser *lifts out* of its container is still inside the container's gap, so two emitters
 print it (`AttrGaps::claimed` is that seam) — and ownership masks it: only a line comment
-(never owned) exposes the double-print. The **print-once comment ledger**
-(`deno task comments:audit`, gated in `deno task check`; see ./docs/audits.md) is the
-structural guard on all three.
+(never owned) exposes the double-print; (4) an **alternate-layout container builder** that
+emits only its children's docs never runs a gap lookup at all, so every leading /
+inter-item / trailing / empty-container comment is DROPPED — hand a commented container to
+its comment-aware twin (gate BEFORE the empty arm) or share the per-item emission seam, and
+note that ownership masks this one in mirror image: the glued *leading* comment is owned and
+survives, so a leading-comment repro reports the builder healthy. The **print-once comment
+ledger** (`deno task comments:audit`, gated in `deno task check`; see ./docs/audits.md) is
+the structural guard on all four — but it only sees a document AS AUTHORED, so a wholly
+comment-blind builder stays green until some file puts a comment there; the **injection**
+audits (`gaps:audit`) are the discovery arm for hazard 4.
 
 ⚠️ **Leading comments have one rule and one emitter** — `Printer::push_leading_comment_run`
 (prettier's `printLeadingComment`), with `Printer::comment_hugs_next` as the single glue
