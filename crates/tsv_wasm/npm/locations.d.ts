@@ -36,7 +36,10 @@ export interface Loc {
 export interface Locator {
 	/** Line/column for one node, or `null` if it has no numeric `start`/`end`. */
 	loc_of(node: any): Loc | null;
-	/** Add `loc` to every node in `ast`, mutating in place; returns `ast`. */
+	/**
+	 * Add `loc` to every node in `ast` — and `name_loc` to the Svelte elements,
+	 * attributes, and directives that carry one — mutating in place; returns `ast`.
+	 */
 	reconstruct(ast: any): any;
 }
 
@@ -48,8 +51,9 @@ export declare function create_locator(source: string, opts?: LocationOptions): 
 
 /**
  * Add a `loc` line/column object to every node of a span-only wire, derived from
- * `start`/`end` + `source`. Mutates `ast` in place and returns it. Exact for
- * TypeScript, approximate for Svelte, a no-op for CSS.
+ * `start`/`end` + `source` — plus the Svelte `name_loc`. Mutates `ast` in place
+ * and returns it. Exact for TypeScript, approximate for Svelte (`name_loc` itself
+ * is exact), a no-op for CSS.
  */
 export declare function reconstruct_locations(ast: any, source: string, opts?: LocationOptions): any;
 

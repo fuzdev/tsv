@@ -22,7 +22,8 @@
  *
  * TypeScript reconstruction is EXACT (pure offset → line/col); Svelte is
  * APPROXIMATE (the `<script>` `Program` tag-position override + destructure
- * `+1`-column quirk + dropped `name_loc` — see `no_locations_parity.ts`), so its
+ * `+1`-column quirk — `name_loc` and the in-tag comment `character` field both
+ * reconstruct exactly; see `no_locations_parity.ts`), so its
  * B path is still a valid *perf* measurement but its output isn't Svelte's exact
  * `loc`. Both are reported; the headline "reconstruct beats materialize" number is
  * the exact TS one.
@@ -148,7 +149,7 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 	if (!t || t.files === 0) continue;
 	const exactness = language === 'typescript'
 		? 'EXACT reconstruction'
-		: 'APPROXIMATE — omits name_loc + 2 quirks; see no_locations_parity.ts';
+		: 'APPROXIMATE — 2 parser quirks; see no_locations_parity.ts';
 	console.log(`\n${language} (${exactness}), ${t.files} files:`);
 	console.log(`  A  full wire, loc materialized in Rust     : ${t.a.toFixed(2)}`);
 	console.log(

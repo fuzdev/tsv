@@ -224,10 +224,9 @@ occupies (`source[span]`), never from a symbol table:
   its decoded form as an `Option<&'arena str>` escape hatch (the parser's already
   arena-allocated `current_decoded`) — read directly, no round-trip.
 - **Svelte element/attribute names** (`tsv_svelte`): `Element::name(source)` =
-  `source[name_span]` (tag names are verbatim source runs); `Attribute::name(source)`
-  = `source[name_span].trim()` (a no-op except for a padded `{ shorthand }`, whose
-  `name_span` covers the untrimmed braces interior to match Svelte's `name_loc`).
-  No stored name field at all.
+  `source[name_span]` and `Attribute::name(source)` = `source[name_span]` — every
+  name is a verbatim source run, a padded `{ shorthand }` included (its `name_span`
+  is the identifier alone, as Svelte's `name_loc` is). No stored name field at all.
 
 The one render-time resolution the doc builder needs is [`DocText::SourceSpan`] →
 verbatim source slice (`span.extract(source)`). A printer emitting `SourceSpan` passes
