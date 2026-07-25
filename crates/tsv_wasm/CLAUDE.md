@@ -85,9 +85,12 @@ rules: `reconstruct_locations(ast, source, opts?)` (one-shot, adds `loc` to ever
 node, **mutates in place**), `create_locator(source, opts?)` (amortized — holds
 the prebuilt line table, exposes `loc_of(node)` / `reconstruct(ast)`), and a bare
 `loc_of(node, source, opts?)` convenience. **Exact for TypeScript**; **approximate
-for Svelte** (doesn't recover `name_loc`, doesn't replicate the `<script>`
-tag-position or destructure `+1`-column parser quirks, and adds `loc` to template
-nodes Svelte's own wire omits); **a no-op for CSS**. It rides the **parse-capable**
+for Svelte** (doesn't replicate the `<script>` tag-position or destructure
+`+1`-column parser quirks, leaves a root in-tag comment without its `character`
+field, and adds `loc` to template nodes Svelte's own wire omits — but `name_loc`
+is restored exactly, its span derived from each node's own `start`/`end` + type,
+as is the name-shaped `loc` on shorthand-attribute identifiers, snippet names, and
+simple-identifier block patterns); **a no-op for CSS**. It rides the **parse-capable**
 packages only (`@fuzdev/tsv_parse_wasm`, `@fuzdev/tsv_wasm`) — it operates on the
 parse wire, so the format-only package has no use for it. `patch_npm_package.ts`
 copies it + the hand-written `npm/locations.d.ts` into the package root and
