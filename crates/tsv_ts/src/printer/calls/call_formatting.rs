@@ -167,11 +167,20 @@ pub(super) fn build_call_doc_with_wrapping(
     // the page (a *layout* question), not who emits it — see `has_comments_on_page_between`.
     let call_has_comments = printer.has_comments_on_page_between(paren_open, call.span.end);
 
+    // A trailing LINE comment on an argument (`fn(a, // c⏎ b)`) rules out every layout
+    // below that would have to place the arguments itself: each joins them with `", "` or
+    // hugs them, and a comment running to EOL can't survive either — so they all decline
+    // and the call falls through to the comment-aware paths. Computed once: it is pure in
+    // `(call, printer)`, six arms ask it, and each ask walks the arguments with a binary
+    // search per gap. (`build_call_with_arg_comments` hoists the same predicate for the
+    // same reason.) The `call_has_comments` conjunct keeps a comment-free call at the one
+    // window-wide binary search above.
+    let arg_trailing_line_comment =
+        call_has_comments && has_trailing_comments_on_args(call, printer);
+
     // Module path calls that should not break at arguments (e.g., require.resolve)
     // Keep the call on one line; let assignment/parent break instead
-    if is_module_path_no_break(call, printer)
-        && !(call_has_comments && has_trailing_comments_on_args(call, printer))
-    {
+    if is_module_path_no_break(call, printer) && !arg_trailing_line_comment {
         return d.concat(&[
             callee,
             d.text("("),
@@ -187,8 +196,8 @@ pub(super) fn build_call_doc_with_wrapping(
 
     // Module path calls (require.resolve.paths, import.meta.resolve) break at chain
     // rather than at arguments, keeping the path on the same line as the method
-    if let Some((base_expr, method_name)) = get_module_path_chain_break(call, printer)
-        .filter(|_| !(call_has_comments && has_trailing_comments_on_args(call, printer)))
+    if let Some((base_expr, method_name)) =
+        get_module_path_chain_break(call, printer).filter(|_| !arg_trailing_line_comment)
     {
         let base_doc = printer.build_expression_doc(base_expr);
         let method_doc = printer.identifier_name_doc(method_name);
@@ -220,7 +229,7 @@ pub(super) fn build_call_doc_with_wrapping(
                 .any(|c| c.is_block)
         });
     if call.arguments.len() == 1
-        && !(call_has_comments && has_trailing_comments_on_args(call, printer))
+        && !arg_trailing_line_comment
         && !has_trailing_block_comment
         && let Some(doc) = try_single_arg_hug(printer, call, callee)
     {
@@ -260,9 +269,7 @@ pub(super) fn build_call_doc_with_wrapping(
     // e.g., fn(arr.map((x) => x), b) → fn(\n\tarr.map((x) => x),\n\tb,\n)
     // Prettier's isFunctionCompositionArgs: 2+ args, any arg is call with function/arrow inside
     // Skip if there are trailing comments - let the comment handling code deal with expansion
-    if is_function_composition_args(call.arguments)
-        && !(call_has_comments && has_trailing_comments_on_args(call, printer))
-    {
+    if is_function_composition_args(call.arguments) && !arg_trailing_line_comment {
         return build_call_args_expanded(
             printer,
             callee,
@@ -276,7 +283,7 @@ pub(super) fn build_call_doc_with_wrapping(
     // and remaining args are short, hug the function and put tail args after closing }
     // e.g., setTimeout(() => { tick(); }, 100);
     if should_expand_first_arg(printer, call.arguments)
-        && !(call_has_comments && has_trailing_comments_on_args(call, printer))
+        && !arg_trailing_line_comment
         && !(call_has_comments && first_arg_has_any_comments(call.arguments, printer, paren_open))
     {
         let first_arg_doc = printer.build_expression_doc(&call.arguments[0]);
@@ -329,7 +336,7 @@ pub(super) fn build_call_doc_with_wrapping(
             .iter()
             .all(|arg| matches!(arg, internal::Expression::ArrowFunctionExpression(_)));
 
-    if all_args_are_arrows && !(call_has_comments && has_trailing_comments_on_args(call, printer)) {
+    if all_args_are_arrows && !arg_trailing_line_comment {
         return build_call_args_expanded(
             printer,
             callee,

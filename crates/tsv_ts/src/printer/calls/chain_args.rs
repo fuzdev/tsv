@@ -636,6 +636,14 @@ fn build_chain_args_single(
         ..
     } = ctx;
 
+    // Whether a comment on the page attaches to the last argument — the predicate that
+    // refuses every argument hug below. Computed once: it walks the arguments with a
+    // `find_comma_pos` source scan plus two binary searches, and three arms ask it with
+    // identical arguments. Guarded by the same `has_any_comment_text`, so a comment-free
+    // call still pays nothing beyond the one window-wide search that set that flag.
+    let last_arg_commented = has_any_comment_text
+        && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open);
+
     let arg = &call.arguments[0];
 
     // Special case: arrow function with call expression body
@@ -653,8 +661,7 @@ fn build_chain_args_single(
         && arrow_body_is_call_through_non_null(body_expr)
         // `has_any_comment_text`: refusing the hug is a LAYOUT decision, so it must see a
         // comment the argument owns and prints itself (see `build_chain_args_multi`).
-        && !(has_any_comment_text
-            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
+        && !last_arg_commented
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
         let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
@@ -713,8 +720,7 @@ fn build_chain_args_single(
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && is_ternary_arrow_body(body_expr)
         // `has_any_comment_text`: see above — a layout gate counts an owned comment.
-        && !(has_any_comment_text
-            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
+        && !last_arg_commented
     {
         let arrow_doc = printer.build_arg_expression_doc(arg);
         let arrow_doc = prepend_leading(d, leading_comment_doc, arrow_doc);
@@ -782,8 +788,7 @@ fn build_chain_args_single(
         // `has_any_comment_text` (on page), not `has_any_comments` (to emit): an owned
         // leading comment defeats the expand-last hug just like an ordinary one, so the
         // hug must refuse it too — a to-emit gate would hug blind.
-        && !(has_any_comment_text
-            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
+        && !last_arg_commented
         // A comment LEADING the arg isn't the only shape that defeats the hug: one INSIDE
         // the signature forces a break the one-line hug can't honor. Same predicate as the
         // non-chain path — see `arrow_signature_has_breaking_comments`.
@@ -987,6 +992,14 @@ fn build_chain_args_multi(
         ..
     } = ctx;
 
+    // Whether a comment on the page attaches to the last argument — the predicate that
+    // refuses the expand-last hugs below. Computed once (see `build_chain_args_single`);
+    // four arms ask it, two through the narrower **to-emit** `has_any_comments`, which is
+    // a subset of the `has_any_comment_text` guarding this binding, so each arm keeps
+    // saying which axis it means.
+    let last_arg_commented = has_any_comment_text
+        && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open);
+
     // Multiple arguments with block-body callback:
     // Use conditional_group to try inline first, then expand-all.
     // fits() checks actual width, handling both short and non-short preceding args.
@@ -1000,8 +1013,7 @@ fn build_chain_args_multi(
         // `has_any_comment_text`, not `has_any_comments`: refusing the expand-last hug is a
         // LAYOUT decision, so it must see a comment the last argument owns and prints
         // itself (a bundler annotation) — prettier's `shouldExpandLastArg` sees it too.
-        && !(has_any_comment_text
-            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
+        && !last_arg_commented
     {
         let (head_parts, last_arg_doc, all_args_broken) =
             build_args_split_last(call.arguments, printer, paren_open, has_any_comments);
@@ -1032,8 +1044,7 @@ fn build_chain_args_multi(
     // signature is emitted via build_arrow_sig_doc).
     if call.arguments.len() >= 2
         && !comments_force_expansion
-        && !(has_any_comments
-            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
+        && !(has_any_comments && last_arg_commented)
         && let Some(Expression::ArrowFunctionExpression(arrow)) = call.arguments.last()
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && matches!(
@@ -1103,8 +1114,7 @@ fn build_chain_args_multi(
     // way (its full signature is emitted via build_arrow_sig_doc).
     if call.arguments.len() >= 2
         && !comments_force_expansion
-        && !(has_any_comments
-            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
+        && !(has_any_comments && last_arg_commented)
         && let Some(Expression::ArrowFunctionExpression(arrow)) = call.arguments.last()
         && let internal::ArrowFunctionBody::Expression(body_expr) = &arrow.body
         && matches!(
@@ -1240,8 +1250,7 @@ fn build_chain_args_multi(
         // `has_any_comment_text` (on page), not `has_any_comments` (to emit): an owned
         // comment leading the last array/object argument defeats the expand-last hug just
         // like an ordinary one — a to-emit gate would hug blind.
-        && !(has_any_comment_text
-            && last_arg_has_comments(call.arguments, printer, call.span.end, paren_open))
+        && !last_arg_commented
         // Prettier blocks expand-last for 2-arg arrow+array (React hook pattern)
         && !(call.arguments.len() == 2
             && matches!(
