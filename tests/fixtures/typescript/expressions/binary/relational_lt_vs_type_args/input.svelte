@@ -34,6 +34,47 @@
 	const a21 = x < y > { a: 1 };
 	const a22 = x < y > typeof c;
 
+	// an indexed member access after `<` is a comparison operand, not an indexed access
+	// type; the `,` that follows it belongs to the enclosing argument, element, or
+	// property list, whatever the index is
+	fn(a < B[c], d);
+	fn(a < B['k'], d);
+	fn(a < B[typeof c], d);
+	const a23 = [a < B[c], d];
+	const a24 = { a: b < C[d], e: f };
+	const a25 = (a < B[c], d);
+	const a26 = a < B.C[d];
+	const a27 = a < B[c][e];
+
+	// richer index contents are comparison operands too when no `>` closes the list
+	fn(a < B[c | d], e);
+	fn(a < B[c & d], e);
+	fn(a < B[c[d]], e);
+	fn(a < B[0], e);
+	fn(a < B[-1], e);
+	fn(a < B[c.d], e);
+	fn(a < B[c['k']], e);
+	fn(a < B[c < d], e);
+
+	// arithmetic inside the index is not a type, so the list stays a comparison even
+	// when a `>` closes it; a negated operand and the logical and relational operators
+	// are expressions too, never types
+	const a32 = a < arr[b - 1] > c;
+	const a33 = a < arr[-b] > c;
+	const a34 = a < B[0 || 1] > c;
+	const a35 = a < B[0 <= 1] > c;
+
+	// a `>` or a shift operator after the indexed operand continues the comparison
+	// chain — the `>` run belongs to the operator, not to a type-argument close
+	const a28 = a < B[c] > d;
+	const a29 = a < B[c] >> d;
+	const a30 = a < B[c] >>> d;
+
+	// an identifier that merely starts with `extends` is a fresh statement on the next
+	// line (ASI), not a type constraint
+	const a31 = a < b;
+	extendsFoo();
+
 	// genuine instantiation with a literal/keyword/object/tuple/numeric type arg, or a
 	// function type with an optional param, still parses as type arguments
 	const b1 = fn<'b'>();
@@ -56,4 +97,35 @@
 	// a template literal after the closing `>` is a tagged template on the
 	// instantiation, not a comparison
 	const b15 = fn<A>`b`;
+
+	// an indexed access, array, or conditional type argument still parses as type
+	// arguments — the closing `>` is followed by a call
+	const b16 = fn<A[]>();
+	const b17 = fn<A['b']>();
+	const b18 = fn<A[B], C>();
+	const b19 = fn<A[keyof B]>();
+	const b20 = fn<A[typeof b]>();
+	const b21 = fn<A[B][C]>();
+	const b22 = fn<T extends U ? A : B>();
+
+	// every index content that is itself a valid type — union, intersection, nested
+	// index, numeric literal, and conditional — makes the list type arguments
+	const b23 = fn<A[B | C]>();
+	const b24 = fn<A[B & C]>();
+	const b25 = fn<A[B[C]]>();
+	const b26 = fn<A[0]>();
+	const b27 = fn<A[-1]>();
+	const b28 = fn<A[B extends C ? D : E]>();
+	const b29 = fn<A[B.C]>();
+	const b30 = fn<A[B['k']]>();
+	const b31 = fn<A[B<C>]>();
+
+	// a numeric literal index continues into a type exactly as a reference index does —
+	// union, intersection, and conditional forms are type arguments whichever operand
+	// kind opens them, and an exponent's own sign belongs to the literal
+	const b32 = fn<A[0 | 1]>();
+	const b33 = fn<A[-1 | -2]>();
+	const b34 = fn<A[0 & 1]>();
+	const b35 = fn<A[1e-3 | 2]>();
+	const b36 = fn<A[0 extends 1 ? B : C]>();
 </script>

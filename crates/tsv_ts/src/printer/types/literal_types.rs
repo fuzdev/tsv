@@ -117,7 +117,28 @@ impl<'a> Printer<'a> {
                 // For negative number types like `-1`
                 let op = d.text(unary.operator.as_str());
                 let arg = self.build_expression_doc(unary.argument);
-                d.concat(&[op, arg])
+                // The sign→numeral gap has no other emitter, so a comment authored there
+                // (`-/* c */ 1`) is dropped unless this builder claims it. Same seam as the
+                // value-level `build_unary_doc`, minus its paren re-adding: a parenthesized
+                // operand is only a *value* form, and `-(1)` is not a type — tsc reads `-`
+                // as a negative literal type only when the next token is a numeric/bigint
+                // literal, so prettier's comment-holding parens fail to re-parse. The
+                // in-place comment stays valid because that lookahead skips trivia.
+                // See docs/conformance_prettier.md §Comment relocation.
+                //
+                // Glued, unlike the `Adjacent` its update-expression sibling uses
+                // (`build_update_doc`): that gap HAS a prettier oracle and prettier keeps
+                // the author's break there, so it lives with two fixed points. Here
+                // prettier's output does not parse, so there is no oracle to match and
+                // the freer choice is the better one — gluing collapses every authoring
+                // (`-/* c */⏎1`, `- /* c */ 1`) onto the single fixed point `-/* c */ 1`.
+                // A negative literal type is one atom; splitting its sign across a line
+                // break buys nothing.
+                let operator_end = unary.span.start + unary.operator.as_str().len() as u32;
+                match self.build_rhs_comments_glued_opt(operator_end, unary.argument.span().start) {
+                    Some(comments) => d.concat(&[op, comments, arg]),
+                    None => d.concat(&[op, arg]),
+                }
             }
         }
     }

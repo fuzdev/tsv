@@ -1,0 +1,426 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 280,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " `>=` after a `<` operand is a relational chain — the `>` belongs to the `>=`",
+			"start": 20,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " operator, not to a type-argument close followed by `=`. The bare-identifier and",
+			"start": 101,
+			"end": 183,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " indexed-access operands agree.",
+			"start": 185,
+			"end": 218,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 34
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 279,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 220,
+					"end": 242,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 23
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 226,
+							"end": 241,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 22
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 226,
+								"end": 228,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 7
+									},
+									"end": {
+										"line": 5,
+										"column": 9
+									}
+								},
+								"name": "a1"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 231,
+								"end": 241,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 12
+									},
+									"end": {
+										"line": 5,
+										"column": 22
+									}
+								},
+								"left": {
+									"type": "BinaryExpression",
+									"start": 231,
+									"end": 236,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 12
+										},
+										"end": {
+											"line": 5,
+											"column": 17
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 231,
+										"end": 232,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 12
+											},
+											"end": {
+												"line": 5,
+												"column": 13
+											}
+										},
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "Identifier",
+										"start": 235,
+										"end": 236,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 16
+											},
+											"end": {
+												"line": 5,
+												"column": 17
+											}
+										},
+										"name": "b"
+									}
+								},
+								"operator": ">=",
+								"right": {
+									"type": "Identifier",
+									"start": 240,
+									"end": 241,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 21
+										},
+										"end": {
+											"line": 5,
+											"column": 22
+										}
+									},
+									"name": "d"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `>=` after a `<` operand is a relational chain — the `>` belongs to the `>=`",
+							"start": 20,
+							"end": 99
+						},
+						{
+							"type": "Line",
+							"value": " operator, not to a type-argument close followed by `=`. The bare-identifier and",
+							"start": 101,
+							"end": 183
+						},
+						{
+							"type": "Line",
+							"value": " indexed-access operands agree.",
+							"start": 185,
+							"end": 218
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 244,
+					"end": 269,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 26
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 250,
+							"end": 268,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 25
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 250,
+								"end": 252,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 9
+									}
+								},
+								"name": "a2"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 255,
+								"end": 268,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 12
+									},
+									"end": {
+										"line": 6,
+										"column": 25
+									}
+								},
+								"left": {
+									"type": "BinaryExpression",
+									"start": 255,
+									"end": 263,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 12
+										},
+										"end": {
+											"line": 6,
+											"column": 20
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 255,
+										"end": 256,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 12
+											},
+											"end": {
+												"line": 6,
+												"column": 13
+											}
+										},
+										"name": "a"
+									},
+									"operator": "<",
+									"right": {
+										"type": "MemberExpression",
+										"start": 259,
+										"end": 263,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 16
+											},
+											"end": {
+												"line": 6,
+												"column": 20
+											}
+										},
+										"object": {
+											"type": "Identifier",
+											"start": 259,
+											"end": 260,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 16
+												},
+												"end": {
+													"line": 6,
+													"column": 17
+												}
+											},
+											"name": "B"
+										},
+										"property": {
+											"type": "Identifier",
+											"start": 261,
+											"end": 262,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 18
+												},
+												"end": {
+													"line": 6,
+													"column": 19
+												}
+											},
+											"name": "c"
+										},
+										"computed": true,
+										"optional": false
+									}
+								},
+								"operator": ">=",
+								"right": {
+									"type": "Identifier",
+									"start": 267,
+									"end": 268,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 24
+										},
+										"end": {
+											"line": 6,
+											"column": 25
+										}
+									},
+									"name": "d"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
