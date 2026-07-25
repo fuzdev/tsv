@@ -1021,11 +1021,19 @@ impl<'a> Printer<'a> {
                         .collect();
                 // The element's leading run and the element form one group — see
                 // `build_list_element_group` for why (prettier routes `ArrayPattern`
-                // through the same `printArray` as an array literal).
+                // through the same `printArray` as an array literal). An own-line
+                // format-ignore directive in the element's gap freezes it verbatim
+                // (Rule A) — the array literal's expanding printer does the same, and
+                // either spelling of an own-line comment routes the pattern here.
+                let element_doc =
+                    match self.element_frozen_span(arr.span.start + 1, arr.elements, i) {
+                        Some(frozen) => self.build_frozen_arg_doc(e, frozen),
+                        None => self.build_expression_doc(e),
+                    };
                 parts.push(self.build_list_element_group_from_comments(
                     leading_comments.iter().copied(),
                     elem_start,
-                    self.build_expression_doc(e),
+                    element_doc,
                 ));
 
                 let elem_end = e.span().end;

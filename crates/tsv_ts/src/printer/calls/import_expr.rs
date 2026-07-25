@@ -114,12 +114,24 @@ pub(super) fn build_import_expression_doc(
     let (open, leading_scan_start) = build_import_open_doc(printer, import_expr);
     let source_start = import_expr.source.span().start;
 
+    // Rule A over the two arguments: `import()`'s source and options are an argument list
+    // like any other, so an own-line directive in the head→source gap (which spans the
+    // `(`, matching the leading-comment scan above it) or in the source→options gap
+    // freezes the argument that follows it. The two items are named fields rather than a
+    // slice, so each asks the seam with its own gap anchor.
+    let frozen_source = printer.gap_frozen_span(leading_scan_start, import_expr.source.span());
+
     // Parenthesize an `in` argument inside a for-header init (`for (a = import(m,
     // (b in c));…)`); a no-op elsewhere. Dynamic-import args are hand-rolled here
     // rather than routed through `needs_parens(Argument)`, so apply the rule directly.
-    let raw_source_doc = printer.wrap_for_init_in(
-        import_expr.source,
-        printer.build_expression_doc(import_expr.source),
+    let raw_source_doc = frozen_source.map_or_else(
+        || {
+            printer.wrap_for_init_in(
+                import_expr.source,
+                printer.build_expression_doc(import_expr.source),
+            )
+        },
+        |frozen| printer.build_frozen_arg_doc(import_expr.source, frozen),
     );
     let (source_doc, leading_forces_break) =
         printer.build_paren_leading_value_doc(leading_scan_start, source_start, raw_source_doc);
@@ -168,7 +180,12 @@ pub(super) fn build_import_expression_doc(
         return wrap_import_group(d, open, source_doc);
     };
 
-    let options_doc = printer.wrap_for_init_in(options, printer.build_expression_doc(options));
+    let options_doc = printer
+        .gap_frozen_span(source_end, options.span())
+        .map_or_else(
+            || printer.wrap_for_init_in(options, printer.build_expression_doc(options)),
+            |frozen| printer.build_frozen_arg_doc(options, frozen),
+        );
     let options_end = options.span().end;
     let options_start = options.span().start;
 

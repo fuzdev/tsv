@@ -16,10 +16,10 @@ use crate::printer::calls::arg_predicates::{
     is_ternary_arrow_body,
 };
 use crate::printer::calls::{
-    PartitionedComments, build_args_joined_with_comments, build_args_split_last,
+    ArgItem, ArgsJoin, PartitionedComments, build_args_joined_with_comments, build_args_split_last,
     build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
-    build_expand_all_args, build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
-    emit_first_arg_leading_comments, has_inter_argument_comments_slice,
+    build_call_args_expanded, build_expand_all_args, build_inline_args, build_inline_or_expand_all,
+    could_expand_arrow_chain, emit_first_arg_leading_comments, has_inter_argument_comments_slice,
     has_trailing_comments_slice, has_trailing_line_comments_slice, last_two_args_same_type,
     prebuild_expand_last_break_body, prepend_arrow_body_comments,
     should_force_expansion_for_comments, wrap_call_with_hard_breaks,
@@ -130,7 +130,26 @@ impl<'a> Printer<'a> {
             && new_has_comments
             && has_trailing_comments_slice(new_expr.arguments, new_expr.span.end, self);
 
-        if new_expr.arguments.len() == 1 && !single_arg_has_trailing_comment {
+        // A comment in the `(`→argument gap that this expression would have to EMIT
+        // disqualifies the three hug arms below (object / array / function expression):
+        // they emit the argument's doc alone, with no gap emitter, so the comment would be
+        // DROPPED (the hazard-4 shape in docs/comments.md). Such a call falls through to
+        // the comment-aware paths and expands, matching prettier.
+        //
+        // **To-emit axis**, deliberately: a GLUED block comment is owned by the argument
+        // and rides inside its doc, so the hug does print it — and hugging there matches
+        // prettier (`new A(/* c */ { a: 1 })`). The question is exactly "would a comment be
+        // dropped?". The arrow arm asks the wider ON-PAGE question for its own reason (an
+        // owned comment must still defeat the hug, per prettier's `couldExpandArg`), which
+        // is why the gate sits on the three arms rather than on the outer guard.
+        let single_arg_leading_emit_comment = new_expr.arguments.len() == 1
+            && new_has_comments
+            && self.has_comments_to_emit_between(paren_open, new_expr.arguments[0].span().start);
+
+        if new_expr.arguments.len() == 1
+            && !single_arg_has_trailing_comment
+            && !single_arg_leading_emit_comment
+        {
             match &new_expr.arguments[0] {
                 // Object literal: hug it
                 internal::Expression::ObjectExpression(_) => {
@@ -319,15 +338,13 @@ impl<'a> Printer<'a> {
             && !(new_has_comments
                 && has_trailing_comments_slice(new_expr.arguments, new_expr.span.end, self))
         {
-            let arg_parts = build_args_joined_with_comments(
+            return build_call_args_expanded(
                 self,
+                callee_with_types,
                 new_expr.arguments,
                 paren_open,
-                true,
-                #[allow(clippy::redundant_closure_for_method_calls)]
-                |p, a| p.build_arg_expression_doc(a),
+                ArgItem::ArgContext,
             );
-            return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
         }
 
         // Single template literal argument with embedded newlines on the same line
@@ -351,15 +368,13 @@ impl<'a> Printer<'a> {
 
         if has_multiline {
             // Force expansion with hardlines for multiline content
-            let arg_parts = build_args_joined_with_comments(
+            return build_call_args_expanded(
                 self,
+                callee_with_types,
                 new_expr.arguments,
                 paren_open,
-                true,
-                #[allow(clippy::redundant_closure_for_method_calls)]
-                |p, a| p.build_arg_expression_doc(a),
+                ArgItem::ArgContext,
             );
-            return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
         }
 
         // Check for blank lines between arguments (forces expansion and preservation).
@@ -372,7 +387,7 @@ impl<'a> Printer<'a> {
             .any(|window| self.is_next_line_empty(window[0].span().end, window[1].span().start));
 
         if has_blank_lines {
-            let arg_doc = build_args_with_blank_lines(self, new_expr.arguments);
+            let arg_doc = build_args_with_blank_lines(self, new_expr.arguments, paren_open);
             return wrap_call_with_hard_breaks(d, callee_with_types, arg_doc);
         }
 
@@ -438,8 +453,9 @@ impl<'a> Printer<'a> {
                 // Build the argument with the argument-context builder so a binary/
                 // logical chain (or conditional) keeps its continuation indent in this
                 // trailing-line-comment path — matching the no-comment path (the
-                // call/member-chain comment paths do the same).
-                arg_parts.push(self.build_arg_expression_doc(arg));
+                // call/member-chain comment paths do the same). An own-line directive in
+                // this argument's gap freezes it verbatim (Rule A).
+                arg_parts.push(self.build_arg_item_doc(paren_open, new_expr.arguments, i));
 
                 // Check for comments after this argument
                 if i < new_expr.arguments.len() - 1 {
@@ -489,10 +505,8 @@ impl<'a> Printer<'a> {
         if has_trailing_block_only {
             // Build args with trailing block comment
             let last_idx = new_expr.arguments.len() - 1;
-            let mut arg_docs: DocBuf = new_expr
-                .arguments
-                .iter()
-                .map(|arg| self.build_arg_expression_doc(arg))
+            let mut arg_docs: DocBuf = (0..new_expr.arguments.len())
+                .map(|i| self.build_arg_item_doc(paren_open, new_expr.arguments, i))
                 .collect();
 
             // Prepend leading comments before the first arg (e.g. `new Foo(/* c */ a /* t */)`);
@@ -757,15 +771,14 @@ impl<'a> Printer<'a> {
                     inner.push(self.build_comment_doc(comment));
                     inner.push(d.hardline());
                 }
-                // Build the args without re-emitting the first-arg leading gap
-                // (pass first_arg_start so the gap scan finds nothing).
+                // The `(`→first-argument gap is emitted above (the paren-line prefix and
+                // the leading run), so the builder must not print it a second time.
                 inner.push(build_args_joined_with_comments(
                     self,
                     new_expr.arguments,
-                    first_arg_start,
-                    true,
-                    #[allow(clippy::redundant_closure_for_method_calls)]
-                    |p, a| p.build_arg_expression_doc(a),
+                    paren_open,
+                    ArgsJoin::HardlineLeadingGapEmitted,
+                    ArgItem::ArgContext,
                 ));
 
                 return d.concat(&[
@@ -784,9 +797,8 @@ impl<'a> Printer<'a> {
                 self,
                 new_expr.arguments,
                 paren_open,
-                false,
-                #[allow(clippy::redundant_closure_for_method_calls)]
-                |p, a| p.build_arg_expression_doc(a),
+                ArgsJoin::SoftLine,
+                ArgItem::ArgContext,
             );
             return wrap_call_with_will_break_guard(d, callee_with_types, arg_parts);
         }

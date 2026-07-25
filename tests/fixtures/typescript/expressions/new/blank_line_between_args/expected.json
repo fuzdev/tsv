@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 390,
+	"end": 604,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -105,24 +105,72 @@
 					"column": 37
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " Leading comment before the FIRST arg, with a blank line after it: the blank-line",
+			"start": 382,
+			"end": 465,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " layout must emit the `(`→first-argument gap itself or the comment is dropped",
+			"start": 467,
+			"end": 546,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 569,
+			"end": 579,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 2
+				},
+				"end": {
+					"line": 35,
+					"column": 12
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 389,
+		"end": 603,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 380,
+			"end": 594,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 31,
+					"line": 40,
 					"column": 9
 				}
 			},
@@ -644,6 +692,142 @@
 							"value": " Mixed: some blank lines, some not",
 							"start": 304,
 							"end": 340
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 548,
+					"end": 593,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 554,
+							"end": 592,
+							"loc": {
+								"start": {
+									"line": 34,
+									"column": 7
+								},
+								"end": {
+									"line": 39,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 554,
+								"end": 555,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 7
+									},
+									"end": {
+										"line": 34,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "NewExpression",
+								"start": 558,
+								"end": 592,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 11
+									},
+									"end": {
+										"line": 39,
+										"column": 2
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 562,
+									"end": 565,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 15
+										},
+										"end": {
+											"line": 34,
+											"column": 18
+										}
+									},
+									"name": "Foo"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 582,
+										"end": 583,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 2
+											},
+											"end": {
+												"line": 36,
+												"column": 3
+											}
+										},
+										"name": "x",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " comment",
+												"start": 569,
+												"end": 579
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 588,
+										"end": 589,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 2
+											},
+											"end": {
+												"line": 38,
+												"column": 3
+											}
+										},
+										"name": "y"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Leading comment before the FIRST arg, with a blank line after it: the blank-line",
+							"start": 382,
+							"end": 465
+						},
+						{
+							"type": "Line",
+							"value": " layout must emit the `(`→first-argument gap itself or the comment is dropped",
+							"start": 467,
+							"end": 546
 						}
 					]
 				}

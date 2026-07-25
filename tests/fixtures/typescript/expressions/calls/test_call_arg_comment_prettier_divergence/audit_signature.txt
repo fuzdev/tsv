@@ -1,0 +1,86 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2%%
+<script lang="ts">
+	// a test call's flat one-line layout has no argument-gap comment emitter, so a
+	// comment in the leading or an inter-argument gap gives up that layout and the
+	// call expands like any other — tsv keeps the comment on its own line where
+	// prettier relocates it onto the `(` (or the previous argument's) line
+	it(// c
+	'text', () => {
+		a();
+	});
+
+	it('text', () => { // c
+		a();
+	});
+
+	// the block spelling behaves the same
+	describe(/* c */
+	'text', () => {
+		a();
+	});
+
+	// a directive alone on its line freezes the following argument here too
+	test(// prettier-ignore
+	'te  xt', () => {
+		a();
+	});
+
+	// a glued block comment is owned by its argument and rides inside its doc, so the
+	// flat layout survives
+	it('text', /* c */ () => {
+		a();
+	});
+
+	// a trailing comment after the last argument is emitted by the flat layout itself
+	it('text', () => {
+		a();
+	}); // c
+</script>
+
+%%PASS=3 (fixed point)%%
+<script lang="ts">
+	// a test call's flat one-line layout has no argument-gap comment emitter, so a
+	// comment in the leading or an inter-argument gap gives up that layout and the
+	// call expands like any other — tsv keeps the comment on its own line where
+	// prettier relocates it onto the `(` (or the previous argument's) line
+	it(// c
+	'text', () => {
+		a();
+	});
+
+	it('text', () => {
+		// c
+		a();
+	});
+
+	// the block spelling behaves the same
+	describe(/* c */
+	'text', () => {
+		a();
+	});
+
+	// a directive alone on its line freezes the following argument here too
+	test(// prettier-ignore
+	'te  xt', () => {
+		a();
+	});
+
+	// a glued block comment is owned by its argument and rides inside its doc, so the
+	// flat layout survives
+	it('text', /* c */ () => {
+		a();
+	});
+
+	// a trailing comment after the last argument is emitted by the flat layout itself
+	it('text', () => {
+		a();
+	}); // c
+</script>

@@ -23,16 +23,13 @@
 # ARE pinned (this is a ratchet over a live bug family, born red).
 #
 # Format: KIND<TAB>POSITION
-# shapes: 68
-UNHONORED	ArrayExpression.elements
-UNHONORED	ArrayPattern.elements
+# shapes: 62
 UNHONORED	ArrowFunctionExpression.body
 UNHONORED	ArrowFunctionExpression.typeParameters
 UNHONORED	AssignmentExpression.right
 UNHONORED	BinaryExpression.left
 UNHONORED	BinaryExpression.right
 UNHONORED	BindDirective.expression
-UNHONORED	CallExpression.arguments
 UNHONORED	CallExpression.callee
 UNHONORED	ChainExpression.expression
 UNHONORED	ClassDeclaration.body
@@ -55,12 +52,10 @@ UNHONORED	IfStatement.consequent
 UNHONORED	IfStatement.test
 UNHONORED	ImportDeclaration.attributes
 UNHONORED	ImportDeclaration.specifiers
-UNHONORED	ImportExpression.arguments
 UNHONORED	LabeledStatement.body
 UNHONORED	LogicalExpression.left
 UNHONORED	LogicalExpression.right
 UNHONORED	MemberExpression.object
-UNHONORED	NewExpression.arguments
 UNHONORED	NewExpression.callee
 UNHONORED	OnDirective.expression
 UNHONORED	Program.body
@@ -75,7 +70,6 @@ UNHONORED	TSAsExpression.expression
 UNHONORED	TSImportEqualsDeclaration.moduleReference
 UNHONORED	TSNonNullExpression.expression
 UNHONORED	TSParenthesizedType.typeAnnotation
-UNHONORED	TSSatisfiesExpression.expression
 UNHONORED	TSTypeAssertion.expression
 UNHONORED	TSTypeLiteral.members
 UNHONORED	TemplateLiteral.expressions
