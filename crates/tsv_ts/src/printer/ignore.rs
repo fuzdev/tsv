@@ -6,6 +6,14 @@
 // index signature's value, a signature's return type — where the whole `: type`
 // freezes).
 //
+// Parameter lists (value-side and type-side alike) join the list family through
+// `param_frozen_span`, over each parameter's RENDER span so a decorated parameter
+// freezes from its first decorator. A decorated parameter has a SECOND freeze position
+// inside itself — a directive between its decorators and its binding freezes just the
+// binding — which lives with the decorator printer it composes with
+// (`Printer::build_frozen_param_binding_doc`, `printer/decorators.rs`); an index
+// signature's key parameter asks `member_gap_frozen` on the `[`→key gap directly.
+//
 // One seam that knows what a directive is and where it sits, so the printers
 // only ever ask "freeze this member / this child / this whole node?" and
 // never re-derive directive recognition. Recognition itself stays centralized in
@@ -454,6 +462,35 @@ impl<'a> Printer<'a> {
         } else {
             self.member_gap_frozen(item_span(i - 1).end, item_span(i).start)
         }
+    }
+
+    /// [`Self::list_item_frozen`] for parameter list item `i`, over the parameter's
+    /// RENDER span ([`Self::param_render_span`]) rather than its node span, so a
+    /// decorated parameter's gap ends where its first decorator begins — the directive
+    /// precedes the decorator, not the binding.
+    ///
+    /// `Some` is the span to freeze: that same render span, so a parameter property's
+    /// modifiers (`public p = 1`), a parameter decorator (`@dec() p: T`), and a rest
+    /// parameter's `...` all ride inside the freeze, matching prettier. The list's `,` is
+    /// parent-owned and stays outside. Handing back the span rather than a bool keeps the
+    /// decorator scan to one pass — every caller freezes exactly what was measured.
+    ///
+    /// `open_paren` is the `(` position (the delimited-list anchor opens just past it);
+    /// with no located paren the first item's gap is empty, so nothing can freeze there.
+    #[inline]
+    pub(in crate::printer) fn param_frozen_span(
+        &self,
+        open_paren: Option<u32>,
+        params: &[internal::Expression<'_>],
+        i: usize,
+    ) -> Option<Span> {
+        if !self.has_format_ignore {
+            return None;
+        }
+        let item_span = |j: usize| self.param_render_span(&params[j]);
+        let container_start = open_paren.map_or_else(|| item_span(0).start, |p| p + 1);
+        self.list_item_frozen(container_start, &item_span, i)
+            .then(|| item_span(i))
     }
 
     /// [`Self::list_item_frozen`] over a `TSType` slice, plus the union /

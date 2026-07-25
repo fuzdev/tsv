@@ -123,6 +123,29 @@ function fn()
 Such a gap only exists when a line comment already pushed the `:` onto its own
 line, so this is a rare shape in practice.
 
+### On parameter lists
+
+A parameter list is a member list too, so the same rule applies: an own-line
+directive after the `(` or between two parameters freezes the **next parameter**
+only. The whole parameter freezes — its modifiers, decorators, `?`, default,
+rest `...`, and type annotation are all part of what the directive precedes:
+
+```ts
+function fn(
+	p: T,
+	// format-ignore
+	q: { x:1,  y:2 },   // ← frozen verbatim; the `,` stays parent-owned
+	r: U
+) {}
+```
+
+Every parameter list is covered — functions, methods, arrows, `{#snippet}`
+parameters, method / call / construct signatures, function and constructor
+types, and an index signature's `[key: T]`. A single parameter that would
+normally hug (`fn({ a, b }: T)`) expands instead, so the directive keeps its own
+line. A directive written *between* a parameter's decorators and its binding
+freezes just the binding, leaving the decorators to format normally.
+
 ## `format-ignore-start` / `format-ignore-end`
 
 In Svelte templates, a pair of range markers preserves every node between them:
