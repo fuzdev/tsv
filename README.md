@@ -14,7 +14,7 @@ and a drop-in replacement for [Svelte](https://svelte.dev/)'s parser +
 Compared to Oxc, Biome, and SWC, tsv is a set of focused tools, not a generic language platform,
 so the focus is Web standards + Svelte and there's no support for JSX/SCSS/etc.
 Compared to [rsvelte](https://github.com/baseballyama/rsvelte),
-tsv has its own parsers instead of using Oxc, and has no linter or typechecker integration yet.
+tsv has its own parsers instead of using Oxc, and has no compiler/linter/typechecker yet.
 The extensibility story is currently limited to using its Rust crates as libraries (or forking);
 bridging to JS or WASM plugins is an open question (leaning against).
 
