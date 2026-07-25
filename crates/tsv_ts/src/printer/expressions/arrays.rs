@@ -401,6 +401,42 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&[d.text("["), indented_content, closing_line, d.text("]")]))
     }
 
+    /// Push element `i`'s doc plus its inline leading/trailing block comments.
+    ///
+    /// The one definition of "an array element and the comments glued around it",
+    /// shared by [`Self::build_array_group_doc`] and its forced twin
+    /// [`Self::build_array_group_doc_forced`] — the two printers a *glued* block comment
+    /// can reach, since gluing is not an expansion trigger and so does not divert the
+    /// array to the expanding printer. Emitting the element alone DROPS the trailing
+    /// side (the leading side is owned by the element and rides inside its own doc), so
+    /// the pairing is an invariant worth having one home rather than two.
+    ///
+    /// `has_comments` is the array-wide zero-comment fast gate: with no comment anywhere
+    /// in the array none can lie in this element's leading/trailing gap, so both the
+    /// block-comment collection and its comma scan are skipped. Blank-line detection is
+    /// comment-independent and stays with the callers, outside the gate.
+    fn push_array_element_with_inline_comments(
+        &self,
+        arr: &internal::ArrayExpression<'_>,
+        i: usize,
+        expr: &Expression<'_>,
+        has_comments: bool,
+        parts: &mut DocBuf,
+    ) {
+        if has_comments {
+            let elem_start = expr.span().start;
+            let search_start = self.leading_comment_search_start_for(arr, i, elem_start);
+            self.add_inline_leading_block_comments(search_start, elem_start, parts);
+        }
+
+        parts.push(self.build_arg_expression_doc(expr));
+
+        if has_comments {
+            // Trailing block comments (before comma only)
+            self.add_trailing_array_comments(arr, expr.span().end, i, parts);
+        }
+    }
+
     /// Build group doc for non-numeric arrays (one per line when broken)
     ///
     /// Includes inline block comments between elements.
@@ -424,22 +460,13 @@ impl<'a> Printer<'a> {
         for (i, elem) in arr.elements.iter().enumerate() {
             // Handle comments and element (skip comment collection for elisions)
             if let Some(expr) = elem {
-                // Zero-comment fast gate: with no comments anywhere in the array, no
-                // comment can lie in this element's leading/trailing gap, so skip the
-                // inline block-comment collection (and its comma scan). The blank-line
-                // detection below is comment-independent and stays outside the gate.
-                if has_comments {
-                    let elem_start = expr.span().start;
-                    let search_start = self.leading_comment_search_start_for(arr, i, elem_start);
-                    self.add_inline_leading_block_comments(search_start, elem_start, &mut parts);
-                }
-
-                parts.push(self.build_arg_expression_doc(expr));
-
-                if has_comments {
-                    // Trailing block comments (before comma only)
-                    self.add_trailing_array_comments(arr, expr.span().end, i, &mut parts);
-                }
+                self.push_array_element_with_inline_comments(
+                    arr,
+                    i,
+                    expr,
+                    has_comments,
+                    &mut parts,
+                );
             }
 
             let is_last = i == arr.elements.len() - 1;
@@ -579,9 +606,16 @@ impl<'a> Printer<'a> {
     }
 
     /// Build group doc for arrays with multiline content (forced expansion with hardlines)
+    ///
+    /// The hardline twin of [`Self::build_array_group_doc`], and it shares that builder's
+    /// [`Self::push_array_element_with_inline_comments`] seam: a *glued* block comment is
+    /// not an expansion trigger, so `build_array_doc` does not divert a commented array to
+    /// the expanding printer, and a glued comment reaches this path whenever some element
+    /// also holds multiline content.
     fn build_array_group_doc_forced(&self, arr: &internal::ArrayExpression<'_>) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
+        let has_comments = self.has_comments_on_page_between(arr.span.start, arr.span.end);
 
         for (i, elem) in arr.elements.iter().enumerate() {
             if i > 0 {
@@ -599,7 +633,13 @@ impl<'a> Printer<'a> {
             }
 
             if let Some(expr) = elem {
-                parts.push(self.build_arg_expression_doc(expr));
+                self.push_array_element_with_inline_comments(
+                    arr,
+                    i,
+                    expr,
+                    has_comments,
+                    &mut parts,
+                );
             }
         }
 
@@ -875,6 +915,13 @@ impl<'a> Printer<'a> {
         arr: &internal::ArrayExpression<'_>,
     ) -> DocId {
         let d = self.d();
+        // A commented array hands off to `build_array_doc` wholesale — the element-doc-only
+        // loop below would DROP every structural comment, the empty-`[]` dangling one
+        // included. The object twin (`build_object_doc_expanded`) carries the same gate for
+        // the same reason; the rationale lives there in full.
+        if self.has_comments_on_page_between(arr.span.start, arr.span.end) {
+            return self.build_array_doc(arr);
+        }
         if arr.elements.is_empty() {
             return d.text("[]");
         }
