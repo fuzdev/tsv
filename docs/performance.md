@@ -150,6 +150,15 @@ cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib --json
 Output shows, per language: file/byte/wire-byte/multibyte counts and the
 `parse` and `write` medians (sums of per-file medians).
 
+**When A/B-ing a write-path change, read `write` from here and `parse` from
+`profile` (§1) — not from this command.** Both phases run in one process against
+one allocator, so a change that alters what the writer allocates also changes the
+state the *next* iteration's `parse` starts from; that alone can move this
+command's `parse` median by a few percent in either direction while the parse
+code is untouched. `profile` (§1) never calls `convert_ast_json_bytes` at all,
+which makes it both the trustworthy parse surface and the **null control** for a
+write-path change: a genuine write-path win leaves its totals flat.
+
 ### 3. `[profile.profiling]` — cargo profile for perf
 
 The release profile strips debug symbols (`strip = true`), making `perf` useless. The `profiling` profile keeps symbols at release speed:

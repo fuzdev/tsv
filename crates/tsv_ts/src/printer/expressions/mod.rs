@@ -248,7 +248,21 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let open = cast.span.start; // the `(`
         let inner_start = cast.inner.span().start;
-        let inner_doc = self.build_expression_doc(cast.inner);
+        // Rule A inside the cast's own parens: a directive alone on its line in the
+        // `(`→inner gap freezes the INNER verbatim, with the cast's comment and parens
+        // printing around the frozen slice. Freezing the paren-stripped inner rather than
+        // the whole shell is the same choice the type side makes
+        // (`paren_interior_routed_inner`), and it is what keeps the shell's own comments
+        // with the shell's emitters below. Prettier agrees on both the scope and the
+        // preserved parens here.
+        let frozen_inner = self.gap_frozen_span(open + 1, cast.inner.span());
+        let inner_doc = frozen_inner.map_or_else(
+            || self.build_expression_doc(cast.inner),
+            // Built bare, like the ordinary arm: the cast's parens already group it. The
+            // owned-comment claim still applies — a block glued before the inner rides
+            // inside its doc, which the slice replaces.
+            |frozen| self.build_frozen_expression_doc(cast.inner, frozen),
+        );
 
         // The owned comment, glued to the `(`. A comment the author gave a line of its
         // own keeps it (the same predicate drives the enclosing assignment to hang, so
@@ -274,13 +288,22 @@ impl<'a> Printer<'a> {
         // A line comment on either side of the inner must force a hardline layout —
         // otherwise `(// c <inner>)` runs the inner and the `)` into the comment
         // (silent content loss). Mirrors `build_expression_doc_keep_paren_comments`.
-        if self.has_line_comments_between(open + 1, inner_start) || trailing_needs_break {
+        // A frozen inner joins the two content-loss triggers: the block spelling of an
+        // honored directive would otherwise collapse onto the frozen value's line, which
+        // is a glued — hence inert — placement, so the freeze would be lost on the second
+        // pass. (The line spelling already lands here via the scan above.)
+        if self.has_line_comments_between(open + 1, inner_start)
+            || trailing_needs_break
+            || frozen_inner.is_some()
+        {
             let mut parts: DocBuf = smallvec![d.hardline()];
             for comment in comments_to_emit_in_range(self.comments, open + 1, inner_start) {
                 parts.push(self.build_comment_doc(comment));
                 // A line comment runs to end-of-line, so it must break; a block
-                // comment hugs the next token inline (`/** @type {B} */ (x)`).
-                parts.push(if comment.is_block {
+                // comment hugs the next token inline (`/** @type {B} */ (x)`) — unless
+                // it is an honored directive, which must keep its own line for the
+                // freeze to survive the next pass.
+                parts.push(if comment.is_block && !self.is_honored_directive(comment) {
                     d.text(" ")
                 } else {
                     d.hardline()

@@ -17,16 +17,17 @@ use super::arg_predicates::{
     is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
-    append_type_args_with_gap_comments, arg_needs_soft_wrap, build_args_joined_with_comments,
-    build_args_split_last, build_args_with_blank_lines, build_arrow_call_body_states,
-    build_arrow_sig_doc, build_break_body_state, build_empty_args_doc, build_expand_all_args,
+    ArgItem, append_type_args_with_gap_comments, arg_needs_soft_wrap, build_args_split_last,
+    build_args_with_blank_lines, build_arrow_call_body_states, build_arrow_sig_doc,
+    build_break_body_state, build_call_args_expanded, build_empty_args_doc, build_expand_all_args,
     build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
     last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, try_hug_multiline_template_arg,
     wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
 };
+use super::call_paren_open;
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
-use super::test_patterns::{build_test_callee_flat_doc, is_test_call};
+use super::test_patterns::{build_test_callee_flat_doc, test_call_flat_layout_applies};
 use crate::ast::internal;
 use crate::printer::CommentVec;
 use crate::printer::expressions::functions::arrow_signature_has_breaking_comments;
@@ -114,9 +115,14 @@ pub(super) fn build_call_doc_with_wrapping(
         return doc;
     }
 
+    // Position the `(` follows — every argument-gap window (the comment scans, and Rule A's
+    // first-argument freeze) opens here.
+    let paren_open = call_paren_open(call);
+
     // Test function calls (it, test, describe, etc.) stay on one line
-    // even if they exceed print width
-    if is_test_call(call, printer) {
+    // even if they exceed print width — unless an argument gap holds a comment the
+    // flat layout has no emitter for (it would be dropped); such a call expands.
+    if test_call_flat_layout_applies(call, printer) {
         // Build callee as a flat doc (no conditionalGroup) straight from the
         // span-identity chain parts — this prevents breaking at `.skip` etc. even when
         // very long, without materializing a throwaway callee `String`.
@@ -126,7 +132,7 @@ pub(super) fn build_call_doc_with_wrapping(
         // above, so `arguments` is non-empty here and `.last()` is always `Some`.
         #[allow(clippy::unreachable)] // empty args already returned above ⇒ last() is Some
         let Some(last_arg) = call.arguments.last() else {
-            unreachable!("is_test_call requires arguments");
+            unreachable!("a test call requires arguments");
         };
         let paren_close = call.span.end;
         let mut parts: DocBuf = smallvec![
@@ -151,12 +157,6 @@ pub(super) fn build_call_doc_with_wrapping(
         return d.concat(&parts);
     }
 
-    // Position after type args (or callee if no type args) — the `(` follows this.
-    let paren_open = call
-        .type_arguments
-        .as_ref()
-        .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
-
     // Whole-call comment-presence gate: one binary search over the entire argument
     // window. Every per-argument comment sub-query below (the leading / inter-arg /
     // trailing predicates, each O(n) over args, plus the general comment path) lies
@@ -167,11 +167,20 @@ pub(super) fn build_call_doc_with_wrapping(
     // the page (a *layout* question), not who emits it — see `has_comments_on_page_between`.
     let call_has_comments = printer.has_comments_on_page_between(paren_open, call.span.end);
 
+    // A trailing LINE comment on an argument (`fn(a, // c⏎ b)`) rules out every layout
+    // below that would have to place the arguments itself: each joins them with `", "` or
+    // hugs them, and a comment running to EOL can't survive either — so they all decline
+    // and the call falls through to the comment-aware paths. Computed once: it is pure in
+    // `(call, printer)`, six arms ask it, and each ask walks the arguments with a binary
+    // search per gap. (`build_call_with_arg_comments` hoists the same predicate for the
+    // same reason.) The `call_has_comments` conjunct keeps a comment-free call at the one
+    // window-wide binary search above.
+    let arg_trailing_line_comment =
+        call_has_comments && has_trailing_comments_on_args(call, printer);
+
     // Module path calls that should not break at arguments (e.g., require.resolve)
     // Keep the call on one line; let assignment/parent break instead
-    if is_module_path_no_break(call, printer)
-        && !(call_has_comments && has_trailing_comments_on_args(call, printer))
-    {
+    if is_module_path_no_break(call, printer) && !arg_trailing_line_comment {
         return d.concat(&[
             callee,
             d.text("("),
@@ -187,8 +196,8 @@ pub(super) fn build_call_doc_with_wrapping(
 
     // Module path calls (require.resolve.paths, import.meta.resolve) break at chain
     // rather than at arguments, keeping the path on the same line as the method
-    if let Some((base_expr, method_name)) = get_module_path_chain_break(call, printer)
-        .filter(|_| !(call_has_comments && has_trailing_comments_on_args(call, printer)))
+    if let Some((base_expr, method_name)) =
+        get_module_path_chain_break(call, printer).filter(|_| !arg_trailing_line_comment)
     {
         let base_doc = printer.build_expression_doc(base_expr);
         let method_doc = printer.identifier_name_doc(method_name);
@@ -220,7 +229,7 @@ pub(super) fn build_call_doc_with_wrapping(
                 .any(|c| c.is_block)
         });
     if call.arguments.len() == 1
-        && !(call_has_comments && has_trailing_comments_on_args(call, printer))
+        && !arg_trailing_line_comment
         && !has_trailing_block_comment
         && let Some(doc) = try_single_arg_hug(printer, call, callee)
     {
@@ -247,32 +256,34 @@ pub(super) fn build_call_doc_with_wrapping(
 
     if has_multiline {
         // Force expansion with hardlines for multiline content
-        let arg_parts =
-            build_args_joined_with_comments(printer, call.arguments, paren_open, true, |p, a| {
-                p.build_arg_expression_doc(a)
-            });
-        return wrap_call_with_hard_breaks(d, callee, arg_parts);
+        return build_call_args_expanded(
+            printer,
+            callee,
+            call.arguments,
+            paren_open,
+            ArgItem::ArgContext,
+        );
     }
 
     // Function composition pattern: when any argument is a call containing a callback
     // e.g., fn(arr.map((x) => x), b) → fn(\n\tarr.map((x) => x),\n\tb,\n)
     // Prettier's isFunctionCompositionArgs: 2+ args, any arg is call with function/arrow inside
     // Skip if there are trailing comments - let the comment handling code deal with expansion
-    if is_function_composition_args(call.arguments)
-        && !(call_has_comments && has_trailing_comments_on_args(call, printer))
-    {
-        let arg_parts =
-            build_args_joined_with_comments(printer, call.arguments, paren_open, true, |p, a| {
-                p.build_arg_expression_doc(a)
-            });
-        return wrap_call_with_hard_breaks(d, callee, arg_parts);
+    if is_function_composition_args(call.arguments) && !arg_trailing_line_comment {
+        return build_call_args_expanded(
+            printer,
+            callee,
+            call.arguments,
+            paren_open,
+            ArgItem::ArgContext,
+        );
     }
 
     // "Expand first arg" pattern: when first arg is a function with block body
     // and remaining args are short, hug the function and put tail args after closing }
     // e.g., setTimeout(() => { tick(); }, 100);
     if should_expand_first_arg(printer, call.arguments)
-        && !(call_has_comments && has_trailing_comments_on_args(call, printer))
+        && !arg_trailing_line_comment
         && !(call_has_comments && first_arg_has_any_comments(call.arguments, printer, paren_open))
     {
         let first_arg_doc = printer.build_expression_doc(&call.arguments[0]);
@@ -296,16 +307,13 @@ pub(super) fn build_call_doc_with_wrapping(
         // Prettier: if (tailArgs.some(willBreak)) return allArgsBrokenOut()
         // When any tail arg's doc will break, the inline tail won't work.
         if tail_parts.iter().any(|&id| d.will_break(id)) {
-            let arg_parts = build_args_joined_with_comments(
+            return build_call_args_expanded(
                 printer,
+                callee,
                 call.arguments,
                 paren_open,
-                true,
-                // Closure required: method references cause HRTB lifetime errors
-                #[allow(clippy::redundant_closure_for_method_calls)]
-                |p, a| p.build_expression_doc(a),
+                ArgItem::Plain,
             );
-            return wrap_call_with_hard_breaks(d, callee, arg_parts);
         }
 
         // Structure: callee + ( + first_arg_with_breaks + , + tail_args + )
@@ -328,12 +336,14 @@ pub(super) fn build_call_doc_with_wrapping(
             .iter()
             .all(|arg| matches!(arg, internal::Expression::ArrowFunctionExpression(_)));
 
-    if all_args_are_arrows && !(call_has_comments && has_trailing_comments_on_args(call, printer)) {
-        let arg_parts =
-            build_args_joined_with_comments(printer, call.arguments, paren_open, true, |p, a| {
-                p.build_expression_doc(a)
-            });
-        return wrap_call_with_hard_breaks(d, callee, arg_parts);
+    if all_args_are_arrows && !arg_trailing_line_comment {
+        return build_call_args_expanded(
+            printer,
+            callee,
+            call.arguments,
+            paren_open,
+            ArgItem::Plain,
+        );
     }
 
     // Expand-last pattern for function/arrow last arguments. Returns `None` when
@@ -383,7 +393,7 @@ pub(super) fn build_call_doc_with_wrapping(
         // Build arguments with blank line preservation (forced expansion).
         // The shared builder's comment branches never fire here: the comment
         // handling path above returns early when any inter-arg comments exist.
-        let arg_doc = build_args_with_blank_lines(printer, call.arguments);
+        let arg_doc = build_args_with_blank_lines(printer, call.arguments, paren_open);
         return wrap_call_with_hard_breaks(d, callee, arg_doc);
     }
 
@@ -494,7 +504,9 @@ fn try_single_arg_comment_paths(
         // conditional) gets its continuation indent — matching the no-leading-
         // comment path. `build_expression_doc` would emit the Grouped chain
         // (flush continuation), losing the indent prettier applies here.
-        inner.push(printer.build_arg_expression_doc(first_arg));
+        // An own-line directive in the gap freezes the argument verbatim (Rule A);
+        // this branch already keeps such a comment on its own line.
+        inner.push(printer.build_arg_item_doc(paren_open, call.arguments, 0));
 
         return Some(d.concat(&[
             callee,
@@ -522,8 +534,10 @@ fn try_single_arg_comment_paths(
         let inline_comments = printer.build_rhs_comments_glued_opt(paren_open, arg_start);
         // Argument-context builder so a binary/logical chain gets its
         // continuation indent (matches the no-comment path); see the leading
-        // line-comment branch above for the same reasoning.
-        let arg_doc = printer.build_arg_expression_doc(first_arg);
+        // line-comment branch above for the same reasoning. A directive alone on its
+        // line freezes the argument (Rule A) — only the BLOCK spelling reaches here
+        // (a line comment routes to the branch above).
+        let arg_doc = printer.build_arg_item_doc(paren_open, call.arguments, 0);
 
         // Build comment + arg, including any trailing comments after the arg
         // Note: build_rhs_comments_opt already adds trailing space after each comment
@@ -1329,8 +1343,9 @@ fn build_call_with_arg_comments(
         // Build the argument with the argument-context builder so a binary/logical
         // chain (or conditional) keeps its continuation indent — matching the
         // no-comment path (the single-arg comment path does the same via
-        // build_arg_expression_doc).
-        arg_parts.push(printer.build_arg_expression_doc(arg));
+        // build_arg_expression_doc). An own-line format-ignore directive in this
+        // argument's gap freezes it verbatim (Rule A).
+        arg_parts.push(printer.build_arg_item_doc(paren_open, call.arguments, i));
 
         // Check for comments after this argument (before next arg or closing paren)
         if i < call.arguments.len() - 1 {

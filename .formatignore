@@ -1,0 +1,11 @@
+# The fixture trees are DATA, not source. Their `unformatted_*` / `variant_*` /
+# `output_prettier.*` / `input_invalid_*` files are deliberately NOT format fixed
+# points — each one's whole claim is the state it is committed in — so a stray
+# `tsv format .` at the repo root would destroy them. They are regenerated with
+# `deno task fixtures:update` / `fixture_init`, never with `tsv format`.
+#
+# A directory arg can't step past this (`tsv format tests/fixtures` finds nothing);
+# only an explicitly named FILE bypasses the ignore files — see docs/cli.md
+# §Multi-File Formatting.
+tests/fixtures/
+tests/fixtures_compile/
