@@ -6,7 +6,10 @@ use super::expression_lookahead::{
     is_construct_type_start, is_function_type_start, is_generic_function_type_start,
     scan_for_closing_angle_bracket,
 };
-use super::scan::{is_identifier_start, is_word_at, skip_identifier, skip_whitespace_and_comments};
+use super::scan::{
+    is_identifier_start, is_word_at, skip_identifier, skip_numeric_literal,
+    skip_whitespace_and_comments,
+};
 
 impl<'a, 'arena> Parser<'a, 'arena> {
     /// Check if current position starts type arguments: `<Type, ...>`
@@ -192,61 +195,60 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// Check if `[` at `pos` starts an indexed type (not array access).
+    /// Whether the `[` at `pos` can open an indexed-access type rather than an array
+    /// index. A pre-filter only: every shape that stays grammatical both ways is handed
+    /// to the caller's closing-`>` scan, which arbitrates.
     ///
-    /// - `arr[0]`: numeric index → array access
-    /// - `arr[i]` followed by `<` or `;`: array access
-    /// - `T[K]` followed by `>`, `,`, or another `[`: indexed type
-    /// - `T["key"]`, `T[keyof U]`, `T[typeof x]`: indexed type
-    /// - `a[b - 1]`: complex expression → array access (default)
+    /// - `T[]`, `T["key"]`, `T[keyof U]`, `T[typeof x]`: indexed type
+    /// - `T[K]`, `T[0]`, `T[-1]` followed by `>`, `,`, or another `[`: indexed type
+    /// - `T[A | B]`, `T[0 | 1]`, `T[A[B]]`, `T[A.B]`, `T[A<B>]`,
+    ///   `T[A extends B ? C : D]`: the index is itself a type, so the scan decides
+    /// - `a[b - 1]`, `a[0 + 1]`, `a[c || d]`, `a[c <= d]`: arithmetic, or a
+    ///   logical/shift/relational operator — an expression, never a type → array access
+    /// - `a[-b]`: a unary negation, not a negative literal → array access
     fn check_indexed_type_pattern(&self, bytes: &[u8], pos: usize) -> bool {
         let inside = skip_whitespace_and_comments(bytes, pos + 1);
-        if inside >= bytes.len() {
+        let Some(&first) = bytes.get(inside) else {
             return false;
-        }
+        };
 
-        // Empty brackets `T[]` — array type
-        if bytes[inside] == b']' {
-            return true;
-        }
+        match first {
+            // Empty brackets `T[]` — array type
+            b']' => true,
 
-        // Numeric index is definitely array access
-        if bytes[inside].is_ascii_digit() {
-            return false;
-        }
-
-        // Identifier index: check for type keywords then what follows `]`
-        if is_identifier_start(bytes[inside]) {
-            let after_id = skip_identifier(bytes, inside);
-
-            // Type operator keywords: `T[keyof U]`, `T[typeof x]`
-            let kw = &bytes[inside..after_id];
-            if kw == b"keyof" || kw == b"typeof" {
-                return true;
+            // Numeric literal index: `T[0]`, `T[-1]`, `T[0 | 1]`. A numeric literal is as
+            // valid a type as it is an array index, so the literal alone decides nothing —
+            // what FOLLOWS it does, under the same rule a reference index answers to.
+            b'0'..=b'9' | b'-' => {
+                let after_number = skip_numeric_literal(bytes, inside);
+                // No literal starts here at all (`-b`) — a unary negation, so the index is
+                // an expression. Guarding on this is what stops the `-` from swallowing an
+                // identifier and landing on the same `]` a real literal ends at.
+                if after_number == inside {
+                    return false;
+                }
+                continues_as_type(bytes, skip_whitespace_and_comments(bytes, after_number))
             }
 
-            let after_bracket = skip_whitespace_and_comments(bytes, after_id);
-            if after_bracket < bytes.len() && bytes[after_bracket] == b']' {
-                let after_close = skip_whitespace_and_comments(bytes, after_bracket + 1);
-                // Type args end with `>`, continue with `,`, or chain another index
-                // group (`T[K][J]`) — the caller's closing-`>` scan arbitrates all three
-                if after_close < bytes.len() && matches!(bytes[after_close], b'>' | b',' | b'[') {
+            // String literal key: `T["key"]`, `T['key']` — indexed access type
+            b'\'' | b'"' | b'`' => true,
+
+            // Identifier index: check for type keywords then what follows the identifier
+            _ if is_identifier_start(first) => {
+                let after_id = skip_identifier(bytes, inside);
+
+                // Type operator keywords: `T[keyof U]`, `T[typeof x]`
+                let kw = &bytes[inside..after_id];
+                if kw == b"keyof" || kw == b"typeof" {
                     return true;
                 }
-                return false;
+
+                continues_as_type(bytes, skip_whitespace_and_comments(bytes, after_id))
             }
-            // Identifier followed by something other than `]` (e.g., `b - 1]`)
-            // is a complex expression — array access, not indexed type
-            return false;
-        }
 
-        // String literal key: `T["key"]`, `T['key']` — indexed access type
-        if matches!(bytes[inside], b'\'' | b'"' | b'`') {
-            return true;
+            // Unknown pattern — default to NOT type args (safer for JS expressions)
+            _ => false,
         }
-
-        // Unknown pattern — default to NOT type args (safer for JS expressions)
-        false
     }
 
     /// Check if position points to a TypeScript type keyword.
@@ -284,5 +286,37 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             Some(b'r') => kw(b"readonly"),
             _ => false,
         }
+    }
+}
+
+/// Whether the byte at `after_operand` — the first non-trivia byte past an index operand —
+/// continues a TYPE rather than an expression.
+///
+/// Shared by both operand kinds, and it must stay shared: `T[K | J]` and `T[0 | 1]` are
+/// the same question, and answering it in one place is what keeps a numeric index from
+/// being read more narrowly than a reference one.
+fn continues_as_type(bytes: &[u8], after_operand: usize) -> bool {
+    match bytes.get(after_operand) {
+        Some(b']') => {
+            let after_close = skip_whitespace_and_comments(bytes, after_operand + 1);
+            // Type args end with `>`, continue with `,`, or chain another index group
+            // (`T[K][J]`) — the caller's closing-`>` scan arbitrates all three
+            matches!(bytes.get(after_close), Some(b'>' | b',' | b'['))
+        }
+        // `||` and `&&` are logical operators, so the index is an expression — only the
+        // single `|`/`&` are type operators (as in the caller's own arm). Likewise `<<` is
+        // a shift and `<=` a comparison, neither a type's `<`.
+        Some(b'|' | b'&') if bytes.get(after_operand + 1) == bytes.get(after_operand) => false,
+        Some(b'<') if matches!(bytes.get(after_operand + 1), Some(b'<' | b'=')) => false,
+        // Type-continuation tokens: the index is a union or intersection (`T[A | B]`), a
+        // nested index (`T[A[B]]`), a qualified name (`T[A.B]`), a generic reference
+        // (`T[A<B>]`), or a conditional (`T[A extends B ? C : D]`). None of these can be
+        // arithmetic, so hand the decision to the caller's closing-`>` scan.
+        Some(b'|' | b'&' | b'[' | b'.' | b'<') => true,
+        Some(b'e') if is_word_at(bytes, after_operand, b"extends") => true,
+        // Anything else after the operand (e.g. `b - 1]`) is arithmetic — an expression,
+        // never a type, and the one case the closing-`>` scan cannot arbitrate
+        // (`a < arr[b - 1] > (c)` is grammatical both ways).
+        _ => false,
     }
 }

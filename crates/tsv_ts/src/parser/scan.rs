@@ -110,6 +110,43 @@ pub(super) fn is_word_at(bytes: &[u8], pos: usize, word: &[u8]) -> bool {
             .is_none_or(|&b| !is_identifier_continue(b))
 }
 
+/// Skip a numeric literal, returning the position after it — or `pos` unchanged when no
+/// literal starts there. Handles a leading `-` (the only sign a literal *type* may carry —
+/// `A[+1]` is not one), radix prefixes (`0x`), separators (`1_000`), a BigInt `n`, and an
+/// exponent whose own sign (`1e-3`) would otherwise end the scan.
+///
+/// Deliberately loose about a literal's INTERIOR — it accepts more than the grammar does.
+/// Callers use it to find where a literal ENDS, then check what follows, so over-consuming
+/// a malformed literal only makes that follow-check fail. The FIRST character is the one
+/// place it is strict, and must stay so: `-b` would otherwise scan as a literal ending at
+/// the very `]` a real one ends at, leaving the follow-check no way to tell a negated
+/// identifier from a negative number.
+#[inline]
+pub(super) fn skip_numeric_literal(bytes: &[u8], pos: usize) -> usize {
+    let mut cursor = pos;
+    if bytes.get(cursor) == Some(&b'-') {
+        cursor += 1;
+    }
+    // A literal starts with a digit, or a bare `.` for `-.5`. Anything else (`-b`, `-$b`)
+    // is a unary negation; reporting "nothing skipped" is how the caller learns that.
+    if !matches!(bytes.get(cursor), Some(b'0'..=b'9' | b'.')) {
+        return pos;
+    }
+    while cursor < bytes.len() {
+        let b = bytes[cursor];
+        if b.is_ascii_alphanumeric() || b == b'.' || b == b'_' {
+            // An exponent's sign belongs to the literal, not to a following operator.
+            if matches!(b, b'e' | b'E') && matches!(bytes.get(cursor + 1), Some(b'-' | b'+')) {
+                cursor += 1;
+            }
+            cursor += 1;
+        } else {
+            break;
+        }
+    }
+    cursor
+}
+
 /// Skip an identifier, returning position after the identifier
 /// Assumes `pos` is at the start of an identifier
 #[inline]
