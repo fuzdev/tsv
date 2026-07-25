@@ -96,7 +96,8 @@
 //! - **A seed already bearing an ignore directive is skipped** whole (coarse substring exemption) —
 //!   an injected directive interacting with a pre-existing one is fragile, and the confirmed gaps
 //!   are reached through the many directive-free fixtures regardless.
-//! - **Union/Intersection candidate nodes are skipped** (paren-transparently — `is_composite_type`):
+//! - **Union/Intersection candidate nodes are skipped** (paren-transparently, and through a
+//!   zero-prefix `TSTypeAnnotation` wrapper whose span coincides with its child's — `is_composite_type`):
 //!   at a single-child head, an own-line directive before a composite freezes only the FIRST member
 //!   by decided semantics (Rule A; prettier's `types[0]` redirect agrees), so the whole-node
 //!   substring check is the wrong expectation there, and the member-level positions carry those
@@ -475,23 +476,42 @@ fn in_any_span(p: usize, spans: &[(usize, usize)]) -> bool {
     spans.iter().any(|&(a, b)| a <= p && p < b)
 }
 
-/// Whether a wire node is a `TSUnionType`/`TSIntersectionType`, looking through
-/// `TSParenthesizedType` shells — the directive binding is paren-transparent, so a
-/// parenthesized composite declines injection the same way a bare one does.
-fn is_composite_type(node: &Value, nt: &str) -> bool {
-    if matches!(nt, "TSUnionType" | "TSIntersectionType") {
-        return true;
-    }
+/// Whether a wire node is a `TSUnionType`/`TSIntersectionType`, looking through two kinds of
+/// shell:
+///
+/// - a `TSParenthesizedType` — the directive binding is paren-transparent, so a parenthesized
+///   composite declines injection the same way a bare one does;
+/// - a **zero-prefix** `TSTypeAnnotation`, one whose span COINCIDES with its child's. Such a
+///   wrapper contributes no token of its own, so it *is* the composite (the type-predicate
+///   `x is A | B` shape, where the wrapper starts at the union). Contrast the ordinary `: T`
+///   annotation, whose span starts at the `:`: that one is a real candidate, since the
+///   decided semantics freeze it whole — operators and all — rather than applying the member
+///   rules (`docs/conformance_prettier.md` §Format-ignore directive, "On annotation heads").
+fn is_composite_type(node: &Value) -> bool {
     let mut cur = node;
     loop {
-        match cur.get("type").and_then(Value::as_str) {
-            Some("TSParenthesizedType") => match cur.get("typeAnnotation") {
-                Some(inner) => cur = inner,
-                None => return false,
-            },
+        let inner = match cur.get("type").and_then(Value::as_str) {
+            Some("TSParenthesizedType") => cur.get("typeAnnotation"),
+            Some("TSTypeAnnotation") => cur
+                .get("typeAnnotation")
+                .filter(|child| covers_same_range(cur, child)),
             Some("TSUnionType" | "TSIntersectionType") => return true,
             _ => return false,
+        };
+        match inner {
+            Some(inner) => cur = inner,
+            None => return false,
         }
+    }
+}
+
+/// Whether two wire nodes cover exactly the same source range (both offsets in the wire's own
+/// UTF-16 space, so no mapping is needed to compare them).
+fn covers_same_range(a: &Value, b: &Value) -> bool {
+    let range = |n: &Value| Some((n.get("start")?.as_u64()?, n.get("end")?.as_u64()?));
+    match (range(a), range(b)) {
+        (Some(x), Some(y)) => x == y,
+        _ => false,
     }
 }
 
@@ -728,7 +748,9 @@ impl Walk<'_> {
         // single-child head, the decided semantics for an own-line directive before a
         // composite are the MEMBER rules — Rule A freezes only the FIRST member
         // (prettier's own `types[0]` redirect agrees) — so this audit's whole-node
-        // substring check is the wrong expectation there by design, and the
+        // substring check is the wrong expectation there by design (a zero-prefix
+        // `TSTypeAnnotation` wrapper counts as the composite it coincides with; see
+        // `is_composite_type`), and the
         // member-level positions (`TSUnionType.types`, `TSIntersectionType.types`)
         // already carry those placements. Without the skip, every single-child
         // position whose fixture sites hold union-valued children (annotation, alias
@@ -741,7 +763,7 @@ impl Walk<'_> {
         // instead. The skipped span still feeds the span-maximality map so the
         // union's own first member doesn't run companion checks against a narrower
         // span than the decided item-level freeze.
-        if is_composite_type(node, nt) {
+        if is_composite_type(node) {
             self.skipped_composites.push((line_start, e));
             return;
         }

@@ -23,12 +23,11 @@
 # ARE pinned (this is a ratchet over a live bug family, born red).
 #
 # Format: KIND<TAB>POSITION
-# shapes: 90
+# shapes: 81
 UNHONORED	ArrayExpression.elements
 UNHONORED	ArrayPattern.elements
 UNHONORED	ArrowFunctionExpression.body
 UNHONORED	ArrowFunctionExpression.params
-UNHONORED	ArrowFunctionExpression.returnType
 UNHONORED	ArrowFunctionExpression.typeParameters
 UNHONORED	AssignmentExpression.right
 UNHONORED	AssignmentPattern.left
@@ -54,10 +53,7 @@ UNHONORED	ForStatement.init
 UNHONORED	ForStatement.test
 UNHONORED	ForStatement.update
 UNHONORED	FunctionDeclaration.params
-UNHONORED	FunctionDeclaration.returnType
 UNHONORED	FunctionExpression.params
-UNHONORED	FunctionExpression.returnType
-UNHONORED	Identifier.typeAnnotation
 UNHONORED	IfStatement.alternate
 UNHONORED	IfStatement.consequent
 UNHONORED	IfStatement.test
@@ -74,7 +70,6 @@ UNHONORED	ObjectExpression.properties
 UNHONORED	OnDirective.expression
 UNHONORED	Program.body
 UNHONORED	Property.value
-UNHONORED	PropertyDefinition.typeAnnotation
 UNHONORED	PropertyDefinition.value
 UNHONORED	ReturnStatement.argument
 UNHONORED	SequenceExpression.expressions
@@ -89,17 +84,13 @@ UNHONORED	TSConstructorType.parameters
 UNHONORED	TSFunctionType.parameters
 UNHONORED	TSImportEqualsDeclaration.moduleReference
 UNHONORED	TSIndexSignature.parameters
-UNHONORED	TSIndexSignature.typeAnnotation
 UNHONORED	TSMethodSignature.parameters
-UNHONORED	TSMethodSignature.typeAnnotation
 UNHONORED	TSNonNullExpression.expression
 UNHONORED	TSParameterProperty.parameter
 UNHONORED	TSParenthesizedType.typeAnnotation
-UNHONORED	TSPropertySignature.typeAnnotation
 UNHONORED	TSSatisfiesExpression.expression
 UNHONORED	TSTypeAssertion.expression
 UNHONORED	TSTypeLiteral.members
-UNHONORED	TSTypePredicate.typeAnnotation
 UNHONORED	TemplateLiteral.expressions
 UNHONORED	ThrowStatement.argument
 UNHONORED	TryStatement.handler

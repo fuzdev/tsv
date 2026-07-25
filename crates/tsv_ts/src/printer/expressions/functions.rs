@@ -778,10 +778,18 @@ impl<'a> Printer<'a> {
         params_start: Option<u32>,
     ) -> DocId {
         let d = self.d();
+        // One depth-tracked close-`)` scan feeds both `)`→`:` questions below.
+        let close_paren_after = self.return_type_close_paren(params_start, annotation.span.start);
+        // An alone-on-line format-ignore directive in the `)`→`:` gap freezes the whole
+        // `: type` annotation and keeps its own line — before the function-type paren
+        // wrapping below, which would rebuild a frozen type from parts.
+        if let Some(frozen) = self.build_frozen_return_type_doc(close_paren_after, annotation) {
+            return frozen;
+        }
         // Preserve a block comment between `)` and the return type `:`
         // (`(x) /* c */ : T => ...`); prettier adds a space before `:`.
-        let comment_prefix =
-            self.build_paren_to_return_type_comments(params_start, annotation.span.start);
+        let comment_prefix = self
+            .build_close_paren_to_return_type_comments(close_paren_after, annotation.span.start);
 
         // Function types need parentheses to disambiguate from the arrow's `=>`
         // Example: `(x: T): ((y: T) => U) =>` not `(x: T): (y: T) => U =>`

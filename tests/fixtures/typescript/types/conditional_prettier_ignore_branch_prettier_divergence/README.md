@@ -19,7 +19,14 @@ classification, so prettier's relocated form would lose the freeze on tsv's seco
 pass — keeping the authored own-line placement is both the comment-position doctrine
 and the idempotent fixed point.
 
-The `type C` control pins that a **plain** comment keeps the trailing relocation
+A **composite** branch (`type C`) freezes **whole**, operators and all — the
+interposing `?` / `:` token means the union's own leading-run walk can never reach
+the directive, so the member rules that apply at a bare single-child head (first
+member freezes) have nothing to bind to here; the branch the directive precedes is
+the freeze target. Prettier agrees on that scope (both members stay verbatim in
+`output_prettier.svelte`) and diverges only in the placement.
+
+The `type D` control pins that a **plain** comment keeps the trailing relocation
 (`X extends string // c` — a fixed point for both tools): only a directive earns
 own-line preservation. (The relocation itself — an own-line plain comment moving to
 its trailing fixed point — is pinned by the

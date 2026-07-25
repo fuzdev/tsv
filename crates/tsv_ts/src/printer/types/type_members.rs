@@ -64,53 +64,41 @@ impl<'a> Printer<'a> {
             self.build_type_member_key_doc(prop.span.start, &prop.key, prop.computed);
         parts.push(key_doc);
 
-        // Push the optional `?` marker (comments around it stay after `?`; prettier
-        // moves them before). key_region_end is after `]` for computed keys.
-        let after_marker = if prop.optional {
-            self.push_modifier_marker_doc(&mut parts, key_region_end, b'?')
-        } else {
-            key_region_end
-        };
         // Where the trailing (pre-`;`) comment gap begins: after the type annotation
         // if present, else after the key/`?` marker (the no-annotation gap).
-        let trailing_start = if let Some(type_ann) = &prop.type_annotation {
-            let colon_pos = type_ann.span.start;
-            // Width-aware wrapping for TypeReference with type arguments.
-            let type_doc = self.build_type_annotation_doc_wrapping(type_ann);
-            // Comments between the key (or `?`) and `:`. Gate on `has_comments_to_emit_between`
-            // so the common no-comment path stays a single binary search.
-            if self.has_comments_to_emit_between(after_marker, colon_pos) {
-                // A line comment keeps the comment after the marker and indents the
-                // `: type` continuation one level (`a // c⏎\t\t: T`). A block stays
-                // inline before `:`: the optional `?→:` path keeps a space
-                // (`a? /* c */ : T`), the non-optional key→`:` path does not
-                // (`a /* c */: T`).
-                if let Some(doc) =
-                    self.build_marker_colon_line_continuation(after_marker, colon_pos, type_doc)
-                {
-                    parts.push(doc);
-                } else {
-                    if prop.optional {
-                        if let Some(comment_doc) =
-                            self.build_marker_to_colon_comments_doc(after_marker, colon_pos)
-                        {
-                            parts.push(comment_doc);
-                        }
-                    } else if let Some(comment_doc) = self.build_name_to_type_params_comments_opt(
-                        after_marker,
-                        colon_pos,
-                        CommentSpacing::Leading,
-                    ) {
-                        parts.push(comment_doc);
-                    }
-                    parts.push(type_doc);
-                }
-            } else {
-                parts.push(type_doc);
-            }
-            type_ann.span.end
+        //
+        // An alone-on-line format-ignore directive in the key→`?` gap precedes the whole
+        // `?: type` tail, so the freeze starts at the marker and swallows it — neither the
+        // marker nor the annotation is emitted separately then. A directive AFTER the
+        // marker declines here and is routed by the annotation head's own ask.
+        let trailing_start = if let Some((frozen, tail_end)) = self
+            .build_frozen_marker_annotation_tail(
+                key_region_end,
+                prop.optional.then_some(b'?'),
+                prop.type_annotation.as_ref(),
+            ) {
+            parts.push(frozen);
+            tail_end
         } else {
-            after_marker
+            // Push the optional `?` marker (comments around it stay after `?`; prettier
+            // moves them before). key_region_end is after `]` for computed keys.
+            let after_marker = if prop.optional {
+                self.push_modifier_marker_doc(&mut parts, key_region_end, b'?')
+            } else {
+                key_region_end
+            };
+            match &prop.type_annotation {
+                Some(type_ann) => {
+                    self.push_property_signature_annotation_doc(
+                        &mut parts,
+                        after_marker,
+                        prop.optional,
+                        type_ann,
+                    );
+                    type_ann.span.end
+                }
+                None => after_marker,
+            }
         };
 
         // Comments in the content→`;` gap, shared by both arms: with an annotation
@@ -126,6 +114,60 @@ impl<'a> Printer<'a> {
             prop.span.end,
         ));
         d.concat(&parts)
+    }
+
+    /// Push a property signature's `: Type` annotation into `parts`, with the comments in
+    /// the key- (or `?`-) →`:` gap that precede it. `after_marker` is where that gap opens
+    /// (past the `?` when `optional`, else past the key/`]`).
+    ///
+    /// The frozen route comes first: an alone-on-line format-ignore directive in the gap
+    /// freezes the whole `: type` annotation and keeps its own line, asked before the
+    /// annotation doc is built at all — the frozen route emits a verbatim slice, so the
+    /// built doc would only be discarded.
+    fn push_property_signature_annotation_doc(
+        &self,
+        parts: &mut DocBuf,
+        after_marker: u32,
+        optional: bool,
+        type_ann: &internal::TSTypeAnnotation<'_>,
+    ) {
+        if let Some(frozen) = self.build_frozen_annotation_head_doc(after_marker, type_ann) {
+            parts.push(frozen);
+            return;
+        }
+        let colon_pos = type_ann.span.start;
+        // Width-aware wrapping for TypeReference with type arguments.
+        let type_doc = self.build_type_annotation_doc_wrapping(type_ann);
+        // Comments between the key (or `?`) and `:`. Gate on `has_comments_to_emit_between`
+        // so the common no-comment path stays a single binary search.
+        if !self.has_comments_to_emit_between(after_marker, colon_pos) {
+            parts.push(type_doc);
+            return;
+        }
+        // A line comment keeps the comment after the marker and indents the
+        // `: type` continuation one level (`a // c⏎\t\t: T`). A block stays
+        // inline before `:`: the optional `?→:` path keeps a space
+        // (`a? /* c */ : T`), the non-optional key→`:` path does not
+        // (`a /* c */: T`).
+        if let Some(doc) =
+            self.build_marker_colon_line_continuation(after_marker, colon_pos, type_doc)
+        {
+            parts.push(doc);
+            return;
+        }
+        let comment_doc = if optional {
+            self.build_marker_to_colon_comments_doc(after_marker, colon_pos)
+        } else {
+            self.build_name_to_type_params_comments_opt(
+                after_marker,
+                colon_pos,
+                CommentSpacing::Leading,
+            )
+        };
+        if let Some(comment_doc) = comment_doc {
+            parts.push(comment_doc);
+        }
+        parts.push(type_doc);
     }
 
     /// Build a `TSMethodSignature` member (`get`/`set`? key `?`? `<T>`?
@@ -604,34 +646,44 @@ impl<'a> Printer<'a> {
             // leading-`|`) / intersection (hug `:`, continuations wrap) layouts. The only
             // difference is the `]`→value-`:` comment, emitted here: it sits after `]`
             // (prettier relocates it into the brackets).
-            let val_annotation = self.build_type_annotation_doc(type_annotation);
-            match bracket_close_pos {
-                Some(close_pos) if has_bracket_colon_comment && bracket_colon_has_line => {
-                    // A line comment in this gap: the first comment trails `]` on its line,
-                    // then the remaining comments and the value `:` drop to continuation
-                    // lines indented one level (uniform forced-continuation indent, the
-                    // shared `build_continuation_indent` — each line comment ends its own
-                    // line so a `//` can't swallow the next comment or the `: V`). Mirrors
-                    // the `: Type` line-comment layout in `build_type_annotation_doc`.
-                    parts.push(self.build_continuation_indent(
-                        close_pos + 1,
-                        val_colon_pos,
-                        val_annotation,
-                    ));
-                }
-                Some(close_pos) if has_bracket_colon_comment => {
-                    // Block-only comment(s): stay inline before the value `:`, which keeps
-                    // its own line (`[k: T] /* c */ : V`).
-                    for comment in
-                        comments_to_emit_in_range(self.comments, close_pos + 1, val_colon_pos)
-                    {
-                        parts.push(d.text(" "));
-                        parts.push(self.build_comment_doc(comment));
+            // An alone-on-line format-ignore directive in the `]`→value-`:` gap freezes
+            // the whole `: type` annotation and keeps its own line, replacing every arm
+            // below (the line arm's continuation indent would trail the directive on the
+            // `]` line — an inert placement, losing the freeze on the second pass).
+            if let Some(frozen) = bracket_close_pos.and_then(|close_pos| {
+                self.build_frozen_annotation_head_doc(close_pos + 1, type_annotation)
+            }) {
+                parts.push(frozen);
+            } else {
+                let val_annotation = self.build_type_annotation_doc(type_annotation);
+                match bracket_close_pos {
+                    Some(close_pos) if has_bracket_colon_comment && bracket_colon_has_line => {
+                        // A line comment in this gap: the first comment trails `]` on its line,
+                        // then the remaining comments and the value `:` drop to continuation
+                        // lines indented one level (uniform forced-continuation indent, the
+                        // shared `build_continuation_indent` — each line comment ends its own
+                        // line so a `//` can't swallow the next comment or the `: V`). Mirrors
+                        // the `: Type` line-comment layout in `build_type_annotation_doc`.
+                        parts.push(self.build_continuation_indent(
+                            close_pos + 1,
+                            val_colon_pos,
+                            val_annotation,
+                        ));
                     }
-                    parts.push(d.text(" "));
-                    parts.push(val_annotation);
+                    Some(close_pos) if has_bracket_colon_comment => {
+                        // Block-only comment(s): stay inline before the value `:`, which keeps
+                        // its own line (`[k: T] /* c */ : V`).
+                        for comment in
+                            comments_to_emit_in_range(self.comments, close_pos + 1, val_colon_pos)
+                        {
+                            parts.push(d.text(" "));
+                            parts.push(self.build_comment_doc(comment));
+                        }
+                        parts.push(d.text(" "));
+                        parts.push(val_annotation);
+                    }
+                    _ => parts.push(val_annotation),
                 }
-                _ => parts.push(val_annotation),
             }
             type_annotation.span.end
         } else {

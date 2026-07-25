@@ -470,30 +470,64 @@ impl<'a> Printer<'a> {
     // Signature Helpers (shared with type members)
     //
 
+    /// The params' close paren (the position just past the `)`) bounding a `)`→return-type
+    /// gap, resolved ONCE for the two consumers keyed on it — the frozen route
+    /// ([`Self::build_frozen_return_type_doc`]) and the gap's comment prefix
+    /// ([`Self::build_close_paren_to_return_type_comments`]) — so neither walks the
+    /// parameter list the other just walked. A caller that already located its close paren
+    /// for other boundaries (a function declaration, whose scan also bounds the params'
+    /// trailing comments) passes it to those two directly and skips this.
+    ///
+    /// Depth-tracked (skips nested parens / comments) — the naive first-`)` scan mis-fires
+    /// on complex params and pulls real param-trailing comments into the gap
+    /// (duplication).
+    ///
+    /// That scan walks the whole parameter list byte by byte, and it exists ONLY to bound
+    /// the two comment-keyed questions above, so it is skipped when the WIDER
+    /// `(`→return-type window holds no comment TO EMIT: the `)`→`:` window is contained in
+    /// it, so the emitter's loop could not have run, and no *honorable* directive can sit
+    /// in the gap either — the freeze needs the directive alone on its line, so a newline
+    /// follows it, so it is not glued, so it is never `owned_by_node` and always in the
+    /// to-emit set (`member_gap_frozen`'s in-source axis and this to-emit gate agree for
+    /// exactly that reason). Either way a `None` close paren yields the same empty doc and
+    /// the same declined freeze. One binary search replaces a per-signature byte walk on
+    /// the common (comment-free) path.
+    pub(in crate::printer) fn return_type_close_paren(
+        &self,
+        paren_pos: Option<u32>,
+        return_type_start: u32,
+    ) -> Option<u32> {
+        paren_pos
+            .filter(|&p| self.has_comments_to_emit_between(p, return_type_start))
+            .and_then(|p| self.find_closing_paren(p, return_type_start))
+    }
+
+    /// The frozen return-type route for a `)`→`:` gap: an alone-on-line format-ignore
+    /// directive there freezes the whole `: type` annotation and keeps its own line
+    /// ([`Self::build_frozen_annotation_head_doc`]), replacing the ordinary
+    /// prefix-plus-annotation emission of all three hosts — a function/method
+    /// declaration, an arrow, and a type-member signature. Without it the gap's first
+    /// comment trails `)` (`build_close_paren_to_return_type_comments`), which is inert
+    /// under the placement classification and would lose the freeze on the second pass.
+    ///
+    /// Takes the already-located `close_paren_after` (via
+    /// [`Self::return_type_close_paren`] where the caller doesn't have one), so it shares
+    /// that scan with the comment emitter below rather than running a second one.
+    pub(in crate::printer) fn build_frozen_return_type_doc(
+        &self,
+        close_paren_after: Option<u32>,
+        return_type: &internal::TSTypeAnnotation<'_>,
+    ) -> Option<DocId> {
+        self.build_frozen_annotation_head_doc(close_paren_after?, return_type)
+    }
+
     /// Emit any comments in the `)`→return-type gap, so the caller can append the
-    /// `: type` after this prefix.
+    /// `: type` after this prefix (`close_paren_after` = the position just past the `)`).
     ///
     /// A **block** comment stays inline with a trailing space, and prettier adds a
     /// space before `:` when one precedes it (`m(a) /* c */ : void`). A **line**
     /// comment forces the return-type `:` onto the next line (`m(a) // c⏎: void`)
-    /// so it isn't swallowed — see `build_close_paren_to_return_type_comments`.
-    /// Returns an empty doc when there is no such comment.
-    pub(in crate::printer) fn build_paren_to_return_type_comments(
-        &self,
-        paren_pos: Option<u32>,
-        return_type_start: u32,
-    ) -> DocId {
-        // Depth-tracked close paren (skips nested parens / comments) — the naive
-        // first-`)` scan mis-fires on complex params and pulls real param-trailing
-        // comments into this range (duplication).
-        let close_paren_after =
-            paren_pos.and_then(|p| self.find_closing_paren(p, return_type_start));
-        self.build_close_paren_to_return_type_comments(close_paren_after, return_type_start)
-    }
-
-    /// `build_paren_to_return_type_comments` for callers that already located the
-    /// params' close paren (`close_paren_after` = position just past the `)`) —
-    /// reuses that scan instead of re-running it.
+    /// so it isn't swallowed. Returns an empty doc when there is no such comment.
     pub(in crate::printer) fn build_close_paren_to_return_type_comments(
         &self,
         close_paren_after: Option<u32>,
@@ -526,20 +560,19 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Build return type annotation with comment handling between `)` and `:`
-    /// Used by MethodSignature, CallSignature, ConstructSignature (type-literal and
-    /// interface members) and the declare-function signature.
+    /// [`Self::build_function_return_type_doc`] for a caller that has only the params'
+    /// `(` — it locates the close paren once ([`Self::return_type_close_paren`]) and
+    /// hands it on. Used by MethodSignature, CallSignature, ConstructSignature
+    /// (type-literal and interface members) and the declare-function signature.
     pub(in crate::printer) fn build_signature_return_type_doc(
         &self,
         paren_pos: Option<u32>,
         return_type: &internal::TSTypeAnnotation<'_>,
     ) -> DocId {
-        let d = self.d();
-        let prefix = self.build_paren_to_return_type_comments(paren_pos, return_type.span.start);
-        d.concat(&[
-            prefix,
-            self.build_type_annotation_doc_for_return_type(return_type),
-        ])
+        self.build_function_return_type_doc(
+            self.return_type_close_paren(paren_pos, return_type.span.start),
+            return_type,
+        )
     }
 
     /// Wrap the parameter list and return-type annotation of a type-member
@@ -591,17 +624,20 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&sig_parts))
     }
 
-    /// Build a function-declaration return type (`: T`) with `)`→`:` comment
-    /// handling, using the return-type type variant (wraps unions/intersections so
-    /// params break first). Sibling of `build_signature_return_type_doc`, which
-    /// serves type-member signatures and uses the plain type variant. The caller
-    /// supplies the already-located close paren (position just past the `)`).
+    /// Build a return type (`: T`) with `)`→`:` comment handling, using the return-type
+    /// type variant (wraps unions/intersections so params break first). The caller
+    /// supplies the already-located close paren (position just past the `)`); the
+    /// `(`-only twin is [`Self::build_signature_return_type_doc`].
     pub(in crate::printer) fn build_function_return_type_doc(
         &self,
         close_paren_after: Option<u32>,
         return_type: &internal::TSTypeAnnotation<'_>,
     ) -> DocId {
         let d = self.d();
+        // The frozen `)`→`:` route, on the close paren this caller already located.
+        if let Some(frozen) = self.build_frozen_return_type_doc(close_paren_after, return_type) {
+            return frozen;
+        }
         let prefix = self
             .build_close_paren_to_return_type_comments(close_paren_after, return_type.span.start);
         d.concat(&[

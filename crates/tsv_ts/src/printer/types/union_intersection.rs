@@ -283,7 +283,7 @@ impl<'a> Printer<'a> {
         // document-level flag — the in-span `has_comments` gate below cannot see an
         // out-of-span directive. `freeze_first` is applied in the main loop and the
         // single-member branch.
-        let leading_freeze = self.union_leading_run_freeze(union);
+        let leading_freeze = self.composite_leading_run_freeze(union.span.start, union.types);
         let (freeze_first, freeze_first_multiline) =
             LeadingRunFreeze::first_member_flags(leading_freeze);
 
@@ -647,7 +647,9 @@ impl<'a> Printer<'a> {
         // routed here, plus a leading-run alone-on-line directive before the union).
         // Recomputed rather than threaded — gated on `has_format_ignore`, so it costs
         // nothing in the common case.
-        let freeze_first = self.union_leading_run_freeze(union).is_some();
+        let freeze_first = self
+            .composite_leading_run_freeze(union.span.start, union.types)
+            .is_some();
 
         for (i, t) in union.types.iter().enumerate() {
             let type_start = t.span().start;
@@ -1143,11 +1145,8 @@ impl<'a> Printer<'a> {
         // whole-intersection arm — the intersection first member behaves like every
         // other honored list position.) Gated on the document-level flag; the in-span `has_comments`
         // gate below cannot see an out-of-span directive.
-        let first_inner = intersection
-            .types
-            .first()
-            .map(|t| unwrap_parenthesized(t).span());
-        let leading_freeze = self.leading_run_freeze(intersection.span.start, first_inner);
+        let leading_freeze =
+            self.composite_leading_run_freeze(intersection.span.start, intersection.types);
         let freeze_first = leading_freeze.is_some();
 
         // Single-member-intersection collapse under a freeze — the union's rule, mirrored
@@ -1605,10 +1604,7 @@ impl<'a> Printer<'a> {
         // path (`strip_first_paren_leading`) already relocates the first member's inner
         // line comment, so a freeze there would double-print it — the hoist wins.
         let freeze_first = self
-            .leading_run_freeze(
-                intersection.span.start,
-                types.first().map(|t| unwrap_parenthesized(t).span()),
-            )
+            .composite_leading_run_freeze(intersection.span.start, types)
             .is_some();
         let frozen_first = !strip_first_paren_leading
             && self.list_member_frozen(intersection.span.start, types, 0, freeze_first);

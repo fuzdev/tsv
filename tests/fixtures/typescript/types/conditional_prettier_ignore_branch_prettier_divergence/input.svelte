@@ -12,8 +12,14 @@
 		// prettier-ignore
 		: {y:   2};
 
+	// composite branch: the whole branch freezes, operators and all
+	type C = X extends string
+		// prettier-ignore
+		? {x:   1} | {z:   3}
+		: { y: 2 };
+
 	// control: a plain comment keeps the trailing relocation
-	type C = X extends string // c
+	type D = X extends string // c
 		? { x: 1 }
 		: { y: 2 };
 </script>

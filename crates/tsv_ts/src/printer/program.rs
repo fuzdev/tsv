@@ -100,7 +100,7 @@ impl<'a> Printer<'a> {
             }
 
             // Leading comments (allow inline comments since statement will be printed)
-            let has_ignore = self.has_format_ignore_in_range(prev_end, statement.span().start);
+            let has_ignore = self.member_gap_frozen(prev_end, statement.span().start);
             if let Some(leading_doc) = self.build_leading_comments_doc(
                 prev_end,
                 statement.span().start,

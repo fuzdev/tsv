@@ -907,12 +907,12 @@ impl<'a> Printer<'a> {
 
             // A preceding format-ignore directive keeps the member's source verbatim.
             // The member span includes its trailing `;`.
-            let member_doc =
-                if body_has_comments && self.has_format_ignore_in_range(prev_end, member_start) {
-                    self.raw_source_doc(member.span())
-                } else {
-                    self.build_type_element_doc(member)
-                };
+            let member_doc = if body_has_comments && self.member_gap_frozen(prev_end, member_start)
+            {
+                self.raw_source_doc(member.span())
+            } else {
+                self.build_type_element_doc(member)
+            };
             parts.push(member_doc);
 
             // Handle trailing inline comments on the same line after the member —
@@ -1094,13 +1094,12 @@ impl<'a> Printer<'a> {
                 // A preceding format-ignore directive keeps the member's source
                 // verbatim. The member span excludes the
                 // trailing `,`, which the loop still appends below.
-                let member_doc = if body_has_comments
-                    && self.has_format_ignore_in_range(prev_end, member_start)
-                {
-                    self.raw_source_doc(member.span)
-                } else {
-                    self.build_enum_member_doc(member)
-                };
+                let member_doc =
+                    if body_has_comments && self.member_gap_frozen(prev_end, member_start) {
+                        self.raw_source_doc(member.span)
+                    } else {
+                        self.build_enum_member_doc(member)
+                    };
                 member_parts.push(member_doc);
 
                 let member_end = member.span.end;

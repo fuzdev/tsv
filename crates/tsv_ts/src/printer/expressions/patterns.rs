@@ -630,7 +630,7 @@ impl<'a> Printer<'a> {
 
             // A preceding format-ignore directive keeps the property's source verbatim
             // (trailing comment/comma handled normally)
-            if has_comments && self.has_format_ignore_in_range(prev_end, prop_start) {
+            if has_comments && self.member_gap_frozen(prev_end, prop_start) {
                 prop_parts.push(self.raw_source_doc(prop.span()));
             } else {
                 prop_parts.push(self.build_object_pattern_property_doc(prop));

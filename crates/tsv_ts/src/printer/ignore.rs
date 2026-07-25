@@ -1,7 +1,10 @@
 // Format-ignore directive honoring for type-member lists (union / intersection /
-// tuple / type-parameter / type-argument members) and single-child type heads (the
+// tuple / type-parameter / type-argument members), single-child type heads (the
 // type after an annotation's `:`, an alias's `=`, a type parameter's `extends`/`=`,
-// a named tuple member's `label:`, a mapped type's `]:` value and key-side gaps).
+// a named tuple member's `label:`, a mapped type's `]:` value and key-side gaps),
+// and annotation heads (the gap BEFORE a `:` — a binding, a property signature, an
+// index signature's value, a signature's return type — where the whole `: type`
+// freezes).
 //
 // One seam that knows what a directive is and where it sits, so the printers
 // only ever ask "freeze this member / this child / this whole node?" and
@@ -46,8 +49,11 @@ use super::Printer;
 use super::has_newline_after_position;
 use super::has_newline_before_position;
 use super::unwrap_parenthesized;
-use crate::ast::internal::{Comment, TSType, TSUnionType};
+use crate::ast::internal::{self, Comment, TSType};
+use smallvec::smallvec;
+use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Span, comments_in_source_range, is_format_ignore_directive};
 
 /// The freeze implied by a format-ignore directive alone on its line in a union's or
@@ -133,20 +139,18 @@ impl<'a> Printer<'a> {
     }
 
     /// Rule A leading-run freeze plan for a union or intersection whose `span.start` is
-    /// `node_start` and whose first member's paren-stripped span is `first_inner`.
-    /// Gated on `has_format_ignore`.
+    /// `node_start` and whose first member's paren-stripped span is `first_inner`. The
+    /// span-shaped core of [`Self::composite_leading_run_freeze`], which is the only
+    /// entry — and which owns the `has_format_ignore` gate, so nothing here re-reads it.
     ///
     /// A directive alone on its line freezes the first member (with `multiline` set
     /// when the frozen first slice spans lines, so the caller forces the broken
     /// layout); any other placement is inert.
-    pub(in crate::printer) fn leading_run_freeze(
+    fn leading_run_freeze(
         &self,
         node_start: u32,
         first_inner: Option<Span>,
     ) -> Option<LeadingRunFreeze> {
-        if !self.has_format_ignore {
-            return None;
-        }
         let directive = self.leading_run_directive(node_start)?;
         // The alone-on-line floor, the same one `member_gap_frozen` applies. Without
         // it, the walk's `|`/`&`/`(` transparency lets a NESTED composite member reach
@@ -167,23 +171,42 @@ impl<'a> Printer<'a> {
         Some(LeadingRunFreeze { multiline })
     }
 
-    /// [`Self::leading_run_freeze`] for a union — resolves the first member's inner span
-    /// so the caller doesn't repeat the paren-unwrap.
-    pub(in crate::printer) fn union_leading_run_freeze(
+    /// [`Self::leading_run_freeze`] for a composite taken as its span start plus its
+    /// member slice — the one entry every union and intersection site uses, so the first
+    /// member's paren-strip is spelled here instead of at each of them.
+    ///
+    /// Opens on the document-level bool, so a directive-free document pays one predicted
+    /// branch and never that paren-unwrap — every union and intersection in the document
+    /// asks this question (the same reason [`Self::list_item_frozen`] and
+    /// [`Self::single_child_frozen`] open with it).
+    #[inline]
+    pub(in crate::printer) fn composite_leading_run_freeze(
         &self,
-        union: &TSUnionType<'_>,
+        node_start: u32,
+        types: &[TSType<'_>],
     ) -> Option<LeadingRunFreeze> {
-        let first_inner = union.types.first().map(|t| unwrap_parenthesized(t).span());
-        self.leading_run_freeze(union.span.start, first_inner)
+        if !self.has_format_ignore {
+            return None;
+        }
+        let first_inner = types.first().map(|t| unwrap_parenthesized(t).span());
+        self.leading_run_freeze(node_start, first_inner)
     }
 
-    /// True when the gap `[prev_end, member_start)` before a union / intersection member
-    /// carries a format-ignore directive **alone on its line** — the one placement that
-    /// freezes. Any other placement — TRAILING the previous member, the separator
-    /// (`{ a: 1 } & // prettier-ignore`), a declaration head, or glued before the member
-    /// (`a | /* prettier-ignore */ b`) — is inert (the wrong-node-misbind floor; the
-    /// `trailing_inert` fixtures are its regression pins, the `glued_inert` fixtures pin
-    /// the glued side).
+    /// True when the gap `[prev_end, member_start)` before a list item carries a
+    /// format-ignore directive **alone on its line** — the one placement that freezes.
+    /// Any other placement — TRAILING the previous member, the separator
+    /// (`{ a: 1 } & // prettier-ignore`), an opening delimiter, a declaration head, or
+    /// glued before the member (`a | /* prettier-ignore */ b`) — is inert (the
+    /// wrong-node-misbind floor; the `trailing_inert` fixtures are its regression pins,
+    /// the `glued_inert` fixtures pin the glued side).
+    ///
+    /// **The single Rule A predicate for every family**, value-level and type-level
+    /// alike: statement lists (`Program.body`, a block body), class / interface / enum
+    /// bodies, object properties and destructuring patterns, a member-chain `.` gap, and
+    /// — through [`Self::list_item_frozen`], [`Self::mapped_gap_frozen`],
+    /// [`Self::single_child_frozen`] and the annotation heads — every type position. All
+    /// of them ask the identical question about the identical window, so they share one
+    /// predicate rather than each re-deriving directive recognition.
     ///
     /// The test keys on the directive's own line, NOT on `is_same_line` against
     /// `prev_end`: a blank line injected between `prev_end` and a trailing directive would
@@ -191,8 +214,9 @@ impl<'a> Printer<'a> {
     /// keying on `prev_end` would flip the freeze on and off across that blank (a
     /// non-idempotency `blank_audit` catches). `prev_end` still bounds the comment window.
     ///
-    /// Gated on `has_format_ignore`; the caller has already opened its comment window,
-    /// so this only runs inside a directive-bearing document.
+    /// Opens on the document-level `has_format_ignore` flag, so a directive-free document
+    /// (≈ every document) pays one predicted branch instead of the range scan and the
+    /// directive match — the gate every entry in this module shares.
     ///
     /// **In-source axis** (`comments_in_source_range`) — the one deliberate axis every
     /// directive-recognition seam in this module uses (`leading_run_directive` walks
@@ -273,6 +297,96 @@ impl<'a> Printer<'a> {
         self.member_gap_frozen(gap_start, child.span().start)
     }
 
+    /// The frozen `: type` for an annotation HEAD gap — the gap *before* the `:`, between
+    /// the head (a binding name plus any `?`/`!`, an index signature's `]`, a signature's
+    /// `)`) and the annotation. An alone-on-line directive there freezes the WHOLE
+    /// annotation node, the one it precedes: `Some` is the gap's own-line-preserving
+    /// comment run followed by the verbatim `: type` slice; `None` leaves the caller's
+    /// ordinary emission in place. The caller pushes the head itself (no trailing space)
+    /// and concatenates this after it.
+    ///
+    /// **Span-shaped, and deliberately NOT composite-transparent** — unlike a single-child
+    /// head ([`Self::single_child_frozen`]), where a union / intersection child declines so
+    /// the member rules apply instead. Those rules can only apply where the composite's own
+    /// leading run REACHES the directive, and that run crosses whitespace and the
+    /// transparent `|` / `&` / `(` only — the annotation's `:` blocks it. So a composite
+    /// value here rides *inside* the frozen span, and the head rules and the member rules
+    /// still can never both claim one directive.
+    ///
+    /// The emission is [`Self::append_keyword_value_line_comments`], the same
+    /// own-line-preserving run the single-child heads use and for the same reason: every
+    /// one of these heads' default emitters trails the gap's first comment on the head's
+    /// line, an inert placement that would lose the freeze on the second pass. The block
+    /// spelling routes here too — placement, not spelling, keys the freeze, and the run
+    /// keeps an own-line block on its own line.
+    ///
+    /// The document-level flag is read HERE rather than left to
+    /// [`Self::member_gap_frozen`] two calls down: every annotation in the document asks
+    /// this question, so a directive-free document pays one predicted branch at the entry
+    /// instead of a call chain (the same reason [`Self::single_child_frozen`] opens with it).
+    pub(in crate::printer) fn build_frozen_annotation_head_doc(
+        &self,
+        gap_start: u32,
+        annotation: &internal::TSTypeAnnotation<'_>,
+    ) -> Option<DocId> {
+        if !self.has_format_ignore {
+            return None;
+        }
+        self.build_frozen_head_span_doc(gap_start, annotation.span)
+    }
+
+    /// [`Self::build_frozen_annotation_head_doc`] for an annotation preceded by an optional
+    /// `?` / definite `!` MARKER, asked on the key→marker gap: a directive alone on its line
+    /// there precedes `?: T` as a unit, so the freeze starts at the marker and the caller
+    /// must emit neither the marker nor the annotation itself. `Some` carries the frozen
+    /// doc plus the cursor just past it (the annotation's span end), so the caller advances
+    /// exactly as its ordinary arm would. `None` leaves the ordinary emission in place —
+    /// including the case where the directive sits AFTER the marker, which the plain
+    /// annotation-head ask then routes on the marker→`:` gap.
+    ///
+    /// `marker` and `annotation` are taken as options so the two hosts — a class property
+    /// (`?` or `!`) and a property signature (`?` only) — share one seam instead of each
+    /// spelling the have-both test. The marker scan runs only in a directive-bearing
+    /// document (the flag is checked first) and is bounded by the annotation's `:`.
+    pub(in crate::printer) fn build_frozen_marker_annotation_tail(
+        &self,
+        gap_start: u32,
+        marker: Option<u8>,
+        annotation: Option<&internal::TSTypeAnnotation<'_>>,
+    ) -> Option<(DocId, u32)> {
+        if !self.has_format_ignore {
+            return None;
+        }
+        let (marker, annotation) = marker.zip(annotation)?;
+        let marker_pos = find_char_skipping_comments(
+            self.source.as_bytes(),
+            gap_start as usize,
+            annotation.span.start as usize,
+            marker,
+        )? as u32;
+        let frozen =
+            self.build_frozen_head_span_doc(gap_start, Span::new(marker_pos, annotation.span.end))?;
+        Some((frozen, annotation.span.end))
+    }
+
+    /// The shared core of the two annotation-head entries: the directive must be alone on its
+    /// line in `[gap_start, frozen.start)`, and `frozen` is emitted verbatim after the gap's
+    /// own-line-preserving comment run.
+    fn build_frozen_head_span_doc(&self, gap_start: u32, frozen: Span) -> Option<DocId> {
+        if !self.member_gap_frozen(gap_start, frozen.start) {
+            return None;
+        }
+        let d = self.d();
+        let mut parts: DocBuf = smallvec![];
+        self.append_keyword_value_line_comments(
+            &mut parts,
+            gap_start,
+            frozen.start,
+            self.build_frozen_span_doc(frozen),
+        );
+        Some(d.concat(&parts))
+    }
+
     /// The strip target for a head whose child is a paren shell whose INTERIOR leading
     /// gap — from just past the outermost `(` to the fully-unwrapped inner's span
     /// start, spanning every nested layer — holds an alone-on-line format-ignore
@@ -319,12 +433,22 @@ impl<'a> Printer<'a> {
     /// wrapper [`Self::list_member_frozen`]) rather than picking its own anchors.
     /// Closure-shaped so the item type is family-agnostic (`TSType` members,
     /// `TSTypeParameter` declarations).
+    ///
+    /// Opens on the document-level bool — ~25 container loops ask this PER ITEM, the
+    /// hottest ignore-seam position by a wide margin, so a directive-free document must
+    /// pay exactly that one predicted branch and never the span closure behind it (the
+    /// same reason [`Self::single_child_frozen`] opens with it; `member_gap_frozen`
+    /// re-checks the flag, harmlessly, for its other callers).
+    #[inline]
     pub(in crate::printer) fn list_item_frozen(
         &self,
         container_start: u32,
         item_span: &impl Fn(usize) -> Span,
         i: usize,
     ) -> bool {
+        if !self.has_format_ignore {
+            return false;
+        }
         if i == 0 {
             self.member_gap_frozen(container_start, item_span(0).start)
         } else {
@@ -335,6 +459,11 @@ impl<'a> Printer<'a> {
     /// [`Self::list_item_frozen`] over a `TSType` slice, plus the union /
     /// intersection `freeze_first` arm (the out-of-span leading-run directive, which
     /// applies only to the first member of an undelimited list).
+    ///
+    /// Opens on the same document-level bool, which also subsumes the `freeze_first`
+    /// arm: that flag comes from [`Self::leading_run_freeze`], itself gated on it, so it
+    /// can only be set in a directive-bearing document.
+    #[inline]
     pub(in crate::printer) fn list_member_frozen(
         &self,
         container_start: u32,
@@ -342,7 +471,9 @@ impl<'a> Printer<'a> {
         i: usize,
         freeze_first: bool,
     ) -> bool {
-        (i == 0 && freeze_first) || self.list_item_frozen(container_start, &|j| types[j].span(), i)
+        self.has_format_ignore
+            && ((i == 0 && freeze_first)
+                || self.list_item_frozen(container_start, &|j| types[j].span(), i))
     }
 
     //

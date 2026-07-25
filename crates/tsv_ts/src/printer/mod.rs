@@ -75,8 +75,7 @@ use tsv_lang::{
         self,
         arena::{DocArena, DocId},
     },
-    has_comments_to_emit_in_range, has_line_comments_in_range, is_format_ignore_directive,
-    printing,
+    has_comments_to_emit_in_range, has_line_comments_in_range, printing,
     source_scan::{TriviaProfile, skip_trivia},
 };
 
@@ -126,9 +125,10 @@ pub struct Printer<'a> {
     pub(crate) has_owned_comments: bool,
     /// Whether any comment in this document is a `format-ignore` directive.
     /// Document-level presence flag (from `PrinterInputs`), computed once per document —
-    /// never here (the `.svelte` per-`{expr}` trap). Gates `has_format_ignore_in_range` so
-    /// a document with no format-ignore directive (~all of them) skips the per-node range
-    /// scan + directive-string match entirely.
+    /// never here (the `.svelte` per-`{expr}` trap). Gates every entry of the
+    /// format-ignore seam (`printer/ignore.rs`) so a document with no format-ignore
+    /// directive (~all of them) skips the per-node range scan + directive-string match
+    /// entirely — each entry reads this flag before any span arithmetic behind it.
     pub(crate) has_format_ignore: bool,
     /// Precomputed line break positions for O(log n) line boundary lookups —
     /// the *layout* table.
@@ -1199,27 +1199,6 @@ impl<'a> Printer<'a> {
                 self.find_keyword_in_range(last.span.end, self.source.len() as u32, keyword)
             })
             .unwrap_or(fallback)
-    }
-
-    /// Check if any comment in the range is a format-ignore directive **alone on its
-    /// line** — the one placement that freezes (the placement floor,
-    /// `directive_alone_on_line`). Used to emit the next node as raw source text
-    /// instead of formatting. A directive sharing its line with anything — trailing
-    /// the previous member's line, trailing the opening `{`, or glued before the node
-    /// — is an ordinary comment here.
-    ///
-    /// Axis-free: ownership binds only a *bundler annotation* (`@__NAME__`) or a JSDoc cast,
-    /// and neither is a format-ignore directive — no owned comment can ever match this
-    /// predicate, so skipping and counting give the same answer.
-    fn has_format_ignore_in_range(&self, start: u32, end: u32) -> bool {
-        // Document-level short-circuit: no format-ignore directive anywhere in the
-        // document ⇒ none in any sub-range, so skip the range scan + directive match.
-        if !self.has_format_ignore {
-            return false;
-        }
-        comments_to_emit_in_range(self.comments, start, end).any(|c| {
-            is_format_ignore_directive(c.content(self.source)) && self.directive_alone_on_line(c)
-        })
     }
 
     /// Emit a node's source span verbatim. Used to round-trip the source of a

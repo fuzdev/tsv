@@ -203,7 +203,7 @@ impl<'a> Printer<'a> {
 
                 // Build property doc — a preceding format-ignore directive keeps the
                 // property's source verbatim (trailing comment/comma handled normally)
-                let prop_doc = if self.has_format_ignore_in_range(search_start, prop_start) {
+                let prop_doc = if self.member_gap_frozen(search_start, prop_start) {
                     self.raw_source_doc(prop.span())
                 } else {
                     self.build_object_property_doc(prop, has_comments)

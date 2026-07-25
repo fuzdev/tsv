@@ -1466,8 +1466,13 @@ return `=>` / predicate `is` / `as` · `satisfies` / indexed-access `[` index /
 angle-assertion `<` / required-paren interior).** The same placement classification honors
 a directive before a head's single child:
 an own-line directive between the head token and the child freezes the child whole —
-unless the (paren-transparent) child is a union or intersection, in which case the member
-rules above apply unchanged (first member freezes). The ordinary fixtures
+unless the (paren-transparent) child is a union or intersection **the directive is
+adjacent to**, in which case the member rules above apply unchanged (first member
+freezes). Adjacency is what makes that split well-defined: the composite claims the
+directive through its own leading run, which crosses only whitespace and the
+transparent `|` / `&` / `(`. At the conditional branches the interposing `?` / `:`
+token blocks that run, so a composite branch has nothing to bind to and freezes
+**whole**, operators and all — prettier's scope there too. The ordinary fixtures
 `alias_prettier_ignore_value`, `annotation_prettier_ignore_union_member`,
 `named_tuple_prettier_ignore_element`, `mapped_prettier_ignore_signature` (a
 directive above a mapped type's `[K in ...]: V` clause freezes the whole clause — the
@@ -1521,6 +1526,50 @@ precede:
   the alias `=` (own-line under it at its 2-pass fixed point, freeze intact, pinned via
   `audit_signature.txt`) —
   [required paren interior](../tests/fixtures/typescript/types/array_element_paren_prettier_ignore_interior_prettier_divergence/)
+
+**On annotation heads (the gap *before* a `:`).** The classification also reaches the
+other side of an annotation's `:` — the gap between a head and the `:` itself, which a
+line comment in that gap is what makes reachable at all (it is the only canonical shape
+where a `: type` leads its own line). An own-line directive there freezes the **whole
+`: type` annotation**: the node the directive precedes, exactly as everywhere else. A
+union or intersection value rides *inside* that frozen span rather than applying the
+member rules — the composite's own leading run stops at the interposing `:`, so it can
+never claim the directive, and the two rules can't both fire. An optional `?` marker
+between the head and the `:` is inside the freeze rather than before it — the frozen
+span starts wherever the directive's own line ends, so `?: T` freezes as a unit. tsv
+keeps the directive own-line at every one of these heads; prettier relocates it to
+trail the head:
+
+- Own-line directive kept own-line at an annotation head — ◆comment_preservation
+  ◆prettier_bug — at a binding's `:` (class property, parameter, variable,
+  index-signature key), an index signature's value `:`, and a signature's return `:`,
+  prettier freezes the same `: type` span but relocates the directive to trail the head
+  (`a // prettier-ignore`, `[k: string] // prettier-ignore`, `fn() // prettier-ignore`)
+  and dedents the frozen slice; tsv keeps the authored own-line placement, which is also
+  the only idempotent one (a head-trailing directive is inert under the placement
+  classification, so the relocated form loses the freeze on tsv's second pass).
+  Prettier's own relocated forms are not self-stable either — the class property's
+  directive slides onto the initializer `=`, the index signature's back inside the
+  brackets, the return type's into the function **body** — losing the freeze
+  (non-idempotent, pinned via each fixture's `audit_signature.txt`) —
+  [binding](../tests/fixtures/typescript/types/binding_prettier_ignore_annotation_prettier_divergence/),
+  [index signature](../tests/fixtures/typescript/types/index_signature_prettier_ignore_annotation_prettier_divergence/),
+  [return type](../tests/fixtures/typescript/types/return_type_prettier_ignore_annotation_prettier_divergence/)
+- Property signature: prettier re-binds the directive **past the `:`** —
+  ◆design_choice ◆comment_preservation ◆prettier_bug — at an interface / type-literal
+  property signature prettier pulls the `:` back onto the key and freezes the *type*
+  alone (`a: // prettier-ignore⏎{x:   1}`), reaching a different node than the one the
+  author pointed at; tsv's scope follows the directive's position, so the whole
+  annotation freezes. With a second comment already in the gap prettier also **merges
+  the two onto one line** (`b: // prettier-ignore // c`), making the second `//`
+  ordinary text — a content loss the own-line placement avoids —
+  [property signature](../tests/fixtures/typescript/types/property_signature_prettier_ignore_annotation_prettier_divergence/)
+- ⚠️ A **second** comment in the index signature's `]`→`:` gap has no prettier oracle at
+  all: prettier oscillates forever between the two placements (the plain-comment case is
+  pinned by
+  [index_signature_bracket_colon_multi_comment](../tests/fixtures/typescript/types/type_members/index_signature_bracket_colon_multi_comment_prettier_divergence/)),
+  so the directive fixture keeps the single-directive shape and the multi-comment
+  interaction rides the other three heads.
 
 See [directives.md](./directives.md) for the user-facing reference.
 
