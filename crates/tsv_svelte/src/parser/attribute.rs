@@ -66,6 +66,18 @@ impl DirectiveType {
             _ => None,
         }
     }
+
+    /// The `TransitionDirective` direction this prefix carries, or `None` for a
+    /// prefix that isn't a transition. `transition:` runs both ways; `in:`/`out:`
+    /// are the same node type with one side (Svelte has no In/OutDirective).
+    const fn transition_direction(self) -> Option<TransitionDirection> {
+        match self {
+            Self::Transition => Some(TransitionDirection::Both),
+            Self::In => Some(TransitionDirection::In),
+            Self::Out => Some(TransitionDirection::Out),
+            _ => None,
+        }
+    }
 }
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
@@ -335,7 +347,24 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             end: end as u32,
         };
 
-        // Create the directive
+        // `transition:`/`in:`/`out:` are ONE node type differing only by direction —
+        // Svelte has no In/OutDirective — so they share a single construction.
+        if let Some(direction) = directive_type.transition_direction() {
+            return Ok(AttributeNode::TransitionDirective(TransitionDirective {
+                name_span,
+                expression,
+                modifiers,
+                direction,
+                span,
+                head_span,
+                expression_tag_span,
+            }));
+        }
+
+        // A valueless `bind:`/`class:` synthesizes its expression from its own name.
+        let name_expression =
+            || self.make_shorthand_identifier(directive_name, colon_idx + 1 + start, name_end);
+
         match directive_type {
             DirectiveType::On => Ok(AttributeNode::OnDirective(OnDirective {
                 name_span,
@@ -345,69 +374,26 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 head_span,
                 expression_tag_span,
             })),
-            DirectiveType::Bind => {
-                // Bind directive always has an expression (auto-generated for shorthand)
-                let expr = expression.unwrap_or_else(|| {
-                    self.make_shorthand_identifier(directive_name, colon_idx + 1 + start, name_end)
-                });
-                Ok(AttributeNode::BindDirective(BindDirective {
-                    name_span,
-                    expression: expr,
-                    modifiers,
-                    span,
-                    head_span,
-                    expression_tag_span,
-                }))
-            }
-            DirectiveType::Class => {
-                // Class directive always has an expression (auto-generated for shorthand)
-                let expr = expression.unwrap_or_else(|| {
-                    self.make_shorthand_identifier(directive_name, colon_idx + 1 + start, name_end)
-                });
-                Ok(AttributeNode::ClassDirective(ClassDirective {
-                    name_span,
-                    expression: expr,
-                    modifiers,
-                    span,
-                    head_span,
-                    expression_tag_span,
-                }))
-            }
-            #[allow(clippy::unreachable)] // Style directives return early before this match
-            DirectiveType::Style => unreachable!("Style directives are handled and returned above"),
+            DirectiveType::Bind => Ok(AttributeNode::BindDirective(BindDirective {
+                name_span,
+                expression: expression.unwrap_or_else(name_expression),
+                modifiers,
+                span,
+                head_span,
+                expression_tag_span,
+            })),
+            DirectiveType::Class => Ok(AttributeNode::ClassDirective(ClassDirective {
+                name_span,
+                expression: expression.unwrap_or_else(name_expression),
+                modifiers,
+                span,
+                head_span,
+                expression_tag_span,
+            })),
             DirectiveType::Use => Ok(AttributeNode::UseDirective(UseDirective {
                 name_span,
                 expression,
                 modifiers,
-                span,
-                head_span,
-                expression_tag_span,
-            })),
-            DirectiveType::Transition => {
-                Ok(AttributeNode::TransitionDirective(TransitionDirective {
-                    name_span,
-                    expression,
-                    modifiers,
-                    direction: TransitionDirection::Both,
-                    span,
-                    head_span,
-                    expression_tag_span,
-                }))
-            }
-            DirectiveType::In => Ok(AttributeNode::TransitionDirective(TransitionDirective {
-                name_span,
-                expression,
-                modifiers,
-                direction: TransitionDirection::In,
-                span,
-                head_span,
-                expression_tag_span,
-            })),
-            DirectiveType::Out => Ok(AttributeNode::TransitionDirective(TransitionDirective {
-                name_span,
-                expression,
-                modifiers,
-                direction: TransitionDirection::Out,
                 span,
                 head_span,
                 expression_tag_span,
@@ -428,6 +414,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 head_span,
                 expression_tag_span,
             })),
+            #[allow(clippy::unreachable)] // Style returns early; transitions are built above
+            DirectiveType::Style
+            | DirectiveType::Transition
+            | DirectiveType::In
+            | DirectiveType::Out => {
+                unreachable!("Style returns early; transitions are built above")
+            }
         }
     }
 
@@ -477,10 +470,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Name channel for a synthesized TS `Identifier` covering `span`:
-    /// span-identity when the name is exactly the source slice (the common
-    /// case), else the decoded name arena-copied as the `&'arena str` escape
-    /// hatch — e.g. a `{ name }` shorthand attribute whose braces content was
-    /// trimmed, so the span includes the padding.
+    /// span-identity when the name is exactly the source slice — which every
+    /// caller's span is built to be — else the decoded name arena-copied as the
+    /// `&'arena str` escape hatch, so a future caller whose name isn't a verbatim
+    /// run can't silently emit the wrong text.
     fn synthesized_ident_name(&self, name: &str, span: Span) -> IdentName<'arena> {
         let slice = &self.source[span.start as usize..span.end as usize];
         if slice == name && u16::try_from(name.len()).is_ok() {
@@ -724,7 +717,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let end = pos + 1; // Include the closing '}'
 
         // Extract content: the identifier name
-        let name_str = self.source[content_start..content_end].trim();
+        let interior = &self.source[content_start..content_end];
+        let name_str = interior.trim();
 
         if name_str.is_empty() {
             return Err(
@@ -748,11 +742,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             ));
         }
 
-        // Create the value as an ExpressionTag containing an Identifier
-        // The identifier has the same name as the attribute
+        // Every span below is the identifier's own — the braces and any padding are outside
+        // all of them. Svelte eats `{`, runs `allow_whitespace()`, then `read_identifier()`,
+        // and threads that identifier's position through as the `ExpressionTag`'s span
+        // (`{start: id.start, end: id.end}`) and the attribute's `name_loc`
+        // (`create_attribute(id.name, id.loc, …)`). Pinned by
+        // `tests/svelte_shorthand_attribute_span.rs` — `format` normalizes `{ x }` → `{x}`,
+        // so no fixture can hold the padded trigger.
+        let ident_start = content_start + (interior.len() - interior.trim_start().len());
         let ident_span = Span {
-            start: content_start as u32,
-            end: content_end as u32,
+            start: ident_start as u32,
+            end: (ident_start + name_str.len()) as u32,
         };
         let identifier = Identifier::simple(
             self.synthesized_ident_name(name_str, ident_span),
@@ -761,10 +761,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         let expression_tag = ExpressionTag {
             expression: Expression::Identifier(identifier),
-            span: Span {
-                start: content_start as u32,
-                end: content_end as u32,
-            },
+            span: ident_span,
         };
 
         // Advance the lexer past the entire {name} construct
@@ -773,18 +770,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let mut value_vec = self.bvec();
         value_vec.push(AttributeValue::ExpressionTag(expression_tag));
 
-        // The attribute name is span-identity: `source[name_span].trim()`
-        // recovers it (the braces interior may carry padding, trimmed on read).
         Ok(Attribute {
             value: Some(value_vec.into_bump_slice()),
             span: Span {
                 start: start as u32,
                 end: end as u32,
             },
-            name_span: Span {
-                start: content_start as u32,
-                end: content_end as u32,
-            },
+            name_span: ident_span,
         })
     }
 

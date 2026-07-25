@@ -983,26 +983,13 @@ pub struct Attribute<'arena> {
 }
 
 impl Attribute<'_> {
-    /// The attribute name — span-identity, recovered from `source[name_span]`
-    /// with surrounding whitespace trimmed. Only a padded `{ shorthand }` has
-    /// any whitespace to trim (its `name_span` covers the untrimmed braces
-    /// interior, matching Svelte's `name_loc`); every other attribute name is a
-    /// verbatim source run, so `trim` is a no-op. Recovered directly from source.
+    /// The attribute name — span-identity, the verbatim `source[name_span]` slice.
+    /// Every attribute name is a bare source run, a padded `{ shorthand }`
+    /// included: its `name_span` is the identifier alone, not the braces interior
+    /// (see the parser's `parse_shorthand_attribute`).
     #[inline]
     pub fn name<'s>(&self, source: &'s str) -> &'s str {
-        source[self.name_span.range()].trim()
-    }
-
-    /// The sub-span of `name_span` covering the trimmed name — the doc-emission
-    /// seam (`DocText::SourceSpan`). Equal to `name_span` except for a padded
-    /// `{ shorthand }`.
-    #[inline]
-    pub fn name_render_span(&self, source: &str) -> Span {
-        let start = self.name_span.start as usize;
-        let raw = &source[start..self.name_span.end as usize];
-        let lead = raw.len() - raw.trim_start().len();
-        let len = raw.trim().len();
-        Span::new((start + lead) as u32, (start + lead + len) as u32)
+        &source[self.name_span.range()]
     }
 }
 

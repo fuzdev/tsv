@@ -24,7 +24,15 @@
 import { describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
+import {
+	existsSync,
+	mkdirSync,
+	mkdtempSync,
+	readdirSync,
+	readFileSync,
+	rmSync,
+	writeFileSync,
+} from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
@@ -53,6 +61,13 @@ const PKG_NAMES = {
 };
 
 const node_entry = await import(`../${pkg_dir}/index.js`);
+
+/** Repo root — `PKG_DIR` is repo-relative, and this file lives in `scripts/`. */
+const repo_root = dirname(import.meta.dirname);
+
+/** Structural equality for plain wire JSON (no cycles, no undefined-vs-missing nuance). */
+const deep_equal_json = (a: unknown, b: unknown): boolean =>
+	JSON.stringify(a) === JSON.stringify(b);
 
 describe(`package metadata: ${pkg_dir}`, () => {
 	const pkg = JSON.parse(
@@ -264,6 +279,88 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		assert.ok(name_locs_checked > 0, 'expected at least one name_loc to compare');
 		// The walk is a superset: it adds `loc` to template nodes Svelte's wire omits.
 		assert.ok(recon.loc, 'reconstruct added loc to the Root (template node)');
+	});
+
+	// The hand-written case above pins the shapes a reader can follow; this one drives
+	// the SAME helper over every `.svelte` fixture in the repo, so the tables it carries
+	// (`NAME_LOC_KINDS`, the character-bearing shapes) are graded against what the writer
+	// actually emits rather than against a remembered list. Every mismatch must fall into
+	// one of the two documented Svelte divergences — anything else fails.
+	//
+	// Self-oracle by construction: it grades `reconstruct(no-loc) == full wire`, so it
+	// proves reconstruction fidelity, NOT conformance to Svelte. The conformance oracle is
+	// `deno task corpus:compare:parse` plus the root Rust span tests.
+	it('reconstructs every .svelte fixture, modulo the two documented quirks', () => {
+		const roots = [join(repo_root, 'tests/fixtures'), join(repo_root, 'tests/fixtures_compile')];
+		const files: Array<string> = [];
+		const collect = (dir: string): void => {
+			for (const entry of readdirSync(dir, { withFileTypes: true })) {
+				const p = join(dir, entry.name);
+				if (entry.isDirectory()) collect(p);
+				else if (entry.name.endsWith('.svelte')) files.push(p);
+			}
+		};
+		for (const r of roots) if (existsSync(r)) collect(r);
+		assert.ok(files.length > 500, `expected the fixture tree, found ${files.length} .svelte files`);
+
+		const findings: Array<string> = [];
+		let compared = 0;
+		let character_locs = 0;
+		let scanned = 0;
+
+		const compare = (recon: any, full: any, file: string): void => {
+			if (Array.isArray(full)) {
+				full.forEach((x, i) => compare(recon?.[i], x, file));
+				return;
+			}
+			if (!full || typeof full !== 'object') return;
+			if (full.name_loc) {
+				compared++;
+				if (!deep_equal_json(recon?.name_loc, full.name_loc)) {
+					findings.push(`${file}: name_loc on ${full.type}@${full.start}`);
+				}
+			}
+			if (full.loc) {
+				compared++;
+				const has_character = 'character' in (full.loc.start ?? {});
+				if (has_character) character_locs++;
+				if (!deep_equal_json(recon?.loc, full.loc)) {
+					// documented quirk 1: Svelte's `<script>`/`<style>` tag-position override
+					const script_program = full.type === 'Program';
+					// documented quirk 2: the destructure-pattern synthetic-`(` column shift
+					const destructure_shift =
+						recon?.loc?.start?.line === full.loc.start.line &&
+						full.loc.start.column - (recon?.loc?.start?.column ?? 0) === 1;
+					if (!script_program && !destructure_shift) {
+						findings.push(`${file}: loc on ${full.type}@${full.start}`);
+					}
+				}
+			}
+			for (const k of Object.keys(full)) {
+				if (k === 'loc' || k === 'name_loc') continue;
+				compare(recon?.[k], full[k], file);
+			}
+		};
+
+		for (const file of files) {
+			const source = readFileSync(file, 'utf8');
+			let full;
+			let span_only;
+			try {
+				full = node_entry.parse_svelte(source);
+				span_only = node_entry.parse_svelte_no_locations(source);
+			} catch {
+				continue; // a fixture tsv rejects on purpose (input_invalid_*, tsv_rejects)
+			}
+			scanned++;
+			const recon = node_entry.reconstruct_locations(span_only, source, { language: 'svelte' });
+			compare(recon, full, file.slice(repo_root.length + 1));
+		}
+
+		assert.ok(scanned > 500, `expected to parse most fixtures, parsed ${scanned}`);
+		assert.ok(compared > 10_000, `expected a broad comparison, made ${compared}`);
+		assert.ok(character_locs > 0, 'expected some character-bearing locs (in-tag comments)');
+		assert.deepEqual(findings.slice(0, 10), [], `${findings.length} undocumented mismatches`);
 	});
 });
 

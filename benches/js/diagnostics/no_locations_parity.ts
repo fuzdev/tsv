@@ -10,9 +10,9 @@
  *
  * Svelte's `name_loc` gets the same treatment. Its name span isn't a node
  * `start`/`end`, but it is a function of them plus the node type — the tag-name run
- * after `<`, an attribute name at the node start (a shorthand `{x}` naming its
- * braces interior), a directive's whole head token — so this file derives the span
- * and gates both it and its line/column against the oracle wire.
+ * after `<`, an attribute name at the node start (a shorthand `{x}` naming the
+ * identifier inside its braces), a directive's whole head token — so this file
+ * derives the span and gates both it and its line/column against the oracle wire.
  *
  * Line rules (mirrored from `tsv_lang::LocationTracker`):
  * - TypeScript / `.ts`: ECMAScript LineTerminators — \n, \r, \r\n (ONE), U+2028,
@@ -137,9 +137,13 @@ function name_span_of(node: Record<string, unknown>, source: string): [number, n
 		return [start, head_end];
 	}
 	if (type === 'Attribute') {
-		// a shorthand `{x}` names its braces interior, padding included (`{ x }`) —
-		// unlike a `<script>` attribute, whose literal name can itself be braced
-		if (source[start] === '{' && !source.startsWith(name, start)) return [start + 1, end - 1];
+		// a shorthand `{x}` names the identifier inside the braces, so a padded `{ x }`
+		// excludes the padding — unlike a `<script>` attribute, whose literal name can
+		// itself be braced (`<script {x}>`, name `{x}`)
+		if (source[start] === '{' && !source.startsWith(name, start)) {
+			const name_start = source.indexOf(name, start + 1);
+			return name_start < 0 || name_start >= end ? null : [name_start, name_start + name.length];
+		}
 		return [start, start + name.length];
 	}
 	return null;
