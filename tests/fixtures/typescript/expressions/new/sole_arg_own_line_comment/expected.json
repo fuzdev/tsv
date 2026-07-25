@@ -1,0 +1,1005 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 525,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a lone huggable argument with an own-line leading comment expands instead of",
+			"start": 20,
+			"end": 99,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " hugging — the hug has no gap emitter, so the comment would be dropped",
+			"start": 101,
+			"end": 173,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 184,
+			"end": 188,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 215,
+			"end": 219,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 244,
+			"end": 248,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line block comment behaves the same",
+			"start": 283,
+			"end": 328,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 339,
+			"end": 346,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a glued block comment is owned by the argument and rides inside its doc, so the",
+			"start": 364,
+			"end": 446,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " hug survives",
+			"start": 448,
+			"end": 463,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 471,
+			"end": 478,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 7
+				},
+				"end": {
+					"line": 29,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 498,
+			"end": 505,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 7
+				},
+				"end": {
+					"line": 31,
+					"column": 14
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 524,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 515,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 32,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 175,
+					"end": 203,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 175,
+						"end": 202,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 179,
+							"end": 180,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 5
+								},
+								"end": {
+									"line": 4,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": [
+							{
+								"type": "ObjectExpression",
+								"start": 191,
+								"end": 199,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 10
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 193,
+										"end": 197,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 4
+											},
+											"end": {
+												"line": 6,
+												"column": 8
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 193,
+											"end": 194,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 4
+												},
+												"end": {
+													"line": 6,
+													"column": 5
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 196,
+											"end": 197,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 7
+												},
+												"end": {
+													"line": 6,
+													"column": 8
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 184,
+										"end": 188
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a lone huggable argument with an own-line leading comment expands instead of",
+							"start": 20,
+							"end": 99
+						},
+						{
+							"type": "Line",
+							"value": " hugging — the hug has no gap emitter, so the comment would be dropped",
+							"start": 101,
+							"end": 173
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 206,
+					"end": 232,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 206,
+						"end": 231,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 210,
+							"end": 211,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 5
+								},
+								"end": {
+									"line": 9,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": [
+							{
+								"type": "ArrayExpression",
+								"start": 222,
+								"end": 228,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 223,
+										"end": 224,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 3
+											},
+											"end": {
+												"line": 11,
+												"column": 4
+											}
+										},
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 226,
+										"end": 227,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 6
+											},
+											"end": {
+												"line": 11,
+												"column": 7
+											}
+										},
+										"name": "b"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 215,
+										"end": 219
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 235,
+					"end": 280,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 235,
+						"end": 279,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 19,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 239,
+							"end": 240,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 5
+								},
+								"end": {
+									"line": 14,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": [
+							{
+								"type": "FunctionExpression",
+								"start": 251,
+								"end": 276,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 263,
+									"end": 276,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 14
+										},
+										"end": {
+											"line": 18,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 268,
+											"end": 272,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 3
+												},
+												"end": {
+													"line": 17,
+													"column": 7
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 268,
+												"end": 271,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 3
+													},
+													"end": {
+														"line": 17,
+														"column": 6
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 268,
+													"end": 269,
+													"loc": {
+														"start": {
+															"line": 17,
+															"column": 3
+														},
+														"end": {
+															"line": 17,
+															"column": 4
+														}
+													},
+													"name": "a"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 244,
+										"end": 248
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 330,
+					"end": 361,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 330,
+						"end": 360,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 1
+							},
+							"end": {
+								"line": 25,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 334,
+							"end": 335,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 5
+								},
+								"end": {
+									"line": 22,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": [
+							{
+								"type": "ObjectExpression",
+								"start": 349,
+								"end": 357,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 2
+									},
+									"end": {
+										"line": 24,
+										"column": 10
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 351,
+										"end": 355,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 4
+											},
+											"end": {
+												"line": 24,
+												"column": 8
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 351,
+											"end": 352,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 4
+												},
+												"end": {
+													"line": 24,
+													"column": 5
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 354,
+											"end": 355,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 7
+												},
+												"end": {
+													"line": 24,
+													"column": 8
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 339,
+										"end": 346
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line block comment behaves the same",
+							"start": 283,
+							"end": 328
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 465,
+					"end": 489,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 25
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 465,
+						"end": 488,
+						"loc": {
+							"start": {
+								"line": 29,
+								"column": 1
+							},
+							"end": {
+								"line": 29,
+								"column": 24
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 469,
+							"end": 470,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 5
+								},
+								"end": {
+									"line": 29,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": [
+							{
+								"type": "ObjectExpression",
+								"start": 479,
+								"end": 487,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 15
+									},
+									"end": {
+										"line": 29,
+										"column": 23
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 481,
+										"end": 485,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 17
+											},
+											"end": {
+												"line": 29,
+												"column": 21
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 481,
+											"end": 482,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 17
+												},
+												"end": {
+													"line": 29,
+													"column": 18
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 484,
+											"end": 485,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 20
+												},
+												"end": {
+													"line": 29,
+													"column": 21
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 471,
+										"end": 478
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a glued block comment is owned by the argument and rides inside its doc, so the",
+							"start": 364,
+							"end": 446
+						},
+						{
+							"type": "Line",
+							"value": " hug survives",
+							"start": 448,
+							"end": 463
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 492,
+					"end": 514,
+					"loc": {
+						"start": {
+							"line": 31,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 23
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 492,
+						"end": 513,
+						"loc": {
+							"start": {
+								"line": 31,
+								"column": 1
+							},
+							"end": {
+								"line": 31,
+								"column": 22
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 496,
+							"end": 497,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 5
+								},
+								"end": {
+									"line": 31,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": [
+							{
+								"type": "ArrayExpression",
+								"start": 506,
+								"end": 512,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 15
+									},
+									"end": {
+										"line": 31,
+										"column": 21
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 507,
+										"end": 508,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 16
+											},
+											"end": {
+												"line": 31,
+												"column": 17
+											}
+										},
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 510,
+										"end": 511,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 19
+											},
+											"end": {
+												"line": 31,
+												"column": 20
+											}
+										},
+										"name": "b"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 498,
+										"end": 505
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

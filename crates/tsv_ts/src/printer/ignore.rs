@@ -6,6 +6,16 @@
 // index signature's value, a signature's return type — where the whole `: type`
 // freezes).
 //
+// Value-side argument and element lists join the list family through
+// `args_frozen_span` / `element_frozen_span` and the freeze-aware item builder
+// `build_arg_item_doc` — a call's, a `new`'s and a member chain's arguments, and an
+// array literal's or array pattern's elements. A lone item whose gap anchor its
+// printer already holds (dynamic `import()`'s two named fields, a JSDoc cast's
+// interior) asks `gap_frozen_span` instead, the same question without the list
+// index. Each freezes over the item's own node span, so a spread or rest `...` rides
+// inside; an element SLOT may be a hole, which never freezes and contributes only
+// its comma to the next slot's gap.
+//
 // Parameter lists (value-side and type-side alike) join the list family through
 // `param_frozen_span`, over each parameter's RENDER span so a decorated parameter
 // freezes from its first decorator. A decorated parameter has a SECOND freeze position
@@ -53,6 +63,7 @@
 // comment survives — comment preservation outranks redundant-paren removal under a freeze
 // (`union_prettier_ignore_paren_shell_comment` exercises it, `comments:audit` guards it).
 
+use super::ParenContext;
 use super::Printer;
 use super::has_newline_after_position;
 use super::has_newline_before_position;
@@ -241,10 +252,18 @@ impl<'a> Printer<'a> {
     /// about the directive's own placement, not the freeze target.
     pub(in crate::printer) fn member_gap_frozen(&self, prev_end: u32, member_start: u32) -> bool {
         self.has_format_ignore
-            && comments_in_source_range(self.comments, prev_end, member_start).any(|c| {
-                is_format_ignore_directive(c.content(self.source))
-                    && self.directive_alone_on_line(c)
-            })
+            && comments_in_source_range(self.comments, prev_end, member_start)
+                .any(|c| self.is_honored_directive(c))
+    }
+
+    /// Whether comment `c` is a format-ignore directive that HONORS — the recognizer plus
+    /// the placement floor below, in one predicate. The freeze tests ask it through
+    /// [`Self::member_gap_frozen`]; an emitter asks it directly when a comment's own
+    /// layout depends on the answer, because an honored directive must keep the line the
+    /// author gave it — collapsing it onto the frozen value's line would make it glued,
+    /// hence inert, and the freeze would be lost on the next pass.
+    pub(in crate::printer) fn is_honored_directive(&self, c: &Comment) -> bool {
+        is_format_ignore_directive(c.content(self.source)) && self.directive_alone_on_line(c)
     }
 
     /// The placement floor: whether comment `c` is the only thing on its physical line
@@ -493,6 +512,72 @@ impl<'a> Printer<'a> {
             .then(|| item_span(i))
     }
 
+    /// [`Self::member_gap_frozen`] resolved to the span it freezes, for a value-side item
+    /// whose gap anchor the caller already holds — a lone argument (the JSDoc cast's
+    /// interior, dynamic `import()`'s two named fields, which are not a slice at all) or
+    /// an element slot, whose anchor skips the holes before it.
+    ///
+    /// `Some` is the span to freeze: the item's own node span, so a spread or rest `...`
+    /// rides inside the freeze (the node starts at the `...`, so its span already covers
+    /// it), matching prettier. The list's `,` is parent-owned and stays outside.
+    #[inline]
+    pub(in crate::printer) fn gap_frozen_span(&self, prev_end: u32, span: Span) -> Option<Span> {
+        self.member_gap_frozen(prev_end, span.start).then_some(span)
+    }
+
+    /// [`Self::list_item_frozen`] for a value-side ARGUMENT list item `i` — a call's,
+    /// a `new`'s or a member chain's arguments. `Some` is the span to freeze, per
+    /// [`Self::gap_frozen_span`].
+    ///
+    /// `container_start` is where the FIRST item's gap opens, per each family's own
+    /// convention: just past the `[` for a bracketed list, and for a call the position
+    /// the `(` follows (the callee's, or the type-argument list's, end) — the same window
+    /// every leading-argument-comment emitter at those sites already opens, so a
+    /// directive written above the `(` leads the first argument exactly as it does for
+    /// those emitters (prettier-confirmed).
+    #[inline]
+    pub(in crate::printer) fn args_frozen_span(
+        &self,
+        container_start: u32,
+        args: &[internal::Expression<'_>],
+        i: usize,
+    ) -> Option<Span> {
+        if !self.has_format_ignore {
+            return None;
+        }
+        let item_span = |j: usize| args[j].span();
+        self.list_item_frozen(container_start, &item_span, i)
+            .then(|| item_span(i))
+    }
+
+    /// [`Self::args_frozen_span`] over an ELEMENT slot slice — an array literal's or
+    /// array pattern's `elements`, where a slot may be a HOLE (elision).
+    ///
+    /// A hole never freezes: it has no span for a verbatim slice to cover. And a run of
+    /// holes before slot `i` contributes only its commas, so the gap window keeps the
+    /// same shape (commas, whitespace, comments) when anchored at the previous PRESENT
+    /// element's end — or at `container_start` when every earlier slot is a hole. That
+    /// anchor rule is why this is spelled here beside [`Self::list_item_frozen`], the
+    /// other home of the gap-anchor convention, rather than at the element loops.
+    pub(in crate::printer) fn element_frozen_span(
+        &self,
+        container_start: u32,
+        elements: &[Option<internal::Expression<'_>>],
+        i: usize,
+    ) -> Option<Span> {
+        if !self.has_format_ignore {
+            return None;
+        }
+        let elem = elements[i].as_ref()?;
+        let prev_end = elements[..i]
+            .iter()
+            .rev()
+            .flatten()
+            .next()
+            .map_or(container_start, |e| e.span().end);
+        self.gap_frozen_span(prev_end, elem.span())
+    }
+
     /// [`Self::list_item_frozen`] over a `TSType` slice, plus the union /
     /// intersection `freeze_first` arm (the out-of-span leading-run directive, which
     /// applies only to the first member of an undelimited list).
@@ -545,6 +630,95 @@ impl<'a> Printer<'a> {
     /// taken as-is).
     pub(in crate::printer) fn build_frozen_span_doc(&self, span: Span) -> DocId {
         self.with_frozen_must_break(self.raw_source_range(span.start, span.end), span)
+    }
+
+    /// The frozen verbatim slice for an ARGUMENT or ELEMENT item, with the
+    /// argument-context clarity parens re-synthesized around it: an assignment argument
+    /// prints as `fn((a = b))`, and those parens are the printer's rather than the
+    /// author's, so they belong OUTSIDE the frozen slice — prettier freezes the inner and
+    /// keeps them too (`fn(⏎// prettier-ignore⏎(a = b  +  c))`). Same rule, and the same
+    /// reason, as [`Self::build_frozen_member_doc`]'s bare-member arm.
+    ///
+    /// The must-break rides in the doc ([`Self::build_frozen_span_doc`]): every layout in
+    /// this family is width-decided, and a `verbatim_source_span` is `will_break`-opaque,
+    /// so a multi-line frozen item has to say so explicitly.
+    pub(in crate::printer) fn build_frozen_arg_doc(
+        &self,
+        arg: &internal::Expression<'_>,
+        frozen: Span,
+    ) -> DocId {
+        let doc = self.build_frozen_expression_doc(arg, frozen);
+        if self.needs_parens(arg, ParenContext::Argument) {
+            // Parens outside the claimed comment, exactly as the ordinary path nests them
+            // (`d.parens(build_expression_doc(..))`, whose owned-comment prepend is inside).
+            self.d().parens(doc)
+        } else {
+            doc
+        }
+    }
+
+    /// The frozen verbatim slice for an EXPRESSION, with the glued leading comment the
+    /// expression OWNS claimed onto it.
+    ///
+    /// A block comment glued before a node is owned by it and rides *inside* that node's
+    /// ordinary doc, which is exactly the doc a freeze replaces — and the slice starts at
+    /// the node's own span, so the comment is not in it either. Nothing else prints it (the
+    /// gap emitters all skip owned comments), so without this claim it is DROPPED:
+    /// docs/comments.md hazard 1, the ownership-is-about-who-PRINTS rule. Prettier keeps
+    /// the comment right where it is, glued before the frozen slice.
+    ///
+    /// Found by `gaps:audit` injecting a block comment before a frozen argument — the
+    /// print-once ledger over the fixtures as authored could not see it, since no fixture
+    /// glues a comment to a frozen item.
+    ///
+    /// A **`SequenceExpression`** additionally gets back the grouping parens it prints for
+    /// itself. Those parens are required (`fn((0, 1))` passes ONE argument; `fn(0, 1)`
+    /// passes two) but they are printed by `build_sequence_doc`, not by the enclosing
+    /// context — which is why `needs_parens` deliberately answers `false` for it — and they
+    /// sit OUTSIDE the node's span, so a verbatim slice of the span alone drops them and
+    /// changes the meaning. The rule belongs here rather than at
+    /// [`Self::build_frozen_arg_doc`] because it is a property of the node, not of the
+    /// position: the cast interior needs it too.
+    pub(in crate::printer) fn build_frozen_expression_doc(
+        &self,
+        expr: &internal::Expression<'_>,
+        frozen: Span,
+    ) -> DocId {
+        let doc =
+            self.prepend_owned_leading_comment_at(frozen.start, self.build_frozen_span_doc(frozen));
+        if matches!(expr, internal::Expression::SequenceExpression(_)) {
+            self.d().parens(doc)
+        } else {
+            doc
+        }
+    }
+
+    /// The doc for argument item `i`: the frozen verbatim slice when Rule A fires
+    /// ([`Self::args_frozen_span`]), else the ordinary argument-context doc. The one
+    /// freeze-aware twin of `build_arg_expression_doc`, so no argument loop spells the
+    /// dispatch itself — every call, `new` and member-chain argument loop routes here.
+    ///
+    /// The document-level flag is read HERE, with the ordinary build on its own arm, rather
+    /// than left to [`Self::args_frozen_span`] one call down: this is the hottest position
+    /// in the module — every argument of every call, `new` and chain call asks it — so a
+    /// directive-free document (≈ every document) pays exactly one predicted branch and
+    /// never the `Option` or the span closure behind it. The same reason
+    /// [`Self::list_item_frozen`] and [`Self::single_child_frozen`] open with it. (Measured
+    /// as null either way on real corpora — the shape is doctrine, not a won benchmark.)
+    #[inline]
+    pub(in crate::printer) fn build_arg_item_doc(
+        &self,
+        container_start: u32,
+        args: &[internal::Expression<'_>],
+        i: usize,
+    ) -> DocId {
+        if !self.has_format_ignore {
+            return self.build_arg_expression_doc(&args[i]);
+        }
+        self.args_frozen_span(container_start, args, i).map_or_else(
+            || self.build_arg_expression_doc(&args[i]),
+            |frozen| self.build_frozen_arg_doc(&args[i], frozen),
+        )
     }
 
     /// Paren-transparent frozen doc for a union / intersection member — and, through

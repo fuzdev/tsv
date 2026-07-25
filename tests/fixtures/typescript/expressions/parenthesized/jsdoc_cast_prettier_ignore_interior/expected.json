@@ -1,0 +1,1161 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 927,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a directive alone on its line inside a JSDoc cast's own parens freezes the cast's",
+			"start": 10,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " inner expression — the cast's comment and parens print around the frozen slice",
+			"start": 96,
+			"end": 177,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 189,
+			"end": 205,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 11
+				},
+				"end": {
+					"line": 4,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 210,
+			"end": 228,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the block spelling keeps its line here too: a glued directive is inert, so",
+			"start": 248,
+			"end": 325,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " collapsing it inline would lose the freeze on the next pass",
+			"start": 327,
+			"end": 389,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 401,
+			"end": 417,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 11
+				},
+				"end": {
+					"line": 11,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 422,
+			"end": 443,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " as a call argument — the position the ignore ledger keys this on",
+			"start": 463,
+			"end": 530,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 546,
+			"end": 562,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 568,
+			"end": 586,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 3
+				},
+				"end": {
+					"line": 20,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an ordinary own-line comment in the same gap still collapses inline (no freeze,",
+			"start": 612,
+			"end": 694,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " nothing to preserve)",
+			"start": 696,
+			"end": 719,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 731,
+			"end": 747,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 11
+				},
+				"end": {
+					"line": 27,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 749,
+			"end": 756,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 29
+				},
+				"end": {
+					"line": 27,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a block comment glued before the inner is owned by it and stays put",
+			"start": 770,
+			"end": 840,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 852,
+			"end": 868,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 11
+				},
+				"end": {
+					"line": 30,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 873,
+			"end": 891,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 894,
+			"end": 901,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 2
+				},
+				"end": {
+					"line": 32,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 926,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 917,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 34,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 179,
+					"end": 245,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 185,
+							"end": 244,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 185,
+								"end": 186,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 231,
+								"end": 241,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 12
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 231,
+									"end": 233,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 4
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 234,
+										"end": 235,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 5
+											},
+											"end": {
+												"line": 6,
+												"column": 6
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 239,
+										"end": 240,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 10
+											},
+											"end": {
+												"line": 6,
+												"column": 11
+											}
+										},
+										"value": 2,
+										"raw": "2"
+									}
+								],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 189,
+										"end": 205
+									},
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 210,
+										"end": 228
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a directive alone on its line inside a JSDoc cast's own parens freezes the cast's",
+							"start": 10,
+							"end": 94
+						},
+						{
+							"type": "Line",
+							"value": " inner expression — the cast's comment and parens print around the frozen slice",
+							"start": 96,
+							"end": 177
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 391,
+					"end": 460,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 397,
+							"end": 459,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 14,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 397,
+								"end": 398,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 446,
+								"end": 456,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 12
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 446,
+									"end": 448,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 4
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 449,
+										"end": 450,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 5
+											},
+											"end": {
+												"line": 13,
+												"column": 6
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 454,
+										"end": 455,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 10
+											},
+											"end": {
+												"line": 13,
+												"column": 11
+											}
+										},
+										"value": 2,
+										"raw": "2"
+									}
+								],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 401,
+										"end": 417
+									},
+									{
+										"type": "Block",
+										"value": " prettier-ignore ",
+										"start": 422,
+										"end": 443
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the block spelling keeps its line here too: a glued directive is inert, so",
+							"start": 248,
+							"end": 325
+						},
+						{
+							"type": "Line",
+							"value": " collapsing it inline would lose the freeze on the next pass",
+							"start": 327,
+							"end": 389
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 532,
+					"end": 609,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 532,
+						"end": 608,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 23,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 532,
+							"end": 535,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 1
+								},
+								"end": {
+									"line": 17,
+									"column": 4
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 532,
+								"end": 533,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 1
+									},
+									"end": {
+										"line": 17,
+										"column": 2
+									}
+								},
+								"name": "c"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 534,
+								"end": 535,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 3
+									},
+									"end": {
+										"line": 17,
+										"column": 4
+									}
+								},
+								"name": "d"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrayExpression",
+								"start": 539,
+								"end": 542,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 5
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 540,
+										"end": 541,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 3
+											},
+											"end": {
+												"line": 18,
+												"column": 4
+											}
+										},
+										"name": "e"
+									}
+								]
+							},
+							{
+								"type": "CallExpression",
+								"start": 590,
+								"end": 601,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 3
+									},
+									"end": {
+										"line": 21,
+										"column": 14
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 590,
+									"end": 593,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 3
+										},
+										"end": {
+											"line": 21,
+											"column": 6
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 590,
+										"end": 591,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 3
+											},
+											"end": {
+												"line": 21,
+												"column": 4
+											}
+										},
+										"name": "f"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 592,
+										"end": 593,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 5
+											},
+											"end": {
+												"line": 21,
+												"column": 6
+											}
+										},
+										"name": "g"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 594,
+										"end": 595,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 7
+											},
+											"end": {
+												"line": 21,
+												"column": 8
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 599,
+										"end": 600,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 12
+											},
+											"end": {
+												"line": 21,
+												"column": 13
+											}
+										},
+										"value": 2,
+										"raw": "2"
+									}
+								],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 546,
+										"end": 562
+									},
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 568,
+										"end": 586
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " as a call argument — the position the ignore ledger keys this on",
+							"start": 463,
+							"end": 530
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 721,
+					"end": 767,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 47
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 727,
+							"end": 766,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 7
+								},
+								"end": {
+									"line": 27,
+									"column": 46
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 727,
+								"end": 728,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 7
+									},
+									"end": {
+										"line": 27,
+										"column": 8
+									}
+								},
+								"name": "h"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 757,
+								"end": 765,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 37
+									},
+									"end": {
+										"line": 27,
+										"column": 45
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 757,
+									"end": 759,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 37
+										},
+										"end": {
+											"line": 27,
+											"column": 39
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 760,
+										"end": 761,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 40
+											},
+											"end": {
+												"line": 27,
+												"column": 41
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 763,
+										"end": 764,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 43
+											},
+											"end": {
+												"line": 27,
+												"column": 44
+											}
+										},
+										"value": 2,
+										"raw": "2"
+									}
+								],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 731,
+										"end": 747
+									},
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 749,
+										"end": 756
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an ordinary own-line comment in the same gap still collapses inline (no freeze,",
+							"start": 612,
+							"end": 694
+						},
+						{
+							"type": "Line",
+							"value": " nothing to preserve)",
+							"start": 696,
+							"end": 719
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 842,
+					"end": 916,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 848,
+							"end": 915,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 7
+								},
+								"end": {
+									"line": 33,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 848,
+								"end": 849,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 7
+									},
+									"end": {
+										"line": 30,
+										"column": 8
+									}
+								},
+								"name": "i"
+							},
+							"init": {
+								"type": "CallExpression",
+								"start": 902,
+								"end": 912,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 10
+									},
+									"end": {
+										"line": 32,
+										"column": 20
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 902,
+									"end": 904,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 10
+										},
+										"end": {
+											"line": 32,
+											"column": 12
+										}
+									},
+									"name": "fn"
+								},
+								"arguments": [
+									{
+										"type": "Literal",
+										"start": 905,
+										"end": 906,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 13
+											},
+											"end": {
+												"line": 32,
+												"column": 14
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									},
+									{
+										"type": "Literal",
+										"start": 910,
+										"end": 911,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 18
+											},
+											"end": {
+												"line": 32,
+												"column": 19
+											}
+										},
+										"value": 2,
+										"raw": "2"
+									}
+								],
+								"optional": false,
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 852,
+										"end": 868
+									},
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 873,
+										"end": 891
+									},
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 894,
+										"end": 901
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment glued before the inner is owned by it and stays put",
+							"start": 770,
+							"end": 840
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

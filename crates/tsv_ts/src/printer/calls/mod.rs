@@ -37,11 +37,11 @@ pub(crate) use arg_comments::{
     should_force_expansion_for_comments, skip_stripped_open_paren,
 };
 pub(crate) use arg_wrapping::{
-    build_args_joined_with_comments, build_args_split_last, build_arrow_call_body_states,
-    build_arrow_sig_doc, build_break_body_state, build_expand_all_args, build_inline_args,
-    build_inline_or_expand_all, could_expand_arrow_chain, last_two_args_same_type,
-    prebuild_expand_last_break_body, prepend_arrow_body_comments, wrap_call_with_hard_breaks,
-    wrap_call_with_will_break_guard,
+    ArgItem, ArgsJoin, build_args_joined_with_comments, build_args_split_last,
+    build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
+    build_call_args_expanded, build_expand_all_args, build_inline_args, build_inline_or_expand_all,
+    could_expand_arrow_chain, last_two_args_same_type, prebuild_expand_last_break_body,
+    prepend_arrow_body_comments, wrap_call_with_hard_breaks, wrap_call_with_will_break_guard,
 };
 
 use super::Printer;
@@ -50,6 +50,17 @@ use crate::ast::internal;
 use arg_comments::{any_comment_forces_expansion, last_arg_has_comments};
 use arg_predicates::is_block_function;
 use tsv_lang::doc::arena::DocId;
+
+/// The position the call's `(` follows — the end of the type-argument list when the call
+/// has one (`fn<T>(a)`), else the callee's end. Every argument-gap window in this family
+/// opens here: the leading-argument comment scans, and Rule A's first-argument freeze
+/// window ([`Printer::args_frozen_span`]). One spelling, so a caller can't accidentally
+/// open the window at the callee and swallow the type arguments' own comments.
+pub(super) fn call_paren_open(call: &internal::CallExpression<'_>) -> u32 {
+    call.type_arguments
+        .as_ref()
+        .map_or_else(|| call.callee.span().end, |ta| ta.span.end)
+}
 
 /// Check if a chain expression contains any call expressions
 fn chain_has_calls(expr: &internal::Expression<'_>) -> bool {
@@ -160,7 +171,7 @@ impl<'a> Printer<'a> {
         // if they exceed print width. Must check BEFORE chain routing, because
         // memberish callees like `it.skip(...)` would otherwise be routed through
         // the chain path which doesn't know about test call special-casing.
-        if test_patterns::is_test_call(call, self) {
+        if test_patterns::test_call_flat_layout_applies(call, self) {
             return self.build_call_doc_with_wrapping(call);
         }
 

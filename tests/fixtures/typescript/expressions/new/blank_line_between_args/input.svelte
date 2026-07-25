@@ -28,4 +28,13 @@
 
 		z
 	);
+
+	// Leading comment before the FIRST arg, with a blank line after it: the blank-line
+	// layout must emit the `(`→first-argument gap itself or the comment is dropped
+	const e = new Foo(
+		// comment
+		x,
+
+		y
+	);
 </script>
