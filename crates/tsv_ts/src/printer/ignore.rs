@@ -8,10 +8,13 @@
 //
 // Value-side argument and element lists join the list family through
 // `args_frozen_span` / `element_frozen_span` and the freeze-aware item builder
-// `build_arg_item_doc` — a call's, a `new`'s and a dynamic `import()`'s arguments,
-// and an array literal's or array pattern's elements. Each freezes over the item's
-// own node span, so a spread or rest `...` rides inside; an element SLOT may be a
-// hole, which never freezes and contributes only its comma to the next slot's gap.
+// `build_arg_item_doc` — a call's, a `new`'s and a member chain's arguments, and an
+// array literal's or array pattern's elements. A lone item whose gap anchor its
+// printer already holds (dynamic `import()`'s two named fields, a JSDoc cast's
+// interior) asks `gap_frozen_span` instead, the same question without the list
+// index. Each freezes over the item's own node span, so a spread or rest `...` rides
+// inside; an element SLOT may be a hole, which never freezes and contributes only
+// its comma to the next slot's gap.
 //
 // Parameter lists (value-side and type-side alike) join the list family through
 // `param_frozen_span`, over each parameter's RENDER span so a decorated parameter
@@ -509,12 +512,22 @@ impl<'a> Printer<'a> {
             .then(|| item_span(i))
     }
 
-    /// [`Self::list_item_frozen`] for a value-side ARGUMENT or ELEMENT list item `i` —
-    /// a call's / `new`'s / dynamic `import()`'s arguments, an array literal's or array
-    /// pattern's elements. `Some` is the span to freeze: the item's own node span, so a
-    /// spread or rest `...` rides inside the freeze (the element node starts at the
-    /// `...`, so its own span already covers it), matching prettier. The list's `,` is
-    /// parent-owned and stays outside.
+    /// [`Self::member_gap_frozen`] resolved to the span it freezes, for a value-side item
+    /// whose gap anchor the caller already holds — a lone argument (the JSDoc cast's
+    /// interior, dynamic `import()`'s two named fields, which are not a slice at all) or
+    /// an element slot, whose anchor skips the holes before it.
+    ///
+    /// `Some` is the span to freeze: the item's own node span, so a spread or rest `...`
+    /// rides inside the freeze (the node starts at the `...`, so its span already covers
+    /// it), matching prettier. The list's `,` is parent-owned and stays outside.
+    #[inline]
+    pub(in crate::printer) fn gap_frozen_span(&self, prev_end: u32, span: Span) -> Option<Span> {
+        self.member_gap_frozen(prev_end, span.start).then_some(span)
+    }
+
+    /// [`Self::list_item_frozen`] for a value-side ARGUMENT list item `i` — a call's,
+    /// a `new`'s or a member chain's arguments. `Some` is the span to freeze, per
+    /// [`Self::gap_frozen_span`].
     ///
     /// `container_start` is where the FIRST item's gap opens, per each family's own
     /// convention: just past the `[` for a bracketed list, and for a call the position
@@ -522,27 +535,6 @@ impl<'a> Printer<'a> {
     /// every leading-argument-comment emitter at those sites already opens, so a
     /// directive written above the `(` leads the first argument exactly as it does for
     /// those emitters (prettier-confirmed).
-    ///
-    /// Closure-shaped like [`Self::list_item_frozen`] itself, so the item type stays
-    /// family-agnostic: `Expression` arguments, `Option<Expression>` element slots, and
-    /// dynamic `import()`'s two named fields, which are not a slice at all.
-    #[inline]
-    pub(in crate::printer) fn arg_frozen_span(
-        &self,
-        container_start: u32,
-        item_span: &impl Fn(usize) -> Span,
-        i: usize,
-    ) -> Option<Span> {
-        if !self.has_format_ignore {
-            return None;
-        }
-        self.list_item_frozen(container_start, item_span, i)
-            .then(|| item_span(i))
-    }
-
-    /// [`Self::arg_frozen_span`] over an argument slice — the form every call / `new`
-    /// argument loop takes, so the item-span closure is spelled here instead of at each
-    /// of them.
     #[inline]
     pub(in crate::printer) fn args_frozen_span(
         &self,
@@ -550,10 +542,15 @@ impl<'a> Printer<'a> {
         args: &[internal::Expression<'_>],
         i: usize,
     ) -> Option<Span> {
-        self.arg_frozen_span(container_start, &|j| args[j].span(), i)
+        if !self.has_format_ignore {
+            return None;
+        }
+        let item_span = |j: usize| args[j].span();
+        self.list_item_frozen(container_start, &item_span, i)
+            .then(|| item_span(i))
     }
 
-    /// [`Self::arg_frozen_span`] over an ELEMENT slot slice — an array literal's or
+    /// [`Self::args_frozen_span`] over an ELEMENT slot slice — an array literal's or
     /// array pattern's `elements`, where a slot may be a HOLE (elision).
     ///
     /// A hole never freezes: it has no span for a verbatim slice to cover. And a run of
@@ -578,8 +575,7 @@ impl<'a> Printer<'a> {
             .flatten()
             .next()
             .map_or(container_start, |e| e.span().end);
-        self.member_gap_frozen(prev_end, elem.span().start)
-            .then(|| elem.span())
+        self.gap_frozen_span(prev_end, elem.span())
     }
 
     /// [`Self::list_item_frozen`] over a `TSType` slice, plus the union /

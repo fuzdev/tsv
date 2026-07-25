@@ -255,7 +255,7 @@ impl<'a> Printer<'a> {
         // (`paren_interior_routed_inner`), and it is what keeps the shell's own comments
         // with the shell's emitters below. Prettier agrees on both the scope and the
         // preserved parens here.
-        let frozen_inner = self.arg_frozen_span(open + 1, &|_| cast.inner.span(), 0);
+        let frozen_inner = self.gap_frozen_span(open + 1, cast.inner.span());
         let inner_doc = frozen_inner.map_or_else(
             || self.build_expression_doc(cast.inner),
             // Built bare, like the ordinary arm: the cast's parens already group it. The

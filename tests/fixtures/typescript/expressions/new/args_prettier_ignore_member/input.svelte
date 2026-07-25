@@ -61,6 +61,15 @@
 		}
 	);
 
+	// an ordinary comment leading the same run keeps the directive on its own line, so
+	// the freeze survives the next pass; the variant authors that comment on the `(` line
+	new A(
+		// c
+		// prettier-ignore
+		{ a:   1 },
+		{ b: 2 }
+	);
+
 	// a frozen FIRST argument followed by an author blank line — the blank-line layout
 	// owns the leading gap here
 	new A(

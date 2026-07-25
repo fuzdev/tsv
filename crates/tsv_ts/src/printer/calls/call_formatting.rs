@@ -17,9 +17,9 @@ use super::arg_predicates::{
     is_function_composition_args, is_ternary_arrow_body, last_arg_is_array_or_object,
 };
 use super::arg_wrapping::{
-    append_type_args_with_gap_comments, arg_needs_soft_wrap, build_args_joined_with_comments,
-    build_args_split_last, build_args_with_blank_lines, build_arrow_call_body_states,
-    build_arrow_sig_doc, build_break_body_state, build_empty_args_doc, build_expand_all_args,
+    ArgItem, append_type_args_with_gap_comments, arg_needs_soft_wrap, build_args_split_last,
+    build_args_with_blank_lines, build_arrow_call_body_states, build_arrow_sig_doc,
+    build_break_body_state, build_call_args_expanded, build_empty_args_doc, build_expand_all_args,
     build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
     last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, try_hug_multiline_template_arg,
@@ -122,7 +122,7 @@ pub(super) fn build_call_doc_with_wrapping(
     // Test function calls (it, test, describe, etc.) stay on one line
     // even if they exceed print width — unless an argument gap holds a comment the
     // flat layout has no emitter for (it would be dropped); such a call expands.
-    if test_call_flat_layout_applies(call, printer, paren_open) {
+    if test_call_flat_layout_applies(call, printer) {
         // Build callee as a flat doc (no conditionalGroup) straight from the
         // span-identity chain parts — this prevents breaking at `.skip` etc. even when
         // very long, without materializing a throwaway callee `String`.
@@ -247,17 +247,13 @@ pub(super) fn build_call_doc_with_wrapping(
 
     if has_multiline {
         // Force expansion with hardlines for multiline content
-        let arg_parts = build_args_joined_with_comments(
+        return build_call_args_expanded(
             printer,
+            callee,
             call.arguments,
             paren_open,
-            false,
-            true,
-            // Closure required: a method reference trips the HRTB lifetime check.
-            #[allow(clippy::redundant_closure_for_method_calls)]
-            |p, a| p.build_arg_expression_doc(a),
+            ArgItem::ArgContext,
         );
-        return wrap_call_with_hard_breaks(d, callee, arg_parts);
     }
 
     // Function composition pattern: when any argument is a call containing a callback
@@ -267,17 +263,13 @@ pub(super) fn build_call_doc_with_wrapping(
     if is_function_composition_args(call.arguments)
         && !(call_has_comments && has_trailing_comments_on_args(call, printer))
     {
-        let arg_parts = build_args_joined_with_comments(
+        return build_call_args_expanded(
             printer,
+            callee,
             call.arguments,
             paren_open,
-            false,
-            true,
-            // Closure required: a method reference trips the HRTB lifetime check.
-            #[allow(clippy::redundant_closure_for_method_calls)]
-            |p, a| p.build_arg_expression_doc(a),
+            ArgItem::ArgContext,
         );
-        return wrap_call_with_hard_breaks(d, callee, arg_parts);
     }
 
     // "Expand first arg" pattern: when first arg is a function with block body
@@ -308,17 +300,13 @@ pub(super) fn build_call_doc_with_wrapping(
         // Prettier: if (tailArgs.some(willBreak)) return allArgsBrokenOut()
         // When any tail arg's doc will break, the inline tail won't work.
         if tail_parts.iter().any(|&id| d.will_break(id)) {
-            let arg_parts = build_args_joined_with_comments(
+            return build_call_args_expanded(
                 printer,
+                callee,
                 call.arguments,
                 paren_open,
-                false,
-                true,
-                // Closure required: method references cause HRTB lifetime errors
-                #[allow(clippy::redundant_closure_for_method_calls)]
-                |p, a| p.build_expression_doc(a),
+                ArgItem::Plain,
             );
-            return wrap_call_with_hard_breaks(d, callee, arg_parts);
         }
 
         // Structure: callee + ( + first_arg_with_breaks + , + tail_args + )
@@ -342,17 +330,13 @@ pub(super) fn build_call_doc_with_wrapping(
             .all(|arg| matches!(arg, internal::Expression::ArrowFunctionExpression(_)));
 
     if all_args_are_arrows && !(call_has_comments && has_trailing_comments_on_args(call, printer)) {
-        let arg_parts = build_args_joined_with_comments(
+        return build_call_args_expanded(
             printer,
+            callee,
             call.arguments,
             paren_open,
-            false,
-            true,
-            // Closure required: a method reference trips the HRTB lifetime check.
-            #[allow(clippy::redundant_closure_for_method_calls)]
-            |p, a| p.build_expression_doc(a),
+            ArgItem::Plain,
         );
-        return wrap_call_with_hard_breaks(d, callee, arg_parts);
     }
 
     // Expand-last pattern for function/arrow last arguments. Returns `None` when

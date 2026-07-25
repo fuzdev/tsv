@@ -16,10 +16,10 @@ use crate::printer::calls::arg_predicates::{
     is_ternary_arrow_body,
 };
 use crate::printer::calls::{
-    PartitionedComments, build_args_joined_with_comments, build_args_split_last,
+    ArgItem, ArgsJoin, PartitionedComments, build_args_joined_with_comments, build_args_split_last,
     build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
-    build_expand_all_args, build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
-    emit_first_arg_leading_comments, has_inter_argument_comments_slice,
+    build_call_args_expanded, build_expand_all_args, build_inline_args, build_inline_or_expand_all,
+    could_expand_arrow_chain, emit_first_arg_leading_comments, has_inter_argument_comments_slice,
     has_trailing_comments_slice, has_trailing_line_comments_slice, last_two_args_same_type,
     prebuild_expand_last_break_body, prepend_arrow_body_comments,
     should_force_expansion_for_comments, wrap_call_with_hard_breaks,
@@ -338,16 +338,13 @@ impl<'a> Printer<'a> {
             && !(new_has_comments
                 && has_trailing_comments_slice(new_expr.arguments, new_expr.span.end, self))
         {
-            let arg_parts = build_args_joined_with_comments(
+            return build_call_args_expanded(
                 self,
+                callee_with_types,
                 new_expr.arguments,
                 paren_open,
-                false,
-                true,
-                #[allow(clippy::redundant_closure_for_method_calls)]
-                |p, a| p.build_arg_expression_doc(a),
+                ArgItem::ArgContext,
             );
-            return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
         }
 
         // Single template literal argument with embedded newlines on the same line
@@ -371,16 +368,13 @@ impl<'a> Printer<'a> {
 
         if has_multiline {
             // Force expansion with hardlines for multiline content
-            let arg_parts = build_args_joined_with_comments(
+            return build_call_args_expanded(
                 self,
+                callee_with_types,
                 new_expr.arguments,
                 paren_open,
-                false,
-                true,
-                #[allow(clippy::redundant_closure_for_method_calls)]
-                |p, a| p.build_arg_expression_doc(a),
+                ArgItem::ArgContext,
             );
-            return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
         }
 
         // Check for blank lines between arguments (forces expansion and preservation).
@@ -777,16 +771,14 @@ impl<'a> Printer<'a> {
                     inner.push(self.build_comment_doc(comment));
                     inner.push(d.hardline());
                 }
-                // Build the args without re-emitting the first-arg leading gap
-                // (pass first_arg_start so the gap scan finds nothing).
+                // The `(`→first-argument gap is emitted above (the paren-line prefix and
+                // the leading run), so the builder must not print it a second time.
                 inner.push(build_args_joined_with_comments(
                     self,
                     new_expr.arguments,
                     paren_open,
-                    true,
-                    true,
-                    #[allow(clippy::redundant_closure_for_method_calls)]
-                    |p, a| p.build_arg_expression_doc(a),
+                    ArgsJoin::HardlineLeadingGapEmitted,
+                    ArgItem::ArgContext,
                 ));
 
                 return d.concat(&[
@@ -805,10 +797,8 @@ impl<'a> Printer<'a> {
                 self,
                 new_expr.arguments,
                 paren_open,
-                false,
-                false,
-                #[allow(clippy::redundant_closure_for_method_calls)]
-                |p, a| p.build_arg_expression_doc(a),
+                ArgsJoin::SoftLine,
+                ArgItem::ArgContext,
             );
             return wrap_call_with_will_break_guard(d, callee_with_types, arg_parts);
         }

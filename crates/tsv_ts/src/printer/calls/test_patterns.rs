@@ -5,6 +5,7 @@
 
 use super::super::Printer;
 use super::arg_comments::has_inter_argument_comments_slice;
+use super::call_paren_open;
 use crate::ast::internal::{self, IdentName};
 use smallvec::SmallVec;
 use tsv_lang::doc::arena::DocId;
@@ -148,11 +149,11 @@ fn get_member_chain_parts<'a>(
 pub(super) fn test_call_flat_layout_applies(
     call: &internal::CallExpression<'_>,
     printer: &Printer<'_>,
-    paren_open: u32,
 ) -> bool {
     if !is_test_call(call, printer) {
         return false;
     }
+    let paren_open = call_paren_open(call);
     // Zero-comment fast gate: ONE binary search over `[paren_open, last argument's start)`,
     // which strictly contains every gap the check below looks at — the `(`→first-argument
     // gap and each inter-argument gap all end at or before the last argument. So with no
