@@ -214,9 +214,9 @@ impl<'a> Printer<'a> {
         is_html: bool,
     ) -> DocId {
         let d = self.d();
-        // Span-identity attribute name (`source[name_render_span]`, trimmed for a
-        // padded `{ shorthand }`), reused across the branches below.
-        let name_doc = d.source_span_ident(attr.name_render_span(self.source));
+        // Span-identity attribute name (`source[name_span]`), reused across the
+        // branches below.
+        let name_doc = d.source_span_ident(attr.name_span);
 
         if let Some(value_parts) = &attr.value {
             // Check for shorthand: {name}
