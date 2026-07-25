@@ -97,6 +97,32 @@ Inside a mapped type, a directive above the `[K in ...]: V` clause freezes the
 whole clause; a directive inside the bracket freezes just the `K in ...`
 binding.
 
+### On annotation heads
+
+A directive can also sit on the other side of a `:` — in the gap *before* it,
+between a head and its annotation. That reaches four heads: a binding (class
+property, parameter, variable, index-signature key), a property signature, an
+index signature's value `:`, and a signature's return type. The whole `: type`
+freezes there, since that is what the directive precedes — a union or
+intersection value included, and an optional `?` marker too:
+
+```ts
+interface I {
+	a
+		// format-ignore
+		: { x:1,  y:2 };   // ← the whole `: { … }` frozen verbatim
+}
+
+function fn()
+	// format-ignore
+	: { x:1,  y:2 } {
+	return { x: 1, y: 2 };
+}
+```
+
+Such a gap only exists when a line comment already pushed the `:` onto its own
+line, so this is a rare shape in practice.
+
 ## `format-ignore-start` / `format-ignore-end`
 
 In Svelte templates, a pair of range markers preserves every node between them:

@@ -355,7 +355,7 @@ impl<'a> Printer<'a> {
             self.push_leading_comments_before(body_parts, &leading_comments, stmt_start);
 
             // format-ignore: emit raw source instead of formatting
-            if body_has_comments && self.has_format_ignore_in_range(prev_end, stmt_start) {
+            if body_has_comments && self.member_gap_frozen(prev_end, stmt_start) {
                 body_parts.push(self.raw_source_doc(stmt.span()));
             } else {
                 body_parts.push(self.build_statement_doc(stmt, in_program_or_block));
