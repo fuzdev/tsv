@@ -28,12 +28,27 @@ import { load_all_versions } from './versions.ts';
  */
 export const COMPARE_BASE_ARG_FIELDS = {
 	_: z.array(z.string()).default(() => []),
-	all: z.boolean().default(false).meta({ aliases: ['a'] }),
-	filter: z.string().optional().meta({ aliases: ['f'] }),
-	limit: z.number().optional().meta({ aliases: ['l'] }),
-	verbose: z.boolean().default(false).meta({ aliases: ['v'] }),
+	all: z
+		.boolean()
+		.default(false)
+		.meta({ aliases: ['a'] }),
+	filter: z
+		.string()
+		.optional()
+		.meta({ aliases: ['f'] }),
+	limit: z
+		.number()
+		.optional()
+		.meta({ aliases: ['l'] }),
+	verbose: z
+		.boolean()
+		.default(false)
+		.meta({ aliases: ['v'] }),
 	json: z.boolean().default(false),
-	help: z.boolean().default(false).meta({ aliases: ['h'] }),
+	help: z
+		.boolean()
+		.default(false)
+		.meta({ aliases: ['h'] })
 } as const;
 
 /** Get relative path from base directory. */
@@ -78,7 +93,7 @@ export function emit_json_stdout(report: Record<string, unknown>): void {
  */
 export function create_compare_loader(
 	use_all: boolean,
-	base_path: string,
+	base_path: string
 ): DevReposLoader | DirectoryLoader {
 	return use_all ? new DevReposLoader('gates') : new DirectoryLoader(base_path);
 }
@@ -106,8 +121,8 @@ export async function init_compare_implementations(): Promise<{
 			label: `FFI (${ffi_profile})`,
 			path: get_library_path(),
 			binding_crates: ['tsv_ffi'],
-			rebuild,
-		},
+			rebuild
+		}
 	]);
 
 	const versions = await load_all_versions();
@@ -141,7 +156,7 @@ export async function init_compare_implementations(): Promise<{
 export function run_compare_main<T extends { json: boolean }>(
 	main: () => Promise<void>,
 	schema: z.ZodType<T>,
-	build_error_report: (message: string) => Record<string, unknown>,
+	build_error_report: (message: string) => Record<string, unknown>
 ): void {
 	main().catch((e) => {
 		const message = e instanceof Error ? e.message : String(e);

@@ -72,9 +72,7 @@ export class NapiImplementation implements TsvImplementation {
 		try {
 			await stat(path);
 		} catch {
-			throw new Error(
-				`N-API addon not found at ${path}. Run 'deno task build:napi' first.`,
-			);
+			throw new Error(`N-API addon not found at ${path}. Run 'deno task build:napi' first.`);
 		}
 		// `process.dlopen` loads a native addon from any path/extension into the
 		// passed module's `exports` — the supported way to load a `.so`/`.dylib`
@@ -96,7 +94,7 @@ export class NapiImplementation implements TsvImplementation {
 		return {
 			svelte: this.addon.parse_svelte,
 			typescript: this.addon.parse_typescript,
-			css: this.addon.parse_css,
+			css: this.addon.parse_css
 		};
 	}
 
@@ -104,7 +102,7 @@ export class NapiImplementation implements TsvImplementation {
 		return {
 			svelte: this.addon.parse_internal_svelte,
 			typescript: this.addon.parse_internal_typescript,
-			css: this.addon.parse_internal_css,
+			css: this.addon.parse_internal_css
 		};
 	}
 
@@ -112,7 +110,7 @@ export class NapiImplementation implements TsvImplementation {
 		return {
 			svelte: this.addon.format_svelte,
 			typescript: this.addon.format_typescript,
-			css: this.addon.format_css,
+			css: this.addon.format_css
 		};
 	}
 
@@ -120,7 +118,7 @@ export class NapiImplementation implements TsvImplementation {
 	private get parse_no_locations_fns(): Partial<Record<Language, (source: string) => string>> {
 		return {
 			svelte: this.addon.parse_svelte_no_locations,
-			typescript: this.addon.parse_typescript_no_locations,
+			typescript: this.addon.parse_typescript_no_locations
 		};
 	}
 

@@ -15,13 +15,13 @@ export {
 	type DivergencePattern,
 	enrich_detection_context,
 	type HunkCoverageResult,
-	PATTERNS,
+	PATTERNS
 } from './patterns.ts';
 export {
 	check_expected_error,
 	EXPECTED_ERROR_PATTERNS,
 	type ExpectedErrorPattern,
-	type ExpectedErrorResult,
+	type ExpectedErrorResult
 } from './expected_errors.ts';
 export { type DiffHunk, extract_hunks } from '../diff.ts';
 export {
@@ -31,5 +31,5 @@ export {
 	generate_audit_report,
 	load_documented_divergences,
 	parse_conformance_prettier_md,
-	type PatternCoverage,
+	type PatternCoverage
 } from './validation.ts';

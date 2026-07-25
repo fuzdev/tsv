@@ -96,7 +96,7 @@ const FORMATTING_CHARS = new Set([
 	';',
 	// Parens (optional in arrow params, some grouping)
 	'(',
-	')',
+	')'
 ]);
 
 /**
@@ -131,7 +131,7 @@ const FORMATTING_CHARS = new Set([
 export function check_safety_vs_prettier(
 	source: string,
 	ours: string,
-	prettier: string,
+	prettier: string
 ): SafetyViolation[] {
 	const source_counts = count_semantic_chars(source);
 	const ours_counts = count_semantic_chars(ours);
@@ -141,11 +141,11 @@ export function check_safety_vs_prettier(
 	// remainder our output incurs beyond prettier.
 	const lost = differential_deltas(
 		excess_chars(source_counts, ours_counts),
-		excess_chars(source_counts, prettier_counts),
+		excess_chars(source_counts, prettier_counts)
 	);
 	const added = differential_deltas(
 		excess_chars(ours_counts, source_counts),
-		excess_chars(prettier_counts, source_counts),
+		excess_chars(prettier_counts, source_counts)
 	);
 
 	const violations: SafetyViolation[] = [];
@@ -160,10 +160,7 @@ export function check_safety_vs_prettier(
  * Per-char positive excess of `a` over `b`: `{char => a[char] - b[char]}` for
  * every char where `a` has strictly more than `b`.
  */
-function excess_chars(
-	a: Map<string, number>,
-	b: Map<string, number>,
-): Map<string, number> {
+function excess_chars(a: Map<string, number>, b: Map<string, number>): Map<string, number> {
 	const out = new Map<string, number>();
 	for (const [char, a_count] of a) {
 		const b_count = b.get(char) ?? 0;
@@ -180,7 +177,7 @@ function excess_chars(
  */
 function differential_deltas(
 	ours_excess: Map<string, number>,
-	prettier_excess: Map<string, number>,
+	prettier_excess: Map<string, number>
 ): SafetyCharDelta[] {
 	const out: SafetyCharDelta[] = [];
 	for (const [char, ours] of ours_excess) {
@@ -203,7 +200,7 @@ function make_violation(
 	type: SafetyViolation['type'],
 	chars: SafetyCharDelta[],
 	scan_text: string,
-	other_text: string,
+	other_text: string
 ): SafetyViolation {
 	const total = chars.reduce((sum, d) => sum + d.real, 0);
 	const real_map = new Map(chars.map((d) => [d.char, d.real]));
@@ -233,7 +230,7 @@ function format_summary(total: number, chars: SafetyCharDelta[]): string {
 function find_missing_lines(
 	source: string,
 	formatted: string,
-	lost_chars: Map<string, number>,
+	lost_chars: Map<string, number>
 ): string[] {
 	const source_lines = source.split('\n');
 	const formatted_normalized = normalize_for_comparison(formatted);

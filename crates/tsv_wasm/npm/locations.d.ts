@@ -55,7 +55,11 @@ export declare function create_locator(source: string, opts?: LocationOptions): 
  * and returns it. Exact for TypeScript, approximate for Svelte (`name_loc` itself
  * is exact), a no-op for CSS.
  */
-export declare function reconstruct_locations(ast: any, source: string, opts?: LocationOptions): any;
+export declare function reconstruct_locations(
+	ast: any,
+	source: string,
+	opts?: LocationOptions
+): any;
 
 /**
  * Line/column for a single node. Rebuilds the line-start table per call — reuse a

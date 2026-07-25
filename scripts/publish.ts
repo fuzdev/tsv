@@ -48,7 +48,7 @@ const unknown_args = Deno.args.filter((arg, i) =>
 if (unknown_args.length > 0) {
 	console.error(`FAIL: unknown argument(s): ${unknown_args.join(' ')}`);
 	console.error(
-		'Usage: deno task publish [--wetrun] [--bump patch|minor|major] [--no-check] [--no-git]',
+		'Usage: deno task publish [--wetrun] [--bump patch|minor|major] [--no-check] [--no-git]'
 	);
 	Deno.exit(1);
 }
@@ -87,16 +87,16 @@ const dec = new TextDecoder();
 const packages = [
 	{
 		label: '@fuzdev/tsv_format_wasm',
-		dir: 'crates/tsv_wasm/pkg/format/npm',
+		dir: 'crates/tsv_wasm/pkg/format/npm'
 	},
 	{
 		label: '@fuzdev/tsv_parse_wasm',
-		dir: 'crates/tsv_wasm/pkg/parse/npm',
+		dir: 'crates/tsv_wasm/pkg/parse/npm'
 	},
 	{
 		label: '@fuzdev/tsv_wasm',
-		dir: 'crates/tsv_wasm/pkg/all/npm',
-	},
+		dir: 'crates/tsv_wasm/pkg/all/npm'
+	}
 ];
 
 /** Only the release files — a stray file generated mid-pipeline must never
@@ -155,7 +155,7 @@ if (branch === 'main') {
 		if (behind > 0) {
 			if (wetrun) {
 				console.error(
-					`  FAIL: main is ${behind} commit(s) behind origin/main — run \`git pull\` first`,
+					`  FAIL: main is ${behind} commit(s) behind origin/main — run \`git pull\` first`
 				);
 				Deno.exit(1);
 			}
@@ -229,13 +229,13 @@ if (wetrun) {
 		const content = changelog_unreleased_content();
 		if (content === null) {
 			console.error(
-				`  FAIL: no "## Unreleased" section in ${CHANGELOG_PATH} — add release notes before publishing`,
+				`  FAIL: no "## Unreleased" section in ${CHANGELOG_PATH} — add release notes before publishing`
 			);
 			Deno.exit(1);
 		}
 		if (content === '') {
 			console.error(
-				`  FAIL: "## Unreleased" section in ${CHANGELOG_PATH} is empty — add release notes before publishing`,
+				`  FAIL: "## Unreleased" section in ${CHANGELOG_PATH} is empty — add release notes before publishing`
 			);
 			Deno.exit(1);
 		}
@@ -270,23 +270,25 @@ if (wetrun) {
 		// Mirror the wetrun's requirements without exiting — report what it would do.
 		const content = changelog_unreleased_content();
 		if (content === null) {
-			console.warn(`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — a fresh wetrun would FAIL`);
+			console.warn(
+				`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — a fresh wetrun would FAIL`
+			);
 		} else if (content === '') {
 			console.warn(`  WARN: "## Unreleased" section is empty — a fresh wetrun would FAIL`);
 		}
 		if (!bump) {
 			console.warn(
-				'  WARN: no --bump given — a fresh wetrun would FAIL (required, and must match the CHANGELOG marker)',
+				'  WARN: no --bump given — a fresh wetrun would FAIL (required, and must match the CHANGELOG marker)'
 			);
 		}
 		if (!declared) {
 			console.warn(
-				`  WARN: no "<!-- bump: <level> -->" marker in ${CHANGELOG_PATH} — a fresh wetrun would FAIL`,
+				`  WARN: no "<!-- bump: <level> -->" marker in ${CHANGELOG_PATH} — a fresh wetrun would FAIL`
 			);
 		}
 		if (bump && declared && bump !== declared) {
 			console.warn(
-				`  WARN: --bump ${bump} disagrees with CHANGELOG marker <!-- bump: ${declared} --> — a fresh wetrun would FAIL`,
+				`  WARN: --bump ${bump} disagrees with CHANGELOG marker <!-- bump: ${declared} --> — a fresh wetrun would FAIL`
 			);
 		}
 		if (bump && declared && bump === declared) {
@@ -341,19 +343,19 @@ if (no_check) {
 		exists('../acorn-typescript/test') ? null : '../acorn-typescript checkout',
 		exists('../typescript/tests') ? null : '../typescript checkout',
 		exists('../test262/test') ? null : '../test262 checkout',
-		exists('benches/js/node_modules') ? null : 'benches/js/node_modules (deno task bench:install)',
+		exists('benches/js/node_modules') ? null : 'benches/js/node_modules (deno task bench:install)'
 	].filter((m): m is string => m !== null);
 	if (missing.length > 0 && wetrun) {
 		console.error(
 			`  FAIL: missing ${missing.join(' + ')} — the conformance gates cannot run. ` +
-				'Clone/install the missing pieces, or pass --no-check to release without gates (explicitly).',
+				'Clone/install the missing pieces, or pass --no-check to release without gates (explicitly).'
 		);
 		Deno.exit(1);
 	} else if (missing.length > 0) {
 		conformance_skip_reason = `missing ${missing.join(' + ')}`;
 		console.warn(
 			`  WARN: skipping — ${conformance_skip_reason}. ` +
-				'A --wetrun would FAIL here; run `deno task conformance:all` on a machine with the oracles.',
+				'A --wetrun would FAIL here; run `deno task conformance:all` on a machine with the oracles.'
 		);
 	} else {
 		run(
@@ -365,7 +367,7 @@ if (no_check) {
 				'  `deno task corpus:compare:format ~/dev/<that-repo>` on the single repo to rule out\n' +
 				'  the known --all FFI heisenbug (benches/js/CLAUDE.md §Known Issues) before treating\n' +
 				'  it as a real regression. A conformance:test262 GATE FAIL is a real positive-parse\n' +
-				'  regression (or a deliberate test262 pull needing a POSITIVE_PASSED_PIN re-pin).',
+				'  regression (or a deliberate test262 pull needing a POSITIVE_PASSED_PIN re-pin).'
 		);
 	}
 }
@@ -392,13 +394,13 @@ if (no_check) {
 		if (wetrun) {
 			console.error(
 				`  FAIL: ${audit_corpus_skip_reason} — the corpus audit cannot run over real code. ` +
-					'Clone it, or pass --no-check to release without the audit (explicitly).',
+					'Clone it, or pass --no-check to release without the audit (explicitly).'
 			);
 			Deno.exit(1);
 		}
 		console.warn(
 			`  WARN: skipping — ${audit_corpus_skip_reason}. ` +
-				'A --wetrun would FAIL here; run `deno task audit:corpus` on a machine with the corpus.',
+				'A --wetrun would FAIL here; run `deno task audit:corpus` on a machine with the corpus.'
 		);
 	} else {
 		run(
@@ -408,7 +410,7 @@ if (no_check) {
 			undefined,
 			'  Corpus robustness audit found a content-loss / panic / non-idempotency regression over\n' +
 				'  REAL code (what `deno task check`’s fixture-only gate cannot see). Triage the failing\n' +
-				'  leg by name with the matching `tsv_debug` audit on the single repo it points at.',
+				'  leg by name with the matching `tsv_debug` audit on the single repo it points at.'
 		);
 	}
 }
@@ -455,7 +457,7 @@ for (const { label, dir } of packages) {
 		env: { PKG_DIR: dir },
 		stdin: 'inherit',
 		stdout: 'inherit',
-		stderr: 'inherit',
+		stderr: 'inherit'
 	}).outputSync();
 	if (!result.success) {
 		console.error(`\n  FAIL: artifact tests for ${label}`);
@@ -479,10 +481,9 @@ for (let i = 0; i < packages.length; i++) {
 		}
 		console.log(`  Publishing ${label}...`);
 		const not_published = packages.slice(i);
-		const fail_hint =
-			`  Packages not published — re-run \`deno task publish --wetrun\` to retry, or publish manually:\n${
-				not_published.map((p) => `    cd ${p.dir} && npm publish --access public`).join('\n')
-			}`;
+		const fail_hint = `  Packages not published — re-run \`deno task publish --wetrun\` to retry, or publish manually:\n${not_published
+			.map((p) => `    cd ${p.dir} && npm publish --access public`)
+			.join('\n')}`;
 		run(`npm publish ${label}`, 'npm', ['publish', '--access', 'public'], dir, fail_hint);
 		console.log(`  Published ${label}@${version}`);
 	} else {
@@ -498,7 +499,7 @@ for (let i = 0; i < packages.length; i++) {
 			const preview = (bump as BumpLevel | null) ?? changelog_declared_bump();
 			const target = preview ? `v${bump_version(version, preview)}` : 'the bumped version';
 			console.log(
-				`  PASS: ${label} packs cleanly (v${version} already published — a real run publishes ${target})`,
+				`  PASS: ${label} packs cleanly (v${version} already published — a real run publishes ${target})`
 			);
 		} else {
 			if (res.stdout) console.error(res.stdout);
@@ -556,7 +557,7 @@ for (const { label, dir } of packages) {
 	console.log(
 		wetrun
 			? `  Published ${label}@${version} — ${size_note}`
-			: `  ${label}@${version} — ${size_note}`,
+			: `  ${label}@${version} — ${size_note}`
 	);
 }
 if (conformance_skip_reason !== null) {
@@ -584,18 +585,18 @@ console.log('');
 function capture(
 	cmd: string,
 	args: string[],
-	cwd?: string,
+	cwd?: string
 ): { success: boolean; stdout: string; stderr: string } {
 	const result = new Deno.Command(cmd, {
 		args,
 		cwd,
 		stdout: 'piped',
-		stderr: 'piped',
+		stderr: 'piped'
 	}).outputSync();
 	return {
 		success: result.success,
 		stdout: dec.decode(result.stdout).trim(),
-		stderr: dec.decode(result.stderr).trim(),
+		stderr: dec.decode(result.stderr).trim()
 	};
 }
 
@@ -615,7 +616,7 @@ function run(label: string, cmd: string, args: string[], cwd?: string, fail_hint
 		cwd,
 		stdin: 'inherit',
 		stdout: 'inherit',
-		stderr: 'inherit',
+		stderr: 'inherit'
 	}).outputSync();
 	if (!result.success) {
 		console.error(`\n  FAIL: ${label} (exit code ${result.code})`);
@@ -662,14 +663,14 @@ function stamp_changelog(new_version: string): void {
 		const stamped = changelog.replace(with_marker, `${fresh}## ${new_version}\n`);
 		Deno.writeTextFileSync(CHANGELOG_PATH, stamped);
 		console.log(
-			`  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${new_version}; seeded fresh ## Unreleased (bump: patch)`,
+			`  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${new_version}; seeded fresh ## Unreleased (bump: patch)`
 		);
 	} else if (/^## Unreleased$/m.test(changelog)) {
 		// No marker (defensive — a wetrun would have failed earlier). Rename + seed.
 		const stamped = changelog.replace(/^## Unreleased$/m, `${fresh}## ${new_version}`);
 		Deno.writeTextFileSync(CHANGELOG_PATH, stamped);
 		console.log(
-			`  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${new_version}; seeded fresh ## Unreleased (bump: patch)`,
+			`  Stamped ${CHANGELOG_PATH}: ## Unreleased -> ## ${new_version}; seeded fresh ## Unreleased (bump: patch)`
 		);
 	} else {
 		console.warn(`  WARN: no "## Unreleased" section in ${CHANGELOG_PATH} — nothing to stamp`);
@@ -723,18 +724,20 @@ function changelog_declared_bump(): BumpLevel | null {
  * and they must match. Exits if either is missing or they disagree. */
 function resolve_bump(flag: BumpLevel | null, declared: BumpLevel | null): BumpLevel {
 	if (!flag) {
-		console.error('  FAIL: --bump patch|minor|major is required (and must match the CHANGELOG marker)');
+		console.error(
+			'  FAIL: --bump patch|minor|major is required (and must match the CHANGELOG marker)'
+		);
 		Deno.exit(1);
 	}
 	if (!declared) {
 		console.error(
-			`  FAIL: no "<!-- bump: <level> -->" marker under ## Unreleased in ${CHANGELOG_PATH} — declare the bump there too`,
+			`  FAIL: no "<!-- bump: <level> -->" marker under ## Unreleased in ${CHANGELOG_PATH} — declare the bump there too`
 		);
 		Deno.exit(1);
 	}
 	if (flag !== declared) {
 		console.error(
-			`  FAIL: --bump ${flag} disagrees with CHANGELOG marker <!-- bump: ${declared} --> (they must match)`,
+			`  FAIL: --bump ${flag} disagrees with CHANGELOG marker <!-- bump: ${declared} --> (they must match)`
 		);
 		Deno.exit(1);
 	}

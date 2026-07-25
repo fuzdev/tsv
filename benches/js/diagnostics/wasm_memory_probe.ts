@@ -109,7 +109,7 @@ async function load_fresh(js_path: string): Promise<Loaded> {
 	if (captured.length === before || !mem) throw new Error(`no memory captured for ${js_path}`);
 	return {
 		build: { svelte: mod.format_svelte, typescript: mod.format_typescript, css: mod.format_css },
-		mem,
+		mem
 	};
 }
 
@@ -119,11 +119,13 @@ const pages = (b: number): number => b / PAGE;
 const pct = (n: number, d: number): string => ((n / d - 1) * 100).toFixed(2);
 
 // ---- load corpus ----
-const files = (await new DirectoryLoader(corpus_dir).load((m) => console.error(m)))
-	.filter((f) => langs.includes(f.language));
+const files = (await new DirectoryLoader(corpus_dir).load((m) => console.error(m))).filter((f) =>
+	langs.includes(f.language)
+);
 const by_lang = group_by_language(files);
 const scoped: SourceFile[] = [];
-for (const lang of langs) scoped.push(...by_lang[lang].slice(0, limit === Infinity ? undefined : limit));
+for (const lang of langs)
+	scoped.push(...by_lang[lang].slice(0, limit === Infinity ? undefined : limit));
 scoped.sort((a, b) => a.bytes - b.bytes);
 
 const builds: { label: string; path: string }[] = [{ label: 'current', path: current_path }];
@@ -153,7 +155,7 @@ if (baseline_path) {
 	if (mismatches) {
 		console.error(
 			`ABORT: builds format differently on ${mismatches}/${scoped.length} files — ` +
-				`a memory A/B is only meaningful when output is byte-identical.`,
+				`a memory A/B is only meaningful when output is byte-identical.`
 		);
 		Deno.exit(1);
 	}
@@ -162,11 +164,15 @@ if (baseline_path) {
 
 console.error(
 	`\nWASM memory probe · ${scoped.length} files · ${cold ? 'COLD (fresh instance/file)' : 'steady-state (one warm instance)'}` +
-		`${baseline_path ? ' · A/B' : ' · A/A'}\n`,
+		`${baseline_path ? ' · A/B' : ' · A/A'}\n`
 );
 
 // deno-lint-ignore no-explicit-any
-const report: Record<string, any> = { mode: cold ? 'cold' : 'steady', files: scoped.length, builds: {} };
+const report: Record<string, any> = {
+	mode: cold ? 'cold' : 'steady',
+	files: scoped.length,
+	builds: {}
+};
 
 if (cold) {
 	// Fresh instance per file: reserve0 (pre-format) → peak (post-format), growth = peak-reserve0.
@@ -206,21 +212,22 @@ if (cold) {
 			growth_p90: percentile(growths, 0.9),
 			growth_max: Math.max(0, ...growths),
 			worst_file: worst.path,
-			n,
+			n
 		};
 		const r = report.builds[b.label];
 		console.error(
 			`${b.label.padStart(9)}: reserve ${mb(r.reserve_bytes)}MB (${pages(r.reserve_bytes)}p) · ` +
 				`cold peak p50 ${mb(r.peak_p50)} / p90 ${mb(r.peak_p90)} / p99 ${mb(r.peak_p99)} / max ${mb(r.peak_max)}MB · ` +
-				`growth p50 ${mb(r.growth_p50)} / max ${mb(r.growth_max)}MB (n=${n})`,
+				`growth p50 ${mb(r.growth_p50)} / max ${mb(r.growth_max)}MB (n=${n})`
 		);
 	}
 	if (baseline_path) {
-		const c = report.builds.current, bl = report.builds.baseline;
+		const c = report.builds.current,
+			bl = report.builds.baseline;
 		console.error(
 			`\nA/B (current vs baseline): reserve ${pct(c.reserve_bytes, bl.reserve_bytes)}% · ` +
 				`peak_p90 ${pct(c.peak_p90, bl.peak_p90)}% · peak_max ${pct(c.peak_max, bl.peak_max)}% ` +
-				`(negative = current uses less)`,
+				`(negative = current uses less)`
 		);
 	}
 } else {
@@ -250,20 +257,21 @@ if (cold) {
 			reserve_bytes: reserve,
 			high_water_bytes: high,
 			total_growth_bytes: high - reserve,
-			processed,
+			processed
 		};
 		const r = report.builds[b.label];
 		console.error(
 			`${b.label.padStart(9)}: reserve ${mb(r.reserve_bytes)}MB (${pages(r.reserve_bytes)}p) · ` +
 				`steady high-water ${mb(r.high_water_bytes)}MB (${pages(r.high_water_bytes)}p) · ` +
-				`corpus growth ${mb(r.total_growth_bytes)}MB (${processed} files)`,
+				`corpus growth ${mb(r.total_growth_bytes)}MB (${processed} files)`
 		);
 	}
 	if (baseline_path) {
-		const c = report.builds.current, bl = report.builds.baseline;
+		const c = report.builds.current,
+			bl = report.builds.baseline;
 		console.error(
 			`\nA/B (current vs baseline): reserve ${pct(c.reserve_bytes, bl.reserve_bytes)}% · ` +
-				`high-water ${pct(c.high_water_bytes, bl.high_water_bytes)}% (negative = current uses less)`,
+				`high-water ${pct(c.high_water_bytes, bl.high_water_bytes)}% (negative = current uses less)`
 		);
 	}
 }

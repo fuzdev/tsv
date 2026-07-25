@@ -43,7 +43,7 @@ import {
 	harvest_up_to_date,
 	short_commit,
 	type StampInputs,
-	write_stamp,
+	write_stamp
 } from '../lib/harvest_stamp.ts';
 
 const OUT_DEFAULT = 'benches/js/.cache/wpt_css';
@@ -54,9 +54,10 @@ const out_flag_index = Deno.args.indexOf('--out');
 const out_dir = out_flag_index === -1 ? OUT_DEFAULT : Deno.args[out_flag_index + 1];
 const if_present = Deno.args.includes('--if-present');
 const force = Deno.args.includes('--force');
-const source_root = Deno.args.find(
-	(a, i) => !a.startsWith('-') && (out_flag_index === -1 || i !== out_flag_index + 1),
-) ?? SOURCE_DEFAULT;
+const source_root =
+	Deno.args.find(
+		(a, i) => !a.startsWith('-') && (out_flag_index === -1 || i !== out_flag_index + 1)
+	) ?? SOURCE_DEFAULT;
 
 try {
 	await stat(source_root);
@@ -76,15 +77,17 @@ const source_commit = git_head(source_root);
 const stamp_inputs: StampInputs = {
 	harvest: 'wpt-css',
 	source_commit,
-	pin: WPT_CSS_HARVEST_PIN,
+	pin: WPT_CSS_HARVEST_PIN
 };
 if (
-	stamped_run && !force && source_commit !== null &&
+	stamped_run &&
+	!force &&
+	source_commit !== null &&
 	(await harvest_up_to_date(STAMP_PATH, stamp_inputs, [out_dir]))
 ) {
 	console.error(
 		`wpt harvest up to date (../wpt at ${short_commit(source_commit)}, ` +
-			`pin ${WPT_CSS_HARVEST_PIN}) — skipping; --force to re-harvest.`,
+			`pin ${WPT_CSS_HARVEST_PIN}) — skipping; --force to re-harvest.`
 	);
 	Deno.exit(0);
 }
@@ -100,7 +103,7 @@ const stats = {
 	blocks_skipped_type: 0,
 	blocks_skipped_empty: 0,
 	blocks_skipped_duplicate: 0,
-	bytes_written: 0,
+	bytes_written: 0
 };
 
 await rm(out_dir, { recursive: true, force: true });
@@ -163,7 +166,7 @@ for (const entry of entries) {
 if (source_root === SOURCE_DEFAULT && stats.blocks_written !== WPT_CSS_HARVEST_PIN) {
 	console.error(
 		`FAIL: pinned count mismatch — harvested ${stats.blocks_written} blocks ≠ pinned ${WPT_CSS_HARVEST_PIN}. ` +
-			`Removing ${out_dir}; if the move is deliberate (wpt pull), re-pin in lib/gate_counts.ts.`,
+			`Removing ${out_dir}; if the move is deliberate (wpt pull), re-pin in lib/gate_counts.ts.`
 	);
 	await rm(out_dir, { recursive: true, force: true });
 	Deno.exit(1);
@@ -172,5 +175,7 @@ if (source_root === SOURCE_DEFAULT && stats.blocks_written !== WPT_CSS_HARVEST_P
 if (stamped_run && source_commit !== null) {
 	await write_stamp(STAMP_PATH, stamp_inputs);
 }
-console.error(`done: ${stats.blocks_written} blocks from ${stats.files_with_blocks} files → ${out_dir}`);
+console.error(
+	`done: ${stats.blocks_written} blocks from ${stats.files_with_blocks} files → ${out_dir}`
+);
 console.log(JSON.stringify(stats, null, '\t'));

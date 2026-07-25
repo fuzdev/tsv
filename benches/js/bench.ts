@@ -67,7 +67,7 @@ import type { BenchmarkResult } from '@fuzdev/fuz_util/benchmark_types.ts';
 import {
 	benchmark_baseline_compare,
 	benchmark_baseline_format,
-	benchmark_baseline_save,
+	benchmark_baseline_save
 } from '@fuzdev/fuz_util/benchmark_baseline.ts';
 import { spawn_out } from '@fuzdev/fuz_util/process.ts';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
@@ -80,7 +80,7 @@ import {
 	canonical_parser_label,
 	get_alternative_versions,
 	get_benchmark_tasks,
-	init_implementations,
+	init_implementations
 } from './lib/implementations.ts';
 import {
 	type EffectiveCorpusEntry,
@@ -98,19 +98,19 @@ import {
 	generate_skipped_files_report,
 	generate_summary_report,
 	generate_versions_info,
-	type GroupResults,
+	type GroupResults
 } from './lib/report.ts';
 import {
 	type BinarySize,
 	collect_binary_sizes,
 	generate_binary_size_markdown,
-	generate_binary_size_report,
+	generate_binary_size_report
 } from './lib/binary_sizes.ts';
 import { type Language, LANGUAGES, type SourceFile } from './lib/types.ts';
 import {
 	check_artifact_freshness,
 	WASM_CRATES,
-	wasm_artifact_path,
+	wasm_artifact_path
 } from './lib/check_artifact_freshness.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { get_library_path } from './lib/ffi.ts';
@@ -134,7 +134,7 @@ const Args_schema = z.strictObject({
 	'save-baseline': z.boolean().default(false),
 	'compare-baseline': z.boolean().default(false),
 	'save-report': z.boolean().default(false),
-	verbose: z.boolean().default(false),
+	verbose: z.boolean().default(false)
 });
 
 // Strip leading -- from deno task passthrough. `argv.slice(2)` (node:process) is
@@ -150,7 +150,7 @@ if (!parsed.success) {
 		.map((k) => `--${k}`);
 	console.error(
 		'Invalid arguments:',
-		parsed.error.issues.map((i: { message: string }) => i.message).join(', '),
+		parsed.error.issues.map((i: { message: string }) => i.message).join(', ')
 	);
 	console.error(`Known flags: ${known.join(', ')}`);
 	exit(1);
@@ -167,7 +167,7 @@ const args = {
 	save_baseline: parsed.data['save-baseline'],
 	compare_baseline: parsed.data['compare-baseline'],
 	save_report: parsed.data['save-report'],
-	verbose: parsed.data.verbose,
+	verbose: parsed.data.verbose
 };
 
 // Baseline statistics requested — raises the sample floors in the timed suite
@@ -209,7 +209,7 @@ const NOISE_PATTERNS = [
 	// oxfmt 0.50 wraps the call site in backticks (`oxfmt::textToDoc()`),
 	// so match the unwrapped function name to survive minor wording shifts.
 	'oxfmt::textToDoc',
-	'panicked at crates/biome_rowan',
+	'panicked at crates/biome_rowan'
 ];
 const original_console_error = console.error.bind(console);
 const suppressed_noise = new Map<string, number>();
@@ -316,7 +316,7 @@ const IS_CONFORMANCE = CORPUS_MODE === 'conformance';
 if (IS_CONFORMANCE && (args.save_baseline || args.compare_baseline)) {
 	console.error(
 		'Baseline flags are perf-corpus only — drop --save-baseline/--compare-baseline ' +
-			'or run without BENCH_CORPUS=conformance.',
+			'or run without BENCH_CORPUS=conformance.'
 	);
 	exit(1);
 }
@@ -361,7 +361,7 @@ if (COVERAGE_ONLY && !IS_CONFORMANCE) {
 	// null-timing entries — corrupting the throughput headline. Reject the combo.
 	console.error(
 		'BENCH_COVERAGE_ONLY=1 requires BENCH_CORPUS=conformance (it is a conformance-only mode; ' +
-			'running it in perf mode would overwrite the perf report with null-timing entries).',
+			'running it in perf mode would overwrite the perf report with null-timing entries).'
 	);
 	exit(1);
 }
@@ -389,7 +389,7 @@ const RESULTS_DIR = './benches/js/results';
 
 log('Loading corpus...\n');
 const corpus_loader = new DevReposLoader(CORPUS_MODE, {
-	allow_missing: env.BENCH_ALLOW_MISSING === '1',
+	allow_missing: env.BENCH_ALLOW_MISSING === '1'
 });
 // Drain `stream()` directly instead of `load()` so we skip the loader's
 // own corpus summary — bench.ts prints its own tighter one below that
@@ -407,7 +407,7 @@ const by_language = group_by_language(files);
 const total_file_counts = {
 	svelte: by_language.svelte.length,
 	typescript: by_language.typescript.length,
-	css: by_language.css.length,
+	css: by_language.css.length
 };
 
 // Apply file filter and limit
@@ -427,7 +427,7 @@ const is_limited = MAX_FILES_PER_LANGUAGE !== undefined || FILE_FILTER !== undef
 const bytes_by_language: Record<Language, number> = {
 	svelte: svelte_files.reduce((sum, f) => sum + f.bytes, 0),
 	typescript: ts_files.reduce((sum, f) => sum + f.bytes, 0),
-	css: css_files.reduce((sum, f) => sum + f.bytes, 0),
+	css: css_files.reduce((sum, f) => sum + f.bytes, 0)
 };
 
 /**
@@ -443,26 +443,24 @@ function format_throughput(bytes_per_sec: number): string {
 // limited, each line reads `N of M files` so the subset is obvious.
 const total_files = svelte_files.length + ts_files.length + css_files.length;
 const total_bytes = bytes_by_language.svelte + bytes_by_language.typescript + bytes_by_language.css;
-const fmt_count = (
-	n: number,
-	total: number,
-) => (is_limited && n !== total ? `${n} of ${total}` : `${n}`);
+const fmt_count = (n: number, total: number) =>
+	is_limited && n !== total ? `${n} of ${total}` : `${n}`;
 const fmt_bytes = (b: number) => `${(b / 1_000_000).toFixed(1)} MB`;
 log(`Corpus (${CORPUS_MODE} view):`);
 log(
-	`  Svelte:      ${fmt_count(svelte_files.length, total_file_counts.svelte).padEnd(11)} files (${
-		fmt_bytes(bytes_by_language.svelte)
-	})`,
+	`  Svelte:      ${fmt_count(svelte_files.length, total_file_counts.svelte).padEnd(11)} files (${fmt_bytes(
+		bytes_by_language.svelte
+	)})`
 );
 log(
-	`  TypeScript:  ${fmt_count(ts_files.length, total_file_counts.typescript).padEnd(11)} files (${
-		fmt_bytes(bytes_by_language.typescript)
-	})`,
+	`  TypeScript:  ${fmt_count(ts_files.length, total_file_counts.typescript).padEnd(11)} files (${fmt_bytes(
+		bytes_by_language.typescript
+	)})`
 );
 log(
-	`  CSS:         ${fmt_count(css_files.length, total_file_counts.css).padEnd(11)} files (${
-		fmt_bytes(bytes_by_language.css)
-	})`,
+	`  CSS:         ${fmt_count(css_files.length, total_file_counts.css).padEnd(11)} files (${fmt_bytes(
+		bytes_by_language.css
+	)})`
 );
 log(`  Total:       ${String(total_files).padEnd(11)} files (${fmt_bytes(total_bytes)})`);
 log();
@@ -472,19 +470,20 @@ log();
 // WASM artifacts are runtime-specific: Deno executes the FFI library + the
 // `deno`-target WASM bundle; Node/Bun execute the N-API addon + the `nodejs`
 // target. `wasm_artifact_path` resolves the runtime's bundle itself.
-const native_check = RUNTIME === 'deno'
-	? {
-		label: `FFI (${env.TSV_FFI_PROFILE ?? 'release'})`,
-		path: get_library_path(),
-		binding_crates: ['tsv_ffi'],
-		rebuild: 'deno task build:ffi',
-	}
-	: {
-		label: 'N-API',
-		path: get_napi_library_path(),
-		binding_crates: ['tsv_napi'],
-		rebuild: 'deno task build:napi',
-	};
+const native_check =
+	RUNTIME === 'deno'
+		? {
+				label: `FFI (${env.TSV_FFI_PROFILE ?? 'release'})`,
+				path: get_library_path(),
+				binding_crates: ['tsv_ffi'],
+				rebuild: 'deno task build:ffi'
+			}
+		: {
+				label: 'N-API',
+				path: get_napi_library_path(),
+				binding_crates: ['tsv_napi'],
+				rebuild: 'deno task build:napi'
+			};
 const wasm_target = RUNTIME === 'deno' ? 'deno' : 'nodejs';
 await check_artifact_freshness([
 	native_check,
@@ -492,8 +491,8 @@ await check_artifact_freshness([
 		label: `WASM (all/${wasm_target})`,
 		path: wasm_artifact_path('all'),
 		binding_crates: WASM_CRATES,
-		rebuild: `deno task build:wasm:all:${wasm_target}`,
-	},
+		rebuild: `deno task build:wasm:all:${wasm_target}`
+	}
 ]);
 
 // Friendly preflight: the canonical impls (prettier + svelte/compiler) resolve
@@ -586,7 +585,7 @@ function enforce_perf_coverage(): void {
 	console.error(
 		`Perf corpus: ${violations.length} unlisted pre-flight failure(s). Every in-scope tool must ` +
 			`process every real-world file — fix the tool, or add a reviewed entry (with a reason) to ` +
-			`PERF_OMITS in lib/perf_omit.ts:\n${violations.join('\n')}`,
+			`PERF_OMITS in lib/perf_omit.ts:\n${violations.join('\n')}`
 	);
 	exit(1);
 }
@@ -644,12 +643,12 @@ function warn_variant_parity(): void {
 				native: name,
 				wasm: sibling_name,
 				native_only,
-				wasm_only,
+				wasm_only
 			});
 			console.error(
 				`⚠ variant parity (${group_name}): ${name} and ${sibling_name} accept different files ` +
 					`(${native_only} ${name}-only, ${wasm_only} ${sibling_name}-only). Same engine — a ` +
-					`divergence usually means one binding's error surface is broken, not an engine difference.`,
+					`divergence usually means one binding's error surface is broken, not an engine difference.`
 			);
 		}
 	}
@@ -671,7 +670,7 @@ function process_corpus(files: SourceFile[], process_fn: (file: SourceFile) => v
 /** Async variant of `process_corpus`. */
 async function process_corpus_async(
 	files: SourceFile[],
-	process_fn: (file: SourceFile) => Promise<void>,
+	process_fn: (file: SourceFile) => Promise<void>
 ): Promise<void> {
 	for (const file of files) {
 		await process_fn(file);
@@ -682,7 +681,7 @@ async function process_corpus_async(
 const files_by_language: Record<Language, SourceFile[]> = {
 	svelte: svelte_files,
 	typescript: ts_files,
-	css: css_files,
+	css: css_files
 };
 
 /**
@@ -697,7 +696,7 @@ const files_by_language: Record<Language, SourceFile[]> = {
 async function run_preflight(
 	tasks: ReturnType<typeof get_benchmark_tasks>,
 	files: SourceFile[],
-	language: Language,
+	language: Language
 ): Promise<void> {
 	for (let i = 0; i < tasks.length; i++) {
 		const task = tasks[i];
@@ -756,7 +755,7 @@ const group_setups: Map<string, GroupSetup> = new Map();
  */
 async function run_preflight_group(
 	operation: 'parse' | 'format',
-	language: Language,
+	language: Language
 ): Promise<void> {
 	const files = files_by_language[language];
 	if (files.length === 0) return;
@@ -765,7 +764,7 @@ async function run_preflight_group(
 	log(`\n· ${group_name}`);
 
 	const tasks = get_benchmark_tasks(impls, operation, language, {
-		forced_async: BENCH_FORCED_ASYNC,
+		forced_async: BENCH_FORCED_ASYNC
 	});
 	await run_preflight(tasks, files, language);
 
@@ -804,7 +803,7 @@ async function run_preflight_group(
 			const success_set = successful_files.get(task.tracking_key) ?? new Set<string>();
 			filtered_files_by_task.set(
 				task.tracking_key,
-				files.filter((f) => success_set.has(f.path)),
+				files.filter((f) => success_set.has(f.path))
 			);
 		}
 	}
@@ -815,7 +814,10 @@ async function run_preflight_group(
 	// `Nx (Mf)` annotation in the bench-table `vs baseline` column.
 	for (const task of tasks) {
 		const task_files = filtered_files_by_task.get(task.tracking_key)!;
-		effective_corpus_bytes.set(task.tracking_key, task_files.reduce((sum, f) => sum + f.bytes, 0));
+		effective_corpus_bytes.set(
+			task.tracking_key,
+			task_files.reduce((sum, f) => sum + f.bytes, 0)
+		);
 		iterated_file_count.set(task.tracking_key, task_files.length);
 	}
 
@@ -825,7 +827,7 @@ async function run_preflight_group(
 /** Run the timed measurement loop for one group using its stashed pre-flight setup. */
 async function run_benchmark_group(
 	operation: 'parse' | 'format',
-	language: Language,
+	language: Language
 ): Promise<void> {
 	const group_name = `${operation}/${language}`;
 	const setup = group_setups.get(group_name);
@@ -864,15 +866,16 @@ async function run_benchmark_group(
 			// the displayed MB/s is what this impl actually achieved, not
 			// what it would have done on the full corpus.
 			const tracking_key = task_tracking.get(result.name);
-			const effective_bytes = tracking_key ? effective_corpus_bytes.get(tracking_key) ?? 0 : 0;
+			const effective_bytes = tracking_key ? (effective_corpus_bytes.get(tracking_key) ?? 0) : 0;
 			// Mirror the report-path guard (`generate_group_throughput_markdown`):
 			// with an empty intersection the MB/s figure is a misleading `0.0 MB/s`
 			// while ops/sec is real, so print `—` instead of a fake throughput.
-			const throughput = effective_bytes === 0
-				? '—'
-				: format_throughput(result.stats.ops_per_second * effective_bytes);
+			const throughput =
+				effective_bytes === 0
+					? '—'
+					: format_throughput(result.stats.ops_per_second * effective_bytes);
 			log(`  [${index + 1}/${total}] ${result.name}: ${ops_per_sec} sweeps/sec (${throughput})`);
-		},
+		}
 	});
 
 	for (const task of tasks) {
@@ -901,7 +904,7 @@ async function run_benchmark_group(
 						await task.run_async!(f.content, language, f.goal);
 					});
 				},
-				async: true,
+				async: true
 			});
 		} else {
 			bench.add({
@@ -909,7 +912,7 @@ async function run_benchmark_group(
 				fn: () => {
 					process_corpus(task_files, (f) => task.run(f.content, language, f.goal));
 				},
-				async: false,
+				async: false
 			});
 		}
 	}
@@ -941,7 +944,9 @@ if (CORPUS_MODE === 'perf') {
 }
 
 if (COVERAGE_ONLY) {
-	log('\nCoverage-only mode: skipping the timed benchmark phase (coverage is a pre-flight product).');
+	log(
+		'\nCoverage-only mode: skipping the timed benchmark phase (coverage is a pre-flight product).'
+	);
 } else {
 	log('\nRunning benchmarks:');
 	for (const lang of LANGUAGES) {
@@ -1117,7 +1122,7 @@ const NULL_STATS = {
 	std_dev_ns: null,
 	cv: null,
 	ops_per_second: null,
-	sample_size: null,
+	sample_size: null
 } as const;
 
 /**
@@ -1143,7 +1148,7 @@ function build_coverage_entries(): BaselineEntry[] {
 					files_processed: coverage?.processed ?? null,
 					files_total: coverage?.total ?? null,
 					files_iterated: iterated ?? null,
-					runtime: RUNTIME,
+					runtime: RUNTIME
 				});
 			}
 		}
@@ -1156,7 +1161,7 @@ async function build_results_data(
 	groups: GroupResults[],
 	corpus: { svelte: number; typescript: number; css: number },
 	versions: BaselineVersions,
-	binary_sizes: BinarySize[],
+	binary_sizes: BinarySize[]
 ): Promise<Baseline> {
 	const entries: BaselineEntry[] = [];
 	if (COVERAGE_ONLY) {
@@ -1188,7 +1193,7 @@ async function build_results_data(
 					files_processed: coverage?.processed ?? null,
 					files_total: coverage?.total ?? null,
 					files_iterated: iterated ?? null,
-					runtime: RUNTIME,
+					runtime: RUNTIME
 				});
 			}
 		}
@@ -1210,7 +1215,7 @@ async function build_results_data(
 		binary_sizes: binary_sizes,
 		entries,
 		suppressed_noise: Object.fromEntries(suppressed_noise),
-		variant_parity: variant_parity_findings,
+		variant_parity: variant_parity_findings
 	};
 }
 
@@ -1233,19 +1238,17 @@ function generate_markdown_report(
 	effective_size: Map<string, EffectiveCorpusEntry>,
 	effective_bytes: Map<string, number>,
 	iterated_counts: Map<string, number>,
-	skipped: Map<string, Map<string, string>>,
+	skipped: Map<string, Map<string, string>>
 ): string {
 	const lines: string[] = [];
 	lines.push(
-		IS_CONFORMANCE
-			? '# tsv conformance benchmark results (parse)\n'
-			: '# tsv benchmark results\n',
+		IS_CONFORMANCE ? '# tsv conformance benchmark results (parse)\n' : '# tsv benchmark results\n'
 	);
 	const commit_str = git_commit ? ` (${git_commit})` : '';
 	lines.push(`**Runtime:** ${RUNTIME}\n`);
 	lines.push(
 		`**Machine:** ${machine.cpu_model} · ${machine.os}/${machine.arch} · ` +
-			`${RUNTIME} ${machine.runtime_version}\n`,
+			`${RUNTIME} ${machine.runtime_version}\n`
 	);
 	const conformance_note = COVERAGE_ONLY
 		? 'conformance — fixtures-only corpus (disjoint from perf; Svelte set minus svelte/compiler-rejected files), parse groups only; per-tool Coverage lines only (coverage-only run — timed throughput skipped)'
@@ -1253,7 +1256,7 @@ function generate_markdown_report(
 	lines.push(
 		`**Corpus kind:** ${
 			IS_CONFORMANCE ? conformance_note : 'perf — real-world code only (fixture suites excluded)'
-		}\n`,
+		}\n`
 	);
 	lines.push(`**Date:** ${timestamp} — tsv ${versions.tsv}${commit_str}\n`);
 
@@ -1263,11 +1266,11 @@ function generate_markdown_report(
 		`**Corpus:** ${corpus.svelte} Svelte (${format_mb(corpus_bytes.svelte)}), ` +
 			`${corpus.typescript} TypeScript (${format_mb(corpus_bytes.typescript)}), ` +
 			`${corpus.css} CSS (${format_mb(corpus_bytes.css)}) — ` +
-			`${total_files} files, ${format_mb(total_bytes)} total\n`,
+			`${total_files} files, ${format_mb(total_bytes)} total\n`
 	);
 	if (corpus_loader.sources.length > 0) {
 		lines.push(
-			`**Sources:** ${corpus_loader.sources.map((s) => `${s.path} (${s.files})`).join(', ')}\n`,
+			`**Sources:** ${corpus_loader.sources.map((s) => `${s.path} (${s.files})`).join(', ')}\n`
 		);
 	}
 
@@ -1277,7 +1280,7 @@ function generate_markdown_report(
 		`acorn@${versions.acorn}`,
 		`acorn-typescript@${versions.acorn_ts}`,
 		`prettier@${versions.prettier}`,
-		`prettier-plugin-svelte@${versions.prettier_svelte}`,
+		`prettier-plugin-svelte@${versions.prettier_svelte}`
 	];
 	if (versions.oxc_parser) version_parts.push(`oxc-parser@${versions.oxc_parser}`);
 	if (versions.oxfmt) version_parts.push(`oxfmt@${versions.oxfmt}`);
@@ -1291,14 +1294,14 @@ function generate_markdown_report(
 			'over the group\u2019s iterated file set, so the absolute columns (sweeps/sec, p50\u2013p99, min/max) ' +
 			'are per-sweep, not per-file — divide by the group\u2019s file count (the Files lines / `(Mf)` ' +
 			'annotations) for per-file figures; ratios and MB/s are denominated consistently either way. ' +
-			'This is single-core throughput, not the multi-core batch throughput a CLI gets formatting many files at once.\n',
+			'This is single-core throughput, not the multi-core batch throughput a CLI gets formatting many files at once.\n'
 	);
 
 	// Coverage-only run: no timed groups exist, so render the per-tool coverage
 	// tables straight from pre-flight state (the timed loop below no-ops).
 	if (COVERAGE_ONLY) {
 		lines.push(
-			...generate_coverage_only_markdown(LANGUAGES, OPERATIONS, task_tracking, effective_size),
+			...generate_coverage_only_markdown(LANGUAGES, OPERATIONS, task_tracking, effective_size)
 		);
 	}
 
@@ -1324,7 +1327,7 @@ function generate_markdown_report(
 
 		lines.push(`## ${group.name}\n`);
 		lines.push(
-			generate_group_bench_table_markdown(group.results, baseline_exists ? baseline : undefined),
+			generate_group_bench_table_markdown(group.results, baseline_exists ? baseline : undefined)
 		);
 		lines.push('');
 
@@ -1350,7 +1353,7 @@ function generate_markdown_report(
 		// mean self is faster than the opponent. File counts are surfaced per
 		// group (Files / Coverage lines) and per row in the Comparisons tables.
 		lines.push(
-			'_Note: every `Nx` is speedup form — values > 1 mean self is faster. File counts come from the per-group `Files (intersection):` / `Coverage:` lines and the Comparisons table row labels._\n',
+			'_Note: every `Nx` is speedup form — values > 1 mean self is faster. File counts come from the per-group `Files (intersection):` / `Coverage:` lines and the Comparisons table row labels._\n'
 		);
 	}
 
@@ -1365,7 +1368,7 @@ function generate_markdown_report(
 			groups,
 			LANGUAGES,
 			iterated_counts,
-			task_tracking,
+			task_tracking
 		);
 		if (comparison_markdown) {
 			lines.push(comparison_markdown);
@@ -1381,7 +1384,7 @@ function generate_markdown_report(
 		skipped,
 		MAX_ERROR_MESSAGE_LENGTH,
 		args.verbose,
-		task_tracking,
+		task_tracking
 	);
 	if (skipped_markdown) {
 		lines.push(skipped_markdown);
@@ -1406,7 +1409,7 @@ async function save_results(
 	data: Baseline,
 	groups: GroupResults[],
 	binary_sizes: BinarySize[],
-	write_report: boolean,
+	write_report: boolean
 ): Promise<string> {
 	await mkdir(RESULTS_DIR, { recursive: true });
 	const timestamp = data.timestamp.replace(/[:.]/g, '-').slice(0, 19);
@@ -1426,18 +1429,18 @@ async function save_results(
 		effective_corpus_size,
 		effective_corpus_bytes,
 		iterated_file_count,
-		skipped_files,
+		skipped_files
 	);
 
 	const json = JSON.stringify(data, null, '\t');
 	const writes: Promise<void>[] = [
 		writeFile(`${base_path}.json`, json),
-		writeFile(`${base_path}.md`, markdown),
+		writeFile(`${base_path}.md`, markdown)
 	];
 	if (write_report) {
 		writes.push(
 			writeFile(`${RESULTS_DIR}/report.${REPORT_TAG}.json`, json),
-			writeFile(`${RESULTS_DIR}/report.${REPORT_TAG}.md`, markdown),
+			writeFile(`${RESULTS_DIR}/report.${REPORT_TAG}.md`, markdown)
 		);
 	}
 	await Promise.all(writes);
@@ -1473,7 +1476,7 @@ function build_baseline_metadata(data: Baseline): Record<string, unknown> {
 	return {
 		corpus: data.corpus,
 		versions: data.versions,
-		binary_sizes: data.binary_sizes,
+		binary_sizes: data.binary_sizes
 	};
 }
 
@@ -1486,7 +1489,7 @@ interface BaselineMeta {
 async function save_baseline(data: Baseline): Promise<void> {
 	await benchmark_baseline_save(flatten_results_for_baseline(all_group_results), {
 		path: BASELINE_DIR,
-		metadata: build_baseline_metadata(data),
+		metadata: build_baseline_metadata(data)
 	});
 	log(`Baseline saved to ${BASELINE_DIR}/baseline.json`);
 }
@@ -1511,13 +1514,13 @@ async function compare_baseline(current: Baseline): Promise<void> {
 			regression_threshold: 1.0,
 			// Mark the baseline stale after a week so a long-untouched baseline
 			// doesn't quietly mask drift accumulated over months.
-			staleness_warning_days: 7,
-		},
+			staleness_warning_days: 7
+		}
 	);
 
 	if (!comparison.baseline_found) {
 		console.error(
-			`\nNo baseline found at ${BASELINE_DIR}/baseline.json. Run with --save-baseline first.`,
+			`\nNo baseline found at ${BASELINE_DIR}/baseline.json. Run with --save-baseline first.`
 		);
 		return;
 	}
@@ -1532,17 +1535,18 @@ async function compare_baseline(current: Baseline): Promise<void> {
 	// would silently move with the corpus otherwise).
 	const meta = comparison.baseline_metadata as BaselineMeta | null;
 	const baseline_corpus = meta?.corpus;
-	const corpus_match = baseline_corpus &&
+	const corpus_match =
+		baseline_corpus &&
 		baseline_corpus.svelte === current.corpus.svelte &&
 		baseline_corpus.typescript === current.corpus.typescript &&
 		baseline_corpus.css === current.corpus.css;
 	if (baseline_corpus && !corpus_match) {
 		log(`\n⚠️  Corpus size differs from baseline:`);
 		log(
-			`   Baseline: svelte=${baseline_corpus.svelte}, ts=${baseline_corpus.typescript}, css=${baseline_corpus.css}`,
+			`   Baseline: svelte=${baseline_corpus.svelte}, ts=${baseline_corpus.typescript}, css=${baseline_corpus.css}`
 		);
 		log(
-			`   Current:  svelte=${current.corpus.svelte}, ts=${current.corpus.typescript}, css=${current.corpus.css}`,
+			`   Current:  svelte=${current.corpus.svelte}, ts=${current.corpus.typescript}, css=${current.corpus.css}`
 		);
 	}
 
@@ -1562,14 +1566,14 @@ const binary_sizes = await collect_binary_sizes({
 	has_wasm: !!impls.wasm,
 	has_oxc: !!impls.oxc,
 	has_biome: !!impls.biome,
-	has_dprint: !!impls.dprint,
+	has_dprint: !!impls.dprint
 });
 
 // Build results data (used by all output paths and always saved)
 const corpus = {
 	svelte: svelte_files.length,
 	typescript: ts_files.length,
-	css: css_files.length,
+	css: css_files.length
 };
 const alt_versions = get_alternative_versions(impls);
 const v = impls.versions.canonical;
@@ -1580,7 +1584,7 @@ const versions: BaselineVersions = {
 	acorn_ts: v['@sveltejs/acorn-typescript'],
 	prettier: v.prettier,
 	prettier_svelte: v['prettier-plugin-svelte'],
-	...alt_versions,
+	...alt_versions
 };
 const results_data = await build_results_data(all_group_results, corpus, versions, binary_sizes);
 
@@ -1602,8 +1606,8 @@ if (args.json) {
 			effective_corpus_size,
 			effective_corpus_bytes,
 			iterated_file_count,
-			skipped_files,
-		),
+			skipped_files
+		)
 	);
 } else {
 	// Standard text output. The timed summary is empty in coverage-only mode —
@@ -1616,7 +1620,7 @@ if (args.json) {
 
 	const effective_corpus_report = generate_effective_corpus_report(
 		effective_corpus_size,
-		task_tracking_by_group,
+		task_tracking_by_group
 	);
 	if (effective_corpus_report) {
 		console.log(effective_corpus_report);
@@ -1626,7 +1630,7 @@ if (args.json) {
 		skipped_files,
 		MAX_ERROR_MESSAGE_LENGTH,
 		args.verbose,
-		task_tracking_by_group,
+		task_tracking_by_group
 	);
 	if (skipped_report) {
 		console.log(skipped_report);
@@ -1645,8 +1649,8 @@ if (args.json) {
 				all_group_results,
 				LANGUAGES,
 				iterated_file_count,
-				task_tracking_by_group,
-			),
+				task_tracking_by_group
+			)
 		);
 	}
 
@@ -1670,7 +1674,7 @@ const results_path = await save_results(
 	results_data,
 	all_group_results,
 	binary_sizes,
-	write_report,
+	write_report
 );
 log(`\nResults saved to:`);
 log(`  ${results_path}.json`);

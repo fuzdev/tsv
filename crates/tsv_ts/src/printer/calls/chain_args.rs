@@ -544,7 +544,26 @@ fn build_chain_args_force_expand(
         // (Rule A). The three hugging special cases above all decline once a comment
         // forces expansion, so this is the only argument builder a directive reaches in
         // the chain family.
+        //
+        // A lone expression-body arrow renders its signature flat here, the same way the
+        // expand-last arm does (prettier's `expandLastArg` `removeLines`): the argument is
+        // already broken out onto its own line, so the remaining break belongs after `=>`,
+        // on the body — never inside the parameter list. Without this the signature group
+        // is the first break candidate this hardline-wrapped layout offers, and a
+        // one-parameter arrow shatters into three lines. The non-chain path keeps the
+        // signature intact by construction (`call_formatting.rs`'s `try_single_arg_hug`);
+        // this is the chain path answering the question the same way rather than
+        // differently.
+        let flat_sig = call.arguments.len() == 1
+            && matches!(arg, Expression::ArrowFunctionExpression(arrow)
+                if arrow.body.is_expression() && !is_curried_arrow(arg));
+        if flat_sig {
+            printer.expand_last_arg_flat_params.set(true);
+        }
         arg_parts.push(printer.build_arg_item_doc(paren_open, call.arguments, i));
+        if flat_sig {
+            printer.expand_last_arg_flat_params.set(false);
+        }
 
         // Handle trailing comments and comma placement
         let arg_end = arg.span().end;

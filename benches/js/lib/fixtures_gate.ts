@@ -28,7 +28,12 @@ import type { GatePins } from './gate_counts.ts';
 import type { KnownGap, Sanction } from './parse_sanctions.ts';
 import type { Language } from './types.ts';
 import { type CanonicalVersions, load_all_versions } from './versions.ts';
-import { bigint_replacer, type DiffEntry, diff_asts, type MatchContext } from '../corpus_compare_parse.ts';
+import {
+	bigint_replacer,
+	type DiffEntry,
+	diff_asts,
+	type MatchContext
+} from '../corpus_compare_parse.ts';
 
 export interface FixturesGateConfig {
 	/** Display title, e.g. `TypeScript-fixtures`. */
@@ -79,7 +84,7 @@ interface AstGroup {
 
 async function* discover(
 	root: string,
-	config: FixturesGateConfig,
+	config: FixturesGateConfig
 ): AsyncGenerator<{ path: string; content: string }> {
 	let entries;
 	try {
@@ -122,7 +127,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 		over_acceptance: [] as OverRejection[],
 		sanctioned: [] as (OverRejection & { reason: string })[],
 		known_gap: [] as (OverRejection & { category: string; reason: string })[],
-		unexpected: [] as OverRejection[],
+		unexpected: [] as OverRejection[]
 	};
 
 	const ast_groups = new Map<string, AstGroup>();
@@ -141,7 +146,13 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 			const key = `${entry.signature}\0${entry.documented ?? ''}`;
 			let g = ast_groups.get(key);
 			if (!g) {
-				g = { signature: entry.signature, documented: entry.documented, files: new Set(), count: 0, sample: null };
+				g = {
+					signature: entry.signature,
+					documented: entry.documented,
+					files: new Set(),
+					count: 0,
+					sample: null
+				};
 				ast_groups.set(key, g);
 			}
 			g.files.add(path);
@@ -181,7 +192,12 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 				buckets.sanctioned.push({ path: file.path, error: tsv_err, reason: sanction.reason });
 			} else if (gap) {
 				used_gaps.add(gap.pattern);
-				buckets.known_gap.push({ path: file.path, error: tsv_err, category: gap.category, reason: gap.reason });
+				buckets.known_gap.push({
+					path: file.path,
+					error: tsv_err,
+					category: gap.category,
+					reason: gap.reason
+				});
 			} else {
 				buckets.unexpected.push({ path: file.path, error: tsv_err });
 			}
@@ -209,13 +225,13 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 	if (scanned === 0) {
 		if (json_mode) {
 			Deno.stdout.writeSync(
-				new TextEncoder().encode(JSON.stringify({ root, scanned: 0 }, null, '\t') + '\n'),
+				new TextEncoder().encode(JSON.stringify({ root, scanned: 0 }, null, '\t') + '\n')
 			);
 		}
 		console.error(
 			`\n${config.title} parse-conformance gate — root: ${root}\n` +
 				`FAIL: 0 ${config.input_noun} found — nothing was graded. ` +
-				`Clone the suite checkout (expected at ${config.default_root}), or fix the path argument.`,
+				`Clone the suite checkout (expected at ${config.default_root}), or fix the path argument.`
 		);
 		Deno.exit(1);
 	}
@@ -224,7 +240,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 	if (config.oracle_pin) {
 		try {
 			const checkout_pkg = JSON.parse(
-				await readFile(config.oracle_pin.checkout_package_json, 'utf8'),
+				await readFile(config.oracle_pin.checkout_package_json, 'utf8')
 			) as { version?: string };
 			const pinned = (await load_all_versions()).canonical[config.oracle_pin.npm_package];
 			if (checkout_pkg.version && checkout_pkg.version !== pinned) {
@@ -232,7 +248,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 					`\n⚠ oracle version skew: ${config.oracle_pin.checkout_package_json} is v${checkout_pkg.version} but the ` +
 						`${config.oracle_pin.npm_package} oracle is pinned v${pinned} — the suite INPUTS and the grading parser ` +
 						`come from different versions. Align the checkout, or bump the canonical pins deliberately (see ` +
-						`benches/js/CLAUDE.md §"Canonical baseline is coupled").`,
+						`benches/js/CLAUDE.md §"Canonical baseline is coupled").`
 				);
 			}
 		} catch {
@@ -255,18 +271,24 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 	console.error(`  VERDICT`);
 	console.error(`    parity (both reject):     ${buckets.parity}`);
 	console.error(`    both accept:              ${buckets.both_accept}`);
-	console.error(`    over-acceptance:          ${buckets.over_acceptance.length}  (deferred early-errors; not gated)`);
-	console.error(`    over-rejection sanctioned:${buckets.sanctioned.length}  (${config.sanctioned_note})`);
+	console.error(
+		`    over-acceptance:          ${buckets.over_acceptance.length}  (deferred early-errors; not gated)`
+	);
+	console.error(
+		`    over-rejection sanctioned:${buckets.sanctioned.length}  (${config.sanctioned_note})`
+	);
 	console.error(
 		`    over-rejection known-gap: ${buckets.known_gap.length}  (tracked; ${
 			[...gap_by_category.entries()].map(([c, n]) => `${c}=${n}`).join(', ') || 'none'
-		})`,
+		})`
 	);
 	console.error(`    over-rejection UNEXPECTED: ${buckets.unexpected.length}  (new gap — GATES)`);
 	console.error(`\n  AST-SHAPE (of the ${buckets.both_accept} both-accept)`);
 	console.error(`    clean:                    ${ast_clean}`);
 	console.error(`    documented diff groups:   ${documented_groups.length}`);
-	console.error(`    undocumented diff groups: ${undocumented_groups.length}  (report-only — triage surface)`);
+	console.error(
+		`    undocumented diff groups: ${undocumented_groups.length}  (report-only — triage surface)`
+	);
 
 	for (const e of buckets.unexpected) {
 		console.error(`\n    ✗ UNEXPECTED over-rejection: ${e.path}\n        ${e.error}`);
@@ -277,7 +299,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 		for (const g of undocumented_groups) {
 			console.error(
 				`      · undocumented AST group: ${g.signature}  (${g.count} in ${g.files.size} file(s))` +
-					(g.sample ? `  e.g. ${g.sample.path}` : ''),
+					(g.sample ? `  e.g. ${g.sample.path}` : '')
 			);
 		}
 		for (const g of buckets.known_gap) console.error(`      · known-gap [${g.category}] ${g.path}`);
@@ -294,7 +316,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 			sanctioned: buckets.sanctioned,
 			known_gap: buckets.known_gap,
 			known_gap_by_category: Object.fromEntries(gap_by_category),
-			unexpected: buckets.unexpected,
+			unexpected: buckets.unexpected
 		},
 		ast: {
 			both_accept: buckets.both_accept,
@@ -303,15 +325,15 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 				signature: g.signature,
 				matcher: g.documented,
 				count: g.count,
-				files: g.files.size,
+				files: g.files.size
 			})),
 			undocumented_groups: undocumented_groups.map((g) => ({
 				signature: g.signature,
 				count: g.count,
 				files: [...g.files].slice(0, 10),
-				sample: g.sample ? { path: g.sample.path, entry: g.sample.entry } : null,
-			})),
-		},
+				sample: g.sample ? { path: g.sample.path, entry: g.sample.entry } : null
+			}))
+		}
 	};
 
 	if (json_mode) {
@@ -322,7 +344,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 		console.error(
 			`\nNOTE: ${undocumented_groups.length} undocumented AST-shape group(s) to triage (report-only, not ` +
 				`gating) — catalog each into corpus_compare_parse.ts DOCUMENTED_MATCHERS (shared; also shrinks ` +
-				`the corpus:compare:parse count) or fix as a writer/parser bug. Detail: -v or --json.`,
+				`the corpus:compare:parse count) or fix as a writer/parser bug. Detail: -v or --json.`
 		);
 	}
 	// Only the verdict half enforces: a NEW over-rejection in neither the sanction
@@ -331,7 +353,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 		console.error(
 			`\nFAIL: ${buckets.unexpected.length} unexpected over-rejection(s) — tsv rejects input ${config.oracle_name} ` +
 				`accepts, and it's neither sanctioned nor a tracked gap. Fix the parser, or — if tsv is correctly ` +
-				`stricter — add a reasoned sanction entry; if it's a known gap, add a KNOWN_GAPS entry.`,
+				`stricter — add a reasoned sanction entry; if it's a known gap, add a KNOWN_GAPS entry.`
 		);
 		Deno.exit(1);
 	}
@@ -343,14 +365,18 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 		// fixed gap's entry rots dormant, an upstream fixture rename orphans it
 		// silently, and a too-broad pattern can mask a NEW regression.
 		const stale = [
-			...config.sanctioned.filter((s) => !used_sanctions.has(s.pattern)).map((s) => `sanction: ${s.pattern}`),
-			...config.known_gaps.filter((g) => !used_gaps.has(g.pattern)).map((g) => `known-gap: ${g.pattern}`),
+			...config.sanctioned
+				.filter((s) => !used_sanctions.has(s.pattern))
+				.map((s) => `sanction: ${s.pattern}`),
+			...config.known_gaps
+				.filter((g) => !used_gaps.has(g.pattern))
+				.map((g) => `known-gap: ${g.pattern}`)
 		];
 		if (stale.length > 0) {
 			console.error(
 				`\nFAIL: ${stale.length} stale ledger entr${stale.length === 1 ? 'y' : 'ies'} — matched no over-rejection in this full-suite run:\n` +
 					stale.map((s) => `    · ${s}`).join('\n') +
-					`\n  Delete the entry if its gap/leniency was fixed; update the pattern if upstream renamed the fixture.`,
+					`\n  Delete the entry if its gap/leniency was fixed; update the pattern if upstream renamed the fixture.`
 			);
 			Deno.exit(1);
 		}
@@ -360,17 +386,15 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 		// down, is a suite refresh or a behavior change and must be re-pinned
 		// deliberately. Down = regression/gutted input; up = new inputs graded.
 		const pin_failures = [
-			scanned !== config.pins.scanned
-				? `scanned ${scanned} ≠ pinned ${config.pins.scanned}`
-				: null,
+			scanned !== config.pins.scanned ? `scanned ${scanned} ≠ pinned ${config.pins.scanned}` : null,
 			buckets.both_accept !== config.pins.both_accept
 				? `both-accept ${buckets.both_accept} ≠ pinned ${config.pins.both_accept}`
-				: null,
+				: null
 		].filter((f): f is string => f !== null);
 		if (pin_failures.length > 0) {
 			console.error(
 				`\nFAIL: pinned count mismatch — ${pin_failures.join('; ')}. ` +
-					`If this move is deliberate (suite refresh, behavior change), re-pin in lib/gate_counts.ts (see its update ritual).`,
+					`If this move is deliberate (suite refresh, behavior change), re-pin in lib/gate_counts.ts (see its update ritual).`
 			);
 			Deno.exit(1);
 		}

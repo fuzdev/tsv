@@ -75,7 +75,7 @@ if (reports.size === 0) {
 	console.error(
 		'No per-runtime reports found in results/ ' +
 			'(report.deno.json / report.node.json / report.bun.json).\n' +
-			'Run `deno task bench` (or a per-runtime bench) first.',
+			'Run `deno task bench` (or a per-runtime bench) first.'
 	);
 	exit(1);
 }
@@ -120,9 +120,10 @@ const sources = present.map((r) => ({
 	timestamp: reports.get(r)!.timestamp,
 	git_commit: reports.get(r)!.git_commit,
 	tsv: reports.get(r)!.versions?.tsv ?? null,
-	machine: reports.get(r)!.machine ?? null,
+	machine: reports.get(r)!.machine ?? null
 }));
-const mixed_vintage = new Set(sources.map((s) => `${s.git_commit ?? '?'}@${s.tsv ?? '?'}`)).size > 1;
+const mixed_vintage =
+	new Set(sources.map((s) => `${s.git_commit ?? '?'}@${s.tsv ?? '?'}`)).size > 1;
 
 // Loud flag when the siblings were produced on DIFFERENT boxes — the
 // throughput numbers are machine-relative, so cross-runtime ratios are only
@@ -154,9 +155,9 @@ const combined = {
 			name: row.name,
 			ops_per_second: row.ops,
 			mean_ns: row.mean_ns,
-			files_iterated: row.files_iterated,
+			files_iterated: row.files_iterated
 		};
-	}),
+	})
 };
 
 // Markdown: one table per group, runtimes side by side + ratio vs base_runtime.
@@ -176,13 +177,13 @@ md.push('# tsv benchmark results — cross-runtime\n');
 md.push(`**Generated:** ${combined.generated}\n`);
 md.push(
 	`**Runtimes:** ${present.join(', ')} ` +
-		'— each runtime’s full report is its `report.<runtime>.{json,md}` sibling.\n',
+		'— each runtime’s full report is its `report.<runtime>.{json,md}` sibling.\n'
 );
 for (const s of sources) {
 	const rt_ver = s.machine ? ` ${s.machine.runtime_version}` : '';
 	md.push(
 		`- \`${s.runtime}\`${rt_ver}: ${s.git_commit ?? 'unknown commit'} @ ${s.timestamp}` +
-			`${s.tsv ? ` (tsv ${s.tsv})` : ''}`,
+			`${s.tsv ? ` (tsv ${s.tsv})` : ''}`
 	);
 }
 md.push('');
@@ -193,14 +194,14 @@ if (mixed_machine) {
 	md.push(
 		'⚠ **Mixed machines** — the sibling reports were produced on different ' +
 			'hardware, so the cross-runtime ratios are not comparable; re-run every ' +
-			'runtime on one machine (`deno task bench:perf`).\n',
+			'runtime on one machine (`deno task bench:perf`).\n'
 	);
 }
 if (mixed_vintage) {
 	md.push(
 		'⚠ **Mixed vintages** — the sibling reports above come from different ' +
 			'commits/versions, so the cross-runtime ratios are unreliable; re-run the ' +
-			'stale runtimes (`deno task bench:perf` refreshes all three).\n',
+			'stale runtimes (`deno task bench:perf` refreshes all three).\n'
 	);
 }
 md.push(
@@ -209,7 +210,7 @@ md.push(
 		`\`${base_runtime}\` (> 1 = faster than ${base_runtime}). A group (or row) ` +
 		'flagged `⚠ files …` iterated *different per-runtime intersections* (each ' +
 		'runtime times the files all its impls passed preflight on), so a sliver ' +
-		'of the ratio can be file-set difference rather than runtime effect.\n',
+		'of the ratio can be file-set difference rather than runtime effect.\n'
 );
 
 const groups: string[] = [];
@@ -247,18 +248,19 @@ for (const group of groups) {
 	const header = [
 		'Impl',
 		...present.map((r) => `${r} sweeps/sec`),
-		...others.map((r) => `${r}/${base_runtime}`),
+		...others.map((r) => `${r}/${base_runtime}`)
 	];
 	md.push(`| ${header.join(' | ')} |`);
 	md.push(`| ${header.map((_, i) => (i === 0 ? '---' : '---:')).join(' | ')} |`);
 	for (const row of group_rows) {
-		const name_cell = !uniform && files_unequal(row.files_iterated)
-			? `${row.name} ⚠ files ${fmt_file_counts(row.files_iterated)}`
-			: row.name;
+		const name_cell =
+			!uniform && files_unequal(row.files_iterated)
+				? `${row.name} ⚠ files ${fmt_file_counts(row.files_iterated)}`
+				: row.name;
 		const cells = [
 			name_cell,
 			...present.map((r) => fmt_ops(row.ops[r])),
-			...others.map((r) => fmt_ratio(row.ops[r], row.ops[base_runtime])),
+			...others.map((r) => fmt_ratio(row.ops[r], row.ops[base_runtime]))
 		];
 		md.push(`| ${cells.join(' | ')} |`);
 	}
@@ -272,14 +274,14 @@ if (mixed_vintage) {
 	console.error(
 		'⚠ compose: sibling reports have MIXED VINTAGES (' +
 			sources.map((s) => `${s.runtime}=${(s.git_commit ?? '?').slice(0, 8)}`).join(' ') +
-			') — cross-runtime ratios unreliable; re-run the stale runtimes.',
+			') — cross-runtime ratios unreliable; re-run the stale runtimes.'
 	);
 }
 if (mixed_machine) {
 	console.error(
 		'⚠ compose: sibling reports were produced on DIFFERENT machines (' +
 			sources.map((s) => `${s.runtime}=${s.machine?.cpu_model ?? '?'}`).join(' | ') +
-			') — cross-runtime ratios are not comparable; re-run every runtime on one box.',
+			') — cross-runtime ratios are not comparable; re-run every runtime on one box.'
 	);
 }
 console.log(`Composed cross-runtime report from: ${present.join(', ')}`);

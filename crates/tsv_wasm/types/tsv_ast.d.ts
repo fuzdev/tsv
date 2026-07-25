@@ -766,11 +766,7 @@ export interface ClassBody {
 	body: ClassMember[];
 }
 
-export type ClassMember =
-	| MethodDefinition
-	| PropertyDefinition
-	| StaticBlock
-	| TSIndexSignature;
+export type ClassMember = MethodDefinition | PropertyDefinition | StaticBlock | TSIndexSignature;
 
 /** Static initialization block: `static { ... }` (ES2022). */
 export interface StaticBlock {
@@ -1053,11 +1049,7 @@ export interface ExportDefaultDeclaration {
 }
 
 export type ExportDefaultValue =
-	| Expression
-	| FunctionDeclaration
-	| TSDeclareFunction
-	| ClassDeclaration
-	| TSInterfaceDeclaration;
+	Expression | FunctionDeclaration | TSDeclareFunction | ClassDeclaration | TSInterfaceDeclaration;
 
 /**
  * A module export name: a bare `Identifier` or a string `Literal`. Per ecma262
@@ -1125,9 +1117,7 @@ export interface ImportDeclaration {
 }
 
 export type ImportSpecifier =
-	| ImportDefaultSpecifier
-	| ImportNamedSpecifier
-	| ImportNamespaceSpecifier;
+	ImportDefaultSpecifier | ImportNamedSpecifier | ImportNamespaceSpecifier;
 
 export interface ImportDefaultSpecifier {
 	type: 'ImportDefaultSpecifier';

@@ -45,7 +45,7 @@ const CANONICAL_PACKAGES = [
 	'prettier-plugin-svelte',
 	'svelte',
 	'acorn',
-	'@sveltejs/acorn-typescript',
+	'@sveltejs/acorn-typescript'
 ] as const;
 
 const SIDECAR_PATH = 'crates/tsv_debug/src/deno/sidecar.ts';
@@ -84,7 +84,7 @@ for (const name of CANONICAL_PACKAGES) {
 		versions_object:
 			new RegExp(`(?:'${escaped}'|${escaped}): '([^']+)'`).exec(versions_block)?.[1] ?? null,
 		import_specifier: new RegExp(`npm:${escaped}@(\\d+\\.\\d+\\.\\d+)`).exec(sidecar)?.[1] ?? null,
-		bench_package_json: bench_deps[name] ?? null,
+		bench_package_json: bench_deps[name] ?? null
 	};
 
 	const entries = Object.entries(pins) as [keyof PinSources, string | null][];
@@ -95,9 +95,7 @@ for (const name of CANONICAL_PACKAGES) {
 	}
 	const distinct = new Set(entries.map(([, v]) => v));
 	if (distinct.size > 1) {
-		failures.push(
-			`${name}: pins disagree — ${entries.map(([k, v]) => `${k}=${v}`).join(', ')}`,
-		);
+		failures.push(`${name}: pins disagree — ${entries.map(([k, v]) => `${k}=${v}`).join(', ')}`);
 		continue;
 	}
 	report.push(`${name}@${pins.versions_object}`);
@@ -110,7 +108,7 @@ for (const name of CANONICAL_PACKAGES) {
 			failures.push(`acorn: missing npm:acorn@x.y.z import-map pin in ${ACTOR_PATH}`);
 		} else if (actor_pin !== pins.versions_object) {
 			failures.push(
-				`acorn: ${ACTOR_PATH} import-map pin ${actor_pin} disagrees with ${pins.versions_object}`,
+				`acorn: ${ACTOR_PATH} import-map pin ${actor_pin} disagrees with ${pins.versions_object}`
 			);
 		}
 	}
@@ -118,9 +116,12 @@ for (const name of CANONICAL_PACKAGES) {
 
 // --- Checkout alignment (see the header docstring, half 2) ---------------------
 
-const CHECKOUT_ALIGNMENT: { pkg_json: string; npm_package: (typeof CANONICAL_PACKAGES)[number] }[] = [
+const CHECKOUT_ALIGNMENT: {
+	pkg_json: string;
+	npm_package: (typeof CANONICAL_PACKAGES)[number];
+}[] = [
 	{ pkg_json: '../svelte/packages/svelte/package.json', npm_package: 'svelte' },
-	{ pkg_json: '../acorn-typescript/package.json', npm_package: '@sveltejs/acorn-typescript' },
+	{ pkg_json: '../acorn-typescript/package.json', npm_package: '@sveltejs/acorn-typescript' }
 ];
 const checkout_notes: string[] = [];
 for (const { pkg_json, npm_package } of CHECKOUT_ALIGNMENT) {
@@ -136,7 +137,7 @@ for (const { pkg_json, npm_package } of CHECKOUT_ALIGNMENT) {
 	if (checkout_version !== pinned) {
 		failures.push(
 			`${npm_package}: checkout ${pkg_json} is v${checkout_version ?? '?'} but the oracle pin is v${pinned} — ` +
-				'align the checkout to the pinned tag, or bump the canonical pins deliberately (a fixture re-baseline)',
+				'align the checkout to the pinned tag, or bump the canonical pins deliberately (a fixture re-baseline)'
 		);
 	}
 }
@@ -149,7 +150,7 @@ const head_commit = (repo: string): string | null => {
 		const { success, stdout } = new Deno.Command('git', {
 			args: ['-C', repo, 'rev-parse', 'HEAD'],
 			stdout: 'piped',
-			stderr: 'null',
+			stderr: 'null'
 		}).outputSync();
 		return success ? new TextDecoder().decode(stdout).trim() : null;
 	} catch {
@@ -166,7 +167,9 @@ for (const [repo, { commit, pins }] of Object.entries(GATE_CHECKOUT_COMMITS)) {
 	}
 	// The recorded commits are abbreviated, so compare on the prefix.
 	if (!head.startsWith(commit)) {
-		drifted.push(`${repo}: measured at ${commit}, now at ${head.slice(0, commit.length)} — pins: ${pins}`);
+		drifted.push(
+			`${repo}: measured at ${commit}, now at ${head.slice(0, commit.length)} — pins: ${pins}`
+		);
 	}
 }
 
@@ -175,7 +178,7 @@ if (failures.length > 0) {
 	for (const f of failures) console.error(`  · ${f}`);
 	console.error(
 		`  Pin sites: ${SIDECAR_PATH} (VERSIONS + imports), ${BENCH_PKG_PATH}, ${ACTOR_PATH} — edit in lockstep.\n` +
-			'  ⚠ Bumping a canonical pin re-baselines the fixture corpus — see benches/js/CLAUDE.md §"Canonical baseline is coupled".',
+			'  ⚠ Bumping a canonical pin re-baselines the fixture corpus — see benches/js/CLAUDE.md §"Canonical baseline is coupled".'
 	);
 	Deno.exit(1);
 }
@@ -184,10 +187,10 @@ if (drifted.length > 0) {
 	for (const d of drifted) console.warn(`  · ${d}`);
 	console.warn(
 		'  The count pins are the gate; this is the diagnosis. If one trips, suspect corpus movement\n' +
-			'  before a tsv regression — and re-record the commit in GATE_CHECKOUT_COMMITS when you re-pin.',
+			'  before a tsv regression — and re-record the commit in GATE_CHECKOUT_COMMITS when you re-pin.'
 	);
 }
 console.log(
 	`pins:audit OK — canonical pins agree across sidecar VERSIONS/imports, benches/js/package.json, actor.rs ` +
-		`(${report.join(', ')}); checkouts aligned${checkout_notes.length > 0 ? ` (${checkout_notes.join('; ')})` : ''}`,
+		`(${report.join(', ')}); checkouts aligned${checkout_notes.length > 0 ? ` (${checkout_notes.join('; ')})` : ''}`
 );

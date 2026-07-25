@@ -29,14 +29,27 @@
 import { parseArgs } from 'node:util';
 import { dirname, relative, resolve, sep } from 'node:path';
 
-import { type CorpusView, DevReposLoader, DirectoryLoader, stream_perf_candidate } from '../lib/corpus.ts';
+import {
+	type CorpusView,
+	DevReposLoader,
+	DirectoryLoader,
+	stream_perf_candidate
+} from '../lib/corpus.ts';
 import { LANGUAGES, type Language, type SourceFile } from '../lib/types.ts';
 
 /** Directory-name segments worth calling out when a candidate carries them — the
  * usual homes of non-representative bulk (generated data, scaffolding, snapshots,
  * fixture-like trees). `fixtures` / `test/samples` are already pruned by the
  * perf-candidate stream, so these are the ones that SURVIVE and need a human call. */
-const WATCH_SEGMENTS = ['templates', 'template', 'tests', 'snapshots', '__snapshots__', 'generated', '__fixtures__'];
+const WATCH_SEGMENTS = [
+	'templates',
+	'template',
+	'tests',
+	'snapshots',
+	'__snapshots__',
+	'generated',
+	'__fixtures__'
+];
 
 const SMALL_FILE_BYTES = 256;
 
@@ -71,7 +84,7 @@ function stats_of(files: SourceFile[]): Stats {
 		median: percentile(sizes, 0.5),
 		p90: percentile(sizes, 0.9),
 		p99: percentile(sizes, 0.99),
-		max: sizes[sizes.length - 1] ?? 0,
+		max: sizes[sizes.length - 1] ?? 0
 	};
 }
 
@@ -82,7 +95,9 @@ function fmt_bytes(n: number): string {
 }
 
 function lang_mix(by: Record<Language, number>): string {
-	return LANGUAGES.filter((l) => by[l] > 0).map((l) => `${l[0]}:${by[l]}`).join(' ');
+	return LANGUAGES.filter((l) => by[l] > 0)
+		.map((l) => `${l[0]}:${by[l]}`)
+		.join(' ');
 }
 
 /** Every ancestor directory of `path` strictly under `root`, deepest last. */
@@ -102,7 +117,7 @@ function ancestors_under(path: string, root: string): string[] {
 function concentration(
 	files: SourceFile[],
 	root: string,
-	top: number,
+	top: number
 ): Array<{ dir: string; files: number; bytes: number }> {
 	const count = new Map<string, number>();
 	const bytes = new Map<string, number>();
@@ -132,10 +147,14 @@ function watch_hits(files: SourceFile[]): Array<{ segment: string; files: number
 			}
 		}
 	}
-	return [...acc.entries()].map(([segment, v]) => ({ segment, ...v })).sort((a, b) => b.files - a.files);
+	return [...acc.entries()]
+		.map(([segment, v]) => ({ segment, ...v }))
+		.sort((a, b) => b.files - a.files);
 }
 
-async function collect_view(view: CorpusView): Promise<{ files: SourceFile[]; entry_paths: string[] }> {
+async function collect_view(
+	view: CorpusView
+): Promise<{ files: SourceFile[]; entry_paths: string[] }> {
 	const loader = new DevReposLoader(view);
 	const files = await loader.load(() => {}); // silent — this tool prints its own summary
 	return { files, entry_paths: loader.sources.map((s) => resolve(s.path)) };
@@ -154,7 +173,7 @@ async function collect_dir(dir: string, raw: boolean): Promise<SourceFile[]> {
 /** Bucket files by the corpus entry (longest matching resolved-path prefix). */
 function group_by_entry(
 	files: SourceFile[],
-	entry_paths: string[],
+	entry_paths: string[]
 ): Array<{ label: string; stats: Stats }> {
 	const sorted_entries = [...entry_paths].sort((a, b) => b.length - a.length);
 	const buckets = new Map<string, SourceFile[]>();
@@ -164,7 +183,10 @@ function group_by_entry(
 		(buckets.get(key) ?? buckets.set(key, []).get(key)!).push(f);
 	}
 	return [...buckets.entries()]
-		.map(([abs, fs]) => ({ label: abs === '(unattributed)' ? abs : relative(resolve('..'), abs), stats: stats_of(fs) }))
+		.map(([abs, fs]) => ({
+			label: abs === '(unattributed)' ? abs : relative(resolve('..'), abs),
+			stats: stats_of(fs)
+		}))
 		.sort((a, b) => b.stats.files - a.stats.files);
 }
 
@@ -177,8 +199,8 @@ function main(): void {
 			raw: { type: 'boolean', default: false },
 			json: { type: 'boolean', default: false },
 			largest: { type: 'string', default: '12' },
-			big: { type: 'string', default: '65536' },
-		},
+			big: { type: 'string', default: '65536' }
+		}
 	});
 	const dir = positionals[0];
 	const largest_n = Number(values.largest);
@@ -212,8 +234,9 @@ function main(): void {
 		if (files.length === 0) throw new Error(`No in-scope files found for ${title}`);
 
 		const overall = stats_of(files);
-		const per_lang = LANGUAGES.map((l) => ({ language: l, stats: stats_of(files.filter((f) => f.language === l)) }))
-			.filter((r) => r.stats.files > 0);
+		const per_lang = LANGUAGES.map(
+			(l) => ({ language: l, stats: stats_of(files.filter((f) => f.language === l)) })
+		).filter((r) => r.stats.files > 0);
 		const groups = dir ? [] : group_by_entry(files, entry_paths);
 		const conc = dir ? concentration(files, root, largest_n) : [];
 		const big_files = files.filter((f) => f.bytes > big).sort((a, b) => b.bytes - a.bytes);
@@ -222,20 +245,30 @@ function main(): void {
 		const largest = [...files].sort((a, b) => b.bytes - a.bytes).slice(0, largest_n);
 
 		if (to_json) {
-			console.log(JSON.stringify({
-				title,
-				overall,
-				per_language: per_lang,
-				groups,
-				concentration: conc,
-				largest: largest.map((f) => ({ path: relative(root, f.path), language: f.language, bytes: f.bytes })),
-				flags: {
-					big_bytes: big,
-					big_files: big_files.map((f) => ({ path: relative(root, f.path), bytes: f.bytes })),
-					small_files: { under_bytes: SMALL_FILE_BYTES, count: small_files },
-					watch_segments: watch,
-				},
-			}, null, 2));
+			console.log(
+				JSON.stringify(
+					{
+						title,
+						overall,
+						per_language: per_lang,
+						groups,
+						concentration: conc,
+						largest: largest.map((f) => ({
+							path: relative(root, f.path),
+							language: f.language,
+							bytes: f.bytes
+						})),
+						flags: {
+							big_bytes: big,
+							big_files: big_files.map((f) => ({ path: relative(root, f.path), bytes: f.bytes })),
+							small_files: { under_bytes: SMALL_FILE_BYTES, count: small_files },
+							watch_segments: watch
+						}
+					},
+					null,
+					2
+				)
+			);
 			return;
 		}
 
@@ -244,7 +277,7 @@ function main(): void {
 		for (const { language, stats } of per_lang) {
 			log(
 				`  ${language.padEnd(11)} ${String(stats.files).padStart(5)} files  ${fmt_bytes(stats.bytes).padStart(9)}` +
-					`   median ${fmt_bytes(stats.median)}  p90 ${fmt_bytes(stats.p90)}  p99 ${fmt_bytes(stats.p99)}  max ${fmt_bytes(stats.max)}`,
+					`   median ${fmt_bytes(stats.median)}  p90 ${fmt_bytes(stats.p90)}  p99 ${fmt_bytes(stats.p99)}  max ${fmt_bytes(stats.max)}`
 			);
 		}
 
@@ -253,32 +286,40 @@ function main(): void {
 			for (const g of groups) {
 				log(
 					`  ${g.label.padEnd(42)} ${String(g.stats.files).padStart(4)}f  ${fmt_bytes(g.stats.bytes).padStart(9)}` +
-						`  [${lang_mix(g.stats.by_language)}]  med ${fmt_bytes(g.stats.median)}  p99 ${fmt_bytes(g.stats.p99)}`,
+						`  [${lang_mix(g.stats.by_language)}]  med ${fmt_bytes(g.stats.median)}  p99 ${fmt_bytes(g.stats.p99)}`
 				);
 			}
 		}
 		if (conc.length > 0) {
 			log(`\nSubtree concentration (files beneath each dir):`);
 			for (const c of conc) {
-				log(`  ${String(c.files).padStart(4)}f  ${fmt_bytes(c.bytes).padStart(9)}  ${c.dir || '.'}`);
+				log(
+					`  ${String(c.files).padStart(4)}f  ${fmt_bytes(c.bytes).padStart(9)}  ${c.dir || '.'}`
+				);
 			}
 		}
 
 		log(`\nLargest ${largest.length} files:`);
 		for (const f of largest) {
-			log(`  ${fmt_bytes(f.bytes).padStart(9)}  ${f.language.padEnd(10)} ${relative(root, f.path)}`);
+			log(
+				`  ${fmt_bytes(f.bytes).padStart(9)}  ${f.language.padEnd(10)} ${relative(root, f.path)}`
+			);
 		}
 
 		log(`\nFlags:`);
 		log(
 			big_files.length > 0
 				? `  ⚠ ${big_files.length} file(s) > ${fmt_bytes(big)} (largest ${fmt_bytes(big_files[0].bytes)} — ${relative(root, big_files[0].path)})`
-				: `  ✓ no files > ${fmt_bytes(big)}`,
+				: `  ✓ no files > ${fmt_bytes(big)}`
 		);
-		log(`  small files (< ${SMALL_FILE_BYTES} B): ${small_files} (${((small_files / overall.files) * 100).toFixed(0)}%)`);
+		log(
+			`  small files (< ${SMALL_FILE_BYTES} B): ${small_files} (${((small_files / overall.files) * 100).toFixed(0)}%)`
+		);
 		if (watch.length > 0) {
 			for (const w of watch) {
-				log(`  ⚠ '${w.segment}/' subtree present: ${w.files} files, ${fmt_bytes(w.bytes)} — likely non-representative; consider excluding`);
+				log(
+					`  ⚠ '${w.segment}/' subtree present: ${w.files} files, ${fmt_bytes(w.bytes)} — likely non-representative; consider excluding`
+				);
 			}
 		} else {
 			log(`  ✓ no ${WATCH_SEGMENTS.join('/')} subtrees`);

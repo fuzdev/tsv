@@ -11,7 +11,11 @@
  */
 
 import { cpus } from 'node:os';
-import { arch as node_arch, platform as node_platform, versions as node_versions } from 'node:process';
+import {
+	arch as node_arch,
+	platform as node_platform,
+	versions as node_versions
+} from 'node:process';
 
 /** The JS runtime executing the harness. Stamped on every report row. */
 export type Runtime = 'deno' | 'node' | 'bun';
@@ -116,6 +120,6 @@ export function current_machine(): Machine {
 		cpu_model: cpus()[0]?.model ?? 'unknown',
 		os: current_os(),
 		arch: current_arch(),
-		runtime_version: runtime_version(),
+		runtime_version: runtime_version()
 	};
 }

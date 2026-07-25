@@ -100,7 +100,7 @@ const ELEMENT_NAME_TYPES = new Set([
 	'SlotElement',
 	'SvelteFragment',
 	'SvelteBoundary',
-	'TitleElement',
+	'TitleElement'
 ]);
 
 /** Node types whose name span is the whole directive head (`on:click|preventDefault`). */
@@ -112,7 +112,7 @@ const DIRECTIVE_NAME_TYPES = new Set([
 	'UseDirective',
 	'TransitionDirective', // `in:`/`out:` too — Svelte has no In/OutDirective type
 	'AnimateDirective',
-	'LetDirective',
+	'LetDirective'
 ]);
 
 /**
@@ -154,9 +154,11 @@ function check_node(
 	starts: number[],
 	is_svelte: boolean,
 	source: string,
-	t: Tally,
+	t: Tally
 ): void {
-	const loc = node.loc as { start?: { line: number; column: number }; end?: { line: number; column: number } } | undefined;
+	const loc = node.loc as
+		| { start?: { line: number; column: number }; end?: { line: number; column: number } }
+		| undefined;
 	if (loc?.start && typeof node.start === 'number') {
 		// A Svelte `<script>`/`<style>` `Program` loc is deliberately the *tag*
 		// position, not the content offset (Svelte's read_script override) — a
@@ -175,7 +177,7 @@ function check_node(
 				t.mismatch++;
 				if (t.mismatch <= 5) {
 					console.error(
-						`  loc mismatch ${node.type as string} @${node.start}: got ${got.line}:${got.column} want ${want.line}:${want.column}`,
+						`  loc mismatch ${node.type as string} @${node.start}: got ${got.line}:${got.column} want ${want.line}:${want.column}`
 					);
 				}
 			}
@@ -203,14 +205,20 @@ function check_node(
 			t.name_span_mismatch++;
 			if (t.name_span_mismatch <= 5) {
 				console.error(
-					`  name span mismatch ${node.type as string} @${node.start}: got ${span ? `[${span[0]},${span[1]}]` : 'null'} want [${nl.start.character},${nl.end.character}]`,
+					`  name span mismatch ${node.type as string} @${node.start}: got ${span ? `[${span[0]},${span[1]}]` : 'null'} want [${nl.start.character},${nl.end.character}]`
 				);
 			}
 		}
 	}
 }
 
-function walk(value: unknown, starts: number[], is_svelte: boolean, source: string, t: Tally): void {
+function walk(
+	value: unknown,
+	starts: number[],
+	is_svelte: boolean,
+	source: string,
+	t: Tally
+): void {
 	if (Array.isArray(value)) {
 		for (const v of value) walk(v, starts, is_svelte, source, t);
 	} else if (value && typeof value === 'object') {
@@ -238,7 +246,7 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 		name_loc_exact: 0,
 		name_loc_mismatch: 0,
 		name_span_exact: 0,
-		name_span_mismatch: 0,
+		name_span_mismatch: 0
 	};
 	let checked = 0;
 	for (const f of by_lang[language] ?? []) {
@@ -261,11 +269,11 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 	}
 	const loc_total = t.exact + t.pattern_quirk + t.script_override + t.mismatch;
 	console.error(
-		`\n${language}: ${checked} files, ${loc_total} loc nodes — exact ${t.exact}, pattern_quirk ${t.pattern_quirk}, script_tag_override ${t.script_override}, MISMATCH ${t.mismatch}`,
+		`\n${language}: ${checked} files, ${loc_total} loc nodes — exact ${t.exact}, pattern_quirk ${t.pattern_quirk}, script_tag_override ${t.script_override}, MISMATCH ${t.mismatch}`
 	);
 	if (is_svelte) {
 		console.error(
-			`  name_loc: line/col exact ${t.name_loc_exact}, MISMATCH ${t.name_loc_mismatch}; name span exact ${t.name_span_exact}, MISMATCH ${t.name_span_mismatch}`,
+			`  name_loc: line/col exact ${t.name_loc_exact}, MISMATCH ${t.name_loc_mismatch}; name span exact ${t.name_span_exact}, MISMATCH ${t.name_span_mismatch}`
 		);
 	}
 	if (t.mismatch > 0 || t.name_loc_mismatch > 0 || t.name_span_mismatch > 0) any_mismatch = true;
@@ -275,4 +283,6 @@ if (any_mismatch) {
 	console.error('\nFAIL: loc/name_loc not fully reconstructible from offsets + source');
 	Deno.exit(1);
 }
-console.error('\nPASS: every loc reconstructs from start/end + source (pattern-quirk columns classified)');
+console.error(
+	'\nPASS: every loc reconstructs from start/end + source (pattern-quirk columns classified)'
+);

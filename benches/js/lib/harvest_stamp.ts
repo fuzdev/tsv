@@ -30,7 +30,7 @@ export function git_head(repo: string): string | null {
 		const out = new Deno.Command('git', {
 			args: ['-C', repo, 'rev-parse', 'HEAD'],
 			stdout: 'piped',
-			stderr: 'null',
+			stderr: 'null'
 		}).outputSync();
 		if (!out.success) return null;
 		return new TextDecoder().decode(out.stdout).trim();
@@ -54,7 +54,7 @@ export function short_commit(sha: string): string {
 export async function harvest_up_to_date(
 	stamp_path: string,
 	inputs: StampInputs,
-	caches: string[],
+	caches: string[]
 ): Promise<boolean> {
 	for (const path of caches) {
 		try {
@@ -72,8 +72,7 @@ export async function stamp_fresh(path: string, inputs: StampInputs): Promise<bo
 		const recorded = JSON.parse(await readFile(path, 'utf8')) as StampInputs;
 		const keys = Object.keys(inputs);
 		return (
-			keys.length === Object.keys(recorded).length &&
-			keys.every((k) => recorded[k] === inputs[k])
+			keys.length === Object.keys(recorded).length && keys.every((k) => recorded[k] === inputs[k])
 		);
 	} catch {
 		return false;

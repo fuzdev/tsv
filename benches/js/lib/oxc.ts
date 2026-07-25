@@ -5,7 +5,12 @@
  * oxfmt: Fast TypeScript/JS/CSS/Svelte formatter (Svelte is experimental as of 0.49)
  */
 
-import { type Language, LANGUAGE_EXTENSIONS, type ParseGoal, type TsvImplementation } from './types.ts';
+import {
+	type Language,
+	LANGUAGE_EXTENSIONS,
+	type ParseGoal,
+	type TsvImplementation
+} from './types.ts';
 import type { OxcVersions } from './versions.ts';
 
 /** oxc-parser module types */
@@ -13,7 +18,7 @@ interface OxcParserModule {
 	parseSync: (
 		filename: string,
 		source: string,
-		options?: { sourceType?: 'script' | 'module' },
+		options?: { sourceType?: 'script' | 'module' }
 	) => { program: unknown; errors: unknown[] };
 }
 
@@ -31,7 +36,7 @@ interface OxfmtModule {
 	format: (
 		filename: string,
 		source: string,
-		options?: OxfmtFormatOptions,
+		options?: OxfmtFormatOptions
 	) => Promise<{ code: string; errors: unknown[] }>;
 }
 
@@ -83,7 +88,7 @@ export class OxcImplementation implements TsvImplementation {
 
 		// A test262 goal pins oxc's `sourceType` so it's scored at the declared
 		// goal like tsv/acorn, instead of oxc's filename-based inference.
-		const options = goal ? {sourceType: goal} : undefined;
+		const options = goal ? { sourceType: goal } : undefined;
 		const result = this._parser.parseSync(`file${LANGUAGE_EXTENSIONS[language]}`, source, options);
 
 		// Read `errors` once into a local: the WASI sibling's getter is consume-once
@@ -124,7 +129,7 @@ export class OxcImplementation implements TsvImplementation {
 			useTabs: true,
 			printWidth: 100,
 			singleQuote: true,
-			trailingComma: 'none',
+			trailingComma: 'none'
 		};
 		// oxfmt gates .svelte handling behind the `svelte` config key (experimental as of 0.49).
 		if (language === 'svelte') options.svelte = {};
@@ -132,7 +137,7 @@ export class OxcImplementation implements TsvImplementation {
 		const result = await this._formatter.format(
 			`file${LANGUAGE_EXTENSIONS[language]}`,
 			source,
-			options,
+			options
 		);
 
 		const errors = result.errors;

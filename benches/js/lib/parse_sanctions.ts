@@ -60,8 +60,9 @@ export const TS_FIXTURE_SANCTIONS: Sanction[] = [
 	// not a gap.
 	{
 		pattern: 'assert_import_assert/',
-		reason: "deprecated import assertions (`assert {…}`) — tsv supports the successor `with {…}` only",
-	},
+		reason:
+			'deprecated import assertions (`assert {…}`) — tsv supports the successor `with {…}` only'
+	}
 ];
 
 /** First matching sanction reason for `path`, or null. */

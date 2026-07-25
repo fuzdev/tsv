@@ -76,7 +76,7 @@ use tsv_lang::{
         arena::{DocArena, DocId},
     },
     has_comments_to_emit_in_range, has_line_comments_in_range, printing,
-    source_scan::{TriviaProfile, skip_trivia},
+    source_scan::{TriviaProfile, is_regex_start, skip_regex_literal, skip_trivia},
 };
 
 /// The parent context that routes a curried arrow chain (`(a) => (b) => …`)
@@ -1089,6 +1089,20 @@ impl<'a> Printer<'a> {
                     depth -= 1;
                     if depth == 0 {
                         return Some((i + 1) as u32);
+                    }
+                }
+                // Regex literals are the one trivia kind the shared cursor leaves
+                // significant (it needs a backward token lookback), so they are
+                // skipped here. A regex whose body holds comment bytes — `/\//`,
+                // `/[//]/`, `/\/*/` — would otherwise read as a comment from the
+                // inside and swallow the rest of the line, losing the `)` this
+                // scan is looking for and running its range on to some unrelated
+                // paren. The scan reaches the literal's OPENING `/` first, whose
+                // next byte is never `/` or `*`, so `skip_trivia` can't claim it.
+                b'/' => {
+                    if is_regex_start(source, i, start as usize) {
+                        i = skip_regex_literal(source, i, end);
+                        continue;
                     }
                 }
                 _ => {}

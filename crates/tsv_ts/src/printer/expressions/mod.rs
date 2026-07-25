@@ -41,6 +41,17 @@ use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
+/// What a comment-blind binary-chain layout builder gets to work with, produced by
+/// `Printer::prepare_binary_chain_layout`.
+enum BinaryChainLayout {
+    /// A finished doc — the comment-aware twin's, or the ordinary binary doc for a chain
+    /// that flattened to a single operand. Return it unchanged.
+    Built(DocId),
+    /// A comment-free chain of 2+ operands, flattened into operand docs plus the
+    /// operators between them, ready to lay out.
+    Operands(DocBuf, OperatorBuf),
+}
+
 impl<'a> Printer<'a> {
     /// Print an expression using doc-based formatting
     pub(crate) fn print_expression(&mut self, expression: &Expression<'_>) {
@@ -1006,23 +1017,14 @@ impl<'a> Printer<'a> {
     /// wants to control the grouping (e.g., chain printing).
     pub(crate) fn build_binary_chain_parts_indented(&self, binary: &BinaryExpression<'_>) -> DocId {
         let d = self.d();
-        // If there are comments within the binary expression, use the comment-aware
-        // implementation from operators.rs which preserves comments and their line breaks.
-        // This handles cases like: fn(a && // comment\n    b)
-        if self.has_comments_to_emit_between(binary.span.start, binary.span.end) {
-            // Use the parts version (no group wrapper) since our caller controls grouping
-            return self.build_binary_chain_parts_with_continuation_indent(binary);
-        }
-
-        // Collect all operands and operators in the chain
-        let mut operands = DocBuf::new();
-        let mut operators = OperatorBuf::new();
-        self.collect_binary_operands_for_indent(binary, &mut operands, &mut operators);
-
-        if operands.len() <= 1 {
-            // Fallback to regular expression doc
-            return self.build_binary_doc(binary);
-        }
+        // The comment-aware twin keeps comments and their line breaks: `fn(a && // c\n b)`.
+        // Continuation-indent style, matching this builder's own.
+        let (operands, operators) = match self.prepare_binary_chain_layout(binary, |p| {
+            p.build_binary_chain_parts_with_continuation_indent(binary)
+        }) {
+            BinaryChainLayout::Built(doc) => return doc,
+            BinaryChainLayout::Operands(operands, operators) => (operands, operators),
+        };
 
         // Build with indented continuations for chains:
         // "first +
@@ -1097,10 +1099,45 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
+    /// Prepare a binary chain for one of the two comment-blind layout builders
+    /// (`build_binary_chain_parts_indented`, `build_binary_chain_for_parens`).
+    ///
+    /// Both lay a chain out as operand docs plus raw operator text, with nothing emitted
+    /// in the operand→operator gaps — so a comment anywhere in the chain would be dropped
+    /// (the comment-blind container builder, `docs/comments.md` hazard 4). Routing both
+    /// through this preparation makes the hand-off unskippable: neither can reach an
+    /// operand list without having first answered the comment question. `build_commented`
+    /// names which comment-aware twin this builder's layout wants — they differ in
+    /// indent style, which is the only thing the two callers disagree on.
+    fn prepare_binary_chain_layout(
+        &self,
+        binary: &BinaryExpression<'_>,
+        build_commented: impl FnOnce(&Self) -> DocId,
+    ) -> BinaryChainLayout {
+        if self.has_comments_to_emit_between(binary.span.start, binary.span.end) {
+            return BinaryChainLayout::Built(build_commented(self));
+        }
+
+        let mut operands = DocBuf::new();
+        let mut operators = OperatorBuf::new();
+        self.collect_binary_operands_for_indent(binary, &mut operands, &mut operators);
+
+        if operands.len() <= 1 {
+            // Nothing chained after flattening — the ordinary binary doc says it better.
+            return BinaryChainLayout::Built(self.build_binary_doc(binary));
+        }
+
+        BinaryChainLayout::Operands(operands, operators)
+    }
+
     /// Collect operands and operators from a binary chain (helper for indented version)
     ///
     /// Uses `can_flatten_with()` to determine which operators can be chained together.
     /// Flattens both left and right sides when operators are compatible.
+    ///
+    /// The result carries no spans, so a caller laying it out **cannot** emit comments in
+    /// the gaps between operands — reach it only through `prepare_binary_chain_layout`,
+    /// which answers the comment question first.
     fn collect_binary_operands_for_indent(
         &self,
         expr: &BinaryExpression<'_>,
@@ -1144,23 +1181,29 @@ impl<'a> Printer<'a> {
     /// In break: `a /\nb /\nc` (with outer indent providing indentation)
     pub(crate) fn build_binary_chain_for_parens(&self, binary: &BinaryExpression<'_>) -> DocId {
         let d = self.d();
-        // Collect all operands and operators in the chain
-        let mut operands = DocBuf::new();
-        let mut operators = OperatorBuf::new();
-        self.collect_binary_operands_for_indent(binary, &mut operands, &mut operators);
+        // The *ungrouped* comment-aware twin, not the continuation-indent one: this
+        // builder's caller wraps the result in `group(indent([softline, …]), softline)`,
+        // which already supplies the one indent level the broken parens want. A
+        // continuation indent on top of it would indent every operand after the first a
+        // second time.
+        let (operands, operators) = match self
+            .prepare_binary_chain_layout(binary, |p| p.build_binary_chain_doc_ungrouped(binary))
+        {
+            BinaryChainLayout::Built(doc) => return doc,
+            BinaryChainLayout::Operands(operands, operators) => (operands, operators),
+        };
 
-        if operands.len() <= 1 {
-            // Fallback to regular expression doc
-            return self.build_binary_doc(binary);
-        }
-
-        // For 2-operand non-logical chains, wrap in a group with line() so the
-        // binary can independently decide whether to break at the operator.
-        // The group stays flat when the operands fit; when they don't, line()
-        // fires and breaks at the operator (e.g., `left +\nright`), preventing
-        // the operands' internal break points (like member chain dots) from
-        // firing instead.
-        if operands.len() == 2 && !operators[0].is_logical() {
+        // For 2-operand chains, wrap in a group with line() so the binary can
+        // independently decide whether to break at the operator. The group stays flat
+        // when the operands fit; when they don't, line() fires and breaks at the
+        // operator (e.g., `left +\nright`), preventing the operands' internal break
+        // points (like member chain dots) from firing instead.
+        //
+        // Applies to every operator family. A logical operator used to be excluded here,
+        // which left a parenthesized logical base breaking its operands where the
+        // arithmetic one held them together — see conformance_prettier.md §TypeScript
+        // (Parenthesized binary member base).
+        if operands.len() == 2 {
             return d.group(d.concat(&[
                 operands[0],
                 d.text(" "),

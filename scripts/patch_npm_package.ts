@@ -47,7 +47,7 @@ if (variant !== 'format' && variant !== 'parse' && variant !== 'all') {
 const PKG_NAMES = {
 	format: '@fuzdev/tsv_format_wasm',
 	parse: '@fuzdev/tsv_parse_wasm',
-	all: '@fuzdev/tsv_wasm',
+	all: '@fuzdev/tsv_wasm'
 } as const;
 const pkg_name = PKG_NAMES[variant];
 const has_format_exports = variant !== 'parse';
@@ -93,7 +93,7 @@ if (has_format_exports) {
 }
 if (has_parse_exports && !has_parse) {
 	console.error(
-		`FAIL: ${variant} variant has no parse_* exports — was \`--features parse\` passed?`,
+		`FAIL: ${variant} variant has no parse_* exports — was \`--features parse\` passed?`
 	);
 	Deno.exit(1);
 }
@@ -114,7 +114,9 @@ if (has_format_exports) {
 		Deno.exit(1);
 	}
 } else if (classes.length) {
-	console.error(`FAIL: ${variant} variant contains class exports (${classes.join(', ')}) — stale build dir?`);
+	console.error(
+		`FAIL: ${variant} variant contains class exports (${classes.join(', ')}) — stale build dir?`
+	);
 	Deno.exit(1);
 }
 console.log(`Exports: ${[...fns, ...classes].join(', ')}`);
@@ -174,17 +176,15 @@ export function init_sync(...args) {
 	_ready = true;
 }
 
-${
-	fns
-		.map(
-			(f) =>
-				`export function ${f}(source) {
+${fns
+	.map(
+		(f) =>
+			`export function ${f}(source) {
 	_check();
 	return _${f}(source);
-}`,
-		)
-		.join('\n\n')
-}
+}`
+	)
+	.join('\n\n')}
 `;
 
 Deno.writeTextFileSync(`${pkg_root}/browser.js`, browser_js);
@@ -251,7 +251,7 @@ pkg.name = pkg_name;
 pkg.description = {
 	format: 'formatter for Svelte, TypeScript, and CSS',
 	parse: 'parser for Svelte, TypeScript, and CSS',
-	all: 'formatter and parser for Svelte, TypeScript, and CSS',
+	all: 'formatter and parser for Svelte, TypeScript, and CSS'
 }[variant];
 pkg.type = 'module';
 pkg.exports = {
@@ -259,8 +259,8 @@ pkg.exports = {
 	'.': {
 		types: './index.d.ts',
 		node: './index.js',
-		default: './browser.js',
-	},
+		default: './browser.js'
+	}
 };
 if (variant === 'all') {
 	pkg.bin = { tsv: `./${cli_file}` };
@@ -275,7 +275,7 @@ pkg.files = [
 	...(has_parse_exports ? ['tsv_ast.d.ts', locations_file, locations_dts] : []),
 	...(variant === 'all' ? [cli_file] : []),
 	'README.md',
-	'LICENSE',
+	'LICENSE'
 ];
 pkg.keywords = [
 	'typescript',
@@ -285,17 +285,17 @@ pkg.keywords = [
 	...(has_parse_exports ? ['parser', 'ast', 'acorn'] : []),
 	...(variant === 'all' ? ['cli'] : []),
 	'wasm',
-	'webassembly',
+	'webassembly'
 ];
 pkg.homepage = 'https://github.com/fuzdev/tsv';
 pkg.author = {
 	name: 'Ryan Atkinson',
 	email: 'mail@ryanatkn.com',
-	url: 'https://www.ryanatkn.com/',
+	url: 'https://www.ryanatkn.com/'
 };
 pkg.repository = {
 	type: 'git',
-	url: 'git+https://github.com/fuzdev/tsv.git',
+	url: 'git+https://github.com/fuzdev/tsv.git'
 };
 pkg.bugs = 'https://github.com/fuzdev/tsv/issues';
 pkg.funding = 'https://www.ryanatkn.com/funding';
@@ -336,9 +336,8 @@ async function print_summary(dir: string, files: string[]): Promise<void> {
 	for (const e of entries) {
 		const name = e.name.padEnd(name_width);
 		const size = format_size(e.size).padStart(size_width);
-		const annotation = e === wasm && wasm_gzipped !== null
-			? `  →  ${format_size(wasm_gzipped)} gzipped`
-			: '';
+		const annotation =
+			e === wasm && wasm_gzipped !== null ? `  →  ${format_size(wasm_gzipped)} gzipped` : '';
 		console.log(`  ${name}  ${size}${annotation}`);
 	}
 }

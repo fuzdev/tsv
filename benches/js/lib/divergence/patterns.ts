@@ -164,12 +164,12 @@ function ours_lines_in_hunk(ours_lines: string[], hunk: DiffHunk): string[] {
 function long_line_rewrapped(
 	hunk: DiffHunk,
 	prettier_lines: string[],
-	options: { min_width?: number; line_predicate: (line: string) => boolean },
+	options: { min_width?: number; line_predicate: (line: string) => boolean }
 ): boolean {
 	const min_width = options.min_width ?? 100;
 	const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
 	const has_long_match = p_lines.some(
-		(l) => options.line_predicate(l) && visual_width(l) > min_width,
+		(l) => options.line_predicate(l) && visual_width(l) > min_width
 	);
 	if (!has_long_match) return false;
 	return hunk.added_lines.length > hunk.removed_lines.length;
@@ -227,7 +227,7 @@ function compute_code_regions(text: string): CodeRegion[] {
 			start,
 			end,
 			line_start: line_at(start),
-			line_end: line_at(end),
+			line_end: line_at(end)
 		});
 	}
 	return regions;
@@ -241,7 +241,7 @@ function is_line_in_style_block(line: number, regions: CodeRegion[]): boolean {
 /** Whether a hunk's line range overlaps any code region (either kind). */
 function overlaps_code_region(
 	range: { start: number; end: number } | null,
-	regions: CodeRegion[],
+	regions: CodeRegion[]
 ): boolean {
 	return (
 		range !== null && regions.some((r) => range.start <= r.line_end && r.line_start <= range.end)
@@ -441,9 +441,9 @@ export function extract_line_comment_contents(line: string): string[] {
  * the bare text anywhere — prevents "map" from matching `arr.map(...)`.
  */
 function comment_exists_in_output(output: string, text: string): boolean {
-	return output.includes(`// ${text}`) ||
-		output.includes(`/* ${text}`) ||
-		output.includes(` * ${text}`);
+	return (
+		output.includes(`// ${text}`) || output.includes(`/* ${text}`) || output.includes(` * ${text}`)
+	);
 }
 
 /**
@@ -476,7 +476,7 @@ function comment_line_exists_in_output(output: string, text: string): boolean {
  */
 function border_comment_contents(
 	lines: string[],
-	range: { start: number; end: number } | null,
+	range: { start: number; end: number } | null
 ): string[] {
 	if (!range) return [];
 	const out: string[] = [];
@@ -504,7 +504,7 @@ function border_comment_contents(
  */
 function comment_line_neighbors(
 	lines: string[],
-	text: string,
+	text: string
 ): { prev: string; next: string } | null {
 	for (let i = 0; i < lines.length; i++) {
 		if (extract_comment_content(lines[i]) === text) {
@@ -571,7 +571,7 @@ const format_ignore_preserved: DivergencePattern = {
 		'svelte/syntax/format_ignore/js_css_prettier_divergence',
 		'svelte/syntax/format_ignore/css_nested_prettier_divergence',
 		'svelte/syntax/format_ignore/css_atrule_decl_prettier_divergence',
-		'svelte/syntax/format_ignore/range_prettier_divergence',
+		'svelte/syntax/format_ignore/range_prettier_divergence'
 	],
 	detect(ctx) {
 		const ours_lines = ctx.ours_lines!;
@@ -604,9 +604,10 @@ const format_ignore_preserved: DivergencePattern = {
 			pattern: 'format_ignore_preserved',
 			confidence: 'certain',
 			hunk_indices,
-			reason: 'construct preserved verbatim under a `format-ignore` directive prettier does not honor',
+			reason:
+				'construct preserved verbatim under a `format-ignore` directive prettier does not honor'
 		};
-	},
+	}
 };
 
 // ─── Pattern Detectors ──────────────────────────────────────────────────────
@@ -627,7 +628,7 @@ const bom_strip: DivergencePattern = {
 	fixtures: [
 		'svelte/syntax/whitespace/bom_prettier_divergence',
 		'css/tokens/whitespace/bom_prettier_divergence',
-		'typescript/syntax/whitespace/bom_prettier_divergence',
+		'typescript/syntax/whitespace/bom_prettier_divergence'
 	],
 	detect(ctx) {
 		// Use the `﻿` escape rather than a literal BOM glyph in source — a raw
@@ -640,20 +641,20 @@ const bom_strip: DivergencePattern = {
 				// Find the hunk covering the BOM rather than assuming it is hunk 0:
 				// the hunk whose prettier (removed) range starts at source line 0, or
 				// failing that whose removed line still carries the BOM.
-				const bom_hunk = ctx.hunks.find((h) =>
-					h.prettier_range?.start === 0 || h.removed_lines.some((l) => l.startsWith(BOM))
+				const bom_hunk = ctx.hunks.find(
+					(h) => h.prettier_range?.start === 0 || h.removed_lines.some((l) => l.startsWith(BOM))
 				);
 				const hunk_indices = bom_hunk ? [bom_hunk.index] : [];
 				return {
 					pattern: 'bom_strip',
 					confidence: 'certain',
 					hunk_indices,
-					reason: 'BOM (byte order mark) removed',
+					reason: 'BOM (byte order mark) removed'
 				};
 			}
 		}
 		return null;
-	},
+	}
 };
 
 const self_closing_nonvoid: DivergencePattern = {
@@ -663,7 +664,7 @@ const self_closing_nonvoid: DivergencePattern = {
 	conformance_sections: ['Svelte/HTML'],
 	fixtures: [
 		'svelte/elements/self_closing_nonvoid_prettier_divergence',
-		'svelte/elements/ws_sensitive_self_closing_kinds_prettier_divergence',
+		'svelte/elements/ws_sensitive_self_closing_kinds_prettier_divergence'
 	],
 	// `<i … />` → `<i …></i>` adds `<`, `/`, `>` and the tag name — real semantic chars.
 	// The detect below proves preservation by matching the tag NAME on both sides.
@@ -695,12 +696,10 @@ const self_closing_nonvoid: DivergencePattern = {
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			// Full-tag: require self-closing <Tag /> on one side and </Tag> on other
 			// Covers both directions (components and HTML elements)
-			for (
-				const [self_lines, close_lines] of [
-					[hunk.added_lines, hunk.removed_lines],
-					[hunk.removed_lines, hunk.added_lines],
-				]
-			) {
+			for (const [self_lines, close_lines] of [
+				[hunk.added_lines, hunk.removed_lines],
+				[hunk.removed_lines, hunk.added_lines]
+			]) {
 				for (const line of self_lines) {
 					const re = /<([a-zA-Z][\w.-]*)[^>]*\/>/g;
 					let m;
@@ -716,21 +715,25 @@ const self_closing_nonvoid: DivergencePattern = {
 			if (
 				hunk.removed_lines.some((l) => self_closing_end.test(l)) &&
 				hunk.added_lines.some((l) => explicit_close_end.test(l))
-			) return true;
+			)
+				return true;
 			if (
 				hunk.added_lines.some((l) => self_closing_end.test(l)) &&
 				hunk.removed_lines.some((l) => explicit_close_end.test(l))
-			) return true;
+			)
+				return true;
 			// Orphaned remove-only: prettier has self-closing non-void HTML that we removed
 			if (
 				hunk.added_lines.length === 0 &&
 				hunk.removed_lines.every((l) => self_closing_nonvoid_tag.test(l))
-			) return true;
+			)
+				return true;
 			// Orphaned add-only: we added empty explicit-close HTML that prettier didn't have
 			if (
 				hunk.removed_lines.length === 0 &&
 				hunk.added_lines.every((l) => empty_explicit_close.test(l))
-			) return true;
+			)
+				return true;
 			return false;
 		});
 
@@ -739,11 +742,11 @@ const self_closing_nonvoid: DivergencePattern = {
 				pattern: 'self_closing_nonvoid',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'Non-void HTML element self-closing normalization',
+				reason: 'Non-void HTML element self-closing normalization'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const attr_value_single_quote: DivergencePattern = {
@@ -754,7 +757,7 @@ const attr_value_single_quote: DivergencePattern = {
 	fixtures: [
 		'svelte/attributes/value_double_quote_prettier_divergence',
 		'svelte/directives/style/value_double_quote_prettier_divergence',
-		'svelte/special_elements/svelte_element_this_double_quote_prettier_divergence',
+		'svelte/special_elements/svelte_element_this_double_quote_prettier_divergence'
 	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
@@ -785,11 +788,11 @@ const attr_value_single_quote: DivergencePattern = {
 				pattern: 'attr_value_single_quote',
 				confidence: 'certain',
 				hunk_indices,
-				reason: 'Value with a literal " kept single-quoted (prettier corrupts to double quotes)',
+				reason: 'Value with a literal " kept single-quoted (prettier corrupts to double quotes)'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const empty_statement_removal: DivergencePattern = {
@@ -820,11 +823,11 @@ const empty_statement_removal: DivergencePattern = {
 				pattern: 'empty_statement_removal',
 				confidence: 'certain',
 				hunk_indices,
-				reason: 'Standalone empty statement (;) removed',
+				reason: 'Standalone empty statement (;) removed'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const css_value_ratio: DivergencePattern = {
@@ -857,11 +860,11 @@ const css_value_ratio: DivergencePattern = {
 				pattern: 'css_value_ratio',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'Ratio spacing normalized in CSS',
+				reason: 'Ratio spacing normalized in CSS'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 // ─── CSS-specific patterns ──────────────────────────────────────────────────
@@ -890,7 +893,7 @@ const css_unit_serialize_case: DivergencePattern = {
 				if (!prettier_unit.test(removed)) return false;
 				const lowered = removed.toLowerCase();
 				return hunk.added_lines.some(
-					(added) => ours_unit.test(added) && added.toLowerCase() === lowered,
+					(added) => ours_unit.test(added) && added.toLowerCase() === lowered
 				);
 			});
 		});
@@ -900,11 +903,11 @@ const css_unit_serialize_case: DivergencePattern = {
 				pattern: 'css_unit_serialize_case',
 				confidence: 'certain',
 				hunk_indices,
-				reason: 'CSS Hz/kHz/Q serialized lowercase per spec (CSS Values 4 §6.2/§7.3)',
+				reason: 'CSS Hz/kHz/Q serialized lowercase per spec (CSS Values 4 §6.2/§7.3)'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const css_atrule_spec_spacing: DivergencePattern = {
@@ -914,7 +917,7 @@ const css_atrule_spec_spacing: DivergencePattern = {
 	conformance_sections: ['CSS: At-Rules'],
 	fixtures: [
 		'css/at_rules/container_spacing_prettier_divergence',
-		'css/at_rules/media_boolean_spacing_prettier_divergence',
+		'css/at_rules/media_boolean_spacing_prettier_divergence'
 	],
 	detect(ctx) {
 		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
@@ -939,8 +942,10 @@ const css_atrule_spec_spacing: DivergencePattern = {
 				/@(?:container|media|supports)/.test(l)
 			);
 
-			return (removed_missing_space && added_has_space) ||
-				(removed_has_atrule && added_has_atrule && removed_missing_space);
+			return (
+				(removed_missing_space && added_has_space) ||
+				(removed_has_atrule && added_has_atrule && removed_missing_space)
+			);
 		});
 
 		if (hunk_indices.length > 0) {
@@ -948,11 +953,11 @@ const css_atrule_spec_spacing: DivergencePattern = {
 				pattern: 'css_atrule_spec_spacing',
 				confidence: 'certain',
 				hunk_indices,
-				reason: 'CSS at-rule keyword spacing normalized per spec (CSS Syntax 3 §4.3.4)',
+				reason: 'CSS at-rule keyword spacing normalized per spec (CSS Syntax 3 §4.3.4)'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const css_atrule_long_wrap: DivergencePattern = {
@@ -964,7 +969,7 @@ const css_atrule_long_wrap: DivergencePattern = {
 		'css/at_rules/container_long_prettier_divergence',
 		'css/at_rules/media_long_prettier_divergence',
 		'css/at_rules/import_media_query_long_prettier_divergence',
-		'css/at_rules/supports_long_prettier_divergence',
+		'css/at_rules/supports_long_prettier_divergence'
 	],
 	detect(ctx) {
 		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
@@ -976,7 +981,7 @@ const css_atrule_long_wrap: DivergencePattern = {
 			if (!is_in_css_context(hunk, ctx)) return false;
 			// Prettier has a long at-rule line (> 100 chars) that ours wrapped.
 			return long_line_rewrapped(hunk, prettier_lines, {
-				line_predicate: (l) => atrule_pattern.test(l),
+				line_predicate: (l) => atrule_pattern.test(l)
 			});
 		});
 
@@ -985,11 +990,11 @@ const css_atrule_long_wrap: DivergencePattern = {
 				pattern: 'css_atrule_long_wrap',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'CSS at-rule wraps at print width',
+				reason: 'CSS at-rule wraps at print width'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const css_atrule_stable_quirk: DivergencePattern = {
@@ -999,7 +1004,7 @@ const css_atrule_stable_quirk: DivergencePattern = {
 	conformance_sections: ['CSS: At-Rules'],
 	fixtures: [
 		'css/at_rules/scope_complex_prettier_divergence',
-		'css/at_rules/scope_selector_prettier_divergence',
+		'css/at_rules/scope_selector_prettier_divergence'
 	],
 	detect(ctx) {
 		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
@@ -1012,11 +1017,11 @@ const css_atrule_stable_quirk: DivergencePattern = {
 
 			// @layer with spacing quirks (extra spaces after commas)
 			if (/@layer/.test(removed_joined) || /@layer/.test(added_joined)) {
-				const removed_extra_spaces = hunk.removed_lines.some((l) =>
-					/@layer/.test(l) && /,\s{2,}/.test(l)
+				const removed_extra_spaces = hunk.removed_lines.some(
+					(l) => /@layer/.test(l) && /,\s{2,}/.test(l)
 				);
-				const added_normalized = hunk.added_lines.some((l) =>
-					/@layer/.test(l) && /, [^\s]/.test(l)
+				const added_normalized = hunk.added_lines.some(
+					(l) => /@layer/.test(l) && /, [^\s]/.test(l)
 				);
 				if (removed_extra_spaces && added_normalized) return true;
 			}
@@ -1025,11 +1030,16 @@ const css_atrule_stable_quirk: DivergencePattern = {
 			// to, or a comma/combinator the author wrote tight)
 			if (/@scope/.test(removed_joined) || /@scope/.test(added_joined)) {
 				// Prettier adds spaces inside scope parens: ( .class ) vs (.class)
-				const removed_has_quirk = hunk.removed_lines.some((l) =>
-					/@scope/.test(l) &&
-					(/\( /.test(l) || / \)/.test(l) || /\s{2,}to\s{2,}/.test(l) ||
-						// tight comma / combinator preserved: (.x,.y), (a>b), (.x)to(.y)
-						/,\S/.test(l) || /\S[>+~]\S/.test(l) || /\)to\(/.test(l))
+				const removed_has_quirk = hunk.removed_lines.some(
+					(l) =>
+						/@scope/.test(l) &&
+						(/\( /.test(l) ||
+							/ \)/.test(l) ||
+							/\s{2,}to\s{2,}/.test(l) ||
+							// tight comma / combinator preserved: (.x,.y), (a>b), (.x)to(.y)
+							/,\S/.test(l) ||
+							/\S[>+~]\S/.test(l) ||
+							/\)to\(/.test(l))
 				);
 				const added_is_normal = hunk.added_lines.some((l) => /@scope/.test(l));
 				if (removed_has_quirk && added_is_normal) return true;
@@ -1043,11 +1053,11 @@ const css_atrule_stable_quirk: DivergencePattern = {
 				pattern: 'css_atrule_stable_quirk',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'CSS at-rule stable quirk (Prettier preserves multiple forms, we normalize)',
+				reason: 'CSS at-rule stable quirk (Prettier preserves multiple forms, we normalize)'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const css_scss_directive_number: DivergencePattern = {
@@ -1094,11 +1104,11 @@ const css_scss_directive_number: DivergencePattern = {
 				pattern: 'css_scss_directive_number',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'SCSS-directive at-rule prelude preserved verbatim; prettier number-normalizes',
+				reason: 'SCSS-directive at-rule prelude preserved verbatim; prettier number-normalizes'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const css_selector_divergence: DivergencePattern = {
@@ -1110,7 +1120,7 @@ const css_selector_divergence: DivergencePattern = {
 		'css/selectors/combinators/column_prettier_divergence',
 		'css/selectors/pseudo_class/nth_child_prettier_divergence',
 		'css/selectors/pseudo_class/compound_args_indent_long_prettier_divergence',
-		'css/selectors/pseudo_class/nested_where_is_long_prettier_divergence',
+		'css/selectors/pseudo_class/nested_where_is_long_prettier_divergence'
 	],
 	detect(ctx) {
 		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
@@ -1137,10 +1147,12 @@ const css_selector_divergence: DivergencePattern = {
 				const removed_nth_content = hunk.removed_lines.filter((l) => nth_pattern.test(l));
 				const added_nth_content = hunk.added_lines.filter((l) => nth_pattern.test(l));
 				if (
-					removed_nth_content.length > 0 && added_nth_content.length > 0 &&
-					removed_nth_content.some((l, i) =>
-						added_nth_content[i] &&
-						l.replace(/\s+/g, '') === added_nth_content[i].replace(/\s+/g, '')
+					removed_nth_content.length > 0 &&
+					added_nth_content.length > 0 &&
+					removed_nth_content.some(
+						(l, i) =>
+							added_nth_content[i] &&
+							l.replace(/\s+/g, '') === added_nth_content[i].replace(/\s+/g, '')
 					)
 				) {
 					return true;
@@ -1155,11 +1167,11 @@ const css_selector_divergence: DivergencePattern = {
 				pattern: 'css_selector_divergence',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'CSS selector formatting divergence',
+				reason: 'CSS selector formatting divergence'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const css_comment_stable_quirk: DivergencePattern = {
@@ -1175,7 +1187,7 @@ const css_comment_stable_quirk: DivergencePattern = {
 		'css/tokens/comments/media_list_prettier_divergence',
 		'css/tokens/comments/media_long_prettier_divergence',
 		'css/tokens/comments/selector_before_opening_brace_prettier_divergence',
-		'css/tokens/comments/selector_list_prettier_divergence',
+		'css/tokens/comments/selector_list_prettier_divergence'
 	],
 	detect(ctx) {
 		if (ctx.language !== 'css' && ctx.language !== 'svelte') return null;
@@ -1244,11 +1256,11 @@ const css_comment_stable_quirk: DivergencePattern = {
 				pattern: 'css_comment_stable_quirk',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'CSS comment position stable quirk (we normalize)',
+				reason: 'CSS comment position stable quirk (we normalize)'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 // ─── Feature-specific patterns ──────────────────────────────────────────────
@@ -1260,7 +1272,7 @@ const template_literal_width: DivergencePattern = {
 	conformance_sections: ['TypeScript: Template Literals'],
 	fixtures: [
 		'typescript/expressions/literals/template/interpolation_nested_template_prettier_divergence',
-		'typescript/types/template_literal_type_long_prettier_divergence',
+		'typescript/types/template_literal_type_long_prettier_divergence'
 		// TODO: `template_literal_type_conditional_long` was listed here but the
 		// break markers below (`${` at EOL, `}\`` at line start) don't describe its
 		// shape — the conditional type breaks at `?`/`:` INSIDE the interpolation.
@@ -1291,10 +1303,10 @@ const template_literal_width: DivergencePattern = {
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			const added_has_break = hunk.added_lines.some(
-				(l) => break_after_dollar_brace.test(l) || closing_brace_backtick.test(l),
+				(l) => break_after_dollar_brace.test(l) || closing_brace_backtick.test(l)
 			);
 			const removed_has_break = hunk.removed_lines.some(
-				(l) => break_after_dollar_brace.test(l) || closing_brace_backtick.test(l),
+				(l) => break_after_dollar_brace.test(l) || closing_brace_backtick.test(l)
 			);
 
 			// Case 1: Only our side has template breaks — verify the break is
@@ -1345,7 +1357,7 @@ const template_literal_width: DivergencePattern = {
 			// nested-template line in place would be claimed purely from its width.
 			if (
 				long_line_rewrapped(hunk, prettier_lines, {
-					line_predicate: (l) => nested_template_interpolation.test(l),
+					line_predicate: (l) => nested_template_interpolation.test(l)
 				})
 			) {
 				return true;
@@ -1359,11 +1371,11 @@ const template_literal_width: DivergencePattern = {
 				pattern: 'template_literal_width',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'Template interpolation breaks to respect print width',
+				reason: 'Template interpolation breaks to respect print width'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const block_expression_logical: DivergencePattern = {
@@ -1383,8 +1395,10 @@ const block_expression_logical: DivergencePattern = {
 		const block_operator_break = /^\t+(?:&&|\|\|)/;
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			return hunk.added_lines.some((l) => block_operator_break.test(l)) &&
-				!hunk.removed_lines.some((l) => block_operator_break.test(l));
+			return (
+				hunk.added_lines.some((l) => block_operator_break.test(l)) &&
+				!hunk.removed_lines.some((l) => block_operator_break.test(l))
+			);
 		});
 
 		if (hunk_indices.length > 0) {
@@ -1392,11 +1406,11 @@ const block_expression_logical: DivergencePattern = {
 				pattern: 'block_expression_logical',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'Logical expression in block condition broken to respect print width',
+				reason: 'Logical expression in block condition broken to respect print width'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const single_specifier_import: DivergencePattern = {
@@ -1445,11 +1459,11 @@ const single_specifier_import: DivergencePattern = {
 			// Prettier side: the long inline import itself.
 			const removed_long = hunk.removed_lines.some(
 				(l) =>
-					import_inline.test(l) && visual_width(l) > 100 && broken_paths.has(from_path(l) ?? ''),
+					import_inline.test(l) && visual_width(l) > 100 && broken_paths.has(from_path(l) ?? '')
 			);
 			// Ours side: the broken close `} from '<same path>';`.
 			const added_break = hunk.added_lines.some(
-				(l) => import_close.test(l) && broken_paths.has(from_path(l) ?? ''),
+				(l) => import_close.test(l) && broken_paths.has(from_path(l) ?? '')
 			);
 			return removed_long || added_break;
 		});
@@ -1459,11 +1473,11 @@ const single_specifier_import: DivergencePattern = {
 				pattern: 'single_specifier_import',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'Single specifier import wraps at print width',
+				reason: 'Single specifier import wraps at print width'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const member_expression_call: DivergencePattern = {
@@ -1497,11 +1511,11 @@ const member_expression_call: DivergencePattern = {
 				pattern: 'member_expression_call',
 				confidence: 'possible',
 				hunk_indices,
-				reason: 'Member expression in call args breaks differently',
+				reason: 'Member expression in call args breaks differently'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const return_type_generic_union: DivergencePattern = {
@@ -1509,9 +1523,7 @@ const return_type_generic_union: DivergencePattern = {
 	description: 'Return type generic with union wraps at print width',
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['TypeScript'],
-	fixtures: [
-		'typescript/declarations/function/return_type_generic_union_long_prettier_divergence',
-	],
+	fixtures: ['typescript/declarations/function/return_type_generic_union_long_prettier_divergence'],
 	detect(ctx) {
 		const prettier_lines = ctx.prettier_lines!;
 
@@ -1519,12 +1531,10 @@ const return_type_generic_union: DivergencePattern = {
 		// where prettier's line exceeds 100 chars and ours re-wrapped it.
 		const union_in_generic = /[<>].*\|\s*(?:null|void|undefined)/;
 
-		const hunk_indices = find_matching_hunks(
-			ctx.hunks,
-			(hunk) =>
-				long_line_rewrapped(hunk, prettier_lines, {
-					line_predicate: (l) => union_in_generic.test(l),
-				}),
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) =>
+			long_line_rewrapped(hunk, prettier_lines, {
+				line_predicate: (l) => union_in_generic.test(l)
+			})
 		);
 
 		if (hunk_indices.length > 0) {
@@ -1532,11 +1542,11 @@ const return_type_generic_union: DivergencePattern = {
 				pattern: 'return_type_generic_union',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'Return type generic with union wraps at print width',
+				reason: 'Return type generic with union wraps at print width'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const non_null_paren_base: DivergencePattern = {
@@ -1558,7 +1568,7 @@ const non_null_paren_base: DivergencePattern = {
 			ctx.hunks,
 			(hunk) =>
 				hunk.removed_lines.some((l) => prettier_hugs.test(l)) &&
-				hunk.added_lines.some((l) => ours_hangs.test(l)),
+				hunk.added_lines.some((l) => ours_hangs.test(l))
 		);
 
 		if (hunk_indices.length > 0) {
@@ -1567,11 +1577,11 @@ const non_null_paren_base: DivergencePattern = {
 				confidence: 'likely',
 				hunk_indices,
 				reason:
-					'Non-null assertion on a parenthesized base: tsv hangs the outer parens, prettier hugs the inner call',
+					'Non-null assertion on a parenthesized base: tsv hangs the outer parens, prettier hugs the inner call'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 // ─── Svelte-specific patterns ───────────────────────────────────────────────
@@ -1621,11 +1631,11 @@ const menu_block: DivergencePattern = {
 				pattern: 'menu_block',
 				confidence: 'certain',
 				hunk_indices,
-				reason: '<menu> treated as block element (prettier treats as inline)',
+				reason: '<menu> treated as block element (prettier treats as inline)'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const inline_content_hug: DivergencePattern = {
@@ -1654,8 +1664,8 @@ const inline_content_hug: DivergencePattern = {
 			//   - >content on a line (tag break with content on same line, e.g. <small\n\t>text{expr})
 			//   - removed content ending with > (tag with > at end of line)
 			// Exclude closing tags (>/) to avoid matching </tag>
-			const prettier_breaks = hunk.removed_lines.some((l) => /^\s*>(?!\/)/.test(l)) ||
-				/>\s*$/.test(removed_joined);
+			const prettier_breaks =
+				hunk.removed_lines.some((l) => /^\s*>(?!\/)/.test(l)) || />\s*$/.test(removed_joined);
 
 			return ours_hugs && prettier_breaks;
 		});
@@ -1665,11 +1675,11 @@ const inline_content_hug: DivergencePattern = {
 				pattern: 'inline_content_hug',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'Expression breaks internally vs bracket breaks',
+				reason: 'Expression breaks internally vs bracket breaks'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const fill_after_inline: DivergencePattern = {
@@ -1699,12 +1709,10 @@ const fill_after_inline: DivergencePattern = {
 		// (more added than removed lines). Without this, a bug where ours emits the
 		// same long line (no legitimate fill break) would be claimed solely from
 		// prettier's width.
-		const hunk_indices = find_matching_hunks(
-			ctx.hunks,
-			(hunk) =>
-				long_line_rewrapped(hunk, prettier_lines, {
-					line_predicate: (l) => inline_close_tag.test(l),
-				}),
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) =>
+			long_line_rewrapped(hunk, prettier_lines, {
+				line_predicate: (l) => inline_close_tag.test(l)
+			})
 		);
 
 		if (hunk_indices.length > 0) {
@@ -1712,11 +1720,11 @@ const fill_after_inline: DivergencePattern = {
 				pattern: 'fill_after_inline',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'Text after inline element breaks at print width',
+				reason: 'Text after inline element breaks at print width'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const comment_preserved: DivergencePattern = {
@@ -1738,7 +1746,7 @@ const comment_preserved: DivergencePattern = {
 		'svelte/expression_tag/paren_multiline_comment_prettier_divergence',
 		'svelte/tags/html_render_paren_multiline_comment_prettier_divergence',
 		'svelte/directives/value_paren_multiline_comment_prettier_divergence',
-		'svelte/attributes/attach_spread_paren_multiline_comment_prettier_divergence',
+		'svelte/attributes/attach_spread_paren_multiline_comment_prettier_divergence'
 	],
 	// The "we preserve / Prettier DROPS a comment" family (◆content_preservation).
 	// `comment_position` deliberately can't claim these — its content guard requires
@@ -1750,7 +1758,10 @@ const comment_preserved: DivergencePattern = {
 		// Strip JS/Svelte comments + all whitespace, leaving only code glyphs — so
 		// two lines that differ ONLY by a comment (and its reflow) compare equal.
 		const strip_code = (s: string): string =>
-			s.replace(/\/\*[\s\S]*?\*\//g, '').replace(/\/\/[^\n]*/g, '').replace(/\s+/g, '');
+			s
+				.replace(/\/\*[\s\S]*?\*\//g, '')
+				.replace(/\/\/[^\n]*/g, '')
+				.replace(/\s+/g, '');
 		const has_comment = (s: string): boolean => /\/\*[\s\S]*?\*\/|\/\//.test(s);
 
 		// Claim a hunk where an OURS (added) line carries a comment and, with the
@@ -1804,11 +1815,11 @@ const comment_preserved: DivergencePattern = {
 				pattern: 'comment_preserved',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'We preserve a comment inside {…}/a tag that Prettier drops',
+				reason: 'We preserve a comment inside {…}/a tag that Prettier drops'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const short_expr_100: DivergencePattern = {
@@ -1821,7 +1832,7 @@ const short_expr_100: DivergencePattern = {
 		'svelte/blocks/await/long_prettier_divergence',
 		'svelte/blocks/key/long_prettier_divergence',
 		'svelte/blocks/if/long_prettier_divergence',
-		'svelte/blocks/if/inline_element_long_prettier_divergence',
+		'svelte/blocks/if/inline_element_long_prettier_divergence'
 	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
@@ -1837,7 +1848,7 @@ const short_expr_100: DivergencePattern = {
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
 			const has_short_overflow_block = p_lines.some(
-				(l) => block_expr_pattern.test(l) && visual_width(l) > 100 && visual_width(l) <= 110,
+				(l) => block_expr_pattern.test(l) && visual_width(l) > 100 && visual_width(l) <= 110
 			);
 			if (!has_short_overflow_block) return false;
 			return hunk.added_lines.length > hunk.removed_lines.length;
@@ -1848,11 +1859,11 @@ const short_expr_100: DivergencePattern = {
 				pattern: 'short_expr_100',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'Short expression in block condition exceeds 100 chars, we break',
+				reason: 'Short expression in block condition exceeds 100 chars, we break'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 /**
@@ -1942,7 +1953,7 @@ const forced_continuation_indent: DivergencePattern = {
 		// The declaration-header clause's only witness, so it is listed deliberately:
 		// if this fixture stops being claimed the clause is dead, and nothing else
 		// would say so.
-		'typescript/syntax/comments/keyword_name_line_comment_prettier_divergence',
+		'typescript/syntax/comments/keyword_name_line_comment_prettier_divergence'
 	],
 	detect(ctx) {
 		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
@@ -1972,9 +1983,9 @@ const forced_continuation_indent: DivergencePattern = {
 			pattern: 'forced_continuation_indent',
 			confidence: 'likely',
 			hunk_indices,
-			reason: `comment-forced continuation indents one level where prettier keeps it flush (${[...sites].join(', ')})`,
+			reason: `comment-forced continuation indents one level where prettier keeps it flush (${[...sites].join(', ')})`
 		};
-	},
+	}
 };
 
 const inline_content_block_style: DivergencePattern = {
@@ -1993,7 +2004,7 @@ const inline_content_block_style: DivergencePattern = {
 		'svelte/elements/inline_break_before_component_long_prettier_divergence',
 		'svelte/elements/inline_break_before_void_long_prettier_divergence',
 		'svelte/elements/ws_collapsing_containers_prettier_divergence',
-		'svelte/elements/implicit_close_table_prettier_divergence',
+		'svelte/elements/implicit_close_table_prettier_divergence'
 	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
@@ -2044,7 +2055,8 @@ const inline_content_block_style: DivergencePattern = {
 		// region-markers, `<svelte:element>` attr wrap, an html template literal) — they have
 		// no block tag on a changed line at all.
 		const block_head_at_eol = /\{#(?:if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
-		const block_branch_alone = /^[ \t]*\{[:/](?:else|then|catch|if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
+		const block_branch_alone =
+			/^[ \t]*\{[:/](?:else|then|catch|if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
 		// The whitespace-collapsing-container block-style (§"reaches inter-sibling whitespace …
 		// a whitespace-collapsing container"): inside `<table>`/`<tbody>`/`<thead>`/`<tfoot>`/
 		// `<tr>`/`<colgroup>`/`<select>`/`<datalist>` the compiler removes inter-sibling
@@ -2077,14 +2089,16 @@ const inline_content_block_style: DivergencePattern = {
 		let has_signature = false;
 		for (const hunk of ctx.hunks) {
 			if (
-				hunk.removed_lines.concat(hunk.added_lines).some((l) => dangle_close.test(l) || dangle_open.test(l)) ||
+				hunk.removed_lines
+					.concat(hunk.added_lines)
+					.some((l) => dangle_close.test(l) || dangle_open.test(l)) ||
 				hunk.removed_lines.some((l) => dangle_open_tag_after_text.test(l)) ||
 				hunk.added_lines.some(
 					(l) =>
 						block_head_alone.test(l) ||
 						block_head_at_eol.test(l) ||
 						block_branch_alone.test(l) ||
-						container_tag_alone.test(l),
+						container_tag_alone.test(l)
 				)
 			) {
 				has_signature = true;
@@ -2101,9 +2115,9 @@ const inline_content_block_style: DivergencePattern = {
 			confidence: 'likely',
 			hunk_indices: ctx.hunks.map((h) => h.index),
 			reason:
-				'inline/block content laid out block-style (tags intact, content on its own line), or an inline element broken before onto a fresh line; prettier dangles the tag delimiters / dangles the opening tag',
+				'inline/block content laid out block-style (tags intact, content on its own line), or an inline element broken before onto a fresh line; prettier dangles the tag delimiters / dangles the opening tag'
 		};
-	},
+	}
 };
 
 /**
@@ -2136,7 +2150,7 @@ const VOID_ELEMENTS =
  */
 const boundary_after_open_tag = new RegExp(
 	String.raw`(?<=<(?!(?:${VOID_ELEMENTS})\b)[A-Za-z][^<>"'{}]*(?:(?:"[^"]*"|'[^']*'|\{(?:[^{}]|\{[^{}]*\})*\})[^<>"'{}]*)*>)(?<!/>)[ \t\r\n]+`,
-	'gi',
+	'gi'
 );
 /** Before a closing tag — content end. */
 const boundary_before_close_tag = /[ \t\r\n]+(?=<\/)/g;
@@ -2171,7 +2185,7 @@ const erase_fragment_edges = (s: string): string =>
  */
 const collapse_fragment_edge_ws = (
 	s: string,
-	regions: CodeRegion[] = compute_code_regions(s),
+	regions: CodeRegion[] = compute_code_regions(s)
 ): string => {
 	let out = '';
 	let last = 0;
@@ -2196,7 +2210,7 @@ const svelte_boundary_ws_trim: DivergencePattern = {
 		'svelte/blocks/boundary_space_trim_prettier_divergence',
 		'svelte/blocks/await/boundary_space_trim_prettier_divergence',
 		'svelte/blocks/if/spaces_prettier_divergence',
-		'svelte/blocks/if/last_block_prettier_divergence',
+		'svelte/blocks/if/last_block_prettier_divergence'
 	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
@@ -2237,7 +2251,7 @@ const svelte_boundary_ws_trim: DivergencePattern = {
 				confidence: 'likely',
 				hunk_indices: ctx.hunks.map((h) => h.index),
 				reason:
-					'render-free content-boundary whitespace trimmed (Svelte-mirror trim); prettier keeps the boundary space or expands the construct',
+					'render-free content-boundary whitespace trimmed (Svelte-mirror trim); prettier keeps the boundary space or expands the construct'
 			};
 		}
 		// A hunk inside a <script>/<style> region can never be a template trim — its
@@ -2269,9 +2283,9 @@ const svelte_boundary_ws_trim: DivergencePattern = {
 			confidence: 'likely',
 			hunk_indices: claimed,
 			reason:
-				'render-free content-boundary whitespace trimmed (Svelte-mirror trim); prettier keeps the boundary space or expands the construct',
+				'render-free content-boundary whitespace trimmed (Svelte-mirror trim); prettier keeps the boundary space or expands the construct'
 		};
-	},
+	}
 };
 
 // ─── Broad patterns (run last) ──────────────────────────────────────────────
@@ -2281,9 +2295,7 @@ const css_url_opaque: DivergencePattern = {
 	description: 'Unquoted url() content kept verbatim; prettier reformats inside nested parens',
 	languages: ['css', 'svelte'],
 	conformance_sections: ['CSS: Values'],
-	fixtures: [
-		'css/values/functions/url_nested_reformat_prettier_divergence',
-	],
+	fixtures: ['css/values/functions/url_nested_reformat_prettier_divergence'],
 	detect(ctx) {
 		// A nested `(...)` inside an unquoted `url(...)` — the only place url content
 		// (opaque per css-syntax §4.3.6, never re-parsed) and prettier's value
@@ -2312,7 +2324,8 @@ const css_url_opaque: DivergencePattern = {
 				// line disables the detector, so it can never mask a real content change.
 				if (strip_all_ws(removed[i]) !== strip_all_ws(added[i])) return false;
 				if (
-					nested_url.test(removed[i]) && nested_url.test(added[i]) &&
+					nested_url.test(removed[i]) &&
+					nested_url.test(added[i]) &&
 					strip_outer(removed[i]) !== strip_outer(added[i])
 				) {
 					saw_interior_reformat = true;
@@ -2325,11 +2338,11 @@ const css_url_opaque: DivergencePattern = {
 				pattern: 'css_url_opaque',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'unquoted url() content kept verbatim; prettier reformats inside the nested parens',
+				reason: 'unquoted url() content kept verbatim; prettier reformats inside the nested parens'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const css_value_wrap: DivergencePattern = {
@@ -2339,7 +2352,7 @@ const css_value_wrap: DivergencePattern = {
 	conformance_sections: ['CSS: Values'],
 	fixtures: [
 		'css/values/functions/transform_long_prettier_divergence',
-		'css/values/lists/space_separated_long_wrap_prettier_divergence',
+		'css/values/lists/space_separated_long_wrap_prettier_divergence'
 	],
 	detect(ctx) {
 		const prettier_lines = ctx.prettier_lines!;
@@ -2349,7 +2362,7 @@ const css_value_wrap: DivergencePattern = {
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			if (!is_in_css_context(hunk, ctx)) return false;
 			return long_line_rewrapped(hunk, prettier_lines, {
-				line_predicate: (l) => /^\t+[\w-]+:\s*.+/.test(l),
+				line_predicate: (l) => /^\t+[\w-]+:\s*.+/.test(l)
 			});
 		});
 
@@ -2358,11 +2371,11 @@ const css_value_wrap: DivergencePattern = {
 				pattern: 'css_value_wrap',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'CSS property value wraps at print width',
+				reason: 'CSS property value wraps at print width'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const fill_101_boundary: DivergencePattern = {
@@ -2379,7 +2392,7 @@ const fill_101_boundary: DivergencePattern = {
 		'svelte/elements/fill_after_inline_prettier_divergence',
 		'svelte/elements/fill_multiple_expr_long_prettier_divergence',
 		'svelte/elements/block_multiline_attrs_content_hug_prettier_divergence',
-		'svelte/attributes/multiline_value_inline_long_prettier_divergence',
+		'svelte/attributes/multiline_value_inline_long_prettier_divergence'
 	],
 	detect(ctx) {
 		const prettier_lines = ctx.prettier_lines!;
@@ -2402,8 +2415,8 @@ const fill_101_boundary: DivergencePattern = {
 			// Require at least one added line — `every` is vacuously true for a
 			// removal-only hunk (empty added_lines), which would otherwise claim a
 			// prettier line we simply DELETED as a print-width rewrap.
-			const ours_all_fit = hunk.added_lines.length > 0 &&
-				hunk.added_lines.every((l) => visual_width(l) <= 100);
+			const ours_all_fit =
+				hunk.added_lines.length > 0 && hunk.added_lines.every((l) => visual_width(l) <= 100);
 			if (!we_break_more && !ours_all_fit) return false;
 
 			for (const l of p_lines) {
@@ -2418,11 +2431,11 @@ const fill_101_boundary: DivergencePattern = {
 				pattern: 'fill_101_boundary',
 				confidence: 'likely',
 				hunk_indices,
-				reason: `Prettier allows ${longest_prettier_overflow} chars, we break at print width`,
+				reason: `Prettier allows ${longest_prettier_overflow} chars, we break at print width`
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const comment_position: DivergencePattern = {
@@ -2500,7 +2513,7 @@ const comment_position: DivergencePattern = {
 		// Sequence operand outer-edge comments float out of the sequence parens
 		// (call context matches prettier's fixed point; statement context keeps the
 		// trailing comment before `;`)
-		'typescript/expressions/sequence/operand_edge_comment_prettier_divergence',
+		'typescript/expressions/sequence/operand_edge_comment_prettier_divergence'
 		// NOTE: the Svelte `expr_trailing` / `debug_comment` fixtures are NOT
 		// claimed here. Prettier DROPS those comments, so they fail this pattern's
 		// "comment exists as a whole line in BOTH outputs" content guard by design
@@ -2547,7 +2560,8 @@ const comment_position: DivergencePattern = {
 					if (
 						!comment_line_exists_in_output(ctx.ours, text) ||
 						!comment_line_exists_in_output(ctx.prettier, text)
-					) return false;
+					)
+						return false;
 					// Relocation evidence: both neighbors of the comment differ AND
 					// neither neighbor merely BEGINS THE SAME ELEMENT as its counterpart
 					// (which would be a stable comment bordering a width re-wrap of the
@@ -2555,10 +2569,14 @@ const comment_position: DivergencePattern = {
 					// the comment among entirely different tokens on both sides.
 					const o = comment_line_neighbors(ours_lines, text);
 					const p = comment_line_neighbors(prettier_lines, text);
-					return o !== null && p !== null &&
-						o.prev !== p.prev && o.next !== p.next &&
+					return (
+						o !== null &&
+						p !== null &&
+						o.prev !== p.prev &&
+						o.next !== p.next &&
 						!lines_begin_same_element(o.prev, p.prev) &&
-						!lines_begin_same_element(o.next, p.next);
+						!lines_begin_same_element(o.next, p.next)
+					);
 				});
 			}
 
@@ -2604,7 +2622,8 @@ const comment_position: DivergencePattern = {
 			if (!has_overlap) return false;
 
 			// Lines must differ (the comment moved positions)
-			const lines_differ = added_comment_lines.length !== removed_comment_lines.length ||
+			const lines_differ =
+				added_comment_lines.length !== removed_comment_lines.length ||
 				added_comment_lines.some((l, i) => l !== removed_comment_lines[i]);
 			if (!lines_differ) return false;
 
@@ -2612,9 +2631,17 @@ const comment_position: DivergencePattern = {
 			// and compare the trimmed non-empty lines. If the code itself changed
 			// significantly, this is a formatting bug, not a comment position divergence.
 			const strip_comments = (line: string) =>
-				line.replace(/\/\/.*$/, '').replace(/\/\*.*?\*\//g, '').trim();
-			const added_code = hunk.added_lines.map(strip_comments).filter((l) => l.length > 0).sort();
-			const removed_code = hunk.removed_lines.map(strip_comments).filter((l) => l.length > 0)
+				line
+					.replace(/\/\/.*$/, '')
+					.replace(/\/\*.*?\*\//g, '')
+					.trim();
+			const added_code = hunk.added_lines
+				.map(strip_comments)
+				.filter((l) => l.length > 0)
+				.sort();
+			const removed_code = hunk.removed_lines
+				.map(strip_comments)
+				.filter((l) => l.length > 0)
 				.sort();
 
 			// If non-comment content is identical (same set of trimmed lines),
@@ -2633,16 +2660,13 @@ const comment_position: DivergencePattern = {
 			// and compare whitespace-normalized to handle these cases.
 			// Cap at 100 chars to avoid masking real formatting bugs in longer code.
 			const added_code_unsorted = hunk.added_lines.map(strip_comments).filter((l) => l.length > 0);
-			const removed_code_unsorted = hunk.removed_lines.map(strip_comments).filter(
-				(l) => l.length > 0,
-			);
+			const removed_code_unsorted = hunk.removed_lines
+				.map(strip_comments)
+				.filter((l) => l.length > 0);
 			const normalize = (lines: string[]) => lines.join('').replace(/\s+/g, '');
 			const normalized_added = normalize(added_code_unsorted);
 			const normalized_removed = normalize(removed_code_unsorted);
-			if (
-				normalized_added.length <= 100 &&
-				normalized_added === normalized_removed
-			) {
+			if (normalized_added.length <= 100 && normalized_added === normalized_removed) {
 				return true;
 			}
 
@@ -2659,7 +2683,10 @@ const comment_position: DivergencePattern = {
 			// purely comment-driven union/intersection layout. The separator-count
 			// guard keeps a genuine dropped-`|`/`&` (content loss) from being masked.
 			const strip_layout = (lines: string[]) =>
-				lines.map(strip_comments).join('').replace(/[|&\s]/g, '');
+				lines
+					.map(strip_comments)
+					.join('')
+					.replace(/[|&\s]/g, '');
 			const count_separators = (lines: string[]) =>
 				lines.map(strip_comments).join('').match(/[|&]/g)?.length ?? 0;
 			const layout_added = strip_layout(hunk.added_lines);
@@ -2681,11 +2708,11 @@ const comment_position: DivergencePattern = {
 				pattern: 'comment_position',
 				confidence: 'likely',
 				hunk_indices,
-				reason: 'Comment preserved where user placed it (Prettier relocates)',
+				reason: 'Comment preserved where user placed it (Prettier relocates)'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const instantiation_parens: DivergencePattern = {
@@ -2693,9 +2720,7 @@ const instantiation_parens: DivergencePattern = {
 	description: 'Parens preserved in ternary/binary instantiation expressions',
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['TypeScript'],
-	fixtures: [
-		'typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence',
-	],
+	fixtures: ['typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence'],
 	detect(ctx) {
 		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
 
@@ -2706,7 +2731,7 @@ const instantiation_parens: DivergencePattern = {
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			const ours_has_parens = hunk.added_lines.some((l) => paren_before_type_args.test(l));
 			const prettier_missing = hunk.removed_lines.some(
-				(l) => !paren_before_type_args.test(l) && /[?+\-]\s.*<[a-zA-Z]/.test(l),
+				(l) => !paren_before_type_args.test(l) && /[?+\-]\s.*<[a-zA-Z]/.test(l)
 			);
 			return ours_has_parens && prettier_missing;
 		});
@@ -2717,11 +2742,11 @@ const instantiation_parens: DivergencePattern = {
 				confidence: 'certain',
 				hunk_indices,
 				reason:
-					'Parens preserved around ternary/binary in instantiation expression (changes semantics)',
+					'Parens preserved around ternary/binary in instantiation expression (changes semantics)'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const single_type_param_comma: DivergencePattern = {
@@ -2732,7 +2757,7 @@ const single_type_param_comma: DivergencePattern = {
 	conformance_sections: ['TypeScript'],
 	fixtures: [
 		'typescript/expressions/arrow/generic/single_type_param_prettier_divergence',
-		'typescript/typescript_specific/generics/const_type_param_arrow_prettier_divergence',
+		'typescript/typescript_specific/generics/const_type_param_arrow_prettier_divergence'
 	],
 	detect(ctx) {
 		// Svelte only: prettier force-adds the JSX-disambiguating comma to a single
@@ -2764,11 +2789,11 @@ const single_type_param_comma: DivergencePattern = {
 				confidence: 'certain',
 				hunk_indices,
 				reason:
-					'Single unconstrained arrow type param stays bare `<T>` (tsv emits no JSX); prettier-in-Svelte forces `<T,>`',
+					'Single unconstrained arrow type param stays bare `<T>` (tsv emits no JSX); prettier-in-Svelte forces `<T,>`'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const block_comment_computed_member: DivergencePattern = {
@@ -2776,9 +2801,7 @@ const block_comment_computed_member: DivergencePattern = {
 	description: 'Block comment preserved inside computed member brackets',
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['TypeScript: Comments'],
-	fixtures: [
-		'typescript/syntax/comments/block_comment_computed_member_long_prettier_divergence',
-	],
+	fixtures: ['typescript/syntax/comments/block_comment_computed_member_long_prettier_divergence'],
 	detect(ctx) {
 		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
 
@@ -2802,11 +2825,11 @@ const block_comment_computed_member: DivergencePattern = {
 				confidence: 'certain',
 				hunk_indices,
 				reason:
-					'Block comment preserved inside computed member brackets (Prettier hoists, changing association)',
+					'Block comment preserved inside computed member brackets (Prettier hoists, changing association)'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const block_comment_chain: DivergencePattern = {
@@ -2814,9 +2837,7 @@ const block_comment_chain: DivergencePattern = {
 	description: 'Block comment spacing in member chain normalization',
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['TypeScript: Comments'],
-	fixtures: [
-		'typescript/expressions/calls/chained/block_comment_chain_prettier_divergence',
-	],
+	fixtures: ['typescript/expressions/calls/chained/block_comment_chain_prettier_divergence'],
 	detect(ctx) {
 		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
 
@@ -2842,11 +2863,11 @@ const block_comment_chain: DivergencePattern = {
 				confidence: 'likely',
 				hunk_indices,
 				reason:
-					'Block comment spacing in member chain differs (normalization-only, both reach same stable output)',
+					'Block comment spacing in member chain differs (normalization-only, both reach same stable output)'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const jsdoc_type_cast_parens: DivergencePattern = {
@@ -2881,20 +2902,21 @@ const jsdoc_type_cast_parens: DivergencePattern = {
 				pattern: 'jsdoc_type_cast_parens',
 				confidence: 'certain',
 				hunk_indices,
-				reason: 'JSDoc type cast parens preserved (required for the cast; prettier-TS strips)',
+				reason: 'JSDoc type cast parens preserved (required for the cast; prettier-TS strips)'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const template_embedded_verbatim: DivergencePattern = {
 	id: 'template_embedded_verbatim',
-	description: 'Tagged/decorator template body kept verbatim; prettier reformats the embedded language',
+	description:
+		'Tagged/decorator template body kept verbatim; prettier reformats the embedded language',
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['TypeScript: Template Literals'],
 	fixtures: [
-		'typescript/expressions/literals/template/embedded_language_verbatim_prettier_divergence',
+		'typescript/expressions/literals/template/embedded_language_verbatim_prettier_divergence'
 	],
 	detect(ctx) {
 		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
@@ -2910,7 +2932,7 @@ const template_embedded_verbatim: DivergencePattern = {
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
 			const prettier_reflowed = hunk.removed_lines.some((l) => embedded_tag_template.test(l));
 			const ours_verbatim = hunk.added_lines.some(
-				(l) => embedded_tag_template.test(l) && !hunk.removed_lines.includes(l),
+				(l) => embedded_tag_template.test(l) && !hunk.removed_lines.includes(l)
 			);
 			return prettier_reflowed && ours_verbatim;
 		});
@@ -2921,11 +2943,11 @@ const template_embedded_verbatim: DivergencePattern = {
 				confidence: 'certain',
 				hunk_indices,
 				reason:
-					'Tagged-template body kept verbatim (prettier reformats the embedded html/css/graphql language; tsv does no embedded formatting)',
+					'Tagged-template body kept verbatim (prettier reformats the embedded html/css/graphql language; tsv does no embedded formatting)'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 const field_key_unquote: DivergencePattern = {
@@ -2956,7 +2978,7 @@ const field_key_unquote: DivergencePattern = {
 		const field_modifiers =
 			'(?:(?:static|readonly|public|private|protected|declare|abstract|accessor|override)\\s+)*';
 		const quoted_field_key = new RegExp(
-			`^\\s*${field_modifiers}'([A-Za-z_$][A-Za-z0-9_$]*)'\\s*(?:[=:?;]|$)`,
+			`^\\s*${field_modifiers}'([A-Za-z_$][A-Za-z0-9_$]*)'\\s*(?:[=:?;]|$)`
 		);
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
@@ -2969,7 +2991,7 @@ const field_key_unquote: DivergencePattern = {
 				// edit removing the line.
 				const bare = new RegExp(`^\\s*${field_modifiers}${ident}\\s*(?:[=:?;]|$)`);
 				const unquoted_on_ours = hunk.added_lines.some(
-					(o) => bare.test(o) && !o.includes(`'${ident}'`),
+					(o) => bare.test(o) && !o.includes(`'${ident}'`)
 				);
 				if (unquoted_on_ours) return true;
 			}
@@ -2982,11 +3004,11 @@ const field_key_unquote: DivergencePattern = {
 				confidence: 'certain',
 				hunk_indices,
 				reason:
-					'Class field key unquoted (tsv unquotes a valid-identifier class field key; prettier keeps it quoted)',
+					'Class field key unquoted (tsv unquotes a valid-identifier class field key; prettier keeps it quoted)'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 // ─── Pattern Registry ───────────────────────────────────────────────────────
@@ -3037,11 +3059,11 @@ const union_paren_member_inline: DivergencePattern = {
 				confidence: 'likely',
 				hunk_indices,
 				reason:
-					'tsv keeps a parenthesized union member inline (union-fit); prettier explodes it one member per line',
+					'tsv keeps a parenthesized union member inline (union-fit); prettier explodes it one member per line'
 			};
 		}
 		return null;
-	},
+	}
 };
 
 export const PATTERNS: DivergencePattern[] = [
@@ -3097,7 +3119,7 @@ export const PATTERNS: DivergencePattern[] = [
 	// 6. Broad patterns (run last)
 	css_value_wrap,
 	fill_101_boundary,
-	comment_position,
+	comment_position
 ];
 
 /** Pattern lookup by id, for resolving a `DivergenceMatch` back to its declaring pattern. */
@@ -3161,9 +3183,7 @@ export function detect_divergences(ctx: DetectionContext): HunkCoverageResult {
 		for (const idx of match.hunk_indices) vouching_hunks.add(idx);
 	}
 	const char_risky_hunks = hunks
-		.filter((h) =>
-			hunk_alters_semantic_chars(h.removed_lines.join('\n'), h.added_lines.join('\n')),
-		)
+		.filter((h) => hunk_alters_semantic_chars(h.removed_lines.join('\n'), h.added_lines.join('\n')))
 		.map((h) => h.index);
 	const safety_vouched =
 		unexplained_hunks.length === 0 && char_risky_hunks.every((idx) => vouching_hunks.has(idx));
@@ -3175,6 +3195,6 @@ export function detect_divergences(ctx: DetectionContext): HunkCoverageResult {
 		unexplained_hunks,
 		classification,
 		safety_vouched,
-		char_risky_hunks,
+		char_risky_hunks
 	};
 }

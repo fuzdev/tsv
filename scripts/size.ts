@@ -18,7 +18,7 @@ export function format_size(bytes: number): string {
 export async function gzip_size(path: string): Promise<number> {
 	const output = await new Deno.Command('gzip', {
 		args: ['-c', path],
-		stdout: 'piped',
+		stdout: 'piped'
 	}).output();
 	return output.stdout.length;
 }

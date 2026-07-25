@@ -19,7 +19,10 @@ import { format_audit_report, generate_audit_report } from './lib/divergence/mod
 
 const AuditArgs = z.object({
 	json: z.boolean().default(false),
-	help: z.boolean().default(false).meta({ aliases: ['h'] }),
+	help: z
+		.boolean()
+		.default(false)
+		.meta({ aliases: ['h'] })
 });
 
 function print_usage(): void {
@@ -74,12 +77,12 @@ async function main(): Promise<void> {
 		if (report.stats.total_undetected > 0 || report.stats.total_partial > 0) {
 			console.log(
 				`\x1b[33mWARN: ${report.stats.total_undetected} documented divergences are detected ` +
-					`by no pattern; ${report.stats.total_partial} more leave hunks unexplained\x1b[0m`,
+					`by no pattern; ${report.stats.total_partial} more leave hunks unexplained\x1b[0m`
 			);
 			if (report.stats.total_unlisted_but_explained > 0) {
 				console.log(
 					`      (${report.stats.total_unlisted_but_explained} more are fully explained but ` +
-						`unlisted in fixtures[] — bookkeeping, not a gap)`,
+						`unlisted in fixtures[] — bookkeeping, not a gap)`
 				);
 			}
 			Deno.exit(1);

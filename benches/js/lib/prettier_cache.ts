@@ -65,8 +65,8 @@ export class PrettierCache {
 					schema: CACHE_SCHEMA,
 					versions,
 					options: prettier_options_json,
-					prettier_debug: process.env.PRETTIER_DEBUG ?? null,
-				}),
+					prettier_debug: process.env.PRETTIER_DEBUG ?? null
+				})
 			)
 			.digest('hex');
 	}

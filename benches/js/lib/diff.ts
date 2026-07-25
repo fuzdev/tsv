@@ -144,14 +144,16 @@ export function extract_hunks(diff: DiffLine[]): DiffHunk[] {
 		hunks.push({
 			index: hunks.length,
 			lines: current_lines,
-			ours_range: hunk_ours_start !== null && hunk_ours_end !== null
-				? { start: hunk_ours_start, end: hunk_ours_end }
-				: null,
-			prettier_range: hunk_prettier_start !== null && hunk_prettier_end !== null
-				? { start: hunk_prettier_start, end: hunk_prettier_end }
-				: null,
+			ours_range:
+				hunk_ours_start !== null && hunk_ours_end !== null
+					? { start: hunk_ours_start, end: hunk_ours_end }
+					: null,
+			prettier_range:
+				hunk_prettier_start !== null && hunk_prettier_end !== null
+					? { start: hunk_prettier_start, end: hunk_prettier_end }
+					: null,
 			added_lines: added_lines,
-			removed_lines: removed_lines,
+			removed_lines: removed_lines
 		});
 
 		current_lines = [];
@@ -252,7 +254,7 @@ export function format_diff_for_terminal(diff: DiffLine[], use_color = true): st
 	// Expand tabs for consistent display, then find max width among lines exceeding threshold
 	const expanded_lines = diff.map((d) => ({
 		...d,
-		expanded: expand_tabs(d.line),
+		expanded: expand_tabs(d.line)
 	}));
 
 	let max_width = 0;

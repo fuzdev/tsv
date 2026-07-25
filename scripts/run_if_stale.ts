@@ -41,7 +41,7 @@ import {
 	CORE_CRATES,
 	newest_source_mtime,
 	type SourceMtime,
-	WASM_CRATES,
+	WASM_CRATES
 } from '../benches/js/lib/check_artifact_freshness.ts';
 
 const ROOT = fileURLToPath(new URL('..', import.meta.url));
@@ -93,7 +93,7 @@ const main = async (): Promise<void> => {
 			// Strict `<` so an artifact built in the same second as its source rebuilds.
 			if (source.ms < target_ms) {
 				console.log(
-					`run_if_stale: ${target} is fresh — skipping \`${command[0]}\` (TSV_BUILD_FORCE=1 to force)`,
+					`run_if_stale: ${target} is fresh — skipping \`${command[0]}\` (TSV_BUILD_FORCE=1 to force)`
 				);
 				return;
 			}
@@ -104,7 +104,7 @@ const main = async (): Promise<void> => {
 		args: command.slice(1),
 		stdin: 'inherit',
 		stdout: 'inherit',
-		stderr: 'inherit',
+		stderr: 'inherit'
 	}).outputSync();
 	if (!result.success) Deno.exit(result.code);
 };

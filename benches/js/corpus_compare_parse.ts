@@ -45,14 +45,17 @@ import {
 	redirect_logs_to_stderr,
 	rel_path,
 	resolve_compare_base_path,
-	run_compare_main,
+	run_compare_main
 } from './lib/compare_cli.ts';
 import { CORPUS_PARSE_COMPARED_MIN, CORPUS_PARSE_TSV_ERRORS_PIN } from './lib/gate_counts.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 
 const CorpusCompareParseArgs = z.object({
 	...COMPARE_BASE_ARG_FIELDS,
-	'multibyte-only': z.boolean().default(false).meta({ aliases: ['m'] }),
+	'multibyte-only': z
+		.boolean()
+		.default(false)
+		.meta({ aliases: ['m'] })
 });
 
 /** Per-file diff cap — collection stops here and the file is flagged truncated. */
@@ -62,11 +65,7 @@ const MAX_DIFFS_PER_FILE = 50;
 const MAX_GROUP_SAMPLES = 3;
 
 type DiffKind =
-	| 'value_mismatch'
-	| 'type_mismatch'
-	| 'missing_ours'
-	| 'missing_canonical'
-	| 'length_mismatch';
+	'value_mismatch' | 'type_mismatch' | 'missing_ours' | 'missing_canonical' | 'length_mismatch';
 
 export interface DiffEntry {
 	/** Concrete path into the AST, e.g. `body[3].declarations[0].init.start` */
@@ -113,7 +112,7 @@ function empty_stats(): LanguageStats {
 		undocumented: 0,
 		tsv_errors: 0,
 		canonical_errors: 0,
-		both_errors: 0,
+		both_errors: 0
 	};
 }
 
@@ -211,7 +210,7 @@ interface DocumentedMatcher {
 	matches: (
 		entry: Omit<DiffEntry, 'documented' | 'signature'>,
 		canonical_parent: unknown,
-		ctx: MatchContext,
+		ctx: MatchContext
 	) => boolean;
 }
 
@@ -243,7 +242,7 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 				return Array.isArray(starts) && new Set(starts).size !== starts.length;
 			}
 			return false;
-		},
+		}
 	},
 	{
 		// Svelte parses `<script module>` and the instance `<script>` against one
@@ -273,13 +272,13 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 			if (
 				entry.kind === 'value_mismatch' &&
 				/^instance\.content(\.body\[0\])?\.(leadingComments|trailingComments)\[\d+\]\.(type|value|start|end)$/.test(
-					entry.path,
+					entry.path
 				)
 			) {
 				const comment = canonical_parent as { start?: number } | null;
-				const instance = get_at_path(ctx.canonical_root, 'instance.content') as
-					| { start?: number }
-					| null;
+				const instance = get_at_path(ctx.canonical_root, 'instance.content') as {
+					start?: number;
+				} | null;
 				return (
 					comment != null &&
 					typeof comment.start === 'number' &&
@@ -289,7 +288,7 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 				);
 			}
 			return false;
-		},
+		}
 	},
 	{
 		// Svelte's parse_expression_at sets acorn `preserveParens: true`; a leading
@@ -305,7 +304,7 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 		matches: (entry) =>
 			entry.kind === 'missing_canonical' &&
 			/^fragment\./.test(entry.path) &&
-			/(^|\.)(leadingComments|trailingComments)$/.test(entry.path),
+			/(^|\.)(leadingComments|trailingComments)$/.test(entry.path)
 	},
 	{
 		// acorn-typescript drops ALL params from async arrows with type params
@@ -316,11 +315,9 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 		matches: (entry, canonical_parent) => {
 			if (!/(^|\.)params$/.test(entry.path)) return false;
 			const parent = canonical_parent as
-				| { async?: unknown; typeParameters?: unknown }
-				| null
-				| undefined;
+				{ async?: unknown; typeParameters?: unknown } | null | undefined;
 			return parent?.async === true && parent?.typeParameters != null;
-		},
+		}
 	},
 	{
 		// Svelte's parseCss/parse call remove_bom before parsing, so every canonical
@@ -334,7 +331,7 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 			entry.kind === 'value_mismatch' &&
 			typeof entry.ours === 'number' &&
 			typeof entry.canonical === 'number' &&
-			entry.ours === entry.canonical + 1,
+			entry.ours === entry.canonical + 1
 	},
 	{
 		// Under lang="ts", Svelte parses `{#each expr as binding}` by letting the TS
@@ -350,7 +347,7 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 			if (!m) return false;
 			const owner = get_at_path(ctx.canonical_root, m[1]) as { type?: unknown } | null;
 			return owner?.type === 'EachBlock';
-		},
+		}
 	},
 	{
 		// acorn-typescript ends a typed RestElement at the binding, excluding the
@@ -368,7 +365,7 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 				typeAnnotation?: unknown;
 			} | null;
 			return owner?.type === 'RestElement' && owner.typeAnnotation != null;
-		},
+		}
 	},
 	{
 		// `static` newline `static` in a class body: tsc reads modifier + member (a
@@ -396,11 +393,11 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 						member?.type === 'PropertyDefinition' &&
 						member.computed === false &&
 						member.value === null &&
-						member.key?.name === 'static',
+						member.key?.name === 'static'
 				);
 			}
 			return false;
-		},
+		}
 	},
 	{
 		// acorn-typescript leaves a class heritage with type args as a
@@ -419,7 +416,7 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 				superClass?: { type?: unknown } | null;
 			} | null;
 			return cls?.superClass?.type === 'TSInstantiationExpression';
-		},
+		}
 	},
 	{
 		// A lone UTF-16 surrogate in a string value (`"\ud800"`) is unrepresentable
@@ -434,10 +431,10 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 			if (typeof entry.ours !== 'string' || typeof entry.canonical !== 'string') return false;
 			const replaced = entry.canonical.replace(
 				/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/gu,
-				'\u{FFFD}',
+				'\u{FFFD}'
 			);
 			return replaced !== entry.canonical && replaced === entry.ours;
-		},
+		}
 	},
 	{
 		// acorn-typescript starts the call/member nodes built on a parenthesized
@@ -449,12 +446,12 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 			'TypeScript Parser Corrections (corpus-enforced) — Parenthesized decorator subscript start',
 		matches: (entry, _canonical_parent, ctx) => {
 			const m = entry.path.match(
-				/^(.*\.decorators\[\d+\]\.expression)(?:\.(?:callee|object|expression))*\.(?:start|loc\.start\.(?:line|column))$/,
+				/^(.*\.decorators\[\d+\]\.expression)(?:\.(?:callee|object|expression))*\.(?:start|loc\.start\.(?:line|column))$/
 			);
 			if (!m) return false;
 			const expr = get_at_path(ctx.canonical_root, m[1]) as { type?: unknown } | null;
 			return expr?.type === 'CallExpression' || expr?.type === 'MemberExpression';
-		},
+		}
 	},
 	{
 		// Svelte's read_declaration tokenizes garbage when a stray `;` or an adjacent
@@ -467,16 +464,13 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 		conformance_section:
 			'CSS Parser Corrections (corpus-enforced) — Declaration tokenization garbage',
 		matches: (_entry, canonical_parent) => {
-			const parent = canonical_parent as
-				| { type?: unknown; property?: unknown }
-				| null
-				| undefined;
+			const parent = canonical_parent as { type?: unknown; property?: unknown } | null | undefined;
 			return (
 				parent?.type === 'Declaration' &&
 				typeof parent.property === 'string' &&
 				(parent.property.startsWith(';') || parent.property.includes('/*'))
 			);
-		},
+		}
 	},
 	{
 		// acorn-typescript reads `<T>(<parenthesized arrow>)` as a generic arrow —
@@ -494,7 +488,7 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 			for (let i = parts.length - 1; i >= 1; i--) {
 				const node = get_at_path(ctx.canonical_root, parts.slice(0, i).join('.')) as {
 					type?: unknown;
-					typeParameters?: {end?: unknown} | null;
+					typeParameters?: { end?: unknown } | null;
 				} | null;
 				if (
 					node?.type === 'ArrowFunctionExpression' &&
@@ -505,7 +499,7 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 				}
 			}
 			return false;
-		},
+		}
 	},
 	{
 		// Svelte's parseCss reads `:nth-child(An+B of S)` as `Nth.value = "2n of "`
@@ -529,14 +523,14 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 				(entry.kind === 'missing_canonical' && /\.selector$/.test(entry.path)) ||
 				(entry.kind === 'length_mismatch' && /\.(children|selectors)$/.test(entry.path))
 			);
-		},
-	},
+		}
+	}
 ];
 
 function classify(
 	entry: Omit<DiffEntry, 'documented' | 'signature'>,
 	canonical_parent: unknown,
-	ctx: MatchContext,
+	ctx: MatchContext
 ): string | null {
 	for (const matcher of DOCUMENTED_MATCHERS) {
 		if (matcher.matches(entry, canonical_parent, ctx)) return matcher.name;
@@ -559,7 +553,7 @@ function path_signature(path: string): string {
 export function diff_asts(
 	ours: unknown,
 	canonical: unknown,
-	ctx: MatchContext,
+	ctx: MatchContext
 ): { diffs: DiffEntry[]; truncated: boolean } {
 	const diffs: DiffEntry[] = [];
 	let truncated = false;
@@ -569,7 +563,7 @@ export function diff_asts(
 		path: string,
 		o: unknown,
 		c: unknown,
-		canonical_parent: unknown,
+		canonical_parent: unknown
 	): void => {
 		if (diffs.length >= MAX_DIFFS_PER_FILE) {
 			truncated = true;
@@ -579,7 +573,7 @@ export function diff_asts(
 		diffs.push({
 			...base,
 			signature: `${kind}:${path_signature(path)}`,
-			documented: classify(base, canonical_parent, ctx),
+			documented: classify(base, canonical_parent, ctx)
 		});
 	};
 
@@ -661,7 +655,7 @@ function build_groups(results: Map<Language, FileResult[]>): DiffGroup[] {
 						documented: entry.documented,
 						files: new Set(),
 						entry_count: 0,
-						samples: [],
+						samples: []
 					};
 					groups.set(key, group);
 				}
@@ -716,7 +710,7 @@ function stats_to_counts(s: LanguageStats) {
 		undocumented: s.undocumented,
 		tsv_errors: s.tsv_errors,
 		canonical_errors: s.canonical_errors,
-		both_errors: s.both_errors,
+		both_errors: s.both_errors
 	};
 }
 
@@ -746,7 +740,7 @@ function build_json_report(
 	results: Map<Language, FileResult[]>,
 	stats: Map<Language, LanguageStats>,
 	groups: DiffGroup[],
-	base_path: string,
+	base_path: string
 ): Record<string, unknown> {
 	return {
 		stats: build_stats_block(stats),
@@ -762,22 +756,26 @@ function build_json_report(
 				path: s.entry.path,
 				kind: s.entry.kind,
 				ours: preview(s.entry.ours),
-				canonical: preview(s.entry.canonical),
-			})),
+				canonical: preview(s.entry.canonical)
+			}))
 		})),
 		errors: LANGUAGES.flatMap((lang) =>
-			results.get(lang)!
+			results
+				.get(lang)!
 				.filter((r) => r.status.endsWith('_error'))
 				.map((r) => ({
 					path: rel_path(r.path, base_path),
 					language: lang,
 					status: r.status,
-					error: r.error,
+					error: r.error
 				}))
 		),
 		truncated_files: LANGUAGES.flatMap((lang) =>
-			results.get(lang)!.filter((r) => r.truncated).map((r) => rel_path(r.path, base_path))
-		),
+			results
+				.get(lang)!
+				.filter((r) => r.truncated)
+				.map((r) => rel_path(r.path, base_path))
+		)
 	};
 }
 
@@ -821,7 +819,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	if (json_mode) redirect_logs_to_stderr();
 
 	console.log(
-		use_all_repos ? 'Parse-comparing: All default corpus repos' : `Parse-comparing: ${base_path}`,
+		use_all_repos ? 'Parse-comparing: All default corpus repos' : `Parse-comparing: ${base_path}`
 	);
 	if (filter_lang) console.log(`Filter: ${filter_lang} only`);
 	if (limit) console.log(`Limit: ${limit} files per language`);
@@ -868,18 +866,15 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			// Serialize exactly like the fixture sidecar does (BigInt → string;
 			// RegExp values collapse to {}), so corpus and fixture semantics match.
 			canonical_ast = JSON.parse(
-				JSON.stringify(canonical.parse(file.content, lang), bigint_replacer),
+				JSON.stringify(canonical.parse(file.content, lang), bigint_replacer)
 			);
 		} catch (e) {
 			canonical_error = String(e instanceof Error ? e.message : e).split('\n')[0];
 		}
 
 		if (tsv_error || canonical_error) {
-			const status = tsv_error && canonical_error
-				? 'both_error'
-				: tsv_error
-				? 'tsv_error'
-				: 'canonical_error';
+			const status =
+				tsv_error && canonical_error ? 'both_error' : tsv_error ? 'tsv_error' : 'canonical_error';
 			lang_stats[`${status}s` as 'both_errors' | 'tsv_errors' | 'canonical_errors']++;
 			lang_results.push({
 				path: file.path,
@@ -888,7 +883,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 				status,
 				diffs: [],
 				truncated: false,
-				error: tsv_error ?? canonical_error ?? undefined,
+				error: tsv_error ?? canonical_error ?? undefined
 			});
 			continue;
 		}
@@ -898,7 +893,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 
 		const { diffs, truncated } = diff_asts(ours, canonical_ast, {
 			source: file.content,
-			canonical_root: canonical_ast,
+			canonical_root: canonical_ast
 		});
 		if (diffs.length === 0) {
 			lang_stats.match++;
@@ -917,7 +912,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			multibyte,
 			status: all_documented ? 'documented' : 'undocumented',
 			diffs,
-			truncated,
+			truncated
 		});
 
 		if (verbose) {
@@ -987,7 +982,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	const total_skipped = totals.tsv_errors + totals.canonical_errors + totals.both_errors;
 	if (total_skipped > 0) {
 		console.log(
-			`\n\x1b[2mParse failures skipped (tsv ${totals.tsv_errors} / canonical ${totals.canonical_errors} / both ${totals.both_errors}) — triage with diagnostics/skip_triage.ts\x1b[0m`,
+			`\n\x1b[2mParse failures skipped (tsv ${totals.tsv_errors} / canonical ${totals.canonical_errors} / both ${totals.both_errors}) — triage with diagnostics/skip_triage.ts\x1b[0m`
 		);
 	}
 
@@ -1002,7 +997,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	// sidecar breakage would zero out `compared` and sail through green.
 	if (totals.compared === 0) {
 		console.log(
-			`\x1b[31mFAIL: 0 of ${total_processed} files compared (all parse-fail-skipped) — systemic failure or wrong corpus?\x1b[0m`,
+			`\x1b[31mFAIL: 0 of ${total_processed} files compared (all parse-fail-skipped) — systemic failure or wrong corpus?\x1b[0m`
 		);
 		canonical.dispose();
 		native.dispose();
@@ -1018,21 +1013,21 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	if (use_all_repos) {
 		const pin_failures = [
 			...LANGUAGES.filter(
-				(lang) => stats.get(lang)!.compared < CORPUS_PARSE_COMPARED_MIN[lang],
+				(lang) => stats.get(lang)!.compared < CORPUS_PARSE_COMPARED_MIN[lang]
 			).map(
 				(lang) =>
-					`${lang} compared ${stats.get(lang)!.compared} < pinned minimum ${CORPUS_PARSE_COMPARED_MIN[lang]}`,
+					`${lang} compared ${stats.get(lang)!.compared} < pinned minimum ${CORPUS_PARSE_COMPARED_MIN[lang]}`
 			),
 			...LANGUAGES.filter(
-				(lang) => stats.get(lang)!.tsv_errors !== CORPUS_PARSE_TSV_ERRORS_PIN[lang],
+				(lang) => stats.get(lang)!.tsv_errors !== CORPUS_PARSE_TSV_ERRORS_PIN[lang]
 			).map(
 				(lang) =>
-					`${lang} tsv-parse-failures ${stats.get(lang)!.tsv_errors} ≠ pinned ${CORPUS_PARSE_TSV_ERRORS_PIN[lang]}`,
-			),
+					`${lang} tsv-parse-failures ${stats.get(lang)!.tsv_errors} ≠ pinned ${CORPUS_PARSE_TSV_ERRORS_PIN[lang]}`
+			)
 		];
 		if (pin_failures.length > 0) {
 			console.log(
-				`\x1b[31mFAIL: pinned counts — ${pin_failures.join('; ')}. If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`,
+				`\x1b[31mFAIL: pinned counts — ${pin_failures.join('; ')}. If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`
 			);
 			canonical.dispose();
 			native.dispose();
@@ -1045,13 +1040,13 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		console.log(`\n\x1b[31mUNDOCUMENTED diff groups (${undocumented_groups.length}):\x1b[0m`);
 		for (const g of undocumented_groups) {
 			console.log(
-				`\n  [${g.language}] ${g.signature}  (${g.files.size} files, ${g.entry_count} sites)`,
+				`\n  [${g.language}] ${g.signature}  (${g.files.size} files, ${g.entry_count} sites)`
 			);
 			for (const s of g.samples) {
 				console.log(`    ${rel_path(s.path, base_path)}`);
 				console.log(`      at ${s.entry.path}`);
 				console.log(
-					`      ours: ${preview(s.entry.ours)}  canonical: ${preview(s.entry.canonical)}`,
+					`      ours: ${preview(s.entry.ours)}  canonical: ${preview(s.entry.canonical)}`
 				);
 			}
 			if (g.files.size > g.samples.length) {
@@ -1064,9 +1059,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	if (documented_groups.length > 0) {
 		console.log(`\nDocumented divergence groups (${documented_groups.length}):`);
 		for (const g of documented_groups) {
-			console.log(
-				`  [${g.language}] ${g.documented}: ${g.signature} (${g.files.size} files)`,
-			);
+			console.log(`  [${g.language}] ${g.documented}: ${g.signature} (${g.files.size} files)`);
 		}
 	}
 
@@ -1075,7 +1068,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	);
 	if (truncated_files.length > 0) {
 		console.log(
-			`\n\x1b[33mNote: ${truncated_files.length} file(s) hit the ${MAX_DIFFS_PER_FILE}-diff cap — diff lists are partial:\x1b[0m`,
+			`\n\x1b[33mNote: ${truncated_files.length} file(s) hit the ${MAX_DIFFS_PER_FILE}-diff cap — diff lists are partial:\x1b[0m`
 		);
 		for (const r of truncated_files.slice(0, 5)) {
 			console.log(`  ${rel_path(r.path, base_path)}`);
@@ -1088,7 +1081,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	console.log();
 	if (total_undocumented > 0) {
 		console.log(
-			`\x1b[31mFAIL: ${total_undocumented} file(s) with undocumented AST diffs vs canonical\x1b[0m`,
+			`\x1b[31mFAIL: ${total_undocumented} file(s) with undocumented AST diffs vs canonical\x1b[0m`
 		);
 		canonical.dispose();
 		native.dispose();
@@ -1107,14 +1100,14 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
  */
 function build_error_json_report(message: string): Record<string, unknown> {
 	const empty: Map<Language, LanguageStats> = new Map(
-		LANGUAGES.map((lang) => [lang, empty_stats()]),
+		LANGUAGES.map((lang) => [lang, empty_stats()])
 	);
 	return {
 		stats: build_stats_block(empty),
 		groups: [],
 		errors: [],
 		truncated_files: [],
-		error: message,
+		error: message
 	};
 }
 

@@ -50,54 +50,63 @@ Deno.test('canonical: an existing `<T,>` is normalized to `<T>` in pure .ts', as
 	}
 });
 
-Deno.test('canonical: `.js` path routes through babel and preserves a JSDoc `@type` cast', async () => {
-	const impl = await make_canonical();
-	try {
-		// babel (real prettier-on-`.js`) keeps the cast parens; tsv preserves them too, so
-		// passing the real `.js` path makes the oracle match tsv instead of a phantom divergence.
-		const out = await impl.format_async(
-			'const x = /** @type {string} */ (y);\n',
-			'typescript',
-			'foo.js',
-		);
-		assertEquals(out, 'const x = /** @type {string} */ (y);\n');
-	} finally {
-		impl.dispose();
+Deno.test(
+	'canonical: `.js` path routes through babel and preserves a JSDoc `@type` cast',
+	async () => {
+		const impl = await make_canonical();
+		try {
+			// babel (real prettier-on-`.js`) keeps the cast parens; tsv preserves them too, so
+			// passing the real `.js` path makes the oracle match tsv instead of a phantom divergence.
+			const out = await impl.format_async(
+				'const x = /** @type {string} */ (y);\n',
+				'typescript',
+				'foo.js'
+			);
+			assertEquals(out, 'const x = /** @type {string} */ (y);\n');
+		} finally {
+			impl.dispose();
+		}
 	}
-});
+);
 
-Deno.test('canonical: `.ts` path routes through typescript and strips a JSDoc `@type` cast', async () => {
-	const impl = await make_canonical();
-	try {
-		// typescript (real prettier-on-`.ts`) drops the cast parens — the sanctioned
-		// `jsdoc_type_cast_ts_prettier_divergence` direction. Pins that `.ts` still routes here
-		// (not babel) so the routing split is real, not an accidental babel-everywhere.
-		const out = await impl.format_async(
-			'const x = /** @type {string} */ (y);\n',
-			'typescript',
-			'foo.ts',
-		);
-		assertEquals(out, 'const x = /** @type {string} */ y;\n');
-	} finally {
-		impl.dispose();
+Deno.test(
+	'canonical: `.ts` path routes through typescript and strips a JSDoc `@type` cast',
+	async () => {
+		const impl = await make_canonical();
+		try {
+			// typescript (real prettier-on-`.ts`) drops the cast parens — the sanctioned
+			// `jsdoc_type_cast_ts_prettier_divergence` direction. Pins that `.ts` still routes here
+			// (not babel) so the routing split is real, not an accidental babel-everywhere.
+			const out = await impl.format_async(
+				'const x = /** @type {string} */ (y);\n',
+				'typescript',
+				'foo.ts'
+			);
+			assertEquals(out, 'const x = /** @type {string} */ y;\n');
+		} finally {
+			impl.dispose();
+		}
 	}
-});
+);
 
-Deno.test('canonical: single-type-param arrow keeps `<T,>` in .svelte (JSX disambiguation)', async () => {
-	const impl = await make_canonical();
-	try {
-		// In a Svelte `<script lang="ts">`, prettier force-adds the JSX-disambiguating
-		// comma (no `.ts` filepath, so its `shouldForceTrailingComma` guard fires). This
-		// pins that canonical baseline behavior — the corpus comparison depends on it. tsv
-		// itself diverges here, emitting the bare `<T>` (it has no JSX, and Svelte's parser
-		// accepts the bare form); see the single_type_param_prettier_divergence fixture and
-		// docs/conformance_prettier.md §TypeScript.
-		const out = await impl.format_async(
-			'<script lang="ts">\n\tconst f = <T>(x: T) => x;\n</script>\n',
-			'svelte',
-		);
-		assert(out.includes('<T,>'), `expected disambiguating comma in .svelte, got: ${out}`);
-	} finally {
-		impl.dispose();
+Deno.test(
+	'canonical: single-type-param arrow keeps `<T,>` in .svelte (JSX disambiguation)',
+	async () => {
+		const impl = await make_canonical();
+		try {
+			// In a Svelte `<script lang="ts">`, prettier force-adds the JSX-disambiguating
+			// comma (no `.ts` filepath, so its `shouldForceTrailingComma` guard fires). This
+			// pins that canonical baseline behavior — the corpus comparison depends on it. tsv
+			// itself diverges here, emitting the bare `<T>` (it has no JSX, and Svelte's parser
+			// accepts the bare form); see the single_type_param_prettier_divergence fixture and
+			// docs/conformance_prettier.md §TypeScript.
+			const out = await impl.format_async(
+				'<script lang="ts">\n\tconst f = <T>(x: T) => x;\n</script>\n',
+				'svelte'
+			);
+			assert(out.includes('<T,>'), `expected disambiguating comma in .svelte, got: ${out}`);
+		} finally {
+			impl.dispose();
+		}
 	}
-});
+);

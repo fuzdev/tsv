@@ -115,7 +115,7 @@ export const disk_io: FixtureIo = {
 		return names.sort();
 	},
 	read: (fixture_path, name) =>
-		read_if_exists(new URL(name, new URL(fixture_path + '/', FIXTURES_ROOT))),
+		read_if_exists(new URL(name, new URL(fixture_path + '/', FIXTURES_ROOT)))
 };
 
 /** Which rung of the precedence chain supplied a fixture's witnesses. */
@@ -177,7 +177,7 @@ export interface Witness {
  */
 export function select_witnesses(
 	names: string[],
-	ext: string,
+	ext: string
 ): { rung: WitnessRung; witnesses: Witness[] } {
 	const matching = (prefix: string): string[] =>
 		names.filter((n) => n.startsWith(prefix) && n.endsWith(ext)).sort();
@@ -187,7 +187,7 @@ export function select_witnesses(
 	if (canonical.length > 0) {
 		return {
 			rung: 'output_prettier',
-			witnesses: canonical.map((n) => ({ prettier_file: n, source_file: null, label: n })),
+			witnesses: canonical.map((n) => ({ prettier_file: n, source_file: null, label: n }))
 		};
 	}
 
@@ -197,7 +197,7 @@ export function select_witnesses(
 	if (variants.length > 0) {
 		return {
 			rung: 'prettier_variant',
-			witnesses: variants.map((n) => ({ prettier_file: n, source_file: n, label: n })),
+			witnesses: variants.map((n) => ({ prettier_file: n, source_file: n, label: n }))
 		};
 	}
 
@@ -207,7 +207,7 @@ export function select_witnesses(
 	if (intermediates.length > 0) {
 		return {
 			rung: 'prettier_intermediate',
-			witnesses: intermediates.map((n) => ({ prettier_file: n, source_file: null, label: n })),
+			witnesses: intermediates.map((n) => ({ prettier_file: n, source_file: null, label: n }))
 		};
 	}
 
@@ -218,7 +218,7 @@ export function select_witnesses(
 	if (divergent.length > 0) {
 		return {
 			rung: 'divergent_variant',
-			witnesses: divergent.map((n) => ({ prettier_file: n, source_file: null, label: n })),
+			witnesses: divergent.map((n) => ({ prettier_file: n, source_file: null, label: n }))
 		};
 	}
 
@@ -237,9 +237,9 @@ export function select_witnesses(
 				{
 					prettier_file: stable[0],
 					source_file: unformatted_ours[0],
-					label: `${stable[0]} (via ${unformatted_ours[0]}, N10)`,
-				},
-			],
+					label: `${stable[0]} (via ${unformatted_ours[0]}, N10)`
+				}
+			]
 		};
 	}
 
@@ -252,7 +252,7 @@ export function select_witnesses(
  */
 export async function build_cases(
 	fixture_path: string,
-	io: FixtureIo = disk_io,
+	io: FixtureIo = disk_io
 ): Promise<DetectionCase[] | 'no_input'> {
 	let input_name: string | null = null;
 	let input: string | null = null;
@@ -281,7 +281,7 @@ export async function build_cases(
 			source: w.source_file === null ? input : await read(w.source_file),
 			ours: input,
 			prettier: await read(w.prettier_file),
-			language,
+			language
 		});
 	}
 	return cases;
@@ -297,7 +297,7 @@ export function build_context(detection_case: DetectionCase): DetectionContext {
 		prettier: detection_case.prettier,
 		diff,
 		hunks,
-		language: detection_case.language,
+		language: detection_case.language
 	};
 	enrich_detection_context(ctx);
 	return ctx;

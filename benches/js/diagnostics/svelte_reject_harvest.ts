@@ -46,7 +46,7 @@ import {
 	harvest_up_to_date,
 	short_commit,
 	type StampInputs,
-	write_stamp,
+	write_stamp
 } from '../lib/harvest_stamp.ts';
 import { load_all_versions } from '../lib/versions.ts';
 
@@ -67,15 +67,16 @@ async function main(): Promise<void> {
 		svelte_commit,
 		prettier_commit: git_head('../prettier'),
 		svelte_oracle: versions.canonical.svelte,
-		rejects_pin: SVELTE_REJECTS_PIN,
+		rejects_pin: SVELTE_REJECTS_PIN
 	};
 	if (
-		!force && svelte_commit !== null &&
+		!force &&
+		svelte_commit !== null &&
 		(await harvest_up_to_date(STAMP_PATH, stamp_inputs, [CACHE_PATH]))
 	) {
 		console.error(
 			`svelte-rejects harvest up to date (../svelte at ${short_commit(svelte_commit)}, ` +
-				`oracle svelte@${versions.canonical.svelte}, pin ${SVELTE_REJECTS_PIN}) — skipping; --force to re-harvest.`,
+				`oracle svelte@${versions.canonical.svelte}, pin ${SVELTE_REJECTS_PIN}) — skipping; --force to re-harvest.`
 		);
 		return;
 	}
@@ -101,7 +102,7 @@ async function main(): Promise<void> {
 	try {
 		files = await new DevReposLoader('conformance', {
 			allow_missing: true,
-			apply_reject_cache: false,
+			apply_reject_cache: false
 		}).load((m) => console.error(m));
 	} catch (e) {
 		const msg = `svelte_reject_harvest: could not load conformance corpus (${e instanceof Error ? e.message : e})`;
@@ -132,7 +133,7 @@ async function main(): Promise<void> {
 	if (rejects.length !== SVELTE_REJECTS_PIN) {
 		console.error(
 			`FAIL: pinned count mismatch — ${rejects.length} rejects ≠ pinned ${SVELTE_REJECTS_PIN}; ` +
-				`cache not written. If the move is deliberate (suite refresh), re-pin in lib/gate_counts.ts.`,
+				`cache not written. If the move is deliberate (suite refresh), re-pin in lib/gate_counts.ts.`
 		);
 		Deno.exit(1);
 	}
@@ -147,7 +148,7 @@ async function main(): Promise<void> {
 	const cwd = resolve('.');
 	console.error(
 		`svelte_reject_harvest: ${rejects.length}/${svelte.length} Svelte files rejected by ` +
-			`svelte/compiler → ${relative(cwd, out)}`,
+			`svelte/compiler → ${relative(cwd, out)}`
 	);
 }
 

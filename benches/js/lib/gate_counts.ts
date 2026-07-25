@@ -88,13 +88,16 @@ import type { Language } from './types.ts';
  * Re-record a commit in the same change that re-pins the counts it explains.
  */
 export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: string }> = {
-	'../svelte': { commit: 'b4d1583ae', pins: 'SVELTE_FIXTURES_PINS, CORPUS_FORMAT_*, CORPUS_PARSE_*' },
+	'../svelte': {
+		commit: 'b4d1583ae',
+		pins: 'SVELTE_FIXTURES_PINS, CORPUS_FORMAT_*, CORPUS_PARSE_*'
+	},
 	'../acorn-typescript': { commit: '312d079', pins: 'TS_FIXTURES_PINS' },
 	'../typescript': { commit: '637d5746b', pins: 'TS_REPO_PINS' },
 	'../kit': { commit: 'da5b08ea7', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
 	'../svelte.dev': { commit: 'c21c2d0f0', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
 	'../prettier': { commit: '1dcd0b05d', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
-	'../prettier-plugin-svelte': { commit: '7809486', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
+	'../prettier-plugin-svelte': { commit: '7809486', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' }
 };
 
 /** Exact expected counts for a fixtures parse-conformance gate (`lib/fixtures_gate.ts`). */
@@ -126,7 +129,7 @@ export const TS_REPO_PINS = { scanned: 768, accept_parity: 429 };
 export const CORPUS_PARSE_COMPARED_MIN: Record<Language, number> = {
 	svelte: 1371,
 	typescript: 4356,
-	css: 168,
+	css: 168
 };
 
 /**
@@ -139,7 +142,7 @@ export const CORPUS_PARSE_COMPARED_MIN: Record<Language, number> = {
 export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
 	svelte: 0,
 	typescript: 9,
-	css: 3,
+	css: 3
 };
 
 /**
@@ -157,7 +160,7 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	svelte: 513,
 	typescript: 2332,
-	css: 89,
+	css: 89
 };
 
 /**
@@ -173,7 +176,7 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
 	typescript: 115,
-	css: 23,
+	css: 23
 };
 
 /**
@@ -185,7 +188,7 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 1,
 	typescript: 44,
-	css: 9,
+	css: 9
 };
 
 /**

@@ -79,9 +79,9 @@ export const SVELTE_FIXTURES_GATE: FixturesGateConfig = {
 	oracle_name: 'the modern Svelte parser',
 	oracle_pin: {
 		checkout_package_json: '../svelte/packages/svelte/package.json',
-		npm_package: 'svelte',
+		npm_package: 'svelte'
 	},
-	pins: SVELTE_FIXTURES_PINS,
+	pins: SVELTE_FIXTURES_PINS
 };
 
 if (import.meta.main) {

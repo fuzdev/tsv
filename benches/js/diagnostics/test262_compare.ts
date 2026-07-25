@@ -62,7 +62,7 @@ const examples = Number(flag('examples', '15'));
 
 const manifest: Manifest = JSON.parse(await Deno.readTextFile(manifest_path));
 console.error(
-	`Loaded ${manifest.count} graded tests from ${manifest_path} (root ${manifest.test262_root})`,
+	`Loaded ${manifest.count} graded tests from ${manifest_path} (root ${manifest.test262_root})`
 );
 
 /**
@@ -76,7 +76,7 @@ console.error(
 function oxc_verdict(filename: string, source: string, module: boolean): Verdict {
 	try {
 		const result = oxc.parseSync(filename, source, {
-			sourceType: module ? 'module' : 'script',
+			sourceType: module ? 'module' : 'script'
 		});
 		return result.errors && result.errors.length > 0 ? 'reject' : 'accept';
 	} catch {
@@ -94,7 +94,7 @@ const buckets = {
 	neg_both_reject: [] as Row[],
 	neg_tsv_gap: [] as Row[], // tsv accept, oxc reject  ← actionable early-error gap
 	neg_both_accept: [] as Row[], // neither enforces (oxc under-enforces too)
-	neg_tsv_stricter: [] as Row[], // tsv reject, oxc accept (rare)
+	neg_tsv_stricter: [] as Row[] // tsv reject, oxc accept (rare)
 };
 
 let read_errors = 0;
@@ -118,7 +118,7 @@ for (const t of manifest.tests) {
 		module: t.module,
 		expected: t.expected,
 		tsv: t.tsv,
-		oxc: oxc_v,
+		oxc: oxc_v
 	};
 
 	if (t.expected === 'accept') {
@@ -135,22 +135,26 @@ for (const t of manifest.tests) {
 }
 
 const graded = manifest.count - read_errors;
-const positives = buckets.pos_both_accept.length +
+const positives =
+	buckets.pos_both_accept.length +
 	buckets.pos_tsv_bug.length +
 	buckets.pos_oxc_gap.length +
 	buckets.pos_both_reject.length;
-const negatives = buckets.neg_both_reject.length +
+const negatives =
+	buckets.neg_both_reject.length +
 	buckets.neg_tsv_gap.length +
 	buckets.neg_both_accept.length +
 	buckets.neg_tsv_stricter.length;
 
 // Pass rate over the SAME graded subset — a like-for-like baseline for tsv's
 // numbers (a parser "passes" a test iff its verdict matches `expected`).
-const tsv_pass = buckets.pos_both_accept.length +
+const tsv_pass =
+	buckets.pos_both_accept.length +
 	buckets.pos_oxc_gap.length + // tsv accept == expected accept
 	buckets.neg_both_reject.length +
 	buckets.neg_tsv_stricter.length; // tsv reject == expected reject
-const oxc_pass = buckets.pos_both_accept.length +
+const oxc_pass =
+	buckets.pos_both_accept.length +
 	buckets.pos_tsv_bug.length + // oxc accept == expected accept
 	buckets.neg_both_reject.length +
 	buckets.neg_tsv_gap.length; // oxc reject == expected reject
@@ -159,9 +163,10 @@ const pct = (n: number, d: number) => (d > 0 ? ((n / d) * 100).toFixed(1) : '0.0
 
 function summarize(label: string, rows: Row[], total: number, star = false): string {
 	const mark = star ? ' ←' : '  ';
-	return `  ${label.padEnd(26)} ${String(rows.length).padStart(6)}  (${
-		pct(rows.length, total)
-	}%)${mark}`;
+	return `  ${label.padEnd(26)} ${String(rows.length).padStart(6)}  (${pct(
+		rows.length,
+		total
+	)}%)${mark}`;
 }
 
 console.error(`\ntest262 differential: tsv vs oxc-parser (oxc parsed as module)`);
@@ -169,7 +174,7 @@ console.error(`graded subset: ${graded} tests  (${positives} positive, ${negativ
 if (read_errors) console.error(`(${read_errors} files unreadable, skipped)`);
 console.error(
 	`pass rate (same subset):  tsv ${tsv_pass}/${graded} (${pct(tsv_pass, graded)}%)   ` +
-		`oxc ${oxc_pass}/${graded} (${pct(oxc_pass, graded)}%)`,
+		`oxc ${oxc_pass}/${graded} (${pct(oxc_pass, graded)}%)`
 );
 
 console.error(`\npositives (expected accept): ${positives}`);
@@ -204,6 +209,6 @@ const report = {
 	pass_rate: { tsv: tsv_pass, oxc: oxc_pass, total: graded },
 	counts: Object.fromEntries(Object.entries(buckets).map(([k, v]) => [k, v.length])),
 	buckets_note: 'pos_both_accept paths omitted (count only); all other buckets list full paths',
-	buckets: triage_buckets,
+	buckets: triage_buckets
 };
 console.log(JSON.stringify(report, null, 2));

@@ -219,10 +219,11 @@ export function parse_conformance_prettier_md(content: string): DocumentedDiverg
 				// List item: feature is the text between the bullet and the
 				// em-dash before the link (falls back to the fixture name)
 				const before_fixture = line.slice(0, fixture_match.index);
-				feature = before_fixture
-					.replace(/^\s*[-*]\s*/, '')
-					.replace(/\s*[—–]\s*$/, '')
-					.trim() || fixture_name;
+				feature =
+					before_fixture
+						.replace(/^\s*[-*]\s*/, '')
+						.replace(/\s*[—–]\s*$/, '')
+						.trim() || fixture_name;
 			} else {
 				// Prose paragraph: use the bold prefix when present
 				const bold_match = line.match(/^\*\*([^*]+)\*\*/);
@@ -234,7 +235,7 @@ export function parse_conformance_prettier_md(content: string): DocumentedDiverg
 				feature,
 				reason,
 				fixture_name,
-				fixture_path,
+				fixture_path
 			});
 		}
 	}
@@ -332,7 +333,7 @@ async function detect_fixture(fixture_path: string): Promise<FixtureDetection> {
 		fixture_path,
 		status: best,
 		patterns: [...claiming].sort(),
-		...(best === 'partial' ? { unexplained_hunks: unexplained } : {}),
+		...(best === 'partial' ? { unexplained_hunks: unexplained } : {})
 	};
 }
 
@@ -391,7 +392,7 @@ export async function generate_audit_report(): Promise<AuditReport> {
 			documented_fixtures: documented_in_claimed,
 			claimed_fixtures: claimed,
 			undocumented_fixtures: undocumented_in_claimed,
-			detected_fixtures: detected_by_pattern.get(pattern.id) ?? [],
+			detected_fixtures: detected_by_pattern.get(pattern.id) ?? []
 		};
 	});
 
@@ -420,14 +421,14 @@ export async function generate_audit_report(): Promise<AuditReport> {
 		total_partial: partial_fixtures.length,
 		total_undetected: undetected_fixtures.length,
 		total_ungradeable: ungradeable_fixtures.length,
-		coverage_percent: documented_paths.size > 0
-			? Math.round((explained_fixtures.length / documented_paths.size) * 100)
-			: 100,
-		gradeable_percent: gradeable > 0
-			? Math.round((explained_fixtures.length / gradeable) * 100)
-			: 100,
+		coverage_percent:
+			documented_paths.size > 0
+				? Math.round((explained_fixtures.length / documented_paths.size) * 100)
+				: 100,
+		gradeable_percent:
+			gradeable > 0 ? Math.round((explained_fixtures.length / gradeable) * 100) : 100,
 		total_listed: listed_documented.length,
-		total_unlisted_but_explained: unlisted_but_explained.length,
+		total_unlisted_but_explained: unlisted_but_explained.length
 	};
 
 	return {
@@ -441,7 +442,7 @@ export async function generate_audit_report(): Promise<AuditReport> {
 		pattern_coverage,
 		orphaned_pattern_fixtures,
 		missing_pattern_fixtures,
-		stats,
+		stats
 	};
 }
 
@@ -463,7 +464,9 @@ export function format_audit_report(report: AuditReport): string {
 	lines.push(`Partial (hunks left):   ${s.total_partial}`);
 	lines.push(`Undetected (real gaps): ${s.total_undetected}`);
 	lines.push(`Ungradeable:            ${s.total_ungradeable}  (pin no prettier form to test)`);
-	lines.push(`Detection:              ${s.coverage_percent}%  (${s.gradeable_percent}% of gradeable)`);
+	lines.push(
+		`Detection:              ${s.coverage_percent}%  (${s.gradeable_percent}% of gradeable)`
+	);
 	lines.push('');
 	lines.push(`Listed in fixtures[]:   ${s.total_listed}`);
 	lines.push(`Explained but unlisted: ${s.total_unlisted_but_explained}  (bookkeeping, not a gap)`);
@@ -490,7 +493,7 @@ export function format_audit_report(report: AuditReport): string {
 				const left = detected?.unexplained_hunks;
 				lines.push(
 					`    - ${f.fixture_name}${f.reason ? ` (${f.reason})` : ''}` +
-						(left ? `  [${left} hunk(s) unexplained]` : ''),
+						(left ? `  [${left} hunk(s) unexplained]` : '')
 				);
 				lines.push(`      ${f.fixture_path}`);
 			}
@@ -503,11 +506,11 @@ export function format_audit_report(report: AuditReport): string {
 	// so it reads as covered until you count hunks.
 	push_by_section(
 		'Undetected Fixtures (pin a prettier form, no pattern explains it):',
-		report.undetected_fixtures,
+		report.undetected_fixtures
 	);
 	push_by_section(
 		'Partially Explained Fixtures (some hunks claimed, some left over):',
-		report.partial_fixtures,
+		report.partial_fixtures
 	);
 
 	// Ungradeable — neither a success nor a gap; listed so the number is legible
@@ -560,9 +563,9 @@ export function format_audit_report(report: AuditReport): string {
 		const listed = pc.claimed_fixtures.length;
 		const detects = pc.detected_fixtures.length;
 		lines.push(
-			`  ${pc.pattern_id.padEnd(34)} listed ${String(listed).padStart(3)}   detects ${
-				String(detects).padStart(3)
-			}`,
+			`  ${pc.pattern_id.padEnd(34)} listed ${String(listed).padStart(3)}   detects ${String(
+				detects
+			).padStart(3)}`
 		);
 	}
 

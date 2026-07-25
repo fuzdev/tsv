@@ -55,14 +55,7 @@ import { current_runtime } from './runtime.ts';
  * (`tsv_debug`, `tsv_cli`): they don't feed the measured artifacts, and
  * including them would force wasm rebuilds on every fixture-workflow edit.
  */
-export const CORE_CRATES = [
-	'tsv_lang',
-	'tsv_arena',
-	'tsv_html',
-	'tsv_ts',
-	'tsv_css',
-	'tsv_svelte',
-];
+export const CORE_CRATES = ['tsv_lang', 'tsv_arena', 'tsv_html', 'tsv_ts', 'tsv_css', 'tsv_svelte'];
 
 /**
  * Crates that feed the WASM bundle beyond `CORE_CRATES`: the binding crate
@@ -188,7 +181,7 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 				label: check.label,
 				path: check.path,
 				reason: 'missing',
-				rebuild: check.rebuild,
+				rebuild: check.rebuild
 			});
 			continue;
 		}
@@ -202,7 +195,7 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 				rebuild: check.rebuild,
 				source_path: source.path,
 				artifact_ms,
-				source_ms: source.ms,
+				source_ms: source.ms
 			});
 		}
 	}
@@ -217,7 +210,7 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 	lines.push(
 		fatal
 			? '✗ Stale benchmark artifacts — refusing to measure outdated binaries.'
-			: '⚠ Stale benchmark artifacts (BENCH_STALE_OK=1 — measuring anyway).',
+			: '⚠ Stale benchmark artifacts (BENCH_STALE_OK=1 — measuring anyway).'
 	);
 	for (const s of stale) {
 		if (s.reason === 'missing') {
@@ -225,18 +218,16 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 		} else {
 			lines.push(
 				`  • ${s.label}: built ${fmt_mtime(s.artifact_ms!)}, ` +
-					`but ${s.source_path} changed ${fmt_mtime(s.source_ms!)}`,
+					`but ${s.source_path} changed ${fmt_mtime(s.source_ms!)}`
 			);
 		}
 		lines.push(`      rebuild: ${s.rebuild}`);
 	}
 	if (fatal) {
 		lines.push('');
+		lines.push('  Rebuild everything first with a build-first task (`deno task bench` /');
 		lines.push(
-			'  Rebuild everything first with a build-first task (`deno task bench` /',
-		);
-		lines.push(
-			'  `deno task corpus:compare:format`), or `deno task build:bench` then re-run `deno task smoke`,',
+			'  `deno task corpus:compare:format`), or `deno task build:bench` then re-run `deno task smoke`,'
 		);
 		lines.push('  run the specific rebuild command(s) above, or set BENCH_STALE_OK=1 to override');
 		lines.push('  (the override applies to stale artifacts only — a missing one is always fatal).');
@@ -252,6 +243,6 @@ export async function check_artifact_freshness(checks: readonly ArtifactCheck[])
 export function wasm_artifact_path(variant: 'format' | 'parse' | 'all'): string {
 	const target = current_runtime() === 'deno' ? 'deno' : 'nodejs';
 	return fileURLToPath(
-		new URL(`../../../crates/tsv_wasm/pkg/${variant}/${target}/tsv_wasm_bg.wasm`, import.meta.url),
+		new URL(`../../../crates/tsv_wasm/pkg/${variant}/${target}/tsv_wasm_bg.wasm`, import.meta.url)
 	);
 }

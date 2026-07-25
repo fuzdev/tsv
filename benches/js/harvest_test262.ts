@@ -43,7 +43,7 @@ import {
 	harvest_up_to_date,
 	short_commit,
 	type StampInputs,
-	write_stamp,
+	write_stamp
 } from './lib/harvest_stamp.ts';
 
 const TEST262_ROOT = '../test262';
@@ -60,7 +60,7 @@ try {
 } catch {
 	if (if_present) {
 		console.error(
-			`test262 checkout not found at ${TEST262_ROOT} — skipping harvest (--if-present)`,
+			`test262 checkout not found at ${TEST262_ROOT} — skipping harvest (--if-present)`
 		);
 		Deno.exit(0);
 	}
@@ -76,15 +76,16 @@ const source_commit = git_head(TEST262_ROOT);
 const stamp_inputs: StampInputs = {
 	harvest: 'test262',
 	source_commit,
-	positives_pin: TEST262_POSITIVES_PIN,
+	positives_pin: TEST262_POSITIVES_PIN
 };
 if (
-	!force && source_commit !== null &&
+	!force &&
+	source_commit !== null &&
 	(await harvest_up_to_date(STAMP_PATH, stamp_inputs, [FILES_PATH, MANIFEST_PATH]))
 ) {
 	console.error(
 		`test262 harvest up to date (../test262 at ${short_commit(source_commit)}, ` +
-			`pin ${TEST262_POSITIVES_PIN}) — skipping; --force to re-grade.`,
+			`pin ${TEST262_POSITIVES_PIN}) — skipping; --force to re-grade.`
 	);
 	Deno.exit(0);
 }
@@ -103,10 +104,10 @@ const command = new Deno.Command('cargo', {
 		'--path',
 		TEST262_ROOT,
 		'--emit-manifest',
-		MANIFEST_PATH,
+		MANIFEST_PATH
 	],
 	stdout: 'inherit',
-	stderr: 'inherit',
+	stderr: 'inherit'
 });
 const status = await command.output();
 if (!status.success) {
@@ -135,7 +136,7 @@ const positives = manifest.tests.filter((t) => t.expected === 'accept');
 const files = positives
 	.map((t) => ({
 		path: join(manifest.test262_root, t.relative_path),
-		goal: (t.module ? 'module' : 'script') as 'module' | 'script',
+		goal: (t.module ? 'module' : 'script') as 'module' | 'script'
 	}))
 	.sort((a, b) => a.path.localeCompare(b.path));
 
@@ -148,7 +149,7 @@ const files = positives
 if (files.length !== TEST262_POSITIVES_PIN) {
 	console.error(
 		`FAIL: pinned count mismatch — ${files.length} expected-positive ≠ pinned ${TEST262_POSITIVES_PIN}; ` +
-			`cache not written. If the move is deliberate, re-pin in lib/gate_counts.ts.`,
+			`cache not written. If the move is deliberate, re-pin in lib/gate_counts.ts.`
 	);
 	Deno.exit(1);
 }
@@ -160,5 +161,5 @@ if (source_commit !== null) {
 const module_count = positives.filter((t) => t.module).length;
 console.error(
 	`test262 harvest: ${files.length} expected-positive of ${manifest.count} graded tests ` +
-		`(${module_count} module-flagged) → ${FILES_PATH}`,
+		`(${module_count} module-flagged) → ${FILES_PATH}`
 );

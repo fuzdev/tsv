@@ -182,13 +182,16 @@ Deno.test('vs_prettier: prettier-empty output never fabricates a violation', () 
 	assertEquals(check_safety_vs_prettier(source, 'const x = abc;\n', ''), []); // ours formatted
 });
 
-Deno.test('vs_prettier: prettier-empty MASKS a real loss (false negative — caller must guard)', () => {
-	// The flip side: when prettier is empty AND ours genuinely drops a char, the
-	// differential subtracts the loss away (prettier "dropped" it too) and reports
-	// nothing. The primitive cannot tell real loss from a sidecar miss once
-	// prettier is gone — which is why `corpus_compare_format.ts` errors out on
-	// `prettier === '' && source non-empty` instead of trusting this verdict.
-	const source = 'const x = abc;\n';
-	const ours = 'const x = ab;\n'; // ours dropped the `c`
-	assertEquals(check_safety_vs_prettier(source, ours, ''), []); // masked — NOT flagged
-});
+Deno.test(
+	'vs_prettier: prettier-empty MASKS a real loss (false negative — caller must guard)',
+	() => {
+		// The flip side: when prettier is empty AND ours genuinely drops a char, the
+		// differential subtracts the loss away (prettier "dropped" it too) and reports
+		// nothing. The primitive cannot tell real loss from a sidecar miss once
+		// prettier is gone — which is why `corpus_compare_format.ts` errors out on
+		// `prettier === '' && source non-empty` instead of trusting this verdict.
+		const source = 'const x = abc;\n';
+		const ours = 'const x = ab;\n'; // ours dropped the `c`
+		assertEquals(check_safety_vs_prettier(source, ours, ''), []); // masked — NOT flagged
+	}
+);

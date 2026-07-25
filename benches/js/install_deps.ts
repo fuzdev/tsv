@@ -39,5 +39,7 @@ const wasi = '@oxc-parser/binding-wasm32-wasi';
 if (oxc_version) {
 	npm(['install', `${wasi}@${oxc_version}`, '--force', '--no-save']);
 } else {
-	console.error(`warning: oxc-parser not pinned in dependencies; ${wasi} (oxc-parser-wasm row) will be unavailable`);
+	console.error(
+		`warning: oxc-parser not pinned in dependencies; ${wasi} (oxc-parser-wasm row) will be unavailable`
+	);
 }

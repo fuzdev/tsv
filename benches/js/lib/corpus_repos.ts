@@ -33,7 +33,7 @@ const exec_file = promisify(execFile);
  */
 const CACHE_CANONICAL: Record<string, string> = {
 	'benches/js/.cache/wpt_css': 'https://github.com/web-platform-tests/wpt',
-	'benches/js/.cache/test262_files.json': 'https://github.com/tc39/test262',
+	'benches/js/.cache/test262_files.json': 'https://github.com/tc39/test262'
 };
 
 /**
@@ -51,12 +51,12 @@ const CLONE_URL_BY_PREFIX: Array<readonly [string, string]> = [
 	['../acorn-typescript', 'https://github.com/sveltejs/acorn-typescript'],
 	['../typescript', 'https://github.com/microsoft/TypeScript'],
 	['../wpt', 'https://github.com/web-platform-tests/wpt'],
-	['../test262', 'https://github.com/tc39/test262'],
+	['../test262', 'https://github.com/tc39/test262']
 ];
 
 async function git(cwd: string, args: string[]): Promise<string | null> {
 	try {
-		const {stdout} = await exec_file('git', args, {cwd});
+		const { stdout } = await exec_file('git', args, { cwd });
 		const out = stdout.trim();
 		return out.length > 0 ? out : null;
 	} catch {
@@ -89,7 +89,7 @@ export async function detect_repo(source_path: string): Promise<CorpusRepoRef | 
 	// (no git, no commit) — see `CACHE_CANONICAL`.
 	const canonical = CACHE_CANONICAL[source_path];
 	if (canonical) {
-		return {url: canonical, slug: new URL(canonical).pathname.slice(1), commit: '', subpath: ''};
+		return { url: canonical, slug: new URL(canonical).pathname.slice(1), commit: '', subpath: '' };
 	}
 	// Any other derived cache (e.g. `svelte_styles`) is gitignored: git would
 	// resolve the enclosing tsv repo and mint a dead link.
@@ -102,11 +102,11 @@ export async function detect_repo(source_path: string): Promise<CorpusRepoRef | 
 	if (!toplevel) return null;
 	const [commit, remote] = await Promise.all([
 		git(toplevel, ['rev-parse', 'HEAD']),
-		git(toplevel, ['remote', 'get-url', 'origin']),
+		git(toplevel, ['remote', 'get-url', 'origin'])
 	]);
 	const url = normalize_github_url(remote);
 	if (!url || !commit) return null;
-	return {url, slug: new URL(url).pathname.slice(1), commit, subpath: relative(toplevel, abs)};
+	return { url, slug: new URL(url).pathname.slice(1), commit, subpath: relative(toplevel, abs) };
 }
 
 /**
@@ -118,7 +118,7 @@ export async function enrich_source_repos(sources: CorpusSource[]): Promise<void
 	await Promise.all(
 		sources.map(async (source) => {
 			source.repo = (await detect_repo(source.path)) ?? undefined;
-		}),
+		})
 	);
 }
 

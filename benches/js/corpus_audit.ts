@@ -49,7 +49,7 @@ const real_dirs = await corpus_present_dirs('perf', log);
 const prettier_suites = [
 	'../prettier/tests/format/typescript',
 	'../prettier/tests/format/js',
-	'../prettier/tests/format/css',
+	'../prettier/tests/format/css'
 ].filter((p) => {
 	if (existsSync(p)) return true;
 	log(`  ⚠ prettier suite missing, skipped: ${p}`);
@@ -69,13 +69,23 @@ log('building --profile corpus tsv_debug (--features audits) …');
 const build = spawnSync(
 	'cargo',
 	['build', '--profile', 'corpus', '-q', '-p', 'tsv_debug', '--features', 'audits'],
-	{ stdio: 'inherit' },
+	{ stdio: 'inherit' }
 );
 if (build.status !== 0) {
 	log('Error: build failed.');
 	process.exit(build.status ?? 1);
 }
-const cargo_run = ['run', '--profile', 'corpus', '-q', '-p', 'tsv_debug', '--features', 'audits', '--'];
+const cargo_run = [
+	'run',
+	'--profile',
+	'corpus',
+	'-q',
+	'-p',
+	'tsv_debug',
+	'--features',
+	'audits',
+	'--'
+];
 
 interface Leg {
 	name: string;
@@ -87,18 +97,33 @@ interface Leg {
 }
 
 const legs: Leg[] = [
-	{ name: 'roundtrip_audit --gate', args: ['roundtrip_audit', '--gate'], dirs: all_dirs, gating: true },
+	{
+		name: 'roundtrip_audit --gate',
+		args: ['roundtrip_audit', '--gate'],
+		dirs: all_dirs,
+		gating: true
+	},
 	{ name: 'comment_audit', args: ['comment_audit'], dirs: all_dirs, gating: true },
-	{ name: 'binding_audit --gate (real code)', args: ['binding_audit', '--gate'], dirs: real_dirs, gating: true },
+	{
+		name: 'binding_audit --gate (real code)',
+		args: ['binding_audit', '--gate'],
+		dirs: real_dirs,
+		gating: true
+	},
 	{
 		name: 'binding_audit --gate (prettier suites)',
 		args: ['binding_audit', '--gate'],
 		dirs: prettier_suites,
 		gating: false,
-		note: 'report-only: a few known adversarial philosophy HARDs (plain comments tsv preserves in place)',
+		note: 'report-only: a few known adversarial philosophy HARDs (plain comments tsv preserves in place)'
 	},
 	{ name: 'authoring_audit', args: ['authoring_audit'], dirs: real_dirs, gating: true },
-	{ name: 'fuzz --iterations 0 (F1 sweep)', args: ['fuzz', '--iterations', '0'], dirs: real_dirs, gating: true },
+	{
+		name: 'fuzz --iterations 0 (F1 sweep)',
+		args: ['fuzz', '--iterations', '0'],
+		dirs: real_dirs,
+		gating: true
+	}
 ];
 
 let failed = false;
@@ -109,7 +134,7 @@ for (const leg of legs) {
 	}
 	log(`\n─ ${leg.name}${leg.gating ? '' : ' [report-only]'}${leg.note ? ` — ${leg.note}` : ''}`);
 	const { status } = spawnSync('cargo', [...cargo_run, ...leg.args, ...leg.dirs], {
-		stdio: 'inherit',
+		stdio: 'inherit'
 	});
 	if (status !== 0) {
 		if (leg.gating) {

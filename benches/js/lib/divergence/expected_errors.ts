@@ -70,13 +70,13 @@ export const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
 		name: 'scss_style',
 		reason: "SCSS in <style> — Svelte's CSS parser doesn't support SCSS",
 		matches: (content) =>
-			/<style[^>]*(?:lang\s*=\s*["']scss["']|type\s*=\s*["']text\/scss["'])[^>]*>/.test(content),
+			/<style[^>]*(?:lang\s*=\s*["']scss["']|type\s*=\s*["']text\/scss["'])[^>]*>/.test(content)
 	},
 	{
 		name: 'unsupported_script_lang',
 		reason: "Non-JS/TS script language — Svelte's JS parser doesn't support it",
 		matches: (content) =>
-			/<script[^>]*lang\s*=\s*["'](?:coffee|coffeescript|pug|jade)["'][^>]*>/.test(content),
+			/<script[^>]*lang\s*=\s*["'](?:coffee|coffeescript|pug|jade)["'][^>]*>/.test(content)
 	},
 
 	// --- Non-standard CSS (Bucket B) — tsv correctly rejects, prettier/oxfmt/biome
@@ -86,7 +86,7 @@ export const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
 		name: 'css_front_matter',
 		reason: 'YAML/front-matter header (`---`) — a PostCSS/prettier feature, not CSS',
 		languages: ['css'],
-		matches: (content) => /^---\r?\n/.test(content),
+		matches: (content) => /^---\r?\n/.test(content)
 	},
 	{
 		name: 'scss_variable',
@@ -94,27 +94,28 @@ export const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
 		languages: ['css'],
 		// `$ident:` declaration; excludes the standard attr-suffix selector `[a$=b]`
 		// (there `$` is followed by `=`, not an identifier).
-		matches: (content) => /(?:^|[\s;{])\$[\w-]+\s*:/m.test(content),
+		matches: (content) => /(?:^|[\s;{])\$[\w-]+\s*:/m.test(content)
 	},
 	{
 		name: 'scss_interpolation',
 		reason: 'SCSS/LESS interpolation (`#{}` / `$()`) — not standard CSS',
 		languages: ['css'],
-		matches: (content) => /[#$]\{|\$\(/.test(content),
+		matches: (content) => /[#$]\{|\$\(/.test(content)
 	},
 	{
 		name: 'scss_less_at_rule',
 		reason: 'SCSS/LESS/PostCSS at-rule (@mixin/@if/@extend/@nest/@value/…) — not standard CSS',
 		languages: ['css'],
 		matches: (content) =>
-			/@(?:mixin|include|if|else|each|for|while|function|return|extend|use|forward|content|nest|value)\b/i
-				.test(content),
+			/@(?:mixin|include|if|else|each|for|while|function|return|extend|use|forward|content|nest|value)\b/i.test(
+				content
+			)
 	},
 	{
 		name: 'less_import',
 		reason: 'LESS `@import … .less` — not standard CSS',
 		languages: ['css'],
-		matches: (content) => /@import[^;{]*\.less\b/i.test(content),
+		matches: (content) => /@import[^;{]*\.less\b/i.test(content)
 	},
 	{
 		name: 'css_scss_nested_props',
@@ -123,13 +124,13 @@ export const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
 		// A declaration-like line ending in `{` (`font: {`). Standard CSS never
 		// has `ident: {`; custom props (`--foo: {`) start with `-`, so the
 		// `[a-z]`-anchored class leaves the deferred top-level-block gap as an error.
-		matches: (content) => /^\s*[a-z][a-z-]*\s*:\s*\{\s*$/m.test(content),
+		matches: (content) => /^\s*[a-z][a-z-]*\s*:\s*\{\s*$/m.test(content)
 	},
 	{
 		name: 'css_ie_hacks',
 		reason: 'IE hacks (`*zoom`, `_width`, `\\9`) — not standard CSS',
 		languages: ['css'],
-		matches: (content) => /(?:[;{]\s*[*_+][a-z-]+\s*:)|[\w)]\\9\b/i.test(content),
+		matches: (content) => /(?:[;{]\s*[*_+][a-z-]+\s*:)|[\w)]\\9\b/i.test(content)
 	},
 
 	// --- Test-harness artifact (all languages). The range-format API embeds
@@ -140,7 +141,7 @@ export const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
 	{
 		name: 'range_marker',
 		reason: 'Prettier range-format marker (`<<<PRETTIER_RANGE_*>>>`) — a test harness artifact',
-		matches: (content) => /<<<PRETTIER_RANGE_(?:START|END)>>>/.test(content),
+		matches: (content) => /<<<PRETTIER_RANGE_(?:START|END)>>>/.test(content)
 	},
 
 	// --- Non-standard JS/TS proposals. tsv targets standard
@@ -159,7 +160,7 @@ export const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
 		languages: ['typescript'],
 		// Operand `|>` operand — excludes the `|`/`>` regex-alternation forms
 		// (`/>|>(`, `(\+|~|>|\|\|)`) that appear in real parser source.
-		matches: (content) => /[)\]\w$%]\s*\|>\s*[\w$%(]/.test(content),
+		matches: (content) => /[)\]\w$%]\s*\|>\s*[\w$%(]/.test(content)
 	},
 	// Note: tsv now *parses* the valid source-phase forms (`import source x from …`,
 	// `import.source(…)`), so those never reach this classifier. What still lands here
@@ -168,16 +169,15 @@ export const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
 	// FromClause` takes a single binding) and tsv correctly rejects.
 	{
 		name: 'js_source_phase_import',
-		reason:
-			'Source-phase import (`import source x from …` / `import.source(…)`) — a TC39 proposal',
+		reason: 'Source-phase import (`import source x from …` / `import.source(…)`) — a TC39 proposal',
 		languages: ['typescript'],
 		// `import.source(` (expression form) or `import source <binding> … from`
 		// (declaration form). The declaration branch requires a binding token AND a
 		// `from`, so the standard default import `import source from "x"` (a binding
 		// named `source`) is left as-is.
 		matches: (content) =>
-			/\bimport\.source\s*\(|\bimport\s+source\s+(?:[\w$]+|\*|\{)[^;\n]*\bfrom\b/.test(content),
-	},
+			/\bimport\.source\s*\(|\bimport\s+source\s+(?:[\w$]+|\*|\{)[^;\n]*\bfrom\b/.test(content)
+	}
 ];
 
 /**
@@ -187,10 +187,7 @@ export const EXPECTED_ERROR_PATTERNS: ExpectedErrorPattern[] = [
  * @param language the file's language; patterns with a `languages` list only
  *                 apply when it includes this value (untagged patterns apply to all)
  */
-export function check_expected_error(
-	content: string,
-	language?: Language,
-): ExpectedErrorResult {
+export function check_expected_error(content: string, language?: Language): ExpectedErrorResult {
 	for (const pattern of EXPECTED_ERROR_PATTERNS) {
 		if (pattern.languages && (!language || !pattern.languages.includes(language))) {
 			continue;

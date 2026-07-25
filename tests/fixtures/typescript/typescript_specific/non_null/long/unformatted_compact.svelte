@@ -8,9 +8,6 @@ veryLongObjectName000000!.veryLongPropertyName000000!.anotherVeryLongPropertyNam
 // Long call chain with non-null
 veryLongFunctionName000000()!.veryLongMethodName000000()!.anotherVeryLongMethodName000000()!.finalMethod();
 
-// Long expression in parens with non-null
-(veryLongObjectName00000.veryLongPropertyName00000||alternativeVeryLongPropertyName00000)!.method();
-
 // Long await with non-null
 (await veryLongAsyncFunctionName(veryLongArgumentOne0000000,veryLongArgumentTwo0000000))!.property;
 

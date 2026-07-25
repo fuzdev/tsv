@@ -85,7 +85,7 @@ async function load_build(js_path: string): Promise<FormatBuild> {
 	return {
 		svelte: mod.format_svelte,
 		typescript: mod.format_typescript,
-		css: mod.format_css,
+		css: mod.format_css
 	};
 }
 
@@ -113,10 +113,12 @@ for (const f of files) {
 }
 console.error(
 	`\nbyte-identity: ${ok.length - mismatches}/${ok.length} identical` +
-		(mismatches ? `  — ${mismatches} MISMATCH` : ''),
+		(mismatches ? `  — ${mismatches} MISMATCH` : '')
 );
 if (mismatches && baseline) {
-	console.error('ABORT: builds format differently — a no-behavior-change edit must be byte-identical.');
+	console.error(
+		'ABORT: builds format differently — a no-behavior-change edit must be byte-identical.'
+	);
 	Deno.exit(1);
 }
 const by_lang = group_by_language(ok);
@@ -164,7 +166,7 @@ for (const r of refs) {
 
 console.error(
 	`Probing ${ok.length} files × ${pairs} pairs` +
-		`${baseline ? ' (A/B + floor)' : ' (A/A floor only)'}, warmup ${warmup}\n`,
+		`${baseline ? ' (A/B + floor)' : ' (A/A floor only)'}, warmup ${warmup}\n`
 );
 
 for (let w = 0; w < warmup; w++) {
@@ -199,21 +201,29 @@ const total_ratios = (key: string): number[] =>
 		{ length: pairs },
 		(_, p) =>
 			langs.reduce((s, l) => s + cur_t[key][l][p], 0) /
-			langs.reduce((s, l) => s + ref_t[key][l][p], 0),
+			langs.reduce((s, l) => s + ref_t[key][l][p], 0)
 	);
 
 const primary = baseline ? 'ab' : 'aa'; // which ref's current samples to report as cur(ms)
-const kb_of = (lang: Language): number =>
-	by_lang[lang].reduce((sum, f) => sum + f.bytes, 0) / 1024;
+const kb_of = (lang: Language): number => by_lang[lang].reduce((sum, f) => sum + f.bytes, 0) / 1024;
 const pad = (s: string, n: number): string => s.padStart(n);
 
-const print_row = (label: string, files_n: number, kb: number, cur_ms: number, ab: number[], aa: number[]): void => {
-	let line = `${pad(label, 11)} ${pad(String(files_n), 4)}f ${pad(kb.toFixed(1), 8)}KB  ` +
-		`cur ${pad(cur_ms.toFixed(2), 8)}ms ${pad((cur_ms / kb * 1000).toFixed(1), 7)}us/KB  ` +
+const print_row = (
+	label: string,
+	files_n: number,
+	kb: number,
+	cur_ms: number,
+	ab: number[],
+	aa: number[]
+): void => {
+	let line =
+		`${pad(label, 11)} ${pad(String(files_n), 4)}f ${pad(kb.toFixed(1), 8)}KB  ` +
+		`cur ${pad(cur_ms.toFixed(2), 8)}ms ${pad(((cur_ms / kb) * 1000).toFixed(1), 7)}us/KB  ` +
 		`floor ${median(aa).toFixed(4)}`;
 	if (baseline) {
 		const ab_m = median(ab);
-		line += `  A/B ${ab_m.toFixed(4)}  net ${(ab_m / median(aa)).toFixed(4)}  ` +
+		line +=
+			`  A/B ${ab_m.toFixed(4)}  net ${(ab_m / median(aa)).toFixed(4)}  ` +
 			`[${Math.min(...ab).toFixed(3)},${Math.max(...ab).toFixed(3)}]`;
 	}
 	console.error(line);
@@ -222,12 +232,28 @@ const print_row = (label: string, files_n: number, kb: number, cur_ms: number, a
 console.error(
 	baseline
 		? `A/B = current/baseline pair-median (<1 = faster) · net = A/B÷floor · [min,max] = A/B spread\n`
-		: `floor = current/current pair-median (noise floor; expect ~1.00)\n`,
+		: `floor = current/current pair-median (noise floor; expect ~1.00)\n`
 );
 for (const lang of langs) {
 	if (by_lang[lang].length === 0) continue;
-	print_row(lang, by_lang[lang].length, kb_of(lang), median(cur_t[primary][lang]), baseline ? ratios('ab', lang) : [], ratios('aa', lang));
+	print_row(
+		lang,
+		by_lang[lang].length,
+		kb_of(lang),
+		median(cur_t[primary][lang]),
+		baseline ? ratios('ab', lang) : [],
+		ratios('aa', lang)
+	);
 }
-const total_cur = median(Array.from({ length: pairs }, (_, p) => langs.reduce((s, l) => s + cur_t[primary][l][p], 0)));
+const total_cur = median(
+	Array.from({ length: pairs }, (_, p) => langs.reduce((s, l) => s + cur_t[primary][l][p], 0))
+);
 console.error('');
-print_row('total', ok.length, langs.reduce((s, l) => s + kb_of(l), 0), total_cur, baseline ? total_ratios('ab') : [], total_ratios('aa'));
+print_row(
+	'total',
+	ok.length,
+	langs.reduce((s, l) => s + kb_of(l), 0),
+	total_cur,
+	baseline ? total_ratios('ab') : [],
+	total_ratios('aa')
+);

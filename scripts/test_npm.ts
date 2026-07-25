@@ -31,7 +31,7 @@ import {
 	readdirSync,
 	readFileSync,
 	rmSync,
-	writeFileSync,
+	writeFileSync
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
@@ -44,10 +44,7 @@ if (!pkg_dir) {
 }
 
 const variant = /\/(format|parse|all)\/npm\/?$/.exec(pkg_dir)?.[1] as
-	| 'format'
-	| 'parse'
-	| 'all'
-	| undefined;
+	'format' | 'parse' | 'all' | undefined;
 if (!variant) {
 	console.error(`PKG_DIR must end in /(format|parse|all)/npm — got ${pkg_dir}`);
 	process.exit(1);
@@ -57,7 +54,7 @@ const has_parse = variant !== 'format';
 const PKG_NAMES = {
 	format: '@fuzdev/tsv_format_wasm',
 	parse: '@fuzdev/tsv_parse_wasm',
-	all: '@fuzdev/tsv_wasm',
+	all: '@fuzdev/tsv_wasm'
 };
 
 const node_entry = await import(`../${pkg_dir}/index.js`);
@@ -71,7 +68,7 @@ const deep_equal_json = (a: unknown, b: unknown): boolean =>
 
 describe(`package metadata: ${pkg_dir}`, () => {
 	const pkg = JSON.parse(
-		readFileSync(new URL(`../${pkg_dir}/package.json`, import.meta.url), 'utf-8'),
+		readFileSync(new URL(`../${pkg_dir}/package.json`, import.meta.url), 'utf-8')
 	);
 
 	it('has the right name', () => {
@@ -85,7 +82,7 @@ describe(`package metadata: ${pkg_dir}`, () => {
 			assert.ok(rel, `exports['.'].${key} missing`);
 			assert.ok(
 				existsSync(new URL(`../${pkg_dir}/${rel}`, import.meta.url)),
-				`exports['.'].${key} → ${rel} does not exist`,
+				`exports['.'].${key} → ${rel} does not exist`
 			);
 		}
 	});
@@ -94,7 +91,7 @@ describe(`package metadata: ${pkg_dir}`, () => {
 		for (const rel of pkg.files) {
 			assert.ok(
 				existsSync(new URL(`../${pkg_dir}/${rel}`, import.meta.url)),
-				`files entry ${rel} does not exist`,
+				`files entry ${rel} does not exist`
 			);
 		}
 	});
@@ -178,15 +175,15 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		// parse_X is defined as JSON.parse(parse_X_json(src)); the two must agree.
 		assert.deepEqual(
 			JSON.parse(node_entry.parse_typescript_json('const x = 1;')),
-			node_entry.parse_typescript('const x = 1;'),
+			node_entry.parse_typescript('const x = 1;')
 		);
 		assert.deepEqual(
 			JSON.parse(node_entry.parse_svelte_json('<div>x</div>')),
-			node_entry.parse_svelte('<div>x</div>'),
+			node_entry.parse_svelte('<div>x</div>')
 		);
 		assert.deepEqual(
 			JSON.parse(node_entry.parse_css_json('a { color: red }')),
-			node_entry.parse_css('a { color: red }'),
+			node_entry.parse_css('a { color: red }')
 		);
 	});
 });
@@ -199,7 +196,10 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 	it('reconstruct_locations is EXACT for TypeScript (equals the full wire)', () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';
 		const full = node_entry.parse_typescript(ts);
-		const recon = node_entry.reconstruct_locations(node_entry.parse_typescript_no_locations(ts), ts);
+		const recon = node_entry.reconstruct_locations(
+			node_entry.parse_typescript_no_locations(ts),
+			ts
+		);
 		// The span-only wire is the full wire minus `loc`; adding it back must
 		// reproduce acorn's `loc` byte-for-byte on every node.
 		assert.deepEqual(recon, full);
@@ -388,7 +388,7 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 		const out = browser.reconstruct_locations(ast, 'x = 1');
 		assert.deepEqual(out.loc, {
 			start: { line: 1, column: 0 },
-			end: { line: 1, column: 5 },
+			end: { line: 1, column: 5 }
 		});
 	});
 
@@ -426,7 +426,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		spawnSync(process.execPath, [cli_path, ...args], {
 			encoding: 'utf-8',
 			input: stdin,
-			cwd,
+			cwd
 		});
 
 	it('format --content prints formatted source', () => {
@@ -485,13 +485,27 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 
 	it('parse --goal script accepts `await` as an identifier; module/default reject it', () => {
 		const script = run_cli([
-			'parse', '--content', 'var await = 1;', '--parser', 'ts', '--goal', 'script',
+			'parse',
+			'--content',
+			'var await = 1;',
+			'--parser',
+			'ts',
+			'--goal',
+			'script'
 		]);
 		assert.equal(script.status, 0, script.stderr);
 		assert.match(script.stdout, /"sourceType":"script"/);
 
 		// the same source is reserved at Module goal (explicit and default)
-		const mod = run_cli(['parse', '--content', 'var await = 1;', '--parser', 'ts', '--goal', 'module']);
+		const mod = run_cli([
+			'parse',
+			'--content',
+			'var await = 1;',
+			'--parser',
+			'ts',
+			'--goal',
+			'module'
+		]);
 		assert.equal(mod.status, 1);
 		const dflt = run_cli(['parse', '--content', 'var await = 1;', '--parser', 'ts']);
 		assert.equal(dflt.status, 1);
@@ -499,7 +513,13 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 
 	it('format --goal script formats an `await` arrow param', () => {
 		const result = run_cli([
-			'format', '--content', 'await => 1;', '--parser', 'ts', '--goal', 'script',
+			'format',
+			'--content',
+			'await => 1;',
+			'--parser',
+			'ts',
+			'--goal',
+			'script'
 		]);
 		assert.equal(result.status, 0, result.stderr);
 		assert.equal(result.stdout, '(await) => 1;\n');
@@ -538,10 +558,10 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 
 			const result = run_cli(['format', dir]);
 			assert.equal(result.status, 0);
-			assert.deepEqual(
-				result.stdout.trim().split('\n').sort(),
-				[join(dir, 'a.ts'), join(dir, 'nested', 'b.svelte')],
-			);
+			assert.deepEqual(result.stdout.trim().split('\n').sort(), [
+				join(dir, 'a.ts'),
+				join(dir, 'nested', 'b.svelte')
+			]);
 			assert.match(result.stderr, /2 formatted, 1 unchanged/);
 			assert.equal(readFileSync(join(dir, 'a.ts'), 'utf-8'), 'const x = 1;\n');
 			assert.equal(readFileSync(join(dir, 'nested', 'b.svelte'), 'utf-8'), '<div>x</div>\n');
@@ -637,7 +657,10 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			// (a) cd into proj and list '.'; (b) from base, list proj by path
 			const inside = run_cli(['format', '--list', '.'], undefined, proj);
 			const outside = run_cli(['format', '--list', proj], undefined, base);
-			for (const [label, out] of [['inside', inside], ['outside', outside]] as const) {
+			for (const [label, out] of [
+				['inside', inside],
+				['outside', outside]
+			] as const) {
 				assert.equal(out.status, 0, `${label}: ${out.stderr}`);
 				assert.match(out.stdout, /src\.ts/, label);
 				assert.doesNotMatch(out.stdout, /out\.ts/, `${label}: gen/ honored regardless of cwd`);
@@ -698,7 +721,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			'--content',
 			'const x = 1;',
 			'--parser',
-			'ts',
+			'ts'
 		]);
 		assert.equal(result.status, 2);
 		assert.match(result.stderr, /--jobs applies to file paths/);
@@ -761,14 +784,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	});
 
 	it('parse --pretty prints tab-indented JSON', () => {
-		const result = run_cli([
-			'parse',
-			'--pretty',
-			'--content',
-			'const x = 1;',
-			'--parser',
-			'ts',
-		]);
+		const result = run_cli(['parse', '--pretty', '--content', 'const x = 1;', '--parser', 'ts']);
 		assert.equal(result.status, 0);
 		assert.match(result.stdout, /^\{\n\t"type": "Program",\n/);
 	});
@@ -839,7 +855,7 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 describe(`discovery parity (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	const cli_path = new URL(`../${pkg_dir}/cli.js`, import.meta.url).pathname;
 	const table = JSON.parse(
-		readFileSync(new URL('../tests/discovery/scenarios.json', import.meta.url), 'utf-8'),
+		readFileSync(new URL('../tests/discovery/scenarios.json', import.meta.url), 'utf-8')
 	);
 
 	/** Materialize a scenario `tree`: string = file (parents created), null = empty dir. */
@@ -864,7 +880,7 @@ describe(`discovery parity (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, (
 				for (const { target, expected } of scenario.cases) {
 					const arg = target === '' ? root : join(root, target);
 					const result = spawnSync(process.execPath, [cli_path, 'format', '--list', arg], {
-						encoding: 'utf-8',
+						encoding: 'utf-8'
 					});
 					assert.equal(result.status, 0, `${scenario.name} [${target}]: ${result.stderr}`);
 					const actual = result.stdout
