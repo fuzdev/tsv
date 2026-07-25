@@ -29,7 +29,7 @@
  * identical data, but a re-serialized tree won't byte-match the wire's key order.)
  *
  * **Svelte is approximate** — reconstruct where you have the source, but be aware
- * of three deliberate divergences from Svelte's own wire (this module does NOT
+ * of two deliberate divergences from Svelte's own wire (this module does NOT
  * replicate Svelte's parser quirks):
  * - The `<script>`/`<style>` `Program` `loc` is Svelte's *tag-position* override
  *   (`read_script`), not the content offset the node's `start`/`end` carry, so the
@@ -37,14 +37,10 @@
  * - Destructure patterns in `{#each … as …}` / `{:then}` / `{:catch}` / `{@const}`
  *   carry a `+1` column in Svelte's wire (parsed under a synthetic `(`); the
  *   reconstruction is the true offset, so it reads one column earlier.
- * - A root **in-tag** comment — one written between an element's attributes, which
- *   Svelte's template reader collects — carries a `character` field in its `loc`.
- *   Nothing on the span-only node distinguishes it from a `<script>` comment, so it
- *   reconstructs in the plain `{line, column}` shape.
  * - Additionally, Svelte's own wire carries `loc` *only* on embedded ECMAScript
  *   nodes (script + template expressions); this walk adds `loc` to the template
  *   nodes (elements, text, blocks) too, so the result is a superset. Everything
- *   outside the three cases above reconstructs exactly.
+ *   outside the two cases above reconstructs exactly.
  *
  * **Svelte `name_loc` is exact.** The name span is a function of the node's own
  * `start`/`end` + type — a tag name is the run after `<`, an attribute name starts
@@ -58,8 +54,11 @@
  * character}` on the ones its own reader creates — a shorthand attribute's
  * expansion (`{x}`), a snippet name, and a simple-identifier block pattern
  * (`{#each … as x}`, `{:then x}`, `{:catch x}`, `{@const x = …}`) — so the walk
- * gives those the `character` field too. The one `character`-bearing shape it can't
- * reach is the in-tag comment above.
+ * gives those the `character` field too. The last `character`-bearing shape is the
+ * **in-tag comment** — one written between an element's attributes, which Svelte's
+ * template reader collects rather than acorn. Nothing on the comment node marks it,
+ * so it's recovered structurally (see `stamp_in_tag_comment_locs`) and gets the
+ * `character` field like Svelte's.
  *
  * **CSS is a no-op** — `parse_css` emits no `loc` (nothing to reconstruct), so
  * `reconstruct_locations` returns a CSS tree unchanged.
@@ -329,39 +328,144 @@ function stamp_character_locs(node, starts, source) {
 }
 
 /**
+ * Whether `comment` sits *between* `element`'s attributes — the position Svelte's
+ * own template reader collects from.
+ *
+ * Scans `element`'s opening tag tracking brace depth and quoting, and reports
+ * whether the comment begins at depth 0 outside any quoted value. Everything
+ * brace-wrapped is an expression acorn parses (an attribute value, a directive, a
+ * spread, an `{@attach}`, a `svelte:element` `this={…}` binding), so one depth test
+ * covers them all — no field-name knowledge, and no reliance on a `tag`/`expression`
+ * span the wire may not carry. Comment bytes are stepped over whole, so a `>`, `{`,
+ * or quote written inside a comment is never read as structure.
+ * @param {any} element
+ * @param {{start: number}} comment
+ * @param {string} source
+ * @param {any[]} comments - the root comment list.
+ * @returns {boolean}
+ */
+function is_between_attributes(element, comment, source, comments) {
+	let i = element.start + 1; // past `<`
+	let depth = 0;
+	let quote = '';
+	while (i < source.length) {
+		if (quote === '') {
+			const here = comments.find((c) => c.start === i);
+			if (here) {
+				if (i === comment.start) return depth === 0;
+				i = here.end;
+				continue;
+			}
+		}
+		const ch = source[i];
+		if (quote !== '') {
+			if (ch === quote) quote = '';
+		} else if (ch === '"' || ch === "'") {
+			quote = ch;
+		} else if (ch === '{') {
+			depth++;
+		} else if (ch === '}') {
+			if (depth > 0) depth--;
+		} else if (ch === '>' && depth === 0) {
+			return false; // opening tag closed before reaching the comment
+		}
+		i++;
+	}
+	return false;
+}
+
+/**
+ * Give each **in-tag** comment the `character`-bearing `loc` Svelte reports on it.
+ *
+ * Svelte's template reader collects the comments written *between* an element's
+ * attributes (`<div /* c *\/ class="x">`) and stamps `character` into their `loc`;
+ * every other comment is collected by acorn and gets the plain shape. Nothing on
+ * the comment node itself tells the two apart, so the class is recovered
+ * structurally — a comment is in-tag when it sits between the attributes of the
+ * innermost element containing it. The "between" half is load-bearing: a comment
+ * inside an attribute's *expression* (`{@attach /* c *\/ foo}`, `onclick={() =>
+ * /* c *\/ x}`, `<svelte:element this={/* c *\/ 'p'}>`) is inside the opening tag
+ * too, but acorn parses it, so it keeps the plain shape.
+ * @param {any[]} comments
+ * @param {any[]} elements - every element node the walk passed, in visit order.
+ * @param {number[]} starts
+ * @param {string} source
+ * @mutates comments
+ */
+function stamp_in_tag_comment_locs(comments, elements, starts, source) {
+	for (const c of comments) {
+		if (typeof c?.start !== 'number' || typeof c.end !== 'number') continue;
+		// innermost = the containing element with the greatest start; an outer
+		// element's opening tag closes before the comment, so only this one can hold it
+		let host = null;
+		for (const e of elements) {
+			if (e.start < c.start && c.end <= e.end && (host === null || e.start > host.start)) {
+				host = e;
+			}
+		}
+		if (host === null || !is_between_attributes(host, c, source, comments)) continue;
+		c.loc = { start: name_loc_at(c.start, starts), end: name_loc_at(c.end, starts) };
+	}
+}
+
+/**
  * Walk `value`, adding a `loc` object to every node with numeric `start`/`end` —
  * and, for a Svelte tree, a `name_loc` to every element, attribute, and directive
  * that carries one. Mutates in place. Skips the keys it writes so it never
  * re-walks its own output.
  * @param {any} value
- * @param {number[]} starts
- * @param {string} source
- * @param {boolean} is_svelte
+ * @param {{starts: number[], source: string, is_svelte: boolean, elements: any[] | null}} ctx
+ *   `elements` collects element nodes for the in-tag comment pass, or is `null`
+ *   when the document has no comments to classify.
  */
-function walk_add_loc(value, starts, source, is_svelte) {
+function walk_add_loc(value, ctx) {
 	if (Array.isArray(value)) {
-		for (const v of value) walk_add_loc(v, starts, source, is_svelte);
+		for (const v of value) walk_add_loc(v, ctx);
 	} else if (value && typeof value === 'object') {
 		if (typeof value.start === 'number' && typeof value.end === 'number') {
-			value.loc = { start: loc_at(value.start, starts), end: loc_at(value.end, starts) };
-			if (is_svelte) {
-				const span = name_span_of(value, source);
+			value.loc = { start: loc_at(value.start, ctx.starts), end: loc_at(value.end, ctx.starts) };
+			if (ctx.is_svelte) {
+				const span = name_span_of(value, ctx.source);
 				if (span) {
 					value.name_loc = {
-						start: name_loc_at(span[0], starts),
-						end: name_loc_at(span[1], starts),
+						start: name_loc_at(span[0], ctx.starts),
+						end: name_loc_at(span[1], ctx.starts),
 					};
+				}
+				if (ctx.elements !== null && NAME_LOC_KINDS.get(value.type) === 'element') {
+					ctx.elements.push(value);
 				}
 			}
 		}
 		for (const key of Object.keys(value)) {
 			if (key === 'loc' || key === 'name_loc') continue;
-			walk_add_loc(value[key], starts, source, is_svelte);
+			walk_add_loc(value[key], ctx);
 		}
 		// Re-stamp the identifiers Svelte gives the name-shaped `loc`, after the walk
 		// above wrote them the plain shape.
-		if (is_svelte) stamp_character_locs(value, starts, source);
+		if (ctx.is_svelte) stamp_character_locs(value, ctx.starts, ctx.source);
 	}
+}
+
+/**
+ * The whole reconstruction for one already-built line table: the `loc`/`name_loc`
+ * walk plus the Svelte in-tag comment pass. Shared by both entry points so they
+ * can't drift.
+ * @param {any} ast
+ * @param {number[]} starts
+ * @param {string} source
+ * @param {'typescript' | 'svelte' | 'css'} language
+ * @returns {any} the same `ast`, mutated.
+ */
+function reconstruct_in(ast, starts, source, language) {
+	// CSS has no `loc` in the wire — nothing to reconstruct.
+	if (language === 'css') return ast;
+	const is_svelte = language === 'svelte';
+	const comments = is_svelte && Array.isArray(ast?.comments) ? ast.comments : null;
+	const elements = comments !== null && comments.length > 0 ? [] : null;
+	walk_add_loc(ast, { starts, source, is_svelte, elements });
+	if (elements !== null) stamp_in_tag_comment_locs(comments, elements, starts, source);
+	return ast;
 }
 
 /**
@@ -378,8 +482,6 @@ function walk_add_loc(value, starts, source, is_svelte) {
 export function create_locator(source, opts) {
 	const language = opts?.language ?? 'typescript';
 	const starts = build_line_starts(source, rule_for(language));
-	const is_css = language === 'css';
-	const is_svelte = language === 'svelte';
 	return {
 		loc_of(node) {
 			if (!node || typeof node.start !== 'number' || typeof node.end !== 'number') {
@@ -388,9 +490,7 @@ export function create_locator(source, opts) {
 			return { start: loc_at(node.start, starts), end: loc_at(node.end, starts) };
 		},
 		reconstruct(ast) {
-			// CSS has no `loc` in the wire — nothing to reconstruct.
-			if (!is_css) walk_add_loc(ast, starts, source, is_svelte);
-			return ast;
+			return reconstruct_in(ast, starts, source, language);
 		},
 	};
 }
