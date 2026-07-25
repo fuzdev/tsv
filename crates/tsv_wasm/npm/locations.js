@@ -199,7 +199,7 @@ const NAME_LOC_KINDS = new Map([
 	['TransitionDirective', 'directive'],
 	['AnimateDirective', 'directive'],
 	['LetDirective', 'directive'],
-	['Attribute', 'attribute'],
+	['Attribute', 'attribute']
 ]);
 
 /**
@@ -429,7 +429,7 @@ function walk_add_loc(value, ctx) {
 				if (span) {
 					value.name_loc = {
 						start: name_loc_at(span[0], ctx.starts),
-						end: name_loc_at(span[1], ctx.starts),
+						end: name_loc_at(span[1], ctx.starts)
 					};
 				}
 				if (ctx.elements !== null && NAME_LOC_KINDS.get(value.type) === 'element') {
@@ -491,7 +491,7 @@ export function create_locator(source, opts) {
 		},
 		reconstruct(ast) {
 			return reconstruct_in(ast, starts, source, language);
-		},
+		}
 	};
 }
 

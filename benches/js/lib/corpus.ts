@@ -73,7 +73,7 @@ const DEFAULT_EXCLUSIONS = [
 	// is excluded separately in `should_exclude` (segment-prefix match).
 	'/_errors_/',
 	'/front-matter/',
-	'/cursor/',
+	'/cursor/'
 ];
 
 /**
@@ -174,7 +174,7 @@ interface WalkOptions {
  * pruning exactly as before. */
 async function* walk_corpus(
 	dir_path: string,
-	options: WalkOptions = {},
+	options: WalkOptions = {}
 ): AsyncGenerator<SourceFile> {
 	const extensions = options.extensions ?? DEFAULT_EXTENSIONS;
 	const ext_set = new Set(extensions.map((e) => `.${e.toLowerCase()}`));
@@ -198,7 +198,7 @@ async function* walk_corpus(
 				path,
 				content,
 				language,
-				bytes: new TextEncoder().encode(content).length,
+				bytes: new TextEncoder().encode(content).length
 			};
 		} catch (e) {
 			console.warn(`Warning: Could not read ${path}: ${e}`);
@@ -223,9 +223,9 @@ async function* load_file_list(list_path: string): AsyncGenerator<SourceFile> {
 	}
 	// Accept both the `{path, goal}` shape (test262, goal-aware) and a bare
 	// `string[]` (older caches / other file lists — goal defaults to module).
-	const entries = raw.map((e) => (typeof e === 'string' ? {path: e} : e));
+	const entries = raw.map((e) => (typeof e === 'string' ? { path: e } : e));
 	entries.sort((a, b) => a.path.localeCompare(b.path));
-	for (const {path: relative, goal} of entries) {
+	for (const { path: relative, goal } of entries) {
 		const path = resolve(relative);
 		const language = detect_language(path);
 		if (!language) continue;
@@ -236,7 +236,7 @@ async function* load_file_list(list_path: string): AsyncGenerator<SourceFile> {
 				content,
 				language,
 				bytes: new TextEncoder().encode(content).length,
-				goal,
+				goal
 			};
 		} catch (e) {
 			console.warn(`Warning: Could not read ${path}: ${e}`);
@@ -261,7 +261,7 @@ export function group_by_language(files: SourceFile[]): Record<Language, SourceF
 	return {
 		svelte: files.filter((f) => f.language === 'svelte'),
 		typescript: files.filter((f) => f.language === 'typescript'),
-		css: files.filter((f) => f.language === 'css'),
+		css: files.filter((f) => f.language === 'css')
 	};
 }
 
@@ -387,7 +387,7 @@ const should_prune_perf = (relative: string): boolean => {
 export async function* stream_perf_candidate(dir: string): AsyncGenerator<SourceFile> {
 	yield* walk_corpus(dir, {
 		prune_build_output: false,
-		skip: (_path, relative) => should_prune_perf(relative),
+		skip: (_path, relative) => should_prune_perf(relative)
 	});
 }
 
@@ -428,7 +428,7 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 		tier: 'real',
 		extensions: ['css'],
 		optional: true,
-		hint: 'run `deno task bench:harvest:svelte-styles`',
+		hint: 'run `deno task bench:harvest:svelte-styles`'
 	},
 	// External projects (monorepo subpaths). Each entry is a reviewed package
 	// `src/` tree — never a whole monorepo — so test fixtures, build output, and
@@ -446,7 +446,7 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 		path: '../prettier-plugin-svelte/test',
 		tier: 'prettier_fixture',
 		extensions: ['html'],
-		skip: has_companion_options,
+		skip: has_companion_options
 	},
 	// Prettier test cases (formatting edge cases and regression tests)
 	{ path: '../prettier/tests/format/typescript', tier: 'prettier_fixture' },
@@ -463,14 +463,14 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 		tier: 'suite',
 		extensions: ['css'],
 		optional: true,
-		hint: 'run `deno task bench:harvest:wpt` (needs ../wpt)',
+		hint: 'run `deno task bench:harvest:wpt` (needs ../wpt)'
 	},
 	{
 		files_from: 'benches/js/.cache/test262_files.json',
 		tier: 'suite',
 		optional: true,
-		hint: 'run `deno task bench:harvest:test262` (needs ../test262)',
-	},
+		hint: 'run `deno task bench:harvest:test262` (needs ../test262)'
+	}
 ];
 
 const TIERS_BY_VIEW: Record<CorpusView, CorpusTier[]> = {
@@ -486,7 +486,7 @@ const TIERS_BY_VIEW: Record<CorpusView, CorpusTier[]> = {
 	// are mutually exclusive sets. perf is the "every in-scope tool must fully
 	// process it" corpus (bench.ts hard-fails an unlisted failure); conformance is
 	// the hard-cases-only surface where sub-100% coverage is the measurement.
-	conformance: ['prettier_fixture', 'suite'],
+	conformance: ['prettier_fixture', 'suite']
 };
 
 /**
@@ -564,7 +564,7 @@ export interface CorpusSource {
  * `scripts/doctor.ts` — kept here so the doctor and the loader can't drift.
  */
 export async function corpus_missing_entries(
-	view: CorpusView,
+	view: CorpusView
 ): Promise<{ missing: string[]; optional_missing: string[]; total: number }> {
 	const tiers = TIERS_BY_VIEW[view];
 	const entries = CORPUS_ENTRIES.filter((e) => tiers.includes(e.tier));
@@ -574,7 +574,7 @@ export async function corpus_missing_entries(
 		const entry_path = entry_source(entry);
 		if (await fs_exists(resolve(entry_path))) continue;
 		(entry.optional ? optional_missing : missing).push(
-			entry_path + (entry.hint ? ` (${entry.hint})` : ''),
+			entry_path + (entry.hint ? ` (${entry.hint})` : '')
 		);
 	}
 	return { missing, optional_missing, total: entries.length };
@@ -594,7 +594,7 @@ export async function corpus_missing_entries(
  */
 export function corpus_present_dirs(
 	view: CorpusView,
-	logger: Logger = console.log,
+	logger: Logger = console.log
 ): Promise<string[]> {
 	return corpus_present_dirs_for_tiers(TIERS_BY_VIEW[view], logger);
 }
@@ -611,7 +611,7 @@ export function corpus_present_dirs(
  */
 export async function corpus_present_dirs_for_tiers(
 	tiers: readonly CorpusTier[],
-	logger: Logger = console.log,
+	logger: Logger = console.log
 ): Promise<string[]> {
 	const dirs: string[] = [];
 	for (const entry of CORPUS_ENTRIES.filter((e) => tiers.includes(e.tier))) {
@@ -657,7 +657,10 @@ export class DevReposLoader {
 	 */
 	sources: CorpusSource[] = [];
 
-	constructor(view: CorpusView, options?: { allow_missing?: boolean; apply_reject_cache?: boolean }) {
+	constructor(
+		view: CorpusView,
+		options?: { allow_missing?: boolean; apply_reject_cache?: boolean }
+	) {
 		this.view = view;
 		this.allow_missing = options?.allow_missing ?? false;
 		this.apply_reject_cache = options?.apply_reject_cache ?? true;
@@ -676,7 +679,9 @@ export class DevReposLoader {
 			if (await fs_exists(resolve(entry_path))) {
 				present.push(entry);
 			} else if (entry.optional) {
-				logger(`  ⚠ optional corpus entry missing: ${entry_path}${entry.hint ? ` — ${entry.hint}` : ''}`);
+				logger(
+					`  ⚠ optional corpus entry missing: ${entry_path}${entry.hint ? ` — ${entry.hint}` : ''}`
+				);
 			} else {
 				// Prefer an entry's own remedy (a harvest task for the derived
 				// caches); otherwise a concrete `git clone` line for a known
@@ -694,7 +699,7 @@ export class DevReposLoader {
 				throw new Error(
 					`Missing corpus entr${missing.length === 1 ? 'y' : 'ies'} (${this.view} view): ` +
 						`${missing.join(', ')} — clone the missing repo(s), or opt into a partial ` +
-						`corpus with allow_missing (BENCH_ALLOW_MISSING=1 for the bench).`,
+						`corpus with allow_missing (BENCH_ALLOW_MISSING=1 for the bench).`
 				);
 			}
 		}
@@ -713,7 +718,7 @@ export class DevReposLoader {
 				reject_set
 					? `  canonical-reject cache: excluding ${reject_set.size} Svelte files rejected by svelte/compiler`
 					: `  ⚠ canonical-reject cache absent — Svelte coverage counts svelte/compiler's rejects ` +
-						`(run \`deno task bench:harvest:svelte-rejects\`)`,
+							`(run \`deno task bench:harvest:svelte-rejects\`)`
 			);
 		}
 		let reject_excluded = 0;
@@ -739,25 +744,24 @@ export class DevReposLoader {
 				const base_skip = entry.skip;
 				// `reject_set` holds only Svelte paths (harvested Svelte-only), so a
 				// bare membership test is inherently language-scoped.
-				const skip: SkipFn | undefined = this.view === 'perf'
-					? async (path, relative) =>
-						should_prune_perf(relative) || ((await base_skip?.(path, relative)) ?? false)
-					: reject_set
-					? async (path, relative) => {
-						if (reject_set.has(path)) {
-							reject_excluded++;
-							return true;
-						}
-						return (await base_skip?.(path, relative)) ?? false;
-					}
-					: base_skip;
-				for await (
-					const file of walk_corpus(resolved_path, {
-						extensions: entry.extensions,
-						skip,
-						prune_build_output: false,
-					})
-				) {
+				const skip: SkipFn | undefined =
+					this.view === 'perf'
+						? async (path, relative) =>
+								should_prune_perf(relative) || ((await base_skip?.(path, relative)) ?? false)
+						: reject_set
+							? async (path, relative) => {
+									if (reject_set.has(path)) {
+										reject_excluded++;
+										return true;
+									}
+									return (await base_skip?.(path, relative)) ?? false;
+								}
+							: base_skip;
+				for await (const file of walk_corpus(resolved_path, {
+					extensions: entry.extensions,
+					skip,
+					prune_build_output: false
+				})) {
 					count++;
 					by_language[file.language]++;
 					file.reproducible = reproducible;
@@ -780,7 +784,7 @@ export class DevReposLoader {
 			// prompted for the `:run` (skip-harvest) path.
 			logger(
 				`  ⚠ canonical-reject cache drift: excluded ${reject_excluded} of ${reject_set.size} ` +
-					`cached paths — re-run \`deno task bench:harvest:svelte-rejects\``,
+					`cached paths — re-run \`deno task bench:harvest:svelte-rejects\``
 			);
 		}
 	}

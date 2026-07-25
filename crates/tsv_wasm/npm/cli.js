@@ -15,7 +15,7 @@ import {
 	readFileSync,
 	realpathSync,
 	statSync,
-	writeFileSync,
+	writeFileSync
 } from 'node:fs';
 import { dirname, isAbsolute, join, relative as path_relative, sep } from 'node:path';
 import { parseArgs } from 'node:util';
@@ -31,7 +31,7 @@ import {
 	parse_typescript_json,
 	parse_typescript_json_no_locations,
 	parse_typescript_json_with_goal,
-	parse_typescript_json_with_goal_no_locations,
+	parse_typescript_json_with_goal_no_locations
 } from './index.js';
 
 /** tsv's native ignore file, discovered hierarchically (one per directory).
@@ -53,13 +53,13 @@ const GITIGNORE_FILE = '.gitignore';
 const FORMATTERS = {
 	svelte: format_svelte,
 	typescript: format_typescript,
-	css: format_css,
+	css: format_css
 };
 
 const PARSERS = {
 	svelte: parse_svelte_json,
 	typescript: parse_typescript_json,
-	css: parse_css_json,
+	css: parse_css_json
 };
 
 // Span-only variant (`--no-locations`): drops per-node `loc` (svelte also `name_loc`).
@@ -67,7 +67,7 @@ const PARSERS = {
 const PARSERS_NO_LOCATIONS = {
 	svelte: parse_svelte_json_no_locations,
 	typescript: parse_typescript_json_no_locations,
-	css: parse_css_json,
+	css: parse_css_json
 };
 
 /** Valid `--parser` values (shared by `format` and `parse` — `FORMATTERS` and
@@ -86,8 +86,7 @@ Commands:
 Run \`tsv <command> --help\` for command flags.
 `;
 
-const FORMAT_HELP =
-	`Usage: tsv format [<paths...>] [--check] [--list] [--content <s> | --stdin] [--parser <p>] [--goal <g>]
+const FORMAT_HELP = `Usage: tsv format [<paths...>] [--check] [--list] [--content <s> | --stdin] [--parser <p>] [--goal <g>]
 
 Format source code in place (near-Prettier output).
 
@@ -223,9 +222,9 @@ function run_format(args) {
 			check: { type: 'boolean' },
 			list: { type: 'boolean' },
 			jobs: { type: 'string' },
-			help: { type: 'boolean' },
+			help: { type: 'boolean' }
 		},
-		FORMAT_HELP,
+		FORMAT_HELP
 	);
 
 	// validated before mode dispatch — a bad value exits 1 in every mode (argh parity)
@@ -272,9 +271,10 @@ function format_single(values, positionals, parser, goal) {
 	try {
 		// --goal applies only to the TypeScript parser (svelte is always a module,
 		// css has no goal); svelte/css ignore it, matching the native CLI.
-		formatted = parser === 'typescript' && goal !== undefined
-			? format_typescript_with_goal(input, goal)
-			: FORMATTERS[parser](input);
+		formatted =
+			parser === 'typescript' && goal !== undefined
+				? format_typescript_with_goal(input, goal)
+				: FORMATTERS[parser](input);
 	} catch (error) {
 		eprint(`Parse error: ${error.message}\n`);
 		process.exit(2);
@@ -296,9 +296,7 @@ function format_paths(values, positionals) {
 		process.exit(2);
 	}
 	if (values.parser !== undefined) {
-		eprint(
-			'Error: --parser applies to --content/--stdin; file paths use extension detection\n',
-		);
+		eprint('Error: --parser applies to --content/--stdin; file paths use extension detection\n');
 		process.exit(2);
 	}
 	if (values.goal !== undefined) {
@@ -393,9 +391,9 @@ function run_parse(args) {
 			parser: { type: 'string' },
 			goal: { type: 'string' },
 			'no-locations': { type: 'boolean' },
-			help: { type: 'boolean' },
+			help: { type: 'boolean' }
 		},
-		PARSE_HELP,
+		PARSE_HELP
 	);
 
 	// validated before mode dispatch — a bad value exits 1 in every mode (argh parity)
@@ -713,7 +711,17 @@ function collect_root(root, cwd, files, errors, warnings) {
 	// scope. Mirrors the native collect_root.
 	if (base_rel !== '' && stack.is_ignored(base_rel, true)) return;
 
-	collect_recursive(root, base_rel, true, in_repo, stack, heuristic_active, files, errors, warnings);
+	collect_recursive(
+		root,
+		base_rel,
+		true,
+		in_repo,
+		stack,
+		heuristic_active,
+		files,
+		errors,
+		warnings
+	);
 }
 
 /** Component-wise path ordering matching Rust's `PathBuf` ordering — `/`
@@ -734,7 +742,17 @@ function compare_paths(a, b) {
 	return as.length - bs.length;
 }
 
-function collect_recursive(dir, dir_rel, is_target_root, in_repo, stack, heuristic_active, files, errors, warnings) {
+function collect_recursive(
+	dir,
+	dir_rel,
+	is_target_root,
+	in_repo,
+	stack,
+	heuristic_active,
+	files,
+	errors,
+	warnings
+) {
 	let entries;
 	try {
 		entries = readdirSync(dir, { withFileTypes: true });
@@ -783,7 +801,7 @@ function collect_recursive(dir, dir_rel, is_target_root, in_repo, stack, heurist
 			dir,
 			in_repo,
 			has_prettierignore,
-			has_formatignore,
+			has_formatignore
 		);
 		if (warning != null) warnings.push(warning);
 	}
@@ -795,7 +813,7 @@ function collect_recursive(dir, dir_rel, is_target_root, in_repo, stack, heurist
 			dir,
 			in_repo,
 			has_prettierignore,
-			has_formatignore,
+			has_formatignore
 		);
 		if (warning != null) warnings.push(warning);
 	}
@@ -832,7 +850,17 @@ function collect_recursive(dir, dir_rel, is_target_root, in_repo, stack, heurist
 				continue;
 			}
 			// the child reads its own ignore files when we recurse into it
-			collect_recursive(path, child_rel, false, in_repo, stack, child_heuristic, files, errors, warnings);
+			collect_recursive(
+				path,
+				child_rel,
+				false,
+				in_repo,
+				stack,
+				child_heuristic,
+				files,
+				errors,
+				warnings
+			);
 		} else if (entry.isFile() && stack.should_format_file(entry.name, child_rel)) {
 			files.push(path);
 		}

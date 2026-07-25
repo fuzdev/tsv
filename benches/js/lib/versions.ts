@@ -50,20 +50,20 @@ const DEFAULT_VERSIONS: AllVersions = {
 		'prettier-plugin-svelte': 'unknown',
 		svelte: 'unknown',
 		acorn: 'unknown',
-		'@sveltejs/acorn-typescript': 'unknown',
+		'@sveltejs/acorn-typescript': 'unknown'
 	},
 	oxc: {
 		'oxc-parser': 'unknown',
-		oxfmt: 'unknown',
+		oxfmt: 'unknown'
 	},
 	biome: {
 		js_api: 'unknown',
-		wasm: 'unknown',
+		wasm: 'unknown'
 	},
 	dprint: {
 		formatter: 'unknown',
-		typescript: 'unknown',
-	},
+		typescript: 'unknown'
+	}
 };
 
 /** Strip a leading semver range marker (`^`/`~`/`>=`/etc.) from a package.json
@@ -92,20 +92,20 @@ export async function load_all_versions(): Promise<AllVersions> {
 				'prettier-plugin-svelte': clean_version(deps['prettier-plugin-svelte']),
 				svelte: clean_version(deps['svelte']),
 				acorn: clean_version(deps['acorn']),
-				'@sveltejs/acorn-typescript': clean_version(deps['@sveltejs/acorn-typescript']),
+				'@sveltejs/acorn-typescript': clean_version(deps['@sveltejs/acorn-typescript'])
 			},
 			oxc: {
 				'oxc-parser': clean_version(deps['oxc-parser']),
-				oxfmt: clean_version(deps['oxfmt']),
+				oxfmt: clean_version(deps['oxfmt'])
 			},
 			biome: {
 				js_api: clean_version(deps['@biomejs/js-api']),
-				wasm: clean_version(deps['@biomejs/wasm-bundler']),
+				wasm: clean_version(deps['@biomejs/wasm-bundler'])
 			},
 			dprint: {
 				formatter: clean_version(deps['@dprint/formatter']),
-				typescript: clean_version(deps['@dprint/typescript']),
-			},
+				typescript: clean_version(deps['@dprint/typescript'])
+			}
 		};
 	} catch {
 		return DEFAULT_VERSIONS;

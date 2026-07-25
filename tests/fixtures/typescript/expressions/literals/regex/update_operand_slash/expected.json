@@ -1,0 +1,1144 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 529,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A postfix `++` ends an operand, so the `/` divides and the comment stays inside the parens",
+			"start": 20,
+			"end": 113,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 94
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 133,
+			"end": 141,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 19
+				},
+				"end": {
+					"line": 3,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Same for postfix `--`",
+			"start": 157,
+			"end": 181,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 201,
+			"end": 209,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 19
+				},
+				"end": {
+					"line": 8,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Another paren-scanned head",
+			"start": 225,
+			"end": 254,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 274,
+			"end": 282,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 19
+				},
+				"end": {
+					"line": 13,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Plain division — the operand is an identifier",
+			"start": 312,
+			"end": 360,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 378,
+			"end": 386,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 17
+				},
+				"end": {
+					"line": 19,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A binary `+` does NOT end an operand, so the `/` still opens a regex",
+			"start": 402,
+			"end": 473,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 497,
+			"end": 505,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 23
+				},
+				"end": {
+					"line": 24,
+					"column": 31
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 528,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 519,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 27,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "IfStatement",
+					"start": 115,
+					"end": 154,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 119,
+						"end": 132,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 5
+							},
+							"end": {
+								"line": 3,
+								"column": 18
+							}
+						},
+						"left": {
+							"type": "BinaryExpression",
+							"start": 119,
+							"end": 128,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 5
+								},
+								"end": {
+									"line": 3,
+									"column": 14
+								}
+							},
+							"left": {
+								"type": "UpdateExpression",
+								"start": 119,
+								"end": 123,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 5
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"operator": "++",
+								"prefix": false,
+								"argument": {
+									"type": "Identifier",
+									"start": 119,
+									"end": 121,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 5
+										},
+										"end": {
+											"line": 3,
+											"column": 7
+										}
+									},
+									"name": "aa"
+								}
+							},
+							"operator": "/",
+							"right": {
+								"type": "Identifier",
+								"start": 126,
+								"end": 128,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 12
+									},
+									"end": {
+										"line": 3,
+										"column": 14
+									}
+								},
+								"name": "bb"
+							}
+						},
+						"operator": ">",
+						"right": {
+							"type": "Literal",
+							"start": 131,
+							"end": 132,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 17
+								},
+								"end": {
+									"line": 3,
+									"column": 18
+								}
+							},
+							"value": 1,
+							"raw": "1"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 133,
+								"end": 141
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 143,
+						"end": 154,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 29
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 147,
+								"end": 151,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 147,
+									"end": 150,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 147,
+										"end": 148,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 3
+											}
+										},
+										"name": "g"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A postfix `++` ends an operand, so the `/` divides and the comment stays inside the parens",
+							"start": 20,
+							"end": 113
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 183,
+					"end": 222,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 187,
+						"end": 200,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 5
+							},
+							"end": {
+								"line": 8,
+								"column": 18
+							}
+						},
+						"left": {
+							"type": "BinaryExpression",
+							"start": 187,
+							"end": 196,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 5
+								},
+								"end": {
+									"line": 8,
+									"column": 14
+								}
+							},
+							"left": {
+								"type": "UpdateExpression",
+								"start": 187,
+								"end": 191,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 5
+									},
+									"end": {
+										"line": 8,
+										"column": 9
+									}
+								},
+								"operator": "--",
+								"prefix": false,
+								"argument": {
+									"type": "Identifier",
+									"start": 187,
+									"end": 189,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 5
+										},
+										"end": {
+											"line": 8,
+											"column": 7
+										}
+									},
+									"name": "aa"
+								}
+							},
+							"operator": "/",
+							"right": {
+								"type": "Identifier",
+								"start": 194,
+								"end": 196,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 12
+									},
+									"end": {
+										"line": 8,
+										"column": 14
+									}
+								},
+								"name": "bb"
+							}
+						},
+						"operator": ">",
+						"right": {
+							"type": "Literal",
+							"start": 199,
+							"end": 200,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 17
+								},
+								"end": {
+									"line": 8,
+									"column": 18
+								}
+							},
+							"value": 1,
+							"raw": "1"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 201,
+								"end": 209
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 211,
+						"end": 222,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 29
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 215,
+								"end": 219,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 215,
+									"end": 218,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 215,
+										"end": 216,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 3
+											}
+										},
+										"name": "g"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Same for postfix `--`",
+							"start": 157,
+							"end": 181
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 256,
+					"end": 309,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "BinaryExpression",
+						"start": 264,
+						"end": 273,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 9
+							},
+							"end": {
+								"line": 13,
+								"column": 18
+							}
+						},
+						"left": {
+							"type": "UpdateExpression",
+							"start": 264,
+							"end": 268,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 9
+								},
+								"end": {
+									"line": 13,
+									"column": 13
+								}
+							},
+							"operator": "++",
+							"prefix": false,
+							"argument": {
+								"type": "Identifier",
+								"start": 264,
+								"end": 266,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 9
+									},
+									"end": {
+										"line": 13,
+										"column": 11
+									}
+								},
+								"name": "aa"
+							}
+						},
+						"operator": "/",
+						"right": {
+							"type": "Identifier",
+							"start": 271,
+							"end": 273,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 16
+								},
+								"end": {
+									"line": 13,
+									"column": 18
+								}
+							},
+							"name": "bb"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c3 ",
+								"start": 274,
+								"end": 282
+							}
+						]
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 288,
+							"end": 306,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 2
+								},
+								"end": {
+									"line": 15,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 300,
+									"end": 306,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 3
+										},
+										"end": {
+											"line": 15,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": null
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Another paren-scanned head",
+							"start": 225,
+							"end": 254
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 362,
+					"end": 399,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 366,
+						"end": 377,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 5
+							},
+							"end": {
+								"line": 19,
+								"column": 16
+							}
+						},
+						"left": {
+							"type": "BinaryExpression",
+							"start": 366,
+							"end": 373,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 5
+								},
+								"end": {
+									"line": 19,
+									"column": 12
+								}
+							},
+							"left": {
+								"type": "Identifier",
+								"start": 366,
+								"end": 368,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 5
+									},
+									"end": {
+										"line": 19,
+										"column": 7
+									}
+								},
+								"name": "aa"
+							},
+							"operator": "/",
+							"right": {
+								"type": "Identifier",
+								"start": 371,
+								"end": 373,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 10
+									},
+									"end": {
+										"line": 19,
+										"column": 12
+									}
+								},
+								"name": "bb"
+							}
+						},
+						"operator": ">",
+						"right": {
+							"type": "Literal",
+							"start": 376,
+							"end": 377,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 15
+								},
+								"end": {
+									"line": 19,
+									"column": 16
+								}
+							},
+							"value": 1,
+							"raw": "1"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c4 ",
+								"start": 378,
+								"end": 386
+							}
+						]
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 388,
+						"end": 399,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 27
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 392,
+								"end": 396,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 392,
+									"end": 395,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 2
+										},
+										"end": {
+											"line": 20,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 392,
+										"end": 393,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 3
+											}
+										},
+										"name": "g"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Plain division — the operand is an identifier",
+							"start": 312,
+							"end": 360
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 475,
+					"end": 518,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 2
+						}
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 479,
+						"end": 496,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 5
+							},
+							"end": {
+								"line": 24,
+								"column": 22
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 479,
+							"end": 481,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 5
+								},
+								"end": {
+									"line": 24,
+									"column": 7
+								}
+							},
+							"name": "aa"
+						},
+						"operator": "+",
+						"right": {
+							"type": "CallExpression",
+							"start": 484,
+							"end": 496,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 10
+								},
+								"end": {
+									"line": 24,
+									"column": 22
+								}
+							},
+							"callee": {
+								"type": "MemberExpression",
+								"start": 484,
+								"end": 493,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 10
+									},
+									"end": {
+										"line": 24,
+										"column": 19
+									}
+								},
+								"object": {
+									"type": "Literal",
+									"start": 484,
+									"end": 488,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 10
+										},
+										"end": {
+											"line": 24,
+											"column": 14
+										}
+									},
+									"value": {},
+									"raw": "/re/",
+									"regex": {
+										"pattern": "re",
+										"flags": ""
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 489,
+									"end": 493,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 15
+										},
+										"end": {
+											"line": 24,
+											"column": 19
+										}
+									},
+									"name": "test"
+								},
+								"computed": false,
+								"optional": false
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 494,
+									"end": 495,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 20
+										},
+										"end": {
+											"line": 24,
+											"column": 21
+										}
+									},
+									"name": "b",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c5 ",
+											"start": 497,
+											"end": 505
+										}
+									]
+								}
+							],
+							"optional": false
+						}
+					},
+					"consequent": {
+						"type": "BlockStatement",
+						"start": 507,
+						"end": 518,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 33
+							},
+							"end": {
+								"line": 26,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 511,
+								"end": 515,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 6
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 511,
+									"end": 514,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 2
+										},
+										"end": {
+											"line": 25,
+											"column": 5
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 511,
+										"end": 512,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 2
+											},
+											"end": {
+												"line": 25,
+												"column": 3
+											}
+										},
+										"name": "g"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A binary `+` does NOT end an operand, so the `/` still opens a regex",
+							"start": 402,
+							"end": 473
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

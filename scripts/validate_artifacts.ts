@@ -65,7 +65,7 @@ const TARGETS = ['npm', 'deno'] as const;
 const BOUNDS = {
 	format: { min: 2_005_000, max: 2_350_000 },
 	parse: { min: 934_000, max: 1_097_000 },
-	all: { min: 2_210_000, max: 2_595_000 },
+	all: { min: 2_210_000, max: 2_595_000 }
 };
 
 // all = format + parse. `all − format` is the parse feature (parser convert
@@ -76,7 +76,7 @@ const BOUNDS = {
 // gate-health signal). A delta near zero means a feature gate broke.
 const DELTAS = {
 	format: { min: 209_000, max: 245_000 }, // all − format
-	parse: { min: 1_295_000, max: 1_525_000 }, // all − parse
+	parse: { min: 1_295_000, max: 1_525_000 } // all − parse
 };
 
 console.log('=== WASM binary sizes ===');
@@ -96,11 +96,11 @@ for (const target of TARGETS) {
 		const { min, max } = BOUNDS[variant];
 		if (size < min) {
 			fail(
-				`${label}: ${format_size(size)} (${size} B) < min ${format_size(min)} — suspiciously small`,
+				`${label}: ${format_size(size)} (${size} B) < min ${format_size(min)} — suspiciously small`
 			);
 		} else if (size > max) {
 			fail(
-				`${label}: ${format_size(size)} (${size} B) > max ${format_size(max)} — size regression`,
+				`${label}: ${format_size(size)} (${size} B) > max ${format_size(max)} — size regression`
 			);
 		} else {
 			pass(`${label}: ${format_size(size)} (${size} B)`);
@@ -120,15 +120,15 @@ for (const target of TARGETS) {
 		const delta = all_bytes - subset_bytes;
 		if (delta < min) {
 			fail(
-				`all - ${variant} (${target}) = ${format_size(delta)} — expected ≥${
-					format_size(min)
-				} (feature gate broken?)`,
+				`all - ${variant} (${target}) = ${format_size(delta)} — expected ≥${format_size(
+					min
+				)} (feature gate broken?)`
 			);
 		} else if (delta > max) {
 			fail(
-				`all - ${variant} (${target}) = ${format_size(delta)} — expected ≤${
-					format_size(max)
-				} (unexpected bloat)`,
+				`all - ${variant} (${target}) = ${format_size(delta)} — expected ≤${format_size(
+					max
+				)} (unexpected bloat)`
 			);
 		} else {
 			pass(`all - ${variant} (${target}) = ${format_size(delta)}`);
@@ -156,7 +156,7 @@ const smoke_entries = (variant: 'format' | 'parse' | 'all'): SmokeTarget[] => [
 		entry: `crates/tsv_wasm/pkg/${variant}/npm/index.js`,
 		has_format: variant !== 'parse',
 		has_parse: variant !== 'format',
-		is_npm: true,
+		is_npm: true
 	},
 	// deno-target bundle (auto-init at import)
 	{
@@ -164,8 +164,8 @@ const smoke_entries = (variant: 'format' | 'parse' | 'all'): SmokeTarget[] => [
 		entry: `crates/tsv_wasm/pkg/${variant}/deno/tsv_wasm.js`,
 		has_format: variant !== 'parse',
 		has_parse: variant !== 'format',
-		is_npm: false,
-	},
+		is_npm: false
+	}
 ];
 
 const smoke_targets: SmokeTarget[] = VARIANTS.flatMap(smoke_entries);
@@ -189,13 +189,13 @@ for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 		check(
 			label,
 			'format_typescript',
-			() => mod.format_typescript('const   x=1') === 'const x = 1;\n',
+			() => mod.format_typescript('const   x=1') === 'const x = 1;\n'
 		);
 		check(label, 'format_css', () => mod.format_css('a{color:red}') === 'a {\n\tcolor: red;\n}\n');
 		check(
 			label,
 			'format_svelte',
-			() => mod.format_svelte('<div   >x</div   >') === '<div>x</div>\n',
+			() => mod.format_svelte('<div   >x</div   >') === '<div>x</div>\n'
 		);
 		check(label, 'IgnoreStack', () => {
 			const ctor = (mod as Record<string, unknown>).IgnoreStack as
@@ -230,24 +230,24 @@ for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 		check(
 			label,
 			'IgnoreStack absent (parse-only build)',
-			() => (mod as Record<string, unknown>).IgnoreStack === undefined,
+			() => (mod as Record<string, unknown>).IgnoreStack === undefined
 		);
 	}
 	if (has_parse) {
 		check(
 			label,
 			'parse_typescript',
-			() => (mod.parse_typescript('const x = 1;') as { type: string }).type === 'Program',
+			() => (mod.parse_typescript('const x = 1;') as { type: string }).type === 'Program'
 		);
 		check(
 			label,
 			'parse_svelte',
-			() => (mod.parse_svelte('<div>x</div>') as { type: string }).type === 'Root',
+			() => (mod.parse_svelte('<div>x</div>') as { type: string }).type === 'Root'
 		);
 		check(
 			label,
 			'parse_css',
-			() => (mod.parse_css('a { color: red }') as { type: string }).type === 'StyleSheetFile',
+			() => (mod.parse_css('a { color: red }') as { type: string }).type === 'StyleSheetFile'
 		);
 	}
 	// The pure-JS `no-locations` reconstruction helper is patched into the npm
@@ -258,8 +258,7 @@ for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 		if (has_parse) {
 			check(label, 'reconstruct_locations', () => {
 				const reconstruct = (mod as Record<string, unknown>).reconstruct_locations as
-					| ((ast: unknown, source: string) => { loc?: unknown })
-					| undefined;
+					((ast: unknown, source: string) => { loc?: unknown }) | undefined;
 				if (typeof reconstruct !== 'function') return false;
 				const ast = mod.parse_typescript_no_locations('const x = 1;') as { loc?: unknown };
 				const out = reconstruct(ast, 'const x = 1;');
@@ -269,7 +268,7 @@ for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 			check(
 				label,
 				'reconstruct_locations absent (format-only build)',
-				() => (mod as Record<string, unknown>).reconstruct_locations === undefined,
+				() => (mod as Record<string, unknown>).reconstruct_locations === undefined
 			);
 		}
 	}
@@ -290,12 +289,12 @@ function check(target: string, name: string, assertion: () => boolean): void {
 // --- Summary ---
 
 console.log(
-	`\n=== Artifact validation: ${passed} passed, ${failed} failed, ${skipped} skipped ===`,
+	`\n=== Artifact validation: ${passed} passed, ${failed} failed, ${skipped} skipped ===`
 );
 if (failed > 0) Deno.exit(1);
 if (passed === 0) {
 	console.error(
-		'FAIL: no artifacts found to validate — run `deno task build:npm:format` etc. first',
+		'FAIL: no artifacts found to validate — run `deno task build:npm:format` etc. first'
 	);
 	Deno.exit(1);
 }

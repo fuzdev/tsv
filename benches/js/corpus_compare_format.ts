@@ -24,19 +24,19 @@ import {
 	redirect_logs_to_stderr,
 	rel_path,
 	resolve_compare_base_path,
-	run_compare_main,
+	run_compare_main
 } from './lib/compare_cli.ts';
 import {
 	diff_lines,
 	type DiffHunk,
 	extract_hunks,
 	filter_diff_context,
-	format_diff_for_terminal,
+	format_diff_for_terminal
 } from './lib/diff.ts';
 import {
 	CORPUS_FORMAT_MATCH_MIN,
 	CORPUS_FORMAT_PARTIAL_PIN,
-	CORPUS_FORMAT_UNKNOWN_PIN,
+	CORPUS_FORMAT_UNKNOWN_PIN
 } from './lib/gate_counts.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 import {
@@ -44,7 +44,7 @@ import {
 	check_safety_vs_prettier,
 	detect_divergences,
 	type HunkCoverageResult,
-	type SafetyViolation,
+	type SafetyViolation
 } from './lib/divergence/mod.ts';
 
 const CorpusCompareArgs = z.object({
@@ -54,7 +54,7 @@ const CorpusCompareArgs = z.object({
 	explain: z.boolean().default(false),
 	strict: z.boolean().default(false),
 	'audit-patterns': z.boolean().default(false),
-	summary: z.boolean().default(false),
+	summary: z.boolean().default(false)
 });
 
 interface LanguageStats {
@@ -153,14 +153,14 @@ function empty_stats(): LanguageStats {
 		unknown_diff: 0,
 		safety_violation: 0,
 		expected_errors: 0,
-		errors: 0,
+		errors: 0
 	};
 }
 
 /** All stored results across languages with the given status (sorted callers chain `.sort`). */
 function results_by_status(
 	results: Map<Language, CompareResult[]>,
-	status: CompareResult['status'],
+	status: CompareResult['status']
 ): CompareResult[] {
 	return LANGUAGES.flatMap((lang) => results.get(lang)!.filter((r) => r.status === status));
 }
@@ -227,7 +227,7 @@ function stats_to_counts(s: LanguageStats) {
 		unknown: s.unknown_diff,
 		safety: s.safety_violation,
 		errors: s.errors,
-		expected_errors: s.expected_errors,
+		expected_errors: s.expected_errors
 	};
 }
 
@@ -255,7 +255,7 @@ function build_stats_block(stats: Map<Language, LanguageStats>) {
 function json_file_entry(
 	r: CompareResult,
 	lang: Language,
-	base_path: string,
+	base_path: string
 ): Record<string, unknown> {
 	const base = { path: rel_path(r.path, base_path), language: lang, bytes: r.bytes };
 	switch (r.status) {
@@ -283,13 +283,14 @@ function json_file_entry(
 function build_json_report(
 	results: Map<Language, CompareResult[]>,
 	stats: Map<Language, LanguageStats>,
-	base_path: string,
+	base_path: string
 ): Record<string, unknown> {
 	const by_status = (status: CompareResult['status']) =>
 		LANGUAGES.flatMap((lang) =>
-			results.get(lang)!.filter((r) => r.status === status).map((r) =>
-				json_file_entry(r, lang, base_path)
-			)
+			results
+				.get(lang)!
+				.filter((r) => r.status === status)
+				.map((r) => json_file_entry(r, lang, base_path))
 		);
 	return {
 		stats: build_stats_block(stats),
@@ -297,7 +298,7 @@ function build_json_report(
 		partial: by_status('partial_divergence'),
 		unknown: by_status('unknown_diff'),
 		errors: by_status('error'),
-		expected_errors: by_status('expected_error'),
+		expected_errors: by_status('expected_error')
 	};
 }
 
@@ -399,16 +400,17 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		pattern_name: string,
 		file_path: string,
 		hunk_indices: number[],
-		hunks: DiffHunk[],
+		hunks: DiffHunk[]
 	): void {
 		const entries = pattern_audit_map.get(pattern_name) ?? [];
 		const first_hunk = hunks[hunk_indices[0]];
 		const preview = (first_hunk?.added_lines[0] || first_hunk?.removed_lines[0] || '')
-			.trim().slice(0, 60);
+			.trim()
+			.slice(0, 60);
 		entries.push({
 			path: rel_path(file_path, base_path),
 			hunk_indices,
-			hunk_preview: preview,
+			hunk_preview: preview
 		});
 		pattern_audit_map.set(pattern_name, entries);
 	}
@@ -417,7 +419,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	function tally_patterns(
 		coverage: HunkCoverageResult,
 		file_path: string,
-		hunks: DiffHunk[],
+		hunks: DiffHunk[]
 	): void {
 		for (const d of coverage.matches) {
 			divergence_counts.set(d.pattern, (divergence_counts.get(d.pattern) || 0) + 1);
@@ -469,7 +471,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 			// surfaced rather than silently suppressing a safety verdict.
 			if (prettier.trim() === '' && file.content.trim() !== '') {
 				throw new Error(
-					'prettier returned empty output for non-empty source (prettier miss — safety verdict unreliable)',
+					'prettier returned empty output for non-empty source (prettier miss — safety verdict unreliable)'
 				);
 			}
 
@@ -510,7 +512,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 						path: file.path,
 						bytes: file.bytes,
 						status: 'known_divergence',
-						coverage,
+						coverage
 					});
 					tally_patterns(coverage, file.path, hunks);
 				} else {
@@ -526,7 +528,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 					const ours_verify = native.format(file.content, lang);
 					if (ours_verify !== ours) {
 						throw new Error(
-							'native format nondeterminism: two runs on identical input differ (FFI corruption — safety verdict unreliable)',
+							'native format nondeterminism: two runs on identical input differ (FFI corruption — safety verdict unreliable)'
 						);
 					}
 					lang_stats.safety_violation++;
@@ -535,7 +537,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 						bytes: file.bytes,
 						status: 'safety_violation',
 						safety_violations,
-						coverage: coverage.classification !== 'none_explained' ? coverage : undefined,
+						coverage: coverage.classification !== 'none_explained' ? coverage : undefined
 					});
 					if (exit_on_first) {
 						const rel = rel_path(file.path, base_path);
@@ -566,7 +568,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 						bytes: file.bytes,
 						status: 'unknown_diff',
 						ours,
-						prettier,
+						prettier
 					});
 					if (exit_on_first) {
 						console.log(`\nDifference (strict mode): ${rel}`);
@@ -583,7 +585,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 							path: file.path,
 							bytes: file.bytes,
 							status: 'known_divergence',
-							coverage,
+							coverage
 						});
 						tally_patterns(coverage, file.path, hunks);
 					} else if (coverage.classification === 'partial') {
@@ -594,7 +596,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 							path: file.path,
 							bytes: file.bytes,
 							status: 'partial_divergence',
-							coverage,
+							coverage
 						});
 						tally_patterns(coverage, file.path, hunks);
 					} else {
@@ -607,7 +609,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 							status: 'unknown_diff',
 							ours,
 							prettier,
-							coverage,
+							coverage
 						});
 						if (exit_on_first) {
 							console.log(`\nUnknown difference: ${rel}`);
@@ -615,7 +617,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 							const removals = diff.filter((d) => d.type === 'remove').length;
 							const additions = diff.filter((d) => d.type === 'add').length;
 							console.log(
-								`Diff: \x1b[31m- Prettier\x1b[0m → \x1b[32m+ Ours\x1b[0m  (${removals} prettier-only, ${additions} ours-only)`,
+								`Diff: \x1b[31m- Prettier\x1b[0m → \x1b[32m+ Ours\x1b[0m  (${removals} prettier-only, ${additions} ours-only)`
 							);
 							console.log('');
 							for (const line of format_diff_for_terminal(filter_diff_context(diff))) {
@@ -636,7 +638,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 					bytes: file.bytes,
 					status: 'expected_error',
 					error: error_msg,
-					expected_reason: expected_check.pattern!.reason,
+					expected_reason: expected_check.pattern!.reason
 				});
 			} else {
 				lang_stats.errors++;
@@ -644,7 +646,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 					path: file.path,
 					bytes: file.bytes,
 					status: 'error',
-					error: error_msg,
+					error: error_msg
 				});
 				if (exit_on_first) {
 					console.log(`\nError: ${rel_path(file.path, base_path)}`);
@@ -732,7 +734,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 			unknown_diff: total_unknown_diff,
 			safety_violation: total_safety_violation,
 			expected_errors: total_expected_errors,
-			errors: total_errors,
+			errors: total_errors
 		};
 		const parts = build_detail_parts(totals);
 
@@ -767,9 +769,10 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 			console.log(`\n${pattern}: ${entries.length} files`);
 			const samples = entries.slice(0, 3);
 			for (const sample of samples) {
-				const hunk_str = sample.hunk_indices.length === 1
-					? `hunk ${sample.hunk_indices[0]}`
-					: `hunks ${sample.hunk_indices.join(',')}`;
+				const hunk_str =
+					sample.hunk_indices.length === 1
+						? `hunk ${sample.hunk_indices[0]}`
+						: `hunks ${sample.hunk_indices.join(',')}`;
 				console.log(`  ${sample.path} (${hunk_str})`);
 				if (sample.hunk_preview) {
 					console.log(`    "${sample.hunk_preview}"`);
@@ -795,28 +798,27 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	}
 
 	// Show partial divergences (some hunks unexplained)
-	const all_partial = results_by_status(results, 'partial_divergence')
-		.sort((a, b) => a.bytes - b.bytes);
+	const all_partial = results_by_status(results, 'partial_divergence').sort(
+		(a, b) => a.bytes - b.bytes
+	);
 
 	// Show unknown differences (needs investigation)
-	const all_unknown = results_by_status(results, 'unknown_diff')
-		.sort((a, b) => a.bytes - b.bytes);
+	const all_unknown = results_by_status(results, 'unknown_diff').sort((a, b) => a.bytes - b.bytes);
 
 	// Default: show unexplained diffs (partial hunks + unknown files)
 	// --summary: compact output without diffs
 	if (summary) {
 		// Compact partial divergence listing
 		if (all_partial.length > 0) {
-			console.log(
-				`\nPartial Divergences (${all_partial.length} files):`,
-			);
+			console.log(`\nPartial Divergences (${all_partial.length} files):`);
 			for (const r of all_partial.slice(0, 10)) {
 				const coverage = r.coverage!;
 				const patterns = coverage.matches.map((d) => d.pattern).join(', ');
 				console.log(
-					`  ${
-						rel_path(r.path, base_path)
-					}: ${patterns} (${coverage.unexplained_hunks.length} unexplained hunks)`,
+					`  ${rel_path(
+						r.path,
+						base_path
+					)}: ${patterns} (${coverage.unexplained_hunks.length} unexplained hunks)`
 				);
 			}
 			if (all_partial.length > 10) {
@@ -826,9 +828,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 
 		// Compact unknown differences listing
 		if (all_unknown.length > 0) {
-			console.log(
-				`\nUnknown Differences (${all_unknown.length} files, needs investigation):`,
-			);
+			console.log(`\nUnknown Differences (${all_unknown.length} files, needs investigation):`);
 			for (const r of all_unknown.slice(0, 10)) {
 				const size_str = format_bytes(r.bytes);
 				const diff_summary = get_diff_summary(r.prettier!, r.ours!);
@@ -844,7 +844,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		const total_unexplained_files = all_partial.length + all_unknown.length;
 		if (total_unexplained_files > 0) {
 			console.log(
-				`\nUnexplained Differences (${all_partial.length} partial + ${all_unknown.length} unknown = ${total_unexplained_files} files):`,
+				`\nUnexplained Differences (${all_partial.length} partial + ${all_unknown.length} unknown = ${total_unexplained_files} files):`
 			);
 		}
 
@@ -858,16 +858,12 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 				const explained_count = coverage.explained_hunks.size;
 				const total_hunks = coverage.hunks.length;
 				console.log(`\n  ${rel_path(r.path, base_path)}:`);
-				console.log(
-					`    explained ${explained_count}/${total_hunks} hunks: ${patterns}`,
-				);
+				console.log(`    explained ${explained_count}/${total_hunks} hunks: ${patterns}`);
 				for (const idx of coverage.unexplained_hunks) {
 					const hunk = coverage.hunks[idx];
 					const ours_label = hunk.ours_range ? `ours:${hunk.ours_range.start}` : '';
 					const prettier_label = hunk.prettier_range ? `prettier:${hunk.prettier_range.start}` : '';
-					console.log(
-						`    \x1b[33mhunk ${idx}\x1b[0m: @@ ${ours_label} / ${prettier_label} @@`,
-					);
+					console.log(`    \x1b[33mhunk ${idx}\x1b[0m: @@ ${ours_label} / ${prettier_label} @@`);
 					for (const line of format_diff_for_terminal(hunk.lines)) {
 						console.log(`      ${line}`);
 					}
@@ -885,7 +881,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 				const additions = diff.filter((d) => d.type === 'add').length;
 				console.log(`\n  ${rel_path(r.path, base_path)} (${format_bytes(r.bytes)}):`);
 				console.log(
-					`    \x1b[31m-${removals} prettier-only\x1b[0m, \x1b[32m+${additions} ours-only\x1b[0m`,
+					`    \x1b[31m-${removals} prettier-only\x1b[0m, \x1b[32m+${additions} ours-only\x1b[0m`
 				);
 				for (const line of format_diff_for_terminal(filter_diff_context(diff))) {
 					console.log(`      ${line}`);
@@ -922,8 +918,9 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	}
 
 	// Show expected errors (dimmed, verbose/explain only for details)
-	const all_expected_errors = results_by_status(results, 'expected_error')
-		.sort((a, b) => a.bytes - b.bytes);
+	const all_expected_errors = results_by_status(results, 'expected_error').sort(
+		(a, b) => a.bytes - b.bytes
+	);
 
 	if (all_expected_errors.length > 0 && (verbose || explain)) {
 		console.log(`\n\x1b[2mExpected Errors (${all_expected_errors.length} files):\x1b[0m`);
@@ -960,28 +957,31 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 			console.log(
 				`\n\x1b[33mWARN: live dev-repo divergences (non-gating) — ${live_warn.join('; ')}. ` +
 					`Unversioned working trees, so not pinned; triage a specific one with ` +
-					`\`corpus:compare:format <repo>\`. SAFETY still gates these.\x1b[0m`,
+					`\`corpus:compare:format <repo>\`. SAFETY still gates these.\x1b[0m`
 			);
 		}
 
 		const pin = (lang: Language) => repro_stats.get(lang)!;
 		const pin_failures = [
 			...LANGUAGES.filter((lang) => pin(lang).match < CORPUS_FORMAT_MATCH_MIN[lang]).map(
-				(lang) => `${lang} match ${pin(lang).match} < pinned minimum ${CORPUS_FORMAT_MATCH_MIN[lang]}`,
+				(lang) =>
+					`${lang} match ${pin(lang).match} < pinned minimum ${CORPUS_FORMAT_MATCH_MIN[lang]}`
 			),
 			...LANGUAGES.filter((lang) => pin(lang).unknown_diff !== CORPUS_FORMAT_UNKNOWN_PIN[lang]).map(
-				(lang) => `${lang} unknown ${pin(lang).unknown_diff} ≠ pinned ${CORPUS_FORMAT_UNKNOWN_PIN[lang]}`,
+				(lang) =>
+					`${lang} unknown ${pin(lang).unknown_diff} ≠ pinned ${CORPUS_FORMAT_UNKNOWN_PIN[lang]}`
 			),
 			...LANGUAGES.filter(
-				(lang) => pin(lang).partial_divergence !== CORPUS_FORMAT_PARTIAL_PIN[lang],
+				(lang) => pin(lang).partial_divergence !== CORPUS_FORMAT_PARTIAL_PIN[lang]
 			).map(
-				(lang) => `${lang} partial ${pin(lang).partial_divergence} ≠ pinned ${CORPUS_FORMAT_PARTIAL_PIN[lang]}`,
-			),
+				(lang) =>
+					`${lang} partial ${pin(lang).partial_divergence} ≠ pinned ${CORPUS_FORMAT_PARTIAL_PIN[lang]}`
+			)
 		];
 		if (pin_failures.length > 0) {
 			console.log(
 				`\n\x1b[31mFAIL: pinned counts (reproducible subset) — ${pin_failures.join('; ')}. ` +
-					`If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`,
+					`If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`
 			);
 			canonical.dispose();
 			native.dispose();
@@ -993,7 +993,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	console.log();
 	if (total_safety_violation > 0) {
 		console.log(
-			`\x1b[31mFAIL: ${total_safety_violation} safety violations (data loss detected)\x1b[0m`,
+			`\x1b[31mFAIL: ${total_safety_violation} safety violations (data loss detected)\x1b[0m`
 		);
 		canonical.dispose();
 		native.dispose();
@@ -1008,9 +1008,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		const parts: string[] = [];
 		if (total_unknown_diff > 0) parts.push(`${total_unknown_diff} unknown`);
 		if (total_partial_divergence > 0) parts.push(`${total_partial_divergence} partial`);
-		console.log(
-			`\x1b[33mWARN: ${parts.join(', ')} differences (may need investigation)\x1b[0m`,
-		);
+		console.log(`\x1b[33mWARN: ${parts.join(', ')} differences (may need investigation)\x1b[0m`);
 	} else if (
 		total_errors > 0 &&
 		total_match + total_known_divergence + total_expected_errors === 0
@@ -1019,7 +1017,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		// NOT a graded run. Without this floor the SAFETY differential never runs
 		// on any file and the gate would WARN + exit 0 having compared nothing.
 		console.log(
-			`\x1b[31mFAIL: all ${total_errors} files errored — nothing was compared (systemic sidecar/FFI failure?)\x1b[0m`,
+			`\x1b[31mFAIL: all ${total_errors} files errored — nothing was compared (systemic sidecar/FFI failure?)\x1b[0m`
 		);
 		canonical.dispose();
 		native.dispose();
@@ -1043,7 +1041,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
  */
 function build_error_json_report(message: string): Record<string, unknown> {
 	const empty_lang_stats: Map<Language, LanguageStats> = new Map(
-		LANGUAGES.map((lang) => [lang, empty_stats()]),
+		LANGUAGES.map((lang) => [lang, empty_stats()])
 	);
 	return {
 		stats: build_stats_block(empty_lang_stats),
@@ -1052,7 +1050,7 @@ function build_error_json_report(message: string): Record<string, unknown> {
 		unknown: [],
 		errors: [],
 		expected_errors: [],
-		error: message,
+		error: message
 	};
 }
 

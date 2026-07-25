@@ -57,37 +57,38 @@ export const PERF_OMITS: PerfOmit[] = [
 	{
 		task: 'typescript/canonical',
 		path: 'kit/packages/kit/src/runtime/app/env',
-		reason: 'acorn-typescript cannot parse ambient const declarations (no .d.ts mode)',
+		reason: 'acorn-typescript cannot parse ambient const declarations (no .d.ts mode)'
 	},
 	{
 		task: 'typescript/oxc',
 		path: 'kit/packages/kit/src/runtime/app/env',
 		reason:
-			'oxc (native + wasm) rejects ambient consts under the synthetic file.ts name (no path threading in the bench)',
+			'oxc (native + wasm) rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
 	},
 	{
 		task: 'typescript/oxfmt',
 		path: 'kit/packages/kit/src/runtime/app/env',
 		reason:
-			'oxfmt rejects ambient consts under the synthetic file.ts name (no path threading in the bench)',
+			'oxfmt rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
 	},
 	// acorn-typescript enforces the `arguments`-in-class-field-initializer early
 	// error; tsv (permissive / defer-diagnostics policy) and prettier accept it.
 	{
 		task: 'typescript/canonical',
 		path: 'svelte/packages/svelte/src/ambient.d.ts',
-		reason: 'acorn-typescript enforces an early error tsv defers (arguments in class field init)',
-	},
+		reason: 'acorn-typescript enforces an early error tsv defers (arguments in class field init)'
+	}
 ];
 
 /** First matching omit reason for `(tracking_key, path)`, or `null` when the failure is unlisted. */
 export function perf_omit_reason(
 	omits: PerfOmit[],
 	tracking_key: string,
-	path: string,
+	path: string
 ): string | null {
 	return (
-		omits.find((o) => (o.task === undefined || tracking_key.includes(o.task)) && path.includes(o.path))
-			?.reason ?? null
+		omits.find(
+			(o) => (o.task === undefined || tracking_key.includes(o.task)) && path.includes(o.path)
+		)?.reason ?? null
 	);
 }

@@ -399,20 +399,81 @@ pub fn is_regex_start(bytes: &[u8], slash_pos: usize, lower_bound: usize) -> boo
         j -= 1;
         let b = bytes[j];
         if !b.is_ascii_whitespace() {
+            // An identifier byte usually ends an operand (`a / 2` divides), but a
+            // whole RESERVED word ending here is an operator, and a `/` after an
+            // operator opens a regex (`typeof /re/`, `void /re/`, `'a' in /re/`).
+            if is_identifier_byte(b) {
+                return word_before_regex(bytes, j + 1, lower_bound);
+            }
+            // A postfix `++`/`--` ends an operand, so the `/` after it DIVIDES
+            // (`aa++ / bb`). A lone `+`/`-` is a binary or unary operator, after
+            // which a regex may start (`aa + /re/.test(b)`), so the doubling is
+            // the whole discriminator.
+            if matches!(b, b'+' | b'-') && j > lower_bound && bytes[j - 1] == b {
+                return false;
+            }
             // Bytes that END an expression — a `/` after these is DIVISION. The
             // string/template closing quotes (`'` `"` `` ` ``) belong here: after a
             // literal like `'ab' / 2`, the `/` divides (skip_trivia already ate the
             // whole string, so this quote can only be its close).
-            return !(b.is_ascii_alphanumeric()
-                || b == b'_'
-                || b == b')'
-                || b == b']'
-                || b == b'\''
-                || b == b'"'
-                || b == b'`');
+            return !(b == b')' || b == b']' || b == b'\'' || b == b'"' || b == b'`');
         }
     }
     // Nothing significant before it (start of the scanned region) → regex.
+    true
+}
+
+/// Whether the identifier ending at `word_end` (exclusive) is a reserved word an
+/// expression — and so a regex literal — may follow (`typeof /re/`, `void /re/`,
+/// `'a' in /re/`).
+///
+/// Only **reserved** words qualify: a reserved word can never be a variable, so
+/// reading one as an operator can never misclassify a real division. Contextual
+/// keywords are deliberately absent — `of` and `as` are legal identifiers, so
+/// `of / 2` must stay division. `await` is the one judgment call: reserved at
+/// `Goal::Module` (the default) and inside every async function, which is where
+/// `await /re/.test(x)` occurs; only at the rare `Goal::Script` is it an ordinary
+/// identifier whose `await / 2` would be misread.
+///
+/// A reserved word used as a PROPERTY NAME is an operand, not an operator
+/// (`a.in / bb` and `a.return / bb` both divide), so a `.` before the word
+/// disqualifies it.
+fn word_before_regex(bytes: &[u8], word_end: usize, lower_bound: usize) -> bool {
+    let mut start = word_end;
+    while start > lower_bound && is_identifier_byte(bytes[start - 1]) {
+        start -= 1;
+    }
+    // Matched as a pattern rather than scanned from a list so the compiler can
+    // switch on length first — this is the hot path for ordinary division, where
+    // the word is some identifier that matches nothing. A numeric literal
+    // (`1e3 / 2`) falls out here too, since no literal spells a keyword.
+    if !matches!(
+        &bytes[start..word_end],
+        b"return"
+            | b"typeof"
+            | b"instanceof"
+            | b"in"
+            | b"void"
+            | b"delete"
+            | b"case"
+            | b"do"
+            | b"else"
+            | b"throw"
+            | b"new"
+            | b"extends"
+            | b"yield"
+            | b"await"
+    ) {
+        return false;
+    }
+    // `.name` / `?.name` — a member access, so the word is an operand.
+    let mut j = start;
+    while j > lower_bound {
+        j -= 1;
+        if !bytes[j].is_ascii_whitespace() {
+            return bytes[j] != b'.';
+        }
+    }
     true
 }
 
@@ -872,6 +933,60 @@ mod tests {
         // The lower bound is honored: even though `(` precedes, a walk bounded
         // at the `/` itself sees nothing before it → regex.
         assert!(is_regex_start(b"(/re/", 1, 1));
+    }
+
+    #[test]
+    fn is_regex_start_reads_a_reserved_word_as_an_operator() {
+        // The prefix's length IS the `/` offset, so each case names its own
+        // position — no scan needed to locate it.
+        let at_slash = |prefix: &str, rest: &str| {
+            let src = format!("{prefix}{rest}");
+            is_regex_start(src.as_bytes(), prefix.len(), 0)
+        };
+
+        // A reserved word is an operator, so the `/` after it opens a regex.
+        for prefix in [
+            "typeof ",
+            "void ",
+            "'a' in ",
+            "return ",
+            "case ",
+            "throw ",
+            "yield ",
+            "await ",
+            "a instanceof ",
+        ] {
+            assert!(at_slash(prefix, "/re/"), "expected regex after `{prefix}`");
+        }
+
+        // An ordinary identifier is an operand — including one that merely ENDS
+        // with a keyword, one ending in `$` (an identifier byte the old exclusion
+        // list missed), and the contextual keywords that are legal variables.
+        for prefix in ["aa ", "notreturn ", "a$ ", "of ", "as "] {
+            assert!(
+                !at_slash(prefix, "/ bb"),
+                "expected division after `{prefix}`"
+            );
+        }
+
+        // A reserved word is a legal PROPERTY name, and a property is an operand.
+        for prefix in ["a.in ", "a.return ", "a?.typeof "] {
+            assert!(
+                !at_slash(prefix, "/ bb"),
+                "expected division after `{prefix}`"
+            );
+        }
+
+        // A postfix update ends an operand; a lone `+`/`-` does not.
+        for prefix in ["aa++ ", "aa-- ", "aa++"] {
+            assert!(
+                !at_slash(prefix, "/ bb"),
+                "expected division after `{prefix}`"
+            );
+        }
+        for prefix in ["aa + ", "aa - ", "aa = -", "aa = +"] {
+            assert!(at_slash(prefix, "/re/"), "expected regex after `{prefix}`");
+        }
     }
 
     #[test]

@@ -39,25 +39,15 @@ pub(crate) fn print_node_inner<'a>(
                 let inner = printer.build_expression_doc(expr);
                 // Match Prettier: inner group handles indent-on-break,
                 // bare parens outside so chain conditionalGroup drives breaking
+                // Prettier's `group([indent([softline, content]), softline])`: the parens
+                // break onto their own lines and the content stays flat while it fits, so
+                // the chain's conditionalGroup can try flat first. Every base kind below
+                // takes this shape — await, binary, and everything else alike — so it is
+                // written once here rather than repeated per arm.
+                let hang = |content: DocId| {
+                    d.group(d.concat(&[d.indent(d.concat(&[d.softline(), content])), d.softline()]))
+                };
                 let inner_group = match expr {
-                    Expression::AwaitExpression(_) => {
-                        // Prettier: group([indent([softline, inner]), softline])
-                        d.group(
-                            d.concat(&[d.indent(d.concat(&[d.softline(), inner])), d.softline()]),
-                        )
-                    }
-                    Expression::BinaryExpression(binary) if binary.operator.is_logical() => {
-                        // Logical: keep existing indented structure
-                        printer.build_parenthesized_base_inner_logical(binary)
-                    }
-                    Expression::BinaryExpression(binary) => {
-                        // Arithmetic: same indent-on-break as await
-                        let bin_inner = printer.build_parenthesized_base_inner_binary(binary);
-                        d.group(d.concat(&[
-                            d.indent(d.concat(&[d.softline(), bin_inner])),
-                            d.softline(),
-                        ]))
-                    }
                     Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_) => {
                         // IIFE / function callee or arrow member-object: the parens
                         // hug the function — its own body drives breaking, prettier
@@ -66,13 +56,18 @@ pub(crate) fn print_node_inner<'a>(
                         // (`call_formatting.rs`), which wraps with hugging parens.
                         inner
                     }
-                    _ => {
-                        // All other expressions: same indent-on-break as await
-                        // so chain conditionalGroup can try flat first
-                        d.group(
-                            d.concat(&[d.indent(d.concat(&[d.softline(), inner])), d.softline()]),
-                        )
+                    Expression::BinaryExpression(binary) => {
+                        // The chain-for-parens operand doc, so the whole operand chain is
+                        // what stays flat. Every operator family — arithmetic, logical
+                        // (`&&`/`||`), and nullish (`??`) — is laid out identically. A
+                        // logical base used to skip this wrapper and break at its own
+                        // operators instead, welding the closing `).member` onto the last
+                        // operand — a third layout matching neither tsv's arithmetic shape
+                        // nor prettier's. See conformance_prettier.md §TypeScript
+                        // (Parenthesized binary member base).
+                        hang(printer.build_binary_chain_for_parens(binary))
                     }
+                    _ => hang(inner),
                 };
                 // Preserve a comment from the stripped grouping parens inside them,
                 // before `)` (`(x + y /* c */)!.foo`) — prettier relocates it past

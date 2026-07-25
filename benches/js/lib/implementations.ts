@@ -65,7 +65,7 @@ export interface InitOptions {
  * ```
  */
 export async function init_implementations(
-	options: InitOptions = {},
+	options: InitOptions = {}
 ): Promise<InitializedImplementations> {
 	const { logger = console.log, skip_missing = true, require_canonical = true } = options;
 
@@ -194,7 +194,7 @@ export async function init_implementations(
 		oxc: oxc_impl,
 		oxc_wasm: oxc_wasm_impl,
 		biome: biome_impl,
-		dprint: dprint_impl,
+		dprint: dprint_impl
 	};
 }
 
@@ -237,7 +237,7 @@ export function get_benchmark_tasks(
 	impls: InitializedImplementations,
 	operation: 'parse' | 'format',
 	language: Language,
-	options: BenchmarkTaskOptions = {},
+	options: BenchmarkTaskOptions = {}
 ): BenchmarkTask[] {
 	const tasks: BenchmarkTask[] = [];
 	const group_name = `${operation}/${language}`;
@@ -248,7 +248,7 @@ export function get_benchmark_tasks(
 			name: canonical_parser_label(language),
 			tracking_key: `${group_name}/canonical`,
 			is_async: false,
-			run: (source, _language, goal) => impls.canonical.parse(source, language, goal),
+			run: (source, _language, goal) => impls.canonical.parse(source, language, goal)
 		});
 
 		// Native parser (with JSON serialization)
@@ -257,7 +257,7 @@ export function get_benchmark_tasks(
 				name: 'tsv-json',
 				tracking_key: `${group_name}/native`,
 				is_async: false,
-				run: (source, _language, goal) => impls.native!.parse(source, language, goal),
+				run: (source, _language, goal) => impls.native!.parse(source, language, goal)
 			});
 		}
 
@@ -270,8 +270,7 @@ export function get_benchmark_tasks(
 				name: 'tsv-json-no-locations',
 				tracking_key: `${group_name}/native-no-locations`,
 				is_async: false,
-				run: (source, _language, goal) =>
-					impls.native!.parse_no_locations!(source, language, goal),
+				run: (source, _language, goal) => impls.native!.parse_no_locations!(source, language, goal)
 			});
 		}
 
@@ -281,7 +280,7 @@ export function get_benchmark_tasks(
 				name: 'tsv_wasm-json',
 				tracking_key: `${group_name}/wasm`,
 				is_async: false,
-				run: (source, _language, goal) => impls.wasm!.parse(source, language, goal),
+				run: (source, _language, goal) => impls.wasm!.parse(source, language, goal)
 			});
 		}
 
@@ -292,8 +291,7 @@ export function get_benchmark_tasks(
 				name: 'tsv_wasm-json-no-locations',
 				tracking_key: `${group_name}/wasm-no-locations`,
 				is_async: false,
-				run: (source, _language, goal) =>
-					impls.wasm!.parse_no_locations!(source, language, goal),
+				run: (source, _language, goal) => impls.wasm!.parse_no_locations!(source, language, goal)
 			});
 		}
 
@@ -303,8 +301,7 @@ export function get_benchmark_tasks(
 				name: 'tsv-internal',
 				tracking_key: `${group_name}/native-internal`,
 				is_async: false,
-				run: (source, _language, goal) =>
-					impls.native!.parse_internal!(source, language, goal),
+				run: (source, _language, goal) => impls.native!.parse_internal!(source, language, goal)
 			});
 		}
 
@@ -313,8 +310,7 @@ export function get_benchmark_tasks(
 				name: 'tsv_wasm-internal',
 				tracking_key: `${group_name}/wasm-internal`,
 				is_async: false,
-				run: (source, _language, goal) =>
-					impls.wasm!.parse_internal!(source, language, goal),
+				run: (source, _language, goal) => impls.wasm!.parse_internal!(source, language, goal)
 			});
 		}
 
@@ -328,7 +324,7 @@ export function get_benchmark_tasks(
 				name: 'oxc-parser',
 				tracking_key: `${group_name}/oxc`,
 				is_async: false,
-				run: (source, _language, goal) => impls.oxc!.parse(source, language, goal),
+				run: (source, _language, goal) => impls.oxc!.parse(source, language, goal)
 			});
 		}
 
@@ -338,7 +334,7 @@ export function get_benchmark_tasks(
 				name: 'oxc-parser-wasm',
 				tracking_key: `${group_name}/oxc-wasm`,
 				is_async: false,
-				run: (source, _language, goal) => impls.oxc_wasm!.parse(source, language, goal),
+				run: (source, _language, goal) => impls.oxc_wasm!.parse(source, language, goal)
 			});
 		}
 	} else {
@@ -350,7 +346,7 @@ export function get_benchmark_tasks(
 			run: () => {
 				throw new Error('Use run_async for prettier');
 			},
-			run_async: (source) => impls.canonical.format_async(source, language),
+			run_async: (source) => impls.canonical.format_async(source, language)
 		});
 
 		// Native formatter
@@ -359,7 +355,7 @@ export function get_benchmark_tasks(
 				name: 'tsv',
 				tracking_key: `${group_name}/native`,
 				is_async: false,
-				run: (source) => impls.native!.format!(source, language),
+				run: (source) => impls.native!.format!(source, language)
 			});
 		}
 
@@ -376,8 +372,7 @@ export function get_benchmark_tasks(
 				run: () => {
 					throw new Error('Use run_async for tsv-forced-async');
 				},
-				run_async: (source, language) =>
-					Promise.resolve(impls.native!.format!(source, language)),
+				run_async: (source, language) => Promise.resolve(impls.native!.format!(source, language))
 			});
 		}
 
@@ -387,7 +382,7 @@ export function get_benchmark_tasks(
 				name: 'tsv_wasm',
 				tracking_key: `${group_name}/wasm`,
 				is_async: false,
-				run: (source) => impls.wasm!.format!(source, language),
+				run: (source) => impls.wasm!.format!(source, language)
 			});
 		}
 
@@ -400,7 +395,7 @@ export function get_benchmark_tasks(
 				run: () => {
 					throw new Error('Use run_async for oxfmt');
 				},
-				run_async: (source) => impls.oxc!.format_async(source, language),
+				run_async: (source) => impls.oxc!.format_async(source, language)
 			});
 		}
 
@@ -410,7 +405,7 @@ export function get_benchmark_tasks(
 				name: 'biome-wasm',
 				tracking_key: `${group_name}/biome`,
 				is_async: false,
-				run: (source) => impls.biome!.format(source, language),
+				run: (source) => impls.biome!.format(source, language)
 			});
 		}
 
@@ -420,7 +415,7 @@ export function get_benchmark_tasks(
 				name: 'dprint-wasm',
 				tracking_key: `${group_name}/dprint`,
 				is_async: false,
-				run: (source) => impls.dprint!.format(source, language),
+				run: (source) => impls.dprint!.format(source, language)
 			});
 		}
 	}
@@ -462,7 +457,7 @@ export function get_formatters(impls: InitializedImplementations): FormatterInfo
 		name: 'prettier',
 		is_async: true,
 		format_async: (source, lang) => impls.canonical.format_async(source, lang),
-		supports_language: () => true,
+		supports_language: () => true
 	});
 
 	// Native - sync
@@ -471,7 +466,7 @@ export function get_formatters(impls: InitializedImplementations): FormatterInfo
 			name: 'tsv',
 			is_async: false,
 			format: (source, lang) => impls.native!.format!(source, lang),
-			supports_language: () => true,
+			supports_language: () => true
 		});
 	}
 
@@ -481,7 +476,7 @@ export function get_formatters(impls: InitializedImplementations): FormatterInfo
 			name: 'tsv_wasm',
 			is_async: false,
 			format: (source, lang) => impls.wasm!.format!(source, lang),
-			supports_language: () => true,
+			supports_language: () => true
 		});
 	}
 
@@ -491,7 +486,7 @@ export function get_formatters(impls: InitializedImplementations): FormatterInfo
 			name: 'oxfmt',
 			is_async: true,
 			format_async: (source, lang) => impls.oxc!.format_async(source, lang),
-			supports_language: (lang) => impls.oxc!.supports_format_language(lang),
+			supports_language: (lang) => impls.oxc!.supports_format_language(lang)
 		});
 	}
 
@@ -501,7 +496,7 @@ export function get_formatters(impls: InitializedImplementations): FormatterInfo
 			name: 'biome-wasm',
 			is_async: false,
 			format: (source, lang) => impls.biome!.format(source, lang),
-			supports_language: (lang) => impls.biome!.supports_format_language(lang),
+			supports_language: (lang) => impls.biome!.supports_format_language(lang)
 		});
 	}
 
@@ -511,7 +506,7 @@ export function get_formatters(impls: InitializedImplementations): FormatterInfo
 			name: 'dprint-wasm',
 			is_async: false,
 			format: (source, lang) => impls.dprint!.format(source, lang),
-			supports_language: (lang) => impls.dprint!.supports_format_language(lang),
+			supports_language: (lang) => impls.dprint!.supports_format_language(lang)
 		});
 	}
 
@@ -537,6 +532,6 @@ export function get_alternative_versions(impls: InitializedImplementations): Alt
 		biome: impls.biome?.versions.wasm,
 		// The plugin version is the one worth citing — `@dprint/formatter` is just
 		// the Wasm host, the TS/JS formatting behavior lives in the plugin.
-		dprint: impls.dprint?.versions.typescript,
+		dprint: impls.dprint?.versions.typescript
 	};
 }

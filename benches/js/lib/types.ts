@@ -15,16 +15,15 @@ export const LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
 export const LANGUAGE_EXTENSIONS: Record<Language, string> = {
 	svelte: '.svelte',
 	typescript: '.ts',
-	css: '.css',
+	css: '.css'
 };
 
 /** Prettier parser names for each language */
 export const LANGUAGE_PRETTIER_PARSERS: Record<Language, string> = {
 	svelte: 'svelte',
 	typescript: 'typescript',
-	css: 'css',
+	css: 'css'
 };
-
 
 /** A source file loaded into memory for benchmarking */
 /**
@@ -67,14 +66,7 @@ export interface SourceFile {
 
 /** Implementation names for benchmarking */
 export type ImplementationName =
-	| 'canonical'
-	| 'native'
-	| 'napi'
-	| 'wasm'
-	| 'oxc'
-	| 'oxc-wasm'
-	| 'biome-wasm'
-	| 'dprint-wasm';
+	'canonical' | 'native' | 'napi' | 'wasm' | 'oxc' | 'oxc-wasm' | 'biome-wasm' | 'dprint-wasm';
 
 /** Common interface for parser/formatter implementations */
 export interface TsvImplementation {

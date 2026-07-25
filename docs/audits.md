@@ -17,6 +17,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Ignore honoring](#ignore-directive-honoring-audit-ignoreaudit) | `ignore:audit` | `prettier-ignore` positions that silently reformat an ignored node, misbind a trailing directive, over-freeze, or lose the freeze on pass 2 | `deno task check` (ratchet) |
 | [Build fanout](#build-fanout-audit-fanoutaudit) | `fanout:audit` | exponential doc-node rebuild in nested layout candidates | `deno task check` |
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
+| [Self-format](#self-format-audit-formataudit) | `format:audit` | tsv failing to format its OWN TS/JS — a would-change file (non-idempotency) or a parse error (over-rejection) | `deno task check` |
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check` |
 | [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` | formatted output the parser rejects (delimiter/structure corruption) | `deno task check` |
 | [Binding](#commenttoken-binding-audit-bindingaudit) | `binding:audit` | a glued comment re-bound to a different subtree by a migrating paren | `deno task check` |
@@ -211,6 +212,20 @@ cargo run -p tsv_debug build_fanout_audit
 # Also: --json. Gated in `deno task check` via the `fanout:audit` task.
 ```
 
+**What it is blind to.** The audit measures how the doc-node count *grows with depth*, so it
+sees only violations that **compound**. Two shapes escape it:
+
+- **A flat constant factor.** An eager build a later branch discards — `let x = build_…(…)`
+  bound before a `match`/`if` whose arms don't all use `x` — costs a fixed 2× at that one site
+  and never compounds, so no depth curve can separate it from the baseline. The tell is
+  syntactic, not empirical; grep the shape rather than waiting for a profile, since a single
+  site sits below the noise floor of a corpus measurement while still being free to remove.
+- **Breadth.** A quadratic over a flat sibling sequence (`[..i].iter().any(…)` inside a child
+  loop) is likewise structurally invisible — it grows with sibling count, not nesting.
+
+Both are guarded by review and grep, not by this audit. The known open instance of the first is
+a parenthesized binary chain base; see the `chain/printing.rs` note in the perf queue.
+
 ## Raw-Find Scan Audit (`scan:audit`)
 
 ```bash
@@ -229,6 +244,44 @@ cargo run -p tsv_debug scan_audit --list     # enumerate every scan site
 # closure `.find(|…|)` (iterator/predicate), counting/existence checks, and hand
 # byte-loops (the cursor is their sanctioned home).
 ```
+
+## Self-Format Audit (`format:audit`)
+
+```bash
+# tsv formats its own TS/JS. Runs `tsv format --check .` over the repo, so the
+# formatter's own output on real, non-fixture source is a standing gate.
+deno task format:audit
+```
+
+**What it proves.** Two things at once, and it fails on either:
+
+- **exit 1 — a would-change file**: the committed tree is not a `tsv format` fixed
+  point. Because the tree is committed formatted, this also makes the audit an
+  **idempotency** check on real code: a non-idempotent file can never be committed
+  clean, so it shows up here rather than as silent churn.
+- **exit 2 — a parse error**: tsv rejects a file it must be able to read. This is
+  the signal with no other home — every over-rejection the repo's own TS has hit
+  was found here first.
+
+**Why it is not redundant with the corpus gates.** `corpus:compare:format` and the
+conformance gates read **other** repositories (framework checkouts, prettier
+suites, the live dev repos). None of them read tsv's own `benches/js`, `scripts`,
+or `crates/**/npm` sources, so nothing else covers this tree.
+
+**Scope.** The root `.formatignore` prunes `tests/fixtures/` and
+`tests/fixtures_compile/` — those files are DATA whose whole claim is the state
+they are committed in, and many are deliberately not format fixed points. A
+directory argument can never step past that; only an explicitly named FILE bypasses
+the ignore files, which is why nothing under `tests/` may ever be named directly.
+Markdown and JSON are out of scope entirely — they stay hand-maintained.
+
+**Blind spots.** It only sees shapes this repo's own source happens to contain, so
+it is a dogfooding tripwire, not a survey — a formatter bug in a construct tsv's
+own TS never writes stays invisible here. The injection audits (`gaps:audit`,
+`blanks:audit`) and the corpus gates are the discovery arms.
+
+**Build world.** Runs `tsv_cli` under `--profile corpus`, the single build world
+every `deno task check` audit shares, so it adds no separate compile.
 
 ## Authoring-Independence Audit (`authoring:audit`)
 

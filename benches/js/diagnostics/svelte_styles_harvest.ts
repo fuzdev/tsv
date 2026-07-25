@@ -88,14 +88,14 @@ async function main(): Promise<void> {
 	if (blocks < collapse_floor) {
 		console.error(
 			`FAIL: collapse — ${blocks} style blocks < ${collapse_floor} (90% of pinned ${SVELTE_STYLES_BLOCKS_MIN}); ` +
-				`cache not written. Extraction likely broke or the corpus was gutted — investigate before re-pinning lib/gate_counts.ts.`,
+				`cache not written. Extraction likely broke or the corpus was gutted — investigate before re-pinning lib/gate_counts.ts.`
 		);
 		Deno.exit(1);
 	}
 	if (blocks < SVELTE_STYLES_BLOCKS_MIN) {
 		console.error(
 			`WARN: ${blocks} style blocks < pinned minimum ${SVELTE_STYLES_BLOCKS_MIN} ` +
-				`(within the 10% drift band) — writing cache anyway. If deliberate, re-pin in lib/gate_counts.ts to silence.`,
+				`(within the 10% drift band) — writing cache anyway. If deliberate, re-pin in lib/gate_counts.ts to silence.`
 		);
 	}
 
@@ -133,7 +133,7 @@ async function main(): Promise<void> {
 	console.error(
 		`svelte_styles_harvest: ${blocks} style blocks / ${(total_bytes / 1024).toFixed(0)} KB ` +
 			`from ${by_repo.size} repos → ${relative(resolve('.'), out_dir)}/ ` +
-			`(${written} written, ${unchanged} unchanged${removed > 0 ? `, ${removed} stray removed` : ''})`,
+			`(${written} written, ${unchanged} unchanged${removed > 0 ? `, ${removed} stray removed` : ''})`
 	);
 }
 

@@ -33,7 +33,7 @@ import {
 	build_context,
 	fixture_dir_exists,
 	type FixtureIo,
-	select_witnesses,
+	select_witnesses
 } from './fixture_cases.ts';
 
 /**
@@ -84,9 +84,9 @@ Deno.test('witnesses: output_prettier outranks every other form', () => {
 			'prettier_intermediate_a.svelte',
 			'divergent_variant_a.svelte',
 			'variant_a.svelte',
-			'unformatted_ours_a.svelte',
+			'unformatted_ours_a.svelte'
 		],
-		svelte_ext,
+		svelte_ext
 	);
 	assert(rung === 'output_prettier', `expected output_prettier rung, got ${rung}`);
 	assert(witnesses.length === 1 && witnesses[0].prettier_file === 'output_prettier.svelte');
@@ -97,7 +97,7 @@ Deno.test('witnesses: output_prettier outranks every other form', () => {
 Deno.test('witnesses: every prettier_variant is a witness, and is its own source', () => {
 	const { rung, witnesses } = select_witnesses(
 		['input.svelte', 'prettier_variant_b.svelte', 'prettier_variant_a.svelte'],
-		svelte_ext,
+		svelte_ext
 	);
 	assert(rung === 'prettier_variant', `expected prettier_variant rung, got ${rung}`);
 	assert(witnesses.length === 2, `expected both variants, got ${witnesses.length}`);
@@ -108,7 +108,7 @@ Deno.test('witnesses: every prettier_variant is a witness, and is its own source
 Deno.test('witnesses: prettier_intermediate stands in when no stable form exists', () => {
 	const { rung, witnesses } = select_witnesses(
 		['input.svelte', 'prettier_intermediate_parens.svelte', 'unformatted_ours_parens.svelte'],
-		svelte_ext,
+		svelte_ext
 	);
 	assert(rung === 'prettier_intermediate', `expected prettier_intermediate rung, got ${rung}`);
 	assert(witnesses.length === 1);
@@ -122,9 +122,9 @@ Deno.test('witnesses: divergent_variant outranks the N10 inference', () => {
 			'input.svelte',
 			'divergent_variant_last_inline.svelte',
 			'variant_expanded_last_glued.svelte',
-			'unformatted_ours_spaces.svelte',
+			'unformatted_ours_spaces.svelte'
 		],
-		svelte_ext,
+		svelte_ext
 	);
 	assert(rung === 'divergent_variant', `expected divergent_variant rung, got ${rung}`);
 	assert(witnesses[0].prettier_file === 'divergent_variant_last_inline.svelte');
@@ -133,7 +133,7 @@ Deno.test('witnesses: divergent_variant outranks the N10 inference', () => {
 Deno.test('witnesses: N10 fires on exactly one stable form', () => {
 	const { rung, witnesses } = select_witnesses(
 		['input.svelte', 'variant_standalone.svelte', 'unformatted_ours_standalone.svelte'],
-		svelte_ext,
+		svelte_ext
 	);
 	assert(rung === 'n10', `expected n10 rung, got ${rung}`);
 	assert(witnesses[0].prettier_file === 'variant_standalone.svelte');
@@ -142,13 +142,8 @@ Deno.test('witnesses: N10 fires on exactly one stable form', () => {
 
 Deno.test('witnesses: N10 refuses two stable forms rather than guessing', () => {
 	const { rung, witnesses } = select_witnesses(
-		[
-			'input.svelte',
-			'variant_a.svelte',
-			'variant_b.svelte',
-			'unformatted_ours_spaces.svelte',
-		],
-		svelte_ext,
+		['input.svelte', 'variant_a.svelte', 'variant_b.svelte', 'unformatted_ours_spaces.svelte'],
+		svelte_ext
 	);
 	assert(rung === 'none', `ambiguous stable set must yield no witness, got ${rung}`);
 	assert(witnesses.length === 0);
@@ -168,15 +163,12 @@ Deno.test('witnesses: a bare divergence fixture yields nothing', () => {
 Deno.test('witnesses: extension match is exact, so .svelte ignores .svelte.ts siblings', () => {
 	// A `.svelte` fixture must not claim a `.svelte.ts` variant, nor vice versa —
 	// `endsWith` on the full suffix is what keeps the two apart.
-	const svelte = select_witnesses(
-		['input.svelte', 'prettier_variant_a.svelte.ts'],
-		'.svelte',
-	);
+	const svelte = select_witnesses(['input.svelte', 'prettier_variant_a.svelte.ts'], '.svelte');
 	assert(svelte.rung === 'none', `.svelte must not claim a .svelte.ts variant`);
 
 	const svelte_ts = select_witnesses(
 		['input.svelte.ts', 'prettier_variant_a.svelte', 'prettier_variant_b.svelte.ts'],
-		'.svelte.ts',
+		'.svelte.ts'
 	);
 	assert(svelte_ts.rung === 'prettier_variant');
 	assert(svelte_ts.witnesses.length === 1, 'only the .svelte.ts variant counts');
@@ -192,13 +184,13 @@ Deno.test('witnesses: extension match is exact, so .svelte ignores .svelte.ts si
 /** An in-memory `FixtureIo` over `{filename: content}`. */
 const memory_io = (files: Record<string, string>): FixtureIo => ({
 	list: () => Promise.resolve(Object.keys(files).sort()),
-	read: (_path, name) => Promise.resolve(files[name] ?? null),
+	read: (_path, name) => Promise.resolve(files[name] ?? null)
 });
 
 Deno.test('assembly: ours is always input, prettier is the witness content', async () => {
 	const cases = await build_cases(
 		'x',
-		memory_io({ 'input.svelte': 'OURS', 'output_prettier.svelte': 'PRETTIER' }),
+		memory_io({ 'input.svelte': 'OURS', 'output_prettier.svelte': 'PRETTIER' })
 	);
 	assert(cases !== 'no_input' && cases.length === 1);
 	assert(cases[0].ours === 'OURS', `ours must be input, got ${cases[0].ours}`);
@@ -210,7 +202,7 @@ Deno.test('assembly: ours is always input, prettier is the witness content', asy
 Deno.test('assembly: a prettier_variant is its own source, not input', async () => {
 	const cases = await build_cases(
 		'x',
-		memory_io({ 'input.svelte': 'OURS', 'prettier_variant_a.svelte': 'VARIANT' }),
+		memory_io({ 'input.svelte': 'OURS', 'prettier_variant_a.svelte': 'VARIANT' })
 	);
 	assert(cases !== 'no_input' && cases.length === 1);
 	assert(cases[0].source === 'VARIANT', `source must be the variant, got ${cases[0].source}`);
@@ -225,8 +217,8 @@ Deno.test('assembly: the N10 case reads source and prettier from DIFFERENT files
 		memory_io({
 			'input.svelte': 'OURS',
 			'variant_standalone.svelte': 'STABLE',
-			'unformatted_ours_standalone.svelte': 'AUTHORING',
-		}),
+			'unformatted_ours_standalone.svelte': 'AUTHORING'
+		})
 	);
 	assert(cases !== 'no_input' && cases.length === 1);
 	assert(cases[0].source === 'AUTHORING', `source must be the authoring, got ${cases[0].source}`);
@@ -237,7 +229,7 @@ Deno.test('assembly: the N10 case reads source and prettier from DIFFERENT files
 Deno.test('assembly: no input.* yields no_input regardless of other files', async () => {
 	const cases = await build_cases(
 		'x',
-		memory_io({ 'output_prettier.svelte': 'P', 'README.md': 'r' }),
+		memory_io({ 'output_prettier.svelte': 'P', 'README.md': 'r' })
 	);
 	assert(cases === 'no_input', `expected no_input, got ${JSON.stringify(cases)}`);
 });
@@ -245,7 +237,7 @@ Deno.test('assembly: no input.* yields no_input regardless of other files', asyn
 Deno.test('assembly: language follows the input extension', async () => {
 	const svelte = await build_cases(
 		'x',
-		memory_io({ 'input.svelte': 'a', 'output_prettier.svelte': 'b' }),
+		memory_io({ 'input.svelte': 'a', 'output_prettier.svelte': 'b' })
 	);
 	const ts = await build_cases('x', memory_io({ 'input.ts': 'a', 'output_prettier.ts': 'b' }));
 	const css = await build_cases('x', memory_io({ 'input.css': 'a', 'output_prettier.css': 'b' }));
@@ -261,8 +253,8 @@ Deno.test('assembly: input resolution order prefers .svelte over .svelte.ts', as
 		memory_io({
 			'input.svelte': 'SVELTE',
 			'input.svelte.ts': 'SVELTE_TS',
-			'output_prettier.svelte': 'P',
-		}),
+			'output_prettier.svelte': 'P'
+		})
 	);
 	assert(cases !== 'no_input' && cases[0].ours === 'SVELTE');
 });
@@ -298,7 +290,7 @@ const KNOWN_PARTIAL: Record<string, string> = {
 	// comment_position claims the comment hunk, not the reflow tail it sits in
 	'typescript/expressions/calls/chained/trailing_member_comment_prettier_divergence': '2 hunks',
 	'typescript/statements/switch/case_block_comment_prettier_divergence': '1 hunk',
-	'typescript/statements/switch/discriminant_trailing_comment_prettier_divergence': '1 hunk',
+	'typescript/statements/switch/discriminant_trailing_comment_prettier_divergence': '1 hunk'
 };
 
 /**
@@ -363,7 +355,7 @@ Deno.test('fixture coverage: every listed fixture is FULLY explained', async () 
 		`${newly_partial.length} listed fixture(s) went PARTIAL — a pattern claims some hunks ` +
 			`and leaves others unexplained, which the per-pattern "claims a hunk" bar cannot see. ` +
 			`Widen the detector, or add a KNOWN_PARTIAL entry with the reason:\n  ` +
-			newly_partial.join('\n  '),
+			newly_partial.join('\n  ')
 	);
 
 	const stale = Object.keys(KNOWN_PARTIAL).filter((f) => !still_partial.has(f));
@@ -371,7 +363,7 @@ Deno.test('fixture coverage: every listed fixture is FULLY explained', async () 
 		stale.length === 0,
 		`${stale.length} KNOWN_PARTIAL entr(ies) no longer fire — the fixture is now fully ` +
 			`explained (or no longer listed). Delete them; the ratchet must mirror the live set:\n  ` +
-			stale.join('\n  '),
+			stale.join('\n  ')
 	);
 });
 
@@ -401,7 +393,7 @@ Deno.test('fixture coverage: every listed fixture path resolves on disk', async 
 		broken.length === 0,
 		`${broken.length} pattern fixture listing(s) point at no directory — fix the path ` +
 			`or unlist it (a renamed fixture, or one that lost its _prettier_divergence ` +
-			`suffix when its divergence was resolved):\n  ${broken.join('\n  ')}`,
+			`suffix when its divergence was resolved):\n  ${broken.join('\n  ')}`
 	);
 });
 
@@ -416,7 +408,7 @@ for (const pattern of PATTERNS) {
 				`[fixture coverage] SKIPPED ${pattern.id}: no --allow-read. The wired ` +
 					`test:deno task grants it; you're running deno test without it, so this ` +
 					`audit does nothing here. Add \`--allow-read\` (or run \`deno task test:deno\`) ` +
-					`to actually exercise the detectors against their fixtures.`,
+					`to actually exercise the detectors against their fixtures.`
 			);
 			return;
 		}
@@ -429,16 +421,13 @@ for (const pattern of PATTERNS) {
 				// DIRECTORY is caught by the broken-reference test below, which
 				// reports every such listing at once rather than aborting here on
 				// the first one.
-				assert(
-					false,
-					`${pattern.id} lists ${fixture_path}, whose directory holds no input.* file`,
-				);
+				assert(false, `${pattern.id} lists ${fixture_path}, whose directory holds no input.* file`);
 			}
 			if (cases.length === 0) {
 				console.warn(
 					`[fixture coverage] ${pattern.id}: ${fixture_path} pins no prettier form ` +
 						`(no output_prettier.*, no prettier_variant_*, and not an unambiguous ` +
-						`N10 case) — skipping`,
+						`N10 case) — skipping`
 				);
 				continue;
 			}
@@ -458,13 +447,13 @@ for (const pattern of PATTERNS) {
 				if (claimed.length === 0) {
 					console.warn(
 						`[fixture coverage] PRE-EXISTING DRIFT: ${pattern.id} does not detect ` +
-							`its claimed fixture ${fixture_path}`,
+							`its claimed fixture ${fixture_path}`
 					);
 				} else {
 					// The drift was fixed elsewhere — flag so the entry can be removed.
 					console.warn(
 						`[fixture coverage] ${pattern.id} now DETECTS ${fixture_path} ` +
-							`(via ${claimed.join(', ')}); remove it from PRE_EXISTING_DRIFT`,
+							`(via ${claimed.join(', ')}); remove it from PRE_EXISTING_DRIFT`
 					);
 				}
 				continue;
@@ -473,7 +462,7 @@ for (const pattern of PATTERNS) {
 			assert(
 				claimed.length > 0,
 				`${pattern.id} claims no hunk in any prettier form its own fixture ` +
-					`${fixture_path} pins (tried: ${cases.map((c) => c.label).join(', ')})`,
+					`${fixture_path} pins (tried: ${cases.map((c) => c.label).join(', ')})`
 			);
 		}
 
@@ -483,7 +472,7 @@ for (const pattern of PATTERNS) {
 			cases_run > 0,
 			`${pattern.id} ran zero detection cases — every fixture it lists was skipped, ` +
 				`so this test asserts nothing. List a fixture that pins a prettier form, or ` +
-				`drop the fixtures array.`,
+				`drop the fixtures array.`
 		);
 	});
 }
