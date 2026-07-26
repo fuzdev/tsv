@@ -77,11 +77,15 @@ impl<'a> Printer<'a> {
             inner.push(d.text("}"));
             d.concat(&inner)
         } else {
-            // Check for line comments between/around attributes (force multiline)
-            let has_line_comments =
+            // Expanding comments force the multiline path — line comments anywhere in the
+            // list, and block comments the author isolated on their own line between the
+            // braces (collapsing `with {⏎ /* c */⏎ type: 'json' }` inline would move the
+            // comment). The attribute brace formerly asked only about line comments.
+            let has_expanding_comments =
                 self.has_line_comments_in_delimited_list(attributes, |a| a.span, stmt_end)
-                    || self.has_line_comments_between(brace_start + 1, attributes[0].span.start);
-            if has_line_comments {
+                    || self.has_line_comments_between(brace_start + 1, attributes[0].span.start)
+                    || self.has_own_line_attribute_comments(attributes, brace_start, brace_close);
+            if has_expanding_comments {
                 // A same-line comment trailing the `with {` brace stays on the
                 // brace line, like the import/export specifier brace
                 // (`import { // c`). Prettier floats it past `;`; tsv keeps the
@@ -123,6 +127,44 @@ impl<'a> Printer<'a> {
         ]);
         parts.push(self.gap_comment_indented_continuation(source_end, with_start, with_clause));
         brace_close + 1
+    }
+
+    /// Whether any comment in the `with { … }` braces was authored on its OWN line —
+    /// isolated from both the attribute (or brace) before it and the one after
+    /// ([`Self::comment_isolated_from_neighbors`]). Such a comment can only keep its line if
+    /// the list breaks, so it is an expansion trigger.
+    ///
+    /// Spelled here rather than reusing `has_own_line_block_comments_in_bracket_list`: that
+    /// predicate looks for the following element with a strict `>`, so a comment GLUED to the
+    /// attribute after it (`/* c */attr`, whose end is exactly that attribute's start) reads
+    /// as a dangling trailing comment and expands — and the expanded form reprints with the
+    /// separating space, which then collapses again (non-idempotent).
+    fn has_own_line_attribute_comments(
+        &self,
+        attributes: &[internal::ImportAttribute<'_>],
+        brace_start: u32,
+        brace_close: u32,
+    ) -> bool {
+        tsv_lang::comments_in_source_range(self.comments, brace_start + 1, brace_close).any(|c| {
+            let inside_attribute = attributes
+                .iter()
+                .any(|a| c.span.start >= a.span.start && c.span.end <= a.span.end);
+            if inside_attribute {
+                return false;
+            }
+            let prev = attributes
+                .iter()
+                .map(|a| a.span.end)
+                .take_while(|&end| end <= c.span.start)
+                .last()
+                .unwrap_or(brace_start);
+            let next = attributes
+                .iter()
+                .map(|a| a.span.start)
+                .find(|&start| start >= c.span.end)
+                .unwrap_or(brace_close);
+            self.comment_isolated_from_neighbors(prev, c, next)
+        })
     }
 
     /// Build doc for an import attribute key: a bare identifier emits verbatim;

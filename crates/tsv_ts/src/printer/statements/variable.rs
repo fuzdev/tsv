@@ -168,6 +168,25 @@ impl<'a> Printer<'a> {
         let has_any_init = decl.declarations.iter().any(|d| d.init.is_some());
         let should_break = is_multi_declarator && has_any_init;
 
+        // The continuation indent the broken declarators carry. Normally explicit `INDENT`
+        // text, because these declarators aren't wrapped in a `d.indent()` — but when the
+        // keyword→first-declarator gap breaks, `build_keyword_to_name_continuation` wraps the
+        // whole continuation in one, and emitting both puts every declarator after the first
+        // two levels deep.
+        let continuation_indent = if self.keyword_gap_breaks(keyword_end, first_decl_start) {
+            d.empty()
+        } else {
+            d.text(INDENT)
+        };
+
+        // The Rule A gap anchors, in the shared closure form `list_item_frozen` takes. The
+        // first declarator's gap opens past the keyword, so a directive written between
+        // `const`/`let`/`var` and it freezes it like any other member; the header emitter
+        // keeps that directive on its own line ([`Printer::build_header_comment_run`]) —
+        // flush against the keyword it would be inert and the freeze would be lost on the
+        // second pass.
+        let item_span = |j: usize| decl.declarations[j].span;
+
         // When breaking to multiple lines, multiline objects/arrays get extra indentation
         // Use save/restore pattern for nested multi-declarator safety
         let old_indent_depth = self.declaration_indent_depth.get();
@@ -202,14 +221,13 @@ impl<'a> Printer<'a> {
                         // Line comment(s) between declarators: the comma must go before
                         // the first line comment, block comments go before the comma.
                         // e.g. `a = 1 /* c1 */,\n// c2\nb = 2` or `a = 1, // c1\n// c2\nb = 2`.
-                        // The gap owns its own break; these declarators aren't wrapped in
-                        // `d.indent()`, so it carries explicit `INDENT` text.
+                        // The gap owns its own break, so it carries the continuation indent.
                         self.push_inter_item_line_comment_gap(
                             &mut parts,
                             prev_end,
                             comma_pos,
                             curr_start,
-                            d.text(INDENT),
+                            continuation_indent,
                         );
                     } else {
                         // Block comment(s) before the comma trail the previous init
@@ -226,7 +244,7 @@ impl<'a> Printer<'a> {
                         self.push_stranded_after_comma_blocks(&mut parts, comma_pos, curr_start);
                         // Break to new line with indentation for next declarator
                         parts.push(d.hardline());
-                        parts.push(d.text(INDENT));
+                        parts.push(continuation_indent);
                         if has_gap_comment {
                             // After-comma block comment(s) lead the next declarator. A
                             // stranded block already trailed the comma above.
@@ -242,7 +260,7 @@ impl<'a> Printer<'a> {
                                 comments.iter().copied(),
                                 curr_start,
                                 LeadingGlue::Adjacent,
-                                d.text(INDENT),
+                                continuation_indent,
                             );
                         }
                     }
@@ -282,6 +300,24 @@ impl<'a> Printer<'a> {
                         }
                     }
                 }
+            }
+
+            // A continuation declarator with no initializer is the one case that lives in
+            // `rest_parts` (wrapped in `d.indent()` after the loop); everything else feeds
+            // `parts`. Named once, then reused by the freeze arm and the plain-`id_doc` arms.
+            let goes_in_parts = should_break || i == 0;
+
+            // Rule A: an own-line directive in an inter-declarator gap freezes the FOLLOWING
+            // declarator over its own node span — the annotation, `=`, and initializer all
+            // ride inside it; the separating `,` is parent-owned and was emitted above.
+            if self.list_item_frozen(keyword_end, &item_span, i) {
+                let frozen_doc = self.build_frozen_span_item_doc(declarator.span);
+                if goes_in_parts {
+                    parts.push(frozen_doc);
+                } else {
+                    rest_parts.push(frozen_doc);
+                }
+                continue;
             }
 
             // Build id doc once for reuse and analysis
