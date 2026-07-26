@@ -169,6 +169,41 @@ argument or element that would normally hug (`fn({ a, b })`, `new A([a, b])`)
 expands instead, so the directive keeps its own line. An array hole contributes
 only its comma, so the element after one still freezes.
 
+### On module and declarator lists
+
+Named **import / export specifiers**, a `with { … }` clause's **import
+attributes**, and a variable declaration's **declarators** are member lists
+too — same rule, an own-line directive freezes the **next item** only:
+
+```ts
+import {
+	aaa as a1,
+	// format-ignore
+	bbb   as   b1,
+	ccc as c1
+} from './a';
+
+const a = 1,
+	// format-ignore
+	b   =   2,
+	c = 3;
+```
+
+The whole item freezes: an inline `type` modifier, a string specifier, an
+attribute's key and value, a declarator's annotation, initializer, or
+destructuring binding. A `for` header's init clause is the same declarator list.
+
+The first item's gap opens just past the keyword, so a directive written between
+`const`/`let`/`var` and the first declarator — or between `import` and a
+`* as ns` namespace binding — freezes that item too. tsv keeps the directive on
+its own line there, leaving the keyword alone on the line above; pulled up beside
+the keyword it would be inert.
+
+That last part holds in **every** declaration-header gap, including ones where
+nothing freezes (`function`, `class`): a directive is never reflowed onto the
+line above it, so its placement — the thing that decides whether it is honored —
+is always the one you wrote.
+
 ## `format-ignore-start` / `format-ignore-end`
 
 In Svelte templates, a pair of range markers preserves every node between them:

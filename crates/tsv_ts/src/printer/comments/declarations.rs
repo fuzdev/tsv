@@ -673,6 +673,29 @@ impl<'a> Printer<'a> {
     /// to indent. Indenting per gap compounds: two broken gaps would put the keyword's
     /// last word two levels deep, below the value that follows it at one.
     ///
+    /// Whether a declaration-header gap ENDS ON ITS OWN LINE — the one predicate behind both
+    /// [`Self::build_keyword_gap_doc`]'s broken-and-indented layout and any caller that must
+    /// stop supplying its own continuation indent because this gap's `indent` already covers
+    /// it (the multi-declarator variable list).
+    ///
+    /// A line comment breaks the gap, and so does an honored format-ignore directive in
+    /// either spelling: [`Self::build_header_comment_run`] ends it on its own line, because
+    /// flush against the keyword the directive would be inert and the freeze it earns would
+    /// be lost on the second pass.
+    #[inline]
+    pub(crate) fn keyword_gap_breaks(&self, start: u32, end: u32) -> bool {
+        self.has_line_comments_between(start, end) || self.member_gap_frozen(start, end)
+    }
+
+    /// One header gap — the comments authored in it plus the separator that follows —
+    /// with **no** `indent` applied. Also reports whether a *line* comment ended the
+    /// line, which is the caller's cue that a break happened.
+    ///
+    /// Split out from [`build_keyword_to_name_continuation`](Self::build_keyword_to_name_continuation)
+    /// so a caller with *several* gaps can emit each one and then decide **once** what
+    /// to indent. Indenting per gap compounds: two broken gaps would put the keyword's
+    /// last word two levels deep, below the value that follows it at one.
+    ///
     /// Two callers: [`build_keyword_words_doc`](Self::build_keyword_words_doc) for a
     /// keyword's interior gaps, and the import-equals header — the one multi-gap header
     /// whose words aren't contiguous (its name sits between `import` and `=`), so it
@@ -687,7 +710,7 @@ impl<'a> Printer<'a> {
         if !self.has_comments_to_emit_between(start, end) {
             return (d.text(" "), false);
         }
-        let has_line = self.has_line_comments_between(start, end);
+        let has_line = self.keyword_gap_breaks(start, end);
         let comment_doc = if has_line {
             self.build_name_to_type_params_comments(start, end, CommentSpacing::Leading)
         } else if let Some(c) = self.build_inline_comments_between_doc_opt(start, end) {
@@ -742,18 +765,60 @@ impl<'a> Printer<'a> {
         end: u32,
         block_spacing: CommentSpacing,
     ) -> DocId {
+        self.build_header_comment_run(start, end, block_spacing, false)
+    }
+
+    /// [`Self::build_name_to_type_params_comments`] with the run's leading separator made
+    /// explicit: `preceded_by_space` is `true` for a caller whose preceding token already ends
+    /// in one (the module headers' `import `/`export `/`type `), so the first comment doesn't
+    /// get a second. It is deliberately NOT the same question as "on a fresh line" — the run
+    /// still starts on the preceding token's line, which is what the directive rule below
+    /// keys on.
+    pub(crate) fn build_header_comment_run(
+        &self,
+        start: u32,
+        end: u32,
+        block_spacing: CommentSpacing,
+        preceded_by_space: bool,
+    ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
         // After a line comment's hardline the next comment starts a fresh (indented)
         // line, so it must not get a leading space — otherwise a 2nd+ own-line comment
         // renders as `\t // c` (stray leading space).
         let mut at_line_start = false;
+        // The caller's token already supplied the run's first separator, if it had one.
+        let mut owed_space = !preceded_by_space;
         for comment in comments_to_emit_in_range(self.comments, start, end) {
+            let space_before = !at_line_start && owed_space;
+            owed_space = true;
+            // An HONORED format-ignore directive keeps the line the author gave it, in both
+            // spellings: pulled up flush against the keyword — or left with the following
+            // token on its line — it would share that line, which the placement floor
+            // classifies as inert, and the freeze it earns would be lost on the second pass.
+            // Every other comment in the run keeps the flush-first layout.
+            //
+            // Deliberately NOT conditioned on this gap being a freeze position: the rule is
+            // about the directive, not the target. A gap that doesn't freeze today (a
+            // `function`/`class` head) can only start honoring one if the placement survives
+            // to be read, so the emitter never relocates a directive anywhere — one rule
+            // instead of a flag threaded through nine header call sites, and no position can
+            // be silently disqualified before its cluster reaches it. The layout cost is
+            // fixtured (`keyword_gap_prettier_ignore_own_line_prettier_divergence`).
+            if self.has_format_ignore && self.is_honored_directive(comment) {
+                if !at_line_start {
+                    parts.push(d.hardline());
+                }
+                parts.push(self.build_comment_doc(comment));
+                parts.push(d.hardline());
+                at_line_start = true;
+                continue;
+            }
             if comment.is_block {
                 // Block comment: use caller-specified spacing
                 match block_spacing {
                     CommentSpacing::Leading => {
-                        if !at_line_start {
+                        if space_before {
                             parts.push(d.text(" "));
                         }
                         parts.push(self.build_comment_doc(comment));
@@ -770,7 +835,7 @@ impl<'a> Printer<'a> {
             } else {
                 // Line comment: leading space (unless already at line start) +
                 // hardline after — `class A // c\n<T> {}`
-                if !at_line_start {
+                if space_before {
                     parts.push(d.text(" "));
                 }
                 parts.push(self.build_comment_doc(comment));

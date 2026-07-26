@@ -386,7 +386,11 @@ impl<'a> Printer<'a> {
         }
 
         let mut inner_parts = DocBuf::new();
-        let mut prev_end = brace_start + 1; // After opening `{`
+        // Where the first item's gap opens, per the delimited-list anchor convention.
+        let list_start = brace_start + 1;
+        let mut prev_end = list_start;
+        // The Rule A gap anchors, in the shared closure form `list_item_frozen` takes.
+        let item_span = |j: usize| get_span(&items[j]);
         // Block comment trailing the LAST item after its source comma — preserved past
         // where the comma was (no trailing comma; trailingComma: 'none') rather than
         // relocated before it (prettier relocates before; see conformance_prettier.md
@@ -419,7 +423,8 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            item_parts.push(build_item_doc(item));
+            item_parts
+                .push(self.build_span_item_doc(list_start, &item_span, i, || build_item_doc(item)));
 
             if !is_last {
                 let next_start = get_span(&items[i + 1]).start;
@@ -505,7 +510,11 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
-        let mut prev_end: u32 = brace_start + 1; // After opening brace
+        // Where the first item's gap opens, per the delimited-list anchor convention.
+        let list_start = brace_start + 1;
+        let mut prev_end: u32 = list_start;
+        // The Rule A gap anchors, in the shared closure form `list_item_frozen` takes.
+        let item_span = |j: usize| get_span(&items[j]);
 
         for (i, item) in items.iter().enumerate() {
             let span = get_span(item);
@@ -550,7 +559,8 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            parts.push(build_item_doc(item));
+            parts
+                .push(self.build_span_item_doc(list_start, &item_span, i, || build_item_doc(item)));
 
             // Comma with comment-boundary splitting
             let item_end = span.end;

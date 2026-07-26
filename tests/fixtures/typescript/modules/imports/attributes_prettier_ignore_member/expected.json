@@ -1,0 +1,1230 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 768,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an own-line directive after the `{` freezes only the first attribute",
+			"start": 20,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 122,
+			"end": 140,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " between two attributes",
+			"start": 180,
+			"end": 205,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 252,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line block comment behaves identically",
+			"start": 294,
+			"end": 342,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 373,
+			"end": 394,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 2
+				},
+				"end": {
+					"line": 18,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a string key rides inside the frozen slice",
+			"start": 418,
+			"end": 463,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 494,
+			"end": 512,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 24,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a re-export host",
+			"start": 554,
+			"end": 573,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 608,
+			"end": 626,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an `export *` host",
+			"start": 666,
+			"end": 687,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 718,
+			"end": 736,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 2
+				},
+				"end": {
+					"line": 38,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 767,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 758,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 41,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 93,
+					"end": 177,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 100,
+							"end": 101,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 8
+								},
+								"end": {
+									"line": 3,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 100,
+								"end": 101,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 8
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "a"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 107,
+						"end": 112,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 15
+							},
+							"end": {
+								"line": 3,
+								"column": 20
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 143,
+							"end": 157,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 2
+								},
+								"end": {
+									"line": 5,
+									"column": 16
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 143,
+								"end": 147,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 6
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 151,
+								"end": 157,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 10
+									},
+									"end": {
+										"line": 5,
+										"column": 16
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 122,
+									"end": 140
+								}
+							]
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 161,
+							"end": 173,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 14
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 161,
+								"end": 164,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 5
+									}
+								},
+								"name": "key"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 166,
+								"end": 173,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 14
+									}
+								},
+								"value": "value",
+								"raw": "'value'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line directive after the `{` freezes only the first attribute",
+							"start": 20,
+							"end": 91
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 207,
+					"end": 291,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 3
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 214,
+							"end": 215,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 8
+								},
+								"end": {
+									"line": 10,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 214,
+								"end": 215,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 8
+									},
+									"end": {
+										"line": 10,
+										"column": 9
+									}
+								},
+								"name": "b"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 221,
+						"end": 226,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 15
+							},
+							"end": {
+								"line": 10,
+								"column": 20
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 236,
+							"end": 248,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 14
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 236,
+								"end": 240,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 6
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 242,
+								"end": 248,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 8
+									},
+									"end": {
+										"line": 11,
+										"column": 14
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 273,
+							"end": 287,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 2
+								},
+								"end": {
+									"line": 13,
+									"column": 16
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 273,
+								"end": 276,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 5
+									}
+								},
+								"name": "key"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 280,
+								"end": 287,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 9
+									},
+									"end": {
+										"line": 13,
+										"column": 16
+									}
+								},
+								"value": "value",
+								"raw": "'value'"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 252,
+									"end": 270
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " between two attributes",
+							"start": 180,
+							"end": 205
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 344,
+					"end": 415,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 3
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 351,
+							"end": 352,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 8
+								},
+								"end": {
+									"line": 17,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 351,
+								"end": 352,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 8
+									},
+									"end": {
+										"line": 17,
+										"column": 9
+									}
+								},
+								"name": "c"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 358,
+						"end": 363,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 15
+							},
+							"end": {
+								"line": 17,
+								"column": 20
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 397,
+							"end": 411,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 2
+								},
+								"end": {
+									"line": 19,
+									"column": 16
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 397,
+								"end": 401,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 6
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 405,
+								"end": 411,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 10
+									},
+									"end": {
+										"line": 19,
+										"column": 16
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " prettier-ignore ",
+									"start": 373,
+									"end": 394
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line block comment behaves identically",
+							"start": 294,
+							"end": 342
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 465,
+					"end": 551,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 3
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 472,
+							"end": 473,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 8
+								},
+								"end": {
+									"line": 23,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 472,
+								"end": 473,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 8
+									},
+									"end": {
+										"line": 23,
+										"column": 9
+									}
+								},
+								"name": "d"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 479,
+						"end": 484,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 15
+							},
+							"end": {
+								"line": 23,
+								"column": 20
+							}
+						},
+						"value": "./d",
+						"raw": "'./d'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 515,
+							"end": 531,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 2
+								},
+								"end": {
+									"line": 25,
+									"column": 18
+								}
+							},
+							"key": {
+								"type": "Literal",
+								"start": 515,
+								"end": 520,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 7
+									}
+								},
+								"value": "k-k",
+								"raw": "'k-k'"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 524,
+								"end": 531,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 11
+									},
+									"end": {
+										"line": 25,
+										"column": 18
+									}
+								},
+								"value": "value",
+								"raw": "'value'"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 494,
+									"end": 512
+								}
+							]
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 535,
+							"end": 547,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 2
+								},
+								"end": {
+									"line": 26,
+									"column": 14
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 535,
+								"end": 539,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 6
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 541,
+								"end": 547,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 8
+									},
+									"end": {
+										"line": 26,
+										"column": 14
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a string key rides inside the frozen slice",
+							"start": 418,
+							"end": 463
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 575,
+					"end": 663,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 3
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 584,
+							"end": 585,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 10
+								},
+								"end": {
+									"line": 30,
+									"column": 11
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 584,
+								"end": 585,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 10
+									},
+									"end": {
+										"line": 30,
+										"column": 11
+									}
+								},
+								"name": "e"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 584,
+								"end": 585,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 10
+									},
+									"end": {
+										"line": 30,
+										"column": 11
+									}
+								},
+								"name": "e"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 593,
+						"end": 598,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 19
+							},
+							"end": {
+								"line": 30,
+								"column": 24
+							}
+						},
+						"value": "./e",
+						"raw": "'./e'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 629,
+							"end": 643,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 2
+								},
+								"end": {
+									"line": 32,
+									"column": 16
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 629,
+								"end": 633,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 6
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 637,
+								"end": 643,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 10
+									},
+									"end": {
+										"line": 32,
+										"column": 16
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 608,
+									"end": 626
+								}
+							]
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 647,
+							"end": 659,
+							"loc": {
+								"start": {
+									"line": 33,
+									"column": 2
+								},
+								"end": {
+									"line": 33,
+									"column": 14
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 647,
+								"end": 650,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 2
+									},
+									"end": {
+										"line": 33,
+										"column": 5
+									}
+								},
+								"name": "key"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 652,
+								"end": 659,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 7
+									},
+									"end": {
+										"line": 33,
+										"column": 14
+									}
+								},
+								"value": "value",
+								"raw": "'value'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a re-export host",
+							"start": 554,
+							"end": 573
+						}
+					]
+				},
+				{
+					"type": "ExportAllDeclaration",
+					"start": 689,
+					"end": 757,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 3
+						}
+					},
+					"exportKind": "value",
+					"exported": null,
+					"source": {
+						"type": "Literal",
+						"start": 703,
+						"end": 708,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 15
+							},
+							"end": {
+								"line": 37,
+								"column": 20
+							}
+						},
+						"value": "./f",
+						"raw": "'./f'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 739,
+							"end": 753,
+							"loc": {
+								"start": {
+									"line": 39,
+									"column": 2
+								},
+								"end": {
+									"line": 39,
+									"column": 16
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 739,
+								"end": 743,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 2
+									},
+									"end": {
+										"line": 39,
+										"column": 6
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 747,
+								"end": 753,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 10
+									},
+									"end": {
+										"line": 39,
+										"column": 16
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 718,
+									"end": 736
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an `export *` host",
+							"start": 666,
+							"end": 687
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

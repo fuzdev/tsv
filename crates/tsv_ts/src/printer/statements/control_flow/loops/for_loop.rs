@@ -1507,6 +1507,18 @@ impl<'a> Printer<'a> {
         let saved_in_for_init = self.in_for_init.replace(true);
         let result = match init {
             internal::ForInit::VariableDeclaration(decl) => {
+                // The keyword→first-declarator gap carries a comment (`for (let /* c */
+                // i = 0; …)`) that must not be dropped — see `build_for_decl_keyword_gap`.
+                // Built here rather than through that helper because the declarator loop
+                // needs the keyword's end as its Rule A anchor for the first declarator.
+                let first_decl_start = decl.declarations[0].span.start;
+                let (keyword_doc, keyword_end) = self.build_keyword_words_doc(
+                    decl.kind.words(),
+                    decl.span.start,
+                    first_decl_start,
+                );
+                let item_span = |j: usize| decl.declarations[j].span;
+
                 // Build each declarator's `id = value` doc.
                 let mut decl_docs: DocBuf = DocBuf::new();
                 for (i, declarator) in decl.declarations.iter().enumerate() {
@@ -1517,6 +1529,14 @@ impl<'a> Printer<'a> {
                             prev_end,
                             declarator.span.start,
                         );
+                    }
+                    // Rule A over the init clause's declarators, anchored exactly as the
+                    // statement-level list (`build_variable_declaration_doc`): an own-line
+                    // directive in the keyword→first-declarator gap or between two
+                    // declarators freezes the FOLLOWING one over its own node span.
+                    if self.list_item_frozen(keyword_end, &item_span, i) {
+                        decl_docs.push(self.build_frozen_span_item_doc(declarator.span));
+                        continue;
                     }
                     let mut one: DocBuf = smallvec![self.build_expression_doc(&declarator.id)];
                     if let Some(init) = &declarator.init {
@@ -1548,22 +1568,24 @@ impl<'a> Printer<'a> {
                     }
                     decl_docs.push(d.concat(&one));
                 }
-                // The keyword→first-declarator gap carries a comment (`for (let /* c */
-                // i = 0; …)`) that must not be dropped — see `build_for_decl_keyword_gap`.
-                let first_decl_start = decl.declarations[0].span.start;
-                if decl.declarations.len() > 1 {
-                    // Multiple declarators break on width: they stay on one line when the
-                    // init clause fits and drop onto their own lines (continuation
-                    // indented one level) when it doesn't — matching prettier's
-                    // `printVariableDeclaration`. A declarator whose `=` comment forces a
-                    // break also breaks the group (its hardline propagates).
-                    d.group(self.build_for_decl_keyword_gap(
-                        decl,
-                        first_decl_start,
-                        d.indent(d.concat(&decl_docs)),
-                    ))
+                // Multiple declarators break on width: they stay on one line when the init
+                // clause fits and drop onto their own lines (continuation indented one
+                // level) when it doesn't — matching prettier's `printVariableDeclaration`. A
+                // declarator whose `=` comment forces a break also breaks the group (its
+                // hardline propagates).
+                let body = if decl.declarations.len() > 1 {
+                    d.indent(d.concat(&decl_docs))
                 } else {
-                    self.build_for_decl_keyword_gap(decl, first_decl_start, d.concat(&decl_docs))
+                    d.concat(&decl_docs)
+                };
+                let header = d.concat(&[
+                    keyword_doc,
+                    self.build_keyword_to_name_continuation(keyword_end, first_decl_start, body),
+                ]);
+                if decl.declarations.len() > 1 {
+                    d.group(header)
+                } else {
+                    header
                 }
             }
             internal::ForInit::Expression(expr) => {

@@ -4,6 +4,7 @@
 
 use super::Printer;
 use crate::ast::internal;
+use crate::printer::comments::CommentSpacing;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -121,6 +122,16 @@ impl<'a> Printer<'a> {
         continuation: DocId,
     ) -> DocId {
         let d = self.d();
+        // An HONORED format-ignore directive keeps the line the author gave it, in both
+        // spellings: pulled up flush against the header keyword it would share that line,
+        // which the placement floor classifies as inert, so the freeze it earns would be lost
+        // on the second pass. Routing the whole run through the declaration headers' emitter
+        // gets that rule (and only that rule — every other comment keeps the flush-first
+        // layout) from one place instead of a second spelling of it here.
+        if self.member_gap_frozen(start, end) {
+            let run = self.build_header_comment_run(start, end, CommentSpacing::Leading, true);
+            return d.indent(d.concat(&[run, continuation]));
+        }
         // Line comment: it ends with a hardline, so indent the continuation.
         if self.has_line_comments_between(start, end) {
             return match self.build_rhs_comments_opt(start, end) {
