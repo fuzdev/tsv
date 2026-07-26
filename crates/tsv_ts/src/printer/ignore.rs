@@ -721,6 +721,46 @@ impl<'a> Printer<'a> {
         )
     }
 
+    /// The doc for a comma-list item identified by SPAN alone — a module specifier, an
+    /// import attribute, a variable declarator: the frozen verbatim slice when Rule A fires
+    /// ([`Self::list_item_frozen`]), else `build_ordinary()`. The freeze-aware twin for the
+    /// families whose item is not an `Expression`, so no list loop spells the dispatch itself.
+    ///
+    /// The slice is the item's own node span; the list's `,` is parent-owned and stays
+    /// outside it. A block comment **glued** before the item is owned by it and rides inside
+    /// the doc the slice replaces, so the freeze claims it (docs/comments.md hazard 1) — the
+    /// same node-level fact [`Self::build_frozen_expression_doc`] carries for arguments. The
+    /// grouping-paren fact does not apply here: none of these item kinds prints parens of its
+    /// own around its span.
+    ///
+    /// `build_ordinary` is lazy so the common path builds the item doc exactly once;
+    /// [`Self::list_item_frozen`] already opens on the document-level flag, so a
+    /// directive-free document pays one predicted branch per item.
+    #[inline]
+    pub(in crate::printer) fn build_span_item_doc(
+        &self,
+        container_start: u32,
+        item_span: &impl Fn(usize) -> Span,
+        i: usize,
+        build_ordinary: impl FnOnce() -> DocId,
+    ) -> DocId {
+        if self.list_item_frozen(container_start, item_span, i) {
+            self.build_frozen_span_item_doc(item_span(i))
+        } else {
+            build_ordinary()
+        }
+    }
+
+    /// What a resolved span-shaped list-item freeze EMITS: the verbatim slice with the
+    /// glued leading comment the item owns claimed onto it. Split from
+    /// [`Self::build_span_item_doc`] for the caller whose ordinary path is the rest of a
+    /// loop body rather than a closure (the variable declarator list), so the two dispatch
+    /// shapes still share one emitter.
+    #[inline]
+    pub(in crate::printer) fn build_frozen_span_item_doc(&self, frozen: Span) -> DocId {
+        self.prepend_owned_leading_comment_at(frozen.start, self.build_frozen_span_doc(frozen))
+    }
+
     /// Paren-transparent frozen doc for a union / intersection member — and, through
     /// [`Self::build_frozen_head_doc`], for a single-child head's frozen value too (the
     /// type-parameter constraint/default site passes a `member_parens` that keeps a

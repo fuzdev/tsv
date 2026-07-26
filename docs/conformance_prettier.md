@@ -1630,6 +1630,57 @@ family. The one place the two tools part is the flat **test-call** layout, and t
 comment-position question rather than a freeze one: see §Comment relocation's test-call
 entry.
 
+**On module and declarator lists.** Rule A once more, over the remaining comma lists: an
+own-line directive in the `{`→first-item gap or between two items freezes the **following
+item** — an import's or export's named specifiers, a `with { … }` clause's import
+attributes, and a variable declaration's declarators (in a statement and in a `for`
+header's init clause alike). The slice is the item's own node span, so an inline `type`
+modifier, a string specifier, a declarator's annotation and initializer, and a
+destructuring binding all ride inside it, and the separating `,` stays parent-owned. The
+list's first gap opens just past the delimiter, which for a declarator list is the
+`const`/`let`/`var` keyword and for an `import`'s leading binding the `import` keyword
+itself — so the first specifier, first attribute, first declarator and a whole `* as ns`
+namespace binding all freeze from that gap. Prettier agrees at the braced lists and at the
+inter-declarator gaps, so the ordinary fixtures
+`imports/specifiers_prettier_ignore_member`, `exports/specifiers_prettier_ignore_member`,
+`imports/attributes_prettier_ignore_member` and
+`variable/declarations_prettier_ignore_member` all **match** prettier. tsv diverges at two
+places, both because prettier decides a directive by comment *attachment* where tsv decides
+by placement:
+
+- Own-line directive **between two module specifiers** — ◆design_choice ◆prettier_bug — tsv
+  freezes the following specifier, like every other member list. Prettier's module-specifier
+  comment handler re-binds an own-line comment whose preceding node is an
+  `ImportSpecifier` / `ExportSpecifier` as that specifier's **trailing** comment, so its
+  freeze runs **backward**: the preceding specifier is emitted verbatim and the following
+  one reformats. `divergent_variant_backward` pins the direction — with the preceding
+  specifier perturbed instead, prettier keeps it frozen while tsv normalizes it and freezes
+  forward. The forward direction is the consistent reading of the list rule, and the same
+  reason a trailing directive is permanently inert —
+  [specifiers between](../tests/fixtures/typescript/modules/imports/specifiers_prettier_ignore_between_prettier_divergence/)
+- Directive in a **declaration-header gap** (`const`/`let`/`var`→first declarator,
+  `import`→binding) — ◆design_choice ◆comment_preservation — tsv freezes the item and keeps
+  the directive on **its own line**, leaving the keyword alone on the line above. Prettier
+  pulls it flush against the keyword (`const // prettier-ignore`) and freezes anyway; tsv
+  cannot follow, since a directive sharing its line with anything else is inert under the
+  placement floor and the relocated form would lose the freeze on tsv's own second pass.
+  Each fixture's `divergent_variant_flush` pins prettier's stable flush form, which tsv
+  reads as inert and reformats. When the gap already holds another comment the two tools
+  agree — that comment takes the keyword line and the directive is own-line either way —
+  [declarator head](../tests/fixtures/typescript/declarations/variable/declarations_prettier_ignore_head_prettier_divergence/),
+  [namespace binding](../tests/fixtures/typescript/modules/imports/namespace_prettier_ignore_binding_prettier_divergence/)
+
+**A header-gap directive keeps its own line even where nothing freezes.** The rule above is
+stated on the emitter, not on the freeze: a directive tsv relocated onto the keyword's line
+would be **inert**, so tsv never relocates one — at a `function`/`class` head, where neither
+tool freezes, just as at the declarator head, where both do. Prettier reflows it flush and
+reformats; the one-sided invariant is deliberate, because it keeps every header gap eligible
+to start honoring a directive later instead of having an emitter silently destroy it first.
+tsv is likewise inert to the flush form and never moves a comment *up*, so prettier's stable
+output is a form tsv only re-indents (`divergent_variant_flush`, the pre-existing keyword→value
+hang) —
+[keyword-gap own line](../tests/fixtures/typescript/syntax/comments/keyword_gap_prettier_ignore_own_line_prettier_divergence/)
+
 See [directives.md](./directives.md) for the user-facing reference.
 
 ---

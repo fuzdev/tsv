@@ -601,6 +601,16 @@ impl<'a> Printer<'a> {
 
         // Add namespace import
         if let Some(ns_spec) = namespace_spec {
+            // Rule A over the LEADING specifier: an own-line directive in the
+            // keyword(s)→`*` gap freezes the whole `* as ns` binding, the node it precedes —
+            // so the slice covers the `as` binding too and the `*`-plus-binding pair below is
+            // skipped. Only reachable without a default binding, whose own `,` gap is the
+            // anchor there instead.
+            let frozen_binding = if has_default {
+                None
+            } else {
+                self.gap_frozen_span(header_end, ns_spec.span)
+            };
             if has_default {
                 // Comments between default specifier and comma → emit before comma
                 // Comments between comma and `*` → emit after comma
@@ -612,6 +622,12 @@ impl<'a> Printer<'a> {
                     ns_spec.span.start,
                 ));
                 parts.push(d.text("*"));
+            } else if let Some(frozen) = frozen_binding {
+                parts.push(self.gap_comment_continuation_tail(
+                    header_end,
+                    ns_spec.span.start,
+                    self.build_frozen_span_item_doc(frozen),
+                ));
             } else {
                 // keyword(s)→namespace-`*` gap, preserved in place. A line comment
                 // indents the `* as ns` continuation (indent-only divergence — prettier
@@ -623,13 +639,15 @@ impl<'a> Printer<'a> {
                     d.text("*"),
                 ));
             }
-            // `* as ns` binding; preserves the `*`→`as` comment in place (mirrors the
-            // export-all side).
-            let star_end = ns_spec.span.start + 1;
-            // An import namespace binding is always an identifier; wrap it to share
-            // the `ModuleExportName`-based renderer with the export-all side.
-            let binding = internal::ModuleExportName::Identifier(ns_spec.local.clone());
-            self.append_namespace_as_binding(&mut parts, star_end, &binding);
+            if frozen_binding.is_none() {
+                // `* as ns` binding; preserves the `*`→`as` comment in place (mirrors the
+                // export-all side).
+                let star_end = ns_spec.span.start + 1;
+                // An import namespace binding is always an identifier; wrap it to share
+                // the `ModuleExportName`-based renderer with the export-all side.
+                let binding = internal::ModuleExportName::Identifier(ns_spec.local.clone());
+                self.append_namespace_as_binding(&mut parts, star_end, &binding);
+            }
             from_content_end = Some(ns_spec.span.end);
         }
 
