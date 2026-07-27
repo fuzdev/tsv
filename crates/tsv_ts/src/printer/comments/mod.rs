@@ -44,6 +44,7 @@ pub(super) use super::{Printer, calls, layout};
 use smallvec::SmallVec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::printing;
 use tsv_lang::{Comment, comments_to_emit_in_range};
 
 /// Small stack-allocated vector of comment references. Inline capacity 8 keeps
@@ -189,10 +190,30 @@ impl<'a> Printer<'a> {
         next: u32,
     ) {
         let d = self.d();
-        if self.has_blank_line_between(comment_end, next) {
+        if self.has_blank_line_between_strict(comment_end, next) {
             parts.push(d.literalline());
         }
         parts.push(d.hardline());
+    }
+
+    /// Whether `[from, next)` holds a **truly blank line** — two newlines with nothing
+    /// but horizontal whitespace between them.
+    ///
+    /// [`Self::has_blank_line_between`] reads the line-break table and counts newlines
+    /// without looking at what sits between them, and either endpoint of this gap can be
+    /// a node span that excludes a delimiter the printer still emits — a grouping paren
+    /// the value's span starts inside (`const y =⏎// c⏎(⏎  a = b // c2⏎);`). The newline
+    /// before that `(` and the one after it then read as an author blank line, one is
+    /// emitted, and the next pass reads it back as real: a one-shot non-idempotency.
+    ///
+    /// The table lookup is kept as the fast reject — fewer than two newlines is
+    /// conclusive — so only the rare positive pays the byte scan
+    /// ([`printing::has_blank_line_between_strict`], the shared statement of the
+    /// intervening-line rule), over a gap that is whitespace and at most a delimiter or
+    /// two.
+    fn has_blank_line_between_strict(&self, from: u32, next: u32) -> bool {
+        self.has_blank_line_between(from, next)
+            && printing::has_blank_line_between_strict(self.source, from, next)
     }
 
     /// Emit the separator after one comment in a leading run, toward the **physical**
