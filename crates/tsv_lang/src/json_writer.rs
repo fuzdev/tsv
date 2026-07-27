@@ -20,6 +20,8 @@
 //! fixtures pin); integers have a unique decimal form and are hand-formatted
 //! (two-digit-pair, the hot path emitting several ints per node).
 
+use crate::swar::{lanes_less_than, splat, zero_lanes};
+
 /// `00`,`01`,…,`99` — the two-digit-pair table behind the integer emitters
 /// ([`JsonWriter::u32`] and its wide arm), halving their divisions.
 const DEC_PAIRS: [u8; 200] = {
@@ -193,6 +195,46 @@ fn digit_word(n: u32, digits: usize) -> u64 {
         word = (word << 8) | u64::from(b'0' + n as u8);
     }
     word
+}
+
+/// Does `bytes` contain a byte JSON must escape?
+///
+/// The predicate is exactly `serde_json`'s: `0x00..=0x1F`, `"`, and `\`. It
+/// answers eight bytes at a time because escaping is the *rare* case — the
+/// strings the wire writers push through [`JsonWriter::string`] are identifier
+/// names, string-literal bodies and comment text, nearly all of which spend the
+/// whole scan confirming misses, the same shape (and the same reason) as the
+/// line scans in [`crate::location`].
+///
+/// The three lane masks are OR-ed and read as a **boolean**, never as a
+/// position, so the lowest-lane guarantee documented on [`zero_lanes`] /
+/// [`lanes_less_than`] is exactly what is needed: a set mask always implies a
+/// genuine hit somewhere. `lanes_less_than(w, 0x20)` already covers `NUL`, so
+/// the two `zero_lanes` tests are only the `"` and `\` needles.
+///
+/// One word is loaded once and tested three ways rather than scanned three
+/// times — the same trade `next_ecmascript_terminator` makes for its two
+/// needles.
+#[inline]
+fn needs_escape(bytes: &[u8]) -> bool {
+    let mut i = 0;
+    while let Some(chunk) = bytes[i..].first_chunk::<8>() {
+        let w = u64::from_le_bytes(*chunk);
+        let hits =
+            lanes_less_than(w, 0x20) | zero_lanes(w ^ splat(b'"')) | zero_lanes(w ^ splat(b'\\'));
+        if hits != 0 {
+            return true;
+        }
+        i += 8;
+    }
+    while i < bytes.len() {
+        let b = bytes[i];
+        if b < 0x20 || b == b'"' || b == b'\\' {
+            return true;
+        }
+        i += 1;
+    }
+    false
 }
 
 /// Compact-JSON output buffer.
@@ -405,12 +447,40 @@ impl JsonWriter {
         self.buf.push(b'"');
     }
 
-    /// A dynamic string value, JSON-escaped and quoted. Delegates to
-    /// `serde_json` so the escape set is exactly `serde_json`'s.
+    /// A dynamic string value, JSON-escaped and quoted.
+    ///
+    /// The escape set is exactly `serde_json`'s, because anything that needs
+    /// escaping still goes through `serde_json::to_writer`. What the prescan
+    /// buys is the *common* case: identifier names, string-literal bodies and
+    /// comment text are overwhelmingly escape-free, and `serde_json`'s
+    /// escaping loop pays a 256-entry table lookup plus `split_at` /
+    /// `split_first` bookkeeping **per byte** to establish that. [`needs_escape`]
+    /// answers the same question eight bytes at a time, and a clean answer
+    /// turns the emission into [`JsonWriter::token`]'s quote-blit-quote.
+    ///
+    /// ⚠️ The predicate must stay a *superset* of `serde_json`'s `ESCAPE`
+    /// table's non-zero set, or a byte that needs escaping would be blitted
+    /// raw. That set is `0x00..=0x1F` plus `"` and `\` — nothing else, in
+    /// particular not `DEL` and no non-ASCII byte. The equivalence is graded
+    /// against `serde_json` itself by `string_matches_serde_json`, exhaustively
+    /// over a boundary alphabet and across the 8-byte stride; a corpus cannot
+    /// see this (a mis-scan would only surface on the rare input that actually
+    /// carries the byte).
+    ///
+    /// The escaping arm is left where LLVM puts it: `#[cold]`-splitting it into
+    /// its own out-of-line function so the hot arm inlines at the ~58 writer
+    /// call sites was measured and is a **wash** (fuz_app −0.02%, zzz +0.03%
+    /// instructions), so it is not worth the code size. Don't re-mint it.
     #[inline]
     #[allow(clippy::expect_used)]
     pub fn string(&mut self, s: &str) {
-        serde_json::to_writer(&mut self.buf, s).expect("Vec<u8> write is infallible");
+        if needs_escape(s.as_bytes()) {
+            serde_json::to_writer(&mut self.buf, s).expect("Vec<u8> write is infallible");
+            return;
+        }
+        self.buf.push(b'"');
+        self.buf.extend_from_slice(s.as_bytes());
+        self.buf.push(b'"');
     }
 
     /// A non-integral `f64` (the rare literal tail) — `serde_json`'s ryu
@@ -554,6 +624,92 @@ mod tests {
         let mut w = JsonWriter::with_capacity(0);
         w.u64(n);
         String::from_utf8(w.into_bytes()).expect("digits are ASCII")
+    }
+
+    fn emit_string(s: &str) -> Vec<u8> {
+        let mut w = JsonWriter::with_capacity(0);
+        w.string(s);
+        w.into_bytes()
+    }
+
+    /// [`JsonWriter::string`]'s escape-free fast path must be byte-identical to
+    /// the `serde_json` delegation it replaces — the parity contract this
+    /// module's whole doc comment rests on.
+    ///
+    /// Graded exhaustively over an alphabet that carries one member of every
+    /// arm of `serde_json`'s `ESCAPE` table plus the bytes adjacent to each
+    /// boundary: the named escapes, an unnamed control (`\u00XX`), both
+    /// literal escapes, `0x1f`/`0x20` either side of the control cutoff, `DEL`
+    /// (which `serde_json` does **not** escape), and a multibyte character
+    /// whose UTF-8 bytes are all `>= 0x80`. A corpus cannot grade this: a
+    /// mis-scan only surfaces on an input that actually carries the byte, and
+    /// several of these never appear in real source at all.
+    #[test]
+    fn string_matches_serde_json() {
+        const ALPHABET: [&str; 12] = [
+            "\u{0}", "\u{8}", "\t", "\n", "\u{c}", "\r", "\u{1f}", " ", "\"", "\\", "\u{7f}", "é",
+        ];
+        // Every string of length 0–3 over the alphabet — enough for two
+        // escapes to meet, and to sit at each end of a partial word.
+        let mut cases: Vec<String> = vec![String::new()];
+        for _ in 0..3 {
+            let mut next = Vec::new();
+            for base in &cases {
+                for piece in ALPHABET {
+                    next.push(format!("{base}{piece}"));
+                }
+            }
+            cases.extend(next);
+        }
+        // ⚠️ The axis a word-at-a-time scan fails on: the same needle at every
+        // offset across the 8-byte stride, including the scalar tail. A corpus
+        // samples alignment arbitrarily; this pins all of it.
+        for piece in ALPHABET {
+            for offset in 0..24 {
+                let mut s = "a".repeat(offset);
+                s.push_str(piece);
+                s.push_str(&"b".repeat(24 - offset));
+                cases.push(s);
+            }
+        }
+        for case in &cases {
+            let ours = emit_string(case);
+            let theirs = serde_json::to_vec(case).expect("serde_json serializes a str");
+            assert_eq!(
+                ours,
+                theirs,
+                "escape parity broke on {case:?}: ours {:?}, serde_json {:?}",
+                String::from_utf8_lossy(&ours),
+                String::from_utf8_lossy(&theirs)
+            );
+        }
+    }
+
+    /// The prescan's own answer, against a per-byte oracle — so a
+    /// `needs_escape` regression is reported here rather than only as a
+    /// slower-but-correct fallback.
+    ///
+    /// ⚠️ The **length** sweep is as load-bearing as the offset sweep: at a
+    /// length that is a multiple of 8 the scalar tail never runs, so a
+    /// tail-dropping corruption reads green. Every length 1–24 × every offset
+    /// within it puts each needle in both the word body and the tail.
+    #[test]
+    fn needs_escape_matches_the_per_byte_predicate() {
+        for needle in 0..=u8::MAX {
+            for len in 1..=24usize {
+                for offset in 0..len {
+                    let mut bytes = vec![b'a'; len];
+                    bytes[offset] = needle;
+                    let expected = bytes.iter().any(|&b| b < 0x20 || b == b'"' || b == b'\\');
+                    assert_eq!(
+                        needs_escape(&bytes),
+                        expected,
+                        "byte {needle:#04x} at offset {offset} of {len}"
+                    );
+                }
+            }
+        }
+        assert!(!needs_escape(b""), "the empty slice needs no escaping");
     }
 
     #[test]

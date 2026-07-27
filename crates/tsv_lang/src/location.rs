@@ -1,5 +1,7 @@
 use std::cell::Cell;
 
+use crate::swar::{high_bit_lanes, splat, zero_lanes};
+
 /// A position in source code (line and column)
 ///
 /// Generic type without serialization - languages can wrap this in their own types
@@ -162,10 +164,9 @@ struct Outgrown {
 /// sparse, so the scan between them is the bulk of construction.
 #[inline]
 fn next_non_ascii(bytes: &[u8], from: usize) -> usize {
-    const HIGH_BITS: u64 = 0x8080_8080_8080_8080;
     let mut i = from;
     while let Some(chunk) = bytes[i..].first_chunk::<8>() {
-        let hits = u64::from_le_bytes(*chunk) & HIGH_BITS;
+        let hits = high_bit_lanes(u64::from_le_bytes(*chunk));
         if hits != 0 {
             // Little-endian: the lowest set bit is the high bit of the
             // earliest non-ASCII byte in the word.
@@ -756,29 +757,6 @@ fn ascii_ecmascript_line_starts(bytes: &[u8]) -> Vec<u32> {
     let mut line_starts = vec![0];
     ascii_ecmascript_line_starts_into(bytes, 0, &mut line_starts);
     line_starts
-}
-
-/// Broadcast `b` to every lane of a `u64` word — the SWAR needle. Written as a
-/// multiply rather than a byte array so it carries no endianness.
-#[inline]
-const fn splat(b: u8) -> u64 {
-    b as u64 * 0x0101_0101_0101_0101
-}
-
-/// Lane mask of the zero bytes in `v`: the high bit of lane `k` is set if
-/// `v`'s byte `k` is zero. The classic `has_zero` kernel.
-///
-/// ⚠️ **Only the LOWEST set lane is guaranteed genuine**, and every caller here
-/// relies on exactly that. A zero byte borrows into the next lane, which can
-/// flag lane `k+1` spuriously — but a spurious flag at `k+1` requires lane `k`
-/// to have been zero, and a zero lane always flags itself, so the lowest flagged
-/// lane is always a real match. Read this mask with `trailing_zeros`, never with
-/// a popcount or a highest-bit scan.
-#[inline]
-const fn zero_lanes(v: u64) -> u64 {
-    const LOW_BITS: u64 = 0x0101_0101_0101_0101;
-    const HIGH_BITS: u64 = 0x8080_8080_8080_8080;
-    v.wrapping_sub(LOW_BITS) & !v & HIGH_BITS
 }
 
 /// Index of the first `\n` at or after `from`, or `bytes.len()`.
