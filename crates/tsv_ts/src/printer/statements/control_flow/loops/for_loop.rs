@@ -4,7 +4,7 @@
 // for-in/for-of left/right printing.
 
 use crate::ast::internal::{self, Expression, Statement};
-use crate::printer::{CommentVec, LeadingGlue, Printer};
+use crate::printer::{CommentVec, LeadingGlue, ParenContext, Printer};
 use smallvec::smallvec;
 use tsv_lang::Comment;
 use tsv_lang::Span;
@@ -629,7 +629,11 @@ impl<'a> Printer<'a> {
             // instead of their own condition width.
             inner_parts.push(test_frozen.map_or_else(
                 || d.group(self.build_condition_doc(test)),
-                |frozen| self.build_frozen_expression_doc(test, frozen),
+                // The clarity parens an assignment test prints (`for (; (a = b); )`) are
+                // the printer's, not the author's, so they wrap the frozen slice instead
+                // of riding inside it — the same `StatementTest` shell, and the same
+                // context, the unfrozen clause above applies.
+                |frozen| self.build_frozen_value_doc(test, frozen, ParenContext::StatementTest),
             ));
         }
         // The test clause→`;` gap comments bind to the `;` like a list separator.
@@ -1152,13 +1156,13 @@ impl<'a> Printer<'a> {
             self.build_keyword_paren_comments(for_keyword_end, spans.open_paren)
         };
 
-        // Check for line comments in the header's *structural gaps* — if present,
-        // use the breaking layout that preserves them where the author placed them.
-        // Only gap comments count: a `//` *inside* the binding or the iterable
-        // expression is that expression's own content (printed by its doc) and must
-        // NOT force the header open — prettier keeps the head inline and only the
+        // Check for a comment in the header's *structural gaps* that needs its own line
+        // — if present, use the breaking layout that preserves it where the author
+        // placed it. Only gap comments count: a `//` *inside* the binding or the
+        // iterable expression is that expression's own content (printed by its doc) and
+        // must NOT force the header open — prettier keeps the head inline and only the
         // iterable breaks. See `in_of_iterable_line_comment`.
-        let has_line_comments = self.for_in_of_header_has_structural_line_comments(&spans);
+        let breaks_for_gap_comment = self.for_in_of_header_gap_comment_forces_break(&spans);
 
         // Build the `for ... (` opening once — shared by both the inline and the
         // breaking (line-comment) layouts, so each preserves any `for`-to-`(`
@@ -1174,8 +1178,8 @@ impl<'a> Printer<'a> {
 
         let async_lhs_paren = self.for_lhs_needs_async_paren(left, keyword, is_await);
 
-        if has_line_comments {
-            let left_doc = self.build_for_in_of_left_doc(left, async_lhs_paren);
+        if breaks_for_gap_comment {
+            let left_doc = self.build_for_in_of_left_doc(left, async_lhs_paren, &spans);
             return self.build_for_in_of_with_line_comments(
                 right, body, keyword, &spans, left_doc, &mut parts,
             );
@@ -1191,7 +1195,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        parts.push(self.build_for_in_of_left_doc(left, async_lhs_paren));
+        parts.push(self.build_for_in_of_left_doc(left, async_lhs_paren, &spans));
 
         // Comments after left, before the keyword
         let has_left_comment =
@@ -1257,11 +1261,26 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether a `//` line comment sits in one of the for-in/for-of header's
-    /// *structural gaps* — after `(` up to the binding target (covering the
-    /// declaration keyword→binding gap, `const // c⏎x`), between the binding and
-    /// the `in`/`of` keyword, between the keyword and the iterable, or between the
+    /// Whether a comment in one of the for-in/for-of header's *structural gaps* needs a
+    /// line of its own, forcing the breaking layout — after `(` up to the binding target
+    /// (covering the declaration keyword→binding gap, `const // c⏎x`), between the binding
+    /// and the `in`/`of` keyword, between the keyword and the iterable, or between the
     /// iterable and `)`.
+    ///
+    /// Two kinds do. A `//` line comment, because inline it would swallow the header
+    /// tokens after it (the reason below). And, in the `(`→binding region only, an
+    /// **honored format-ignore directive** of either spelling, because its own-line
+    /// placement is the thing that makes it honored: collapsed into the inline layout it
+    /// becomes glued to the following token, hence inert, and the freeze it won on the
+    /// first pass is lost on the second — an F1 non-idempotency. An ordinary block comment
+    /// still rides inline.
+    ///
+    /// The directive half is **deliberately not** asked at the three later gaps. Their
+    /// emitters TRAIL a block comment onto the preceding token (`const x /* c */⏎of`), so
+    /// breaking the header there would not give the directive its own line anyway — it
+    /// would only lose that line on the next pass, when the gate reads the trailing
+    /// placement and collapses the header again. A break is worth forcing for a comment
+    /// only where the broken layout actually gives that comment a line of its own.
     ///
     /// Deliberately excludes the interiors of the binding *pattern*
     /// (`[binding_start, left_end)`) and the iterable (`[right_start, right_end)`): a
@@ -1275,12 +1294,16 @@ impl<'a> Printer<'a> {
     /// `in_of_iterable_line_comment` (excluded) and
     /// `of_in_keyword_binding_line_comment_prettier_divergence` (keyword→binding gap,
     /// included) fixtures.
-    fn for_in_of_header_has_structural_line_comments(&self, spans: &ForInOfSpans) -> bool {
+    fn for_in_of_header_gap_comment_forces_break(&self, spans: &ForInOfSpans) -> bool {
         // `(` → binding target (spans the declaration keyword + its keyword→binding
-        // gap). Absent open paren (degenerate header) has no locatable gap.
+        // gap). Absent open paren (degenerate header) has no locatable gap. The one
+        // region whose broken layout puts a comment on its own line, so the one that
+        // also asks about an honored directive — which makes it exactly the
+        // declaration header's own gap question (`keyword_gap_breaks`), asked here
+        // rather than re-spelled, so the two can never drift on what forces a break.
         spans
             .open_paren
-            .is_some_and(|open| self.has_line_comments_between(open + 1, spans.binding_start))
+            .is_some_and(|open| self.keyword_gap_breaks(open + 1, spans.binding_start))
             // binding → keyword
             || self.has_line_comments_between(spans.left_end, spans.keyword_pos)
             // keyword → iterable
@@ -1462,7 +1485,7 @@ impl<'a> Printer<'a> {
     /// `get_for_in_of_left_start` (which points at the `const`/`let` keyword), this
     /// skips the declaration kind so the keyword→binding gap (`const // c⏎x`) reads
     /// as a header-structural position while the binding pattern's own interior does
-    /// not — see `for_in_of_header_has_structural_line_comments`.
+    /// not — see `for_in_of_header_gap_comment_forces_break`.
     fn get_for_in_of_binding_start(&self, left: &internal::ForInOfLeft<'_>) -> u32 {
         match left {
             internal::ForInOfLeft::VariableDeclaration(decl) => decl
@@ -1809,12 +1832,31 @@ impl<'a> Printer<'a> {
         self.build_for_of_statement_with_body_doc(stmt)
     }
 
+    /// The for-in/for-of header's LEFT clause.
+    ///
+    /// Rule: an own-line directive in the `(`→left gap freezes the clause WHOLE
+    /// ([`Printer::value_head_frozen_span`]) — the same delimiter-owned value head as a
+    /// `for` header's init. The slice is the clause's own span, so the `in`/`of` keyword
+    /// and the iterable stay parent-owned and normalize; the `(async)` clarity parens are
+    /// the printer's, so they wrap the frozen slice rather than ride inside it.
+    ///
+    /// Span-shaped for the same reason the init clause is: a left is a
+    /// `VariableDeclaration` as often as a pattern, so the freeze is resolved and emitted
+    /// once here rather than per arm below.
     fn build_for_in_of_left_doc(
         &self,
         left: &internal::ForInOfLeft<'_>,
         wrap_async_paren: bool,
+        spans: &ForInOfSpans,
     ) -> DocId {
         let d = self.d();
+        if let Some(open) = spans.open_paren
+            && let Some(frozen) =
+                self.value_head_frozen_span(open + 1, Span::new(spans.left_start, spans.left_end))
+        {
+            let doc = self.build_frozen_span_item_doc(frozen);
+            return if wrap_async_paren { d.parens(doc) } else { doc };
+        }
         match left {
             internal::ForInOfLeft::VariableDeclaration(decl) => {
                 let Some(declarator) = decl.declarations.first() else {

@@ -663,8 +663,20 @@ impl<'a> Printer<'a> {
             return self.build_condition_group(test_expr);
         }
 
-        // Build with comments
-        let test_doc = self.build_condition_doc(test_expr);
+        // Build with comments.
+        //
+        // Rule: an own-line directive in the `(`→condition gap freezes the condition WHOLE
+        // ([`Printer::value_head_frozen_span`]) — the condition head is a delimiter-owned
+        // value head like a `for` clause or a `return` operand. The slice is the
+        // condition's node span, so the `)` this layout supplies stays parent-owned; the
+        // `StatementTest` clarity parens (`if ((a = b))`) stay outside it too, since they
+        // are the printer's rather than the author's.
+        let test_doc = match self.value_head_frozen_span(open_paren_pos + 1, test_expr.span()) {
+            Some(frozen) => {
+                self.build_frozen_value_doc(test_expr, frozen, super::ParenContext::StatementTest)
+            }
+            None => self.build_condition_doc(test_expr),
+        };
         let mut inner_parts = DocBuf::new();
 
         // Collect leading comments
