@@ -2,7 +2,9 @@
 
 use super::super::super::internal;
 use super::super::Schema;
-use super::expressions::{ExprFlags, write_expression, write_expression_inner, write_expressions};
+use super::expressions::{
+    ChainState, ExprFlags, write_expression, write_expression_inner, write_expressions,
+};
 use super::statements::{write_block_statement, write_statement};
 use super::types::{
     write_entity_name, write_index_signature, write_type, write_type_parameter_instantiation,
@@ -32,7 +34,9 @@ pub(super) fn write_decorator(
         &decorator.expression,
         ctx,
         ExprFlags {
-            in_chain: false,
+            // A decorator expression is a fresh chain root — nothing above it
+            // has resolved its spine either way.
+            chain: ChainState::Unresolved,
             force_optional: false,
             strip_optional: !parenthesized,
         },

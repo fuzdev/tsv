@@ -167,6 +167,11 @@ impl<'arena> Expression<'arena> {
     /// Without this, `(a?.b).c` / `(a?.b)!.c` would wrap the whole thing in
     /// `ChainExpression`, diverging from acorn and dropping the
     /// semantically-required parens.
+    ///
+    /// This walks the whole spine, so a caller that asks it at *every* spine
+    /// node is quadratic in chain depth. The wire writer therefore hands the
+    /// answer down instead of re-deriving it — see the convert layer's
+    /// `ChainState`.
     pub fn has_optional_in_chain(&self) -> bool {
         match self {
             Expression::MemberExpression(m) => {

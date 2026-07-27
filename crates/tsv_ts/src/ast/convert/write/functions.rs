@@ -1,7 +1,9 @@
 // Function-related expression writers.
 
 use super::super::super::internal;
-use super::expressions::{ExprFlags, write_expression, write_expression_inner, write_expressions};
+use super::expressions::{
+    ChainState, ExprFlags, write_expression, write_expression_inner, write_expressions,
+};
 use super::statements::write_block_statement;
 use super::{
     Ctx, JsonWriter, close_node, node_header, write_identifier_with_optional, write_or_null,
@@ -125,7 +127,7 @@ pub(super) fn write_call_expression(
     w: &mut JsonWriter,
     call: &internal::CallExpression<'_>,
     ctx: &Ctx<'_>,
-    callee_in_chain: bool,
+    callee_chain: ChainState,
     force_optional: bool,
     strip_optional: bool,
 ) {
@@ -136,7 +138,7 @@ pub(super) fn write_call_expression(
         call.callee,
         ctx,
         ExprFlags {
-            in_chain: callee_in_chain,
+            chain: callee_chain,
             // acorn-typescript's `?.<T>(...)` path marks the callee node
             // itself optional.
             force_optional: call.optional && call.type_arguments.is_some(),
@@ -155,9 +157,18 @@ pub(super) fn write_call_expression(
         // acorn-typescript omits `optional` on a typeArguments call unless the
         // call is part of an optional chain; the chain test is the call's own
         // left segment (parens seal the segment).
-        let in_optional_chain = call.optional
-            || (call.span.start >= call.callee.span().start && call.callee.has_optional_in_chain());
-        if call.type_arguments.is_none() || in_optional_chain {
+        //
+        // Ordered so the chain test runs only when a `typeArguments` call makes
+        // it load-bearing: it walks the callee spine, and the overwhelming
+        // majority of calls carry no type arguments and would pay that walk to
+        // discard the answer. `KnownFree` is the caller having already resolved
+        // that spine to optional-free.
+        if call.type_arguments.is_none()
+            || call.optional
+            || (callee_chain != ChainState::KnownFree
+                && call.span.start >= call.callee.span().start
+                && call.callee.has_optional_in_chain())
+        {
             w.raw(",\"optional\":");
             w.bool(call.optional);
         }
@@ -172,7 +183,7 @@ pub(super) fn write_member_expression(
     w: &mut JsonWriter,
     member: &internal::MemberExpression<'_>,
     ctx: &Ctx<'_>,
-    object_in_chain: bool,
+    object_chain: ChainState,
     force_optional: bool,
     strip_optional: bool,
 ) {
@@ -183,7 +194,7 @@ pub(super) fn write_member_expression(
         member.object,
         ctx,
         ExprFlags {
-            in_chain: object_in_chain,
+            chain: object_chain,
             force_optional: false,
             strip_optional,
         },
