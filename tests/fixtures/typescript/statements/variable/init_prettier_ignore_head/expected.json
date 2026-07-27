@@ -1,0 +1,1356 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 987,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an own-line directive in the `=`→initializer gap freezes the whole initializer",
+			"start": 20,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 117,
+			"end": 135,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line block comment behaves identically — placement keys the freeze, not the spelling",
+			"start": 153,
+			"end": 247,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 95
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 263,
+			"end": 284,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 2
+				},
+				"end": {
+					"line": 9,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a multi-line frozen initializer keeps its verbatim layout",
+			"start": 302,
+			"end": 362,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 378,
+			"end": 396,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 2
+				},
+				"end": {
+					"line": 14,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an assignment initializer's clarity parens are the printer's, so they stay OUTSIDE the",
+			"start": 432,
+			"end": 521,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " frozen slice",
+			"start": 523,
+			"end": 538,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 554,
+			"end": 572,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a destructuring binding takes its own layout and freezes the same way",
+			"start": 592,
+			"end": 664,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 684,
+			"end": 702,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 2
+				},
+				"end": {
+					"line": 28,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a type-annotated binding is unaffected by the freeze",
+			"start": 721,
+			"end": 776,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 800,
+			"end": 818,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 2
+				},
+				"end": {
+					"line": 33,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a sibling declaration the freeze does not reach still normalizes",
+			"start": 836,
+			"end": 903,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1
+				},
+				"end": {
+					"line": 36,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 919,
+			"end": 937,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 2
+				},
+				"end": {
+					"line": 38,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 986,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 977,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 41,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 103,
+					"end": 150,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 14
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 109,
+							"end": 149,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 5,
+									"column": 13
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 109,
+								"end": 112,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 10
+									}
+								},
+								"name": "aaa"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 138,
+								"end": 149,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 13
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 138,
+									"end": 141,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 5
+										}
+									},
+									"name": "bbb"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 146,
+									"end": 149,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 10
+										},
+										"end": {
+											"line": 5,
+											"column": 13
+										}
+									},
+									"name": "ccc"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 117,
+										"end": 135
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line directive in the `=`→initializer gap freezes the whole initializer",
+							"start": 20,
+							"end": 101
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 249,
+					"end": 299,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 14
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 255,
+							"end": 298,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 13
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 255,
+								"end": 258,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 10
+									}
+								},
+								"name": "ddd"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 287,
+								"end": 298,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 13
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 287,
+									"end": 290,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 2
+										},
+										"end": {
+											"line": 10,
+											"column": 5
+										}
+									},
+									"name": "eee"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 295,
+									"end": 298,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 10
+										},
+										"end": {
+											"line": 10,
+											"column": 13
+										}
+									},
+									"name": "fff"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " prettier-ignore ",
+										"start": 263,
+										"end": 284
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line block comment behaves identically — placement keys the freeze, not the spelling",
+							"start": 153,
+							"end": 247
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 364,
+					"end": 429,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 370,
+							"end": 428,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 370,
+								"end": 373,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 10
+									}
+								},
+								"name": "ggg"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 399,
+								"end": 428,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 3
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 405,
+										"end": 413,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 4
+											},
+											"end": {
+												"line": 16,
+												"column": 12
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 405,
+											"end": 408,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 4
+												},
+												"end": {
+													"line": 16,
+													"column": 7
+												}
+											},
+											"name": "hhh"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 412,
+											"end": 413,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 11
+												},
+												"end": {
+													"line": 16,
+													"column": 12
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 418,
+										"end": 424,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 3
+											},
+											"end": {
+												"line": 17,
+												"column": 9
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 418,
+											"end": 421,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 3
+												},
+												"end": {
+													"line": 17,
+													"column": 6
+												}
+											},
+											"name": "iii"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 423,
+											"end": 424,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 8
+												},
+												"end": {
+													"line": 17,
+													"column": 9
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										},
+										"kind": "init"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 378,
+										"end": 396
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multi-line frozen initializer keeps its verbatim layout",
+							"start": 302,
+							"end": 362
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 540,
+					"end": 589,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 16
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 546,
+							"end": 588,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 546,
+								"end": 549,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 7
+									},
+									"end": {
+										"line": 22,
+										"column": 10
+									}
+								},
+								"name": "jjj"
+							},
+							"init": {
+								"type": "AssignmentExpression",
+								"start": 576,
+								"end": 587,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 3
+									},
+									"end": {
+										"line": 24,
+										"column": 14
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 576,
+									"end": 579,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 3
+										},
+										"end": {
+											"line": 24,
+											"column": 6
+										}
+									},
+									"name": "kkk"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 584,
+									"end": 587,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 11
+										},
+										"end": {
+											"line": 24,
+											"column": 14
+										}
+									},
+									"name": "lll"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 554,
+										"end": 572
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an assignment initializer's clarity parens are the printer's, so they stay OUTSIDE the",
+							"start": 432,
+							"end": 521
+						},
+						{
+							"type": "Line",
+							"value": " frozen slice",
+							"start": 523,
+							"end": 538
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 666,
+					"end": 718,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 15
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 672,
+							"end": 717,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 7
+								},
+								"end": {
+									"line": 29,
+									"column": 14
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 672,
+								"end": 679,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 7
+									},
+									"end": {
+										"line": 27,
+										"column": 14
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 674,
+										"end": 677,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 9
+											},
+											"end": {
+												"line": 27,
+												"column": 12
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 674,
+											"end": 677,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 9
+												},
+												"end": {
+													"line": 27,
+													"column": 12
+												}
+											},
+											"name": "mmm"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 674,
+											"end": 677,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 9
+												},
+												"end": {
+													"line": 27,
+													"column": 12
+												}
+											},
+											"name": "mmm"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "LogicalExpression",
+								"start": 705,
+								"end": 717,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 14
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 705,
+									"end": 708,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 29,
+											"column": 5
+										}
+									},
+									"name": "nnn"
+								},
+								"operator": "||",
+								"right": {
+									"type": "Identifier",
+									"start": 714,
+									"end": 717,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 11
+										},
+										"end": {
+											"line": 29,
+											"column": 14
+										}
+									},
+									"name": "ooo"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 684,
+										"end": 702
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a destructuring binding takes its own layout and freezes the same way",
+							"start": 592,
+							"end": 664
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 778,
+					"end": 833,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 34,
+							"column": 14
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 784,
+							"end": 832,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 7
+								},
+								"end": {
+									"line": 34,
+									"column": 13
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 784,
+								"end": 795,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 7
+									},
+									"end": {
+										"line": 32,
+										"column": 18
+									}
+								},
+								"name": "ppp",
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 787,
+									"end": 795,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 10
+										},
+										"end": {
+											"line": 32,
+											"column": 18
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSNumberKeyword",
+										"start": 789,
+										"end": 795,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 12
+											},
+											"end": {
+												"line": 32,
+												"column": 18
+											}
+										}
+									}
+								}
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 821,
+								"end": 832,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 2
+									},
+									"end": {
+										"line": 34,
+										"column": 13
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 821,
+									"end": 824,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 2
+										},
+										"end": {
+											"line": 34,
+											"column": 5
+										}
+									},
+									"name": "qqq"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 829,
+									"end": 832,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 10
+										},
+										"end": {
+											"line": 34,
+											"column": 13
+										}
+									},
+									"name": "rrr"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 800,
+										"end": 818
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a type-annotated binding is unaffected by the freeze",
+							"start": 721,
+							"end": 776
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 905,
+					"end": 952,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 14
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 911,
+							"end": 951,
+							"loc": {
+								"start": {
+									"line": 37,
+									"column": 7
+								},
+								"end": {
+									"line": 39,
+									"column": 13
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 911,
+								"end": 914,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 7
+									},
+									"end": {
+										"line": 37,
+										"column": 10
+									}
+								},
+								"name": "sss"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 940,
+								"end": 951,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 2
+									},
+									"end": {
+										"line": 39,
+										"column": 13
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 940,
+									"end": 943,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 2
+										},
+										"end": {
+											"line": 39,
+											"column": 5
+										}
+									},
+									"name": "ttt"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 948,
+									"end": 951,
+									"loc": {
+										"start": {
+											"line": 39,
+											"column": 10
+										},
+										"end": {
+											"line": 39,
+											"column": 13
+										}
+									},
+									"name": "uuu"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 919,
+										"end": 937
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a sibling declaration the freeze does not reach still normalizes",
+							"start": 836,
+							"end": 903
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 954,
+					"end": 976,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 1
+						},
+						"end": {
+							"line": 40,
+							"column": 23
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 960,
+							"end": 975,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 7
+								},
+								"end": {
+									"line": 40,
+									"column": 22
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 960,
+								"end": 963,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 7
+									},
+									"end": {
+										"line": 40,
+										"column": 10
+									}
+								},
+								"name": "vvv"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 966,
+								"end": 975,
+								"loc": {
+									"start": {
+										"line": 40,
+										"column": 13
+									},
+									"end": {
+										"line": 40,
+										"column": 22
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 966,
+									"end": 969,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 13
+										},
+										"end": {
+											"line": 40,
+											"column": 16
+										}
+									},
+									"name": "www"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 972,
+									"end": 975,
+									"loc": {
+										"start": {
+											"line": 40,
+											"column": 19
+										},
+										"end": {
+											"line": 40,
+											"column": 22
+										}
+									},
+									"name": "xxx"
+								}
+							}
+						}
+					],
+					"kind": "const"
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

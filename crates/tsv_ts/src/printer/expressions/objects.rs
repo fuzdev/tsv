@@ -9,6 +9,7 @@
 
 use crate::ast::internal::{self, Expression, Literal, LiteralValue};
 use crate::printer::CommentSpacing;
+use crate::printer::expressions::assignment::RhsCommentInfo;
 use crate::printer::expressions::literals::is_valid_js_identifier;
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{CommentVec, Printer};
@@ -562,7 +563,14 @@ impl<'a> Printer<'a> {
                     d.concat(&[key_doc, d.text(": "), value_doc])
                 } else {
                     let is_short_key = self.is_short_property_key(&prop.key, prop.computed);
-                    self.build_assignment_layout(key_doc, ":", &prop.value, is_short_key, None)
+                    // A comment-free object provably holds no directive either.
+                    self.build_assignment_layout(
+                        key_doc,
+                        ":",
+                        &prop.value,
+                        is_short_key,
+                        RhsCommentInfo::frozen_only(None),
+                    )
                 };
             }
 
@@ -621,6 +629,9 @@ impl<'a> Printer<'a> {
                 .comments_in_source_between(colon_pos + 1, value_start)
                 .any(|c| !c.is_block || c.multiline || !self.is_same_line(c.span.end, value_start));
 
+            // The `:`→value head: an own-line directive there freezes the whole value.
+            let value_frozen = self.value_head_frozen_span(colon_pos + 1, prop.value.span());
+
             if pre_colon_comments.is_empty()
                 && post_colon_comments.is_empty()
                 && !has_own_line_comment_post_colon
@@ -636,7 +647,13 @@ impl<'a> Printer<'a> {
                 } else {
                     // No parens needed: use unified assignment layout
                     let is_short_key = self.is_short_property_key(&prop.key, prop.computed);
-                    self.build_assignment_layout(key_doc, ":", &prop.value, is_short_key, None)
+                    self.build_assignment_layout(
+                        key_doc,
+                        ":",
+                        &prop.value,
+                        is_short_key,
+                        RhsCommentInfo::frozen_only(value_frozen),
+                    )
                 }
             } else {
                 if has_own_line_comment_post_colon {
@@ -658,7 +675,10 @@ impl<'a> Printer<'a> {
                     if needs_parens {
                         value_parts.push(d.text("("));
                     }
-                    value_parts.push(self.build_expression_doc(&prop.value));
+                    value_parts.push(match value_frozen {
+                        Some(frozen) => self.build_frozen_expression_doc(&prop.value, frozen),
+                        None => self.build_expression_doc(&prop.value),
+                    });
                     if needs_parens {
                         value_parts.push(d.text(")"));
                     }
@@ -709,12 +729,20 @@ impl<'a> Printer<'a> {
                         d.concat(&parts)
                     } else {
                         let is_short_key = self.is_short_property_key(&prop.key, prop.computed);
+                        // `value_frozen` is provably `None` on this arm (an own-line
+                        // directive is an own-line comment, which took the arm above);
+                        // threaded rather than hardcoded so the two can't drift.
                         self.build_assignment_layout(
                             lhs_doc,
                             ":",
                             &prop.value,
                             is_short_key,
-                            rhs_comments,
+                            RhsCommentInfo {
+                                comments: rhs_comments,
+                                has_line_comment: false,
+                                boundary: None,
+                                frozen: value_frozen,
+                            },
                         )
                     }
                 }
