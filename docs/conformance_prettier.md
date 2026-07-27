@@ -1781,6 +1781,36 @@ tsv diverges at six places:
 [§Comment relocation](#comment-relocation)); the freeze rides on it rather than adding a
 second divergence.
 
+**On assignment-family value heads.** The same head rule, with the assignment operator as the
+delimiter: an own-line directive in an `=`→value or `:`→value gap freezes that **whole value**.
+The hosts are a declarator initializer (`const a =`, and a Svelte `{@const a =}`), an assignment
+RHS (`a =`, a compound `a +=`, and each segment of a chain), an object property value (`k:`), a
+class field value (`f =`, `static f =`, `#f =`, `accessor f =`), and a default value (a
+parameter default, a destructuring default, an array-pattern default). The slice is the value's
+own node span, so the binding, the operator and the enclosing list stay parent-owned and a
+sibling declarator or property the freeze does not reach still normalizes. Prettier agrees at
+every unprefixed host, so the ordinary fixtures
+`statements/variable/init_prettier_ignore_head`, `expressions/assignment/rhs_prettier_ignore_head`
+and `svelte/tags/const/value_prettier_ignore_head` **match**.
+
+The clarity parens rule carries over unchanged — an initializer that is an assignment prints as
+`const a = (b = c)`, and those parens are the printer's, so the frozen inner keeps them around
+it. So does the placement rule: the pattern-family gaps trail an ordinary own-line comment onto
+the operator's line (`aaa = // c`, a relocation §Comment relocation already sanctions at
+`param_default_*_comment_prettier_divergence`), but an **honored directive keeps its own line**
+there, since the trailing placement is inert under the floor and following it would lose the
+freeze on tsv's own second pass. That is the declaration-header rule of §On module and declarator
+lists, one delimiter out.
+
+tsv diverges at one place:
+
+- **Default value** — ◆design_choice — tsv breaks the enclosing list around the frozen value,
+  because the directive's own line is a mandatory break inside that list and a list holding a
+  break prints expanded — the same layout a plain own-line comment in that gap already produces.
+  Prettier keeps the list flat and glues the closer to the frozen value's last line
+  (`function fn(aaa =⏎…⏎bbb  +  ccc) {}`, `const [iii =⏎…⏎jjj  ||  kkk] = lll`) —
+  [default head](../tests/fixtures/typescript/expressions/assignment/default_prettier_ignore_head_prettier_divergence/)
+
 See [directives.md](./directives.md) for the user-facing reference.
 
 ---
