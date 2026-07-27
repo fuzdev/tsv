@@ -560,6 +560,37 @@ impl<'a> Printer<'a> {
         self.gap_frozen_span(gap_start, value)
     }
 
+    /// The statement-side analog of [`Self::value_head_frozen_span`]: a head that introduces
+    /// ONE statement, clause or body behind a delimiter of its own — an `if`'s `)`→consequent
+    /// and `else`→alternate gaps, a `label:`→body gap, the `}`→`catch` / `}`→`finally` gap,
+    /// and a class head's →`{` gap. An alone-on-line directive there freezes the whole thing,
+    /// and `ordinary` — the caller's own builder, taken lazily so a directive-free document
+    /// never pays for the frozen path's setup — supplies the unfrozen doc.
+    ///
+    /// The frozen slice is that node's own span, so the introducing delimiter stays
+    /// parent-owned: a `case` label rides inside its own frozen case, and a class name and
+    /// `extends` clause stay outside the frozen body. Unlike the value heads there is no
+    /// paren shell to re-synthesize — a statement is never parenthesized by the printer — so
+    /// the span emits directly through [`Self::build_frozen_span_doc`].
+    ///
+    /// A head whose ordinary layout would pull the gap's comment onto the head's line must
+    /// ask this BEFORE choosing that layout and keep the directive's own line when it fires:
+    /// a head-trailing placement is inert under the floor, so the relocated form would lose
+    /// the freeze on the second pass (the labeled-body and class-body heads, and the
+    /// switch-case block hug).
+    #[inline]
+    pub(in crate::printer) fn build_statement_head_doc(
+        &self,
+        gap_start: u32,
+        body: Span,
+        ordinary: impl FnOnce() -> DocId,
+    ) -> DocId {
+        match self.gap_frozen_span(gap_start, body) {
+            Some(frozen) => self.build_frozen_span_doc(frozen),
+            None => ordinary(),
+        }
+    }
+
     /// [`Self::list_item_frozen`] for a value-side ARGUMENT list item `i` — a call's,
     /// a `new`'s or a member chain's arguments. `Some` is the span to freeze, per
     /// [`Self::gap_frozen_span`].

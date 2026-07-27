@@ -724,6 +724,7 @@ This input is **valid** by tsv's parse oracle (Svelte / acorn-typescript / `pars
 - Bare definite-assignment class property (`b!;` — no type annotation, no initializer) — `Declarations with definite assignment assertions must also have type annotations.` (TS1264; acorn-typescript defers the early error, tsv follows) — [property_definite_no_init](../tests/fixtures/typescript/statements/class/property_definite_no_init_prettier_divergence/)
 - `@supports (margin: 0))` — unbalanced-paren `@supports` prelude; prettier's CSS parser (postcss, not `typescript`) throws — `Unbalanced parenthesis` — [supports_unbalanced_paren](../tests/fixtures/css/at_rules/supports_unbalanced_paren_prettier_divergence/)
 - `url(a\)b)` — unquoted `url()` with an escaped `)`; per CSS Syntax 3 §4.3.6 a url-token ends at the first *unescaped* `)`, so this is valid (parseCss accepts), but prettier's postcss miscounts the escaped `)` and throws — `Unbalanced parenthesis` — [url_escaped_paren](../tests/fixtures/css/values/functions/url_escaped_paren_prettier_divergence/)
+- Own-line format-ignore directive before an **empty** class body (`class Aaa⏎// prettier-ignore⏎{}`) — prettier's own every-comment-printed assertion fires, because its empty-body path emits no member for the relocated directive to lead — `Comment "prettier-ignore" was not printed` — [body_prettier_ignore_empty](../tests/fixtures/typescript/class/body_prettier_ignore_empty_prettier_divergence/)
 
 **Optional chain to private field**: `x?.#a` is valid modern JS (ecma262 `OptionalChain : ?. PrivateIdentifier`, from the private-fields-in-`in` era). typescript-estree rejects it; tsv keeps it stable. The comprehensive (prettier-formattable) private-field cases live in [private_fields](../tests/fixtures/typescript/declarations/class/private_fields/).
 
@@ -1810,6 +1811,52 @@ tsv diverges at one place:
   Prettier keeps the list flat and glues the closer to the frozen value's last line
   (`function fn(aaa =⏎…⏎bbb  +  ccc) {}`, `const [iii =⏎…⏎jjj  ||  kkk] = lll`) —
   [default head](../tests/fixtures/typescript/expressions/assignment/default_prettier_ignore_head_prettier_divergence/)
+
+**On statement positions.** Rule A once more, over statements. An own-line directive in a
+statement **list** — a `switch` body's `{`→first-case and between-case gaps, a case label's
+`:`→first-statement and between-statement gaps — freezes the **following** member over its own
+node span, exactly as it already does in a program body and a block body. A statement **head**
+— the `)`→consequent and `else`→alternate gaps, every loop's →body gap (`while`, C-style `for`,
+for-in / for-of, and `do`, which introduces its body with no `)` of its own), a `label:`→body
+gap, the `}`→`catch` / `}`→`finally` gap, and a class head's →`{` gap — freezes the single
+statement, clause or body that follows it. The slice is that node's own span, so a `case` label
+rides inside its own frozen case while the sibling cases normalize, and a class name and
+`extends` clause stay parent-owned while the body freezes. A **block** body freezes with its
+braces, and a loop's collapsed-empty-block form (`for (…) {}`) yields to the verbatim slice.
+
+Two of those heads relocate an ordinary own-line comment — a labeled statement's trails the
+label (`lll: // c`) and a class head's trails the heritage (`class Aaa // c`) — and there, as
+at the declaration headers of §On module and declarator lists, an **honored directive keeps its
+own line** instead: the trailing placement is inert under the floor, so following the
+relocation would lose the freeze on tsv's own second pass.
+
+Prettier agrees at the list positions and at the `if` heads — including the freeze's SCOPE
+there, which the fixtures' `unformatted_spaces` variants pin by perturbing the head outside the
+slice — so the ordinary fixtures `statements/switch/case_prettier_ignore_head`,
+`statements/switch/consequent_prettier_ignore_head`,
+`statements/if/branch_prettier_ignore_head` and
+`statements/loops/body_prettier_ignore_head` **match**. tsv diverges at three heads:
+
+- **`catch` / `finally` clause** — ◆comment_preservation — prettier moves the directive inside
+  the clause's block body and freezes the **first statement** there, so its `catch` binding
+  normalizes while tsv freezes the whole clause. The plain-comment form of the same relocation
+  is already sanctioned at
+  [catch_between_comment](../tests/fixtures/typescript/statements/try/catch_between_comment_prettier_divergence/) —
+  [handler head](../tests/fixtures/typescript/statements/try/handler_prettier_ignore_head_prettier_divergence/)
+- **Class body** — ◆comment_preservation — prettier pulls the `{` up onto the head line, moves
+  the directive inside the body and freezes the **first member**; tsv freezes the whole body —
+  [class body head](../tests/fixtures/typescript/class/body_prettier_ignore_head_prettier_divergence/)
+- **Labeled body** — ◆design_choice — a SCOPE difference rather than a relocation: prettier
+  freezes the whole labeled statement (its comment attaches to the `LabeledStatement`, since a
+  `:` begins no node), so a spaced label survives; tsv freezes the body the directive actually
+  precedes and normalizes the label. Pinned by a `prettier_variant_label_spaces` form, and
+  shown to be the freeze's doing by the same label normalizing without a directive —
+  [labeled body head](../tests/fixtures/typescript/statements/labeled/body_prettier_ignore_head_prettier_divergence/)
+
+One statement position is **inert by agreement**: a directive between a **decorator** and its
+declaration (`@dec⏎// prettier-ignore⏎export class D {}`) freezes nothing, in prettier or in
+tsv. The decorator belongs to the declaration it decorates, so the gap is inside the statement
+rather than before it, and there is no following member for the rule to bind to.
 
 See [directives.md](./directives.md) for the user-facing reference.
 
