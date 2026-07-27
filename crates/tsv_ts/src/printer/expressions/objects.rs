@@ -615,10 +615,11 @@ impl<'a> Printer<'a> {
                 self.needs_parens(&prop.value, super::ParenContext::ObjectPropertyValue);
 
             // A post-colon comment forces break-after-operator when it's a line
-            // comment (extends to end of line), a multiline block (its own newlines
-            // break the group), or the source put the value on a later line than the
-            // comment (an own-line leading comment); a single-line block glued to the
-            // value (`: /* c */ v`) stays inline.
+            // comment (extends to end of line), an *indentable* block (its reprint is
+            // hard lines, which break the group), or the source put the value on a later
+            // line than the comment (an own-line leading comment); a block glued to the
+            // value stays inline — single-line (`: /* c */ v`) and preserved multi-line
+            // (`: /* line1⏎line2 */ v`) alike, since neither carries a break out.
             // Prettier ref: hasLeadingOwnLineComment → break-after-operator in chooseLayout
             //
             // **on page**, not `post_colon_comments` (which is emit-keyed): hanging the
@@ -627,7 +628,11 @@ impl<'a> Printer<'a> {
             // value's own node prints it, and the `comments_doc` below is empty).
             let has_own_line_comment_post_colon = self
                 .comments_in_source_between(colon_pos + 1, value_start)
-                .any(|c| !c.is_block || c.multiline || !self.is_same_line(c.span.end, value_start));
+                .any(|c| {
+                    !c.is_block
+                        || self.block_comment_is_indentable(c)
+                        || !self.is_same_line(c.span.end, value_start)
+                });
 
             // The `:`→value head: an own-line directive there freezes the whole value.
             let value_frozen = self.value_head_frozen_span(colon_pos + 1, prop.value.span());

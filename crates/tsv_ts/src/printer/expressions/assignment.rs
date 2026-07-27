@@ -15,6 +15,7 @@
 
 use crate::ast::internal::{self, Expression, JsdocCast};
 use crate::printer::ArrowChainContext;
+use crate::printer::OwnedCommentEffect;
 use crate::printer::Printer;
 use crate::printer::conditional_should_break_after_op;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
@@ -1001,12 +1002,25 @@ impl<'a> Printer<'a> {
         }
         // A comment the RHS *owns* (a JSDoc cast, a bundler annotation) is glued to its
         // first token and travels inside its doc, so it is never in `rhs_comments` — the
-        // gap emits nothing for it. It is still on the page and still hangs the value, so
-        // ask the node. See `owned_leading_comment_hangs_value`.
+        // gap emits nothing for it. It is still on the page and still decides the layout,
+        // so ask the node. Both halves come off one lookup; see
+        // `owned_leading_comment_effect`.
+        let owned_comment_effect = self.owned_leading_comment_effect(right_expr);
+        // An indentable owned comment hangs the value.
         if layout != AssignmentLayout::BreakAfterOperator
-            && self.owned_leading_comment_hangs_value(right_expr)
+            && owned_comment_effect == Some(OwnedCommentEffect::Hangs)
         {
             layout = AssignmentLayout::BreakAfterOperator;
+        }
+        // The other half: a *preserved* multi-line owned comment ends the operator's line
+        // inside itself, so a width-decided break at the operator decides nothing — take
+        // the never-break form, as for a self-expanding value. Only `Fluid` is affected in
+        // practice (it is the one width-decided layout here), and this deliberately does
+        // not override a `BreakAfterOperator` the value itself earned.
+        if layout == AssignmentLayout::Fluid
+            && owned_comment_effect == Some(OwnedCommentEffect::Pins)
+        {
+            layout = AssignmentLayout::NeverBreakAfterOperator;
         }
         // Member-only AND call chains with line comments break internally at the
         // comment location (the chain formatter does this — see
@@ -1052,7 +1066,7 @@ impl<'a> Printer<'a> {
         // - A comment the RHS *owns* prints inside the RHS's doc (a JSDoc cast, a bundler
         //   annotation), so an owned multi-line annotation on a trivial call
         //   (`a = /**⏎ * @__PURE__⏎ */ fn();`) force-breaks the doc without being a chain
-        //   break. The layout already hangs the value for it (`owned_leading_comment_hangs_value`).
+        //   break. The layout already hangs the value for it (`owned_leading_comment_effect`).
         // - An *interior line comment* in the chain (`a = foo // c⏎.bar!`) forces the break
         //   at the comment — a `//` must end its line — and the layout override above already
         //   handled it (`has_line_comments_in_*_chain` → NeverBreakAfterOperator, keeping the
@@ -1072,7 +1086,7 @@ impl<'a> Printer<'a> {
         debug_assert!(
             {
                 let core_expr = unwrap_expression(right_expr);
-                self.owned_leading_comment_hangs_value(right_expr)
+                owned_comment_effect == Some(OwnedCommentEffect::Hangs)
                     || self.has_line_comments_in_chain(right_expr)
                     || chain_has_line_continuation_string_arg(core_expr, self.source)
                     || !is_poorly_breakable_chain(

@@ -49,6 +49,38 @@ fn left_spine_child<'x>(expr: &'x Expression<'x>) -> Option<&'x Expression<'x>> 
     })
 }
 
+/// What the comment a value **owns** does to the operator's line (`=` / `:`) — the two
+/// exclusive halves of one question, so a caller reads them off one lookup instead of
+/// asking twice. See [`Printer::owned_leading_comment_effect`].
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OwnedCommentEffect {
+    /// The comment **hangs** the value onto its own line after the operator
+    /// (prettier's `hasLeadingOwnLineComment` → break-after-operator).
+    ///
+    /// The **indentable** multi-line block (`/**⏎ * c⏎ */`), whose reprint is hard lines
+    /// the enclosing group must honor ([`Printer::block_comment_is_indentable`]) —
+    /// prettier reaches the same place through `printIndentableBlockComment`'s
+    /// `breakParent`.
+    Hangs,
+    /// The comment **pins** the value to the operator's line (the never-break layout).
+    ///
+    /// A *preserved* (non-indentable) multi-line block prints its interior verbatim, so
+    /// the operator's line ends inside the comment no matter what layout is chosen. There
+    /// is nothing left for a width-decided break at the operator to decide: breaking it
+    /// only pushes the same unbreakable run one indent over, and prettier — whose
+    /// non-indentable comment is one opaque string — leaves the value on the operator's
+    /// line (`const a = /* line1⏎line2 */ x;`, `const { a, b } = /* line1⏎line2 */ x;`).
+    /// So the layout must be the never-break form, exactly as for a self-expanding value.
+    ///
+    /// This half is a tsv-side rule with no prettier counterpart because the *mechanism*
+    /// differs: tsv emits that interior through `literalline`s (see
+    /// `build_preserved_block_comment_doc` — they keep the authored columns, and `fits`
+    /// must see them), and a `literalline` breaks its enclosing group. Without it the
+    /// fluid layout broke at the operator on the comment's own newlines rather than on
+    /// width.
+    Pins,
+}
+
 impl<'a> Printer<'a> {
     /// Prepend the comment `expr` owns, glued to its own first token.
     ///
@@ -111,8 +143,8 @@ impl<'a> Printer<'a> {
         d.concat(&[self.build_comment_doc(comment), d.text(" "), doc])
     }
 
-    /// **on page**: whether the comment `expr` owns hangs `expr` onto its own line after an
-    /// assignment operator (`=` / `:`).
+    /// **on page**: what the comment `expr` owns does to the operator's line (`=` / `:`) —
+    /// [`OwnedCommentEffect`], or `None` when nothing it owns changes the layout.
     ///
     /// An owned comment is glued to `expr`'s first token and travels *inside* `expr`'s doc,
     /// so it never reaches the operator→value gap the assignment layout inspects — its
@@ -121,27 +153,54 @@ impl<'a> Printer<'a> {
     /// gap. This is the general rule; the cast-only `is_own_line_jsdoc_cast` node check that
     /// used to sit in `variable.rs` was its special case.
     ///
-    /// The hang test matches every other keyword→value gap: a line comment, a multi-line
-    /// block, or a block the author left on its own line. A single-line block glued to the
-    /// value (`= /* c */ v`) stays inline.
-    pub(crate) fn owned_leading_comment_hangs_value(&self, expr: &Expression<'_>) -> bool {
-        // Document-level short-circuit: no owned comment anywhere ⇒ none hangs the value
-        // (and no `JsdocCast` exists, since a cast's comment is always owned).
+    /// **The answer is what the comment PRINTS as, not how many lines it spans.** General
+    /// ownership binds only a **same-line glued** block (`CommentGlue::SameLine`,
+    /// `bind_leading_comment`), so every comment reaching the general arm below is a block
+    /// sitting on the value's own line — the "line comment" and "newline after it" arms of
+    /// the sibling gap rules are unreachable here, and `multiline` alone is *wrong*: it
+    /// cannot tell [`OwnedCommentEffect::Hangs`] from [`OwnedCommentEffect::Pins`], and
+    /// answering with it hangs values prettier leaves inline.
+    ///
+    /// **One lookup, both halves — deliberately.** Every caller that asks whether the value
+    /// hangs also asks whether it pins (the declarator and the assignment layout both do),
+    /// and each ask costs a backward byte scan, a binary search over the comment array, and
+    /// a walk of the comment body. Two predicates would pay that twice *and* be free to
+    /// drift apart; one classifier makes their exclusivity structural.
+    pub(crate) fn owned_leading_comment_effect(
+        &self,
+        expr: &Expression<'_>,
+    ) -> Option<OwnedCommentEffect> {
+        // Document-level short-circuit: no owned comment anywhere ⇒ no effect (and no
+        // `JsdocCast` exists, since a cast's comment is always owned).
         if !self.has_owned_comments {
-            return false;
+            return None;
         }
-        // A JSDoc cast keeps its own rule, and must: it prints a hardline between the
+        // A JSDoc cast keeps its own hang rule, and must: it prints a hardline between the
         // comment and its `(` on exactly the shape `jsdoc_cast_comment_is_own_line`
         // describes, and a hang without that hardline strands the `(` (see that
         // function's doc — it is the single source of truth for both). The cast's comment
         // may also sit a *newline* away from the `(`, which the glued lookup below
         // deliberately does not match — a bundler annotation binds only when glued.
-        if let Expression::JsdocCast(cast) = expr {
-            return jsdoc_cast_comment_is_own_line(cast, self.source);
+        let is_cast = if let Expression::JsdocCast(cast) = expr {
+            if jsdoc_cast_comment_is_own_line(cast, self.source) {
+                return Some(OwnedCommentEffect::Hangs);
+            }
+            true
+        } else {
+            false
+        };
+        let comment = self.owned_leading_comment_at(expr.span().start)?;
+        if self.block_comment_is_indentable(comment) {
+            // ⚠️ A cast reaches here only in its **glued** shape, which the rule above has
+            // already answered `false` for — its comment prints against its own `(`, so the
+            // indentable form does not hang it the way a general owned comment does.
+            (!is_cast).then_some(OwnedCommentEffect::Hangs)
+        } else if comment.multiline {
+            // A glued cast's preserved shape pins, like any other glued block.
+            Some(OwnedCommentEffect::Pins)
+        } else {
+            None
         }
-        let start = expr.span().start;
-        self.owned_leading_comment_at(start)
-            .is_some_and(|c| !c.is_block || c.multiline || !self.is_same_line(c.span.end, start))
     }
 
     /// **on page**: where `expr`'s printed content begins in source — the start of the owned

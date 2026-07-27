@@ -43,7 +43,7 @@ pub use comment::{
     find_first_comment_from, has_comments_on_page_in_range, has_comments_to_emit_in_range,
     has_line_comments_in_range, has_multiline_block_comments_on_page_in_range,
     is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
-    is_honored_format_ignore,
+    is_honored_format_ignore, is_indentable_block,
 };
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
 pub use error::{ErrorContext, ParseError, Result, lex_err};

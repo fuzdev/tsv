@@ -37,6 +37,7 @@ mod scan;
 
 pub(crate) use declarations::HeritageKeyword;
 pub(crate) use lists::BlankRule;
+pub(crate) use owned::OwnedCommentEffect;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
 pub(super) use super::{Printer, calls, layout};
