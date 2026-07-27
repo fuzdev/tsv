@@ -71,11 +71,10 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Parse
                     if let Some(ch) = char::from_u32(code) {
                         result.push(ch);
                     } else {
-                        return Err(ParseError::InvalidSyntax {
-                            message: format!("Invalid hex escape: \\x{code:02X}"),
-                            position: 0,
-                            context: None,
-                        });
+                        return Err(ParseError::invalid_syntax(
+                            format!("Invalid hex escape: \\x{code:02X}"),
+                            0,
+                        ));
                     }
                 }
 
@@ -104,42 +103,37 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Parse
                                         digits += 1;
                                     }
                                     None => {
-                                        return Err(ParseError::InvalidSyntax {
-                                            message: "Invalid unicode codepoint escape".to_string(),
-                                            position: 0,
-                                            context: None,
-                                        });
+                                        return Err(ParseError::invalid_syntax(
+                                            "Invalid unicode codepoint escape".to_string(),
+                                            0,
+                                        ));
                                     }
                                 },
                                 // End of input before the closing `}` — a `\u{…`
                                 // escape must be terminated (matches acorn).
                                 None => {
-                                    return Err(ParseError::InvalidSyntax {
-                                        message: "Unterminated unicode codepoint escape"
-                                            .to_string(),
-                                        position: 0,
-                                        context: None,
-                                    });
+                                    return Err(ParseError::invalid_syntax(
+                                        "Unterminated unicode codepoint escape".to_string(),
+                                        0,
+                                    ));
                                 }
                             }
                         }
 
                         if digits == 0 || digits > 6 {
-                            return Err(ParseError::InvalidSyntax {
-                                message: "Invalid unicode codepoint escape length".to_string(),
-                                position: 0,
-                                context: None,
-                            });
+                            return Err(ParseError::invalid_syntax(
+                                "Invalid unicode codepoint escape length".to_string(),
+                                0,
+                            ));
                         }
 
                         if let Some(ch) = char::from_u32(code) {
                             result.push(ch);
                         } else {
-                            return Err(ParseError::InvalidSyntax {
-                                message: format!("Invalid unicode codepoint: U+{code:X}"),
-                                position: 0,
-                                context: None,
-                            });
+                            return Err(ParseError::invalid_syntax(
+                                format!("Invalid unicode codepoint: U+{code:X}"),
+                                0,
+                            ));
                         }
                     } else {
                         // Standard unicode escape: \uXXXX (4 digits → 0..=0xFFFF)
@@ -248,19 +242,17 @@ where
             Some(ch) => match ch.to_digit(16) {
                 Some(d) => value = value * 16 + d,
                 None => {
-                    return Err(ParseError::InvalidSyntax {
-                        message: format!("Expected hex digit, found '{ch}'"),
-                        position: 0,
-                        context: None,
-                    });
+                    return Err(ParseError::invalid_syntax(
+                        format!("Expected hex digit, found '{ch}'"),
+                        0,
+                    ));
                 }
             },
             None => {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Unexpected end of string in escape sequence".to_string(),
-                    position: 0,
-                    context: None,
-                });
+                return Err(ParseError::invalid_syntax(
+                    "Unexpected end of string in escape sequence".to_string(),
+                    0,
+                ));
             }
         }
     }

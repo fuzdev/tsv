@@ -464,66 +464,41 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
 
     /// Create an error with custom message at current position
     pub(crate) fn error_msg(&self, message: &str) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: message.to_string(),
-            position: self.current_pos(),
-            context: None,
-        }
+        ParseError::invalid_syntax(message.to_string(), self.current_pos())
     }
 
     /// Create an error with custom message at custom position
     pub(crate) fn error_msg_at(&self, message: &str, position: usize) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: message.to_string(),
-            position,
-            context: None,
-        }
+        ParseError::invalid_syntax(message.to_string(), position)
     }
 
     /// Create an error: "Expected X"
     pub(crate) fn error_expected(&self, what: &str) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: format!("Expected {what}"),
-            position: self.current_pos(),
-            context: None,
-        }
+        ParseError::invalid_syntax(format!("Expected {what}"), self.current_pos())
     }
 
     /// Create an error: "Expected X" at custom position
     pub(crate) fn error_expected_at(&self, what: &str, position: usize) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: format!("Expected {what}"),
-            position,
-            context: None,
-        }
+        ParseError::invalid_syntax(format!("Expected {what}"), position)
     }
 
     /// Create an error: "Expected X, found Y"
     pub(crate) fn error_expected_found(&self, what: &str) -> ParseError {
         let kind = &self.current_kind;
-        ParseError::InvalidSyntax {
-            message: format!("Expected {what}, found {kind}"),
-            position: self.current_pos(),
-            context: None,
-        }
+        ParseError::invalid_syntax(format!("Expected {what}, found {kind}"), self.current_pos())
     }
 
     /// Create an error: "Expected X after 'Y'"
     pub(crate) fn error_expected_after(&self, what: &str, after: &str) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: format!("Expected {what} after '{after}'"),
-            position: self.current_pos(),
-            context: None,
-        }
+        ParseError::invalid_syntax(
+            format!("Expected {what} after '{after}'"),
+            self.current_pos(),
+        )
     }
 
     /// Create an error: "Unexpected X"
     pub(crate) fn error_unexpected(&self, what: &str) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: format!("Unexpected {what}"),
-            position: self.current_pos(),
-            context: None,
-        }
+        ParseError::invalid_syntax(format!("Unexpected {what}"), self.current_pos())
     }
 
     pub(crate) fn parse(&mut self) -> Result<CssStyleSheet<'arena>, ParseError> {

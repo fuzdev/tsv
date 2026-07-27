@@ -77,8 +77,8 @@ struct ParsedExpr<'arena> {
     ///
     /// `u32` (not `usize`): source positions fit in `u32` (the parser rejects
     /// inputs > 4 GB), and the narrower positions keep `ParsedExpr` minimal (one
-    /// pointer + two `u32`) so a boxed error niche-packs into the `&Expression`'s
-    /// spare space for free, leaving `Result<ParsedExpr, Box<ParseError>>`
+    /// pointer + two `u32`) so the pointer-sized `ParseError` niche-packs into the
+    /// `&Expression`'s spare space for free, leaving `Result<ParsedExpr, ParseError>`
     /// register-returnable instead of sret-returned — the recursion's hot return.
     actual_start: u32,
     /// Actual end position after consuming any closing parentheses
@@ -86,16 +86,17 @@ struct ParsedExpr<'arena> {
 }
 
 // `ParsedExpr` is the Pratt recursion's hot return: one `&Expression` reference plus two
-// `u32` paren-bound positions (16 B on 64-bit). Boxing the error niche-packs it into the
-// reference's spare space for free — the fallible `Result<ParsedExpr, Box<ParseError>>` is
-// the *same size* as the success value (no error bloat) — so the recursion returns it in
-// registers instead of via an sret stack slot. An unboxed 96 B `ParseError`, or `usize`
-// positions, would push it over the register threshold. The asserts are width-relative (a
-// `&Expression` is one `usize`), so they also hold for the 32-bit `wasm32` build.
+// `u32` paren-bound positions (16 B on 64-bit). `ParseError` is pointer-sized (it boxes its
+// own payload — see `tsv_lang::ParseError`), so it niche-packs into the reference's spare
+// space for free — the fallible `Result<ParsedExpr, ParseError>` is the *same size* as the
+// success value (no error bloat) — so the recursion returns it in registers instead of via an
+// sret stack slot. A 96 B payload inline, or `usize` positions, would push it over the
+// register threshold. The asserts are width-relative (a `&Expression` is one `usize`), so
+// they also hold for the 32-bit `wasm32` build.
 const _: () =
     assert!(size_of::<ParsedExpr<'static>>() == size_of::<usize>() + 2 * size_of::<u32>());
 const _: () = assert!(
-    size_of::<Result<ParsedExpr<'static>, Box<ParseError>>>() == size_of::<ParsedExpr<'static>>()
+    size_of::<Result<ParsedExpr<'static>, ParseError>>() == size_of::<ParsedExpr<'static>>()
 );
 
 impl<'arena> ParsedExpr<'arena> {
@@ -392,7 +393,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         min_bp: u8,
         expr_start: usize,
         left: &mut ParsedExpr<'arena>,
-    ) -> Result<bool, Box<ParseError>> {
+    ) -> Result<bool, ParseError> {
         let is_as = match self.current_kind() {
             TokenKind::Keyword(KeywordKind::As) => true,
             TokenKind::Keyword(KeywordKind::Satisfies) => false,
@@ -445,7 +446,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Pratt parser: parse expression with minimum binding power
     ///
     /// Returns ParsedExpr with actual end position tracking for parentheses
-    fn parse_expression_bp(&mut self, min_bp: u8) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+    fn parse_expression_bp(&mut self, min_bp: u8) -> Result<ParsedExpr<'arena>, ParseError> {
         let arena = self.arena;
         // Track the true start position (before any parentheses)
         // This is needed because grouped expressions like (a && b) should have their
@@ -515,11 +516,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 )
                 && left.actual_start == left.expr.span().start
             {
-                return Err(Box::new(ParseError::InvalidSyntax {
-                    message: "Unary expression cannot be the left operand of ** without parentheses. Use (-x) ** y or -(x ** y).".to_string(),
-                    position: left.expr.span().start as usize,
-                    context: None,
-                }));
+                return Err(ParseError::invalid_syntax(
+                    "Unary expression cannot be the left operand of ** without parentheses. Use (-x) ** y or -(x ** y).".to_string(),
+                    left.expr.span().start as usize,
+                ));
             }
 
             self.advance()?; // consume operator
@@ -593,12 +593,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // binary operator here, even inside a for-header init. The alternate
             // is `[?In]` and inherits the outer context (so `for (a ? b : x in y;;)`
             // still rejects).
-            // `with_allow_in` threads the unboxed `ParseError`; unbox the spine's
-            // boxed error inside the closure (cold path) and let the outer `?` re-box.
-            let consequent = self.with_allow_in(|p| {
-                p.parse_expression_bp(BP_ASSIGNMENT)
-                    .map_err(ParseError::from)
-            })?;
+            let consequent = self.with_allow_in(|p| p.parse_expression_bp(BP_ASSIGNMENT))?;
 
             // Expect ':'
             self.expect(&TokenKind::Colon)?;
@@ -651,7 +646,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse prefix expression returning ParsedExpr with actual end position
-    fn parse_prefix_expression(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+    fn parse_prefix_expression(&mut self) -> Result<ParsedExpr<'arena>, ParseError> {
         // The head token — the leftmost token of the expression being parsed, and the
         // only one a leading comment can be glued to. Taken before the match, which
         // produces exactly the node that token begins (postfix subscripts wrap it after).
@@ -709,9 +704,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 } else {
                     // Module `[~Await]`: `await` is reserved and there is no
                     // `[+Await]` to make it an await expression.
-                    return Err(Box::new(self.error_msg(
+                    return Err(self.error_msg(
                         "'await' is only allowed inside an async function or at the top level of a module",
-                    )));
+                    ));
                 }
             }
             TokenKind::Keyword(KeywordKind::Yield) => {
@@ -890,12 +885,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             if !matches!(expr.expr, Expression::Identifier(_)) {
                 // `parse_primary_expression` has already consumed the head, so
                 // anchor the error at its start, not the now-current token.
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected an identifier or '(' as the decorator expression"
-                        .to_string(),
-                    position: head_start,
-                    context: None,
-                });
+                return Err(ParseError::invalid_syntax(
+                    "Expected an identifier or '(' as the decorator expression".to_string(),
+                    head_start,
+                ));
             }
 
             // `DecoratorMemberExpression`: a `.`-member chain. Property names are
@@ -959,7 +952,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn wrap_non_null_assertion(
         &mut self,
         expr: ParsedExpr<'arena>,
-    ) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+    ) -> Result<ParsedExpr<'arena>, ParseError> {
         let (_, op_end) = self.current_pos();
         self.advance()?; // consume '!'
         let span = Span::new(expr.actual_start, op_end as u32);
@@ -1008,7 +1001,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         mut left: ParsedExpr<'arena>,
         mode: SubscriptMode,
-    ) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+    ) -> Result<ParsedExpr<'arena>, ParseError> {
         let arena = self.arena;
         // Tracks whether an optional `?.` was consumed in THIS subscript chain (not
         // inside a parenthesized sub-expression — those are parsed as their own
@@ -1113,10 +1106,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             // only a call may follow (`a?.<T>` without `(` is a syntax error)
                             let type_args = self.parse_type_parameter_instantiation()?;
                             if *self.current_kind() != TokenKind::ParenOpen {
-                                return Err(Box::new(self.error_expected_after(
+                                return Err(self.error_expected_after(
                                     "'('",
                                     "type arguments in optional call",
-                                )));
+                                ));
                             }
                             self.advance()?; // consume '('
                             let (arguments, paren_end) = self.parse_call_arguments()?;
@@ -1137,9 +1130,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             );
                         }
                         _ => {
-                            return Err(Box::new(
-                                self.error_expected_after("property name, '[', or '('", "?."),
-                            ));
+                            return Err(
+                                self.error_expected_after("property name, '[', or '('", "?.")
+                            );
                         }
                     }
                 }
@@ -1200,9 +1193,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         // chain (consumed as its own primary, so `optional_chained` is
                         // false here) and is valid.
                         if optional_chained {
-                            return Err(Box::new(self.error_msg(
+                            return Err(self.error_msg(
                                 "Optional chaining cannot appear in the tag of tagged template expressions",
-                            )));
+                            ));
                         }
                         // A `` tag<T>`x` `` tagged template lifts the tag's `<T>`
                         // into the tag's `typeArguments` (see `flatten_instantiation`).
@@ -1269,8 +1262,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         // An instantiation expression can't be followed by a property
                         // access (`f<T>.x`); a call or tagged template, which the loop
                         // below flattens into the expression, stays valid.
-                        self.reject_instantiation_property_access()
-                            .map_err(Box::new)?;
+                        self.reject_instantiation_property_access()?;
                     } else {
                         break;
                     }
@@ -1309,7 +1301,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// literals, parens, arrays, objects, templates, `this`/`super`, and regex; the
     /// keyword-led expression atoms (`new`, `class`, `function`, `async function`,
     /// `import`) sit above the primary layer and are dispatched here.
-    fn parse_heritage_atom(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+    fn parse_heritage_atom(&mut self) -> Result<ParsedExpr<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         // `async function () {}` is the only `async`-led heritage atom. A bare `async`
         // (or an `async`-arrow, which isn't a valid heritage atom) falls through to the
@@ -1352,9 +1344,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 if matches!(parsed.expr, Expression::ArrowFunctionExpression(_))
                     && parsed.actual_start == parsed.expr.span().start
                 {
-                    return Err(Box::new(self.error_msg(
+                    return Err(self.error_msg(
                         "Arrow functions cannot be used as a class heritage expression",
-                    )));
+                    ));
                 }
                 Ok(parsed)
             }
@@ -1408,7 +1400,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Parse primary expression returning ParsedExpr with actual end position
-    fn parse_primary_expression(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+    fn parse_primary_expression(&mut self) -> Result<ParsedExpr<'arena>, ParseError> {
         match self.current_kind() {
             TokenKind::Number => {
                 let literal = self.parse_number_or_bigint_literal()?;
@@ -1593,7 +1585,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 // parsing as an expression the canonical parser refuses.
                 let private_id = self.parse_private_identifier()?;
                 if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::In)) {
-                    return Err(Box::new(self.error_expected_after("'in'", "private name")));
+                    return Err(self.error_expected_after("'in'", "private name"));
                 }
                 let end = private_id.span.end_usize();
                 let start = private_id.span.start;
@@ -1636,11 +1628,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     end,
                 ))
             }
-            _ => Err(Box::new(ParseError::InvalidExpression {
-                found: self.current_kind().to_string(),
-                position: self.current_pos().0,
-                context: None,
-            })),
+            _ => Err(ParseError::invalid_expression(
+                self.current_kind().to_string(),
+                self.current_pos().0,
+            )),
         }
     }
 
@@ -1651,7 +1642,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// - Grouped expression: `(expr)`
     ///
     /// Uses lookahead to detect arrow functions by scanning for `=>` after `)`.
-    fn parse_paren_expression(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+    fn parse_paren_expression(&mut self) -> Result<ParsedExpr<'arena>, ParseError> {
         // Check if this looks like an arrow function by scanning ahead
         if self.is_arrow_function_start() {
             return Ok(ParsedExpr::from_expr(
@@ -1877,7 +1868,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_instantiation_expression(
         &mut self,
         left: ParsedExpr<'arena>,
-    ) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+    ) -> Result<ParsedExpr<'arena>, ParseError> {
         // Parse type parameter instantiation: <T, U>
         let type_args = self.parse_type_parameter_instantiation()?;
         let end = type_args.span.end;
@@ -2020,7 +2011,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Consume the current `await` token as an ordinary `IdentifierReference`
     /// (Script `[~Await]`). The caller must have verified `await_is_identifier()`
     /// — used for a primary reference and a `new` callee (`new await()`).
-    fn parse_await_identifier_reference(&mut self) -> Result<ParsedExpr<'arena>, Box<ParseError>> {
+    fn parse_await_identifier_reference(&mut self) -> Result<ParsedExpr<'arena>, ParseError> {
         let (start, end) = self.current_pos();
         let name = self.current_raw_ident_name();
         self.advance()?;

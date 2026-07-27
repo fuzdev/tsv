@@ -4,7 +4,7 @@ use tsv_lang::ParseError;
 
 /// Read a CSS comment: /* ... */
 /// Content extracted via source[start+2..end-2]
-pub(crate) fn read_comment(source: &str, pos: &mut usize) -> Result<Token, Box<ParseError>> {
+pub(crate) fn read_comment(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
     let start = *pos;
     let bytes = source.as_bytes();
     let len = bytes.len();

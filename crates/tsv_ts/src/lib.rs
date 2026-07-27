@@ -591,8 +591,7 @@ pub fn attach_pattern_type_annotation<'arena>(
             return Err(tsv_lang::lex_err(
                 "type annotation is not valid on this binding pattern",
                 other.span().start as usize,
-            )
-            .into());
+            ));
         }
     }
     Ok(())

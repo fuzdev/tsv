@@ -193,7 +193,7 @@ impl<'a> Lexer<'a> {
     /// lexer's `decode_scratch`. Thin wrapper over the free
     /// `identifiers::read_identifier` so both dispatch arms (`$`-prefixed and plain)
     /// share the handoff.
-    fn read_identifier(&mut self) -> Result<Token, Box<ParseError>> {
+    fn read_identifier(&mut self) -> Result<Token, ParseError> {
         let (token, decoded) = read_identifier(self.source, &mut self.pos)?;
         // css-syntax "consume an ident-like token": an ident whose value is an
         // ASCII-case-insensitive `url`, immediately followed by `(` whose first
@@ -280,7 +280,7 @@ impl<'a> Lexer<'a> {
         })
     }
 
-    pub fn next_token(&mut self) -> Result<Token, Box<ParseError>> {
+    pub fn next_token(&mut self) -> Result<Token, ParseError> {
         // Start each token with a clean decoded flag. Callers copy the prior token's
         // decode out (`advance`/`new` at once, `peek` via its matching
         // `advance`-from-cache), so a stale decode never leaks onto a later token.
