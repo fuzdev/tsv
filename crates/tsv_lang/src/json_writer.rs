@@ -20,8 +20,8 @@
 //! fixtures pin); integers have a unique decimal form and are hand-formatted
 //! (two-digit-pair, the hot path emitting several ints per node).
 
-/// `00`,`01`,…,`99` — the two-digit-pair table behind [`JsonWriter::u64`],
-/// halving its divisions.
+/// `00`,`01`,…,`99` — the two-digit-pair table behind the integer emitters
+/// ([`JsonWriter::u32`] and its wide arm), halving their divisions.
 const DEC_PAIRS: [u8; 200] = {
     let mut t = [0u8; 200];
     let mut i = 0;
@@ -37,28 +37,74 @@ const DEC_PAIRS: [u8; 200] = {
 /// constant length of the copy that appends it.
 const MAX_U64_DIGITS: usize = 20;
 
-/// Digits that fit one `u64` of packed ASCII — the width [`JsonWriter::u64`]'s
-/// hot arm generates entirely in a register. Every integer the writers emit
-/// (offsets, lines, columns) is far below `99_999_999`; wider values take the
-/// cold arm.
+/// Digits that fit one `u64` of packed ASCII — the width [`JsonWriter::u32`]
+/// generates entirely in a register. Every integer the writers emit (offsets,
+/// lines, columns) is far below `99_999_999`; wider values take the cold arm.
 const WORD_DIGITS: usize = 8;
 
-/// Decimal digit count of `n` (`0` is one digit) — the exact width
-/// [`JsonWriter::u64`] front-aligns its digits to.
+/// Decimal digits in `u32::MAX` — the ceiling of [`decimal_width_u32`].
+const MAX_U32_DIGITS: usize = 10;
+
+/// Decimal digit count of a `u32` (`0` is one digit) — the [`decimal_width`]
+/// sibling for the hot path.
 ///
-/// An **ascending** compare chain, deliberately: the writer's integers are
-/// offsets, lines and columns, so the distribution is overwhelmingly small and
-/// the first few compares are perfectly predicted. `ilog10`'s descending
-/// halving structure is the better shape for a uniform-over-`u64` load, which
-/// this is not.
+/// Same ascending-compare rationale, on the narrower type. The whole point of
+/// the `u32` path is that every division in it is 32-bit: a `u64 / 100` lowers
+/// to a full 64×64→128 multiply (`mul %rcx` + two shifts), a `u32 / 100` to a
+/// single widening `imul`. Taking a `u64` here would sink the argument back
+/// into 64-bit arithmetic and undo it.
+#[inline]
+const fn decimal_width_u32(n: u32) -> usize {
+    if n < 10 {
+        return 1;
+    }
+    if n < 100 {
+        return 2;
+    }
+    if n < 1_000 {
+        return 3;
+    }
+    if n < 10_000 {
+        return 4;
+    }
+    if n < 100_000 {
+        return 5;
+    }
+    if n < 1_000_000 {
+        return 6;
+    }
+    /// `POW10[i] == 10^i`, up to the largest power of ten a `u32` holds.
+    const POW10: [u32; MAX_U32_DIGITS] = {
+        let mut t = [1u32; MAX_U32_DIGITS];
+        let mut i = 1;
+        while i < MAX_U32_DIGITS {
+            t[i] = t[i - 1] * 10;
+            i += 1;
+        }
+        t
+    };
+    let mut w = 7;
+    while w < MAX_U32_DIGITS && n >= POW10[w] {
+        w += 1;
+    }
+    w
+}
+
+/// Decimal digit count of `n` (`0` is one digit) — the exact width the wide arm
+/// front-aligns its digits to.
+///
+/// Only the wide arm reaches this — [`JsonWriter::u32`] carries the hot path on
+/// [`decimal_width_u32`] — so the ascending chain here is inherited shape rather
+/// than a tuned one. It stays ascending for consistency with its sibling, whose
+/// distribution (offsets, lines and columns) really is overwhelmingly small.
 ///
 /// ⚠️ The tail is a **bounded loop**, not a call to `ilog10` — and that is a
 /// codegen constraint, not a style choice. `ilog10` is out-of-line, so its
 /// result is opaque to the caller: LLVM then cannot prove the returned width
-/// fits `JsonWriter::u64`'s scratch and re-inserts a `panic_bounds_check` on
-/// every one of its four scratch writes. A `while w < MAX_U64_DIGITS` loop
-/// makes the range provable, and the bounds checks disappear. Keep any future
-/// rewrite provably in `1..=MAX_U64_DIGITS` **at the type/CFG level**.
+/// fits the wide arm's scratch and re-inserts a `panic_bounds_check` on every
+/// one of its four scratch writes. A `while w < MAX_U64_DIGITS` loop makes the
+/// range provable, and the bounds checks disappear. Keep any future rewrite
+/// provably in `1..=MAX_U64_DIGITS` **at the type/CFG level**.
 #[inline]
 const fn decimal_width(n: u64) -> usize {
     if n < 10 {
@@ -174,7 +220,7 @@ impl JsonWriter {
     // `memmove` **call** inside the body, not from removing the call *to* the
     // body (which the pre-existing code also paid).
     #[inline(never)]
-    pub fn u64(&mut self, n: u64) {
+    pub fn u32(&mut self, n: u32) {
         // Two-digit-pair formatting (itoa's approach): halves the divisions.
         // Writers emit several integers per node, so this is hot.
         //
@@ -201,9 +247,9 @@ impl JsonWriter {
         // correlate the trip count with `digits`, so it must assume `i -= 2`
         // can underflow; `while i >= 2` makes non-underflow syntactic. The only
         // indexing left is `DEC_PAIRS[(n % 100) * 2]`, provably in bounds.
-        let digits = decimal_width(n);
+        let digits = decimal_width_u32(n);
         if digits > WORD_DIGITS {
-            self.u64_wide(n, digits);
+            self.u64_wide(u64::from(n), digits);
             return;
         }
         let mut word = 0u64;
@@ -226,10 +272,22 @@ impl JsonWriter {
         self.buf.truncate(len + digits);
     }
 
-    /// The `> WORD_DIGITS` arm of [`JsonWriter::u64`] — a value past
-    /// `99_999_999`, which no offset, line or column in a real document
-    /// reaches. Out-of-line and `cold` so the hot arm keeps its straight-line
-    /// shape and the wide scratch never enters its stack frame.
+    /// A `u64` value. **Every integer the writers actually emit — offsets,
+    /// lines, columns — fits `u32`**, so this is a dispatcher, not a second
+    /// implementation: the `u32` arm carries the real work and keeps its
+    /// arithmetic 32-bit. The compare is one perfectly-predicted branch.
+    #[inline]
+    pub fn u64(&mut self, n: u64) {
+        match u32::try_from(n) {
+            Ok(n) => self.u32(n),
+            Err(_) => self.u64_wide(n, decimal_width(n)),
+        }
+    }
+
+    /// The wide arm — a value past `99_999_999`, which no offset, line or
+    /// column in a real document reaches. Out-of-line and `cold` so the hot arm
+    /// keeps its straight-line shape and the wide scratch never enters its
+    /// stack frame.
     #[cold]
     #[inline(never)]
     fn u64_wide(&mut self, n: u64, digits: usize) {
@@ -257,11 +315,10 @@ impl JsonWriter {
         self.u64(n.unsigned_abs());
     }
 
-    #[inline]
-    pub fn u32(&mut self, n: u32) {
-        self.u64(u64::from(n));
-    }
-
+    /// A `usize` value — the writers' line and column channel. Narrows to the
+    /// `u32` worker rather than widening to `u64`, so lines and columns keep
+    /// 32-bit arithmetic too; only a value no source could produce takes the
+    /// wide arm.
     #[inline]
     pub fn usize(&mut self, n: usize) {
         self.u64(n as u64);
@@ -344,6 +401,67 @@ mod tests {
         }
         for n in [0, u64::MAX, u64::MAX - 1, u32::MAX as u64, i64::MAX as u64] {
             assert_eq!(decimal_width(n), n.to_string().len(), "decimal_width({n})");
+        }
+    }
+
+    #[test]
+    fn decimal_width_u32_matches_std_formatting() {
+        // Exhaustive over every value std can disagree on by one digit, plus
+        // the u32 ceiling — the width the hot arm front-aligns to.
+        let mut pow = 1u32;
+        loop {
+            for n in [pow.wrapping_sub(1), pow, pow + 1] {
+                assert_eq!(
+                    decimal_width_u32(n),
+                    n.to_string().len(),
+                    "decimal_width_u32({n}) disagrees with std"
+                );
+            }
+            match pow.checked_mul(10) {
+                Some(next) => pow = next,
+                None => break,
+            }
+        }
+        for n in [0, u32::MAX, u32::MAX - 1, i32::MAX as u32] {
+            assert_eq!(decimal_width_u32(n), n.to_string().len(), "u32({n})");
+        }
+    }
+
+    #[test]
+    fn u32_matches_std_across_its_whole_range() {
+        // `u32` is the worker, so grade it directly rather than only through
+        // the `u64` dispatcher. Every boundary — including 8→9 digits, where
+        // the register arm hands off to the wide one — plus an LCG sweep.
+        fn emit_u32(n: u32) -> String {
+            let mut w = JsonWriter::with_capacity(0);
+            w.u32(n);
+            String::from_utf8(w.into_bytes()).expect("digits are ASCII")
+        }
+        let mut pow = 1u32;
+        loop {
+            for n in [pow.wrapping_sub(1), pow, pow + 1] {
+                assert_eq!(
+                    emit_u32(n),
+                    n.to_string(),
+                    "u32({n}) at a power-of-ten edge"
+                );
+            }
+            match pow.checked_mul(10) {
+                Some(next) => pow = next,
+                None => break,
+            }
+        }
+        for n in [0, 1, u32::MAX, u32::MAX - 1, i32::MAX as u32] {
+            assert_eq!(emit_u32(n), n.to_string(), "u32({n})");
+        }
+        let mut state = 0x2545_f491_4f6c_dd1du64;
+        for _ in 0..200_000 {
+            state = state
+                .wrapping_mul(6_364_136_223_846_793_005)
+                .wrapping_add(1_442_695_040_888_963_407);
+            for n in [state as u32, (state >> 17) as u32, (state >> 33) as u32] {
+                assert_eq!(emit_u32(n), n.to_string(), "u32({n})");
+            }
         }
     }
 
