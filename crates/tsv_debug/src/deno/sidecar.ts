@@ -24,7 +24,7 @@ const VERSIONS = {
 	'prettier-plugin-svelte': '4.1.1',
 	svelte: '5.56.4',
 	acorn: '8.16.0',
-	'@sveltejs/acorn-typescript': '1.0.11',
+	'@sveltejs/acorn-typescript': '1.0.11'
 } as const;
 
 // TODO verify there's not a better solution to use deno.json here, see the above NOTE too
@@ -34,7 +34,11 @@ import * as prettier from 'npm:prettier@3.9.6';
 // deno-lint-ignore no-import-prefix
 import prettierPluginSvelte from 'npm:prettier-plugin-svelte@4.1.1';
 // deno-lint-ignore no-import-prefix
-import { compile as svelteCompile, parse as svelteParse, parseCss } from 'npm:svelte@5.56.4/compiler';
+import {
+	compile as svelteCompile,
+	parse as svelteParse,
+	parseCss
+} from 'npm:svelte@5.56.4/compiler';
 // deno-lint-ignore no-import-prefix
 import * as acorn from 'npm:acorn@8.16.0';
 // deno-lint-ignore no-import-prefix
@@ -155,9 +159,40 @@ function bakedSkeleton(code: string): string {
 // flow segment independently, so block-boundary whitespace vanishes while inline whitespace
 // (and text presence) is preserved. `<pre>` runs are kept verbatim (Svelte preserves them).
 const BLOCK_TAGS = new Set([
-	'address', 'article', 'aside', 'blockquote', 'div', 'dl', 'dt', 'dd', 'fieldset', 'figure',
-	'figcaption', 'footer', 'form', 'h1', 'h2', 'h3', 'h4', 'h5', 'h6', 'header', 'hr', 'li',
-	'main', 'nav', 'ol', 'p', 'section', 'table', 'thead', 'tbody', 'tr', 'td', 'th', 'ul',
+	'address',
+	'article',
+	'aside',
+	'blockquote',
+	'div',
+	'dl',
+	'dt',
+	'dd',
+	'fieldset',
+	'figure',
+	'figcaption',
+	'footer',
+	'form',
+	'h1',
+	'h2',
+	'h3',
+	'h4',
+	'h5',
+	'h6',
+	'header',
+	'hr',
+	'li',
+	'main',
+	'nav',
+	'ol',
+	'p',
+	'section',
+	'table',
+	'thead',
+	'tbody',
+	'tr',
+	'td',
+	'th',
+	'ul'
 ]);
 const BR = '\x00'; // block-boundary sentinel (never appears in HTML)
 
@@ -177,7 +212,8 @@ function visibleSegments(body: string): string[] {
 			.replace(/<style\b[^>]*>[\s\S]*?<\/style>/gi, '')
 			.replace(/<!--[\s\S]*?-->/g, '') // comments are not visible render
 			.replace(/<\/?([a-zA-Z][\w-]*)\b[^>]*>/g, (_f, tag) =>
-				BLOCK_TAGS.has(tag.toLowerCase()) ? BR : '');
+				BLOCK_TAGS.has(tag.toLowerCase()) ? BR : ''
+			);
 		for (const seg of marked.split(BR)) {
 			const text = seg.replace(/[ \t\r\n\f]+/g, ' ').trim();
 			if (text) segments.push(`text:${text}`);
@@ -199,7 +235,7 @@ function svelteRenderKey(source: string): string {
 	const compiled = svelteCompile(source, {
 		generate: 'server',
 		name: 'C',
-		filename: 'C.svelte',
+		filename: 'C.svelte'
 	}).js.code;
 	return JSON.stringify(visibleSegments(bakedSkeleton(compiled)));
 }
@@ -227,29 +263,29 @@ interface Response {
 async function dispatch(
 	tool: string,
 	content: string,
-	options?: Record<string, unknown>,
+	options?: Record<string, unknown>
 ): Promise<unknown> {
 	switch (tool) {
 		case '__version_info': {
 			return {
 				runtime: Deno.version.deno,
 				typescript: Deno.version.typescript,
-				dependencies: VERSIONS,
+				dependencies: VERSIONS
 			};
 		}
 
 		case 'prettier': {
 			// Provide default filepath based on parser to help prettier make correct decisions
 			// (e.g., typescript parser without filepath hint might add unnecessary JSX disambiguation)
-			const filepath = options?.filepath ?? (
-				options?.parser === 'typescript'
+			const filepath =
+				options?.filepath ??
+				(options?.parser === 'typescript'
 					? 'file.ts'
 					: options?.parser === 'svelte'
-					? 'file.svelte'
-					: options?.parser === 'css'
-					? 'file.css'
-					: undefined
-			);
+						? 'file.svelte'
+						: options?.parser === 'css'
+							? 'file.css'
+							: undefined);
 			return await prettier.format(content, {
 				plugins: [prettierPluginSvelte],
 				useTabs: true,
@@ -257,7 +293,7 @@ async function dispatch(
 				singleQuote: true,
 				trailingComma: 'none',
 				parser: options?.parser as string | undefined,
-				filepath: filepath as string | undefined,
+				filepath: filepath as string | undefined
 			});
 		}
 
@@ -275,7 +311,7 @@ async function dispatch(
 			return ParserWithTS.parse(content, {
 				sourceType,
 				ecmaVersion: 2025,
-				locations: true,
+				locations: true
 			});
 		}
 
@@ -299,7 +335,7 @@ async function dispatch(
 				dev,
 				runes: true,
 				css: 'external',
-				cssHash: () => 'svelte-tsvhash',
+				cssHash: () => 'svelte-tsvhash'
 			});
 			return {
 				js: result.js.code,
@@ -310,8 +346,8 @@ async function dispatch(
 					code: w.code,
 					message: w.message,
 					start: w.start,
-					end: w.end,
-				})),
+					end: w.end
+				}))
 			};
 		}
 
@@ -352,7 +388,7 @@ for await (const line of lines) {
 			id: -1,
 			ok: false,
 			error: `Invalid JSON request: ${err instanceof Error ? err.message : String(err)}`,
-			duration_ms: Math.round(performance.now() - start),
+			duration_ms: Math.round(performance.now() - start)
 		};
 		console.log(JSON.stringify(response, jsonReplacer));
 		continue;
@@ -364,14 +400,14 @@ for await (const line of lines) {
 			id: req.id,
 			ok: true,
 			output,
-			duration_ms: Math.round(performance.now() - start),
+			duration_ms: Math.round(performance.now() - start)
 		};
 	} catch (err) {
 		response = {
 			id: req.id,
 			ok: false,
 			error: err instanceof Error ? err.message : String(err),
-			duration_ms: Math.round(performance.now() - start),
+			duration_ms: Math.round(performance.now() - start)
 		};
 	}
 

@@ -83,13 +83,35 @@ impl<'a> Printer<'a> {
             argument_doc
         };
         let operator_doc = d.text(update.operator.as_str());
+        let operator_len = update.operator.as_str().len() as u32;
 
         if update.prefix {
-            // Prefix: ++x, --x
-            d.concat(&[operator_doc, argument_doc])
+            // Prefix: ++x, --x. The operator→operand gap has no other emitter, so a
+            // comment authored there is dropped unless this builder claims it. Emit-axis,
+            // so a comment the operand OWNS (a glued block, an annotation, a JSDoc cast)
+            // returns `None` and keeps printing from the operand's own doc — claiming it
+            // here too would double-print it.
+            //
+            // `Adjacent`, not the `AdjacentGlued` of the assignment/call pull-up: an
+            // update operand is not a value gap, so prettier does not reflow the author's
+            // break after a glued block — `++/* c */⏎x` keeps the break. Gluing pulled the
+            // operand up to `++/* c */ x` instead.
+            let operator_end = update.span.start + operator_len;
+            match self.build_rhs_comments_opt(operator_end, update.argument.span().start) {
+                Some(comments) => d.concat(&[operator_doc, comments, argument_doc]),
+                None => d.concat(&[operator_doc, argument_doc]),
+            }
         } else {
-            // Postfix: x++, x--
-            d.concat(&[argument_doc, operator_doc])
+            // Postfix: x++, x--. Same unclaimed gap on the other side, and it can only
+            // ever hold a SINGLE-LINE block comment: a line comment or a multiline block
+            // is a line terminator for ASI, so `a // c⏎++` parses as `a;` then `++;` —
+            // never a postfix update, so the AST this prints can't contain one. That is
+            // why the comments emit inline here rather than hanging the operator: a break
+            // would rewrite the program.
+            let operator_start = update.span.end - operator_len;
+            let comments =
+                self.build_inline_comments_between_doc(update.argument.span().end, operator_start);
+            d.concat(&[argument_doc, comments, operator_doc])
         }
     }
 

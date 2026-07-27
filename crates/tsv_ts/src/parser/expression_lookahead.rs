@@ -8,7 +8,10 @@
 //
 // All functions operate on byte slices for performance (no tokenization needed).
 
-use super::scan::{is_identifier_start, skip_identifier, skip_whitespace_and_comments};
+use super::scan::{
+    is_identifier_start, is_word_at, skip_identifier, skip_numeric_literal,
+    skip_whitespace_and_comments,
+};
 use tsv_lang::source_scan::{TriviaProfile, is_regex_start, skip_regex_literal, skip_trivia};
 
 /// `<` at `pos` is `<=` comparison operator, not an angle bracket open
@@ -151,85 +154,227 @@ fn check_arrow_after_paren(bytes: &[u8], pos: usize) -> bool {
     false
 }
 
-/// Scan forward looking for `=>` (used after type annotations)
+/// Whether the return-type annotation opening at the `:` at `colon` is followed
+/// **immediately** by `=>` — the signal that the `(…)` before it was an arrow's
+/// parameter list, not a parenthesized expression.
 ///
-/// Properly handles:
-/// - Statement boundaries: stops at `;` (not an arrow function)
-/// - Nested structures: tracks depth for `()`, `[]`, `{}`, `<>` to find `=>` at depth 0
-/// - Type function signatures: `(x: (a: number) => void): T => ...` correctly finds outer `=>`
-fn scan_for_arrow(bytes: &[u8], mut pos: usize) -> bool {
-    let mut paren_depth = 0;
-    let mut bracket_depth = 0;
-    let mut brace_depth = 0;
-    let mut angle_depth = 0;
+/// Mirrors tsc's rule (`parseParenthesizedArrowFunctionExpression`): scan exactly
+/// ONE type, then require `=>` right after it. Hunting for any `=>` at bracket
+/// depth 0 is not enough, and tsc's own source names the counterexample —
+/// "`a ? (b): c` will have `(b):` parsed as a signature with a return type
+/// annotation". Two shapes put a stray `=>` within reach of such a scan, and in
+/// neither is the `:` a return-type colon:
+///
+/// - a depth-0 `?`, which in a type is only a conditional type's `?` and so
+///   requires an `extends` before it (`a ? (b, c) : d ? (p) => 1 : e`)
+/// - a `=>` belonging to a **function type** in the annotation, which is the
+///   type's own arrow and not the signature's (`a ? (b, c) : (p) => 1`)
+///
+/// Bytes that cannot occur at the top level of a type end the scan, so an
+/// assignment (`d = …`), a non-null assertion (`d! ? …`) or a regex body
+/// containing `=>` stops it rather than being scanned through.
+fn scan_for_arrow(bytes: &[u8], colon: usize) -> bool {
+    let end = bytes.len();
+    let mut pos = colon + 1;
+    // A `?` is type syntax only inside a conditional type, which is introduced by
+    // `extends`. Tracked as a flag rather than a count: an undercount would
+    // reject a valid annotation, and the whole point of this scan is to stop
+    // over-rejecting.
+    let mut saw_extends = false;
+    let mut position = TypePos::Full;
 
-    while pos < bytes.len() {
+    while pos < end {
         pos = skip_whitespace_and_comments(bytes, pos);
-        if pos >= bytes.len() {
+        if pos >= end {
             break;
         }
 
-        // Strings/templates are opaque (comments were already consumed above); a
-        // delimiter inside one isn't significant. No regex skip is needed here
-        // (unlike `scan_parens_then_arrow`): this walks type syntax after a `:` /
-        // `)`, where a `/…/` regex literal can't appear, so a stray `/` is just an
-        // insignificant byte.
-        if let Some(past) = skip_trivia(bytes, pos, bytes.len(), TriviaProfile::JS) {
+        // Strings and templates are opaque (comments were consumed above) and,
+        // as literal types, are atoms.
+        if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
+            position = TypePos::Atom;
             pos = past;
             continue;
         }
 
-        // Check if we're at the outermost nesting level (no open brackets/braces/parens/angles)
-        let at_depth_zero =
-            paren_depth == 0 && bracket_depth == 0 && brace_depth == 0 && angle_depth == 0;
+        // Consume whole identifiers in one step, so a name's bytes can never be
+        // read as operators and so a keyword is matched as a word (never as the
+        // opening of an `extendsFoo`).
+        if is_identifier_start(bytes[pos]) {
+            position = if is_word_at(bytes, pos, b"extends") {
+                // The extends-type and both branches are full types.
+                saw_extends = true;
+                TypePos::Full
+            } else if is_word_at(bytes, pos, b"new") || is_word_at(bytes, pos, b"abstract") {
+                // A construct type's `(params) =>` is the function-type shape.
+                TypePos::Full
+            } else if TYPE_PREFIX_WORDS.iter().any(|w| is_word_at(bytes, pos, w)) {
+                TypePos::Operand
+            } else {
+                TypePos::Atom
+            };
+            pos = skip_identifier(bytes, pos);
+            continue;
+        }
+
+        // A numeric literal type (`-1` included, via the `-` arm below).
+        if bytes[pos].is_ascii_digit() {
+            pos = skip_numeric_literal(bytes, pos);
+            position = TypePos::Atom;
+            continue;
+        }
 
         match bytes[pos] {
-            // Statement boundary - not an arrow function (only at depth 0)
-            // Semicolons inside braces are valid separators in object type literals
-            b';' if at_depth_zero => return false,
-
-            // Track nesting depth
-            b'(' => paren_depth += 1,
-            b')' => {
-                if paren_depth > 0 {
-                    paren_depth -= 1;
-                }
-            }
-            b'[' => bracket_depth += 1,
-            b']' => {
-                if bracket_depth > 0 {
-                    bracket_depth -= 1;
-                }
-            }
-            b'{' => brace_depth += 1,
-            b'}' => {
-                if brace_depth > 0 {
-                    brace_depth -= 1;
-                } else {
-                    // Unbalanced brace - end of scope
+            b'(' => {
+                // A `(` after a complete atom is not type syntax — the type
+                // already ended, so the `:` was never a return-type colon
+                // (`d as (p) => T`, `async (p) => 1`).
+                if position == TypePos::Atom {
                     return false;
                 }
+                let Some(close) = matching_delimiter_close(bytes, pos) else {
+                    return false;
+                };
+                // At a full-type position the `(` may open a function type's
+                // parameter list, whose `=>` belongs to the TYPE and must not be
+                // mistaken for the signature's. At an operand position the
+                // grammar has no function type, so it is a parenthesized type
+                // and a following `=>` is the enclosing arrow's.
+                if position == TypePos::Full && paren_starts_function_type(bytes, pos) {
+                    let after = skip_whitespace_and_comments(bytes, close + 1);
+                    if bytes.get(after) == Some(&b'=') && bytes.get(after + 1) == Some(&b'>') {
+                        // The function type's return type is itself a full type.
+                        pos = after + 2;
+                        position = TypePos::Full;
+                        continue;
+                    }
+                }
+                pos = close + 1;
+                position = TypePos::Atom;
             }
-            b'<' if is_less_equal_op(bytes, pos) => pos += 1,
-            b'<' => angle_depth += 1,
-            b'>' if is_arrow_close(bytes, pos) => {} // `=>` handled by `=` match
-            b'>' if is_greater_equal_op(bytes, pos) => pos += 1,
-            b'>' if angle_depth > 0 => angle_depth -= 1,
-
-            // Check for `=>` at depth 0
-            b'=' if pos + 1 < bytes.len() && bytes[pos + 1] == b'>' && at_depth_zero => {
-                return true;
+            // An object or tuple/array type, or an index/array suffix on an atom.
+            b'{' | b'[' => {
+                let Some(close) = matching_delimiter_close(bytes, pos) else {
+                    return false;
+                };
+                pos = close + 1;
+                position = TypePos::Atom;
             }
-            b'=' if pos + 1 < bytes.len() && bytes[pos + 1] == b'>' => {
-                // Not at depth zero - skip past `=>` to avoid matching the `>` as angle close
+            b'<' => {
+                let Some(close) = matching_angle_close(bytes, pos + 1) else {
+                    return false;
+                };
+                // At a full-type position `<…>` opens a generic function type,
+                // whose parameter list follows; anywhere else it is a
+                // type-argument list, which completes an atom.
+                if position != TypePos::Full {
+                    position = TypePos::Atom;
+                }
+                pos = close + 1;
+            }
+            // The type ended here, so this `=>` is the signature's arrow.
+            b'=' if bytes.get(pos + 1) == Some(&b'>') => return true,
+            // Union / intersection constituents, qualified-name parts, and a
+            // negative literal type's sign all take a higher-precedence operand,
+            // never a bare function type.
+            b'|' | b'&' | b'.' | b'-' => {
+                position = TypePos::Operand;
                 pos += 1;
             }
-
-            _ => {}
+            // A conditional type's `?` and `:` each introduce a branch, which is
+            // a full type.
+            b'?' => {
+                if !saw_extends {
+                    return false;
+                }
+                position = TypePos::Full;
+                pos += 1;
+            }
+            b':' => {
+                position = TypePos::Full;
+                pos += 1;
+            }
+            // Anything else cannot be type syntax, so the type ended without an
+            // arrow: a statement or list boundary (`;`, `,`), an operator
+            // (`d = …`, `d! ? …`, a `/…/` regex whose body holds a `=>`), or an
+            // unbalanced `)`/`]`/`}` closing the group this scan started inside.
+            _ => return false,
         }
-        pos += 1;
     }
     false
+}
+
+/// Where the type scan stands in the type grammar — which shapes the next token
+/// may legally take. The `Full`/`Operand` split is the byte-scan form of the
+/// type parser's own `fn_type_disallowed` flag; the two encode the same rule and
+/// must move together.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum TypePos {
+    /// A complete type may start here, function and construct types included.
+    Full,
+    /// A higher-precedence operand (a union/intersection constituent, a
+    /// `keyof`/`typeof` operand): a `(` is a parenthesized type, never a
+    /// function type's parameter list.
+    Operand,
+    /// A type atom just ended; only suffixes (`[]`, `<…>`, `.`) and operators
+    /// may follow.
+    Atom,
+}
+
+/// Type-level prefix keywords that take an operand of their own, so a `(` right
+/// after one still belongs to the type (`keyof (A | B)`, `typeof import('m')`)
+/// rather than ending it.
+const TYPE_PREFIX_WORDS: [&[u8]; 5] = [b"keyof", b"typeof", b"readonly", b"infer", b"import"];
+
+/// Whether the `(` at `paren` opens a **function type**'s parameter list rather
+/// than a parenthesized type — acorn-typescript's
+/// `tsIsUnambiguouslyStartOfFunctionType`, which decides whether a following
+/// `=>` belongs to the type (`(b: B) => C`) or terminates it (`(B | C) => …`,
+/// where the `=>` is the enclosing arrow's).
+///
+/// True for `()`, `(...`, and a parameter start (identifier, `this`, or a
+/// balanced `{…}`/`[…]` pattern) followed by `:`, `,`, `?`, `=`, or by `) =>`.
+///
+/// The token-level twin of this question, asked once the parser has committed to
+/// parsing a type, is `Parser::paren_starts_function_type_params` — same acorn
+/// rule, same full-type-position precondition, different layer.
+fn paren_starts_function_type(bytes: &[u8], paren: usize) -> bool {
+    let mut pos = skip_whitespace_and_comments(bytes, paren + 1);
+    match bytes.get(pos) {
+        // `()` and `(...` are unambiguous.
+        None => return false,
+        Some(b')') => return true,
+        Some(b'.') if bytes[pos..].starts_with(b"...") => return true,
+        _ => {}
+    }
+    // A parameter start: an identifier (covers `this` and contextual keywords),
+    // or a destructuring pattern, which is skipped as a balanced group rather
+    // than parsed — a malformed one only fails the follow-token check below.
+    pos = if is_identifier_start(bytes[pos]) {
+        skip_identifier(bytes, pos)
+    } else if matches!(bytes[pos], b'{' | b'[') {
+        match matching_delimiter_close(bytes, pos) {
+            Some(close) => close + 1,
+            None => return false,
+        }
+    } else {
+        return false;
+    };
+    pos = skip_whitespace_and_comments(bytes, pos);
+    match bytes.get(pos) {
+        // `( xxx :` and `( xxx ,`
+        Some(b':' | b',') => true,
+        // `( xxx ?` — the optional-parameter marker, not `?.` or `??`
+        Some(b'?') => !matches!(bytes.get(pos + 1), Some(b'.' | b'?')),
+        // `( xxx =` — a default value, not `=>` (an arrow) or `==` (equality)
+        Some(b'=') => !matches!(bytes.get(pos + 1), Some(b'>' | b'=')),
+        // `( xxx ) =>`
+        Some(b')') => {
+            let after = skip_whitespace_and_comments(bytes, pos + 1);
+            bytes.get(after) == Some(&b'=') && bytes.get(after + 1) == Some(&b'>')
+        }
+        _ => false,
+    }
 }
 
 /// Check if position starts with an identifier followed by `=>`
@@ -409,7 +554,7 @@ pub(super) fn is_generic_function_type_start(bytes: &[u8], pos: usize) -> bool {
 /// `new Foo()` value (neither of which has `(…) =>`).
 #[inline]
 fn paren_list_then_arrow(bytes: &[u8], paren: usize) -> bool {
-    matching_paren_close(bytes, paren + 1).is_some_and(|paren_close| {
+    matching_delimiter_close(bytes, paren).is_some_and(|paren_close| {
         let after_params = skip_whitespace_and_comments(bytes, paren_close + 1);
         after_params + 1 < bytes.len()
             && bytes[after_params] == b'='
@@ -430,17 +575,10 @@ fn paren_list_then_arrow(bytes: &[u8], paren: usize) -> bool {
 /// past the `abstract` keyword.
 pub(super) fn is_construct_type_start(bytes: &[u8], pos: usize) -> bool {
     // Whole-word `new` (not an identifier like `newType`).
-    if !bytes[pos..].starts_with(b"new") {
+    if !is_word_at(bytes, pos, b"new") {
         return false;
     }
-    let after_new = pos + b"new".len();
-    if bytes
-        .get(after_new)
-        .is_some_and(|&b| b.is_ascii_alphanumeric() || b == b'_' || b == b'$')
-    {
-        return false;
-    }
-    let paren = skip_whitespace_and_comments(bytes, after_new);
+    let paren = skip_whitespace_and_comments(bytes, pos + b"new".len());
     if bytes.get(paren) != Some(&b'(') {
         return false;
     }
@@ -520,46 +658,46 @@ pub(super) fn matching_angle_close(bytes: &[u8], mut pos: usize) -> Option<usize
     None
 }
 
-/// Find the `)` closing the paren opened just before `pos` (`pos` is the first
-/// byte after the `(`), or `None` if an unbalanced `]`/`}` or end of input
-/// intervenes. Strings, templates, and comments are opaque, like
-/// `matching_angle_close` (and like it, no regex skip — a `)` inside a regex
-/// parameter default could close early, which only fails toward the
-/// shift/comparison reading).
-fn matching_paren_close(bytes: &[u8], mut pos: usize) -> Option<usize> {
-    let mut paren_depth: i32 = 1;
-    let mut bracket_depth: i32 = 0;
-    let mut brace_depth: i32 = 0;
+/// Find the `)`/`]`/`}` closing the `(`/`[`/`{` at `open`, or `None` if a
+/// different delimiter closes unbalanced first or the input ends. Strings,
+/// templates, and comments are opaque, like `matching_angle_close` (and like it,
+/// no regex skip — a `)` inside a regex parameter default could close early,
+/// which only fails toward the shift/comparison reading).
+fn matching_delimiter_close(bytes: &[u8], open: usize) -> Option<usize> {
+    // paren, bracket, brace
+    let target = match bytes.get(open)? {
+        b'(' => 0,
+        b'[' => 1,
+        b'{' => 2,
+        _ => return None,
+    };
+    let mut depths = [0i32; 3];
     let end = bytes.len();
+    let mut pos = open;
 
     while pos < end {
         if let Some(past) = skip_trivia(bytes, pos, end, TriviaProfile::JS) {
             pos = past;
             continue;
         }
-        match bytes[pos] {
-            b'(' => paren_depth += 1,
-            b')' => {
-                paren_depth -= 1;
-                if paren_depth == 0 {
+        let slot = match bytes[pos] {
+            b'(' | b')' => Some(0),
+            b'[' | b']' => Some(1),
+            b'{' | b'}' => Some(2),
+            _ => None,
+        };
+        if let Some(slot) = slot {
+            if matches!(bytes[pos], b'(' | b'[' | b'{') {
+                depths[slot] += 1;
+            } else {
+                depths[slot] -= 1;
+                if slot == target && depths[slot] == 0 {
                     return Some(pos);
                 }
-            }
-            b'[' => bracket_depth += 1,
-            b']' => {
-                bracket_depth -= 1;
-                if bracket_depth < 0 {
-                    return None; // Unbalanced - hit array end
+                if depths[slot] < 0 {
+                    return None; // Unbalanced - a different group ended here
                 }
             }
-            b'{' => brace_depth += 1,
-            b'}' => {
-                brace_depth -= 1;
-                if brace_depth < 0 {
-                    return None; // Unbalanced - hit block end
-                }
-            }
-            _ => {}
         }
         pos += 1;
     }

@@ -67,9 +67,9 @@ export const TS_FIXTURES_GATE: FixturesGateConfig = {
 	oracle_name: 'acorn-typescript',
 	oracle_pin: {
 		checkout_package_json: '../acorn-typescript/package.json',
-		npm_package: '@sveltejs/acorn-typescript',
+		npm_package: '@sveltejs/acorn-typescript'
 	},
-	pins: TS_FIXTURES_PINS,
+	pins: TS_FIXTURES_PINS
 };
 
 if (import.meta.main) {

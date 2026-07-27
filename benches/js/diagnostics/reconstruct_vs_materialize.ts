@@ -131,9 +131,9 @@ for (const language of ['typescript', 'svelte'] as Language[]) {
 		t.b_prime += t_bp;
 		t.files++;
 		console.error(
-			`  ${f.path.split('/').slice(-2).join('/')}: A ${t_a.toFixed(3)} B ${t_b.toFixed(3)} B' ${
-				t_bp.toFixed(3)
-			} ms`,
+			`  ${f.path.split('/').slice(-2).join('/')}: A ${t_a.toFixed(3)} B ${t_b.toFixed(3)} B' ${t_bp.toFixed(
+				3
+			)} ms`
 		);
 	}
 	results[language] = t;
@@ -147,23 +147,26 @@ console.log('\n=== reconstruct-vs-materialize (Deno FFI + materialize), sum of m
 for (const language of ['typescript', 'svelte'] as Language[]) {
 	const t = results[language];
 	if (!t || t.files === 0) continue;
-	const exactness = language === 'typescript'
-		? 'EXACT reconstruction'
-		: 'APPROXIMATE — 2 parser quirks; see no_locations_parity.ts';
+	const exactness =
+		language === 'typescript'
+			? 'EXACT reconstruction'
+			: 'APPROXIMATE — 2 parser quirks; see no_locations_parity.ts';
 	console.log(`\n${language} (${exactness}), ${t.files} files:`);
 	console.log(`  A  full wire, loc materialized in Rust     : ${t.a.toFixed(2)}`);
 	console.log(
-		`  B  no-loc wire + reconstruct ALL loc in JS  : ${t.b.toFixed(2)}  (${
-			ratio(t.a, t.b)
-		}x vs A; >1 = B faster)`,
+		`  B  no-loc wire + reconstruct ALL loc in JS  : ${t.b.toFixed(2)}  (${ratio(
+			t.a,
+			t.b
+		)}x vs A; >1 = B faster)`
 	);
 	console.log(
-		`  B' no-loc wire, no reconstruction (sparse)  : ${t.b_prime.toFixed(2)}  (${
-			ratio(t.a, t.b_prime)
-		}x vs A)`,
+		`  B' no-loc wire, no reconstruction (sparse)  : ${t.b_prime.toFixed(2)}  (${ratio(
+			t.a,
+			t.b_prime
+		)}x vs A)`
 	);
 }
 console.log(
-	'\nB vs A = "reconstruct-all in JS" vs "materialize in Rust"; B\' vs A = the loc-sparse/free ceiling.',
+	'\nB vs A = "reconstruct-all in JS" vs "materialize in Rust"; B\' vs A = the loc-sparse/free ceiling.'
 );
 console.log('The headline (reconstruct beats materialize) is the EXACT TypeScript row.');

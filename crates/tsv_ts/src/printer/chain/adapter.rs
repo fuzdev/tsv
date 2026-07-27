@@ -24,22 +24,6 @@ impl<'a> Printer<'a> {
         self.in_for_init.get()
     }
 
-    pub(crate) fn build_parenthesized_base_inner_logical(
-        &self,
-        binary: &internal::BinaryExpression<'_>,
-    ) -> DocId {
-        let d = self.d();
-        let inner = self.build_binary_chain_parts_indented(binary);
-        d.group(inner)
-    }
-
-    pub(crate) fn build_parenthesized_base_inner_binary(
-        &self,
-        binary: &internal::BinaryExpression<'_>,
-    ) -> DocId {
-        self.build_binary_chain_for_parens(binary)
-    }
-
     pub(crate) fn print_call_args(
         &self,
         call: &internal::CallExpression<'_>,

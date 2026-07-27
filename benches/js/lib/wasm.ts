@@ -70,7 +70,7 @@ export class WasmImplementation implements TsvImplementation {
 		return {
 			svelte: this.module.parse_svelte,
 			typescript: this.module.parse_typescript,
-			css: this.module.parse_css,
+			css: this.module.parse_css
 		};
 	}
 
@@ -78,7 +78,7 @@ export class WasmImplementation implements TsvImplementation {
 		return {
 			svelte: this.module.parse_internal_svelte,
 			typescript: this.module.parse_internal_typescript,
-			css: this.module.parse_internal_css,
+			css: this.module.parse_internal_css
 		};
 	}
 
@@ -86,7 +86,7 @@ export class WasmImplementation implements TsvImplementation {
 		return {
 			svelte: this.module.format_svelte,
 			typescript: this.module.format_typescript,
-			css: this.module.format_css,
+			css: this.module.format_css
 		};
 	}
 
@@ -94,14 +94,14 @@ export class WasmImplementation implements TsvImplementation {
 	private get parse_no_locations_fns(): Partial<Record<Language, (source: string) => unknown>> {
 		return {
 			svelte: this.module.parse_svelte_no_locations,
-			typescript: this.module.parse_typescript_no_locations,
+			typescript: this.module.parse_typescript_no_locations
 		};
 	}
 
 	async init(): Promise<void> {
 		const target = current_runtime() === 'deno' ? 'deno' : 'nodejs';
 		const wasm_path = fileURLToPath(
-			new URL(`../../../crates/tsv_wasm/pkg/all/${target}/tsv_wasm.js`, import.meta.url),
+			new URL(`../../../crates/tsv_wasm/pkg/all/${target}/tsv_wasm.js`, import.meta.url)
 		);
 
 		try {
@@ -109,7 +109,7 @@ export class WasmImplementation implements TsvImplementation {
 		} catch {
 			throw new Error(
 				`WASM module not found at ${wasm_path}. ` +
-					`Run 'deno task build:wasm:all:${target}' first.`,
+					`Run 'deno task build:wasm:all:${target}' first.`
 			);
 		}
 
@@ -143,7 +143,7 @@ export class WasmImplementation implements TsvImplementation {
 			parse_typescript_json_with_goal: module.parse_typescript_json_with_goal,
 			parse_typescript_json_with_goal_no_locations:
 				module.parse_typescript_json_with_goal_no_locations,
-			parse_internal_typescript_with_goal: module.parse_internal_typescript_with_goal,
+			parse_internal_typescript_with_goal: module.parse_internal_typescript_with_goal
 		};
 
 		// Fairness guard for the parse rows: the wasm parse fns must return a
@@ -155,7 +155,7 @@ export class WasmImplementation implements TsvImplementation {
 		const probe = this._module.parse_typescript('const x = 1;');
 		if (typeof probe !== 'object' || probe === null) {
 			throw new Error(
-				`tsv_wasm parse returned a ${typeof probe} — expected a materialized AST object`,
+				`tsv_wasm parse returned a ${typeof probe} — expected a materialized AST object`
 			);
 		}
 	}

@@ -40,6 +40,7 @@ Every `◆prettier_bug` — cases where Prettier produces output that is non-ide
 - `<svelte:element class="a  b">` — fails to collapse repeated whitespace — [svelte_element_class_whitespace](../tests/fixtures/svelte/special_elements/svelte_element_class_whitespace_prettier_divergence/)
 - Space after block element — strands a leading space, non-idempotent — [space_after_block](../tests/fixtures/svelte/elements/space_after_block_prettier_divergence/)
 - Constrained `infer … extends` operand parens — strips required parens → output fails to re-parse — [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)
+- Negative literal type sign comment (`-/* c */ 1`) — *adds* parens to hold the comment (`-(/* c */ 1)`), but no such type exists: `-` is a negative literal type only when the next token is a numeric/bigint literal → output fails to re-parse — [negative_literal_sign_comment](../tests/fixtures/typescript/types/negative_literal_sign_comment_prettier_divergence/)
 - TS instantiation parens (`(x ? y : z)<T>`) — strips parens, semantic change — [instantiation_parens](../tests/fixtures/typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence/); the class-operand / `export default` case (`export default (class {}<T>)`) is worse still (strips → a class _declaration_) — [export_default_instantiation](../tests/fixtures/typescript/modules/exports/default_wrappable_leftmost_operators/instantiation_prettier_divergence/)
 - Svelte destructuring rename-with-default key drop (`{ a: b = 1 }` → `{ b = 1 }`) — semantic change — [each](../tests/fixtures/svelte/blocks/each/destructure_rename_default_prettier_divergence/), [await](../tests/fixtures/svelte/blocks/await/destructure_rename_default_prettier_divergence/)
 - `x?.#a` (optional chain to private field) — throws on valid input (pinned by `prettier_rejects.txt`) — [private_fields_optional_chain](../tests/fixtures/typescript/declarations/class/private_fields_optional_chain_prettier_divergence/)
@@ -641,6 +642,7 @@ Same layout inside an inline element (head wraps + body expands, element hugs th
 - Trailing member after object-arg call — ◆print_width — [trailing_member_expand_args_long](../tests/fixtures/typescript/expressions/calls/chained/trailing_member_expand_args_long_prettier_divergence/)
 - Instantiation expression parens — ◆prettier_bug — [instantiation_parens](../tests/fixtures/typescript/typescript_specific/assertions/instantiation_parens_prettier_divergence/), [export_default_instantiation](../tests/fixtures/typescript/modules/exports/default_wrappable_leftmost_operators/instantiation_prettier_divergence/)
 - Non-null parenthesized base — ◆design_choice — [non_null_paren_base_long](../tests/fixtures/typescript/expressions/member/non_null_paren_base_long_prettier_divergence/)
+- Parenthesized binary member base — ◆design_choice ◆print_width — [paren_binary_base_long](../tests/fixtures/typescript/expressions/member/paren_binary_base_long_prettier_divergence/)
 - Constrained infer extends-operand parens — ◆prettier_bug — [constrained_extends_parens](../tests/fixtures/typescript/types/infer/constrained_extends_parens_prettier_divergence/)
 - Arrow type param trailing comma — ◆design_choice — [single_type_param](../tests/fixtures/typescript/expressions/arrow/generic/single_type_param_prettier_divergence/)
 - Empty-object comment bracket spacing — ◆design_choice — [empty_block_comment](../tests/fixtures/typescript/expressions/objects/empty_block_comment_prettier_divergence/), [destructure empty_comment](../tests/fixtures/typescript/expressions/destructuring/empty_comment_prettier_divergence/), [enum empty_comment](../tests/fixtures/typescript/declarations/enum/body_empty_comment_prettier_divergence/), [literal_body_empty](../tests/fixtures/typescript/types/comments/literal_body_empty_prettier_divergence/), [union_empty_object_member](../tests/fixtures/typescript/types/union_empty_object_member_prettier_divergence/), [call_type_arg_empty_comment](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_prettier_divergence/)
@@ -666,6 +668,8 @@ tsv treats these like any other function call—no special-casing for module pat
 **Trailing member after a call with an object argument**: When `X.f({…}).member` exceeds print width — the call's arguments fit inline, but appending the trailing member overflows — Prettier keeps the arguments on one line and breaks the member onto its own indented line (`.member`), while tsv expands the object argument and keeps the member on the closing brace (`}).member`). This is the same stance as Module path calls above (and single-specifier imports): tsv wraps a call's arguments the same way regardless of a trailing member, rather than special-casing the chain. Because Prettier preserves a multiline object, it keeps tsv's expanded form stable too, so the two only diverge from compact or Prettier-authored source — the Prettier form is pinned as a `prettier_variant` (Prettier keeps it stable; tsv normalizes it back to `input`). Fixture: [trailing_member_expand_args_long](../tests/fixtures/typescript/expressions/calls/chained/trailing_member_expand_args_long_prettier_divergence/).
 
 **Non-null parenthesized base**: For a non-null assertion on a parenthesized base whose inner call breaks its arguments (`(await call(...))!.member`), Prettier hugs the inner call (`(await call(\n...\n))!.member`) — yet it _hangs_ the outer parens for the same base without the `!` (`(await call(...)).member`, see [paren_base_trailing_long](../tests/fixtures/typescript/expressions/member/paren_base_trailing_long/), where tsv matches Prettier). tsv lays out the parenthesized base the same way regardless of a trailing non-null assertion, keeping the two forms visually consistent. Content is identical (ASTs match); only the parenthesized-base layout differs.
+
+**Parenthesized binary member base**: For a parenthesized binary expression used as a member-access base, long enough that the parens must break onto their own lines and whose left operand is itself a parenthesized binary (`((a && b) || c).toString()`), Prettier breaks the parens **and** splits the operand chain onto separate lines. tsv takes only the break the width demands — the parens break, the operand chain stays flat while it fits (`(\n\t(a && b) || c\n).toString()`) — per [§Print Width Philosophy](#print-width-philosophy). The shape is uniform along both axes Prettier varies on: **operator family** (arithmetic, logical `&&`/`||`, and nullish `??` bases are laid out identically) and **what follows the base** (a plain `.member`, a non-null `!.member`, and an optional `?.member` all lay out identically, where Prettier hangs the parens for `.`/`?.` and welds `)!.member` onto the last operand for `!` — the same stance as [§Non-null parenthesized base](#typescript), extended from call/await bases to binary ones). That uniformity is the substance of the rule: the alternative — giving logical and nullish bases a *third* layout that welds the closing `).member` onto the last operand (`((a && b) ||\n\tc).toString()`) — matches neither tsv's own arithmetic shape nor Prettier's, so it is a shape with no constituency. A **flat** chain (`a && b && c`, no parenthesized operand) is outside the divergence: with no nested operand to hold together both formatters break every operand. Content is identical (ASTs match); only the operand-chain layout differs. See [paren_binary_base_long](../tests/fixtures/typescript/expressions/member/paren_binary_base_long_prettier_divergence/). A parenthesized **call** or `as`-cast base is a different case, where tsv matches Prettier — see [paren_base_trailing_long](../tests/fixtures/typescript/expressions/member/paren_base_trailing_long/).
 
 **Non-null assertion in optional-chain parens**: A non-null `!` on a **bare** parenthesized optional chain — one with no trailing non-optional access — has redundant parens: the `!` is TypeScript-only and applies to the whole chain regardless (`(a?.b)!` ≡ `a?.b!`), so tsv strips them (`(a?.b)!` → `a?.b!`, and the `!`-inside form `(a?.b!)` → `a?.b!`). Prettier keeps the parens on `(a?.b)!` (it strips only `(a?.b!)`). tsv matches Biome. When a **non-optional access follows** (`(a?.b)!.c`), the parens are required — they seal the chain so `.c` isn't short-circuited (`(a?.b)!.c` vs `a?.b!.c`) — and there both formatters keep the parens and preserve the author's `!` placement (inside or outside: `(a?.b!).c` and `(a?.b)!.c` each stay as written), so that case is not a divergence. Content is identical (ASTs match); only the redundant parens differ. Fixtures: [optional_paren_non_null_bare](../tests/fixtures/typescript/expressions/chain/optional_paren_non_null_bare_prettier_divergence/) (the strip), [optional_paren_non_null_boundary](../tests/fixtures/typescript/expressions/chain/optional_paren_non_null_boundary/) and [optional_paren_non_null_inside](../tests/fixtures/typescript/expressions/chain/optional_paren_non_null_inside/) (required parens, both preserved).
 
@@ -795,6 +799,7 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Ternary operand to operator (≥2 line comments; test→`?`, consequent→`:`) → Every comment after the first relocated across the operator (`cond // c1⏎ ? // c2`); tsv keeps each before the operator on its own line — [consecutive_operand_comment](../tests/fixtures/typescript/expressions/ternary/consecutive_operand_comment_prettier_divergence/)
 - Ternary operator→branch **block** comment, authored trailing the operand's line (`cond ? x : /* c */⏎y`) → Across the operator, onto the preceding operand (`cond ? x /* c */ : y`), changing its association from the branch it precedes to that operand; tsv keeps it after the operator and collapses inline. Prettier's attachment claims the comment as leading of the branch only when it is *not* on the preceding node's line, so sharing that line makes it trailing of the operand instead. Both slots (`?` and `:`) behave alike, and the relocated form is dual-stable — pinned `variant_trailing`. The **own-line** authoring is a *pass-count* gap, not a relocation: prettier reaches tsv's fixed point non-idempotently (first pass breaks the whole conditional on the authored newline), pinned `prettier_intermediate_own_line` reconverging to input — [operand_block_comment_relocation](../tests/fixtures/typescript/expressions/ternary/operand_block_comment_relocation_prettier_divergence/)
 - Conditional-type branch block comment (same shape, type level; `B extends C ? /* c */ D : E`) → Across the operator (`B extends C /* c */ ? D : E`); tsv preserves. Same `variant_trailing` + `prettier_intermediate_own_line` pinning as its expression twin — [branch_block_comment_relocation](../tests/fixtures/typescript/types/conditional/branch_block_comment_relocation_prettier_divergence/)
+- Negative literal type, sign→numeral (`-/* c */ 1`) → ◆prettier_bug ◆content_preservation — into parens around the numeral (`-(/* c */ 1)`), a type that does not exist: tsc reads `-` as a negative literal type only when the next token is a numeric/bigint literal, so the output fails to re-parse. tsv preserves in place, which stays valid because the lookahead's `nextToken()` skips trivia. Not preserving drops the comment — the position has no other emitter — [negative_literal_sign_comment](../tests/fixtures/typescript/types/negative_literal_sign_comment_prettier_divergence/)
 - Switch empty body → Discriminant parens — [empty_comment](../tests/fixtures/typescript/statements/switch/empty_comment_prettier_divergence/)
 - Switch case before `{` → After opening brace (prettier non-idempotent, 2-3 passes) — [case_block_comment](../tests/fixtures/typescript/statements/switch/case_block_comment_prettier_divergence/)
 - Switch discriminant trailing → Switch body — [discriminant_trailing_comment](../tests/fixtures/typescript/statements/switch/discriminant_trailing_comment_prettier_divergence/)
@@ -1624,6 +1629,57 @@ slice is a raw range in host coordinates) all **match** prettier — no divergen
 family. The one place the two tools part is the flat **test-call** layout, and that is a
 comment-position question rather than a freeze one: see §Comment relocation's test-call
 entry.
+
+**On module and declarator lists.** Rule A once more, over the remaining comma lists: an
+own-line directive in the `{`→first-item gap or between two items freezes the **following
+item** — an import's or export's named specifiers, a `with { … }` clause's import
+attributes, and a variable declaration's declarators (in a statement and in a `for`
+header's init clause alike). The slice is the item's own node span, so an inline `type`
+modifier, a string specifier, a declarator's annotation and initializer, and a
+destructuring binding all ride inside it, and the separating `,` stays parent-owned. The
+list's first gap opens just past the delimiter, which for a declarator list is the
+`const`/`let`/`var` keyword and for an `import`'s leading binding the `import` keyword
+itself — so the first specifier, first attribute, first declarator and a whole `* as ns`
+namespace binding all freeze from that gap. Prettier agrees at the braced lists and at the
+inter-declarator gaps, so the ordinary fixtures
+`imports/specifiers_prettier_ignore_member`, `exports/specifiers_prettier_ignore_member`,
+`imports/attributes_prettier_ignore_member` and
+`variable/declarations_prettier_ignore_member` all **match** prettier. tsv diverges at two
+places, both because prettier decides a directive by comment *attachment* where tsv decides
+by placement:
+
+- Own-line directive **between two module specifiers** — ◆design_choice ◆prettier_bug — tsv
+  freezes the following specifier, like every other member list. Prettier's module-specifier
+  comment handler re-binds an own-line comment whose preceding node is an
+  `ImportSpecifier` / `ExportSpecifier` as that specifier's **trailing** comment, so its
+  freeze runs **backward**: the preceding specifier is emitted verbatim and the following
+  one reformats. `divergent_variant_backward` pins the direction — with the preceding
+  specifier perturbed instead, prettier keeps it frozen while tsv normalizes it and freezes
+  forward. The forward direction is the consistent reading of the list rule, and the same
+  reason a trailing directive is permanently inert —
+  [specifiers between](../tests/fixtures/typescript/modules/imports/specifiers_prettier_ignore_between_prettier_divergence/)
+- Directive in a **declaration-header gap** (`const`/`let`/`var`→first declarator,
+  `import`→binding) — ◆design_choice ◆comment_preservation — tsv freezes the item and keeps
+  the directive on **its own line**, leaving the keyword alone on the line above. Prettier
+  pulls it flush against the keyword (`const // prettier-ignore`) and freezes anyway; tsv
+  cannot follow, since a directive sharing its line with anything else is inert under the
+  placement floor and the relocated form would lose the freeze on tsv's own second pass.
+  Each fixture's `divergent_variant_flush` pins prettier's stable flush form, which tsv
+  reads as inert and reformats. When the gap already holds another comment the two tools
+  agree — that comment takes the keyword line and the directive is own-line either way —
+  [declarator head](../tests/fixtures/typescript/declarations/variable/declarations_prettier_ignore_head_prettier_divergence/),
+  [namespace binding](../tests/fixtures/typescript/modules/imports/namespace_prettier_ignore_binding_prettier_divergence/)
+
+**A header-gap directive keeps its own line even where nothing freezes.** The rule above is
+stated on the emitter, not on the freeze: a directive tsv relocated onto the keyword's line
+would be **inert**, so tsv never relocates one — at a `function`/`class` head, where neither
+tool freezes, just as at the declarator head, where both do. Prettier reflows it flush and
+reformats; the one-sided invariant is deliberate, because it keeps every header gap eligible
+to start honoring a directive later instead of having an emitter silently destroy it first.
+tsv is likewise inert to the flush form and never moves a comment *up*, so prettier's stable
+output is a form tsv only re-indents (`divergent_variant_flush`, the pre-existing keyword→value
+hang) —
+[keyword-gap own line](../tests/fixtures/typescript/syntax/comments/keyword_gap_prettier_ignore_own_line_prettier_divergence/)
 
 See [directives.md](./directives.md) for the user-facing reference.
 

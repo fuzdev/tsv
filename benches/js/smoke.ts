@@ -14,7 +14,7 @@ import { env, exit } from 'node:process';
 import {
 	check_artifact_freshness,
 	WASM_CRATES,
-	wasm_artifact_path,
+	wasm_artifact_path
 } from './lib/check_artifact_freshness.ts';
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { get_library_path } from './lib/ffi.ts';
@@ -22,7 +22,7 @@ import { get_napi_library_path } from './lib/napi.ts';
 import {
 	get_benchmark_tasks,
 	get_formatters,
-	init_implementations,
+	init_implementations
 } from './lib/implementations.ts';
 import { current_runtime } from './lib/runtime.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
@@ -38,8 +38,7 @@ const INPUTS: Record<Language, string> = {
 		'<script lang="ts">const x={a:1,b:2};/* c */function f(n:number){return n*2}</script>\n<div   class="a b"   >{x.a}</div>\n<style>.a{color:red;display:flex}.a:hover{gap:1px}</style>',
 	typescript:
 		'import {x} from "y";const o={a:1,b:2};function f<T>(n:T):T{return n}/* c */type U={a:number;b:string};async function g(){await Promise.resolve(1)}',
-	css:
-		'/* c */@media (min-width:1px){.foo>.bar:hover{color:red;display:flex;gap:1px}}.baz,.qux{margin:0}',
+	css: '/* c */@media (min-width:1px){.foo>.bar:hover{color:red;display:flex;gap:1px}}.baz,.qux{margin:0}'
 };
 
 interface Failure {
@@ -66,27 +65,28 @@ function record_fail(f: Failure): void {
 // the FFI library + the `deno`-target WASM bundle; Node/Bun run the N-API addon +
 // the `nodejs` target (`wasm_artifact_path` resolves the runtime's own bundle).
 const wasm_target = current_runtime() === 'deno' ? 'deno' : 'nodejs';
-const native_check = current_runtime() === 'deno'
-	? {
-		label: `FFI (${env.TSV_FFI_PROFILE ?? 'release'})`,
-		path: get_library_path(),
-		binding_crates: ['tsv_ffi'],
-		rebuild: 'deno task build:ffi',
-	}
-	: {
-		label: 'N-API',
-		path: get_napi_library_path(),
-		binding_crates: ['tsv_napi'],
-		rebuild: 'deno task build:napi',
-	};
+const native_check =
+	current_runtime() === 'deno'
+		? {
+				label: `FFI (${env.TSV_FFI_PROFILE ?? 'release'})`,
+				path: get_library_path(),
+				binding_crates: ['tsv_ffi'],
+				rebuild: 'deno task build:ffi'
+			}
+		: {
+				label: 'N-API',
+				path: get_napi_library_path(),
+				binding_crates: ['tsv_napi'],
+				rebuild: 'deno task build:napi'
+			};
 await check_artifact_freshness([
 	native_check,
 	{
 		label: `WASM (all/${wasm_target})`,
 		path: wasm_artifact_path('all'),
 		binding_crates: WASM_CRATES,
-		rebuild: `deno task build:wasm:all:${wasm_target}`,
-	},
+		rebuild: `deno task build:wasm:all:${wasm_target}`
+	}
 ]);
 
 // Friendly preflight: the canonical impls (prettier + svelte/compiler) resolve
@@ -142,7 +142,7 @@ for (const lang of LANGUAGES) {
 				kind: 'format',
 				lang,
 				impl: fmt.name,
-				reason: `second pass threw: ${msg}`,
+				reason: `second pass threw: ${msg}`
 			});
 			continue;
 		}

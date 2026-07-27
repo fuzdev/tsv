@@ -11,7 +11,7 @@ import {
 	LANGUAGE_EXTENSIONS,
 	LANGUAGE_PRETTIER_PARSERS,
 	type ParseGoal,
-	type TsvImplementation,
+	type TsvImplementation
 } from './types.ts';
 import type { CanonicalVersions } from './versions.ts';
 
@@ -37,7 +37,7 @@ const PRETTIER_OPTIONS = {
 	useTabs: true,
 	printWidth: 100,
 	singleQuote: true,
-	trailingComma: 'none',
+	trailingComma: 'none'
 } as const;
 
 export class CanonicalImplementation implements TsvImplementation {
@@ -73,19 +73,14 @@ export class CanonicalImplementation implements TsvImplementation {
 
 	async init(): Promise<void> {
 		// Load dependencies in parallel
-		const [
-			prettier_mod,
-			prettier_svelte_mod,
-			svelte_mod,
-			acorn_mod,
-			acorn_ts_mod,
-		] = await Promise.all([
-			import('prettier'),
-			import('prettier-plugin-svelte'),
-			import('svelte/compiler'),
-			import('acorn'),
-			import('@sveltejs/acorn-typescript'),
-		]);
+		const [prettier_mod, prettier_svelte_mod, svelte_mod, acorn_mod, acorn_ts_mod] =
+			await Promise.all([
+				import('prettier'),
+				import('prettier-plugin-svelte'),
+				import('svelte/compiler'),
+				import('acorn'),
+				import('@sveltejs/acorn-typescript')
+			]);
 		this.#prettier = prettier_mod as PrettierModule;
 		this.#prettier_svelte = prettier_svelte_mod;
 		// Hoisted once so the bench's timed loop doesn't allocate a fresh plugins
@@ -132,13 +127,13 @@ export class CanonicalImplementation implements TsvImplementation {
 				return this.#acorn_ts_parser.parse(source, {
 					sourceType: 'module',
 					ecmaVersion: 2025,
-					locations: true,
+					locations: true
 				});
 			},
 			css: (source) => {
 				if (!this.#svelte_compiler) throw new Error('Svelte compiler not initialized');
 				return this.#svelte_compiler.parseCss(source);
-			},
+			}
 		};
 	}
 
@@ -152,17 +147,13 @@ export class CanonicalImplementation implements TsvImplementation {
 			return this.#acorn_ts_parser.parse(source, {
 				sourceType: goal,
 				ecmaVersion: 2025,
-				locations: true,
+				locations: true
 			});
 		}
 		return this.#parse_fns[language](source);
 	}
 
-	async format_async(
-		source: string,
-		language: Language,
-		source_path?: string,
-	): Promise<string> {
+	async format_async(source: string, language: Language, source_path?: string): Promise<string> {
 		if (!this.#prettier_svelte) throw new Error('Prettier Svelte plugin not initialized');
 
 		const plugins = language === 'svelte' ? this.#svelte_plugins : NO_PLUGINS;
@@ -197,7 +188,7 @@ export class CanonicalImplementation implements TsvImplementation {
 			parser,
 			filepath,
 			plugins,
-			...PRETTIER_OPTIONS,
+			...PRETTIER_OPTIONS
 		});
 		// Success-only put (a throw above skips it; `put` itself rejects '').
 		if (this.#format_cache) await this.#format_cache.put(source, parser, filepath, output);

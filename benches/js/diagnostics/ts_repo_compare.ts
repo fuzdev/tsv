@@ -146,7 +146,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 	} catch {
 		console.error(
 			`FAIL: ${TS_REPO} checkout not found — nothing can be graded. ` +
-				`Clone microsoft/TypeScript at ${TS_REPO}.`,
+				`Clone microsoft/TypeScript at ${TS_REPO}.`
 		);
 		Deno.exit(1);
 	}
@@ -167,7 +167,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 		console.error(
 			`FAIL: cannot read ${BASELINE_DIR} (${e instanceof Error ? e.message : e}) — ` +
 				`the ${TS_REPO} checkout exists but its baselines are missing (partial/sparse checkout?). ` +
-				`The baselines ARE the oracle, so this run cannot grade anything.`,
+				`The baselines ARE the oracle, so this run cannot grade anything.`
 		);
 		Deno.exit(1);
 	}
@@ -175,7 +175,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 		if (!name.endsWith('.errors.txt')) continue;
 		const key = name.replace(/\.errors\.txt$/, '').replace(/\(.*\)$/, '');
 		(errors_baselines_by_test.get(key) ?? errors_baselines_by_test.set(key, []).get(key)!).push(
-			name,
+			name
 		);
 	}
 
@@ -202,7 +202,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 		over_acceptance: [] as { path: string; tsv_error: string }[],
 		gap_known: [] as Gap[],
 		gap_unexpected: [] as Gap[],
-		gap_beyond_acorn: [] as { path: string; tsv_error: string }[],
+		gap_beyond_acorn: [] as { path: string; tsv_error: string }[]
 	};
 	const skipped = { tsx: 0, multi_file: 0, unreadable: 0 };
 	// Ledger-freshness tracking (see the stale check at the end).
@@ -262,7 +262,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 				path,
 				tsv_error: tsv_err,
 				category: gap.category,
-				reason: gap.reason,
+				reason: gap.reason
 			});
 		} else {
 			buckets.gap_unexpected.push({ path, tsv_error: tsv_err });
@@ -279,40 +279,44 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 		gap_by_category.set(g.category!, (gap_by_category.get(g.category!) ?? 0) + 1);
 	}
 
-	const scanned = buckets.accept_parity + buckets.reject_parity +
+	const scanned =
+		buckets.accept_parity +
+		buckets.reject_parity +
 		buckets.over_acceptance.length +
-		buckets.gap_known.length + buckets.gap_unexpected.length + buckets.gap_beyond_acorn.length;
+		buckets.gap_known.length +
+		buckets.gap_unexpected.length +
+		buckets.gap_beyond_acorn.length;
 
 	// The checkout exists (guarded above), so an empty scan means a wrong subtree
 	// path or a gutted corpus — a broken invocation, not a pass.
 	if (scanned === 0) {
-		console.error(`FAIL: 0 single-file .ts scanned under ${root} — wrong path? Nothing was graded.`);
+		console.error(
+			`FAIL: 0 single-file .ts scanned under ${root} — wrong path? Nothing was graded.`
+		);
 		Deno.exit(1);
 	}
 
 	console.error(`\nTypeScript-repo parse-conformance triage — root: ${root}`);
 	console.error(`  oracle: tsc baselines (${BASELINE_DIR})`);
 	console.error(
-		`  scanned: ${scanned} single-file .ts  (skipped ${skipped.multi_file} @filename, ${skipped.tsx} .tsx, ${skipped.unreadable} unreadable)\n`,
+		`  scanned: ${scanned} single-file .ts  (skipped ${skipped.multi_file} @filename, ${skipped.tsx} .tsx, ${skipped.unreadable} unreadable)\n`
 	);
 	console.error(`  parity accept (tsv ok, tsc valid):     ${buckets.accept_parity}`);
 	console.error(
-		`  parity reject (tsv + tsc both reject): ${buckets.reject_parity}  (incl. acorn-over-leniency — no sanction needed)`,
+		`  parity reject (tsv + tsc both reject): ${buckets.reject_parity}  (incl. acorn-over-leniency — no sanction needed)`
 	);
 	console.error(
-		`  over-acceptance (tsv ok, tsc invalid): ${buckets.over_acceptance.length}  (deferred early-errors; not gated)`,
+		`  over-acceptance (tsv ok, tsc invalid): ${buckets.over_acceptance.length}  (deferred early-errors; not gated)`
 	);
 	console.error(
 		`  GAPS known (tsc+acorn valid, tsv rejects): ${buckets.gap_known.length}  (${
 			[...gap_by_category.entries()].map(([c, n]) => `${c}=${n}`).join(', ') || 'none'
-		})`,
+		})`
 	);
 	console.error(
-		`  gap-beyond-acorn (tsc valid, acorn+tsv reject): ${buckets.gap_beyond_acorn.length}  (MIXED: acorn-ts gaps + early-error timing; manual triage; not gated)`,
+		`  gap-beyond-acorn (tsc valid, acorn+tsv reject): ${buckets.gap_beyond_acorn.length}  (MIXED: acorn-ts gaps + early-error timing; manual triage; not gated)`
 	);
-	console.error(
-		`  GAPS UNEXPECTED (untracked): ${buckets.gap_unexpected.length}  (GATES)`,
-	);
+	console.error(`  GAPS UNEXPECTED (untracked): ${buckets.gap_unexpected.length}  (GATES)`);
 
 	for (const g of buckets.gap_unexpected) {
 		console.error(`\n    ✗ UNEXPECTED gap: ${g.path}\n        ${g.tsv_error}`);
@@ -341,7 +345,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 			gap_known: buckets.gap_known,
 			gap_known_by_category: Object.fromEntries(gap_by_category),
 			gap_beyond_acorn: buckets.gap_beyond_acorn,
-			gap_unexpected: buckets.gap_unexpected,
+			gap_unexpected: buckets.gap_unexpected
 		};
 		Deno.stdout.writeSync(new TextEncoder().encode(JSON.stringify(report, null, '\t') + '\n'));
 	}
@@ -349,7 +353,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 	if (buckets.gap_unexpected.length > 0) {
 		console.error(
 			`\nFAIL: ${buckets.gap_unexpected.length} untracked gap(s) — tsv rejects input BOTH tsc and acorn accept. ` +
-				`Fix the parser, or add a reasoned KNOWN_GAPS entry (this file, separate from the acorn-suite gate).`,
+				`Fix the parser, or add a reasoned KNOWN_GAPS entry (this file, separate from the acorn-suite gate).`
 		);
 		Deno.exit(1);
 	}
@@ -363,7 +367,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 		if (stale.length > 0) {
 			console.error(
 				`\nFAIL: ${stale.length} stale KNOWN_GAPS entr${stale.length === 1 ? 'y' : 'ies'} — matched no over-rejection:\n` +
-					stale.map((g) => `    · ${g.pattern}`).join('\n'),
+					stale.map((g) => `    · ${g.pattern}`).join('\n')
 			);
 			Deno.exit(1);
 		}
@@ -378,19 +382,19 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 				: null,
 			buckets.accept_parity !== TS_REPO_PINS.accept_parity
 				? `accept-parity ${buckets.accept_parity} ≠ pinned ${TS_REPO_PINS.accept_parity}`
-				: null,
+				: null
 		].filter((f): f is string => f !== null);
 		if (pin_failures.length > 0) {
 			console.error(
 				`\nFAIL: pinned count mismatch — ${pin_failures.join('; ')}. If this move is deliberate ` +
-					`(checkout pull, behavior change), re-pin in lib/gate_counts.ts (see its update ritual).`,
+					`(checkout pull, behavior change), re-pin in lib/gate_counts.ts (see its update ritual).`
 			);
 			Deno.exit(1);
 		}
 	}
 
 	console.error(
-		`\nOK: no untracked gaps (all tsv over-rejections are tracked or acorn-confirmed-invalid).`,
+		`\nOK: no untracked gaps (all tsv over-rejections are tracked or acorn-confirmed-invalid).`
 	);
 }
 

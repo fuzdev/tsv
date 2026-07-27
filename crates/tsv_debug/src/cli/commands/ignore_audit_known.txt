@@ -23,7 +23,7 @@
 # ARE pinned (this is a ratchet over a live bug family, born red).
 #
 # Format: KIND<TAB>POSITION
-# shapes: 62
+# shapes: 57
 UNHONORED	ArrowFunctionExpression.body
 UNHONORED	ArrowFunctionExpression.typeParameters
 UNHONORED	AssignmentExpression.right
@@ -40,7 +40,6 @@ UNHONORED	ConditionalExpression.consequent
 UNHONORED	ConditionalExpression.test
 UNHONORED	ExportDefaultDeclaration.declaration
 UNHONORED	ExportNamedDeclaration.declaration
-UNHONORED	ExportNamedDeclaration.specifiers
 UNHONORED	ExpressionStatement.expression
 UNHONORED	ForInStatement.left
 UNHONORED	ForOfStatement.left
@@ -50,8 +49,6 @@ UNHONORED	ForStatement.update
 UNHONORED	IfStatement.alternate
 UNHONORED	IfStatement.consequent
 UNHONORED	IfStatement.test
-UNHONORED	ImportDeclaration.attributes
-UNHONORED	ImportDeclaration.specifiers
 UNHONORED	LabeledStatement.body
 UNHONORED	LogicalExpression.left
 UNHONORED	LogicalExpression.right
@@ -76,8 +73,6 @@ UNHONORED	TemplateLiteral.expressions
 UNHONORED	ThrowStatement.argument
 UNHONORED	TryStatement.handler
 UNHONORED	UnaryExpression.argument
-UNHONORED	VariableDeclaration.declarations
-UNHONORED	VariableDeclarator.id
 UNHONORED	VariableDeclarator.init
 UNHONORED	WhileStatement.test
 UNHONORED	YieldExpression.argument

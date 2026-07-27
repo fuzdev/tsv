@@ -1,0 +1,601 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 394,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a line comment between a prefix operator and its operand stays glued to the operator",
+			"start": 10,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 101,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 3
+				},
+				"end": {
+					"line": 3,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line block comment does too",
+			"start": 113,
+			"end": 150,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 154,
+			"end": 162,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 3
+				},
+				"end": {
+					"line": 7,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a block comment glued to the operator leads the operand inline",
+			"start": 169,
+			"end": 234,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 238,
+			"end": 246,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 3
+				},
+				"end": {
+					"line": 11,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " on the postfix side the comment trails the operand and glues to the operator",
+			"start": 252,
+			"end": 331,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 335,
+			"end": 343,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 3
+				},
+				"end": {
+					"line": 14,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 351,
+			"end": 359,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 3
+				},
+				"end": {
+					"line": 16,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 372,
+			"end": 380,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 8
+				},
+				"end": {
+					"line": 18,
+					"column": 16
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 393,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 384,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 99,
+					"end": 110,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "UpdateExpression",
+						"start": 99,
+						"end": 109,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 2
+							}
+						},
+						"operator": "++",
+						"prefix": true,
+						"argument": {
+							"type": "Identifier",
+							"start": 108,
+							"end": 109,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 2
+								}
+							},
+							"name": "x",
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c1",
+									"start": 101,
+									"end": 106
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment between a prefix operator and its operand stays glued to the operator",
+							"start": 10,
+							"end": 97
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 152,
+					"end": 166,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "UpdateExpression",
+						"start": 152,
+						"end": 165,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"operator": "++",
+						"prefix": true,
+						"argument": {
+							"type": "Identifier",
+							"start": 164,
+							"end": 165,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 1
+								},
+								"end": {
+									"line": 8,
+									"column": 2
+								}
+							},
+							"name": "y",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 154,
+									"end": 162
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line block comment does too",
+							"start": 113,
+							"end": 150
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 236,
+					"end": 249,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "UpdateExpression",
+						"start": 236,
+						"end": 248,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 11,
+								"column": 13
+							}
+						},
+						"operator": "++",
+						"prefix": true,
+						"argument": {
+							"type": "Identifier",
+							"start": 247,
+							"end": 248,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 12
+								},
+								"end": {
+									"line": 11,
+									"column": 13
+								}
+							},
+							"name": "z",
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c3 ",
+									"start": 238,
+									"end": 246
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment glued to the operator leads the operand inline",
+							"start": 169,
+							"end": 234
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 333,
+					"end": 346,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "UpdateExpression",
+						"start": 333,
+						"end": 345,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 13
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 333,
+							"end": 334,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 1
+								},
+								"end": {
+									"line": 14,
+									"column": 2
+								}
+							},
+							"name": "a",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c4 ",
+									"start": 335,
+									"end": 343
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " on the postfix side the comment trails the operand and glues to the operator",
+							"start": 252,
+							"end": 331
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 349,
+					"end": 362,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 14
+						}
+					},
+					"expression": {
+						"type": "UpdateExpression",
+						"start": 349,
+						"end": 361,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 1
+							},
+							"end": {
+								"line": 16,
+								"column": 13
+							}
+						},
+						"operator": "--",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 349,
+							"end": 350,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 1
+								},
+								"end": {
+									"line": 16,
+									"column": 2
+								}
+							},
+							"name": "b",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c5 ",
+									"start": 351,
+									"end": 359
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 365,
+					"end": 383,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 19
+						}
+					},
+					"expression": {
+						"type": "UpdateExpression",
+						"start": 365,
+						"end": 382,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 1
+							},
+							"end": {
+								"line": 18,
+								"column": 18
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "MemberExpression",
+							"start": 365,
+							"end": 371,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 1
+								},
+								"end": {
+									"line": 18,
+									"column": 7
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 365,
+								"end": 368,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 1
+									},
+									"end": {
+										"line": 18,
+										"column": 4
+									}
+								},
+								"name": "arr"
+							},
+							"property": {
+								"type": "Literal",
+								"start": 369,
+								"end": 370,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 5
+									},
+									"end": {
+										"line": 18,
+										"column": 6
+									}
+								},
+								"value": 0,
+								"raw": "0"
+							},
+							"computed": true,
+							"optional": false,
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c6 ",
+									"start": 372,
+									"end": 380
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

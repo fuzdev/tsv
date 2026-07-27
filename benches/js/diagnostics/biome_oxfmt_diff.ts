@@ -36,7 +36,7 @@ const Args = z.object({
 	file: z.string().optional(),
 	files: z.array(z.string()).optional(),
 	stdin: z.boolean().default(false),
-	quiet: z.boolean().default(false),
+	quiet: z.boolean().default(false)
 });
 
 type Out = { text?: string; err?: string };

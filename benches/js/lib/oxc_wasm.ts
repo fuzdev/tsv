@@ -8,7 +8,12 @@
  * Supports: Parse only (TypeScript, JS). No formatting (oxfmt has no WASM variant).
  */
 
-import { type Language, LANGUAGE_EXTENSIONS, type ParseGoal, type TsvImplementation } from './types.ts';
+import {
+	type Language,
+	LANGUAGE_EXTENSIONS,
+	type ParseGoal,
+	type TsvImplementation
+} from './types.ts';
 import type { OxcVersions } from './versions.ts';
 import { current_runtime } from './runtime.ts';
 
@@ -17,7 +22,7 @@ interface OxcParserWasmModule {
 	parseSync: (
 		filename: string,
 		source: string,
-		options?: { sourceType?: 'script' | 'module' },
+		options?: { sourceType?: 'script' | 'module' }
 	) => { program: unknown; errors: unknown[] };
 }
 
@@ -43,9 +48,10 @@ export class OxcWasmImplementation implements TsvImplementation {
 		// entry (`parser.wasi-browser.js`, `@napi-rs/wasm-runtime` + `WebAssembly`)
 		// that Deno can load but Node can't. Pick per runtime so the
 		// oxc-parser-wasm comparison row is available on all three.
-		const entry = current_runtime() === 'deno'
-			? '@oxc-parser/binding-wasm32-wasi/parser.wasi-browser.js'
-			: '@oxc-parser/binding-wasm32-wasi';
+		const entry =
+			current_runtime() === 'deno'
+				? '@oxc-parser/binding-wasm32-wasi/parser.wasi-browser.js'
+				: '@oxc-parser/binding-wasm32-wasi';
 		const mod = await import(entry);
 		this._parser = mod as OxcParserWasmModule;
 	}
@@ -72,7 +78,7 @@ export class OxcWasmImplementation implements TsvImplementation {
 			throw new Error(`OXC WASM parser does not support ${language}`);
 		}
 
-		const options = goal ? {sourceType: goal} : undefined;
+		const options = goal ? { sourceType: goal } : undefined;
 		const result = this._parser.parseSync(`file${LANGUAGE_EXTENSIONS[language]}`, source, options);
 
 		// Read `errors` exactly ONCE: on the WASI binding it's a CONSUME-ONCE getter —

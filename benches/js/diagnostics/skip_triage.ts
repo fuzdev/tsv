@@ -35,7 +35,12 @@
 
 import { DevReposLoader, DirectoryLoader, group_by_language } from '../lib/corpus.ts';
 import { init_implementations } from '../lib/implementations.ts';
-import { type KnownGap, type Sanction, sanction_for, SVELTE_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
+import {
+	type KnownGap,
+	type Sanction,
+	sanction_for,
+	SVELTE_FIXTURE_SANCTIONS
+} from '../lib/parse_sanctions.ts';
 import type { Language } from '../lib/types.ts';
 
 /**
@@ -57,21 +62,23 @@ const SANCTIONED: Sanction[] = [
 	// docs/conformance_svelte.md §TypeScript Corrections.
 	{
 		pattern: 'tests/format/js/import-assertions/',
-		reason: 'legacy `assert {…}` import attributes — abandoned pre-spec form; tsv is `with`-only per ecma262',
+		reason:
+			'legacy `assert {…}` import attributes — abandoned pre-spec form; tsv is `with`-only per ecma262'
 	},
 	// IE property/selector hacks — proprietary syntax outside the CSS grammar, a
 	// PERMANENT non-goal (docs/conformance_svelte.md §CSS Parser Scope). tsv is
 	// spec-only; this never becomes valid, so it's a true sanction, not a gap.
 	{
 		pattern: 'tests/format/css/stylefmt-repo/ie-hacks/',
-		reason: 'IE property/selector hacks — proprietary syntax outside the CSS grammar; tsv is spec-only (permanent non-goal)',
+		reason:
+			'IE property/selector hacks — proprietary syntax outside the CSS grammar; tsv is spec-only (permanent non-goal)'
 	},
 	// Not a Svelte component — an HTML conformance file the corpus loader feeds
 	// to the Svelte parser; svelte/compiler happens to tolerate its raw `[`.
 	{
 		pattern: 'tests/format/html/tags/tags.html',
-		reason: '.html file, not Svelte — raw template `[` svelte tolerates; out of tsv scope',
-	},
+		reason: '.html file, not Svelte — raw template `[` svelte tolerates; out of tsv scope'
+	}
 ];
 
 // Over-rejections where tsv is grammar-correct on INVALID CSS but hard-fails the whole
@@ -83,12 +90,14 @@ const KNOWN_GAPS: KnownGap[] = [
 	{
 		pattern: 'tests/format/css/attribute/quotes.css',
 		category: 'css-error-recovery',
-		reason: 'function as attr value `[id=func("foo")]` — invalid per selectors-4 (<string>|<ident>); recovery drops the rule',
+		reason:
+			'function as attr value `[id=func("foo")]` — invalid per selectors-4 (<string>|<ident>); recovery drops the rule'
 	},
 	{
 		pattern: 'tests/format/css/attribute/sensitive.css',
 		category: 'css-error-recovery',
-		reason: 'invalid attr case-flag `[type=a x]` — selectors-4 <attr-modifier> is `i`|`s` only; recovery drops the rule',
+		reason:
+			'invalid attr case-flag `[type=a x]` — selectors-4 <attr-modifier> is `i`|`s` only; recovery drops the rule'
 	},
 	// wpt-css harvest (benches/js/.cache/wpt_css) — surfaced by the MANUAL wpt-css
 	// differential (`skip_triage.ts benches/js/.cache/wpt_css`, a publish ship-gate step,
@@ -100,63 +109,75 @@ const KNOWN_GAPS: KnownGap[] = [
 	{
 		pattern: 'wpt_css/css-contain/content-visibility/content-visibility-015__0.css',
 		category: 'css-error-recovery',
-		reason: 'missing colon in declaration (`background lightgreen`) — recovery drops it; tsv reparses as a selector and hard-fails',
+		reason:
+			'missing colon in declaration (`background lightgreen`) — recovery drops it; tsv reparses as a selector and hard-fails'
 	},
 	{
 		pattern: 'wpt_css/css-contain/content-visibility/content-visibility-016__0.css',
 		category: 'css-error-recovery',
-		reason: 'missing colon in declaration (`background lightgreen`) — recovery drops it; tsv reparses as a selector and hard-fails',
+		reason:
+			'missing colon in declaration (`background lightgreen`) — recovery drops it; tsv reparses as a selector and hard-fails'
 	},
 	{
 		pattern: 'wpt_css/css-contain/content-visibility/content-visibility-017__0.css',
 		category: 'css-error-recovery',
-		reason: 'missing colon in declaration (`background lightgreen`) — recovery drops it; tsv reparses as a selector and hard-fails',
+		reason:
+			'missing colon in declaration (`background lightgreen`) — recovery drops it; tsv reparses as a selector and hard-fails'
 	},
 	{
 		pattern: 'wpt_css/css-contain/content-visibility/content-visibility-018__0.css',
 		category: 'css-error-recovery',
-		reason: 'missing colon in declaration (`background lightgreen`) — recovery drops it; tsv reparses as a selector and hard-fails',
+		reason:
+			'missing colon in declaration (`background lightgreen`) — recovery drops it; tsv reparses as a selector and hard-fails'
 	},
 	{
 		pattern: 'wpt_css/css-gaps/multicol/multicol-gap-decorations-005-ref__0.css',
 		category: 'css-error-recovery',
-		reason: 'missing colon in declaration (`height 50px`) — recovery drops it; tsv reparses as a selector and hard-fails',
+		reason:
+			'missing colon in declaration (`height 50px`) — recovery drops it; tsv reparses as a selector and hard-fails'
 	},
 	{
 		pattern: 'wpt_css/css-fonts/variations/variable-gpos-m2b__0.css',
 		category: 'css-error-recovery',
-		reason: 'bare token as declaration (`sans-serif;`, no property/colon) — recovery drops it; tsv hard-fails',
+		reason:
+			'bare token as declaration (`sans-serif;`, no property/colon) — recovery drops it; tsv hard-fails'
 	},
 	{
 		pattern: 'wpt_css/css-fonts/variations/variable-gsub-ref__0.css',
 		category: 'css-error-recovery',
-		reason: 'bare token as declaration (`sans-serif;`, no property/colon) — recovery drops it; tsv hard-fails',
+		reason:
+			'bare token as declaration (`sans-serif;`, no property/colon) — recovery drops it; tsv hard-fails'
 	},
 	{
 		pattern: 'wpt_css/css-fonts/variations/variable-gsub__0.css',
 		category: 'css-error-recovery',
-		reason: 'bare token as declaration (`sans-serif;`, no property/colon) — recovery drops it; tsv hard-fails',
+		reason:
+			'bare token as declaration (`sans-serif;`, no property/colon) — recovery drops it; tsv hard-fails'
 	},
 	{
 		pattern: 'wpt_css/css-transitions/animations/transition-end-event-shorthands__0.css',
 		category: 'css-error-recovery',
-		reason: '`//` line comment (not valid CSS — only `/* */`) — parseCss lenient/recovers; tsv hard-fails',
+		reason:
+			'`//` line comment (not valid CSS — only `/* */`) — parseCss lenient/recovers; tsv hard-fails'
 	},
 	{
 		pattern: 'wpt_css/css-animations/missing-values-middle-keyframe__0.css',
 		category: 'css-error-recovery',
-		reason: '`//` line comment inside a keyframe block (not valid CSS) — parseCss lenient/recovers; tsv hard-fails',
+		reason:
+			'`//` line comment inside a keyframe block (not valid CSS) — parseCss lenient/recovers; tsv hard-fails'
 	},
 	{
 		pattern: 'wpt_css/css-variables/variable-declaration-59__0.css',
 		category: 'css-error-recovery',
-		reason: 'unbalanced `)` in a custom-property value (`--a: red)`) — <declaration-value> disallows an unmatched `)`; parseCss lenient',
+		reason:
+			'unbalanced `)` in a custom-property value (`--a: red)`) — <declaration-value> disallows an unmatched `)`; parseCss lenient'
 	},
 	{
 		pattern: 'wpt_css/css-conditional/at-supports-030__0.css',
 		category: 'css-error-recovery',
-		reason: 'malformed `@supports` prelude (`((margin: 0) and ;`) — invalid <supports-condition>; parseCss consumes the prelude (condition=false)',
-	},
+		reason:
+			'malformed `@supports` prelude (`((margin: 0) and ;`) — invalid <supports-condition>; parseCss consumes the prelude (condition=false)'
+	}
 ];
 
 const corpus_path = Deno.args.find((a) => !a.startsWith('-'));
@@ -165,7 +186,7 @@ const [files, impls] = await Promise.all([
 	(corpus_path ? new DirectoryLoader(corpus_path) : new DevReposLoader('gates')).load((m) =>
 		console.error(m)
 	),
-	init_implementations({ logger: (m) => console.error(m) }),
+	init_implementations({ logger: (m) => console.error(m) })
 ]);
 const by_language = group_by_language(files);
 if (!impls.native) throw new Error('native FFI not built');
@@ -197,7 +218,7 @@ for (const lang of langs) {
 		sanctioned_over_rejection: [],
 		known_gap_over_rejection: [],
 		over_acceptance: [],
-		parity: [],
+		parity: []
 	};
 	for (const f of by_language[lang]) {
 		let tsv_err: string | null = null;
@@ -244,7 +265,7 @@ for (const lang of langs) {
 			`sanctioned-over-rejection=${b.sanctioned_over_rejection.length}  ` +
 			`known-gap-over-rejection=${b.known_gap_over_rejection.length}  ` +
 			`over-acceptance=${b.over_acceptance.length}  ` +
-			`UNEXPECTED-over-rejection=${b.unexpected_over_rejection.length}`,
+			`UNEXPECTED-over-rejection=${b.unexpected_over_rejection.length}`
 	);
 	for (const e of b.unexpected_over_rejection) {
 		console.error(`    ✗ ${e.path}\n        ${e.error}`);
@@ -258,7 +279,7 @@ if (unexpected_total > 0) {
 		`\nFAIL: ${unexpected_total} untracked over-rejection(s) — tsv rejects input the ` +
 			`canonical parser accepts. Fix the parser, or add a reasoned entry to SANCTIONED ` +
 			`(a deliberate divergence — deprecated syntax or a permanent non-goal) / KNOWN_GAPS ` +
-			`(tsv wrong, a tracked gap to fix) in this file.`,
+			`(tsv wrong, a tracked gap to fix) in this file.`
 	);
 	Deno.exit(1);
 }

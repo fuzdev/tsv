@@ -62,30 +62,30 @@ export class BiomeImplementation implements TsvImplementation {
 		this._biome.applyConfiguration(projectKey, {
 			formatter: {
 				indentStyle: 'tab',
-				lineWidth: 100,
+				lineWidth: 100
 			},
 			javascript: {
 				formatter: {
 					indentStyle: 'tab',
 					lineWidth: 100,
 					quoteStyle: 'single',
-					trailingCommas: 'none',
-				},
+					trailingCommas: 'none'
+				}
 			},
 			css: {
 				formatter: {
 					indentStyle: 'tab',
 					lineWidth: 100,
-					quoteStyle: 'single',
-				},
+					quoteStyle: 'single'
+				}
 			},
 			html: {
 				experimentalFullSupportEnabled: true,
 				formatter: {
 					indentStyle: 'tab',
-					lineWidth: 100,
-				},
-			},
+					lineWidth: 100
+				}
+			}
 		});
 	}
 
@@ -113,7 +113,7 @@ export class BiomeImplementation implements TsvImplementation {
 
 		try {
 			const result = this._biome.formatContent(this._project_key, source, {
-				filePath: `file${LANGUAGE_EXTENSIONS[language]}`,
+				filePath: `file${LANGUAGE_EXTENSIONS[language]}`
 			});
 			return result.content;
 		} catch (e: unknown) {

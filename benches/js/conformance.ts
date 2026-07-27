@@ -37,7 +37,7 @@ if (Deno.args.length > 0) {
 	console.error(
 		'The conformance driver takes no arguments — use the per-leg tasks for scoped runs\n' +
 			'(conformance:svelte-fixtures / conformance:ts-fixtures / conformance:ts-repo /\n' +
-			' corpus:compare:parse / corpus:compare:format).',
+			' corpus:compare:parse / corpus:compare:format).'
 	);
 	Deno.exit(1);
 }
@@ -130,9 +130,9 @@ async function run_render_audit(): Promise<void> {
 			'--',
 			'render_audit',
 			'--gate',
-			...dirs,
+			...dirs
 		],
-		{ stdio: 'inherit' },
+		{ stdio: 'inherit' }
 	);
 	if (status !== 0) Deno.exit(status ?? 1);
 }
@@ -145,7 +145,7 @@ const legs: [string, () => Promise<void>][] = [
 	['conformance:tsc-check', run_tsc_check],
 	['corpus:compare:parse --all', () => run_corpus_compare_parse(['--all'])],
 	['corpus:compare:format --all', () => run_corpus_compare_format(['--all'])],
-	['render:audit (pinned checkouts)', run_render_audit],
+	['render:audit (pinned checkouts)', run_render_audit]
 ];
 
 const run_started = performance.now();
@@ -163,7 +163,7 @@ for (const [name, leg] of legs) {
 	console.error(`──── ${name} OK (${((performance.now() - leg_started) / 1000).toFixed(1)}s)`);
 }
 console.error(
-	`\n✓ conformance aggregate: all ${legs.length} legs green in ${
-		((performance.now() - run_started) / 60_000).toFixed(1)
-	}m`,
+	`\n✓ conformance aggregate: all ${legs.length} legs green in ${(
+		(performance.now() - run_started) / 60_000
+	).toFixed(1)}m`
 );
