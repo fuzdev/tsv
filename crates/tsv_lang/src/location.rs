@@ -193,7 +193,7 @@ fn next_non_ascii(bytes: &[u8], from: usize) -> usize {
 fn build_deltas<T: DeltaElem>(
     source: &str,
     deltas: &mut Vec<T>,
-    line_starts: &mut Vec<usize>,
+    line_starts: &mut Vec<u32>,
     from: usize,
     mut delta: u32,
     line_rule: LineRule,
@@ -248,7 +248,7 @@ fn build_deltas<T: DeltaElem>(
                     && bytes[i + 1] == 0x80
                     && matches!(bytes[i + 2], 0xA8 | 0xA9)
                 {
-                    line_starts.push(i + 3);
+                    line_starts.push((i + 3) as u32);
                 }
                 i += 3;
             }
@@ -286,7 +286,7 @@ fn utf8_len(lead: u8) -> usize {
 /// narrowing to `u8` when the source's deltas fit — which is every source whose
 /// multibyte characters are sparse. `line_starts` must already hold its leading
 /// `0` unless `line_rule` is `None`.
-fn build_map(source: &str, line_starts: &mut Vec<usize>, line_rule: LineRule) -> ByteToCharMap {
+fn build_map(source: &str, line_starts: &mut Vec<u32>, line_rule: LineRule) -> ByteToCharMap {
     let mut narrow: Vec<u8> = Vec::with_capacity(source.len() + 1);
     let Err(outgrown) = build_deltas::<u8>(source, &mut narrow, line_starts, 0, 0, line_rule)
     else {
@@ -382,11 +382,84 @@ impl<'a> LocationMapper<'a> {
             )
         }
     }
+
+    /// Both endpoints of a span, each as `pos_and_position` would return it —
+    /// the form every wire emitter wants, since a node header writes `start`
+    /// and `end` together.
+    ///
+    /// Resolves the two lines through [`LocationTracker::resolve_span`], which
+    /// searches `end` forward from `start`'s line instead of from scratch and
+    /// keeps the line cache parked on the descending line. Byte-identical to
+    /// `pos_and_position(start)` + `pos_and_position(end)`.
+    ///
+    /// `inline(always)`: plain `#[inline]` was declined here — it outlined as
+    /// a 3.4% standalone symbol — and the writer's node header then paid
+    /// perf131's cost, an opaque call mid-staged-run forcing every following
+    /// append to re-load the stage cursor. Forcing it turned the whole change
+    /// from **+0.14%** instructions to **−1.72%**, with cycles moving
+    /// alongside. Four call sites, so the code-size exposure is bounded (the
+    /// `parse` WASM bundle moved +0.16%, and `format` — which builds without
+    /// the `json` feature — stayed flat at +21 B, confirming the growth is
+    /// confined to the convert path).
+    #[allow(clippy::inline_always)]
+    #[inline(always)]
+    pub fn span_positions(&self, start: u32, end: u32) -> ((u32, Position), (u32, Position)) {
+        let ((start_line, start_line_byte), (end_line, end_line_byte)) =
+            self.tracker.resolve_span(start as usize, end as usize);
+        if self.map.has_multibyte() {
+            let start_pos = self.map.byte_to_char(start);
+            let end_pos = self.map.byte_to_char(end);
+            let start_column = (start_pos - self.map.byte_to_char(start_line_byte as u32)) as usize;
+            let end_column = (end_pos - self.map.byte_to_char(end_line_byte as u32)) as usize;
+            (
+                (
+                    start_pos,
+                    Position {
+                        line: start_line + 1,
+                        column: start_column,
+                    },
+                ),
+                (
+                    end_pos,
+                    Position {
+                        line: end_line + 1,
+                        column: end_column,
+                    },
+                ),
+            )
+        } else {
+            // Byte-space passthrough: the map is identity, so the emitted
+            // offsets are the byte offsets and columns are byte columns.
+            (
+                (
+                    start,
+                    Position {
+                        line: start_line + 1,
+                        column: start as usize - start_line_byte,
+                    },
+                ),
+                (
+                    end,
+                    Position {
+                        line: end_line + 1,
+                        column: end as usize - end_line_byte,
+                    },
+                ),
+            )
+        }
+    }
 }
 
 #[derive(Debug)]
 pub struct LocationTracker {
-    line_starts: Vec<usize>,
+    /// Byte offset of each line's first byte, ascending, `[0]` always present.
+    ///
+    /// `u32`, not `usize`: a source offset is already `u32`-bounded (`Span`,
+    /// and the 4 GB file-size limit `ParseError::FileTooLarge` enforces), so
+    /// the wide element bought nothing and cost the search half its cache
+    /// residency. The searches hold their needle in `u32` too, so nothing
+    /// widens per probe.
+    line_starts: Vec<u32>,
     /// 1-entry line-range cache for `get_line_column` / `line_start_byte`.
     /// Wire-JSON emission is a DFS with high line locality, so successive
     /// offset lookups usually fall in the last-resolved line's `[line_start,
@@ -403,7 +476,7 @@ impl LocationTracker {
     /// line-range cache. The single constructor helper every `new*` routes
     /// through so the cache field stays in one place.
     #[inline]
-    fn with_line_starts(line_starts: Vec<usize>) -> Self {
+    fn with_line_starts(line_starts: Vec<u32>) -> Self {
         Self {
             line_starts,
             line_cache: Cell::new((0, 0, 0)),
@@ -420,7 +493,7 @@ impl LocationTracker {
         let mut line_starts = vec![0];
         for (i, ch) in source.char_indices() {
             if ch == '\n' {
-                line_starts.push(i + 1);
+                line_starts.push((i + 1) as u32);
             }
         }
         Self::with_line_starts(line_starts)
@@ -440,14 +513,14 @@ impl LocationTracker {
         let mut chars = source.char_indices().peekable();
         while let Some((i, ch)) = chars.next() {
             match ch {
-                '\n' | '\u{2028}' | '\u{2029}' => line_starts.push(i + ch.len_utf8()),
+                '\n' | '\u{2028}' | '\u{2029}' => line_starts.push((i + ch.len_utf8()) as u32),
                 '\r' => {
                     // CRLF counts as a single line terminator
                     if let Some(&(j, '\n')) = chars.peek() {
                         chars.next();
-                        line_starts.push(j + 1);
+                        line_starts.push((j + 1) as u32);
                     } else {
-                        line_starts.push(i + 1);
+                        line_starts.push((i + 1) as u32);
                     }
                 }
                 _ => {}
@@ -512,29 +585,98 @@ impl LocationTracker {
     }
 
     /// Resolve `offset` to `(line_idx, line_start)`, consulting the 1-entry
-    /// line-range cache first and filling it via binary search on a miss.
+    /// line-range cache first and filling it via search on a miss.
     /// Byte-identical to the bare `binary_search` + `saturating_sub` both
     /// callers used before — the cache is a pure memo keyed on the line's
     /// half-open byte range.
+    ///
+    /// ⚠️ The cache hit path reads **no memory**: `line_cache` is a `Cell` of
+    /// three scalars the optimizer keeps in registers, so a hit is two
+    /// compares. Any "fast path" that indexes `line_starts` instead is
+    /// *slower* than a hit, not faster — measured, see `resolve_line_after`.
     #[inline]
     fn resolve_line(&self, offset: usize) -> (usize, usize) {
         let (line_idx, line_start, next_line_start) = self.line_cache.get();
         if line_start <= offset && offset < next_line_start {
             return (line_idx, line_start);
         }
-        let line_idx = match self.line_starts.binary_search(&offset) {
-            Ok(idx) => idx, // Exact match - this offset is at the start of a line
-            Err(idx) => idx.saturating_sub(1),
+        // A miss that is still *ahead* of the cached line — the writer walks
+        // the AST in pre-order, so this is the common miss — searches forward
+        // from the cached index rather than bisecting the whole table.
+        let found = if offset >= line_start {
+            self.search_line_from(line_idx, offset)
+        } else {
+            self.search_line_all(offset)
         };
-        let line_start = self.line_starts[line_idx];
+        self.fill_cache(found)
+    }
+
+    /// Record `line_idx` in the 1-entry cache and return `(line_idx,
+    /// line_start)` — the shared tail of every cache-filling resolution.
+    #[inline]
+    fn fill_cache(&self, line_idx: usize) -> (usize, usize) {
+        let line_start = self.line_starts[line_idx] as usize;
         // Last line has no upper bound; a sentinel keeps it a permanent hit.
         let next_line_start = self
             .line_starts
             .get(line_idx + 1)
-            .copied()
-            .unwrap_or(usize::MAX);
+            .map_or(usize::MAX, |&s| s as usize);
         self.line_cache.set((line_idx, line_start, next_line_start));
         (line_idx, line_start)
+    }
+
+    /// The search needle: `offset` narrowed to the table's element width.
+    ///
+    /// Total, not a debug-only assumption. Every line start fits `u32` (the
+    /// 4 GB file-size limit), so an `offset` past `u32::MAX` is at or after
+    /// every line start and saturating to `u32::MAX` selects the same last
+    /// line the un-narrowed compare would.
+    #[inline]
+    fn needle(offset: usize) -> u32 {
+        offset.min(u32::MAX as usize) as u32
+    }
+
+    /// The unbiased search: the greatest `idx` with `line_starts[idx] <=
+    /// offset`, over the whole table. `line_starts[0]` is 0 and offsets are
+    /// non-negative, so the answer always exists.
+    #[inline]
+    fn search_line_all(&self, offset: usize) -> usize {
+        match self.line_starts.binary_search(&Self::needle(offset)) {
+            Ok(idx) => idx, // Exact match - this offset is at the start of a line
+            Err(idx) => idx.saturating_sub(1),
+        }
+    }
+
+    /// The same answer as [`Self::search_line_all`], given the lower bound
+    /// `line_starts[from] <= offset`: gallop forward from `from` until the
+    /// step overshoots, then bisect the bracketed window.
+    ///
+    /// The point is locality, not asymptotics. `line_starts` for a real file
+    /// is a few KB — L1-resident — so a bisection is not miss-bound but
+    /// *latency*-bound: ~9 dependent load-compare-cmov steps that cannot
+    /// pipeline. A gallop from a nearby index resolves the ordinary
+    /// "next line or two" case in one or two steps.
+    fn search_line_from(&self, from: usize, offset: usize) -> usize {
+        let starts = &self.line_starts;
+        let n = starts.len();
+        let needle = Self::needle(offset);
+        // Gallop: double the step until it overshoots, keeping `lo` at the
+        // last probe known to be `<= offset`. `hi` ends at the first probe
+        // known to be `> offset`, or at `n`.
+        let mut lo = from;
+        let mut step = 1;
+        let hi = loop {
+            let probe = from + step;
+            if probe >= n {
+                break n;
+            }
+            if starts[probe] > needle {
+                break probe;
+            }
+            lo = probe;
+            step *= 2;
+        };
+        lo + starts[lo + 1..hi].partition_point(|&s| s <= needle)
     }
 
     pub fn get_line_column(&self, offset: usize) -> (usize, usize) {
@@ -548,11 +690,61 @@ impl LocationTracker {
     pub fn line_start_byte(&self, offset: usize) -> usize {
         self.resolve_line(offset).1
     }
+
+    /// Resolve the trailing endpoint of a span, given that the leading one
+    /// resolved to line `from` — so `line_starts[from] <= offset` and the
+    /// answer is `from` or later.
+    ///
+    /// Layered deliberately, and the order is the whole point:
+    ///
+    /// 1. **the cache**, which the caller's `start` resolution just filled
+    ///    with `from`'s range. A same-line span — 88.5% of them on the TS
+    ///    corpus — is therefore two *register* compares. Do not "optimize"
+    ///    this into a direct `offset < line_starts[from + 1]` test: that
+    ///    reads memory where a hit reads none, and measured **+0.78%
+    ///    instructions** for exactly that reason.
+    /// 2. **a forward gallop** from `from`, for the genuine multi-line span.
+    ///
+    /// It never writes the cache, which is what keeps it parked on the
+    /// *descending* line: the writer emits a node's `start` (line N), its
+    /// `end` (line N+k), then its first child's `start` (back to line N).
+    ///
+    /// Returns exactly what `resolve_line(offset)` would; the caller owes the
+    /// precondition, which `resolve_span` discharges from `end >= start`.
+    #[inline]
+    fn resolve_line_after(&self, from: usize, offset: usize) -> (usize, usize) {
+        let (line_idx, line_start, next_line_start) = self.line_cache.get();
+        if line_start <= offset && offset < next_line_start {
+            return (line_idx, line_start);
+        }
+        let idx = self.search_line_from(from, offset);
+        (idx, self.line_starts[idx] as usize)
+    }
+
+    /// Resolve both endpoints of a span in one call, as
+    /// `((start_line_idx, start_line_start), (end_line_idx, end_line_start))`.
+    ///
+    /// `end >= start` always, so `end`'s line is at or after `start`'s and the
+    /// trailing endpoint is searched forward from the leading one's index
+    /// rather than bisected from scratch — see [`Self::resolve_line_after`]
+    /// for the layering that makes that pay. On the wire-JSON writer's access
+    /// pattern this removes **54%** of all bisections (82.0k → 38.0k per pass
+    /// over the fuz_app TS corpus), and the ones left are the genuinely
+    /// backward lookups.
+    ///
+    /// Byte-identical to `resolve_line(start)` + `resolve_line(end)`; the cache
+    /// is a pure memo, so which line it holds is unobservable.
+    #[inline]
+    fn resolve_span(&self, start: usize, end: usize) -> ((usize, usize), (usize, usize)) {
+        let start_line = self.resolve_line(start);
+        let end_line = self.resolve_line_after(start_line.0, end);
+        (start_line, end_line)
+    }
 }
 
 /// LF-only line starts for ASCII-only source (Svelte's `locate-character`
 /// convention: only `\n` starts a line — no CR/CRLF fusing).
-fn ascii_lf_line_starts(bytes: &[u8]) -> Vec<usize> {
+fn ascii_lf_line_starts(bytes: &[u8]) -> Vec<u32> {
     let mut line_starts = vec![0];
     ascii_lf_line_starts_into(bytes, 0, &mut line_starts);
     line_starts
@@ -560,7 +752,7 @@ fn ascii_lf_line_starts(bytes: &[u8]) -> Vec<usize> {
 
 /// ECMAScript-rule line starts for ASCII-only source: no U+2028/U+2029
 /// possible, so line terminators are single bytes with CRLF fusing.
-fn ascii_ecmascript_line_starts(bytes: &[u8]) -> Vec<usize> {
+fn ascii_ecmascript_line_starts(bytes: &[u8]) -> Vec<u32> {
     let mut line_starts = vec![0];
     ascii_ecmascript_line_starts_into(bytes, 0, &mut line_starts);
     line_starts
@@ -644,10 +836,10 @@ fn next_ecmascript_terminator(bytes: &[u8], from: usize) -> usize {
 /// characters, so each run's line scan is exactly the all-ASCII one — shared
 /// with the fast path rather than re-derived. A run boundary can never split a
 /// line terminator: every terminator this rule recognizes is one ASCII byte.
-fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, line_starts: &mut Vec<usize>) {
+fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, line_starts: &mut Vec<u32>) {
     let mut i = next_lf(bytes, 0);
     while i < bytes.len() {
-        line_starts.push(base + i + 1);
+        line_starts.push((base + i + 1) as u32);
         i = next_lf(bytes, i + 1);
     }
 }
@@ -663,14 +855,14 @@ fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, line_starts: &mut Vec<us
 /// and a lone `\r` both start the next line at `i + 1`, and CRLF is the same
 /// after stepping `i` onto its `\n`. So the only per-byte work left is the CRLF
 /// test, run once per line instead of once per byte.
-fn ascii_ecmascript_line_starts_into(bytes: &[u8], base: usize, line_starts: &mut Vec<usize>) {
+fn ascii_ecmascript_line_starts_into(bytes: &[u8], base: usize, line_starts: &mut Vec<u32>) {
     let mut i = next_ecmascript_terminator(bytes, 0);
     while i < bytes.len() {
         // CRLF counts as a single line terminator.
         if bytes[i] == b'\r' && bytes.get(i + 1) == Some(&b'\n') {
             i += 1;
         }
-        line_starts.push(base + i + 1);
+        line_starts.push((base + i + 1) as u32);
         i = next_ecmascript_terminator(bytes, i + 1);
     }
 }
@@ -884,27 +1076,27 @@ mod tests {
     /// against these shapes *exhaustively over every alignment*
     /// (`test_swar_line_scans_match_scalar_reference_exhaustive`), and by
     /// nothing else.
-    fn reference_lf_line_starts(bytes: &[u8], base: usize) -> Vec<usize> {
+    fn reference_lf_line_starts(bytes: &[u8], base: usize) -> Vec<u32> {
         let mut out = Vec::new();
         for (i, &b) in bytes.iter().enumerate() {
             if b == b'\n' {
-                out.push(base + i + 1);
+                out.push((base + i + 1) as u32);
             }
         }
         out
     }
 
-    fn reference_ecmascript_line_starts(bytes: &[u8], base: usize) -> Vec<usize> {
+    fn reference_ecmascript_line_starts(bytes: &[u8], base: usize) -> Vec<u32> {
         let mut out = Vec::new();
         let mut i = 0;
         while i < bytes.len() {
             match bytes[i] {
-                b'\n' => out.push(base + i + 1),
+                b'\n' => out.push((base + i + 1) as u32),
                 b'\r' => {
                     if bytes.get(i + 1) == Some(&b'\n') {
                         i += 1;
                     }
-                    out.push(base + i + 1);
+                    out.push((base + i + 1) as u32);
                 }
                 _ => {}
             }
@@ -1180,5 +1372,83 @@ mod tests {
         assert_eq!(m.byte_to_char(1), 1); // emoji start
         assert_eq!(m.byte_to_char(2), 1); // interior byte → emoji start
         assert_eq!(m.byte_to_char(5), 3); // 'b' (emoji consumed 2 units)
+    }
+
+    /// `resolve_line_forward` is a second search path to the answer
+    /// `resolve_line` already computes, and no corpus can grade a search that
+    /// returns a plausible wrong line — the wire stays valid JSON either way.
+    /// So grade it exhaustively against the binary search, over every
+    /// `(from, offset)` pair its precondition admits, on a line-length profile
+    /// covering the empty line, the single-byte line, and a run long enough to
+    /// make the gallop take several doublings.
+    #[test]
+    fn test_resolve_line_after_matches_binary_search() {
+        let mut source = String::new();
+        for len in [
+            0usize, 1, 0, 0, 5, 1, 40, 0, 2, 3, 1, 1, 1, 7, 0, 1, 100, 1, 0, 4,
+        ] {
+            source.push_str(&"x".repeat(len));
+            source.push('\n');
+        }
+        source.push_str("tail"); // last line, no terminator
+        let tracker = LocationTracker::new_ecmascript(&source);
+        let lines = tracker.line_starts.len();
+        assert!(lines >= 20, "profile must exercise multi-step gallops");
+
+        for offset in 0..=source.len() {
+            let expected = tracker.resolve_line(offset);
+            // Every `from` the precondition admits: `line_starts[from] <= offset`.
+            for from in 0..lines {
+                if tracker.line_starts[from] as usize > offset {
+                    break;
+                }
+                assert_eq!(
+                    tracker.resolve_line_after(from, offset),
+                    expected,
+                    "offset {offset} from line index {from}"
+                );
+            }
+        }
+    }
+
+    /// `span_positions` must be byte-identical to the two `pos_and_position`
+    /// calls it replaces — including the multibyte column path, where the two
+    /// endpoints translate through the map independently.
+    #[test]
+    fn test_span_positions_matches_two_pos_and_position() {
+        for source in [
+            "a\nbb\n\nccc\ndddd",
+            "aé\nbé c\n\n😀x\ny",
+            "one line only",
+            "\n\n\n",
+        ] {
+            let tracker = LocationTracker::new_ecmascript(source);
+            let map = ByteToCharMap::new(source);
+            for m in [
+                LocationMapper {
+                    tracker: &tracker,
+                    map: &map,
+                },
+                LocationMapper::identity(&tracker),
+            ] {
+                for start in 0..=source.len() as u32 {
+                    for end in start..=source.len() as u32 {
+                        // Fresh trackers so neither side inherits the other's
+                        // cache state — the memo must not be load-bearing.
+                        let fresh = LocationTracker::new_ecmascript(source);
+                        let f = LocationMapper {
+                            tracker: &fresh,
+                            map: m.map,
+                        };
+                        let expected = (f.pos_and_position(start), f.pos_and_position(end));
+                        assert_eq!(
+                            m.span_positions(start, end),
+                            expected,
+                            "{source:?} [{start}, {end}]"
+                        );
+                    }
+                }
+            }
+        }
     }
 }
