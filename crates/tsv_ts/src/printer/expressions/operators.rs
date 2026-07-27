@@ -1353,7 +1353,7 @@ impl<'a> Printer<'a> {
         // own-line block directive onto the operand's line — an inert placement, so the
         // freeze would be lost on the second pass.
         if comments_to_emit_in_range(self.comments, seq.span.start, trailing_end)
-            .any(|c| !c.is_block || (self.has_format_ignore && self.is_honored_directive(c)))
+            .any(|c| !c.is_block || self.is_honored_directive(c))
         {
             return self.build_sequence_doc_with_line_comments(seq, trailing_end, parens);
         }

@@ -25,13 +25,14 @@ use super::expressions::literals::format_directive;
 use super::is_string_literal;
 use super::needs_parens::leftmost_no_lookahead;
 use crate::ast::internal::{self, Expression, Statement};
-use crate::printer::analysis::has_newline_after_position;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::{find_char_skipping_comments, rfind_char_skipping_comments};
+use tsv_lang::source_scan::{
+    find_char_skipping_comments, has_newline_after_position, rfind_char_skipping_comments,
+};
 
 /// Strip only `as`/`satisfies` casts from the head of a statement expression,
 /// returning the innermost operand — but only if at least one cast was peeled.

@@ -263,8 +263,14 @@ impl<'a> Printer<'a> {
     /// layout depends on the answer, because an honored directive must keep the line the
     /// author gave it — collapsing it onto the frozen value's line would make it glued,
     /// hence inert, and the freeze would be lost on the next pass.
+    ///
+    /// The document-level `has_format_ignore` gate lives HERE rather than at each call
+    /// site: no directive in the document means no honored one, so a caller that spelled
+    /// the flag itself was restating the predicate — and a caller that forgot to differed
+    /// from its neighbors for no reason. [`Self::member_gap_frozen`] keeps its own copy,
+    /// where the flag buys something this one can't: skipping the range scan entirely.
     pub(in crate::printer) fn is_honored_directive(&self, c: &Comment) -> bool {
-        is_honored_format_ignore(self.source, c)
+        self.has_format_ignore && is_honored_format_ignore(self.source, c)
     }
 
     /// The placement floor alone — [`tsv_lang::directive_alone_on_line`] against this
@@ -541,17 +547,16 @@ impl<'a> Printer<'a> {
     /// can never both claim one directive. The member half is the sequence's inter-operand
     /// gap, which asks [`Self::gap_frozen_span`] per operand.
     ///
-    /// Opens on the document-level bool: every `for` header and every braced Svelte value
-    /// asks this, so a directive-free document pays exactly one predicted branch.
+    /// The same predicate as [`Self::gap_frozen_span`] — the gap is a gap either way, and
+    /// the `has_format_ignore` gate is already spent inside it. The two names exist because
+    /// the *rules* differ (a head claims the whole value; a member claims one item), and a
+    /// call site that spells which one it is documents the shape it froze.
     #[inline]
     pub(in crate::printer) fn value_head_frozen_span(
         &self,
         gap_start: u32,
         value: Span,
     ) -> Option<Span> {
-        if !self.has_format_ignore {
-            return None;
-        }
         self.gap_frozen_span(gap_start, value)
     }
 

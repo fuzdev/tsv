@@ -22,8 +22,32 @@ own second pass. The same rule already applies at the declaration-header gaps
 this is its `{…}`-value instance, shared by every braced value gap — event and class /
 style directives here, and an expression tag.
 
-`bind:` already writes the broken block form for a value that must break, so it matches
-prettier and needs no divergence — see the ordinary sibling
-[bind/value_prettier_ignore_head](../../../directives/bind/value_prettier_ignore_head/).
+## Both spellings
+
+Placement keys the freeze, not the spelling, so an own-line **block** directive owes the
+identical layout:
+
+```svelte
+<p>
+	{
+		/* prettier-ignore */
+		a  +  b
+	}
+</p>
+```
+
+That half has to be pinned separately because nothing makes it fall out: a `//` directive
+ends in a hardline of its own, so the block form arrives for free, while `/*…*/` is emitted
+inline and the `{…}` group is softline-hung — the collapsed `{/* prettier-ignore */ a  +  b}`
+is precisely the inert placement above. Prettier collapses it and stays frozen (attachment,
+again); tsv breaks and stays frozen.
+
+The block half covers every braced value shape — a directive value, an expression tag, a
+`bind:` value, and a `bind:` function-binding sequence — because they reach three different
+builders that share one block-wrapping seam. `bind:` needs no divergence for the **line**
+spelling, where it already writes the broken form and matches prettier: see the ordinary
+sibling [bind/value_prettier_ignore_head](../../../directives/bind/value_prettier_ignore_head/),
+and [bind/value_sequence_prettier_ignore_head](../../../directives/bind/value_sequence_prettier_ignore_head_prettier_divergence/)
+for the sequence's freeze scope.
 
 See [conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).

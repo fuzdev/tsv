@@ -1748,8 +1748,12 @@ tsv diverges at five places:
   its own line, so the value takes the broken block form; prettier pulls it flush against the
   `{` (`class:active={// prettier-ignore`) and freezes anyway. This is the `{…}` instance of
   the header-gap rule above — the flush form is inert under the placement floor, so following
-  prettier would lose the freeze on tsv's own second pass. `bind:` already writes the broken
-  block form and needs no divergence —
+  prettier would lose the freeze on tsv's own second pass. Per the placement-only
+  classification, **both spellings** take the broken form: a `//` directive ends in a hardline
+  of its own, while a `/*…*/` one is emitted inline into a softline-hung group, so the block
+  half is pinned explicitly across every braced value shape (directive value, expression tag,
+  `bind:` value, `bind:` function-binding sequence). `bind:` needs no divergence for the line
+  spelling, where it already writes the broken form —
   [braced value own line](../tests/fixtures/svelte/syntax/prettier_ignore/braced_value_own_line_prettier_divergence/)
 
 `yield`'s hanging-paren layout carries its own pre-existing comment relocation (see

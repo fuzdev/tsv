@@ -535,15 +535,19 @@ impl<'a> Printer<'a> {
         // the header's `;` stays parent-owned — prettier's slice swallows it and emits a
         // header that no longer parses
         // (`init_declaration_prettier_ignore_head_prettier_divergence`).
-        let clause_frozen = |gap: Option<u32>, start: Option<u32>, end: Option<u32>| {
-            gap.zip(start.zip(end)).and_then(|(gap, (start, end))| {
-                self.value_head_frozen_span(gap, Span::new(start, end))
-            })
+        // Each clause is absent-able independently of its gap, so the clause span is the
+        // `Option` and the gap is a plain offset.
+        let clause_frozen = |gap: u32, start: Option<u32>, end: Option<u32>| {
+            start
+                .zip(end)
+                .and_then(|(start, end)| self.value_head_frozen_span(gap, Span::new(start, end)))
         };
-        let init_frozen = clause_frozen(spans.init_region_start(), spans.init_start, init_end);
-        let test_frozen = clause_frozen(Some(test_search_start), spans.test_start, test_end);
-        let update_frozen =
-            clause_frozen(Some(update_search_start), spans.update_start, update_end);
+        // Init's gap is itself absent when there is no `(` to open one.
+        let init_frozen = spans
+            .init_region_start()
+            .and_then(|gap| clause_frozen(gap, spans.init_start, init_end));
+        let test_frozen = clause_frozen(test_search_start, spans.test_start, test_end);
+        let update_frozen = clause_frozen(update_search_start, spans.update_start, update_end);
 
         // Check if we have any own-line comments that force expansion. A line
         // comment anywhere in the header also forces it: the `//` runs to end of

@@ -16,12 +16,12 @@ use super::{CommentFilter, CommentSpacing, Printer};
 use crate::ast::internal::{Comment, TSIntersectionType, TSType, TSUnionType};
 use crate::printer::CommentVec;
 use crate::printer::LeadingGlue;
-use crate::printer::analysis::has_newline_after_position;
 use crate::printer::ignore::LeadingRunFreeze;
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::has_newline_after_position;
 
 /// Who emits an intersection's leading-`&` gap run (`[span.start, first.start)`) — the
 /// print-once seam between the leading-gap line-comment route and the body builders it

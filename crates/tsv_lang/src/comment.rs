@@ -1,6 +1,7 @@
 // Shared comment type and utilities used across languages
 use crate::Span;
 use crate::printing;
+use crate::source_scan::{has_newline_after_position, has_newline_before_position};
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy)]
@@ -125,25 +126,9 @@ pub fn is_honored_format_ignore(source: &str, comment: &Comment) -> bool {
 /// The placement floor of [`is_honored_format_ignore`], split out for the emitters that
 /// need the placement question alone.
 pub fn directive_alone_on_line(source: &str, comment: &Comment) -> bool {
-    (comment.span.start == 0 || newline_before(source, comment.span.start))
-        && (comment.span.end as usize == source.len() || newline_after(source, comment.span.end))
-}
-
-/// Whether a newline sits immediately before `pos`, skipping horizontal whitespace.
-fn newline_before(source: &str, pos: u32) -> bool {
-    source.as_bytes()[..pos as usize]
-        .iter()
-        .rev()
-        .find(|b| !matches!(b, b' ' | b'\t'))
-        .is_some_and(|b| matches!(b, b'\n' | b'\r'))
-}
-
-/// Whether a newline sits immediately after `pos`, skipping horizontal whitespace.
-fn newline_after(source: &str, pos: u32) -> bool {
-    source.as_bytes()[pos as usize..]
-        .iter()
-        .find(|b| !matches!(b, b' ' | b'\t'))
-        .is_some_and(|b| matches!(b, b'\n' | b'\r'))
+    (comment.span.start == 0 || has_newline_before_position(source, comment.span.start))
+        && (comment.span.end as usize == source.len()
+            || has_newline_after_position(source, comment.span.end))
 }
 
 /// Whether `content` opens an ignore range (`format-ignore-start` /
