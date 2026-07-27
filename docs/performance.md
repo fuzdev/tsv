@@ -205,6 +205,37 @@ For those, dump everything and search by source line instead:
 perf annotate --stdio > annotate.txt   # then search for the fn's source lines
 ```
 
+**A name on the board is not necessarily a function.** With debug info present,
+`perf` attributes samples to *inlined* frames too, so a symbol can top the report
+while having no out-of-line copy anywhere in the binary — its cost is the work of
+one source site, scattered across every caller. `perf annotate -s` returning
+nothing is the tell; `nm` is the confirmation:
+
+```bash
+nm -C target/release/tsv_debug | grep node_header_impl   # empty ⇒ fully inlined
+```
+
+This matters because it changes what a fix can even look like. A leaf that topped
+the wire-writer board at ~16% had **no out-of-line copy in either the release or
+the profiling build**; the lead recorded against it ("take that function apart")
+was unbuildable as stated. Source-line attribution said what the cost actually
+was — `Vec` append bookkeeping, because the node header issues ~16 separate
+appends per AST node, each with its own capacity check:
+
+```bash
+perf report --stdio --no-children -q -s srcline -g none   # flat, by source line
+perf report --stdio --no-children -q -s srcfile,srcline   # + per-line callchains
+```
+
+⚠️ Only **basenames** are printed, so std's `alloc/src/vec/mod.rs` and a crate's
+own `mod.rs` are indistinguishable in the flat view — read a line's callchain
+(drop `-g none`) to tell them apart.
+
+⚠️ Board **shares** move when only the denominator does. That same leaf rose
+15.97% → 16.63% across a change that made *other* things faster and left it
+untouched. Compare absolute instruction or cycle counts across boards, never
+percentages.
+
 **Telling real work from a code-layout artifact — `perf stat`.** When a logically
 tiny change moves the native wall, count instructions before chasing a function:
 **instruction count is layout-independent** (code placement cannot change how many
@@ -529,7 +560,18 @@ by the exhaustive equivalence test that sits beside the function.
 So a numeric change ships with an **equivalence test at its declaration**, graded
 against the shape it replaced, over inputs chosen to hit every branch (the corpus
 will not) — then **corrupt it and watch the test fail**. An oracle you have never
-seen fail proves nothing. See the same rule applied to CSS keyword sets in
+seen fail proves nothing.
+
+**The same rule covers scans, with one extra axis: alignment.** A word-at-a-time
+rewrite of a byte scan fails on *where the pattern lands relative to the stride*,
+which a corpus samples arbitrarily. So grade a scan over every input length and
+**every alignment across the word stride** — the line-start scans are checked
+against the byte-at-a-time shapes they replaced over every string of length 0–4
+on an alphabet covering each arm (`\n`, `\r`, `\0`, ordinary, `0x7f`) × every
+alignment 0–16. Note what no corpus could have covered: real source contains no
+`\r` at all, so the entire CRLF arm is corpus-dead. Both corruptions tried
+(dropping the scalar tail; reading the highest set lane of the SWAR mask instead
+of the lowest) were caught only there. See the same rule applied to CSS keyword sets in
 [`crates/tsv_css/CLAUDE.md`](../crates/tsv_css/CLAUDE.md), and to text width in
 [`crates/tsv_lang/CLAUDE.md`](../crates/tsv_lang/CLAUDE.md).
 
@@ -578,6 +620,38 @@ Two rules fall out:
   from work removed *inside* a function body, keeping the body out-of-line costs
   nothing — the caller was already paying the call. In the case above it kept the
   entire instruction win and left both bundles *smaller* than baseline.
+
+### An instruction A/B is blind to stalls and to store traffic
+
+The companion to the section above, and the reason a lever must be graded on the
+counter that matches what it *moves*:
+
+| what the change moves | counter that can see it |
+| --- | --- |
+| work (fewer operations) | `instructions:u` |
+| bytes, alignment, access width or ordering | `cycles:u` |
+| code size | the WASM bounds (see above) |
+
+The worked case is the direct sequel to the fixed-width-copy change described
+above. That copy loaded 16 bytes out of a stack scratch which the digit loop had
+just filled with **2-byte stores** — a narrow-store → wide-load pattern that
+**never store-forwards** — and it wrote the scratch's full width (20 bytes to
+keep ~3). One store instruction ended up carrying **71% of that function's
+self-time, ~22% of the whole parse→JSON run.** Packing the digits into a register
+and appending one word instead measured **−7.3..−7.7% cycles across four
+corpora with instructions FLAT (−0.06..−0.25%)** — a win an instruction-only A/B
+scores as noise and discards.
+
+Two practical rules:
+
+- **`perf annotate` before theorizing about a hot leaf.** A percentage tells you
+  *where*; only the per-instruction breakdown tells you the cost is one store
+  rather than the arithmetic around it.
+- **Cycles are far noisier than instructions** — on the reference machine the
+  same binary pair reads a ±2% band run to run, and a format-path control drifted
+  2.2–3.3 G for identical work. Use **best-of-N interleaved** (minimum cycles is
+  the least contaminated estimator), never a single pair, and keep a control
+  corpus the lever's code never runs.
 
 ## WASM bundle size
 

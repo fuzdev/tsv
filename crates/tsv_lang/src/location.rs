@@ -566,6 +566,77 @@ fn ascii_ecmascript_line_starts(bytes: &[u8]) -> Vec<usize> {
     line_starts
 }
 
+/// Broadcast `b` to every lane of a `u64` word — the SWAR needle. Written as a
+/// multiply rather than a byte array so it carries no endianness.
+#[inline]
+const fn splat(b: u8) -> u64 {
+    b as u64 * 0x0101_0101_0101_0101
+}
+
+/// Lane mask of the zero bytes in `v`: the high bit of lane `k` is set if
+/// `v`'s byte `k` is zero. The classic `has_zero` kernel.
+///
+/// ⚠️ **Only the LOWEST set lane is guaranteed genuine**, and every caller here
+/// relies on exactly that. A zero byte borrows into the next lane, which can
+/// flag lane `k+1` spuriously — but a spurious flag at `k+1` requires lane `k`
+/// to have been zero, and a zero lane always flags itself, so the lowest flagged
+/// lane is always a real match. Read this mask with `trailing_zeros`, never with
+/// a popcount or a highest-bit scan.
+#[inline]
+const fn zero_lanes(v: u64) -> u64 {
+    const LOW_BITS: u64 = 0x0101_0101_0101_0101;
+    const HIGH_BITS: u64 = 0x8080_8080_8080_8080;
+    v.wrapping_sub(LOW_BITS) & !v & HIGH_BITS
+}
+
+/// Index of the first `\n` at or after `from`, or `bytes.len()`.
+///
+/// The line-scan sibling of [`next_non_ascii`], and the same word-at-a-time
+/// shape for the same reason: line terminators are sparse (~1 per 30–40 source
+/// bytes), so a per-byte compare spends nearly all of its work confirming
+/// misses. `from_le_bytes` puts byte 0 in the low lane, so the lowest set bit is
+/// the earliest match.
+#[inline]
+fn next_lf(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
+    while let Some(chunk) = bytes[i..].first_chunk::<8>() {
+        let hits = zero_lanes(u64::from_le_bytes(*chunk) ^ splat(b'\n'));
+        if hits != 0 {
+            return i + (hits.trailing_zeros() / 8) as usize;
+        }
+        i += 8;
+    }
+    while i < bytes.len() && bytes[i] != b'\n' {
+        i += 1;
+    }
+    i
+}
+
+/// Index of the first `\n` **or** `\r` at or after `from`, or `bytes.len()`.
+///
+/// Both needles are tested against the same loaded word, so the source is read
+/// **once** — two independent single-needle passes would double the memory
+/// traffic to save one `xor`/`sub`/`andn` triple per word, the wrong trade on a
+/// multi-megabyte source.
+#[inline]
+fn next_ecmascript_terminator(bytes: &[u8], from: usize) -> usize {
+    let mut i = from;
+    while let Some(chunk) = bytes[i..].first_chunk::<8>() {
+        let w = u64::from_le_bytes(*chunk);
+        // OR-ing two masks preserves the lowest-lane guarantee: a spurious lane
+        // in either mask is preceded by a genuine one in that same mask.
+        let hits = zero_lanes(w ^ splat(b'\n')) | zero_lanes(w ^ splat(b'\r'));
+        if hits != 0 {
+            return i + (hits.trailing_zeros() / 8) as usize;
+        }
+        i += 8;
+    }
+    while i < bytes.len() && bytes[i] != b'\n' && bytes[i] != b'\r' {
+        i += 1;
+    }
+    i
+}
+
 /// Append the LF-only line starts of an ASCII run to `line_starts`, offset by
 /// the run's `base` position in the source.
 ///
@@ -574,10 +645,10 @@ fn ascii_ecmascript_line_starts(bytes: &[u8]) -> Vec<usize> {
 /// with the fast path rather than re-derived. A run boundary can never split a
 /// line terminator: every terminator this rule recognizes is one ASCII byte.
 fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, line_starts: &mut Vec<usize>) {
-    for (i, &b) in bytes.iter().enumerate() {
-        if b == b'\n' {
-            line_starts.push(base + i + 1);
-        }
+    let mut i = next_lf(bytes, 0);
+    while i < bytes.len() {
+        line_starts.push(base + i + 1);
+        i = next_lf(bytes, i + 1);
     }
 }
 
@@ -587,21 +658,20 @@ fn ascii_lf_line_starts_into(bytes: &[u8], base: usize, line_starts: &mut Vec<us
 /// A CRLF pair can never straddle a run boundary — a run only ends at a
 /// non-ASCII byte, which `\n` is not — so a `\r` at the end of a run is a lone
 /// CR, exactly as this scan reads it.
+///
+/// The rule collapses to one shape once the scan lands *on* a terminator: `\n`
+/// and a lone `\r` both start the next line at `i + 1`, and CRLF is the same
+/// after stepping `i` onto its `\n`. So the only per-byte work left is the CRLF
+/// test, run once per line instead of once per byte.
 fn ascii_ecmascript_line_starts_into(bytes: &[u8], base: usize, line_starts: &mut Vec<usize>) {
-    let mut i = 0;
+    let mut i = next_ecmascript_terminator(bytes, 0);
     while i < bytes.len() {
-        match bytes[i] {
-            b'\n' => line_starts.push(base + i + 1),
-            b'\r' => {
-                // CRLF counts as a single line terminator
-                if bytes.get(i + 1) == Some(&b'\n') {
-                    i += 1;
-                }
-                line_starts.push(base + i + 1);
-            }
-            _ => {}
+        // CRLF counts as a single line terminator.
+        if bytes[i] == b'\r' && bytes.get(i + 1) == Some(&b'\n') {
+            i += 1;
         }
-        i += 1;
+        line_starts.push(base + i + 1);
+        i = next_ecmascript_terminator(bytes, i + 1);
     }
 }
 
@@ -801,6 +871,120 @@ mod tests {
         }
         assert_eq!(next_non_ascii(b"", 0), 0);
         assert_eq!(next_non_ascii(b"abc", 0), 3);
+    }
+
+    /// The byte-at-a-time shapes the SWAR scans replaced, kept as this
+    /// module's line-scan oracle.
+    ///
+    /// **No corpus can grade a scan.** A missed or spurious line start moves a
+    /// `loc.line`/`loc.column` that still parses as valid JSON, so a wrong scan
+    /// survives the fixture suite, the format diff, and a byte-identity wire
+    /// diff over thousands of files unless some file happens to exercise the
+    /// exact word alignment that breaks. The SWAR scans are therefore graded
+    /// against these shapes *exhaustively over every alignment*
+    /// (`test_swar_line_scans_match_scalar_reference_exhaustive`), and by
+    /// nothing else.
+    fn reference_lf_line_starts(bytes: &[u8], base: usize) -> Vec<usize> {
+        let mut out = Vec::new();
+        for (i, &b) in bytes.iter().enumerate() {
+            if b == b'\n' {
+                out.push(base + i + 1);
+            }
+        }
+        out
+    }
+
+    fn reference_ecmascript_line_starts(bytes: &[u8], base: usize) -> Vec<usize> {
+        let mut out = Vec::new();
+        let mut i = 0;
+        while i < bytes.len() {
+            match bytes[i] {
+                b'\n' => out.push(base + i + 1),
+                b'\r' => {
+                    if bytes.get(i + 1) == Some(&b'\n') {
+                        i += 1;
+                    }
+                    out.push(base + i + 1);
+                }
+                _ => {}
+            }
+            i += 1;
+        }
+        out
+    }
+
+    #[test]
+    fn test_swar_line_scans_match_scalar_reference_exhaustive() {
+        // Exhaustive over every string of length 0..=4 on an alphabet that
+        // covers each arm and each adjacency the SWAR kernel can confuse: both
+        // terminators, the CRLF pair in both orders, a byte whose lane borrows
+        // (`\0`), and an ordinary byte. Four positions over five symbols is
+        // every terminator pattern the word kernel can see within a lane group.
+        const ALPHABET: [u8; 5] = [b'\n', b'\r', b'\0', b'a', 0x7f];
+        for len in 0..=4usize {
+            let mut word = vec![0u8; len];
+            let total = ALPHABET.len().pow(len as u32);
+            for n in 0..total {
+                let mut rest = n;
+                for slot in word.iter_mut() {
+                    *slot = ALPHABET[rest % ALPHABET.len()];
+                    rest /= ALPHABET.len();
+                }
+                // Every alignment across the 8-byte stride, so a pattern is
+                // tested inside a word, straddling two, and in the scalar tail.
+                for prefix in 0..17usize {
+                    let mut bytes = vec![b'x'; prefix];
+                    bytes.extend_from_slice(&word);
+                    bytes.extend_from_slice(b"yy");
+                    let label = format!("{bytes:?}");
+
+                    let mut lf = Vec::new();
+                    ascii_lf_line_starts_into(&bytes, 100, &mut lf);
+                    assert_eq!(lf, reference_lf_line_starts(&bytes, 100), "lf {label}");
+
+                    let mut es = Vec::new();
+                    ascii_ecmascript_line_starts_into(&bytes, 100, &mut es);
+                    assert_eq!(
+                        es,
+                        reference_ecmascript_line_starts(&bytes, 100),
+                        "ecmascript {label}"
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_swar_line_scans_match_scalar_reference_on_long_sources() {
+        // A long source exercises the word loop for many iterations, and a
+        // deterministic LCG mixes terminator densities the structured cases
+        // above fix by construction.
+        let mut state = 0x2545_f491_4f6c_dd1du64;
+        for case in 0..64 {
+            let mut bytes = Vec::with_capacity(4096);
+            for _ in 0..4096 {
+                state = state
+                    .wrapping_mul(6_364_136_223_846_793_005)
+                    .wrapping_add(1_442_695_040_888_963_407);
+                // Terminator density sweeps from dense to sparse across cases.
+                bytes.push(match (state >> 33) % (case + 2) {
+                    0 => b'\n',
+                    1 => b'\r',
+                    _ => b'a',
+                });
+            }
+            let mut lf = Vec::new();
+            ascii_lf_line_starts_into(&bytes, 0, &mut lf);
+            assert_eq!(lf, reference_lf_line_starts(&bytes, 0), "lf case {case}");
+
+            let mut es = Vec::new();
+            ascii_ecmascript_line_starts_into(&bytes, 0, &mut es);
+            assert_eq!(
+                es,
+                reference_ecmascript_line_starts(&bytes, 0),
+                "ecmascript case {case}"
+            );
+        }
     }
 
     #[test]
