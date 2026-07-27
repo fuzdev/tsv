@@ -55,28 +55,45 @@ function file_size(path: URL): number | null {
 const VARIANTS = ['format', 'parse', 'all'] as const;
 const TARGETS = ['npm', 'deno'] as const;
 
-// Measured 2026-07-04 (two size cuts landed together: the wasm32 feature
+// Measured 2026-07-27 (deno target; npm == deno, identical `.wasm`): format
+// 2,290,432 B; parse 1,066,009 B; all 2,529,682 B. Bounds recentered ±8%.
+//
+// Recentering, not a ceiling bump. Every variant had drifted +5.0..+5.3% above
+// its 2026-07-04 center through accumulated work — `format` included, which no
+// convert-path change can touch (it builds without the `json` feature) — so the
+// bands had gone asymmetric: parse's max sat +2.9% away while its min sat −12%
+// away. That shape both false-positives on ordinary growth and stops catching a
+// suspicious shrink, which is the half of the check that has no other tripwire.
+// Recentering restores signal in both directions; it does not raise the
+// tolerance, which stays ±8%.
+//
+// Prior center, 2026-07-04 (two size cuts landed together: the wasm32 feature
 // baseline moved to `+simd128,+multivalue` — the multivalue return ABI
 // shrinks the pair-return-dense parse path most, ≈−9% parse / ≈−4.4%
 // format+all — and talc replaced std's default dlmalloc as the wasm32 global
 // allocator, dropping a few more KB per bundle): format 2,178,122 B; parse
-// 1,015,388 B; all 2,401,628 B (npm == deno, identical `.wasm`). Bounds
-// recentered ±8%.
+// 1,015,388 B; all 2,401,628 B.
 const BOUNDS = {
-	format: { min: 2_005_000, max: 2_350_000 },
-	parse: { min: 934_000, max: 1_097_000 },
-	all: { min: 2_210_000, max: 2_595_000 }
+	format: { min: 2_107_000, max: 2_474_000 },
+	parse: { min: 980_000, max: 1_152_000 },
+	all: { min: 2_327_000, max: 2_733_000 }
 };
 
 // all = format + parse. `all − format` is the parse feature (parser convert
-// path; measured 223,506 B — down from 312,547 B when it still carried the
-// comment-island round-trip's `Value` deserialization machinery); `all −
-// parse` is the format feature (printers + doc builder, dropped from the
-// parse-only build at link time; measured 1,386,240 B, ≈unchanged — the
+// path; measured 239,250 B — up from 223,506 B, and down from 312,547 B when it
+// still carried the comment-island round-trip's `Value` deserialization
+// machinery); `all − parse` is the format feature (printers + doc builder,
+// dropped from the parse-only build at link time; measured 1,463,673 B — the
 // gate-health signal). A delta near zero means a feature gate broke.
+//
+// ⚠️ These recentered for the same reason as BOUNDS, and they were the *tighter*
+// constraint: at the old numbers `all − format` sat at 97.7% of its ceiling and
+// `all − parse` at 96.0%, so the next size-adding convert-path change would have
+// tripped a delta check rather than a bundle bound — a confusing failure, since
+// the delta reads as "a feature gate broke".
 const DELTAS = {
-	format: { min: 209_000, max: 245_000 }, // all − format
-	parse: { min: 1_295_000, max: 1_525_000 } // all − parse
+	format: { min: 220_000, max: 259_000 }, // all − format
+	parse: { min: 1_346_000, max: 1_581_000 } // all − parse
 };
 
 console.log('=== WASM binary sizes ===');
