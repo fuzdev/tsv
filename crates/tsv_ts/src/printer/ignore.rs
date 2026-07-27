@@ -667,29 +667,46 @@ impl<'a> Printer<'a> {
         self.with_frozen_must_break(self.raw_source_range(span.start, span.end), span)
     }
 
-    /// The frozen verbatim slice for an ARGUMENT or ELEMENT item, with the
-    /// argument-context clarity parens re-synthesized around it: an assignment argument
-    /// prints as `fn((a = b))`, and those parens are the printer's rather than the
-    /// author's, so they belong OUTSIDE the frozen slice — prettier freezes the inner and
-    /// keeps them too (`fn(⏎// prettier-ignore⏎(a = b  +  c))`). Same rule, and the same
-    /// reason, as [`Self::build_frozen_member_doc`]'s bare-member arm.
+    /// The frozen verbatim slice for a value in a paren-context position, with the clarity
+    /// parens that context supplies re-synthesized around it: an assignment prints as
+    /// `fn((a = b))` as an argument and as `if ((a = b))` as a condition, and those parens
+    /// are the printer's rather than the author's, so they belong OUTSIDE the frozen slice
+    /// — prettier freezes the inner and keeps them too (`fn(⏎// prettier-ignore⏎(a = b  +
+    /// c))`). Same rule, and the same reason, as [`Self::build_frozen_member_doc`]'s
+    /// bare-member arm.
+    ///
+    /// `ctx` is the position's own [`ParenContext`] — the one its ordinary path passes to
+    /// [`Self::needs_parens`], so the frozen and unfrozen forms can never disagree about
+    /// the shell.
     ///
     /// The must-break rides in the doc ([`Self::build_frozen_span_doc`]): every layout in
     /// this family is width-decided, and a `verbatim_source_span` is `will_break`-opaque,
     /// so a multi-line frozen item has to say so explicitly.
-    pub(in crate::printer) fn build_frozen_arg_doc(
+    pub(in crate::printer) fn build_frozen_value_doc(
         &self,
-        arg: &internal::Expression<'_>,
+        value: &internal::Expression<'_>,
         frozen: Span,
+        ctx: ParenContext,
     ) -> DocId {
-        let doc = self.build_frozen_expression_doc(arg, frozen);
-        if self.needs_parens(arg, ParenContext::Argument) {
+        let doc = self.build_frozen_expression_doc(value, frozen);
+        if self.needs_parens(value, ctx) {
             // Parens outside the claimed comment, exactly as the ordinary path nests them
             // (`d.parens(build_expression_doc(..))`, whose owned-comment prepend is inside).
             self.d().parens(doc)
         } else {
             doc
         }
+    }
+
+    /// [`Self::build_frozen_value_doc`] at an ARGUMENT or ELEMENT item, the family that
+    /// names its own emitter because every argument/element loop dispatches through it.
+    #[inline]
+    pub(in crate::printer) fn build_frozen_arg_doc(
+        &self,
+        arg: &internal::Expression<'_>,
+        frozen: Span,
+    ) -> DocId {
+        self.build_frozen_value_doc(arg, frozen, ParenContext::Argument)
     }
 
     /// The frozen verbatim slice for an EXPRESSION, with the glued leading comment the
@@ -712,7 +729,7 @@ impl<'a> Printer<'a> {
     /// context — which is why `needs_parens` deliberately answers `false` for it — and they
     /// sit OUTSIDE the node's span, so a verbatim slice of the span alone drops them and
     /// changes the meaning. The rule belongs here rather than at
-    /// [`Self::build_frozen_arg_doc`] because it is a property of the node, not of the
+    /// [`Self::build_frozen_value_doc`] because it is a property of the node, not of the
     /// position: the cast interior needs it too.
     pub(in crate::printer) fn build_frozen_expression_doc(
         &self,
