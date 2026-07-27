@@ -603,7 +603,12 @@ impl<'a> Printer<'a> {
         expr: &Expression<'_>,
         tag_span: Option<Span>,
     ) -> DocBuf {
-        let expr_content = self.build_expression_content_with_comments(expr, tag_span);
+        // Resolved once: it selects the value's doc (verbatim vs formatted) AND its layout
+        // (block vs hug), and those two must never disagree — a hugged frozen value would
+        // pull the directive flush against the `{`, an inert placement that loses the
+        // freeze on the second pass.
+        let frozen = self.value_gap_frozen(expr, tag_span);
+        let expr_content = self.build_expression_content_with_comments(expr, tag_span, frozen);
 
         // For expressions with internal group structure, keep them hugged with the braces.
         // Prettier lets their internal structure handle wrapping.
@@ -648,7 +653,7 @@ impl<'a> Printer<'a> {
         });
 
         let d = self.d();
-        let inner = if is_hugged || has_trailing_line_comment {
+        let inner = if (is_hugged || has_trailing_line_comment) && !frozen {
             // Hugged: the expression's internal doc handles wrapping
             let content = d.concat(&expr_content);
             d.braces(content)
@@ -662,11 +667,15 @@ impl<'a> Printer<'a> {
 
     /// Build expression content with leading/trailing comments
     ///
-    /// Returns the doc parts: leading comments + expression doc + trailing comments
+    /// Returns the doc parts: leading comments + expression doc + trailing comments.
+    /// `frozen` is the caller's resolved [`Self::value_gap_frozen`] verdict — an honored
+    /// directive in the `{`→value gap freezes the value whole; the caller's block form is
+    /// what keeps the directive on its own line.
     fn build_expression_content_with_comments(
         &self,
         expr: &Expression<'_>,
         tag_span: Option<Span>,
+        frozen: bool,
     ) -> DocBuf {
         // Collect leading comments
         let leading_comments: DocBuf = match tag_span {
@@ -674,7 +683,11 @@ impl<'a> Printer<'a> {
             None => DocBuf::new(),
         };
 
-        let expr_doc = self.build_expression_doc_for_attribute(expr);
+        let expr_doc = if frozen {
+            self.verbatim_source_doc(expr.span())
+        } else {
+            self.build_expression_doc_for_attribute(expr)
+        };
 
         // Collect trailing comments
         let mut trailing_comments: DocBuf = DocBuf::new();
@@ -690,6 +703,13 @@ impl<'a> Printer<'a> {
         expr_content.push(expr_doc);
         expr_content.extend(trailing_comments);
         expr_content
+    }
+
+    /// [`Printer::braced_value_frozen`] for a `{…}` value whose brace span the caller
+    /// holds as an `Option` — the tag span is absent for a value with no braces to open a
+    /// gap, where nothing can freeze.
+    fn value_gap_frozen(&self, expr: &Expression<'_>, tag_span: Option<Span>) -> bool {
+        tag_span.is_some_and(|span| self.braced_value_frozen(span.start + 1, expr.span().start))
     }
 
     /// Wrap expression content in block structure: `{\n\texpr\n}`
@@ -819,6 +839,11 @@ impl<'a> Printer<'a> {
         // overflow or carry their own forced break (matching prettier, which keeps
         // `() => a, (v) => (a = v)` on one line under a leading comment).
         let first_start = seq.expressions[0].span().start;
+        // An honored directive in the `{`→value gap leads the SEQUENCE node, not its first
+        // operand, so the whole pair rides inside one verbatim slice — the value-head rule.
+        // It stays bare: `bind:value={(get, set)}` is a grouped expression to Svelte, not a
+        // getter/setter pair (see value_sequence_prettier_ignore_head_prettier_divergence).
+        let head_frozen = self.braced_value_frozen(tag_span.start + 1, first_start);
         for comment in comments_to_emit_in_range(self.comments, tag_span.start + 1, first_start) {
             if comment.is_block && comment.multiline {
                 // Multi-line block: reindent-to-context through the shared comment
@@ -832,6 +857,11 @@ impl<'a> Printer<'a> {
                 // Single-line block: `/*…*/ ` inline. Line comment: `//…` + hardline.
                 content.push(self.build_leading_js_comment_doc(comment));
             }
+        }
+
+        if head_frozen {
+            content.push(self.verbatim_source_doc(seq.span));
+            return self.wrap_in_block_structure(content);
         }
 
         let mut items: DocBuf = DocBuf::new();
@@ -853,7 +883,14 @@ impl<'a> Printer<'a> {
                 items.push(d.text(","));
 
                 // Comments after the comma: an all-block run leads the next operand
-                // inline; a line comment trails the comma and forces the break.
+                // inline; otherwise the run is partitioned by the author's line
+                // treatment — what shares the comma's line trails it, and from the first
+                // OWN-LINE comment on the run leads the next operand on its own line.
+                //
+                // The partition is what keeps this gap from RELOCATING an own-line comment
+                // up onto the comma's line (prettier keeps it own-line too) — and for an
+                // honored directive the relocation is fatal, since a trailing placement is
+                // inert, so the freeze would die on the next pass.
                 let after: Vec<_> =
                     comments_to_emit_in_range(self.comments, comma_pos + 1, cur_start).collect();
                 if after.is_empty() {
@@ -864,13 +901,40 @@ impl<'a> Printer<'a> {
                         items.push(self.build_leading_js_comment_doc(comment));
                     }
                 } else {
+                    let mut pos = comma_pos;
+                    let mut in_leading_run = false;
                     for comment in &after {
-                        items.push(self.build_trailing_js_comment_doc(comment));
+                        if !in_leading_run
+                            && tsv_lang::printing::has_newline_between_fast(
+                                &self.line_breaks,
+                                pos,
+                                comment.span.start,
+                            )
+                        {
+                            in_leading_run = true;
+                            items.push(d.hardline());
+                        }
+                        items.push(if in_leading_run {
+                            self.build_leading_js_comment_doc(comment)
+                        } else {
+                            self.build_trailing_js_comment_doc(comment)
+                        });
+                        pos = comment.span.end;
                     }
                 }
             }
 
-            items.push(self.build_ts_expression_doc(sub_expr));
+            // Rule A: an honored directive in the comma gap freezes this operand.
+            let frozen = i > 0
+                && self.sequence_operand_frozen(
+                    seq.expressions[i - 1].span().end,
+                    sub_expr.span().start,
+                );
+            items.push(if frozen {
+                self.verbatim_source_doc(sub_expr.span())
+            } else {
+                self.build_ts_expression_doc(sub_expr)
+            });
         }
 
         // The operands sit in their own group so a forced break in the *surrounding*
@@ -894,7 +958,8 @@ impl<'a> Printer<'a> {
         expr: &Expression<'_>,
         tag_span: Option<Span>,
     ) -> DocBuf {
-        let expr_content = self.build_expression_content_with_comments(expr, tag_span);
+        let frozen = self.value_gap_frozen(expr, tag_span);
+        let expr_content = self.build_expression_content_with_comments(expr, tag_span, frozen);
         smallvec![
             self.d().text("="),
             self.wrap_in_block_structure(expr_content),
@@ -912,13 +977,28 @@ impl<'a> Printer<'a> {
     /// ```
     pub(super) fn build_expression_tag_doc(&self, tag: &internal::ExpressionTag<'_>) -> DocId {
         let d = self.d();
-        let mut parts: DocBuf = smallvec![d.text("{")];
+        let expr_start = tag.expression.span().start;
+        let frozen = self.braced_value_frozen(tag.span.start + 1, expr_start);
+
+        // A frozen value takes the broken block form, which supplies its own braces — so
+        // the directive keeps its own line; flush against the `{` it would be inert and
+        // the freeze would be lost on the second pass.
+        let mut parts: DocBuf = if frozen {
+            DocBuf::new()
+        } else {
+            smallvec![d.text("{")]
+        };
 
         // Add leading comments between { and expression (block inline, line + hardline;
         // a multi-line block reindents + forces the break — see `build_leading_js_comment_doc`).
-        parts.extend(self.leading_comment_docs(tag.span.start + 1, tag.expression.span().start));
+        parts.extend(self.leading_comment_docs(tag.span.start + 1, expr_start));
 
-        parts.push(self.build_expression_doc_for_attribute(&tag.expression));
+        // An honored directive in the `{`→value gap freezes the value whole.
+        parts.push(if frozen {
+            self.verbatim_source_doc(tag.expression.span())
+        } else {
+            self.build_expression_doc_for_attribute(&tag.expression)
+        });
 
         // Add trailing comments. A line comment forces `}` onto its own line (the
         // helper appends a hardline) so the `//` doesn't swallow the brace.
@@ -927,6 +1007,9 @@ impl<'a> Printer<'a> {
             parts.push(self.build_trailing_js_comment_doc(comment));
         }
 
+        if frozen {
+            return self.wrap_in_block_structure(parts);
+        }
         parts.push(d.text("}"));
         d.concat(&parts)
     }

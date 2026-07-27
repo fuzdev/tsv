@@ -1686,6 +1686,76 @@ output is a form tsv only re-indents (`divergent_variant_flush`, the pre-existin
 hang) —
 [keyword-gap own line](../tests/fixtures/typescript/syntax/comments/keyword_gap_prettier_ignore_own_line_prettier_divergence/)
 
+**On delimiter-owned value heads, and on sequence operands.** A construct that holds a single
+value behind a delimiter of its own — a `for` header's `(`→init, `;`→test and `;`→update
+clauses, a restricted production's grouping `(` (`return` / `throw` / `yield`), and a Svelte
+`{…}` value (`bind:` / `on:` / `class:` / `style:` and an expression tag) — freezes that
+**whole value** when an own-line directive sits in the gap. The slice is the value's own node
+span, so the delimiter that closes it (the header's `;`, the grouping `)`, the closing `}`)
+stays parent-owned, and a sibling clause or attribute the freeze does not reach still
+normalizes. Prettier agrees at every one of those positions, so the ordinary fixtures
+`for/clauses_prettier_ignore_head`, `return_throw/operand_prettier_ignore_head` and
+`bind/value_prettier_ignore_head` **match**.
+
+Inside a sequence the classification is Rule A again, unchanged: an own-line directive in an
+**inter-operand** gap freezes only the **following** operand, and the operands on either side
+of it reformat. The two rules meet at a sequence's leading gap, where the directive leads the
+*sequence node* rather than its first operand — so the whole sequence rides inside one
+verbatim slice, in a `for` clause, a `return`/`throw` operand and a Svelte value alike
+(`sequence/operands_prettier_ignore_member` covers the inter-operand half and matches
+prettier). Two node-level facts the slice carries are the same ones every value-side freeze
+carries: a block comment glued before the value is **owned** by it and rides inside the doc
+the slice replaces, so the freeze claims it; and a `SequenceExpression` prints its own
+grouping parens *outside* its node span, so a frozen sequence operand re-synthesizes them or
+loses its grouping.
+
+A **glued** directive is inert here as everywhere — `for (/* prettier-ignore */ i = 0; …)`,
+`return /* prettier-ignore */ a + b` — where prettier honors the glued placement and freezes;
+each fixture's `prettier_variant_frozen` pins prettier's stable frozen form, which tsv
+normalizes ([clauses glued
+inert](../tests/fixtures/typescript/statements/for/clauses_prettier_ignore_glued_inert_prettier_divergence/)).
+
+tsv diverges at five places:
+
+- Directive written in an **empty `for` clause slot** — ◆comment_preservation — it stays in
+  that slot, so it freezes nothing: the clause it would freeze is on the other side of the
+  `;`. Prettier moves it across into the next clause and freezes there. This is the freeze
+  consequence of the already-sanctioned empty-slot rule (§Comment relocation), and it follows
+  from the general one — the directive that freezes a value is the one printed above it. The
+  relocated authoring is dual-stable (`variant_relocated`): there the directive really does
+  lead the test clause, and tsv freezes it too —
+  [empty slot inert](../tests/fixtures/typescript/statements/for/empty_slot_prettier_ignore_inert_prettier_divergence/)
+- `yield` / `yield*` operand — ◆comment_preservation ◆prettier_bug — tsv freezes and keeps the
+  hanging-paren layout the own-line comment forces; prettier relocates the directive onto the
+  keyword's line and strips the parens (the pre-existing `yield` relocation in §Comment
+  relocation, here carrying the directive). Its relocated form is **not a fixed point** — the
+  next pass reformats the plain-`yield` operand and **loses the freeze**, pinned in
+  `audit_signature.txt`. `return` / `throw` match prettier —
+  [yield operand](../tests/fixtures/typescript/statements/return_throw/yield_operand_prettier_ignore_head_prettier_divergence/)
+- `for` init that is a **declaration** — ◆prettier_bug — prettier's frozen slice swallows the
+  header's `;` and then emits the separator after it (`let i  =  0, j = 1;;`), producing a
+  four-clause header that **does not parse**. tsv keeps the separator parent-owned, as at
+  every other frozen list item —
+  [init declaration](../tests/fixtures/typescript/statements/for/init_declaration_prettier_ignore_head_prettier_divergence/)
+- Frozen **function-binding sequence** in a `bind:` value — ◆comment_preservation ◆prettier_bug —
+  tsv emits the getter/setter pair bare, as it does for every other function-binding value.
+  Prettier parenthesizes it (which Svelte reads as a grouped expression, not a binding pair)
+  and then **drops the directive entirely** on its second pass, reformatting the value — the
+  same non-idempotent loss the plain-comment case already has —
+  [bind value sequence](../tests/fixtures/svelte/directives/bind/value_sequence_prettier_ignore_head_prettier_divergence/),
+  sibling [function_comment_inline_block](../tests/fixtures/svelte/directives/bind/function_comment_inline_block_prettier_divergence/)
+- Directive in a **`{…}` value gap** — ◆design_choice ◆comment_preservation — tsv keeps it on
+  its own line, so the value takes the broken block form; prettier pulls it flush against the
+  `{` (`class:active={// prettier-ignore`) and freezes anyway. This is the `{…}` instance of
+  the header-gap rule above — the flush form is inert under the placement floor, so following
+  prettier would lose the freeze on tsv's own second pass. `bind:` already writes the broken
+  block form and needs no divergence —
+  [braced value own line](../tests/fixtures/svelte/syntax/prettier_ignore/braced_value_own_line_prettier_divergence/)
+
+`yield`'s hanging-paren layout carries its own pre-existing comment relocation (see
+[§Comment relocation](#comment-relocation)); the freeze rides on it rather than adding a
+second divergence.
+
 See [directives.md](./directives.md) for the user-facing reference.
 
 ---

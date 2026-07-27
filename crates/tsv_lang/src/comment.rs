@@ -106,6 +106,46 @@ pub fn is_format_ignore_directive(content: &str) -> bool {
     matches!(content.trim(), "format-ignore" | "prettier-ignore")
 }
 
+/// Whether `comment` is a format-ignore directive that HONORS — the recognizer above
+/// plus the **placement floor**: the directive must be the only thing on its physical
+/// line (whitespace aside). Every other placement — trailing a token, glued before the
+/// construct, sharing a line with an opening delimiter — is an ordinary comment.
+///
+/// A file boundary counts as a line boundary, so a directive at byte 0 or at EOF still
+/// qualifies. A line comment trivially satisfies the after side (it consumes to EOL);
+/// only a block spelling can share its line with what follows.
+///
+/// Shared across the language printers because it is the one question they must not
+/// answer differently: a printer that freezes from a placement its own emitter would
+/// then relocate loses the freeze on the next pass.
+pub fn is_honored_format_ignore(source: &str, comment: &Comment) -> bool {
+    is_format_ignore_directive(comment.content(source)) && directive_alone_on_line(source, comment)
+}
+
+/// The placement floor of [`is_honored_format_ignore`], split out for the emitters that
+/// need the placement question alone.
+pub fn directive_alone_on_line(source: &str, comment: &Comment) -> bool {
+    (comment.span.start == 0 || newline_before(source, comment.span.start))
+        && (comment.span.end as usize == source.len() || newline_after(source, comment.span.end))
+}
+
+/// Whether a newline sits immediately before `pos`, skipping horizontal whitespace.
+fn newline_before(source: &str, pos: u32) -> bool {
+    source.as_bytes()[..pos as usize]
+        .iter()
+        .rev()
+        .find(|b| !matches!(b, b' ' | b'\t'))
+        .is_some_and(|b| matches!(b, b'\n' | b'\r'))
+}
+
+/// Whether a newline sits immediately after `pos`, skipping horizontal whitespace.
+fn newline_after(source: &str, pos: u32) -> bool {
+    source.as_bytes()[pos as usize..]
+        .iter()
+        .find(|b| !matches!(b, b' ' | b'\t'))
+        .is_some_and(|b| matches!(b, b'\n' | b'\r'))
+}
+
 /// Whether `content` opens an ignore range (`format-ignore-start` /
 /// `prettier-ignore-start`). Everything through the matching range-end marker is
 /// emitted as raw source.

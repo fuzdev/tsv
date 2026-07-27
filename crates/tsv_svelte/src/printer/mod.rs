@@ -32,8 +32,9 @@ use tsv_lang::FxHashSet;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{
-    Comment, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, is_format_ignore_directive,
-    is_format_ignore_range_end, is_format_ignore_range_start,
+    Comment, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, comments_in_source_range,
+    is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
+    is_honored_format_ignore,
 };
 use tsv_ts::Expression;
 
@@ -385,6 +386,40 @@ fn collect_html_comment_spans(fragment: &internal::Fragment<'_>, out: &mut Vec<S
 }
 
 impl<'a> Printer<'a> {
+    /// Whether the `{`→value gap `[gap_start, value_start)` of a braced expression holds
+    /// an honored directive — the Svelte instance of the delimiter-owned value head
+    /// (`tsv_ts`'s `Printer::value_head_frozen_span`): a directive alone on its line there
+    /// freezes the whole value, and the `}` that closes it stays parent-owned.
+    ///
+    /// One predicate for two questions on purpose. It decides the **freeze**, and it also
+    /// decides the gap's **layout** — an honored directive takes the broken block form, so
+    /// the emitter never pulls it flush against the `{`, where it would be inert and the
+    /// freeze would be lost on the second pass (the `{…}` instance of the declaration-header
+    /// rule; see docs/conformance_prettier.md §Format-ignore directive).
+    ///
+    /// Opens on the document-level flag: every braced value in every component asks it.
+    pub(in crate::printer) fn braced_value_frozen(&self, gap_start: u32, value_start: u32) -> bool {
+        self.honored_directive_in_gap(gap_start, value_start)
+    }
+
+    /// **Rule A** for a function-binding sequence's inter-operand gap: an honored
+    /// directive after the previous operand's comma freezes the FOLLOWING operand, and
+    /// the `,` stays parent-owned. The same rule `tsv_ts`'s sequence printer applies;
+    /// the bind value has its own operand loop because Svelte prints the pair bare.
+    pub(in crate::printer) fn sequence_operand_frozen(&self, prev_end: u32, start: u32) -> bool {
+        self.honored_directive_in_gap(prev_end, start)
+    }
+
+    /// Whether `[start, end)` holds a directive that honors. **In-source axis** — a
+    /// directive is never owned, so the axes coincide, but naming the physical one keeps
+    /// directive recognition a single deliberate question (as `tsv_ts`'s
+    /// `member_gap_frozen` does).
+    fn honored_directive_in_gap(&self, start: u32, end: u32) -> bool {
+        self.has_format_ignore
+            && comments_in_source_range(self.comments, start, end)
+                .any(|c| is_honored_format_ignore(self.source, c))
+    }
+
     /// Check if the last non-whitespace fragment node before `target_start` is
     /// a `<!-- format-ignore -->` (or `prettier-ignore`) comment.
     fn has_format_ignore_before(

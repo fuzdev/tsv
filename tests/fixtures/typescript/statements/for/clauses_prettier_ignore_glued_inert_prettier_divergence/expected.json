@@ -1,0 +1,489 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 280,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a glued directive is an ordinary comment: the clause formats normally",
+			"start": 20,
+			"end": 92,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 99,
+			"end": 120,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 6
+				},
+				"end": {
+					"line": 3,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same at a restricted production's grouping `(`",
+			"start": 175,
+			"end": 228,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 238,
+			"end": 259,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 9
+				},
+				"end": {
+					"line": 9,
+					"column": 30
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 279,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 94,
+					"end": 153,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "AssignmentExpression",
+						"start": 121,
+						"end": 126,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 28
+							},
+							"end": {
+								"line": 3,
+								"column": 33
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 121,
+							"end": 122,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 28
+								},
+								"end": {
+									"line": 3,
+									"column": 29
+								}
+							},
+							"name": "i"
+						},
+						"right": {
+							"type": "Literal",
+							"start": 125,
+							"end": 126,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 32
+								},
+								"end": {
+									"line": 3,
+									"column": 33
+								}
+							},
+							"value": 0,
+							"raw": "0"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " prettier-ignore ",
+								"start": 99,
+								"end": 120
+							}
+						]
+					},
+					"test": {
+						"type": "BinaryExpression",
+						"start": 128,
+						"end": 134,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 35
+							},
+							"end": {
+								"line": 3,
+								"column": 41
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 128,
+							"end": 129,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 35
+								},
+								"end": {
+									"line": 3,
+									"column": 36
+								}
+							},
+							"name": "i"
+						},
+						"operator": "<",
+						"right": {
+							"type": "Literal",
+							"start": 132,
+							"end": 134,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 39
+								},
+								"end": {
+									"line": 3,
+									"column": 41
+								}
+							},
+							"value": 10,
+							"raw": "10"
+						}
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 136,
+						"end": 139,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 43
+							},
+							"end": {
+								"line": 3,
+								"column": 46
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 136,
+							"end": 137,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 43
+								},
+								"end": {
+									"line": 3,
+									"column": 44
+								}
+							},
+							"name": "i"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 141,
+						"end": 153,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 48
+							},
+							"end": {
+								"line": 5,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 145,
+								"end": 150,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 145,
+									"end": 149,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 2
+										},
+										"end": {
+											"line": 4,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 145,
+										"end": 147,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a glued directive is an ordinary comment: the clause formats normally",
+							"start": 20,
+							"end": 92
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 156,
+					"end": 269,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 165,
+						"end": 168,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 10
+							},
+							"end": {
+								"line": 7,
+								"column": 13
+							}
+						},
+						"name": "fn1"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [],
+					"body": {
+						"type": "BlockStatement",
+						"start": 171,
+						"end": 269,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 16
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ReturnStatement",
+								"start": 231,
+								"end": 266,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 37
+									}
+								},
+								"argument": {
+									"type": "BinaryExpression",
+									"start": 260,
+									"end": 265,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 31
+										},
+										"end": {
+											"line": 9,
+											"column": 36
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 260,
+										"end": 261,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 31
+											},
+											"end": {
+												"line": 9,
+												"column": 32
+											}
+										},
+										"name": "a"
+									},
+									"operator": "+",
+									"right": {
+										"type": "Identifier",
+										"start": 264,
+										"end": 265,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 35
+											},
+											"end": {
+												"line": 9,
+												"column": 36
+											}
+										},
+										"name": "b"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " prettier-ignore ",
+											"start": 238,
+											"end": 259
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " the same at a restricted production's grouping `(`",
+										"start": 175,
+										"end": 228
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
