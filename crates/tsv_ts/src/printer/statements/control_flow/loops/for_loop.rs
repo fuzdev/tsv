@@ -23,7 +23,63 @@ struct ForHeaderSpans {
     test_start: Option<u32>,
     test_end: Option<u32>,
     update_start: Option<u32>,
+    update_end: Option<u32>,
+    first_semi: Option<u32>,
+    second_semi: Option<u32>,
     close_paren: Option<u32>,
+}
+
+impl ForHeaderSpans {
+    /// The end of the init clause's comment region: the clause itself when present,
+    /// else its `;`.
+    ///
+    /// The three region accessors are what keep an ABSENT clause's comments from
+    /// leaking into the next clause's region. A boundary chained over the absent
+    /// clauses instead (`init_start.or(test_start).or(update_start)`) reaches past the
+    /// separators that delimit the slots, so one comment landed in two regions and was
+    /// printed twice — or, where only the skipped-over region had an emitter, in none
+    /// and was dropped. The `;` positions are the slot boundaries; every region is
+    /// bounded by them.
+    fn init_region_end(&self) -> Option<u32> {
+        self.init_start.or(self.first_semi)
+    }
+
+    /// The start of the init clause's comment region: just inside the `(`.
+    fn init_region_start(&self) -> Option<u32> {
+        self.open_paren.map(|p| p + 1)
+    }
+
+    /// The start of the test clause's comment region: the preceding clause's end when
+    /// there is one — its `content`→`;` gap belongs to it — else just past that `;`.
+    fn test_region_start(&self) -> Option<u32> {
+        self.init_end.or_else(|| self.first_semi.map(|s| s + 1))
+    }
+
+    /// The start of the update clause's comment region. See
+    /// [`Self::test_region_start`].
+    fn update_region_start(&self) -> Option<u32> {
+        self.test_end.or_else(|| self.second_semi.map(|s| s + 1))
+    }
+
+    /// The start of the region that runs to the header's `)` — just past the update
+    /// clause when there is one, else its whole (empty) slot. Unlike the init and test
+    /// slots, nothing but `)` terminates this one, so the clause and the gap after it
+    /// share a single trailing region.
+    fn update_trailing_start(&self) -> Option<u32> {
+        self.update_end.or_else(|| self.second_semi.map(|s| s + 1))
+    }
+
+    /// The end of the test clause's comment region: the clause itself when present,
+    /// else its `;`. See [`Self::init_region_end`].
+    fn test_region_end(&self) -> Option<u32> {
+        self.test_start.or(self.second_semi)
+    }
+
+    /// The end of the update clause's comment region: the clause itself when present,
+    /// else the header's `)`. See [`Self::init_region_end`].
+    fn update_region_end(&self) -> Option<u32> {
+        self.update_start.or(self.close_paren)
+    }
 }
 
 /// Source positions for a for-in/for-of header
@@ -246,6 +302,12 @@ impl<'a> Printer<'a> {
     /// a line comment drops the rest of the header to the next line, but the `;;`
     /// stay together when nothing separates them (`for ( // c⏎\t;;⏎)`). `for_open`
     /// is the already-built `for (` prefix (carrying any `for`→`(` keyword comment).
+    ///
+    /// A *partially*-empty header preserves its empty slots' comments too, but through
+    /// the ordinary path's [`Self::push_for_empty_slot_comments`] and with the ordinary
+    /// separators — a slot there sits between real clauses, so it takes the same
+    /// `softline`/`line` breaks they do. This dedicated emitter exists for the
+    /// separator rules above, which only make sense when the parens hold nothing else.
     fn build_for_empty_with_comments(
         &self,
         stmt: &internal::ForStatement<'_>,
@@ -368,15 +430,16 @@ impl<'a> Printer<'a> {
             d.text("for (")
         };
 
-        // Check if there are any comments inside the for parens
         let open_paren = self.find_open_paren_after(stmt.span.start);
         let close_paren_approx = open_paren.and_then(|p| self.matching_close_paren(p));
-        let has_comments_inside =
-            if let (Some(open), Some(close)) = (open_paren, close_paren_approx) {
-                self.has_comments_to_emit_between(open, close)
-            } else {
-                false
-            };
+        // The whole paren interior, for the two header-wide gates below. `None` for a
+        // degenerate header with no locatable parens, where neither gate has a range to
+        // ask about.
+        let paren_interior = open_paren.zip(close_paren_approx);
+
+        // Check if there are any comments inside the for parens
+        let has_comments_inside = paren_interior
+            .is_some_and(|(open, close)| self.has_comments_to_emit_between(open, close));
 
         if !has_any && !has_comments_inside {
             // Empty for (;;) with no comments - no wrapping needed
@@ -393,6 +456,18 @@ impl<'a> Printer<'a> {
         let (init_end, test_end) = self.for_clause_ends(stmt);
         let update_end = stmt.update.as_ref().map(|u| u.span().end);
 
+        // Find semicolon positions for proper comment boundary detection.
+        // The semicolons in `for (init; test; update)` are at specific positions in
+        // source. Anchored at the clause ends, not `stmt.span.start` — see
+        // `find_for_semicolons`. `open_paren` is only the fallback for an absent init,
+        // so a header with no open paren to find (already degenerate) keeps the
+        // previous keyword-relative behavior.
+        let (first_semi, second_semi) = self.find_for_semicolons(
+            stmt,
+            open_paren.unwrap_or(stmt.span.start),
+            close_paren_approx,
+        );
+
         let spans = ForHeaderSpans {
             open_paren,
             init_start: stmt.init.as_ref().map(|i| match i {
@@ -403,6 +478,9 @@ impl<'a> Printer<'a> {
             test_start: stmt.test.as_ref().map(|t| t.span().start),
             test_end,
             update_start: stmt.update.as_ref().map(|u| u.span().start),
+            update_end,
+            first_semi,
+            second_semi,
             // Reuse the close-paren already found above (`matching_close_paren` is a
             // depth-tracked scan over the whole header) instead of recomputing it.
             close_paren: close_paren_approx,
@@ -412,72 +490,52 @@ impl<'a> Printer<'a> {
         // comment anywhere in the header also forces it: the `//` runs to end of
         // line, so the clauses after it must move to their own lines (matching
         // prettier) — otherwise the comment swallows the rest of the header.
-        let has_line_comment_in_header =
-            if let (Some(open), Some(close)) = (open_paren, spans.close_paren) {
-                self.has_line_comments_between(open + 1, close)
-            } else {
-                false
-            };
+        let has_line_comment_in_header = paren_interior
+            .is_some_and(|(open, close)| self.has_line_comments_between(open + 1, close));
         let has_own_line_comments =
             has_line_comment_in_header || self.for_header_has_own_line_comments(&spans);
 
-        // Extract span positions for use throughout this function
-        let init_start = spans.init_start;
-        let test_start = spans.test_start;
-        let update_start = spans.update_start;
-        let close_paren = spans.close_paren;
-
         let mut inner_parts = DocBuf::new();
 
-        // Leading comments before init (after open paren)
-        // Handles both own-line comments (with hardlines) and inline block comments
-        if let (Some(open), Some(first_start)) =
-            (open_paren, init_start.or(test_start).or(update_start))
-        {
-            let leading = self.build_for_clause_leading_comments(open + 1, first_start);
-            if !leading.is_empty() {
-                inner_parts.extend(leading);
-            }
+        // Every clause is laid out the same way: its region's comments, then the
+        // clause (or nothing, when the slot is empty), then its `;`. Each region is
+        // bounded by the header's own separators (`ForHeaderSpans::*_region_end`), so
+        // exactly one emitter owns each comment.
 
-            // Inline block comments before the first clause (on the same line)
-            // e.g., `for (/* before init */ let j = 0; ...)`
-            for comment in comments_to_emit_in_range(self.comments, open + 1, first_start) {
-                if self.comment_hugs_next(comment, first_start) {
-                    inner_parts.push(self.build_comment_doc(comment));
-                    inner_parts.push(d.text(" "));
-                }
+        // Init clause. Its separator is the header's own `softline` — `for (` and the
+        // first clause together when the header fits, the clause on its own line when
+        // it breaks — where the later clauses take the `line` that follows their `;`.
+        if let (Some(start), Some(init_start)) = (spans.init_region_start(), spans.init_start) {
+            self.push_for_clause_leading_section(
+                &mut inner_parts,
+                start,
+                init_start,
+                None,
+                d.softline(),
+            );
+        } else {
+            inner_parts.push(d.softline());
+            if let (Some(start), Some(region_end)) =
+                (spans.init_region_start(), spans.init_region_end())
+                && self.push_for_empty_slot_comments(&mut inner_parts, start, region_end)
+            {
+                // The `;` that terminates the slot starts a fresh line (or is
+                // space-separated when the header fits).
+                inner_parts.push(d.line());
             }
         }
-
-        // Find semicolon positions for proper comment boundary detection
-        // The semicolons in `for (init; test; update)` are at specific positions in source
-        // Anchored at the clause ends, not `stmt.span.start` — see `find_for_semicolons`.
-        // `open_paren` is only the fallback for an absent init, so a header with no open
-        // paren to find (already degenerate) keeps the previous keyword-relative behavior.
-        let (first_semi, second_semi) =
-            self.find_for_semicolons(stmt, open_paren.unwrap_or(stmt.span.start), close_paren);
-
-        // Init part
         if let Some(init) = &stmt.init {
-            if inner_parts.is_empty() {
-                inner_parts.push(d.softline());
-            }
             inner_parts.push(self.build_for_init_doc(init));
         }
         // The init clause→`;` gap comments bind to the `;` like a list separator.
         self.push_for_clause_semicolon(&mut inner_parts, init_end, first_semi);
 
-        // Inline comments after init (between semicolon and test, on same line as init)
-        if let (Some(semi), Some(end)) = (first_semi, init_end) {
-            let boundary = test_start
-                .or(update_start)
-                .or(close_paren)
-                .unwrap_or(stmt.span.end);
-            self.push_for_clause_same_line_comments(&mut inner_parts, semi + 1, boundary, end);
-        }
-
-        // Leading comments before test (own line, between first semi and test)
-        if let Some(start) = test_start {
+        // Test clause, same shape as init.
+        if let Some(start) = spans.test_start {
+            // Inline comments after init (after the `;`, on the same line as init)
+            if let (Some(semi), Some(end)) = (first_semi, init_end) {
+                self.push_for_clause_same_line_comments(&mut inner_parts, semi + 1, start, end);
+            }
             let search_start =
                 self.for_clause_search_start(stmt.span.start, open_paren, first_semi, init_end);
             self.push_for_clause_leading_section(
@@ -485,23 +543,22 @@ impl<'a> Printer<'a> {
                 search_start,
                 start,
                 init_end,
-                has_init,
+                d.line(),
             );
         } else {
-            // No test clause: still emit the post-`;` separator (a space when flat) so
-            // the header isn't collapsed to `;;`. Prettier keeps it whenever the header
-            // isn't fully empty — `for (x = 0; ;)`, not `for (x = 0;;)` (the fully-empty
-            // `for (;;)` is handled by the early return above). Covers init-only,
-            // update-only, and init+update alike.
+            // The post-`;` separator is emitted even with nothing to separate, so the
+            // header isn't collapsed to `;;` — prettier keeps it whenever the header
+            // isn't fully empty (`for (x = 0; ;)`, not `for (x = 0;;)`; the fully-empty
+            // `for (;;)` returned above).
             inner_parts.push(d.line());
-        }
-
-        // Test part
-        if let Some(test) = &stmt.test {
-            if !has_init && inner_parts.len() == 1 {
-                // Only ";" so far, add line (becomes space in flat mode, newline when breaking)
+            if let (Some(semi), Some(region_end)) = (first_semi, spans.test_region_end())
+                && self.push_for_empty_slot_comments(&mut inner_parts, semi + 1, region_end)
+            {
                 inner_parts.push(d.line());
             }
+        }
+
+        if let Some(test) = &stmt.test {
             // Wrap in group so binary chains (Ungrouped mode) have a tight parent
             // to evaluate fit against — matching how if/while use build_condition_group.
             // Without this, logical operators break with the for-header group (too wide)
@@ -512,14 +569,15 @@ impl<'a> Printer<'a> {
         // The test clause→`;` gap comments bind to the `;` like a list separator.
         self.push_for_clause_semicolon(&mut inner_parts, test_end, second_semi);
 
-        // Inline comments after test (between second semicolon and update, on same line as test)
-        if let (Some(semi), Some(end)) = (second_semi, test_end) {
-            let boundary = update_start.or(close_paren).unwrap_or(stmt.span.end);
-            self.push_for_clause_same_line_comments(&mut inner_parts, semi + 1, boundary, end);
-        }
-
-        // Leading comments before update (own line, between second semi and update)
-        if let Some(start) = update_start {
+        // Update clause. Unlike init and test, nothing terminates its region but the
+        // header's own closing `softline`/`hardline` — so the clause and the gap after
+        // it share one trailing region (`push_for_update_trailing_comments`, below),
+        // which is also the whole slot when the clause is absent.
+        if let Some(start) = spans.update_start {
+            // Inline comments after test (after the `;`, on the same line as test)
+            if let (Some(semi), Some(end)) = (second_semi, test_end) {
+                self.push_for_clause_same_line_comments(&mut inner_parts, semi + 1, start, end);
+            }
             let search_start = self.for_clause_search_start(
                 stmt.span.start,
                 open_paren,
@@ -531,26 +589,21 @@ impl<'a> Printer<'a> {
                 search_start,
                 start,
                 test_end,
-                true,
+                d.line(),
             );
         }
 
-        // Update part
         if let Some(update) = &stmt.update {
-            if !has_init && !has_test && inner_parts.len() == 2 {
-                // Only ";;" so far, add line (becomes space in flat mode)
-                inner_parts.push(d.line());
-            }
             inner_parts.push(self.build_for_update_doc(update));
-            // Inline comments after update (on same line as update expression)
-            if let Some(end) = update_end {
-                let boundary = close_paren.unwrap_or(stmt.span.end);
-                self.push_for_clause_same_line_comments(&mut inner_parts, end, boundary, end);
-            }
         }
-        // When the update clause is absent, nothing trails the last `;`: prettier
-        // 3.9 (#19188) dropped the space it used to add before `)` →
-        // `for (…; cond;)`, not `for (…; cond; )`.
+        if let Some(start) = spans.update_trailing_start() {
+            self.push_for_update_trailing_comments(
+                &mut inner_parts,
+                start,
+                spans.close_paren.unwrap_or(stmt.span.end),
+                update_end,
+            );
+        }
 
         let closing = if has_own_line_comments {
             d.hardline()
@@ -566,73 +619,28 @@ impl<'a> Printer<'a> {
         ]))
     }
 
-    /// Build leading comments for a for clause (comments on their own line before the clause)
-    ///
-    /// `search_start` - where to start looking for comments
-    /// `clause_start` - start of the next clause
-    /// `prev_expr_end` - end of the previous expression (to filter out inline comments)
-    fn build_for_clause_leading_comments_with_prev(
-        &self,
-        search_start: u32,
-        clause_start: u32,
-        prev_expr_end: Option<u32>,
-    ) -> DocBuf {
-        let d = self.d();
-        let mut parts = DocBuf::new();
-        for comment in comments_to_emit_in_range(self.comments, search_start, clause_start) {
-            // Only include comments that are:
-            // 1. NOT on the same line as the next clause
-            // 2. NOT on the same line as the previous expression (inline comments)
-            let is_own_line_before_clause = !self.is_same_line(comment.span.end, clause_start);
-            let is_own_line_after_prev =
-                prev_expr_end.is_none_or(|end| !self.is_same_line(end, comment.span.start));
-            if is_own_line_before_clause && is_own_line_after_prev {
-                parts.push(d.hardline());
-                parts.push(self.build_comment_doc(comment));
-            }
-        }
-        if !parts.is_empty() {
-            parts.push(d.hardline());
-        }
-        parts
-    }
-
-    /// Build leading comments for a for clause (comments on their own line before the clause)
-    fn build_for_clause_leading_comments(&self, start: u32, clause_start: u32) -> DocBuf {
-        self.build_for_clause_leading_comments_with_prev(start, clause_start, None)
-    }
-
     /// Check if for header has any own-line comments that force expansion
+    ///
+    /// One check per clause region, each bounded by the header's separators exactly as
+    /// the emitters are (`ForHeaderSpans::*_region_end`) — so a comment in an EMPTY
+    /// slot is seen here too, and the header it forces open is the one that prints it.
+    /// A region starts at the preceding clause's end when there is one (its `content`→`;`
+    /// gap belongs to it) and just past the preceding `;` otherwise.
     fn for_header_has_own_line_comments(&self, spans: &ForHeaderSpans) -> bool {
-        // Check for leading comments before first clause
-        if let (Some(open), Some(first)) = (
-            spans.open_paren,
-            spans.init_start.or(spans.test_start).or(spans.update_start),
-        ) {
-            let (_, own_line, _) = self.partition_comments_by_line(open + 1, first);
-            if !own_line.is_empty() {
-                return true;
-            }
-        }
+        let region = |start: Option<u32>, end: Option<u32>| {
+            start
+                .zip(end)
+                .is_some_and(|(start, end)| self.has_isolated_comment_between(start, end))
+        };
 
-        // Check between init and test (or init and update if no test)
-        let after_init = spans.test_start.or(spans.update_start);
-        if let (Some(end), Some(start)) = (spans.init_end, after_init) {
-            let (_, own_line, _) = self.partition_comments_by_line(end, start);
-            if !own_line.is_empty() {
-                return true;
-            }
-        }
-
-        // Check between test and update
-        if let (Some(end), Some(start)) = (spans.test_end, spans.update_start) {
-            let (_, own_line, _) = self.partition_comments_by_line(end, start);
-            if !own_line.is_empty() {
-                return true;
-            }
-        }
-
-        false
+        region(spans.init_region_start(), spans.init_region_end())
+            || region(spans.test_region_start(), spans.test_region_end())
+            || region(spans.update_region_start(), spans.update_region_end())
+            // The update→`)` gap, when an update clause splits it off from the region
+            // above. Scanned separately rather than by widening that region's end to
+            // `)`, so the update expression's own interior comments stay the
+            // expression printer's business.
+            || region(spans.update_end, spans.close_paren)
     }
 
     /// Emit a for-header clause terminator `;` with its content→`;` gap comments
@@ -710,6 +718,13 @@ impl<'a> Printer<'a> {
     /// Resolve where to start searching for a for-clause's leading comments: just
     /// past the preceding `;` if present, else the previous clause's end, else just
     /// inside the open paren (or past `for (` when the paren is unknown).
+    ///
+    /// The `;`-first preference is the deliberate mirror of
+    /// [`ForHeaderSpans::test_region_start`], which prefers the previous clause's
+    /// *end*. Two starts because two questions: a comment before the `;` belongs to the
+    /// separator gap and is emitted by [`Self::push_for_clause_semicolon`], so the
+    /// leading run must start *after* it or print it twice — while the break scan must
+    /// see it, since it is what forces the header open.
     fn for_clause_search_start(
         &self,
         stmt_start: u32,
@@ -749,36 +764,142 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Emit the lead-in before a for-clause: own-line leading comments (or a `line`
-    /// when there are none and `push_line_when_empty`), then any inline block
-    /// comment on the same line just before the clause.
+    /// Emit the lead-in before a for-clause: the leading-comment run, then any comment
+    /// hugging the clause on its own line (`for (let i = 0; /* before test */ i < 10;
+    /// …)`) — or just `separator` when the gap is empty.
+    ///
+    /// `separator` is what follows the preceding token when no comment takes that
+    /// place — the `line` after the `;` for the test and update clauses, the header's
+    /// opening `softline` for init.
+    ///
+    /// One pass **partitions** the gap, so every comment is printed exactly once and no
+    /// comment can fall between two filters that must agree: what shares the *previous*
+    /// clause's line was already emitted by
+    /// [`Self::push_for_clause_same_line_comments`], a **block** sharing the clause's
+    /// line hugs it, and everything else is the leading run. The run is the default arm
+    /// on purpose — a `//` normally can't share a line with what follows it, but the
+    /// line-break table records only `\n` while the lexer also ends a `//` at a lone
+    /// `\r`, so `// c\r i < 10` does read as same-line. Landing that in the hug arm
+    /// would emit `// c i < 10` and swallow the clause; the run gives it its own line.
+    ///
+    /// Only the break onto the run's first line belongs to this site; every separator
+    /// within the run, and the one before the clause, comes from the shared
+    /// [`Printer::push_leading_comment_run`], so this gap follows the same rules as
+    /// every other leading run: an author blank line between two comments survives and
+    /// a run glued onto one line stays glued. Hand-rolling a `hardline` per comment
+    /// lost both. The break onto the first line preserves the authored one: an
+    /// **own-line** first comment (every line comment, and a block with a newline
+    /// before it) starts a fresh line, while a block written on the `(`/`;` line takes
+    /// `separator` and stays there — which is what lets `for (/* a */ x = 0; …)` keep
+    /// one line, as prettier prints it.
+    ///
+    /// `search_start` - where to start looking for comments
+    /// `clause_start` - start of the next clause
+    /// `prev_end` - end of the previous expression (whose own trailing comments are
+    /// already emitted); `None` for the init clause, which no expression precedes
     fn push_for_clause_leading_section(
         &self,
         parts: &mut DocBuf,
         search_start: u32,
         clause_start: u32,
         prev_end: Option<u32>,
-        push_line_when_empty: bool,
+        separator: DocId,
     ) {
         let d = self.d();
-        let leading =
-            self.build_for_clause_leading_comments_with_prev(search_start, clause_start, prev_end);
-        if !leading.is_empty() {
-            parts.extend(leading);
-        } else if push_line_when_empty {
-            parts.push(d.line());
+        let mut run = CommentVec::new();
+        let mut hug = CommentVec::new();
+        for comment in comments_to_emit_in_range(self.comments, search_start, clause_start) {
+            if prev_end.is_some_and(|pe| self.is_same_line(pe, comment.span.start)) {
+                continue;
+            }
+            if comment.is_block && self.is_same_line(comment.span.end, clause_start) {
+                hug.push(comment);
+            } else {
+                run.push(comment);
+            }
         }
 
-        // Inline block comments on the same line just before the clause
-        // e.g., `for (let i = 0; /* before test */ i < 10; ...)`
-        for comment in comments_to_emit_in_range(self.comments, search_start, clause_start) {
-            if comment.is_block
-                && self.is_same_line(comment.span.end, clause_start)
-                && prev_end.is_none_or(|pe| !self.is_same_line(pe, comment.span.start))
-            {
-                parts.push(self.build_comment_doc(comment));
-                parts.push(d.text(" "));
+        match run.first() {
+            None => parts.push(separator),
+            Some(first) => {
+                parts.push(if self.is_own_line_comment(first) {
+                    d.hardline()
+                } else {
+                    separator
+                });
+                self.push_leading_comment_run(
+                    parts,
+                    run.iter().copied(),
+                    clause_start,
+                    LeadingGlue::Adjacent,
+                    d.empty(),
+                );
             }
+        }
+
+        for comment in hug {
+            parts.push(self.build_comment_doc(comment));
+            parts.push(d.text(" "));
+        }
+    }
+
+    /// Emit the comments an **absent** clause's slot holds, joined by `line`, and
+    /// report whether any were emitted.
+    ///
+    /// An empty slot has no other emitter — the clause whose leading run would print
+    /// them isn't there — so without this the comments are dropped. They stay in the
+    /// slot the author wrote them in, which is what the fully-empty header already
+    /// does (`build_for_empty_with_comments`) and a divergence from prettier, which
+    /// relocates them into the next clause or out of the header entirely (see the
+    /// `empty_slot_comment_prettier_divergence` fixture).
+    ///
+    /// Only the init and test slots come through here — the ones a `;` terminates. The
+    /// caller supplies the separators around the run: the header's leading `softline`
+    /// or the `line` after the preceding `;` before it, and a `line` after it so a `//`
+    /// can't swallow that `;`. The update slot has no terminator of its own and shares
+    /// the update clause's trailing region instead
+    /// ([`Self::push_for_update_trailing_comments`]).
+    fn push_for_empty_slot_comments(&self, parts: &mut DocBuf, start: u32, end: u32) -> bool {
+        let d = self.d();
+        let mut emitted = false;
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
+            if emitted {
+                parts.push(d.line());
+            }
+            parts.push(self.build_comment_doc(comment));
+            emitted = true;
+        }
+        emitted
+    }
+
+    /// Emit the update slot's trailing region — the update→`)` gap, and the whole
+    /// (empty) slot when there is no update clause. One region either way, since `)` is
+    /// all that closes it.
+    ///
+    /// The separator goes *before* each comment and none after: a comment sharing the
+    /// update's line trails it, every other one takes its own line, and the header's
+    /// own closing `softline`/`hardline` terminates the last. That is also why an
+    /// absent update clause with nothing to say adds no separator at all — prettier 3.9
+    /// (#19188) dropped the space it used to put before `)` → `for (…; cond;)`, not
+    /// `for (…; cond; )`.
+    ///
+    /// Only the trailing form used to be emitted, so an own-line comment here was
+    /// dropped.
+    fn push_for_update_trailing_comments(
+        &self,
+        parts: &mut DocBuf,
+        start: u32,
+        close: u32,
+        update_end: Option<u32>,
+    ) {
+        let d = self.d();
+        for comment in comments_to_emit_in_range(self.comments, start, close) {
+            if update_end.is_some_and(|end| self.is_same_line(end, comment.span.start)) {
+                parts.push(d.text(" "));
+            } else {
+                parts.push(d.line());
+            }
+            parts.push(self.build_comment_doc(comment));
         }
     }
 

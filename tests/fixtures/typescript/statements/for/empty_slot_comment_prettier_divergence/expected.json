@@ -1,0 +1,895 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 532,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment in the empty test slot stays in that slot",
+			"start": 10,
+			"end": 64,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 79,
+			"end": 84,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A comment in the empty update slot stays in that slot",
+			"start": 113,
+			"end": 169,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 189,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A comment in the empty init slot stays in that slot",
+			"start": 213,
+			"end": 267,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 277,
+			"end": 282,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An own-line block comment keeps its own line, like the line spelling",
+			"start": 316,
+			"end": 387,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 402,
+			"end": 410,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 2
+				},
+				"end": {
+					"line": 34,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An inline block comment stays on the header line",
+			"start": 439,
+			"end": 490,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 1
+				},
+				"end": {
+					"line": 41,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 500,
+			"end": 508,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 9
+				},
+				"end": {
+					"line": 42,
+					"column": 17
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 531,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 522,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 43,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 66,
+					"end": 110,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "Identifier",
+						"start": 74,
+						"end": 75,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 2
+							},
+							"end": {
+								"line": 4,
+								"column": 3
+							}
+						},
+						"name": "a"
+					},
+					"test": null,
+					"update": {
+						"type": "UpdateExpression",
+						"start": 91,
+						"end": 94,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 2
+							},
+							"end": {
+								"line": 7,
+								"column": 5
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 91,
+							"end": 92,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 3
+								}
+							},
+							"name": "c"
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 79,
+								"end": 84
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 98,
+						"end": 110,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 3
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 102,
+								"end": 107,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 102,
+									"end": 106,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 102,
+										"end": 104,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment in the empty test slot stays in that slot",
+							"start": 10,
+							"end": 64
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 171,
+					"end": 210,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "Identifier",
+						"start": 179,
+						"end": 180,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 2
+							},
+							"end": {
+								"line": 14,
+								"column": 3
+							}
+						},
+						"name": "a"
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 184,
+						"end": 185,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 2
+							},
+							"end": {
+								"line": 15,
+								"column": 3
+							}
+						},
+						"name": "b"
+					},
+					"update": null,
+					"body": {
+						"type": "BlockStatement",
+						"start": 198,
+						"end": 210,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 3
+							},
+							"end": {
+								"line": 19,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 202,
+								"end": 207,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 202,
+									"end": 206,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 202,
+										"end": 204,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 189,
+								"end": 194
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment in the empty update slot stays in that slot",
+							"start": 113,
+							"end": 169
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 269,
+					"end": 313,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 2
+						}
+					},
+					"init": null,
+					"test": {
+						"type": "Identifier",
+						"start": 289,
+						"end": 290,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 2
+							},
+							"end": {
+								"line": 25,
+								"column": 3
+							}
+						},
+						"name": "b",
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c3",
+								"start": 277,
+								"end": 282
+							}
+						]
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 294,
+						"end": 297,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 2
+							},
+							"end": {
+								"line": 26,
+								"column": 5
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 294,
+							"end": 295,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 2
+								},
+								"end": {
+									"line": 26,
+									"column": 3
+								}
+							},
+							"name": "c"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 301,
+						"end": 313,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 3
+							},
+							"end": {
+								"line": 29,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 305,
+								"end": 310,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 305,
+									"end": 309,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 2
+										},
+										"end": {
+											"line": 28,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 305,
+										"end": 307,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 2
+											},
+											"end": {
+												"line": 28,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment in the empty init slot stays in that slot",
+							"start": 213,
+							"end": 267
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 389,
+					"end": 436,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "Identifier",
+						"start": 397,
+						"end": 398,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 2
+							},
+							"end": {
+								"line": 33,
+								"column": 3
+							}
+						},
+						"name": "a"
+					},
+					"test": null,
+					"update": {
+						"type": "UpdateExpression",
+						"start": 417,
+						"end": 420,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 2
+							},
+							"end": {
+								"line": 36,
+								"column": 5
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 417,
+							"end": 418,
+							"loc": {
+								"start": {
+									"line": 36,
+									"column": 2
+								},
+								"end": {
+									"line": 36,
+									"column": 3
+								}
+							},
+							"name": "c"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c4 ",
+								"start": 402,
+								"end": 410
+							}
+						]
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 424,
+						"end": 436,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 3
+							},
+							"end": {
+								"line": 39,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 428,
+								"end": 433,
+								"loc": {
+									"start": {
+										"line": 38,
+										"column": 2
+									},
+									"end": {
+										"line": 38,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 428,
+									"end": 432,
+									"loc": {
+										"start": {
+											"line": 38,
+											"column": 2
+										},
+										"end": {
+											"line": 38,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 428,
+										"end": 430,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 2
+											},
+											"end": {
+												"line": 38,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line block comment keeps its own line, like the line spelling",
+							"start": 316,
+							"end": 387
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 492,
+					"end": 521,
+					"loc": {
+						"start": {
+							"line": 42,
+							"column": 1
+						},
+						"end": {
+							"line": 42,
+							"column": 30
+						}
+					},
+					"init": {
+						"type": "Identifier",
+						"start": 497,
+						"end": 498,
+						"loc": {
+							"start": {
+								"line": 42,
+								"column": 6
+							},
+							"end": {
+								"line": 42,
+								"column": 7
+							}
+						},
+						"name": "a"
+					},
+					"test": null,
+					"update": {
+						"type": "UpdateExpression",
+						"start": 511,
+						"end": 514,
+						"loc": {
+							"start": {
+								"line": 42,
+								"column": 20
+							},
+							"end": {
+								"line": 42,
+								"column": 23
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 511,
+							"end": 512,
+							"loc": {
+								"start": {
+									"line": 42,
+									"column": 20
+								},
+								"end": {
+									"line": 42,
+									"column": 21
+								}
+							},
+							"name": "c"
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c5 ",
+								"start": 500,
+								"end": 508
+							}
+						]
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 516,
+						"end": 521,
+						"loc": {
+							"start": {
+								"line": 42,
+								"column": 25
+							},
+							"end": {
+								"line": 42,
+								"column": 30
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 516,
+							"end": 520,
+							"loc": {
+								"start": {
+									"line": 42,
+									"column": 25
+								},
+								"end": {
+									"line": 42,
+									"column": 29
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 516,
+								"end": 518,
+								"loc": {
+									"start": {
+										"line": 42,
+										"column": 25
+									},
+									"end": {
+										"line": 42,
+										"column": 27
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An inline block comment stays on the header line",
+							"start": 439,
+							"end": 490
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

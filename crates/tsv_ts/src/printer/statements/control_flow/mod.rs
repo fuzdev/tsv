@@ -76,6 +76,25 @@ impl<'a> Printer<'a> {
         (inline_prev, own_line, inline_next)
     }
 
+    /// Whether any comment between two positions falls in the `own_line` bucket of
+    /// [`Self::partition_comments_by_line`] — the same classification, asked without
+    /// building the two buckets the caller would throw away. For a caller that only
+    /// needs the *existence* answer (a break gate) this short-circuits on the first hit
+    /// and allocates nothing.
+    ///
+    /// Isolation is judged by position for **every** comment kind, which is what
+    /// separates this from [`Printer::comment_isolated_from_neighbors`] (and the
+    /// param-list gate over it): there a line comment counts as own-line wherever it
+    /// sits, because it forces the list open either way. Here a `//` sharing the
+    /// previous clause's line is that clause's trailing comment and belongs to the
+    /// `inline_prev` bucket, so it must not answer yes.
+    fn has_isolated_comment_between(&self, prev_end: u32, next_start: u32) -> bool {
+        comments_to_emit_in_range(self.comments, prev_end, next_start).any(|comment| {
+            !self.is_same_line(prev_end, comment.span.start)
+                && !self.is_same_line(comment.span.end, next_start)
+        })
+    }
+
     /// Does a header→body gap's comment run force the body onto its own line?
     ///
     /// Two independent reasons, and the second is easy to miss: a **line** comment must

@@ -1,0 +1,358 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 256,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Each statement below is authored with a redundant paren pair around its",
+			"start": 10,
+			"end": 84,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " expression (see the variant); the paren is dropped and the comment inside",
+			"start": 86,
+			"end": 162,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " it leads the statement.",
+			"start": 164,
+			"end": 190,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 192,
+			"end": 197,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 204,
+			"end": 212,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 219,
+			"end": 224,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 236,
+			"end": 241,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 255,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 246,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 199,
+					"end": 201,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 199,
+						"end": 200,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"name": "a"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Each statement below is authored with a redundant paren pair around its",
+							"start": 10,
+							"end": 84
+						},
+						{
+							"type": "Line",
+							"value": " expression (see the variant); the paren is dropped and the comment inside",
+							"start": 86,
+							"end": 162
+						},
+						{
+							"type": "Line",
+							"value": " it leads the statement.",
+							"start": 164,
+							"end": 190
+						},
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 192,
+							"end": 197
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 214,
+					"end": 216,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 214,
+						"end": 215,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"name": "b"
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c2 ",
+							"start": 204,
+							"end": 212
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 226,
+					"end": 233,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 8
+						}
+					},
+					"expression": {
+						"type": "SequenceExpression",
+						"start": 227,
+						"end": 231,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 2
+							},
+							"end": {
+								"line": 12,
+								"column": 6
+							}
+						},
+						"expressions": [
+							{
+								"type": "Identifier",
+								"start": 227,
+								"end": 228,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 3
+									}
+								},
+								"name": "c"
+							},
+							{
+								"type": "Identifier",
+								"start": 230,
+								"end": 231,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 5
+									},
+									"end": {
+										"line": 12,
+										"column": 6
+									}
+								},
+								"name": "d"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c3",
+							"start": 219,
+							"end": 224
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 243,
+					"end": 245,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 243,
+						"end": 244,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 1
+							},
+							"end": {
+								"line": 15,
+								"column": 2
+							}
+						},
+						"name": "e"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c4",
+							"start": 236,
+							"end": 241
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

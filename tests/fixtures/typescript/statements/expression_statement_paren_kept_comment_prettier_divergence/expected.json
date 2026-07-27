@@ -1,0 +1,860 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 620,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A bare string keeps its parens so it isn't read as a directive; a comment",
+			"start": 10,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " after the `(` breaks the parens open and keeps its place inside them",
+			"start": 88,
+			"end": 159,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 165,
+			"end": 173,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An object at statement start keeps its parens",
+			"start": 188,
+			"end": 236,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 49
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 242,
+			"end": 250,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 272,
+			"end": 277,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A class or function expression at statement start keeps its parens too",
+			"start": 295,
+			"end": 368,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c4 ",
+			"start": 374,
+			"end": 382,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 404,
+			"end": 409,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 2
+				},
+				"end": {
+					"line": 27,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A run the author glued onto one line stays glued",
+			"start": 433,
+			"end": 484,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 490,
+			"end": 498,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 2
+				},
+				"end": {
+					"line": 33,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 499,
+			"end": 507,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 11
+				},
+				"end": {
+					"line": 33,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank line between two comments is preserved",
+			"start": 525,
+			"end": 574,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 1
+				},
+				"end": {
+					"line": 37,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 580,
+			"end": 585,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 2
+				},
+				"end": {
+					"line": 39,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 589,
+			"end": 594,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 2
+				},
+				"end": {
+					"line": 41,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 619,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 610,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 44,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 161,
+					"end": 185,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "Literal",
+						"start": 176,
+						"end": 181,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 6,
+								"column": 7
+							}
+						},
+						"value": "str",
+						"raw": "'str'",
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c1 ",
+								"start": 165,
+								"end": 173
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A bare string keeps its parens so it isn't read as a directive; a comment",
+							"start": 10,
+							"end": 86
+						},
+						{
+							"type": "Line",
+							"value": " after the `(` breaks the parens open and keeps its place inside them",
+							"start": 88,
+							"end": 159
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 238,
+					"end": 265,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "ObjectExpression",
+						"start": 253,
+						"end": 261,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 2
+							},
+							"end": {
+								"line": 12,
+								"column": 10
+							}
+						},
+						"properties": [
+							{
+								"type": "Property",
+								"start": 255,
+								"end": 259,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 4
+									},
+									"end": {
+										"line": 12,
+										"column": 8
+									}
+								},
+								"method": false,
+								"shorthand": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 255,
+									"end": 256,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 4
+										},
+										"end": {
+											"line": 12,
+											"column": 5
+										}
+									},
+									"name": "a"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 258,
+									"end": 259,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 7
+										},
+										"end": {
+											"line": 12,
+											"column": 8
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								},
+								"kind": "init"
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 242,
+								"end": 250
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An object at statement start keeps its parens",
+							"start": 188,
+							"end": 236
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 268,
+					"end": 292,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "ObjectExpression",
+						"start": 280,
+						"end": 288,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 2
+							},
+							"end": {
+								"line": 17,
+								"column": 10
+							}
+						},
+						"properties": [
+							{
+								"type": "Property",
+								"start": 282,
+								"end": 286,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 4
+									},
+									"end": {
+										"line": 17,
+										"column": 8
+									}
+								},
+								"method": false,
+								"shorthand": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 282,
+									"end": 283,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 4
+										},
+										"end": {
+											"line": 17,
+											"column": 5
+										}
+									},
+									"name": "b"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 285,
+									"end": 286,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 7
+										},
+										"end": {
+											"line": 17,
+											"column": 8
+										}
+									},
+									"value": 2,
+									"raw": "2"
+								},
+								"kind": "init"
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c3",
+								"start": 272,
+								"end": 277
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 370,
+					"end": 397,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "ClassExpression",
+						"start": 385,
+						"end": 393,
+						"loc": {
+							"start": {
+								"line": 23,
+								"column": 2
+							},
+							"end": {
+								"line": 23,
+								"column": 10
+							}
+						},
+						"id": null,
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 391,
+							"end": 393,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 8
+								},
+								"end": {
+									"line": 23,
+									"column": 10
+								}
+							},
+							"body": []
+						},
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c4 ",
+								"start": 374,
+								"end": 382
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A class or function expression at statement start keeps its parens too",
+							"start": 295,
+							"end": 368
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 400,
+					"end": 430,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "FunctionExpression",
+						"start": 412,
+						"end": 426,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 2
+							},
+							"end": {
+								"line": 28,
+								"column": 16
+							}
+						},
+						"id": null,
+						"expression": false,
+						"generator": false,
+						"async": false,
+						"params": [],
+						"body": {
+							"type": "BlockStatement",
+							"start": 424,
+							"end": 426,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 14
+								},
+								"end": {
+									"line": 28,
+									"column": 16
+								}
+							},
+							"body": []
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c5",
+								"start": 404,
+								"end": 409
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 486,
+					"end": 522,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 35,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "ObjectExpression",
+						"start": 510,
+						"end": 518,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 2
+							},
+							"end": {
+								"line": 34,
+								"column": 10
+							}
+						},
+						"properties": [
+							{
+								"type": "Property",
+								"start": 512,
+								"end": 516,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 4
+									},
+									"end": {
+										"line": 34,
+										"column": 8
+									}
+								},
+								"method": false,
+								"shorthand": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 512,
+									"end": 513,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 4
+										},
+										"end": {
+											"line": 34,
+											"column": 5
+										}
+									},
+									"name": "c"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 515,
+									"end": 516,
+									"loc": {
+										"start": {
+											"line": 34,
+											"column": 7
+										},
+										"end": {
+											"line": 34,
+											"column": 8
+										}
+									},
+									"value": 3,
+									"raw": "3"
+								},
+								"kind": "init"
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c6 ",
+								"start": 490,
+								"end": 498
+							},
+							{
+								"type": "Block",
+								"value": " c7 ",
+								"start": 499,
+								"end": 507
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run the author glued onto one line stays glued",
+							"start": 433,
+							"end": 484
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 576,
+					"end": 609,
+					"loc": {
+						"start": {
+							"line": 38,
+							"column": 1
+						},
+						"end": {
+							"line": 43,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "ObjectExpression",
+						"start": 597,
+						"end": 605,
+						"loc": {
+							"start": {
+								"line": 42,
+								"column": 2
+							},
+							"end": {
+								"line": 42,
+								"column": 10
+							}
+						},
+						"properties": [
+							{
+								"type": "Property",
+								"start": 599,
+								"end": 603,
+								"loc": {
+									"start": {
+										"line": 42,
+										"column": 4
+									},
+									"end": {
+										"line": 42,
+										"column": 8
+									}
+								},
+								"method": false,
+								"shorthand": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 599,
+									"end": 600,
+									"loc": {
+										"start": {
+											"line": 42,
+											"column": 4
+										},
+										"end": {
+											"line": 42,
+											"column": 5
+										}
+									},
+									"name": "d"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 602,
+									"end": 603,
+									"loc": {
+										"start": {
+											"line": 42,
+											"column": 7
+										},
+										"end": {
+											"line": 42,
+											"column": 8
+										}
+									},
+									"value": 4,
+									"raw": "4"
+								},
+								"kind": "init"
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c8",
+								"start": 580,
+								"end": 585
+							},
+							{
+								"type": "Line",
+								"value": " c9",
+								"start": 589,
+								"end": 594
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank line between two comments is preserved",
+							"start": 525,
+							"end": 574
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

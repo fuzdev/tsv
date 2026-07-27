@@ -18,6 +18,7 @@ mod variable;
 // Re-export for submodules to use `super::Printer` instead of `super::super::Printer`
 pub(super) use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 
+use super::LeadingGlue;
 use super::ParenContext;
 use super::class_expr_has_decorators;
 use super::expressions::literals::format_directive;
@@ -162,6 +163,19 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Whether an expression statement opens with a grouping `(` the print may keep
+    /// or drop — the precondition for claiming the comments between it and the
+    /// expression.
+    ///
+    /// `span.start < expr_start` alone does NOT prove one: the Svelte compiler prints
+    /// a **synthesized** program through `format_canonical`, where a statement's span
+    /// points into a generated buffer and need not open at its own expression. Reading
+    /// that as a paren claimed comments the statement-list gap owns, and printed them
+    /// twice. The byte settles it.
+    fn statement_opens_with_paren(&self, span: Span, expr_start: u32) -> bool {
+        span.start < expr_start && self.source.as_bytes().get(span.start as usize) == Some(&b'(')
+    }
+
     /// Build a Doc for an expression statement
     ///
     /// Handles parentheses for object patterns and the "avoid becoming a
@@ -191,25 +205,25 @@ impl<'a> Printer<'a> {
                 .needs_parens(&stmt.expression, ParenContext::ExpressionStatement)
                 || self.needs_avoid_directive_parens(stmt, in_program_or_block);
 
-            // An own-line comment between a source `(` and the expression
-            // (`(// c⏎ expr)` / `(/* c */⏎ expr)` — e.g. a bare parenthesized
-            // decorated class expression) is preserved inside the parens, breaking
-            // them open; the flat `(`/`)` wrap below would drop it. Own-line = a line
-            // comment (never inline) or a block comment with a newline before it; a
-            // same-line block comment (`(/* c */ expr)`) is a separate, rarer case
-            // (inline) left to the default flow. `stmt.span.start < expr_start` means
-            // a real source `(` precedes the expression. prettier hoists the comment
-            // before `(` — a divergence (`decorated_expr_open_paren_comment`).
-            // TODO: a same-line block comment after `(` is still dropped here.
+            // A comment between a source `(` and the expression (`(// c⏎ expr)` /
+            // `(/* c */⏎ expr)` — e.g. a bare parenthesized decorated class
+            // expression) is preserved inside the parens, breaking them open; the flat
+            // `(`/`)` wrap below would drop it, since there is nowhere on one line for
+            // a comment the expression doesn't own to go. prettier hoists the comment
+            // before `(` — a divergence (`expression_statement_paren_kept_comment`,
+            // `decorated_expr_open_paren_comment`).
             let expr_start = stmt.expression.span().start;
+            let source_paren = self.statement_opens_with_paren(stmt.span, expr_start);
+            // The `(`→expression gap, resolved in one place so the gate below and the two
+            // emitters that can claim it cannot read different ranges.
+            let paren_gap =
+                || comments_to_emit_in_range(self.comments, stmt.span.start + 1, expr_start);
             // Deliberately **to emit**, not on-page: this branch also *prints* the comments it
-            // finds, and the non-owned path here already drops them (`(/* c */ fn());` loses the
-            // comment — the ledger reports it). Moving it to the layout axis before that is
-            // fixed would route an owned comment into a path that loses it.
-            let paren_open_own_line_comment = needs_parens
-                && stmt.span.start < expr_start
-                && comments_to_emit_in_range(self.comments, stmt.span.start + 1, expr_start)
-                    .any(|c| self.is_own_line_comment(c));
+            // finds. A block glued to the *expression* is owned by it, rides inside its doc and
+            // is skipped here — which is what keeps `(/* c */ expr)` flat.
+            let paren_open_comments = needs_parens
+                && source_paren
+                && self.has_comments_to_emit_between(stmt.span.start + 1, expr_start);
 
             // When the whole expression isn't wrapped, a nested leftmost
             // object/function/class still needs parens around itself
@@ -258,14 +272,19 @@ impl<'a> Printer<'a> {
                     Expression::ClassExpression(c) if class_expr_has_decorators(c)
                 );
 
-            if paren_open_own_line_comment {
+            if paren_open_comments {
+                // The parens break open around the run. Only the first `hardline` is
+                // the site's own — the run's internal separators come from the shared
+                // leading-comment emitter, so a run the author glued onto one line
+                // stays glued and a blank line between two comments survives.
                 let mut inner: DocBuf = smallvec![d.hardline()];
-                for comment in
-                    comments_to_emit_in_range(self.comments, stmt.span.start + 1, expr_start)
-                {
-                    inner.push(self.build_comment_doc(comment));
-                    inner.push(d.hardline());
-                }
+                self.push_leading_comment_run(
+                    &mut inner,
+                    paren_gap(),
+                    expr_start,
+                    LeadingGlue::Adjacent,
+                    d.empty(),
+                );
                 inner.push(expr_doc);
                 parts.push(d.text("("));
                 parts.push(d.indent(d.concat(&inner)));
@@ -276,6 +295,22 @@ impl<'a> Printer<'a> {
             } else {
                 if needs_parens {
                     parts.push(d.text("("));
+                } else if source_paren {
+                    // The statement had a source `(` that this print DROPS as
+                    // redundant. A comment inside it then has no emitter left: the
+                    // statement-list gap ends at the `(`, and the expression's own doc
+                    // starts past the comment — so it must be emitted here or it is
+                    // lost. It leads the statement, which is where prettier hoists it
+                    // too. (An owned/glued comment rides inside `expr_doc` and is
+                    // skipped by the emit iterator; the paren-KEPT cases are the two
+                    // branches above.)
+                    self.push_leading_comment_run(
+                        &mut parts,
+                        paren_gap(),
+                        expr_start,
+                        LeadingGlue::Adjacent,
+                        d.empty(),
+                    );
                 }
                 parts.push(expr_doc);
                 if needs_parens {
