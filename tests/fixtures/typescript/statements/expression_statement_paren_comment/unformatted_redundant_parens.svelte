@@ -17,4 +17,19 @@
 	((
 	// c4
 	e));
+
+	// A block glued to the expression leads it inline and stays on its line
+	(/* c5 */ f);
+
+	// A run the author glued onto one line stays glued
+	(
+	/* c6 */ /* c7 */
+	g);
+
+	// A blank line between two comments is preserved
+	(
+	// c8
+
+	// c9
+	h);
 </script>

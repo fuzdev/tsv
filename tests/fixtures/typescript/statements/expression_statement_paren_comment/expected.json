@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 256,
+	"end": 492,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -121,24 +121,152 @@
 					"column": 6
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A block glued to the expression leads it inline and stays on its line",
+			"start": 248,
+			"end": 320,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c5 ",
+			"start": 322,
+			"end": 330,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A run the author glued onto one line stays glued",
+			"start": 336,
+			"end": 387,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 52
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c6 ",
+			"start": 389,
+			"end": 397,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c7 ",
+			"start": 398,
+			"end": 406,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 10
+				},
+				"end": {
+					"line": 21,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A blank line between two comments is preserved",
+			"start": 413,
+			"end": 462,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c8",
+			"start": 464,
+			"end": 469,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c9",
+			"start": 472,
+			"end": 477,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 6
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 255,
+		"end": 491,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 246,
+			"end": 482,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 16,
+					"line": 29,
 					"column": 9
 				}
 			},
@@ -347,6 +475,153 @@
 							"value": " c4",
 							"start": 236,
 							"end": 241
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 331,
+					"end": 333,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 10
+						},
+						"end": {
+							"line": 18,
+							"column": 12
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 331,
+						"end": 332,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 10
+							},
+							"end": {
+								"line": 18,
+								"column": 11
+							}
+						},
+						"name": "f"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block glued to the expression leads it inline and stays on its line",
+							"start": 248,
+							"end": 320
+						},
+						{
+							"type": "Block",
+							"value": " c5 ",
+							"start": 322,
+							"end": 330
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 408,
+					"end": 410,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 408,
+						"end": 409,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 1
+							},
+							"end": {
+								"line": 22,
+								"column": 2
+							}
+						},
+						"name": "g"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A run the author glued onto one line stays glued",
+							"start": 336,
+							"end": 387
+						},
+						{
+							"type": "Block",
+							"value": " c6 ",
+							"start": 389,
+							"end": 397
+						},
+						{
+							"type": "Block",
+							"value": " c7 ",
+							"start": 398,
+							"end": 406
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 479,
+					"end": 481,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "Identifier",
+						"start": 479,
+						"end": 480,
+						"loc": {
+							"start": {
+								"line": 28,
+								"column": 1
+							},
+							"end": {
+								"line": 28,
+								"column": 2
+							}
+						},
+						"name": "h"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A blank line between two comments is preserved",
+							"start": 413,
+							"end": 462
+						},
+						{
+							"type": "Line",
+							"value": " c8",
+							"start": 464,
+							"end": 469
+						},
+						{
+							"type": "Line",
+							"value": " c9",
+							"start": 472,
+							"end": 477
 						}
 					]
 				}

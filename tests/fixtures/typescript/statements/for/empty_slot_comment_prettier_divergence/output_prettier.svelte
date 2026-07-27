@@ -38,4 +38,11 @@
 
 	// An inline block comment stays on the header line
 	for (a /* c5 */; ; c++) fn();
+
+	// The init slot's inline form, likewise
+	for (; /* c6 */ b; c++) fn();
+
+	// The update slot's inline form. Its separator sits before the comment, not
+	// after: `)` closes the slot, so nothing pads the gap ahead of it
+	for (a; b /* c7 */;) fn();
 </script>

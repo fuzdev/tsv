@@ -16,6 +16,11 @@ documents the missing condition, not the update expression prettier binds it to.
 Relocating across a `;` changes that association, and the empty-update relocation
 strands the comment outside the construct entirely.
 
+The slot's separator is not symmetric, and the inline cases pin that: the init and
+test slots are terminated by a `;`, so a separator follows their comment to keep a
+`//` from swallowing it, while the update slot is closed by `)` and takes its
+separator before the comment instead — nothing pads the gap ahead of the `)`.
+
 This is the partially-empty header's form of the rule the fully-empty header already
 follows ([empty_clauses_comment](../empty_clauses_comment_prettier_divergence/),
 [empty_clauses_block_comment](../empty_clauses_block_comment_prettier_divergence/)),

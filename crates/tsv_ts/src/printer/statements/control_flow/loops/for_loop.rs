@@ -82,6 +82,23 @@ impl ForHeaderSpans {
     }
 }
 
+/// The C-style `for` header's own parens, located once per statement.
+///
+/// [`Printer::matching_close_paren`] is a depth-tracked scan across the whole header,
+/// so locating the pair once and threading it is the difference between one such scan
+/// per `for` and three — the header-end probe, the header builder, and the empty-header
+/// builder each used to redo it. Every consumer has to agree on the same pair anyway:
+/// the `)` is what bounds the header's comment regions, so two callers disagreeing
+/// about it would bound them differently.
+///
+/// Both fields are `Option` because a degenerate header may have no locatable paren;
+/// each consumer already carries its own fallback for that.
+#[derive(Clone, Copy)]
+struct ForParens {
+    open: Option<u32>,
+    close: Option<u32>,
+}
+
 /// Source positions for a for-in/for-of header
 ///
 /// Groups the resolved header positions to avoid passing many `u32` parameters
@@ -224,12 +241,26 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Locate a C-style `for` header's parens. See [`ForParens`] — call this once per
+    /// statement and thread the result.
+    fn for_parens(&self, stmt_start: u32) -> ForParens {
+        let open = self.find_open_paren_after(stmt_start);
+        ForParens {
+            open,
+            close: open.and_then(|p| self.matching_close_paren(p)),
+        }
+    }
+
     /// Build a complete for statement doc including the body
     ///
     /// This includes the body in the doc so the width calculation accounts for ` {`.
-    fn build_for_statement_with_body_doc(&self, stmt: &internal::ForStatement<'_>) -> DocId {
+    fn build_for_statement_with_body_doc(
+        &self,
+        stmt: &internal::ForStatement<'_>,
+        parens: ForParens,
+    ) -> DocId {
         let d = self.d();
-        let header_doc = self.build_for_header_doc(stmt);
+        let header_doc = self.build_for_header_doc(stmt, parens, None);
         if matches!(stmt.body, Statement::EmptyStatement(_)) {
             // No space before empty statement: `for (...);`
             d.concat(&[header_doc, self.build_statement_doc(stmt.body, false)])
@@ -255,7 +286,11 @@ impl<'a> Printer<'a> {
     }
 
     /// Get the end position of a for loop header (position after the closing paren)
-    fn get_for_header_end(&self, stmt: &internal::ForStatement<'_>) -> u32 {
+    ///
+    /// `parens.close` is depth-tracked, so redundant parens or parens inside a clause
+    /// don't yield a premature match; the last clause's end is the fallback when the
+    /// header has no locatable `)`.
+    fn get_for_header_end(&self, stmt: &internal::ForStatement<'_>, parens: ForParens) -> u32 {
         // Find the last expression end
         let last_expr_end = stmt
             .update
@@ -264,29 +299,8 @@ impl<'a> Printer<'a> {
             .or_else(|| stmt.test.as_ref().map(|t| t.span().end))
             .or_else(|| stmt.init.as_ref().map(|i| self.get_for_init_span_end(i)));
 
-        // Find the for header's closing paren via its open paren (depth-tracked, so
-        // redundant parens or parens inside a clause don't yield a premature match).
         let search_start = last_expr_end.unwrap_or(stmt.span.start + "for ".len() as u32);
-        self.find_open_paren_after(stmt.span.start)
-            .and_then(|open| self.matching_close_paren(open))
-            .map_or(search_start, |p| p + 1)
-    }
-
-    /// Build a Doc for the for loop header with wrapping support
-    ///
-    /// Handles comments in each clause position:
-    /// ```js
-    /// for (
-    ///     // before init
-    ///     let i = 0; // inline with init
-    ///     // before test
-    ///     i < 10; // inline with test
-    ///     // before update
-    ///     i++ // inline with update
-    /// ) {
-    /// ```
-    fn build_for_header_doc(&self, stmt: &internal::ForStatement<'_>) -> DocId {
-        self.build_for_header_doc_impl(stmt, None)
+        parens.close.map_or(search_start, |p| p + 1)
     }
 
     /// Build doc for an empty `for (;;)` header that has comments inside the parens.
@@ -311,13 +325,11 @@ impl<'a> Printer<'a> {
     fn build_for_empty_with_comments(
         &self,
         stmt: &internal::ForStatement<'_>,
+        parens: ForParens,
         for_open: DocId,
     ) -> DocId {
         let d = self.d();
-        let Some(open) = self.find_open_paren_after(stmt.span.start) else {
-            return d.concat(&[for_open, d.text(";;)")]);
-        };
-        let Some(close) = self.matching_close_paren(open) else {
+        let (Some(open), Some(close)) = (parens.open, parens.close) else {
             return d.concat(&[for_open, d.text(";;)")]);
         };
         let (Some(s1), Some(s2)) = self.find_for_semicolons(stmt, open, Some(close)) else {
@@ -411,9 +423,26 @@ impl<'a> Printer<'a> {
         cur.prev_block = false;
     }
 
-    fn build_for_header_doc_impl(
+    /// Build a Doc for the for loop header with wrapping support
+    ///
+    /// Handles comments in each clause position:
+    /// ```js
+    /// for (
+    ///     // before init
+    ///     let i = 0; // inline with init
+    ///     // before test
+    ///     i < 10; // inline with test
+    ///     // before update
+    ///     i++ // inline with update
+    /// ) {
+    /// ```
+    ///
+    /// `keyword_comments` is any `for`→`(` gap comment, already built by the caller;
+    /// `parens` is the header's paren pair, located once per statement ([`ForParens`]).
+    fn build_for_header_doc(
         &self,
         stmt: &internal::ForStatement<'_>,
+        parens: ForParens,
         keyword_comments: Option<DocId>,
     ) -> DocId {
         let d = self.d();
@@ -430,8 +459,10 @@ impl<'a> Printer<'a> {
             d.text("for (")
         };
 
-        let open_paren = self.find_open_paren_after(stmt.span.start);
-        let close_paren_approx = open_paren.and_then(|p| self.matching_close_paren(p));
+        let ForParens {
+            open: open_paren,
+            close: close_paren_approx,
+        } = parens;
         // The whole paren interior, for the two header-wide gates below. `None` for a
         // degenerate header with no locatable parens, where neither gate has a range to
         // ask about.
@@ -449,7 +480,7 @@ impl<'a> Printer<'a> {
         if !has_any && has_comments_inside {
             // Empty for (;;) with comments — preserve them inline where authored
             // (divergence from prettier; see empty_clauses*_comment_prettier_divergence).
-            return self.build_for_empty_with_comments(stmt, for_open);
+            return self.build_for_empty_with_comments(stmt, parens, for_open);
         }
 
         // Determine spans for each part
@@ -481,8 +512,8 @@ impl<'a> Printer<'a> {
             update_end,
             first_semi,
             second_semi,
-            // Reuse the close-paren already found above (`matching_close_paren` is a
-            // depth-tracked scan over the whole header) instead of recomputing it.
+            // The statement's own paren pair, threaded in rather than rescanned — see
+            // [`ForParens`].
             close_paren: close_paren_approx,
         };
 
@@ -1446,12 +1477,13 @@ impl<'a> Printer<'a> {
         // Preserve comments between `for` keyword and `(` in place:
         //   for/* c */(;;){} → for /* c */ (;;) {}
         let for_keyword_end = stmt.span.start + "for".len() as u32;
-        let open_paren = self.find_open_paren_after(stmt.span.start);
-        let keyword_comments = self.build_keyword_paren_comments(for_keyword_end, open_paren);
+        // Located once here and threaded through every consumer — see `ForParens`.
+        let parens = self.for_parens(stmt.span.start);
+        let keyword_comments = self.build_keyword_paren_comments(for_keyword_end, parens.open);
         let has_pre_paren_comments = keyword_comments.is_some();
 
         // Check for comments between ) and body (Prettier 3.7 #18108)
-        let header_end = self.get_for_header_end(stmt);
+        let header_end = self.get_for_header_end(stmt, parens);
         let body_start = stmt.body.span().start;
 
         if has_pre_paren_comments || self.has_comments_to_emit_between(header_end, body_start) {
@@ -1459,9 +1491,9 @@ impl<'a> Printer<'a> {
             // body does NOT force the header to break — the header decides its own
             // flat/break on its own width (prettier 3.9 collapses `for (i; c; u)` and
             // trails the comment after `)`). Only comments *inside* the parens (handled
-            // in `build_for_header_doc_impl`) or overflow expand the header.
+            // in `build_for_header_doc`) or overflow expand the header.
             let mut parts: DocBuf =
-                smallvec![self.build_for_header_doc_impl(stmt, keyword_comments)];
+                smallvec![self.build_for_header_doc(stmt, parens, keyword_comments)];
 
             // Post-header comments. Non-block bodies use Prettier's `adjustClause`
             // (`indent([line, body])`) wrapped with the header in an outer group, so
@@ -1533,7 +1565,7 @@ impl<'a> Printer<'a> {
             }
         } else {
             // Delegate to the sophisticated version that handles all edge cases
-            self.build_for_statement_with_body_doc(stmt)
+            self.build_for_statement_with_body_doc(stmt, parens)
         }
     }
 
