@@ -9,6 +9,7 @@
 
 use super::assignment::RhsCommentInfo;
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
+use crate::printer::layout::hang_after_operator;
 use crate::printer::{
     CommentVec, ParenContext, PatternContext, Printer, object_pattern_should_expand,
 };
@@ -152,6 +153,9 @@ impl<'a> Printer<'a> {
         // source newline (`x = /* c */⏎v` → `x = /* c */ v`), matching prettier's
         // assignment layout.
         let rhs_comments = self.build_rhs_comments_glued_opt(effective_rhs_start, rhs_comment_end);
+        // The `=`→RHS head: an own-line directive there freezes the whole RHS — including a
+        // nested assignment, so a chain freezes from the directive down.
+        let rhs_frozen = self.value_head_frozen_span(effective_rhs_start, assign.right.span());
 
         // For 2-segment chains at top level (a = b = value), use unified assignment layout.
         // Prettier only uses chain formatting for 3+ segments (assignment.js:113-125).
@@ -164,7 +168,7 @@ impl<'a> Printer<'a> {
             let inner_rhs_is_assignment =
                 matches!(inner.right, Expression::AssignmentExpression(_));
             if !inner_rhs_is_assignment {
-                return self.build_assignment_layout_with_line_comment(
+                return self.build_assignment_layout(
                     left_doc,
                     assign.operator.as_str_with_leading_space(),
                     assign.right,
@@ -173,6 +177,7 @@ impl<'a> Printer<'a> {
                         comments: rhs_comments,
                         has_line_comment: rhs_has_line_comment,
                         boundary: Some(assign.span.end),
+                        frozen: rhs_frozen,
                     },
                 );
             }
@@ -184,7 +189,7 @@ impl<'a> Printer<'a> {
             && !matches!(assign.left, Expression::ObjectPattern(_))
             && !rhs_is_assignment
         {
-            return self.build_assignment_layout_with_line_comment(
+            return self.build_assignment_layout(
                 left_doc,
                 assign.operator.as_str_with_leading_space(),
                 assign.right,
@@ -193,12 +198,15 @@ impl<'a> Printer<'a> {
                     comments: rhs_comments,
                     has_line_comment: rhs_has_line_comment,
                     boundary: Some(assign.span.end),
+                    frozen: rhs_frozen,
                 },
             );
         }
 
         // Build right doc for paths that handle layout directly
-        let right_doc = if let Expression::AssignmentExpression(rhs_assign) = assign.right {
+        let right_doc = if let Some(frozen) = rhs_frozen {
+            self.build_frozen_expression_doc(assign.right, frozen)
+        } else if let Expression::AssignmentExpression(rhs_assign) = assign.right {
             self.build_assignment_doc_with_context(rhs_assign, AssignmentContext::Chain)
         } else {
             self.build_expression_doc_with_paren_comments(assign.right, assign.span.end)
@@ -228,13 +236,24 @@ impl<'a> Printer<'a> {
                 segment,
             )
         } else if matches!(assign.left, Expression::ObjectPattern(_)) {
-            // Object patterns on LHS - never break after operator
-            d.concat(&[
-                left_doc,
-                d.text(assign.operator.as_str_with_leading_space()),
-                d.text(" "),
-                right_doc,
-            ])
+            // Object patterns on LHS - never break after operator, EXCEPT under an honored
+            // directive: gluing the run to the operator would leave the directive trailing
+            // `=`, an inert placement, so the freeze would die on the second pass. Hang the
+            // value instead, as every other assignment host does.
+            if rhs_frozen.is_some() {
+                self.build_frozen_assignment_shape(
+                    left_doc,
+                    assign.operator.as_str_with_leading_space(),
+                    right_doc,
+                )
+            } else {
+                d.concat(&[
+                    left_doc,
+                    d.text(assign.operator.as_str_with_leading_space()),
+                    d.text(" "),
+                    right_doc,
+                ])
+            }
         } else {
             // RHS is a chain - group + indent (chain formatting from recursive call)
             d.group(d.concat(&[
@@ -1153,27 +1172,50 @@ impl<'a> Printer<'a> {
             " = "
         };
 
-        // A block comment after `=` inlines onto the value (`a = /* c */ b`),
-        // collapsing an own-line authoring; a line comment forces the value onto
-        // the next line (it can't share the `//` line). Prettier instead moves a
-        // block before `=` (`a /* c */ = b`) or floats a line past the value
-        // (`a = b // c`) — see param_default_*_comment_prettier_divergence.
-        let rhs_doc = self.build_expression_doc(pattern.right);
-        let rhs_doc = if self.needs_parens(pattern.right, ParenContext::DefaultValue) {
-            d.parens(rhs_doc)
+        // The `=`→value head: an own-line directive there freezes the whole default.
+        // The directive also keeps its own line, unlike the ordinary own-line comment
+        // below — the trailing placement that emitter produces is inert under the
+        // placement floor, so following it would lose the freeze on the second pass.
+        // Same rule, same reason, as at the declaration headers.
+        //
+        // Rides the zero-comment gate above: a directive is a comment, so a comment-free
+        // gap provably holds none — and `eq_pos` is a real `=` position only there.
+        let frozen = gap_has_comments
+            .then(|| self.value_head_frozen_span(eq_pos + 1, pattern.right.span()))
+            .flatten();
+        if let Some(frozen) = frozen {
+            let frozen_doc =
+                self.build_frozen_value_doc(pattern.right, frozen, ParenContext::DefaultValue);
+            let rhs = match self.build_rhs_comments_opt(eq_pos + 1, rhs_start) {
+                Some(comments_doc) => d.concat(&[comments_doc, frozen_doc]),
+                None => frozen_doc,
+            };
+            tail.push(d.text(if pre_eq_line_break { "=" } else { " =" }));
+            tail.push(hang_after_operator(d, rhs));
         } else {
-            rhs_doc
-        };
-        let value_doc =
-            if gap_has_comments && self.has_comments_to_emit_between(eq_pos + 1, rhs_start) {
+            // A block comment after `=` inlines onto the value (`a = /* c */ b`),
+            // collapsing an own-line authoring; a line comment forces the value onto
+            // the next line (it can't share the `//` line). Prettier instead moves a
+            // block before `=` (`a /* c */ = b`) or floats a line past the value
+            // (`a = b // c`) — see param_default_*_comment_prettier_divergence.
+            let rhs_doc = self.build_expression_doc(pattern.right);
+            let rhs_doc = if self.needs_parens(pattern.right, ParenContext::DefaultValue) {
+                d.parens(rhs_doc)
+            } else {
+                rhs_doc
+            };
+            let value_doc = if gap_has_comments
+                && self.has_comments_to_emit_between(eq_pos + 1, rhs_start)
+            {
                 let comments_doc = self.build_trailing_comments_hang_next(eq_pos + 1, rhs_start);
                 d.concat(&[comments_doc, rhs_doc])
             } else {
                 rhs_doc
             };
 
-        tail.push(d.text(eq_text));
-        tail.push(value_doc);
+            tail.push(d.text(eq_text));
+            tail.push(value_doc);
+        }
         let tail_doc = d.concat(&tail);
         // A pre-`=` line comment broke `= value` onto its own line; indent it so it
         // reads as this binding's continuation, not a sibling element.

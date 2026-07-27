@@ -16,7 +16,7 @@ use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::doc::{DocBuf, GroupId};
-use tsv_lang::{INDENT, PRINT_WIDTH};
+use tsv_lang::{INDENT, PRINT_WIDTH, Span};
 
 /// Build the fluid assignment layout: break after `=` only when the full line
 /// exceeds print_width. Uses indentIfBreak so the RHS is evaluated independently.
@@ -43,7 +43,21 @@ impl<'a> Printer<'a> {
     /// statement-level `const x = b in c` lexically under a for-header init (e.g. in a
     /// nested function body) parenthesizes the `in` like every other position there.
     /// (A for-header's *own* declarator is built in `build_for_init_doc`, not here.)
-    fn build_init_value_doc(&self, init: &Expression<'_>, boundary_end: u32) -> DocId {
+    ///
+    /// `frozen` is the value-head freeze this position resolved (`=`→initializer, per
+    /// [`Printer::value_head_frozen_span`]): the whole initializer prints verbatim, with
+    /// the same clarity parens the ordinary path would supply — the position's own
+    /// [`ParenContext`], so the two forms cannot disagree about the shell. Every layout
+    /// branch below routes its value through here, so the freeze is stated once.
+    fn build_init_value_doc(
+        &self,
+        init: &Expression<'_>,
+        boundary_end: u32,
+        frozen: Option<Span>,
+    ) -> DocId {
+        if let Some(frozen) = frozen {
+            return self.build_frozen_value_doc(init, frozen, ParenContext::VariableInit);
+        }
         let inner = self.build_expression_doc_with_paren_comments(init, boundary_end);
         if needs_parens(init, ParenContext::VariableInit, self.in_for_init.get())
             && !self.init_keeps_own_parens(init, boundary_end)
@@ -372,6 +386,15 @@ impl<'a> Printer<'a> {
                         (init_start, false, false)
                     };
 
+                // The `=`→initializer value head: an own-line directive there freezes the
+                // whole initializer. Rides the gap probe above — a directive is a comment,
+                // so a comment-free gap provably holds none.
+                let init_frozen = if has_comments_after_eq {
+                    self.value_head_frozen_span(equals_pos + 1, init.span())
+                } else {
+                    None
+                };
+
                 // A line comment between the binding and `=` keeps the comment in place
                 // and drops `= value` to a continuation line indented one level (preserve
                 // — lossless when a second comment also trails the statement; prettier
@@ -438,6 +461,11 @@ impl<'a> Printer<'a> {
                 } else {
                     None
                 };
+
+                // Helper: build the initializer's value — the same three arguments at every
+                // layout branch below, so they are spelled once.
+                let init_value_doc =
+                    || self.build_init_value_doc(init, declarator.span.end, init_frozen);
 
                 // Helper: build init doc with optional inline block comments prepended.
                 // Comments use Trailing spacing (`/* comment */ `) so no extra space needed.
@@ -644,9 +672,7 @@ impl<'a> Printer<'a> {
 
                 if has_comments_after_eq
                     && let Some(rhs) =
-                        self.build_eq_comment_break_rhs(equals_pos, init_start, || {
-                            self.build_init_value_doc(init, declarator.span.end)
-                        })
+                        self.build_eq_comment_break_rhs(equals_pos, init_start, init_value_doc)
                 {
                     // A comment after `=` forces a break (line comment → partition;
                     // own-line / multiline block → break-after-operator hang). Shared
@@ -664,19 +690,13 @@ impl<'a> Printer<'a> {
                     {
                         parts.push(inline);
                     }
-                    parts.push(d.indent(d.concat(&[
-                        d.hardline(),
-                        self.build_init_value_doc(init, declarator.span.end),
-                    ])));
+                    parts.push(d.indent(d.concat(&[d.hardline(), init_value_doc()])));
                 } else if is_curried_arrow {
                     // Curried arrow with return type: mandatory break after `=`
                     // The arrow expression formatter handles the rest of the breaking
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" ="));
-                    parts.push(d.indent(d.concat(&[
-                        d.hardline(),
-                        self.build_init_value_doc(init, declarator.span.end),
-                    ])));
+                    parts.push(d.indent(d.concat(&[d.hardline(), init_value_doc()])));
                 } else if is_curried_arrow_chain(init) {
                     // Untyped curried arrow chain: fluid break after `=`. The chain's
                     // signature heads break only when they don't fit on the operator
@@ -684,7 +704,7 @@ impl<'a> Printer<'a> {
                     // the arrow printer to use the assignment-RHS chain layout.
                     let init_doc = self.build_with_arrow_chain_context(
                         crate::printer::ArrowChainContext::AssignmentRhs,
-                        || make_init_doc(self.build_init_value_doc(init, declarator.span.end)),
+                        || make_init_doc(init_value_doc()),
                     );
                     parts.push(build_fluid_assignment_doc(
                         d,
@@ -725,8 +745,7 @@ impl<'a> Printer<'a> {
 
                     // Add ` = rightDoc` (right side grouped)
                     parts.push(d.text(" = "));
-                    let init_doc =
-                        make_init_doc(self.build_init_value_doc(init, declarator.span.end));
+                    let init_doc = make_init_doc(init_value_doc());
                     parts.push(d.group(init_doc));
                 } else if is_type_assertion_with_lhs_type
                     || is_single_call_member_chain
@@ -748,8 +767,7 @@ impl<'a> Printer<'a> {
                     } else {
                         id_doc
                     };
-                    let init_doc =
-                        make_init_doc(self.build_init_value_doc(init, declarator.span.end));
+                    let init_doc = make_init_doc(init_value_doc());
                     parts.push(build_fluid_assignment_doc(
                         d,
                         make_fluid_lhs(fluid_id_doc),
@@ -764,8 +782,7 @@ impl<'a> Printer<'a> {
                     // indented together after the `=` break.
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" ="));
-                    let init_doc =
-                        make_init_doc(self.build_init_value_doc(init, declarator.span.end));
+                    let init_doc = make_init_doc(init_value_doc());
                     parts.push(hang_after_operator(d, init_doc));
                 } else if is_layout_eligible && !is_simple_value(init) {
                     // Fluid layout (default for layout-eligible values)
@@ -773,8 +790,7 @@ impl<'a> Printer<'a> {
                     // Matches prettier's chooseLayout default: when no special layout
                     // applies, use fluid so the marker can break at `=` only if needed,
                     // while allowing the RHS to break internally first.
-                    let init_doc =
-                        make_init_doc(self.build_init_value_doc(init, declarator.span.end));
+                    let init_doc = make_init_doc(init_value_doc());
                     parts.push(build_fluid_assignment_doc(
                         d,
                         make_fluid_lhs(id_doc),
@@ -783,8 +799,7 @@ impl<'a> Printer<'a> {
                 } else {
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" = "));
-                    let init_doc =
-                        make_init_doc(self.build_init_value_doc(init, declarator.span.end));
+                    let init_doc = make_init_doc(init_value_doc());
                     parts.push(init_doc);
                 }
             } else if should_break || i == 0 {

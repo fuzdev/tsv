@@ -3,6 +3,7 @@
 use super::Printer;
 use crate::ast::internal;
 use crate::printer::class_common::{ClassHeaderLayout, ClassHeaderOptions};
+use crate::printer::expressions::assignment::RhsCommentInfo;
 use crate::printer::{CommentSpacing, CommentVec};
 use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
@@ -598,6 +599,13 @@ impl<'a> Printer<'a> {
             parts.push(self.build_inline_comments_between_doc(before_eq, eq_pos));
         }
 
+        // The `=`→value head: an own-line directive there freezes the whole value.
+        let value_frozen = self.value_head_frozen_span(eq_pos + 1, value.span());
+        let build_value = || match value_frozen {
+            Some(frozen) => self.build_frozen_expression_doc(value, frozen),
+            None => self.build_expression_doc(value),
+        };
+
         // Comments after `=`
         if self.has_line_comments_between(eq_pos + 1, value_start) {
             // A same-line comment stays inline with `=` (line comment via
@@ -605,7 +613,7 @@ impl<'a> Printer<'a> {
             // union); own-line comments stay on their own lines (not merged);
             // the value is indented on the next line. `= // comment\n      c`.
             parts.push(d.text(" ="));
-            let expr_doc = self.build_expression_doc(value);
+            let expr_doc = build_value();
             self.append_keyword_value_line_comments(parts, eq_pos + 1, value_start, expr_doc);
         } else {
             // Use assignment layout for proper line-breaking (handles
@@ -619,14 +627,25 @@ impl<'a> Printer<'a> {
             // built manually like object property values, since the layout
             // chooser takes the bare expression
             let assignment_doc = if self.needs_parens(value, super::ParenContext::DefaultValue) {
-                let value_doc = d.parens(self.build_expression_doc(value));
+                let value_doc = d.parens(build_value());
                 let value_doc = match rhs_comments {
                     Some(comments_doc) => d.concat(&[comments_doc, value_doc]),
                     None => value_doc,
                 };
                 d.concat(&[left_doc, d.text(" = "), value_doc])
             } else {
-                self.build_assignment_layout(left_doc, " =", value, false, rhs_comments)
+                self.build_assignment_layout(
+                    left_doc,
+                    " =",
+                    value,
+                    false,
+                    RhsCommentInfo {
+                        comments: rhs_comments,
+                        has_line_comment: false,
+                        boundary: None,
+                        frozen: value_frozen,
+                    },
+                )
             };
             *parts = smallvec![assignment_doc];
         }

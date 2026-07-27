@@ -97,7 +97,9 @@ impl<'a> Printer<'a> {
         );
 
         // Choose layout matching prettier's assignment layout selection.
-        if Self::const_should_break_after_op(init) {
+        if Self::const_should_break_after_op(init)
+            || self.gap_comment_hangs_value(id.span().end, init.span().start)
+        {
             // Binary expressions, conditional with binary test, etc.
             // Break-after-operator: group with line at "=" so the doc printer
             // can break when the flat form exceeds print width. This takes
@@ -135,6 +137,26 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Whether a comment in the binding→value gap hangs the value — prettier's
+    /// `hasLeadingOwnLineComment` (`hasNewline` at the comment's END, the same shape
+    /// `tsv_ts`'s object-property gap asks), which forces break-after-operator so the
+    /// comment and the value indent together under the `=`.
+    ///
+    /// A comment the author did not glue to the value cannot ride on the operator's line:
+    /// a `//` would swallow what follows, and an own-line block pulled flush against the
+    /// `=` loses the line the author gave it — which for an honored directive makes the
+    /// placement inert, so the freeze would die on the second pass. `tsv_ts`'s assignment
+    /// printer states the same rule for `<script>` code; this is the `{@const}` tag's copy
+    /// of it, and without it a self-expanding value (object, array) took the fluid layout
+    /// and glued the run to `=`, diverging from prettier for a plain comment too.
+    fn gap_comment_hangs_value(&self, gap_start: u32, value_start: u32) -> bool {
+        comments_to_emit_in_range(self.comments, gap_start, value_start).any(|c| {
+            !c.is_block
+                || c.multiline
+                || tsv_lang::source_scan::has_newline_after_position(self.source, c.span.end)
+        })
+    }
+
     /// Check if a @const init expression needs break-after-operator layout.
     ///
     /// Matches prettier's `shouldBreakAfterOperator` for the expression types
@@ -162,6 +184,12 @@ impl<'a> Printer<'a> {
     /// Like `build_expression_with_comments_doc` but uses `first_line_offset = 0`
     /// so binary chains use Grouped style (not ContinuationIndent). The @const
     /// assignment layout handles indentation; ContinuationIndent would stack.
+    ///
+    /// The `=`→value head: an own-line directive anywhere in the binding→value gap
+    /// freezes the whole value. The window is the whole gap rather than the part past
+    /// the `=`, because this tag has no separate before-`=` emitter — `leading_docs`
+    /// prints every comment in it directly above the value, and the directive that
+    /// freezes a value is the one printed above it.
     fn build_const_init_doc(&self, expr: &Expression<'_>, span_start: u32, span_end: u32) -> DocId {
         let d = self.d();
         let expr_start = expr.span().start;
@@ -175,8 +203,11 @@ impl<'a> Printer<'a> {
             ..self.embed
         };
 
-        let expr_doc =
-            tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed);
+        let expr_doc = if self.honored_directive_in_gap(span_start, expr_start) {
+            self.verbatim_source_doc(expr.span())
+        } else {
+            tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed)
+        };
 
         let trailing_docs: DocBuf = comments_to_emit_in_range(self.comments, expr_end, span_end)
             .map(|c| self.build_trailing_js_comment_doc(c))

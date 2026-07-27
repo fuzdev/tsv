@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 362,
+	"end": 528,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -105,24 +105,72 @@
 					"column": 26
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " and at an assignment operator, where the value is likewise reformatted",
+			"start": 354,
+			"end": 427,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 439,
+			"end": 460,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 11
+				},
+				"end": {
+					"line": 18,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 487,
+			"end": 508,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 18
+				},
+				"end": {
+					"line": 20,
+					"column": 39
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 361,
+		"end": 527,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 352,
+			"end": 518,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 16,
+					"line": 21,
 					"column": 9
 				}
 			},
@@ -629,6 +677,276 @@
 							"end": 304
 						}
 					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 429,
+					"end": 467,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 39
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 435,
+							"end": 466,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 38
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 435,
+								"end": 436,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 461,
+								"end": 466,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 33
+									},
+									"end": {
+										"line": 18,
+										"column": 38
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 461,
+									"end": 462,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 33
+										},
+										"end": {
+											"line": 18,
+											"column": 34
+										}
+									},
+									"name": "d"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 465,
+									"end": 466,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 37
+										},
+										"end": {
+											"line": 18,
+											"column": 38
+										}
+									},
+									"name": "e"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " prettier-ignore ",
+										"start": 439,
+										"end": 460
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " and at an assignment operator, where the value is likewise reformatted",
+							"start": 354,
+							"end": 427
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 470,
+					"end": 517,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 48
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 476,
+							"end": 516,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 7
+								},
+								"end": {
+									"line": 20,
+									"column": 47
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 476,
+								"end": 479,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 7
+									},
+									"end": {
+										"line": 20,
+										"column": 10
+									}
+								},
+								"name": "obj"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 482,
+								"end": 516,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 13
+									},
+									"end": {
+										"line": 20,
+										"column": 47
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 484,
+										"end": 514,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 15
+											},
+											"end": {
+												"line": 20,
+												"column": 45
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 484,
+											"end": 485,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 15
+												},
+												"end": {
+													"line": 20,
+													"column": 16
+												}
+											},
+											"name": "f"
+										},
+										"value": {
+											"type": "BinaryExpression",
+											"start": 509,
+											"end": 514,
+											"loc": {
+												"start": {
+													"line": 20,
+													"column": 40
+												},
+												"end": {
+													"line": 20,
+													"column": 45
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 509,
+												"end": 510,
+												"loc": {
+													"start": {
+														"line": 20,
+														"column": 40
+													},
+													"end": {
+														"line": 20,
+														"column": 41
+													}
+												},
+												"name": "g"
+											},
+											"operator": "+",
+											"right": {
+												"type": "Identifier",
+												"start": 513,
+												"end": 514,
+												"loc": {
+													"start": {
+														"line": 20,
+														"column": 44
+													},
+													"end": {
+														"line": 20,
+														"column": 45
+													}
+												},
+												"name": "h"
+											},
+											"leadingComments": [
+												{
+													"type": "Block",
+													"value": " prettier-ignore ",
+													"start": 487,
+													"end": 508
+												}
+											]
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
 				}
 			],
 			"sourceType": "module"

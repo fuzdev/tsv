@@ -13,4 +13,9 @@
 	if (/* prettier-ignore */ a + b) {
 		fn();
 	}
+
+	// and at an assignment operator, where the value is likewise reformatted
+	const c = /* prettier-ignore */ d + e;
+
+	const obj = { f: /* prettier-ignore */ g + h };
 </script>

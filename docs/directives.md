@@ -266,6 +266,49 @@ first operand, so the whole sequence freezes — the value-head rule above. A
 sequence prints its own grouping parens, and they are re-synthesized around a
 frozen operand so its grouping survives.
 
+### On assignment-family value heads
+
+An assignment operator is a delimiter like any other, so an own-line directive in
+an `=`→value or `:`→value gap freezes the **whole value** — a declarator
+initializer, an assignment RHS (including a compound operator and each segment of
+a chain), an object property value, a class field value, and a default value:
+
+```ts
+const aaa =
+	// format-ignore
+	bbb  +  ccc;
+
+obj = {
+	ddd:
+		// format-ignore
+		eee  +  fff
+};
+
+class Single {
+	ggg =
+		// format-ignore
+		hhh  +  iii;
+}
+
+function fn(
+	jjj =
+		// format-ignore
+		kkk  +  lll
+) {}
+```
+
+```svelte
+{@const mmm =
+	// format-ignore
+	nnn  +  ooo}
+```
+
+The binding, the operator and the enclosing list are parent-owned and stay
+outside the frozen slice, so a sibling declarator or property the freeze does not
+reach still reformats. Parens the printer supplies for clarity stay outside too:
+an assignment initializer still prints as `const aaa = (bbb = ccc)` around the
+frozen slice.
+
 ## `format-ignore-start` / `format-ignore-end`
 
 In Svelte templates, a pair of range markers preserves every node between them:
