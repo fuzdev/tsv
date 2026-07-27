@@ -77,6 +77,11 @@ pub(in crate::printer) struct ClassHeaderOptions {
     /// Emit header→body comments here (false when the caller already emitted the
     /// bare name→body / anonymous→body comments).
     pub emit_pre_body_comments: bool,
+    /// An own-line directive in the header→`{` gap freezes the body, so the gap's comment
+    /// run keeps its own line rather than being spaced onto the header's. Resolved once per
+    /// class by the caller (which also emits the frozen body) — see
+    /// [`Printer::build_class_body_doc`].
+    pub body_frozen: bool,
 }
 
 impl<'a> Printer<'a> {
@@ -288,17 +293,27 @@ impl<'a> Printer<'a> {
     /// (line comments don't absorb following comments); a line comment forces the
     /// brace onto the next line, otherwise it hugs with a single space. Returns a
     /// bare `" "` when there are no comments (or `emit_comments` is false).
+    /// Whether the header→`{` gap forces the brace onto its own line: a `//` in the gap would
+    /// otherwise swallow it, and a FROZEN body's directive must keep the own line that makes it
+    /// honored (a header-trailing placement is inert, so the relocated form would lose the
+    /// freeze on the second pass). Both header layouts ask it, so it is spelled once.
+    fn pre_body_gap_breaks(&self, header_end: u32, body_start: u32, body_frozen: bool) -> bool {
+        body_frozen || self.has_line_comments_between(header_end, body_start)
+    }
+
     pub(in crate::printer) fn build_header_pre_body_doc(
         &self,
         emit_comments: bool,
         header_end: u32,
         body_start: u32,
+        body_frozen: bool,
     ) -> DocId {
         let d = self.d();
         if emit_comments
-            && let Some(comments) = self.build_pre_body_comments_doc(header_end, body_start)
+            && let Some(comments) =
+                self.build_pre_body_comments_doc(header_end, body_start, body_frozen)
         {
-            if self.has_line_comments_between(header_end, body_start) {
+            if self.pre_body_gap_breaks(header_end, body_start, body_frozen) {
                 d.concat(&[comments, d.hardline()])
             } else {
                 d.concat(&[comments, d.text(" ")])
@@ -345,6 +360,7 @@ impl<'a> Printer<'a> {
                 options.emit_pre_body_comments,
                 header_end,
                 options.body_start,
+                options.body_frozen,
             ));
             return d.concat(&parts);
         }
@@ -391,9 +407,13 @@ impl<'a> Printer<'a> {
         // non-empty body, `line()` puts the brace on its own line when the
         // group breaks; an empty body always keeps ` {}` on the heritage line.
         let has_line_comment = options.emit_pre_body_comments
-            && self.has_line_comments_between(header_end, options.body_start);
+            && self.pre_body_gap_breaks(header_end, options.body_start, options.body_frozen);
         if options.emit_pre_body_comments
-            && let Some(comments) = self.build_pre_body_comments_doc(header_end, options.body_start)
+            && let Some(comments) = self.build_pre_body_comments_doc(
+                header_end,
+                options.body_start,
+                options.body_frozen,
+            )
         {
             parts.push(comments);
         }

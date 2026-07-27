@@ -6,6 +6,7 @@ use crate::printer::class_common::{ClassHeaderLayout, ClassHeaderOptions};
 use crate::printer::expressions::assignment::RhsCommentInfo;
 use crate::printer::{CommentSpacing, CommentVec};
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -167,6 +168,10 @@ impl<'a> Printer<'a> {
             positions.implements_keyword_start,
         );
 
+        // The header→`{` gap's freeze, resolved once: the header builder needs the placement
+        // answer (keep the run's own line) and the body builder needs the span.
+        let frozen_body = self.gap_frozen_span(positions.header_end, decl.body.span);
+
         if let Some(id) = &decl.id {
             // Named: collect the name + type params + heritage + body into one
             // continuation so a *line* comment in the `class`→name gap indents the
@@ -196,11 +201,12 @@ impl<'a> Printer<'a> {
                     body_start: decl.body.span.start,
                     layout: ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments),
                     emit_pre_body_comments: true,
+                    body_frozen: frozen_body.is_some(),
                 },
             );
             let continuation = d.concat(&[
                 header_doc,
-                self.build_class_body_doc(&decl.body, decl.declare),
+                self.build_class_body_doc(&decl.body, frozen_body),
             ]);
             parts.push(self.build_keyword_to_name_continuation(
                 cursor,
@@ -226,24 +232,35 @@ impl<'a> Printer<'a> {
                 body_start: decl.body.span.start,
                 layout: ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments),
                 emit_pre_body_comments: true,
+                body_frozen: frozen_body.is_some(),
             },
         );
 
         d.concat(&[
             header_doc,
-            self.build_class_body_doc(&decl.body, decl.declare),
+            self.build_class_body_doc(&decl.body, frozen_body),
         ])
     }
 
     /// Build a Doc for a class body
     ///
     /// Handles comments between members, blank line preservation, and trailing comments.
+    /// `frozen` is the header→`{` gap's format-ignore answer, resolved by the caller (which
+    /// also passes it to the header builder as `ClassHeaderOptions::body_frozen`, so the
+    /// gap's comment run keeps the own line that makes the directive honored). `Some` is the
+    /// body's own span, emitted verbatim: the braces and every member ride inside the slice
+    /// while the name and heritage stay parent-owned outside it. Prettier instead relocates
+    /// the directive into the body and freezes only the first member
+    /// (`body_prettier_ignore_head_prettier_divergence`).
     pub(in crate::printer) fn build_class_body_doc(
         &self,
         body: &internal::ClassBody<'_>,
-        _is_ambient: bool,
+        frozen: Option<Span>,
     ) -> DocId {
         let d = self.d();
+        if let Some(frozen) = frozen {
+            return self.build_frozen_span_doc(frozen);
+        }
         if body.body.is_empty() {
             return self.build_empty_body_with_comments_doc(body.span);
         }

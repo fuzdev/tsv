@@ -157,7 +157,9 @@ impl<'a> Printer<'a> {
     ) {
         let d = self.d();
         let body_start = body.span().start;
-        let body_doc = self.build_statement_doc(body, false);
+        let body_doc = self.build_statement_head_doc(paren_end, body.span(), || {
+            self.build_statement_doc(body, false)
+        });
 
         if !self.has_comments_to_emit_between(paren_end, body_start) {
             parts.push(d.text(")"));
@@ -271,7 +273,11 @@ impl<'a> Printer<'a> {
             d.concat(&[
                 header_doc,
                 d.text(" "),
-                self.build_block_statement_doc(block),
+                self.build_statement_head_doc(
+                    self.get_for_header_end(stmt, parens),
+                    block.span,
+                    || self.build_block_statement_doc(block),
+                ),
             ])
         } else {
             // Non-block body. Mirror Prettier's `adjustClause`: the body is
@@ -281,7 +287,11 @@ impl<'a> Printer<'a> {
             // the outer group breaks and the body drops to its own indented line;
             // the inner header group still decides its own flat/break, so a
             // width-only overflow keeps the header flat (matching Prettier).
-            let body_doc = self.build_statement_doc(stmt.body, false);
+            let body_doc = self.build_statement_head_doc(
+                self.get_for_header_end(stmt, parens),
+                stmt.body.span(),
+                || self.build_statement_doc(stmt.body, false),
+            );
             d.group(d.concat(&[header_doc, d.indent_line(body_doc)]))
         }
     }
@@ -292,16 +302,19 @@ impl<'a> Printer<'a> {
     /// don't yield a premature match; the last clause's end is the fallback when the
     /// header has no locatable `)`.
     fn get_for_header_end(&self, stmt: &internal::ForStatement<'_>, parens: ForParens) -> u32 {
-        // Find the last expression end
-        let last_expr_end = stmt
-            .update
-            .as_ref()
-            .map(|u| u.span().end)
-            .or_else(|| stmt.test.as_ref().map(|t| t.span().end))
-            .or_else(|| stmt.init.as_ref().map(|i| self.get_for_init_span_end(i)));
-
-        let search_start = last_expr_end.unwrap_or(stmt.span.start + "for ".len() as u32);
-        parens.close.map_or(search_start, |p| p + 1)
+        // `map_or_else` so the located-paren path — every well-formed header — costs one map
+        // and never walks the clause spans for a fallback it discards.
+        parens.close.map_or_else(
+            || {
+                stmt.update
+                    .as_ref()
+                    .map(|u| u.span().end)
+                    .or_else(|| stmt.test.as_ref().map(|t| t.span().end))
+                    .or_else(|| stmt.init.as_ref().map(|i| self.get_for_init_span_end(i)))
+                    .unwrap_or(stmt.span.start + "for ".len() as u32)
+            },
+            |p| p + 1,
+        )
     }
 
     /// Build doc for an empty `for (;;)` header that has comments inside the parens.
@@ -1457,7 +1470,9 @@ impl<'a> Printer<'a> {
         let paren_end = close_paren.map_or(right_end + 1, |p| p + 1);
         if let Statement::BlockStatement(block) = body {
             self.append_close_paren_with_comments(parts, paren_end, block.span.start);
-            parts.push(self.build_block_statement_expand_empty_doc(block));
+            parts.push(self.build_statement_head_doc(paren_end, block.span, || {
+                self.build_block_statement_expand_empty_doc(block)
+            }));
         } else {
             self.append_close_paren_with_non_block_body(parts, paren_end, body);
         }
@@ -1562,8 +1577,11 @@ impl<'a> Printer<'a> {
             // comment hardline propagates) or the whole thing overflows — while the
             // header group still decides its own flat/break.
             let is_block_body = matches!(stmt.body, Statement::BlockStatement(_));
-            // A C-style `for` collapses its empty block body (`for (…) {}`).
-            let body_doc = self.build_collapsing_body_doc(stmt.body);
+            // A C-style `for` collapses its empty block body (`for (…) {}`) — unless an
+            // own-line directive in the `)`→body gap freezes it.
+            let body_doc = self.build_statement_head_doc(header_end, stmt.body.span(), || {
+                self.build_collapsing_body_doc(stmt.body)
+            });
 
             let gap_breaks = self.header_to_body_gap_breaks(header_end, body_start);
             let (tail, group_it) = if self.has_comments_to_emit_between(header_end, body_start) {

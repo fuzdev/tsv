@@ -45,10 +45,19 @@ impl<'a> Printer<'a> {
     ///
     /// Returns `None` when the range has no comments. The caller appends the pre-`{`
     /// separator itself (`hardline` for a line comment, space/`line` otherwise).
-    pub(crate) fn build_pre_body_comments_doc(&self, start: u32, end: u32) -> Option<DocId> {
+    /// `own_line_first` breaks before the FIRST comment instead of spacing it onto the
+    /// header's line — set when the gap holds an honored format-ignore directive, whose own
+    /// line is what makes it honored (a header-trailing placement is inert, so the relocated
+    /// form would lose the freeze on the second pass).
+    pub(crate) fn build_pre_body_comments_doc(
+        &self,
+        start: u32,
+        end: u32,
+        own_line_first: bool,
+    ) -> Option<DocId> {
         let d = self.d();
         let mut parts = DocBuf::new();
-        let mut prev_is_line = false;
+        let mut prev_is_line = own_line_first;
         for comment in comments_to_emit_in_range(self.comments, start, end) {
             if prev_is_line {
                 parts.push(d.hardline());

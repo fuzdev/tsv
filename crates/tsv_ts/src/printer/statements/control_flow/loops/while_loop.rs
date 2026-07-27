@@ -42,7 +42,9 @@ impl<'a> Printer<'a> {
             parts.push(condition_group);
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
-            parts.push(self.build_block_statement_doc(block));
+            parts.push(self.build_statement_head_doc(paren_end, block.span, || {
+                self.build_block_statement_doc(block)
+            }));
             d.group(d.concat(&parts))
         } else if matches!(stmt.body, Statement::EmptyStatement(_)) {
             // Empty statement: `while (cond);` or `while (cond) /* comment */ ;`
@@ -65,7 +67,9 @@ impl<'a> Printer<'a> {
             // - When broken: line becomes newline + indent -> `while (cond)\n\ta;`
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let body_start = stmt.body.span().start;
-            let body_doc = self.build_statement_doc(stmt.body, false);
+            let body_doc = self.build_statement_head_doc(paren_end, stmt.body.span(), || {
+                self.build_statement_doc(stmt.body, false)
+            });
 
             let mut head_parts: DocBuf = DocBuf::new();
             self.push_keyword_open_paren(&mut head_parts, "while", keyword_comments);
@@ -81,11 +85,14 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let is_block = matches!(stmt.body, Statement::BlockStatement(_));
 
-        // A loop body collapses its empty block form (`do {} while (cond)`).
-        let body_doc = self.build_collapsing_body_doc(stmt.body);
-
         // Check for comments between `do` keyword and body
         let do_end = stmt.span.start + "do".len() as u32;
+        // A loop body collapses its empty block form (`do {} while (cond)`) — unless an
+        // own-line directive in the `do`→body gap freezes it.
+        let body_doc = self.build_statement_head_doc(do_end, stmt.body.span(), || {
+            self.build_collapsing_body_doc(stmt.body)
+        });
+
         let body_start = stmt.body.span().start;
         let mut parts = if self.has_comments_to_emit_between(do_end, body_start) {
             let gap_breaks = self.header_to_body_gap_breaks(do_end, body_start);

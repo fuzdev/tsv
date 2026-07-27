@@ -46,15 +46,83 @@ impl<'a> Printer<'a> {
         d.group(d.indent_line(self.build_statement_doc(alternate, false)))
     }
 
-    /// Append a **block or inline** else body to parts. A non-block, non-inline alternate
-    /// without a forcing comment is emitted by [`Self::build_else_adjust_clause`] at the
-    /// call sites instead; here a non-block alternate is always emitted inline (the caller
-    /// reaches this only with an inline alternate, or a comment that forces inline layout).
-    fn append_else_body_doc(&self, parts: &mut DocBuf, alternate: &Statement<'_>) {
-        if let Statement::BlockStatement(block) = alternate {
-            parts.push(self.build_block_statement_expand_empty_doc(block));
+    /// The doc for one BRANCH of an `if` — a consequent or an alternate. A block body expands
+    /// its empty form (`{⏎}` rather than `{}`, prettier's `block.js`); anything else prints as
+    /// an ordinary statement. Both branch sides and both `if` printers share it, so the two
+    /// can't drift on which block form they emit.
+    ///
+    /// Callers that introduce the branch across a gap want [`Self::build_branch_body_doc`],
+    /// the freeze-aware wrapper; this bare form is for the gaps that provably hold no comment
+    /// (and so no directive).
+    fn build_branch_statement_doc(&self, body: &Statement<'_>) -> DocId {
+        match body {
+            Statement::BlockStatement(block) => self.build_block_statement_expand_empty_doc(block),
+            _ => self.build_statement_doc(body, false),
+        }
+    }
+
+    /// [`Self::build_branch_statement_doc`] with the introducing gap's format-ignore freeze
+    /// applied: an own-line directive in `[gap_start, body.start)` freezes the branch whole,
+    /// over its own span, so a block's braces ride inside the slice.
+    fn build_branch_body_doc(&self, gap_start: u32, body: &Statement<'_>) -> DocId {
+        self.build_statement_head_doc(gap_start, body.span(), || {
+            self.build_branch_statement_doc(body)
+        })
+    }
+
+    /// Append the `else` keyword, the comment run in its →body gap, and the alternate body —
+    /// the comment-bearing else layout, shared by BOTH `if` printers. The two differ only in
+    /// the `}`→`else` gap that selects them, so this gap must answer identically in each;
+    /// `leading_space` prefixes ` else` (set when `else` abuts a preceding `}` on its line),
+    /// mirroring [`Self::append_else_keyword_body`].
+    ///
+    /// The gap routes through the shared header→body emitters like `try`'s or `do`'s: a comment
+    /// trailing `else` stays trailing, one on its own line keeps its own line, and a `//`
+    /// forces the body down. Emitting the run inline relocated an own-line comment up onto the
+    /// `else` line (`} else // c`) — the same defect the `try` family had. Prettier preserves
+    /// here, so it is a clean oracle rather than a stance.
+    ///
+    /// Which layout the gap gets is prettier's, measured on all three alternate shapes:
+    ///
+    /// | alternate | first gap comment own-line | first gap comment trails `else` |
+    /// | --- | --- | --- |
+    /// | **block** | flush (`} else⏎// c⏎{`) | flush |
+    /// | **else-if** | continuation indent (`} else⏎→// c⏎→if (b) {`) | flush |
+    /// | **other non-block** | continuation indent | continuation indent |
+    ///
+    /// A block alternate's own `{` opens the body, so the gap's comment belongs at the head's
+    /// level either way. An else-if is a nested statement and takes the indent — but only when
+    /// the run owns its lines: a comment TRAILING `else` is a trailing comment of the keyword,
+    /// printed before the clause and outside its indent, and prettier keeps the whole run flush
+    /// there (pinned by `if/else_consecutive_comment`). `inline_prev` — the emitters' own
+    /// partition — is that question.
+    ///
+    /// An own-line directive in the gap freezes the alternate whole
+    /// ([`Self::build_statement_head_doc`]).
+    fn append_else_gap_and_body(
+        &self,
+        parts: &mut DocBuf,
+        alternate: &Statement<'_>,
+        else_end: u32,
+        leading_space: bool,
+    ) {
+        let d = self.d();
+        let alt_start = alternate.span().start;
+        let flush_with_else = match alternate {
+            Statement::BlockStatement(_) => true,
+            Statement::IfStatement(_) => !self
+                .partition_comments_by_line(else_end, alt_start)
+                .0
+                .is_empty(),
+            _ => false,
+        };
+        parts.push(d.text(if leading_space { " else" } else { "else" }));
+        let body_doc = self.build_branch_body_doc(else_end, alternate);
+        if flush_with_else {
+            self.push_header_to_body_gap(parts, else_end, alt_start);
+            parts.push(body_doc);
         } else {
-            parts.push(self.build_statement_doc(alternate, false));
+            self.push_indented_else_to_body_gap(parts, else_end, alt_start, body_doc);
         }
     }
 
@@ -74,7 +142,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         if is_inline_alternate(alternate) {
             parts.push(d.text(if leading_space { " else " } else { "else " }));
-            self.append_else_body_doc(parts, alternate);
+            parts.push(self.build_branch_statement_doc(alternate));
         } else {
             parts.push(d.text(if leading_space { " else" } else { "else" }));
             parts.push(self.build_else_adjust_clause(alternate));
@@ -133,24 +201,7 @@ impl<'a> Printer<'a> {
         } else if let Some(else_end) = else_end
             && self.has_comments_to_emit_between(else_end, alt_start)
         {
-            // The `else`→body gap is a header→body gap like `try`'s or `do`'s, so it
-            // routes through the shared emitter: a comment trailing `else` stays
-            // trailing, one on its own line keeps its own line, and a `//` forces the
-            // body down. Emitting the run inline relocated an own-line comment up onto
-            // the `else` line (`} else // c`) — the same defect the `try` family had.
-            // Prettier preserves here, so it is a clean oracle rather than a stance.
-            let is_non_block_non_if = !matches!(
-                alternate,
-                Statement::BlockStatement(_) | Statement::IfStatement(_)
-            );
-            parts.push(d.text(" else"));
-            if is_non_block_non_if {
-                let body_doc = self.build_statement_doc(alternate, false);
-                self.push_indented_else_to_body_gap(parts, else_end, alt_start, body_doc);
-            } else {
-                self.push_header_to_body_gap(parts, else_end, alt_start);
-                self.append_else_body_doc(parts, alternate);
-            }
+            self.append_else_gap_and_body(parts, alternate, else_end, true);
         } else {
             self.append_else_keyword_body(parts, alternate, true);
         }
@@ -220,7 +271,7 @@ impl<'a> Printer<'a> {
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
 
-            parts.push(self.build_block_statement_expand_empty_doc(block));
+            parts.push(self.build_branch_body_doc(paren_end, stmt.consequent));
 
             // Handle else clause
             if let Some(alternate) = &stmt.alternate {
@@ -256,7 +307,7 @@ impl<'a> Printer<'a> {
             // - When broken: line becomes newline + indent -> `if (cond)\n\ta;`
             let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
             let body_start = stmt.consequent.span().start;
-            let consequent_doc = self.build_statement_doc(stmt.consequent, false);
+            let consequent_doc = self.build_branch_body_doc(paren_end, stmt.consequent);
 
             let mut head_parts: DocBuf = DocBuf::new();
             self.push_keyword_open_paren(&mut head_parts, "if", keyword_comments);
@@ -318,14 +369,14 @@ impl<'a> Printer<'a> {
         let paren_end = close_paren.unwrap_or_else(|| stmt.test.span().end) + 1;
         if let Statement::BlockStatement(block) = stmt.consequent {
             self.append_close_paren_with_comments(&mut parts, paren_end, block.span.start);
-            parts.push(self.build_block_statement_expand_empty_doc(block));
+            parts.push(self.build_branch_body_doc(paren_end, stmt.consequent));
         } else if matches!(stmt.consequent, Statement::EmptyStatement(_)) {
             let empty_start = stmt.consequent.span().start;
             self.append_close_paren_empty_stmt_with_comments(&mut parts, paren_end, empty_start);
         } else {
             // Non-block consequent: handle head-body comments between ) and body
             let body_start = stmt.consequent.span().start;
-            let consequent_doc = self.build_statement_doc(stmt.consequent, false);
+            let consequent_doc = self.build_branch_body_doc(paren_end, stmt.consequent);
 
             if self.has_comments_to_emit_between(paren_end, body_start) {
                 let has_line = self.has_line_comments_between(paren_end, body_start);
@@ -397,26 +448,7 @@ impl<'a> Printer<'a> {
             } else if let Some(else_e) = else_end
                 && self.has_comments_to_emit_between(else_e, alternate_start)
             {
-                // The `else`→body gap — see the twin in `build_head_body_else_clause`.
-                // The two `if` paths differ only in the `}`→`else` gap that selects
-                // them, so this gap must answer identically in both.
-                let is_non_block_non_if = !matches!(
-                    alternate,
-                    Statement::BlockStatement(_) | Statement::IfStatement(_)
-                );
-                parts.push(d.text("else"));
-                if is_non_block_non_if {
-                    let body_doc = self.build_statement_doc(alternate, false);
-                    self.push_indented_else_to_body_gap(
-                        &mut parts,
-                        else_e,
-                        alternate_start,
-                        body_doc,
-                    );
-                } else {
-                    self.push_header_to_body_gap(&mut parts, else_e, alternate_start);
-                    self.append_else_body_doc(&mut parts, alternate);
-                }
+                self.append_else_gap_and_body(&mut parts, alternate, else_e, false);
             } else {
                 self.append_else_keyword_body(&mut parts, alternate, false);
             }
