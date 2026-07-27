@@ -56,16 +56,23 @@ const VARIANTS = ['format', 'parse', 'all'] as const;
 const TARGETS = ['npm', 'deno'] as const;
 
 // Measured 2026-07-27 (deno target; npm == deno, identical `.wasm`): format
-// 2,290,432 B; parse 1,066,009 B; all 2,529,682 B. Bounds recentered ±8%.
+// 2,118,243 B; parse 887,893 B; all 2,360,007 B. Bounds recentered ±8%.
 //
-// Recentering, not a ceiling bump. Every variant had drifted +5.0..+5.3% above
-// its 2026-07-04 center through accumulated work — `format` included, which no
-// convert-path change can touch (it builds without the `json` feature) — so the
-// bands had gone asymmetric: parse's max sat +2.9% away while its min sat −12%
-// away. That shape both false-positives on ordinary growth and stops catching a
-// suspicious shrink, which is the half of the check that has no other tripwire.
-// Recentering restores signal in both directions; it does not raise the
-// tolerance, which stays ±8%.
+// A real size cut, not drift: `ParseError` became a newtype over a boxed payload
+// (`struct ParseError(Box<ParseErrorKind>)`), so the type is pointer-sized and a
+// `Result<T, ParseError>` is no longer sized by a 96-byte error at every fallible
+// function whose success payload is smaller than that. The cut is code size rather
+// than data path — the error half of each `Result` shrinks at every site in all
+// three language crates, including the many whose `Result` size never changed
+// because a fat AST node already dominated it. Because it lands in the shared
+// `tsv_lang` type, it reaches the TypeScript, Svelte and CSS parsers alike, which
+// is why `format` moves too (it builds without the `json` feature, so no
+// convert-path change can touch it): −7.5% format, −16.7% parse, −6.7% all.
+// Tolerance stays ±8%.
+//
+// Prior center, 2026-07-27 (recentering after every variant had drifted
+// +5.0..+5.3% above the 2026-07-04 center through accumulated work): format
+// 2,290,432 B; parse 1,066,009 B; all 2,529,682 B.
 //
 // Prior center, 2026-07-04 (two size cuts landed together: the wasm32 feature
 // baseline moved to `+simd128,+multivalue` — the multivalue return ABI
@@ -74,26 +81,23 @@ const TARGETS = ['npm', 'deno'] as const;
 // allocator, dropping a few more KB per bundle): format 2,178,122 B; parse
 // 1,015,388 B; all 2,401,628 B.
 const BOUNDS = {
-	format: { min: 2_107_000, max: 2_474_000 },
-	parse: { min: 980_000, max: 1_152_000 },
-	all: { min: 2_327_000, max: 2_733_000 }
+	format: { min: 1_949_000, max: 2_288_000 },
+	parse: { min: 817_000, max: 959_000 },
+	all: { min: 2_171_000, max: 2_549_000 }
 };
 
 // all = format + parse. `all − format` is the parse feature (parser convert
-// path; measured 239,250 B — up from 223,506 B, and down from 312,547 B when it
-// still carried the comment-island round-trip's `Value` deserialization
-// machinery); `all − parse` is the format feature (printers + doc builder,
-// dropped from the parse-only build at link time; measured 1,463,673 B — the
-// gate-health signal). A delta near zero means a feature gate broke.
+// path; measured 241,764 B); `all − parse` is the format feature (printers + doc
+// builder, dropped from the parse-only build at link time; measured 1,472,114 B —
+// the gate-health signal). A delta near zero means a feature gate broke.
 //
-// ⚠️ These recentered for the same reason as BOUNDS, and they were the *tighter*
-// constraint: at the old numbers `all − format` sat at 97.7% of its ceiling and
-// `all − parse` at 96.0%, so the next size-adding convert-path change would have
-// tripped a delta check rather than a bundle bound — a confusing failure, since
-// the delta reads as "a feature gate broke".
+// Both deltas barely moved across the `ParseError` newtype (−539 B and −280 B):
+// the cut lands in the parser, which both variants link, so it leaves the *feature
+// boundary* where it was. That is the expected shape — a delta that moved with the
+// bundles would mean a feature gate had shifted, not that code got smaller.
 const DELTAS = {
-	format: { min: 220_000, max: 259_000 }, // all − format
-	parse: { min: 1_346_000, max: 1_581_000 } // all − parse
+	format: { min: 222_000, max: 261_000 }, // all − format
+	parse: { min: 1_354_000, max: 1_590_000 } // all − parse
 };
 
 console.log('=== WASM binary sizes ===');

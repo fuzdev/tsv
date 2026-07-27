@@ -308,74 +308,45 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Create error with custom message at current position
     pub(crate) fn error_msg(&self, message: &str) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: message.to_string(),
-            position: self.current_start,
-            context: None,
-        }
+        ParseError::invalid_syntax(message.to_string(), self.current_start)
     }
 
     /// Create error with custom message at specified position
     pub(crate) fn error_msg_at(&self, message: &str, position: usize) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: message.to_string(),
-            position,
-            context: None,
-        }
+        ParseError::invalid_syntax(message.to_string(), position)
     }
 
     /// Create "Expected X" error at current position
     pub(crate) fn error_expected(&self, what: &str) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: format!("Expected {what}"),
-            position: self.current_start,
-            context: None,
-        }
+        ParseError::invalid_syntax(format!("Expected {what}"), self.current_start)
     }
 
     /// Create "Expected X" error at specified position
     pub(crate) fn error_expected_at(&self, what: &str, position: usize) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: format!("Expected {what}"),
-            position,
-            context: None,
-        }
+        ParseError::invalid_syntax(format!("Expected {what}"), position)
     }
 
     /// Create "Expected X, found Y" error at current position
     pub(crate) fn error_expected_found(&self, what: &str) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: format!("Expected {what}, found {}", self.current_kind),
-            position: self.current_start,
-            context: None,
-        }
+        ParseError::invalid_syntax(
+            format!("Expected {what}, found {}", self.current_kind),
+            self.current_start,
+        )
     }
 
     /// Create "Unclosed X" error at specified position
     pub(crate) fn error_unclosed_at(&self, what: &str, position: usize) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: format!("Unclosed {what}"),
-            position,
-            context: None,
-        }
+        ParseError::invalid_syntax(format!("Unclosed {what}"), position)
     }
 
     /// Create "Duplicate X found" error at current position
     pub(crate) fn error_duplicate(&self, what: &str) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: format!("Duplicate {what} found"),
-            position: self.current_start,
-            context: None,
-        }
+        ParseError::invalid_syntax(format!("Duplicate {what} found"), self.current_start)
     }
 
     /// Create "Unknown X: Y" error at specified position
     pub(crate) fn error_unknown_at(&self, kind: &str, value: &str, position: usize) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: format!("Unknown {kind}: {value}"),
-            position,
-            context: None,
-        }
+        ParseError::invalid_syntax(format!("Unknown {kind}: {value}"), position)
     }
 
     // TypeScript Expression Parsing Helpers

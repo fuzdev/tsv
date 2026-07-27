@@ -79,7 +79,7 @@ pub(crate) fn is_ascii_identifier_start(b: u8) -> bool {
 pub(crate) fn read_identifier(
     source: &str,
     pos: &mut usize,
-) -> Result<(Token, Option<String>), Box<ParseError>> {
+) -> Result<(Token, Option<String>), ParseError> {
     let start = *pos;
     // `None` until an escape forces a decoded buffer; then materialized from the
     // verbatim run `source[start..pos]` scanned so far and appended to per escape.
@@ -196,10 +196,7 @@ pub(crate) fn read_identifier(
 /// Per CSS Syntax 3 §4.3.7 (consume an escaped code point), a value that is
 /// zero, is for a surrogate, or is greater than the maximum allowed code point
 /// (U+10FFFF) decodes to U+FFFD REPLACEMENT CHARACTER — it is not a parse error.
-pub(crate) fn decode_unicode_escape(
-    source: &str,
-    pos: &mut usize,
-) -> Result<char, Box<ParseError>> {
+pub(crate) fn decode_unicode_escape(source: &str, pos: &mut usize) -> Result<char, ParseError> {
     let start = *pos;
     *pos += 1; // skip \
 

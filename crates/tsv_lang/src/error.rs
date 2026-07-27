@@ -1,5 +1,7 @@
 // Error types for parsing
 
+use std::fmt;
+
 use thiserror::Error;
 
 /// Rich error context with source snippet and position
@@ -78,8 +80,13 @@ fn format_error(base_msg: &str, position: usize, context: Option<&ErrorContext>)
     }
 }
 
+/// The error payload, behind the `Box` in [`ParseError`]. Private: `ParseError` is
+/// construction-only outside this module — nothing matches a variant or reads a field —
+/// so the constructor functions below are the whole API, and keeping the enum private
+/// makes them the only way in (which is what keeps `context` uniformly `None` at
+/// construction, filled later by [`ParseError::with_context`]).
 #[derive(Debug, Clone, PartialEq, Eq, Error)]
-pub enum ParseError {
+enum ParseErrorKind {
     #[error("{}", format_error(&format!("Expected {expected}, found {found}"), *position, context.as_ref()))]
     UnexpectedToken {
         expected: String,
@@ -112,93 +119,189 @@ pub enum ParseError {
     FileTooLarge { size: usize, max: usize },
 }
 
-/// Result type alias for parsing operations
-pub type Result<T> = std::result::Result<T, ParseError>;
+/// A parse error — **8 bytes**, because the payload lives behind the `Box`.
+///
+/// The size is the point. A `Result<T, E>` is sized by `max(T, E)`, so an inline
+/// [`ParseErrorKind`] (96 bytes) makes *every* fallible function whose success payload is
+/// smaller than that return 96 bytes through memory on its hot `Ok` path — and the parsers
+/// are full of `Result<(), _>`, `Result<bool, _>`, `Result<usize, _>`. Boxing the payload
+/// once, here, shrinks the `Result` at every one of those call sites in all three language
+/// crates without a single signature mentioning a `Box`.
+///
+/// The larger effect is on code size rather than the data path: the error half of each
+/// `Result` shrinks at every site, including the many whose `Result` size never changed
+/// because a fat AST node (`Statement`, `Expression`) already dominated it, so the hot
+/// parse loops pack into less instruction cache.
+///
+/// `Display` and `Debug` forward to the inner kind, so rendered messages and debug output
+/// are exactly what the enum produces.
+#[derive(Clone, PartialEq, Eq)]
+pub struct ParseError(Box<ParseErrorKind>);
 
-/// Unbox a lexer error. The lexer returns `Result<_, Box<ParseError>>` so the hot
-/// `next_token` Ok path stays pointer-sized (a 96-byte `ParseError` inline would
-/// bloat the `Result` and block inlining/SROA of the token pump). The parser's
-/// functions return the unboxed `Result<_, ParseError>`, so this `From` lets their
-/// `?` on a lexer call auto-unbox on the (rare) error path.
-impl From<Box<ParseError>> for ParseError {
+// The whole point of the newtype — guard it. `Box` is non-null, so the niche also carries
+// `Result<(), ParseError>` down to a bare pointer.
+const _: () = assert!(size_of::<ParseError>() == size_of::<*const ()>());
+const _: () = assert!(size_of::<Result<()>>() == size_of::<*const ()>());
+
+impl fmt::Display for ParseError {
     #[inline]
-    fn from(boxed: Box<ParseError>) -> Self {
-        *boxed
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
     }
 }
 
-/// Construct a boxed lexer error, the counterpart to the `From<Box<ParseError>>` above.
-/// The language lexers return `Result<_, Box<ParseError>>`: boxing keeps the hot
-/// `next_token` Ok path pointer-sized (an inline `ParseError` would bloat the `Result` and
-/// block inlining/SROA of the token pump). `#[cold]` / `#[inline(never)]` outlines the
-/// construction so it never bloats the inlined token-scan fast path. Shared by all three
-/// language lexers (`tsv_ts`, `tsv_css`, `tsv_svelte`).
+impl fmt::Debug for ParseError {
+    #[inline]
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        self.0.fmt(f)
+    }
+}
+
+impl std::error::Error for ParseError {}
+
+/// Result type alias for parsing operations
+pub type Result<T> = std::result::Result<T, ParseError>;
+
+/// Construct a lexer error. `#[cold]` / `#[inline(never)]` outlines the construction so it
+/// never bloats the inlined token-scan fast path. Shared by all three language lexers
+/// (`tsv_ts`, `tsv_css`, `tsv_svelte`).
 #[cold]
 #[inline(never)]
-#[allow(clippy::unnecessary_box_returns)] // the box is the point — keeps the hot Result pointer-sized
-pub fn lex_err(message: impl Into<String>, position: usize) -> Box<ParseError> {
-    Box::new(ParseError::InvalidSyntax {
-        message: message.into(),
-        position,
-        context: None,
-    })
+pub fn lex_err(message: impl Into<String>, position: usize) -> ParseError {
+    ParseError::invalid_syntax(message.into(), position)
 }
 
 impl ParseError {
+    #[inline]
+    fn new(kind: ParseErrorKind) -> Self {
+        ParseError(Box::new(kind))
+    }
+
+    /// A general parse error at `position`.
+    pub fn invalid_syntax(message: String, position: usize) -> Self {
+        ParseError::new(ParseErrorKind::InvalidSyntax {
+            message,
+            position,
+            context: None,
+        })
+    }
+
+    /// Found `found` where `expected` was required.
+    pub fn unexpected_token(expected: String, found: String, position: usize) -> Self {
+        ParseError::new(ParseErrorKind::UnexpectedToken {
+            expected,
+            found,
+            position,
+            context: None,
+        })
+    }
+
+    /// Input ended while more was required.
+    pub fn unexpected_eof(position: usize) -> Self {
+        ParseError::new(ParseErrorKind::UnexpectedEof {
+            position,
+            context: None,
+        })
+    }
+
+    /// Found `found` where an expression was required.
+    pub fn invalid_expression(found: String, position: usize) -> Self {
+        ParseError::new(ParseErrorKind::InvalidExpression {
+            found,
+            position,
+            context: None,
+        })
+    }
+
+    /// Source exceeds the 4 GB cap the `u32` span offsets assume.
+    pub fn file_too_large(size: usize, max: usize) -> Self {
+        ParseError::new(ParseErrorKind::FileTooLarge { size, max })
+    }
+
     /// Add source context to an error
     ///
     /// Call this to enrich errors with source snippets for better debugging.
     /// Example:
     /// ```ignore
-    /// let err = ParseError::UnexpectedToken { ... };
+    /// let err = ParseError::unexpected_token(expected, found, position);
     /// let rich_err = err.with_context(source);
     /// ```
-    pub fn with_context(self, source: &str) -> Self {
-        match self {
-            ParseError::UnexpectedToken {
-                expected,
-                found,
-                position,
-                context: _,
-            } => ParseError::UnexpectedToken {
-                expected,
-                found,
-                position,
-                context: ErrorContext::from_source(source, position),
-            },
-            ParseError::UnexpectedEof {
-                position,
-                context: _,
-            } => ParseError::UnexpectedEof {
-                position,
-                context: ErrorContext::from_source(source, position),
-            },
-            ParseError::InvalidSyntax {
-                message,
-                position,
-                context: _,
-            } => ParseError::InvalidSyntax {
-                message,
-                position,
-                context: ErrorContext::from_source(source, position),
-            },
-            ParseError::InvalidExpression {
-                found,
-                position,
-                context: _,
-            } => ParseError::InvalidExpression {
-                found,
-                position,
-                context: ErrorContext::from_source(source, position),
-            },
-            other => other, // FileTooLarge doesn't need context
-        }
+    pub fn with_context(mut self, source: &str) -> Self {
+        // Filling in place rather than rebuilding the variant: the payload is already
+        // boxed, so this is a write through the pointer instead of a 96-byte move.
+        let (position, slot) = match &mut *self.0 {
+            ParseErrorKind::UnexpectedToken {
+                position, context, ..
+            }
+            | ParseErrorKind::UnexpectedEof { position, context }
+            | ParseErrorKind::InvalidSyntax {
+                position, context, ..
+            }
+            | ParseErrorKind::InvalidExpression {
+                position, context, ..
+            } => (*position, context),
+            // FileTooLarge doesn't need context
+            ParseErrorKind::FileTooLarge { .. } => return self,
+        };
+        *slot = ErrorContext::from_source(source, position);
+        self
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// `Display` forwards to the boxed kind, so the rendered message must be exactly
+    /// what the enum's `#[error(...)]` attributes produce — both the bare
+    /// `at position N` fallback and the caret form `with_context` fills in. The
+    /// error-message fixtures and `input_invalid_*` gate this at the product level;
+    /// this pins it beside the forwarding impl.
+    #[test]
+    fn test_display_renders_through_the_newtype() {
+        let source = "let x =\ny";
+
+        let e = ParseError::invalid_syntax("bad token".to_string(), 4);
+        assert_eq!(e.to_string(), "bad token at position 4");
+        assert_eq!(
+            e.with_context(source).to_string(),
+            "bad token\n1:5 let x =\n       ^ here"
+        );
+
+        let e = ParseError::unexpected_token("';'".to_string(), "'y'".to_string(), 8);
+        assert_eq!(e.to_string(), "Expected ';', found 'y' at position 8");
+        assert_eq!(
+            e.with_context(source).to_string(),
+            "Expected ';', found 'y'\n2:1 y\n   ^ here"
+        );
+
+        assert_eq!(
+            ParseError::unexpected_eof(9).to_string(),
+            "Unexpected end of file at position 9"
+        );
+        assert_eq!(
+            ParseError::invalid_expression("'='".to_string(), 6).to_string(),
+            "Expected expression, found '=' at position 6"
+        );
+        assert_eq!(
+            ParseError::file_too_large(5, 4).to_string(),
+            "File too large: 5 bytes (maximum: 4 bytes / 4GB)"
+        );
+
+        // `with_context` on the context-free variant is a no-op, not a panic.
+        assert_eq!(
+            ParseError::file_too_large(5, 4)
+                .with_context(source)
+                .to_string(),
+            "File too large: 5 bytes (maximum: 4 bytes / 4GB)"
+        );
+
+        // `Debug` forwards too, so it prints the kind — not a `ParseError(..)` wrapper.
+        assert!(
+            format!("{:?}", ParseError::unexpected_eof(9)).starts_with("UnexpectedEof"),
+            "Debug must forward to the kind"
+        );
+    }
 
     #[test]
     fn test_error_context_at_eof_no_newline() {

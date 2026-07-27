@@ -8,11 +8,7 @@ use tsv_lang::ParseError;
 ///
 /// **Architecture**: Lexer preserves raw content → Parser decodes → Conversion applies Svelte quirks
 /// This matches TypeScript's approach and keeps the lexer simple and consistent.
-pub(crate) fn read_string(
-    source: &str,
-    pos: &mut usize,
-    quote: char,
-) -> Result<Token, Box<ParseError>> {
+pub(crate) fn read_string(source: &str, pos: &mut usize, quote: char) -> Result<Token, ParseError> {
     let start = *pos;
     let bytes = source.as_bytes();
     let len = bytes.len();

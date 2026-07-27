@@ -243,7 +243,7 @@ impl<'a> Lexer<'a> {
 
     /// Seek to a specific position and re-lex from there.
     /// Used when splitting compound tokens like `>=` into `>` + `=`.
-    pub fn seek_and_next_token(&mut self, position: usize) -> Result<Token, Box<ParseError>> {
+    pub fn seek_and_next_token(&mut self, position: usize) -> Result<Token, ParseError> {
         self.set_position(position);
         self.next_token()
     }
@@ -290,7 +290,7 @@ impl<'a> Lexer<'a> {
         &mut self,
         first_char: char,
         dst: &mut Token,
-    ) -> Result<(), Box<ParseError>> {
+    ) -> Result<(), ParseError> {
         let start = self.position;
         // None until an actual escape is decoded; `decoded.is_some()` ⇔ has-escapes.
         let mut decoded: Option<String> = None;
@@ -425,10 +425,7 @@ impl<'a> Lexer<'a> {
     /// over-acceptances acorn flags as "Numeric separator is not allowed …".
     /// Returns whether at least one digit was consumed (callers enforce the
     /// "≥1 digit after a radix prefix" rule).
-    fn scan_digits(
-        &mut self,
-        is_valid_digit: impl Fn(char) -> bool,
-    ) -> Result<bool, Box<ParseError>> {
+    fn scan_digits(&mut self, is_valid_digit: impl Fn(char) -> bool) -> Result<bool, ParseError> {
         // Digits and `_` are ASCII, so a byte scan suffices: a non-ASCII byte
         // (`b as char` ∈ U+0080..=U+00FF) is never a valid digit, so the predicate
         // breaks the loop just as it would on any other terminator.
@@ -463,7 +460,7 @@ impl<'a> Lexer<'a> {
     /// Handles: 123, 1.5, 1e3, 1.5e-2, 1_000, 1.e1. Returns whether the literal
     /// is integer-form (no fractional part and no exponent) — the only decimal
     /// shape a BigInt `n` suffix may follow (`1.5n` / `1e3n` are rejected).
-    fn scan_decimal_number(&mut self) -> Result<bool, Box<ParseError>> {
+    fn scan_decimal_number(&mut self) -> Result<bool, ParseError> {
         // `s` starts at the char after a `.`. Returns true when `s` begins a valid
         // exponent (`e`/`E`, optional sign, then a digit) — i.e. `1.e1` is one number.
         fn is_exponent_start(s: &str) -> bool {
@@ -541,7 +538,7 @@ impl<'a> Lexer<'a> {
         start: usize,
         first: u8,
         dst: &mut Token,
-    ) -> Result<(), Box<ParseError>> {
+    ) -> Result<(), ParseError> {
         // Radix literals (`0x`/`0b`/`0o`) are always integer-form, so a BigInt
         // `n` suffix is always allowed after them; a decimal literal allows `n`
         // only when it carries no fraction and no exponent.
@@ -658,7 +655,7 @@ impl<'a> Lexer<'a> {
         start: usize,
         quote: u8,
         dst: &mut Token,
-    ) -> Result<(), Box<ParseError>> {
+    ) -> Result<(), ParseError> {
         self.advance(); // consume opening quote
         let content_start = self.position;
 
@@ -686,8 +683,7 @@ impl<'a> Lexer<'a> {
                 // String/Box allocation); `has_decoded` was cleared at entry and is
                 // set only when this token actually carries escapes.
                 if has_escapes {
-                    escapes::decode_string_escapes_into(content, &mut self.decode_scratch)
-                        .map_err(Box::new)?;
+                    escapes::decode_string_escapes_into(content, &mut self.decode_scratch)?;
                     self.has_decoded = true;
                 }
                 *dst = Token {
@@ -767,7 +763,7 @@ impl<'a> Lexer<'a> {
     /// write `dst` (or propagate the error) via an early `return`.
     /// [`Lexer::next_token`] is the thin by-value wrapper kept for the
     /// peek/seek/bootstrap callers.
-    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), Box<ParseError>> {
+    pub fn next_token_into(&mut self, dst: &mut Token) -> Result<(), ParseError> {
         // Clear the decoded-value flag from the previous token so `decoded_str`
         // reflects only the token produced by this call (set by the escape paths below).
         self.has_decoded = false;
@@ -1138,7 +1134,7 @@ impl<'a> Lexer<'a> {
 
     /// By-value next-token for the peek/seek/bootstrap callers. The hot advance
     /// path uses [`Lexer::next_token_into`] to write the parser cursor in place.
-    pub fn next_token(&mut self) -> Result<Token, Box<ParseError>> {
+    pub fn next_token(&mut self) -> Result<Token, ParseError> {
         let mut tok = Token {
             kind: TokenKind::Eof,
             start: 0,
@@ -1206,7 +1202,7 @@ impl<'a> Lexer<'a> {
     /// - TemplateHead: Start of template with `${` interpolation
     /// - TemplateMiddle: Middle section between interpolations (}...${)
     /// - TemplateTail: End section after last interpolation (}...`)
-    fn read_template_into(&mut self, start: usize, dst: &mut Token) -> Result<(), Box<ParseError>> {
+    fn read_template_into(&mut self, start: usize, dst: &mut Token) -> Result<(), ParseError> {
         self.advance(); // consume opening ` or }
 
         let content_start = self.position;
@@ -1267,10 +1263,7 @@ impl<'a> Lexer<'a> {
     /// plus the position of the closing `/` (the pattern/flags boundary), letting
     /// the parser slice `[slash_start+1, close]` and `[close+1, end]` without the
     /// caller ever materializing the strings (`token.decoded` is `None`).
-    pub fn read_regex_literal(
-        &mut self,
-        slash_start: usize,
-    ) -> Result<(Token, usize), Box<ParseError>> {
+    pub fn read_regex_literal(&mut self, slash_start: usize) -> Result<(Token, usize), ParseError> {
         // A regex token never carries a decoded value; clear any left from the
         // previous token so the parser's `decoded_str()` after this lex sees `None`.
         self.has_decoded = false;
@@ -1400,10 +1393,7 @@ impl<'a> Lexer<'a> {
     ///
     /// `brace_end` is the position just after the `}` where template content starts.
     /// The lexer will sync to this position and read the rest of the template.
-    pub fn continue_template_from_brace(
-        &mut self,
-        brace_end: usize,
-    ) -> Result<Token, Box<ParseError>> {
+    pub fn continue_template_from_brace(&mut self, brace_end: usize) -> Result<Token, ParseError> {
         // Standalone token-producing entry point — clear the out-of-band decoded slot
         // so `decoded_str()` reflects only the segment produced here (set below on escapes).
         self.has_decoded = false;
@@ -1455,7 +1445,7 @@ impl<'a> Lexer<'a> {
     /// Only valid at the start of the file (position 0).
     /// Reads until end of line or end of file.
     /// Returns as a Comment token with is_block: false.
-    fn read_hashbang_into(&mut self, start: usize, dst: &mut Token) -> Result<(), Box<ParseError>> {
+    fn read_hashbang_into(&mut self, start: usize, dst: &mut Token) -> Result<(), ParseError> {
         // Skip #!
         self.advance(); // #
         self.advance(); // !

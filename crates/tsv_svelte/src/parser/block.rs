@@ -451,21 +451,13 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             Some(b'{') => (b'{', b'}'),
             Some(b'[') => (b'[', b']'),
             _ => {
-                return Err(ParseError::InvalidSyntax {
-                    message: "Expected { or [".to_string(),
-                    position: 0,
-                    context: None,
-                });
+                return Err(ParseError::invalid_syntax("Expected { or [".to_string(), 0));
             }
         };
 
         match_bracket(bytes, 0, bytes.len(), open, close, TriviaProfile::JS)
             .map(|close_pos| close_pos + 1) // include the closing bracket
-            .ok_or_else(|| ParseError::InvalidSyntax {
-                message: "Unmatched bracket".to_string(),
-                position: 0,
-                context: None,
-            })
+            .ok_or_else(|| ParseError::invalid_syntax("Unmatched bracket".to_string(), 0))
     }
 
     /// Parse ", index" and/or "(key)" after the context pattern
@@ -1144,10 +1136,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             b'>',
             TriviaProfile::JS,
         )
-        .ok_or(ParseError::UnexpectedEof {
-            position: content.len(),
-            context: None,
-        })
+        .ok_or_else(|| ParseError::unexpected_eof(content.len()))
     }
 
     /// Scan source from a position until we find the closing } of a block tag

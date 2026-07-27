@@ -227,13 +227,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Find the top-level `=` in a declaration string (not inside brackets/braces,
     /// strings, or comments) — the one separating the binding from its initializer.
     fn find_top_level_equals(&self, s: &str) -> Result<usize, ParseError> {
-        super::find_top_level_delim(s.as_bytes(), 0, s.len(), b'=', TriviaProfile::JS).ok_or_else(
-            || ParseError::InvalidSyntax {
-                message: "Expected '=' in declaration".to_string(),
-                position: 0,
-                context: None,
-            },
-        )
+        super::find_top_level_delim(s.as_bytes(), 0, s.len(), b'=', TriviaProfile::JS)
+            .ok_or_else(|| ParseError::invalid_syntax("Expected '=' in declaration".to_string(), 0))
     }
 
     /// Parse a debug tag: {@debug} or {@debug x, y, z}
