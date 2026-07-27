@@ -149,10 +149,21 @@ impl<'a> Printer<'a> {
     /// printer states the same rule for `<script>` code; this is the `{@const}` tag's copy
     /// of it, and without it a self-expanding value (object, array) took the fluid layout
     /// and glued the run to `=`, diverging from prettier for a plain comment too.
+    ///
+    /// **on page**, not to-emit: hanging the value is a LAYOUT decision, and a block glued
+    /// to the value is *owned* by it — emitted from inside the value's own doc, so an
+    /// emit-keyed scan never sees it and the gate went blind to exactly the comments that
+    /// sit closest to the value. That blindness is what let `{@const b = /**⏎ * c⏎ */ x}`
+    /// stay inline where `<script>`'s `const b = …` hung it, on the same input.
+    ///
+    /// An **indentable** block hangs even when glued (its reprint is hard lines); a
+    /// preserved multi-line block glued to the value does not (see
+    /// [`tsv_lang::is_indentable_block`]) — the shared rule, so the two hosts cannot
+    /// answer it differently.
     fn gap_comment_hangs_value(&self, gap_start: u32, value_start: u32) -> bool {
-        comments_to_emit_in_range(self.comments, gap_start, value_start).any(|c| {
+        tsv_lang::comments_on_page_in_range(self.comments, gap_start, value_start).any(|c| {
             !c.is_block
-                || c.multiline
+                || tsv_lang::is_indentable_block(self.source, c)
                 || tsv_lang::source_scan::has_newline_after_position(self.source, c.span.end)
         })
     }
