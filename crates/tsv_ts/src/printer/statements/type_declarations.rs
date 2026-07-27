@@ -681,7 +681,7 @@ impl<'a> Printer<'a> {
         // the brace onto the next line. See heritage_last_item_line_comment.
         let mut parts: DocBuf = smallvec![
             header_doc,
-            self.build_header_pre_body_doc(true, header_end, body_start),
+            self.build_header_pre_body_doc(true, header_end, body_start, false),
         ];
 
         if decl.body.body.is_empty() {

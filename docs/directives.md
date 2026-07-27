@@ -309,6 +309,65 @@ reach still reformats. Parens the printer supplies for clarity stay outside too:
 an assignment initializer still prints as `const aaa = (bbb = ccc)` around the
 frozen slice.
 
+### On statement positions
+
+Statements follow the same rule. In a statement **list** — a `switch` body's
+cases, a case label's consequent statements, and (already) a program or block
+body — an own-line directive freezes the **following** statement or case:
+
+```ts
+switch (aaa) {
+	// format-ignore
+	case   1:
+		fn(  bbb  );
+	case 2:
+		fn(ccc);
+}
+```
+
+At a statement **head** it freezes the single statement, clause or body that
+follows — the consequent and alternate of an `if`, any loop's body, a labeled
+statement's body, a `catch` or `finally` clause, and a class body:
+
+```ts
+if (aaa)
+	// format-ignore
+	fn(  bbb  );
+
+while (aaa)
+	// format-ignore
+	fn(  bbb  );
+
+lll:
+// format-ignore
+for (;;) {
+	fn(  ccc  );
+	break lll;
+}
+
+try {
+	fn(aaa);
+}
+// format-ignore
+catch (  eee  ) {
+	fn(  ddd  );
+}
+
+class Aaa
+// format-ignore
+{
+	mmm(  ) {}
+}
+```
+
+A `case` label rides inside its own frozen case, and a class name and `extends`
+clause stay parent-owned outside the frozen body — so the siblings the freeze
+does not reach still reformat.
+
+One position is inert: a directive between a **decorator** and its declaration
+freezes nothing, because the decorator belongs to the declaration and the gap is
+inside the statement rather than before it.
+
 ## `format-ignore-start` / `format-ignore-end`
 
 In Svelte templates, a pair of range markers preserves every node between them:
