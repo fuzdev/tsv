@@ -1026,7 +1026,7 @@ the gap via `blank_scan_start` / `blank_scan_end`, not just the ones this caller
 that *reassembles* a node instead of routing through `build_expression_doc` must claim it
 on its own seam (`prepend_owned_leading_comment_at`); (2) an owned comment travels
 *inside* its node's doc, so the gap around it can't see it — ask the node instead
-(`owned_leading_comment_hangs_value`, the single seam for that question); (3) a region the
+(`owned_leading_comment_effect`, the single seam for that question); (3) a region the
 parser *lifts out* of its container is still inside the container's gap, so two emitters
 print it (`AttrGaps::claimed` is that seam) — and ownership masks it: only a line comment
 (never owned) exposes the double-print; (4) an **alternate-layout container builder** that

@@ -85,6 +85,24 @@ impl Comment {
     }
 }
 
+/// Whether `comment` is a multi-line block comment that **prints as indented lines** —
+/// the comment-level form of [`printing::is_indentable_block_comment`] (prettier's
+/// `isIndentableBlockComment`), which every printer reprints with hard lines.
+///
+/// The layout question a *glued* multi-line comment poses. Its sibling, a **preserved**
+/// (non-indentable) block, is emitted verbatim and carries no break out to the enclosing
+/// group, so a value glued to its `*/` stays on the operator's line. `multiline` alone
+/// cannot tell the two apart, and answering with it hangs values prettier leaves inline.
+///
+/// Shared across the language printers for the same reason
+/// [`is_honored_format_ignore`] is: two printers answering it differently means one host
+/// hangs a value its sibling keeps inline (`<script>`'s `=` vs the `{@const}` tag's).
+pub fn is_indentable_block(source: &str, comment: &Comment) -> bool {
+    comment.is_block
+        && comment.multiline
+        && printing::is_indentable_block_comment(comment.content(source).split('\n'))
+}
+
 //
 // Format-Ignore Directive Recognition
 //

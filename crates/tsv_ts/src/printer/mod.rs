@@ -52,7 +52,7 @@ pub(crate) use analysis::{
     object_pattern_should_expand, template_literal_has_newlines,
 };
 pub(crate) use comments::{
-    CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
+    CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue, OwnedCommentEffect,
 };
 pub use expressions::assignment::should_inline_logical_expression;
 pub(crate) use expressions::assignment::{
@@ -938,6 +938,22 @@ impl<'a> Printer<'a> {
     /// anchor — each comment is judged against whatever immediately precedes it.
     pub(crate) fn is_own_line_comment(&self, comment: &internal::Comment) -> bool {
         !comment.is_block || has_newline_before_position(self.source, comment.span.start)
+    }
+
+    /// Whether a multi-line block comment **prints as indented lines**
+    /// ([`tsv_lang::is_indentable_block`]) — the form `build_comment_doc` reprints as a
+    /// [`tsv_lang::doc::arena::DocNode::MultilineText`] whose newlines are hard lines.
+    ///
+    /// The layout question a *glued* multi-line comment poses, and **not** `multiline`:
+    /// only this form carries a break out to the enclosing group.
+    ///
+    /// ⚠️ **Not** `DocArena::will_break` on the comment's doc, which answers `true` for
+    /// both shapes: tsv emits a preserved block's interior through `literalline`s (a
+    /// genuine newline in the output, so `fits` must see it), where prettier emits one
+    /// opaque string. That difference is deliberate and lives in the renderer; the
+    /// *layout* question is this one.
+    pub(crate) fn block_comment_is_indentable(&self, comment: &internal::Comment) -> bool {
+        tsv_lang::is_indentable_block(self.source, comment)
     }
 
     /// Whether a block comment in `(start, end)` sits **alone on its own physical

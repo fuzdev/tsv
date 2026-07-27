@@ -112,15 +112,35 @@ pub(crate) fn is_string_literal(expr: &internal::Expression<'_>) -> bool {
 /// Pure property chains like `obj.a.b.c` or `obj!.a!.b!` should use fluid assignment wrapping
 /// (break after `=` if doesn't fit). Expressions containing calls, objects,
 /// arrays, or ternaries handle their own wrapping internally.
+///
+/// **At least one member link is required** — a bare `x` / `this` / `x!` is a chain *root*,
+/// not a chain, exactly as prettier's `isPoorlyBreakableMemberOrCallChain` opens on
+/// `isMemberish`. Answering `true` for a lone root made every `const a = x` pick
+/// break-after-operator, which renders identically whenever the value can't force a break —
+/// so the over-approximation stayed invisible until a value that *does* force one arrived
+/// (a glued preserved multi-line comment), and then it hung a value prettier leaves inline.
+/// The two questions are split below so the entry point cannot answer the root's.
 pub(crate) fn is_pure_property_chain(expr: &internal::Expression<'_>) -> bool {
     match expr {
-        // A member expression is a property chain if its object is also a pure chain
-        internal::Expression::MemberExpression(member) => is_pure_property_chain(member.object),
+        // One link, plus a pure-chain root beneath it
+        internal::Expression::MemberExpression(member) => is_property_chain_root(member.object),
         // TSNonNullExpression is transparent - recurse through it
         internal::Expression::TSNonNullExpression(non_null) => {
             is_pure_property_chain(non_null.expression)
         }
-        // Base case: identifiers, this, super are valid chain roots
+        _ => false,
+    }
+}
+
+/// Whether `expr` can sit at the bottom of a [`is_pure_property_chain`] — the chain's own
+/// links, or the identifier / `this` / `super` they bottom out in.
+fn is_property_chain_root(expr: &internal::Expression<'_>) -> bool {
+    match expr {
+        internal::Expression::MemberExpression(member) => is_property_chain_root(member.object),
+        // TSNonNullExpression is transparent - recurse through it
+        internal::Expression::TSNonNullExpression(non_null) => {
+            is_property_chain_root(non_null.expression)
+        }
         internal::Expression::Identifier(_)
         | internal::Expression::ThisExpression(_)
         | internal::Expression::Super(_) => true,

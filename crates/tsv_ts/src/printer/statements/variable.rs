@@ -4,13 +4,14 @@ use super::Printer;
 use crate::ast::internal::{self, Expression};
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::{
-    CommentFilter, CommentSpacing, CommentVec, LeadingGlue, ParenContext, analysis,
-    class_expr_has_decorators, conditional_should_break_after_op, is_call_on_member_chain,
-    is_curried_arrow_chain, is_curried_arrow_with_return_type, is_literal_member_chain,
-    is_module_path_fluid_call, is_multiline_string_literal, is_poorly_breakable_chain,
-    is_pure_property_chain, is_regex_root_chain, is_self_expanding_value, is_simple_self_expanding,
-    is_simple_value, is_single_call_on_member_chain, is_string_literal, is_type_assertion_call,
-    needs_parens, should_inline_logical_expression,
+    CommentFilter, CommentSpacing, CommentVec, LeadingGlue, OwnedCommentEffect, ParenContext,
+    analysis, class_expr_has_decorators, conditional_should_break_after_op,
+    is_call_on_member_chain, is_curried_arrow_chain, is_curried_arrow_with_return_type,
+    is_literal_member_chain, is_module_path_fluid_call, is_multiline_string_literal,
+    is_poorly_breakable_chain, is_pure_property_chain, is_regex_root_chain,
+    is_self_expanding_value, is_simple_self_expanding, is_simple_value,
+    is_single_call_on_member_chain, is_string_literal, is_type_assertion_call, needs_parens,
+    should_inline_logical_expression,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_to_emit_in_range;
@@ -621,16 +622,26 @@ impl<'a> Printer<'a> {
                     false
                 };
 
+                // A comment the initializer *owns* (a JSDoc cast, a bundler annotation) is
+                // glued to its first token and travels inside its doc, so the gap probes
+                // above cannot see it. It is still on the page and still decides the `=`
+                // layout — this declarator builds its own layout rather than routing
+                // through `build_assignment_layout`, so it applies the rule itself. Both
+                // halves come off one lookup; see `owned_leading_comment_effect`.
+                let owned_comment_effect = self.owned_leading_comment_effect(init);
+
                 let is_break_after_op_rhs = should_break_after_op_rhs
                     || needs_break_after_op_layout
                     || is_decorated_class_expr
-                    // A comment the initializer *owns* (a JSDoc cast, a bundler
-                    // annotation) is glued to its first token and travels inside its doc,
-                    // so the gap probes above cannot see it. It is still on the page and
-                    // still hangs the value — this declarator builds its own layout rather
-                    // than routing through `build_assignment_layout`, so it applies the
-                    // rule itself. See `owned_leading_comment_hangs_value`.
-                    || self.owned_leading_comment_hangs_value(init);
+                    // An indentable owned comment hangs the value.
+                    || owned_comment_effect == Some(OwnedCommentEffect::Hangs);
+
+                // The other half: a *preserved* multi-line comment the initializer owns
+                // ends the `=` line inside itself, so no width-decided break at `=` is
+                // meaningful and the plain `= value` form is the layout
+                // (`const a = /* line1⏎line2 */ x;`). Without this the fluid branches broke
+                // at `=` on the comment's own `literalline`s.
+                let init_pinned_to_eq = owned_comment_effect == Some(OwnedCommentEffect::Pins);
 
                 // Breakable LHS (destructuring patterns) with non-self-expanding RHS:
                 // Use fluid layout so the printer breaks at `=` before expanding the
@@ -647,7 +658,8 @@ impl<'a> Printer<'a> {
                     && is_layout_eligible
                     && !should_break
                     && !is_break_after_op_rhs
-                    && !is_expandable_member_call;
+                    && !is_expandable_member_call
+                    && !init_pinned_to_eq;
 
                 // Type assertion calls with LHS type annotation need special fluid handling
                 // (handled separately below because they need non-wrapping LHS type)
@@ -784,7 +796,7 @@ impl<'a> Printer<'a> {
                     parts.push(d.text(" ="));
                     let init_doc = make_init_doc(init_value_doc());
                     parts.push(hang_after_operator(d, init_doc));
-                } else if is_layout_eligible && !is_simple_value(init) {
+                } else if is_layout_eligible && !is_simple_value(init) && !init_pinned_to_eq {
                     // Fluid layout (default for layout-eligible values)
                     //
                     // Matches prettier's chooseLayout default: when no special layout

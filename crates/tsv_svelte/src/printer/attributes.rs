@@ -112,22 +112,14 @@ impl<'a> Printer<'a> {
     /// Single-line block comments: `/*content*/ ` (with trailing space).
     /// Line comments: `// content\n` (with hardline).
     ///
-    /// **Except for an honored directive**, whose block spellings take the hardline too: the
-    /// trailing space would put the following construct on the directive's line, and a
-    /// directive sharing its line is inert under the placement floor — so the freeze it
-    /// earned on this pass would be gone on the next. The line spelling already ends in a
-    /// hardline, which is why only the block arms need saying; *placement* keys the freeze,
-    /// never the spelling. Like `tsv_ts`'s header-gap emitter, the rule is about the
-    /// DIRECTIVE, not the target: a gap that doesn't freeze today can only ever start
-    /// honoring one if the placement survives to be read.
+    /// The block arms take a hardline instead whenever the comment doesn't glue to what
+    /// follows — see [`Self::leading_js_comment_separator`], which owns that rule. The line
+    /// spelling already ends in a hardline, which is why only the block arms consult it.
     pub(super) fn build_leading_js_comment_doc(&self, comment: &Comment) -> DocId {
         let d = self.d();
-        let honored = self.is_honored_directive(comment);
-        // What separates the comment from the construct it leads.
-        let separator = if honored { d.hardline() } else { d.text(" ") };
         if comment.is_block && comment.multiline {
             let doc = tsv_ts::build_comment_doc(d, comment, &self.ts_inputs());
-            return d.concat(&[doc, separator]);
+            return d.concat(&[doc, self.leading_js_comment_separator(comment)]);
         }
         let doc = if comment.is_block {
             let body = d.concat(&[
@@ -135,7 +127,7 @@ impl<'a> Printer<'a> {
                 d.source_span(comment.content_span, self.source),
                 d.text("*/"),
             ]);
-            d.concat(&[body, separator])
+            d.concat(&[body, self.leading_js_comment_separator(comment)])
         } else {
             // Content already includes the space after // (e.g., " comment" from "// comment")
             d.concat(&[
@@ -149,6 +141,35 @@ impl<'a> Printer<'a> {
         #[cfg(feature = "comment_check")]
         d.tag_comment_doc(doc, comment.span, self.source);
         doc
+    }
+
+    /// What separates a **block** leading comment from the construct it leads: a space when
+    /// the author glued the two together and the comment is free to share that line, a
+    /// hardline otherwise. Two independent reasons to break, one separator:
+    ///
+    /// - **The author left it on its own line** (a newline after the `*/`). This is
+    ///   prettier's `printLeadingComment` rule, and it reads only the source right after the
+    ///   comment (`hasNewline(text, locEnd(comment))`), never where the value starts. A
+    ///   trailing space instead pulled the value up onto the comment's closing line,
+    ///   reflowing a break the author gave a comment that cannot be reflowed.
+    /// - **An honored directive**, whose placement floor makes a shared line inert — so the
+    ///   freeze it earned on this pass would be gone on the next. Here the rule is about the
+    ///   DIRECTIVE, not the target: a gap that doesn't freeze today can only ever start
+    ///   honoring one if the placement survives to be read. *Placement* keys the freeze,
+    ///   never the spelling.
+    ///
+    /// ⚠️ Same intent as `tsv_ts`'s `Printer::comment_hugs_next`, but **not** the same
+    /// question, so this is deliberately not a call into it: that one is *anchored* (is the
+    /// token at `next` on the comment's line, read from the line-break table), which the
+    /// `<script>` gap emitters need because what follows a comment there may be another
+    /// comment. Here the rule is prettier's unanchored form — what the author wrote
+    /// immediately after the `*/` — so the two spellings are not interchangeable.
+    fn leading_js_comment_separator(&self, comment: &Comment) -> DocId {
+        let d = self.d();
+        let glued =
+            !tsv_lang::source_scan::has_newline_after_position(self.source, comment.span.end)
+                && !self.is_honored_directive(comment);
+        if glued { d.text(" ") } else { d.hardline() }
     }
 
     /// Build a Doc for a trailing JS comment (after content), before a closing
