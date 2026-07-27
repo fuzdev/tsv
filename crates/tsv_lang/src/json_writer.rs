@@ -215,26 +215,43 @@ fn digit_word(n: u32, digits: usize) -> u64 {
 /// One word is loaded once and tested three ways rather than scanned three
 /// times — the same trade `next_ecmascript_terminator` makes for its two
 /// needles.
+///
+/// The remainder is finished with an **overlapping final word** rather than a
+/// byte loop whenever the slice is at least 8 bytes long. Re-testing bytes the
+/// word loop already cleared is free here in a way it would not be for a
+/// position-returning scan: the answer is a boolean over the *union* of the
+/// bytes tested, so an overlap cannot change it. That matters because the
+/// strings arriving here are short — an identifier name straddles one or two
+/// words — so the tail is a large fraction of the whole scan, and a byte loop
+/// there gives back much of what the word loop won.
 #[inline]
 fn needs_escape(bytes: &[u8]) -> bool {
     let mut i = 0;
     while let Some(chunk) = bytes[i..].first_chunk::<8>() {
-        let w = u64::from_le_bytes(*chunk);
-        let hits =
-            lanes_less_than(w, 0x20) | zero_lanes(w ^ splat(b'"')) | zero_lanes(w ^ splat(b'\\'));
-        if hits != 0 {
+        if word_needs_escape(*chunk) {
             return true;
         }
         i += 8;
     }
-    while i < bytes.len() {
-        let b = bytes[i];
-        if b < 0x20 || b == b'"' || b == b'\\' {
-            return true;
-        }
-        i += 1;
+    if i == bytes.len() {
+        return false;
     }
-    false
+    if let Some(chunk) = bytes.last_chunk::<8>() {
+        // ≥ 8 bytes: the final word covers the whole remainder (and some
+        // already-cleared bytes, harmlessly — see above).
+        return word_needs_escape(*chunk);
+    }
+    // Shorter than one word, so the loop above never ran and there is nothing
+    // to overlap with.
+    bytes.iter().any(|&b| b < 0x20 || b == b'"' || b == b'\\')
+}
+
+/// [`needs_escape`]'s per-word kernel: does any of these eight bytes need a
+/// JSON escape?
+#[inline]
+const fn word_needs_escape(chunk: [u8; 8]) -> bool {
+    let w = u64::from_le_bytes(chunk);
+    lanes_less_than(w, 0x20) | zero_lanes(w ^ splat(b'"')) | zero_lanes(w ^ splat(b'\\')) != 0
 }
 
 /// Compact-JSON output buffer.
@@ -662,14 +679,20 @@ mod tests {
             cases.extend(next);
         }
         // ⚠️ The axis a word-at-a-time scan fails on: the same needle at every
-        // offset across the 8-byte stride, including the scalar tail. A corpus
-        // samples alignment arbitrarily; this pins all of it.
+        // offset across the 8-byte stride. A corpus samples alignment
+        // arbitrarily; this pins all of it. The **total length** is swept as
+        // well as the offset, and both matter — a fixed length that is a
+        // multiple of 8 never exercises the remainder, and an offset that never
+        // reaches the last word never puts the needle *in* the remainder. Each
+        // of those holes has hidden a corruption probe that the other caught.
         for piece in ALPHABET {
-            for offset in 0..24 {
-                let mut s = "a".repeat(offset);
-                s.push_str(piece);
-                s.push_str(&"b".repeat(24 - offset));
-                cases.push(s);
+            for len in 0..24usize {
+                for offset in 0..=len {
+                    let mut s = "a".repeat(offset);
+                    s.push_str(piece);
+                    s.push_str(&"b".repeat(len - offset));
+                    cases.push(s);
+                }
             }
         }
         for case in &cases {
