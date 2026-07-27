@@ -33,9 +33,15 @@ const DEC_PAIRS: [u8; 200] = {
     t
 };
 
-/// Decimal digits in `u64::MAX` — the width of [`JsonWriter::u64`]'s scratch,
-/// and the constant length of the copy that appends it.
+/// Decimal digits in `u64::MAX` — the width of the wide arm's scratch, and the
+/// constant length of the copy that appends it.
 const MAX_U64_DIGITS: usize = 20;
+
+/// Digits that fit one `u64` of packed ASCII — the width [`JsonWriter::u64`]'s
+/// hot arm generates entirely in a register. Every integer the writers emit
+/// (offsets, lines, columns) is far below `99_999_999`; wider values take the
+/// cold arm.
+const WORD_DIGITS: usize = 8;
 
 /// Decimal digit count of `n` (`0` is one digit) — the exact width
 /// [`JsonWriter::u64`] front-aligns its digits to.
@@ -162,8 +168,8 @@ impl JsonWriter {
 
     // ⚠️ `inline(never)`, and that is a **size** constraint. The body below is
     // small enough that LLVM will happily inline it at all ~200 writer call
-    // sites, and each copy carries the fixed-width scratch blit — which grew
-    // the `@fuzdev/tsv_parse_wasm` bundle 6% and blew its publish size bound.
+    // sites, and each copy carries the fixed-width blit — which grew the
+    // `@fuzdev/tsv_parse_wasm` bundle 6% and blew its publish size bound.
     // Out-of-line the win is unaffected: it comes from removing the libc
     // `memmove` **call** inside the body, not from removing the call *to* the
     // body (which the pre-existing code also paid).
@@ -172,27 +178,61 @@ impl JsonWriter {
         // Two-digit-pair formatting (itoa's approach): halves the divisions.
         // Writers emit several integers per node, so this is hot.
         //
-        // ⚠️ The append is a **fixed-width** copy of the whole scratch, then a
-        // `truncate` — deliberately, and it must stay that way. Appending
-        // `&tmp[..digits]` instead is a *runtime*-length copy, which lowers to
-        // a libc `memmove` **call** whose size-ladder dispatch costs several
-        // times the 1–3 bytes it actually moves. At ~6 integers per AST node
-        // that dispatch measured 7.5% of the whole parse→JSON run, dwarfing the
-        // extra stores a constant-width copy pays. A constant length lets LLVM
-        // inline the copy as two stores and never reach libc.
+        // ⚠️ The digits are generated **into a register**, never into a stack
+        // scratch, and that is a codegen constraint. The append must be a
+        // *constant*-length copy — a runtime-length one lowers to a libc
+        // `memmove` **call** whose size-ladder dispatch costs several times the
+        // 1–3 bytes it moves — but a constant-length copy out of a scratch
+        // array the pair loop just filled with 2-byte stores is worse still:
+        // the wide load that feeds the store cannot be store-forwarded past
+        // those narrow stores, and the store itself writes the scratch's full
+        // width (20 bytes to keep ~3). Measured, that single store instruction
+        // was **71% of this function's self time and ~22% of the whole
+        // parse→JSON run**. Packing the digits into a `u64` and appending its
+        // 8 `to_le_bytes` removes both: nothing round-trips through memory, and
+        // the store is one word instead of two vectors.
         //
-        // Front-aligning the digits is what makes the fixed-width append
-        // correct: knowing the exact width up front (`decimal_width`) lets the
-        // back-to-front generation land on index 0 rather than on the scratch's
-        // tail, so the bytes to keep are the *leading* `digits`.
+        // The accumulation runs least-significant pair first and shifts each
+        // earlier pair **up**, so in little-endian byte order the most
+        // significant digit lands at index 0 — the append is then a plain
+        // prefix and `truncate` keeps the leading `digits`.
         // ⚠️ The pair loop is driven by the remaining **width**, not by the
-        // remaining value — also a codegen constraint. Driving on `n >= 100`
-        // leaves LLVM unable to correlate the trip count with `digits`, so it
-        // must assume `i -= 2` can underflow and re-inserts a
-        // `panic_bounds_check` on all four scratch writes. `while i >= 2` makes
-        // non-underflow syntactic, and with `decimal_width` bounded the whole
-        // index range is provable, so every check folds away.
+        // remaining value. Driving on `n >= 100` leaves LLVM unable to
+        // correlate the trip count with `digits`, so it must assume `i -= 2`
+        // can underflow; `while i >= 2` makes non-underflow syntactic. The only
+        // indexing left is `DEC_PAIRS[(n % 100) * 2]`, provably in bounds.
         let digits = decimal_width(n);
+        if digits > WORD_DIGITS {
+            self.u64_wide(n, digits);
+            return;
+        }
+        let mut word = 0u64;
+        let mut i = digits;
+        let mut n = n;
+        while i >= 2 {
+            let pair = (n % 100) as usize * 2;
+            n /= 100;
+            i -= 2;
+            word =
+                (word << 16) | u64::from(DEC_PAIRS[pair]) | (u64::from(DEC_PAIRS[pair + 1]) << 8);
+        }
+        if i == 1 {
+            // Odd digit count: the leading digit is whatever the pair loop
+            // left behind.
+            word = (word << 8) | u64::from(b'0' + n as u8);
+        }
+        let len = self.buf.len();
+        self.buf.extend_from_slice(&word.to_le_bytes());
+        self.buf.truncate(len + digits);
+    }
+
+    /// The `> WORD_DIGITS` arm of [`JsonWriter::u64`] — a value past
+    /// `99_999_999`, which no offset, line or column in a real document
+    /// reaches. Out-of-line and `cold` so the hot arm keeps its straight-line
+    /// shape and the wide scratch never enters its stack frame.
+    #[cold]
+    #[inline(never)]
+    fn u64_wide(&mut self, n: u64, digits: usize) {
         let mut tmp = [0u8; MAX_U64_DIGITS];
         let mut i = digits;
         let mut n = n;
@@ -204,13 +244,9 @@ impl JsonWriter {
             tmp[i + 1] = DEC_PAIRS[pair + 1];
         }
         if i == 1 {
-            // Odd digit count: the leading digit is whatever the pair loop
-            // left behind.
             tmp[0] = b'0' + n as u8;
         }
-        let len = self.buf.len();
-        self.buf.extend_from_slice(&tmp);
-        self.buf.truncate(len + digits);
+        self.buf.extend_from_slice(&tmp[..digits]);
     }
 
     #[inline]
@@ -351,9 +387,9 @@ mod tests {
 
     #[test]
     fn u64_appends_without_disturbing_prior_bytes() {
-        // The in-place generation writes through a raw pointer into spare
-        // capacity; this pins that it neither clobbers what precedes it nor
-        // leaves uninitialized bytes behind across a realloc.
+        // The append writes a fixed-width word and truncates back; this pins
+        // that it neither clobbers what precedes it nor leaves any of the
+        // over-written tail behind, across a realloc and at every digit width.
         let mut w = JsonWriter::with_capacity(0);
         let mut expected = String::new();
         for n in (0..5_000u64).map(|i| i.wrapping_mul(2_654_435_761)) {
