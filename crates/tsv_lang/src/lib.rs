@@ -15,6 +15,8 @@
 //! - `sizing` - sizing heuristics for public-AST JSON / arena buffers
 //! - `json_writer` - shared wire-JSON emission substrate (`json` feature)
 //! - `hash` - dep-free multiply-xor hasher for the integer-keyed side tables
+//! - `swar` - word-at-a-time byte-search kernels shared by the line scans and
+//!   the wire-JSON escape prescan
 
 mod comment;
 #[cfg(feature = "comment_check")]
@@ -32,6 +34,7 @@ pub mod printing;
 mod sizing;
 pub mod source_scan;
 mod span;
+mod swar;
 
 pub use comment::{
     ClassifiedComments, Comment, CommentPosition, classify_comment, classify_comment_fast,
