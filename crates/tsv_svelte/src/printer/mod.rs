@@ -28,7 +28,7 @@ mod text;
 use self::text::TextAnalysis;
 use crate::ast::internal::{self, FragmentNode};
 use std::cell::{Cell, RefCell};
-use std::collections::HashSet;
+use tsv_lang::FxHashSet;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{
@@ -97,7 +97,10 @@ pub(crate) struct Printer<'a> {
     /// element-nested blocks (different spans) keep the multiline body-drop divergence (e.g.
     /// `blocks/await/preceding_sibling_body_long`). Populated once by
     /// [`Printer::mark_root_inline_run_blocks`] before the root content is built.
-    root_inline_run_block_starts: RefCell<HashSet<u32>>,
+    /// Hashed by `tsv_lang`'s `FxHasher` rather than SipHash — only
+    /// `insert`/`contains`/`clear` are used, never iteration, so the hasher is
+    /// unobservable (see `tsv_lang::hash`'s module docs).
+    root_inline_run_block_starts: RefCell<FxHashSet<u32>>,
 }
 
 impl<'a> Printer<'a> {
@@ -133,7 +136,7 @@ impl<'a> Printer<'a> {
                 .any(|c| is_format_ignore_directive(c.content(source))),
             line_breaks,
             block_dangle_allowed: Cell::new(true),
-            root_inline_run_block_starts: RefCell::new(HashSet::new()),
+            root_inline_run_block_starts: RefCell::new(FxHashSet::default()),
         }
     }
 

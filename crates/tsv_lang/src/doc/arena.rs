@@ -14,9 +14,10 @@
 //! - Bulk deallocation
 
 use std::cell::{Cell, RefCell};
-use std::collections::HashMap;
 
 use smallvec::SmallVec;
+
+use crate::hash::FxHashMap;
 
 use crate::Span;
 use crate::config::TAB_WIDTH;
@@ -628,8 +629,10 @@ pub struct DocArena {
     /// empty (stale `DocId`s from a prior document are unreachable — cleared
     /// before any read) and only capacity persists across `reset()`. Only ever
     /// affects allocation, never output (a hit is byte-identical to a rebuild
-    /// by the consumer's eligibility rules).
-    share_map_scratch: RefCell<HashMap<usize, DocId>>,
+    /// by the consumer's eligibility rules). Hashed by [`crate::hash::FxHasher`]
+    /// rather than SipHash — the consumer only ever does `get`/`insert`/`clear`,
+    /// never iterates, so the hasher is unobservable (see `hash`'s module docs).
+    share_map_scratch: RefCell<FxHashMap<usize, DocId>>,
     /// Memoized `will_break(id)` results, indexed by `DocId`. Lazily extended to
     /// match `nodes`; sound because nodes are append-only and the arena is
     /// per-format, so a node's `will_break` value never changes once it exists.
@@ -775,7 +778,7 @@ impl DocArena {
             line_spans_scratch: RefCell::new(Vec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
             docbuf_pool: RefCell::new(Vec::new()),
-            share_map_scratch: RefCell::new(HashMap::new()),
+            share_map_scratch: RefCell::new(FxHashMap::default()),
             will_break_cache: RefCell::new(Vec::new()),
             flat_width_cache: RefCell::new(Vec::new()),
             static_cache: [const { Cell::new(StaticSlot::EMPTY) }; STATIC_CACHE_SLOTS],
@@ -826,7 +829,7 @@ impl DocArena {
             line_spans_scratch: RefCell::new(Vec::new()),
             line_breaks_scratch: Cell::new(Vec::new()),
             docbuf_pool: RefCell::new(Vec::new()),
-            share_map_scratch: RefCell::new(HashMap::new()),
+            share_map_scratch: RefCell::new(FxHashMap::default()),
             // The fitting memos top out at `nodes.len()` (~= `estimated_nodes`),
             // growing from 0 via repeated `resize(nodes.len(), …)`; pre-reserve
             // to absorb those reallocs. Only capacity changes — never values.
@@ -2227,7 +2230,7 @@ impl DocArena {
     /// than holding a `RefMut` open. The consumer owns the clear-at-scope-
     /// entry/exit protocol; this accessor deliberately does NOT clear.
     #[inline]
-    pub fn share_map_scratch(&self) -> &RefCell<HashMap<usize, DocId>> {
+    pub fn share_map_scratch(&self) -> &RefCell<FxHashMap<usize, DocId>> {
         &self.share_map_scratch
     }
 

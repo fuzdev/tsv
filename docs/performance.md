@@ -491,6 +491,8 @@ is only comparable to another anchor over the same corpus.
    the full `deno task bench` also runs the node conformance coverage surface — a
    pre-flight parse-coverage pass, no timed phase)
 3. **Record results** — for regression detection, use `deno task bench:deno:run -- --save-baseline` / `-- --compare-baseline` (or the `bench:node:run` / `bench:bun:run` siblings for the other runtimes)
+4. **Check the size axis if the change shrank a hot function** — see
+   [An instruction A/B is blind to code size](#an-instruction-ab-is-blind-to-code-size); no `check` gate covers it
 
 ### Before optimizing a scan, print what it finds
 
@@ -542,6 +544,40 @@ a result here:
   binaries.** Building a `codegen-units=16` variant inside the baseline's checkout
   overwrites its `target/`, after which a "cu1" run silently compares cu16-baseline
   against cu1-candidate. A build that finishes suspiciously fast is the tell.
+
+### An instruction A/B is blind to code size
+
+**A lever that makes a hot leaf smaller or simpler gets inlined at more call
+sites, and pays for itself in bytes at every one of them.** The instruction
+counter cannot see that, and neither can any gate in `deno task check` — the size
+bounds live in `scripts/validate_artifacts.ts`, which runs at **publish** time
+(`deno task publish` Step 3), not in `check`.
+
+The worked case: rewriting the wire writer's integer emitter to end in a
+fixed-width copy instead of a runtime-length one removed a libc `memmove` call
+and measured a clean **−3.2% parse-product instructions**. It also grew
+`@fuzdev/tsv_parse_wasm` **+6% raw, past its `max` bound** — the smaller body was
+now inlined at ~200 writer call sites, each carrying the fixed-width blit.
+`cargo test --workspace`, `deno task check`, an 8,257-file byte-identity diff and
+the instruction A/B were **all green through the regression**.
+
+So a "make a hot leaf smaller" change ships with the size axis measured too:
+
+```bash
+deno task build:wasm:parse:deno && deno task build:wasm:deno
+# compare raw bytes against BOUNDS in scripts/validate_artifacts.ts
+```
+
+Two rules fall out:
+
+- **Measure HEAD's bundle too, not just the bound.** A bound can already sit near
+  its limit from unrelated work, and attributing that to your change wastes a
+  session (the mirror of the general "verify HEAD is green before blaming
+  yourself" rule).
+- **Reach for `#[inline(never)]` before abandoning the win.** Where the win comes
+  from work removed *inside* a function body, keeping the body out-of-line costs
+  nothing — the caller was already paying the call. In the case above it kept the
+  entire instruction win and left both bundles *smaller* than baseline.
 
 ## WASM bundle size
 
