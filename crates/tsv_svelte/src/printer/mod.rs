@@ -32,8 +32,9 @@ use tsv_lang::FxHashSet;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{
-    Comment, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, is_format_ignore_directive,
-    is_format_ignore_range_end, is_format_ignore_range_start,
+    Comment, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, comments_in_source_range,
+    is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
+    is_honored_format_ignore,
 };
 use tsv_ts::Expression;
 
@@ -385,6 +386,51 @@ fn collect_html_comment_spans(fragment: &internal::Fragment<'_>, out: &mut Vec<S
 }
 
 impl<'a> Printer<'a> {
+    /// Whether the gap `[start, end)` holds a directive that honors — the one freeze
+    /// question the Svelte printer asks, in both of the shapes it has:
+    ///
+    /// - the **value head**: the `{`→value gap of a braced expression (a directive value,
+    ///   an expression tag), the Svelte instance of the delimiter-owned head that `tsv_ts`
+    ///   spells `Printer::value_head_frozen_span`. Freezes the whole value; the `}` that
+    ///   closes it stays parent-owned.
+    /// - **Rule A**: a function-binding sequence's inter-operand gap. Freezes the
+    ///   FOLLOWING operand; the `,` stays parent-owned. The same rule `tsv_ts`'s sequence
+    ///   printer applies — the bind value has its own operand loop only because Svelte
+    ///   prints the pair bare.
+    ///
+    /// Both callers slice their own span from the `bool`, so unlike `tsv_ts` there is
+    /// nothing for a per-rule name to carry; each call site names its rule in a comment
+    /// instead of behind a hollow wrapper.
+    ///
+    /// It also decides the gap's **layout**, which is not a second question: an honored
+    /// directive takes the broken block form, so the emitter never pulls it flush against
+    /// the `{`, where it would be inert and the freeze would be lost on the second pass
+    /// (the `{…}` instance of the declaration-header rule; see
+    /// docs/conformance_prettier.md §Format-ignore directive).
+    ///
+    /// **In-source axis** — a directive is never owned, so the axes coincide, but naming
+    /// the physical one keeps directive recognition a single deliberate question (as
+    /// `tsv_ts`'s `member_gap_frozen` does). Opens on the document-level flag: every braced
+    /// value in every component asks it.
+    pub(in crate::printer) fn honored_directive_in_gap(&self, start: u32, end: u32) -> bool {
+        self.has_format_ignore
+            && comments_in_source_range(self.comments, start, end)
+                .any(|c| self.is_honored_directive(c))
+    }
+
+    /// Whether comment `c` is a format-ignore directive that HONORS — `tsv_ts`'s
+    /// `Printer::is_honored_directive` against this document. The freeze tests ask it
+    /// through [`Self::honored_directive_in_gap`]; an emitter asks it directly when a
+    /// comment's own layout depends on the answer, because an honored directive must keep
+    /// the line the author gave it — gluing the following construct onto that line makes the
+    /// placement inert, and the freeze would be lost on the next pass.
+    ///
+    /// Carries the document-level `has_format_ignore` gate, so a directive-free component
+    /// (≈ every component) pays one predicted branch instead of the content compare.
+    pub(in crate::printer) fn is_honored_directive(&self, c: &Comment) -> bool {
+        self.has_format_ignore && is_honored_format_ignore(self.source, c)
+    }
+
     /// Check if the last non-whitespace fragment node before `target_start` is
     /// a `<!-- format-ignore -->` (or `prettier-ignore`) comment.
     fn has_format_ignore_before(

@@ -631,6 +631,37 @@ pub fn block_comment_end_before(bytes: &[u8], pos: usize, glue: CommentGlue) -> 
     (i >= 4 && bytes.get(i - 2..i) == Some(b"*/".as_slice())).then_some(i)
 }
 
+/// Whether a newline sits immediately before `pos`, skipping horizontal whitespace.
+///
+/// Walks backwards from `pos`, skipping spaces and tabs; `true` when a newline is
+/// reached before any other byte. The start of the source is **not** a newline —
+/// callers that treat a file boundary as a line boundary test `pos == 0` themselves
+/// (`crate::directive_alone_on_line` does).
+///
+/// Mirrors prettier's `hasNewline(text, index, { backwards: true })`.
+#[must_use]
+pub fn has_newline_before_position(source: &str, pos: u32) -> bool {
+    source.as_bytes()[..pos as usize]
+        .iter()
+        .rev()
+        .find(|b| !matches!(b, b' ' | b'\t'))
+        .is_some_and(|b| matches!(b, b'\n' | b'\r'))
+}
+
+/// Whether a newline sits immediately after `pos`, skipping horizontal whitespace.
+///
+/// The forward twin of [`has_newline_before_position`]; end-of-source is likewise not
+/// a newline.
+///
+/// Mirrors prettier's `hasNewline(text, index)`.
+#[must_use]
+pub fn has_newline_after_position(source: &str, pos: u32) -> bool {
+    source.as_bytes()[pos as usize..]
+        .iter()
+        .find(|b| !matches!(b, b' ' | b'\t'))
+        .is_some_and(|b| matches!(b, b'\n' | b'\r'))
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;

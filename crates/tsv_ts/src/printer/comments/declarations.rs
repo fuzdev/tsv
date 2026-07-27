@@ -805,7 +805,7 @@ impl<'a> Printer<'a> {
             // instead of a flag threaded through nine header call sites, and no position can
             // be silently disqualified before its cluster reaches it. The layout cost is
             // fixtured (`keyword_gap_prettier_ignore_own_line_prettier_divergence`).
-            if self.has_format_ignore && self.is_honored_directive(comment) {
+            if self.is_honored_directive(comment) {
                 if !at_line_start {
                     parts.push(d.hardline());
                 }

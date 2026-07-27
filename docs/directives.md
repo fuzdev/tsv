@@ -204,6 +204,57 @@ nothing freezes (`function`, `class`): a directive is never reflowed onto the
 line above it, so its placement — the thing that decides whether it is honored —
 is always the one you wrote.
 
+### On value heads and sequence operands
+
+A construct that holds a single value behind a delimiter of its own freezes that
+**whole value** when an own-line directive sits in the gap — a `for` header's
+init / test / update clauses, a `return` / `throw` / `yield` operand written in
+grouping parens, and a Svelte `{…}` value (`bind:`, `on:`, `class:`, `style:`, an
+expression tag):
+
+```ts
+for (
+	// format-ignore
+	i  =  0;
+	i < 10;
+	i++
+) {
+	fn();
+}
+```
+
+```svelte
+<div
+	class:active={
+		// format-ignore
+		a  &&  b
+	}
+></div>
+```
+
+The delimiter that closes the value — the header's `;`, the grouping `)`, the
+closing `}` — is parent-owned and stays outside the frozen slice, and a sibling
+clause or attribute the freeze does not reach still reformats. As in a
+declaration header, tsv keeps the directive on its own line rather than pulling
+it up beside the `{`, where it would be inert.
+
+A comma **sequence** is a member list inside that: an own-line directive between
+two operands freezes the **next operand** only.
+
+```ts
+fn(
+	(a,
+	// format-ignore
+	b  (  1  ),
+	c)
+);
+```
+
+At a sequence's leading gap the directive leads the *sequence* rather than its
+first operand, so the whole sequence freezes — the value-head rule above. A
+sequence prints its own grouping parens, and they are re-synthesized around a
+frozen operand so its grouping survives.
+
 ## `format-ignore-start` / `format-ignore-end`
 
 In Svelte templates, a pair of range markers preserves every node between them:

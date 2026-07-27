@@ -9,12 +9,12 @@
 
 use super::Printer;
 use crate::ast::internal::{TSLiteralType, TSType, TemplateElement, TemplateLiteralType};
-use crate::printer::analysis::has_newline_before_position;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing::visual_width;
+use tsv_lang::source_scan::has_newline_before_position;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
 /// How a `${…}` interpolation in a template literal type breaks.

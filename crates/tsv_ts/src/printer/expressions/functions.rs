@@ -15,15 +15,14 @@ use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::types::helpers::is_huggable_type;
 use crate::printer::{CommentFilter, CommentSpacing, LeadingGlue};
 use crate::printer::{
-    CommentVec, ParenContext, Printer, has_newline_before_position,
-    is_multiline_template_expression, unwrap_parenthesized,
+    CommentVec, ParenContext, Printer, is_multiline_template_expression, unwrap_parenthesized,
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
-use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::source_scan::{find_char_skipping_comments, has_newline_before_position};
 
 /// Check if an arrow body should stay on the same line as `=>` (no line break option).
 ///

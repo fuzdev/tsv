@@ -4,7 +4,7 @@
 // is handled separately by the chain printer.
 
 use super::super::comments::CommentSpacing;
-use super::super::{Printer, has_newline_before_position, is_multiline_template_expression};
+use super::super::{Printer, is_multiline_template_expression};
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
     build_before_comma_trailing_comments, first_arg_has_any_comments, has_inter_argument_comments,
@@ -28,6 +28,7 @@ use crate::printer::expressions::functions::arrow_signature_has_breaking_comment
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::source_scan::has_newline_before_position;
 
 /// Prepend optional leading comments to a doc.
 #[inline]

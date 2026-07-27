@@ -302,45 +302,6 @@ pub(crate) fn is_multiline_template_expression(expr: &internal::Expression<'_>) 
     }
 }
 
-/// Check if there's a newline immediately before a position (skipping spaces/tabs).
-///
-/// Walks backwards from `pos` in the source, skipping horizontal whitespace.
-/// Returns true if a newline is found before any non-whitespace character.
-///
-/// Mirrors Prettier's `!hasNewline(text, locStart(node), { backwards: true })`
-/// used by `isTemplateOnItsOwnLine` to detect if a template literal was placed
-/// on its own line by the author.
-pub(crate) fn has_newline_before_position(source: &str, pos: u32) -> bool {
-    let pos = pos as usize;
-    for &b in source.as_bytes()[..pos].iter().rev() {
-        match b {
-            b' ' | b'\t' => continue,
-            b'\n' | b'\r' => return true,
-            _ => return false,
-        }
-    }
-    false
-}
-
-/// Check if there's a newline immediately after a position (skipping spaces/tabs).
-///
-/// Walks forward from `pos` in the source, skipping horizontal whitespace.
-/// Returns true if a newline is found before any non-whitespace character.
-///
-/// Mirrors Prettier's `hasNewline(text, locEnd(comment))` used by
-/// `printLeadingComment` to choose the separator after a leading block comment.
-pub(crate) fn has_newline_after_position(source: &str, pos: u32) -> bool {
-    let pos = pos as usize;
-    for &b in &source.as_bytes()[pos..] {
-        match b {
-            b' ' | b'\t' => continue,
-            b'\n' | b'\r' => return true,
-            _ => return false,
-        }
-    }
-    false
-}
-
 /// Check if an expression contains multiline content (e.g., line continuation strings)
 ///
 /// Recursively traverses nested structures (arrays, objects, calls) to find

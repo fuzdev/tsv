@@ -1298,6 +1298,42 @@ impl<'a> Printer<'a> {
         self.build_sequence_doc_inner(seq, trailing_end, SeqParens::KeepInside)
     }
 
+    /// The doc for sequence operand `i` — the freeze-aware twin of the plain
+    /// `build_expression_doc`, shared by both sequence layouts so neither spells the
+    /// dispatch (nor the assignment-paren rule) itself.
+    ///
+    /// **Rule A** over the operand list: an own-line directive in the gap after the
+    /// previous operand's comma freezes the FOLLOWING operand over its own node span, and
+    /// the separating `,` stays parent-owned. The first operand has no such gap here — a
+    /// directive before it leads the *sequence node*, which is the enclosing value head's
+    /// question ([`Printer::value_head_frozen_span`]).
+    ///
+    /// The assignment clarity parens are the printer's, not the author's, so they land
+    /// OUTSIDE the frozen slice, exactly as an argument's do
+    /// ([`Printer::build_frozen_arg_doc`]); a nested sequence operand's own grouping parens
+    /// are re-synthesized by [`Printer::build_frozen_expression_doc`], since slicing the
+    /// node span alone would drop them and change what the operand means.
+    fn build_sequence_operand_doc(
+        &self,
+        seq: &internal::SequenceExpression<'_>,
+        i: usize,
+    ) -> DocId {
+        let d = self.d();
+        let expr = &seq.expressions[i];
+        let frozen = (i > 0)
+            .then(|| self.gap_frozen_span(seq.expressions[i - 1].span().end, expr.span()))
+            .flatten();
+        let core = frozen.map_or_else(
+            || self.build_expression_doc(expr),
+            |frozen| self.build_frozen_expression_doc(expr, frozen),
+        );
+        if matches!(expr, Expression::AssignmentExpression(_)) {
+            d.parens(core)
+        } else {
+            core
+        }
+    }
+
     fn build_sequence_doc_inner(
         &self,
         seq: &internal::SequenceExpression<'_>,
@@ -1312,8 +1348,12 @@ impl<'a> Printer<'a> {
         // or the closing `)`.
         // Axis-free: the rule looks only at LINE comments, and ownership binds only a block
         // comment (`owned ⇒ is_block`), so skipping and counting give the same answer.
+        // An honored directive routes here too, whatever its spelling: the flat path below
+        // emits an inter-operand comment inline before its operand, which would glue an
+        // own-line block directive onto the operand's line — an inert placement, so the
+        // freeze would be lost on the second pass.
         if comments_to_emit_in_range(self.comments, seq.span.start, trailing_end)
-            .any(|c| !c.is_block)
+            .any(|c| !c.is_block || self.is_honored_directive(c))
         {
             return self.build_sequence_doc_with_line_comments(seq, trailing_end, parens);
         }
@@ -1357,14 +1397,7 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            // Assignment expressions in sequences need individual parens.
-            let core = self.build_expression_doc(expr);
-            let inner = if matches!(expr, Expression::AssignmentExpression(_)) {
-                d.parens(core)
-            } else {
-                core
-            };
-            parts.push(inner);
+            parts.push(self.build_sequence_operand_doc(seq, i));
 
             // Trailing comments of this operand: the gap before the next comma.
             if seq_has_comments
@@ -1490,13 +1523,7 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            // Assignment expressions in sequences need individual parens.
-            let core = self.build_expression_doc(expr);
-            od.push(if matches!(expr, Expression::AssignmentExpression(_)) {
-                d.parens(core)
-            } else {
-                core
-            });
+            od.push(self.build_sequence_operand_doc(seq, i));
 
             // Same-line comments in the next comma gap trail this operand: a block
             // stays inline before the comma; a line comment defers via `line_suffix`

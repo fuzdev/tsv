@@ -1,0 +1,60 @@
+<!-- an honored directive keeps its own line in a `{…}` value gap, so the value takes the
+	broken block form -->
+<button
+	on:click={
+		// prettier-ignore
+		()  =>  fn()
+	}
+>
+	text
+</button>
+
+<div
+	class:active={
+		// prettier-ignore
+		a  &&  b
+	}
+	style:color={
+		// prettier-ignore
+		c  ||  d
+	}
+></div>
+
+<p>
+	{
+		// prettier-ignore
+		a  +  b
+	}
+</p>
+
+<!-- placement keys the freeze, not the spelling: an own-line BLOCK directive takes the
+	same broken block form, in every braced value shape -->
+<div
+	class:active={
+		/* prettier-ignore */
+		a  &&  b
+	}
+></div>
+
+<p>
+	{
+		/* prettier-ignore */
+		a  +  b
+	}
+</p>
+
+<input
+	bind:value={
+		/* prettier-ignore */
+		a  .  b
+	}
+/>
+
+<!-- a function-binding sequence takes it too, and stays bare -->
+<input
+	bind:value={
+		/* prettier-ignore */
+		()  =>  a,
+		(v)  =>  (a  =  v)
+	}
+/>
