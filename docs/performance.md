@@ -205,6 +205,22 @@ For those, dump everything and search by source line instead:
 perf annotate --stdio > annotate.txt   # then search for the fn's source lines
 ```
 
+⚠️ **`annotate` has two more silent-empty modes, and neither says why.** A
+recording made with `--call-graph=dwarf` annotates empty — record *without* it
+when the goal is line-level attribution (keep the dwarf recording separately for
+callchain work). And `-s <exact name>` can still return nothing where an
+unfiltered dump annotates that same symbol fine. **When `-s` is empty, dump
+everything before concluding anything about the symbol** — an empty `-s` is
+evidence about `perf`, not about the binary:
+
+```bash
+perf record -q -F 4000 -o flat.data -- <workload>       # no --call-graph
+perf annotate -i flat.data --stdio > annotate.txt       # then slice the symbol out
+```
+
+`perf annotate` may segfault after writing usable output; the already-written
+portion is still valid, so redirect to a file rather than piping to a reader.
+
 **A name on the board is not necessarily a function.** With debug info present,
 `perf` attributes samples to *inlined* frames too, so a symbol can top the report
 while having no out-of-line copy anywhere in the binary — its cost is the work of
@@ -226,6 +242,13 @@ appends per AST node, each with its own capacity check:
 perf report --stdio --no-children -q -s srcline -g none   # flat, by source line
 perf report --stdio --no-children -q -s srcfile,srcline   # + per-line callchains
 ```
+
+⚠️ **An inlining verdict is a fact about one build, and it expires.** That same
+leaf is out-of-line a few commits later, with `perf annotate` working on it
+directly — nothing about it changed, the surrounding code did. Inlining, symbol
+presence and monomorphization counts are all emergent from whole-program codegen,
+so **re-run `nm` against the binary in front of you** rather than trusting a
+recorded finding. The method is durable; the finding is not.
 
 ⚠️ Only **basenames** are printed, so std's `alloc/src/vec/mod.rs` and a crate's
 own `mod.rs` are indistinguishable in the flat view — read a line's callchain
@@ -619,7 +642,24 @@ Two rules fall out:
 - **Reach for `#[inline(never)]` before abandoning the win.** Where the win comes
   from work removed *inside* a function body, keeping the body out-of-line costs
   nothing — the caller was already paying the call. In the case above it kept the
-  entire instruction win and left both bundles *smaller* than baseline.
+  entire instruction win and left both bundles *smaller* than baseline. ⚠️ The
+  converse also happens: where the win *is* the inlining (see the reload tax
+  below), out-of-lining costs the whole thing, and the size growth is the price
+  of the lever rather than an accident to optimize away.
+
+**Recentering the bounds is a deliberate act with a rule.** `BOUNDS` in
+`scripts/validate_artifacts.ts` is ±8% around a measured value, and `DELTAS`
+(`all − format` = the parse feature, `all − parse` = the format feature) the
+same. When a size change is accepted, **recenter every variant on freshly
+measured values rather than raising the one ceiling that failed** — a band left
+stale goes asymmetric as unrelated work accumulates, and an asymmetric band both
+false-positives on ordinary growth and stops catching a suspicious *shrink*,
+which is the half of the check with no other tripwire. Watch the deltas
+especially: they are the tighter constraint in practice, and a delta failure
+reads as "a feature gate broke", which is a confusing way to learn that a bundle
+merely grew. Record the new measurements and the date in the comment above the
+constants, and note that `format` cannot move on a convert-path change at all
+(it builds without the `json` feature) — if it did, something else is going on.
 
 ### An instruction A/B is blind to stalls and to store traffic
 
@@ -652,6 +692,47 @@ Two practical rules:
   2.2–3.3 G for identical work. Use **best-of-N interleaved** (minimum cycles is
   the least contaminated estimator), never a single pair, and keep a control
   corpus the lever's code never runs.
+
+### An `inline(never)` leaf's real cost is paid by its caller
+
+`#[inline(never)]` on a hot leaf is often correct — it is how the fixed-width
+copy above kept its win without blowing a WASM bound. But the call is not the
+whole price. **An opaque call de-registerizes the caller's state around every
+call site**: anything the callee might touch has to be re-loaded from memory
+afterwards. When such a leaf is invoked repeatedly *between* other operations on
+the same object, that reload tax is charged to the surrounding code, where no
+profile line attributes it to the leaf.
+
+The worked case is the node header. It emitted 16 `Vec` appends per AST node, six
+of them out-of-line integer calls. The obvious model — "an append is a capacity
+check plus a store, call it three instructions" — makes 16 appends look cheap
+against any alternative that ends in a `memmove`. That model was wrong by a large
+factor, because each opaque integer call forced the *following* append to re-load
+the buffer's pointer, length and capacity. Assembling the header in a
+writer-owned scratch and appending it **once** measured **−8.2..−10.0%
+instructions and −5.7..−6.6% cycles across four corpora**.
+
+The instructive part is the ledger, not the headline:
+
+| | before | after | delta |
+| --- | --- | --- | --- |
+| run cycles | 3158M | 2944M | **−214M** |
+| libc (the single flush `memmove`) | 219M | 399M | +180M |
+| everything else | 2939M | 2545M | −395M |
+
+**The memmove cost exactly what the pessimistic prediction said it would** —
+libc nearly doubled. The prediction failed on the *benefit* side. So:
+
+- **When a lever is predicted to lose, check whether the prediction priced the
+  benefit or only the cost.** A correct cost estimate is not a correct verdict.
+- **Read the instruction stream, not just the source-line board.** The reload tax
+  is visible as the object's length/pointer reappearing in a `mov` between
+  fragments that should have kept it in a register; no source line names it.
+- Staging is the shape that buys both: the leaf inlines at **one** site (so the
+  code-size bound survives) while the destination becomes a fixed-base,
+  constant-bounded, register-resident cursor. Keep the scratch a **struct field,
+  not a local** — a per-call `[0; N]` is a memset LLVM cannot prove dead when
+  only a dynamic prefix is read, and that alone can eat the win.
 
 ## WASM bundle size
 
