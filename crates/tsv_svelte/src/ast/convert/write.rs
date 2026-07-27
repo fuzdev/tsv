@@ -317,8 +317,8 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
         w.raw("}");
         return;
     }
-    let start_pos = ctx.loc.pos_and_position(comment.span.start).1;
-    let end_pos = ctx.loc.pos_and_position(comment.span.end).1;
+    let ((_, start_pos), (_, end_pos)) =
+        ctx.loc.span_positions(comment.span.start, comment.span.end);
     // The block-pattern synthetic-`(` column shift (`bump_pattern_columns`);
     // a multiline block comment's `end` sits on an unshifted later line.
     let bump = usize::from(comment.bump_pattern_columns);
@@ -393,8 +393,8 @@ fn write_generic_island(
 /// The shared `NameLocation` shape: `start`/`end` each `{line, column, character}`
 /// (all three, always). Char-space via one fused translation per endpoint.
 fn write_name_loc(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
-    let (start_char, start_pos) = ctx.loc.pos_and_position(span.start);
-    let (end_char, end_pos) = ctx.loc.pos_and_position(span.end);
+    let ((start_char, start_pos), (end_char, end_pos)) =
+        ctx.loc.span_positions(span.start, span.end);
     w.raw("{\"start\":{\"line\":");
     w.usize(start_pos.line);
     w.raw(",\"column\":");

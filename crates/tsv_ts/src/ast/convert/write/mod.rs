@@ -531,8 +531,7 @@ pub(super) fn node_header_wide_end(
         w.u32(ctx.loc.pos(wire_end));
         return;
     }
-    let (start_pos, start) = ctx.loc.pos_and_position(span.start);
-    let (_, end) = ctx.loc.pos_and_position(span.end);
+    let ((start_pos, start), (_, end)) = ctx.loc.span_positions(span.start, span.end);
     w.raw(",\"start\":");
     w.u32(start_pos);
     w.raw(",\"end\":");
@@ -595,8 +594,7 @@ fn position_fields<const CHARACTER: bool>(w: &mut JsonWriter, span: Span, ctx: &
         w.stage_u32(ctx.loc.pos(span.end));
         return;
     }
-    let (start_pos, start) = ctx.loc.pos_and_position(span.start);
-    let (end_pos, end) = ctx.loc.pos_and_position(span.end);
+    let ((start_pos, start), (end_pos, end)) = ctx.loc.span_positions(span.start, span.end);
     w.stage_raw(",\"start\":");
     w.stage_u32(start_pos);
     w.stage_raw(",\"end\":");
