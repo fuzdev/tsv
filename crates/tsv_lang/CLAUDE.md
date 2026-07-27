@@ -20,6 +20,7 @@ Each module's visibility (in parens) reflects `pub use`-only modules (private) v
 - `escapes` (`escapes.rs`, private) — Escape sequence handling (quote swapping) — used internally by `printing`
 - `sizing` (`sizing.rs`, private) — `estimated_json_capacity` / `estimated_ast_arena_capacity` — pre-size heuristics for the wire-JSON output buffer and the parse-time bump arena
 - `output` (`output.rs`, private) — `OutputBuffer` — string building with column tracking
+- `hash` (`hash.rs`, private) — `FxHasher` + the `FxHashMap` / `FxHashSet` / `FxBuildHasher` aliases: a dep-free multiply-xor hasher for the integer-keyed side tables (the doc arena's `share_map_scratch`, `tsv_svelte`'s root-inline-run set, `tsv_ts`'s `WriterComments` span map). Replacing SipHash there is **byte-identical by construction only while every consumer stays order-free** — all three use `get`/`insert`/`contains`/`clear` and never let iteration order reach output. A consumer that iterates one of these and emits in that order would make the hasher observable; that is the constraint to preserve, not the hash quality
 
 Each language parser keeps its own single-token lookahead as `peek: Option<Token>` (the lexer's own token POD), with any decoded escape value parked out-of-band — there is no shared lookahead type.
 

@@ -20,8 +20,7 @@
 //! call/member it wraps — acorn assigns the comments to the wrapper).
 
 use std::cell::Cell;
-use std::collections::HashMap;
-use tsv_lang::{JsonWriter, LocationMapper};
+use tsv_lang::{FxHashMap, JsonWriter, LocationMapper};
 
 /// A single comment to emit inline as a `leadingComments`/`trailingComments`
 /// element: `{type, value}` for the synthetic preceding-HTML `Line` comment,
@@ -63,9 +62,13 @@ struct NodeComments {
 ///
 /// Keyed by the node's byte `(start, end)`; the small per-key list is
 /// type-discriminated and consume-once (see `NodeComments::consumed`).
+///
+/// Hashed by `tsv_lang`'s `FxHasher` rather than SipHash. The only iteration is
+/// `debug_assert_consumed`'s order-independent `all`, so the hasher cannot
+/// reach the wire (see `tsv_lang::hash`'s module docs).
 #[derive(Default)]
 pub struct WriterComments {
-    map: HashMap<(u32, u32), Vec<NodeComments>>,
+    map: FxHashMap<(u32, u32), Vec<NodeComments>>,
 }
 
 impl WriterComments {

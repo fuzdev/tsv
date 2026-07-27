@@ -14,6 +14,7 @@
 //! - `printing` - shared printing utilities for printers
 //! - `sizing` - sizing heuristics for public-AST JSON / arena buffers
 //! - `json_writer` - shared wire-JSON emission substrate (`json` feature)
+//! - `hash` - dep-free multiply-xor hasher for the integer-keyed side tables
 
 mod comment;
 #[cfg(feature = "comment_check")]
@@ -22,6 +23,7 @@ mod config;
 pub mod doc;
 mod error;
 mod escapes;
+mod hash;
 #[cfg(feature = "json")]
 mod json_writer;
 mod location;
@@ -41,6 +43,7 @@ pub use comment::{
 };
 pub use config::{EmbedContext, INDENT, LayoutMode, PRINT_WIDTH, TAB_WIDTH};
 pub use error::{ErrorContext, ParseError, Result, lex_err};
+pub use hash::{FxBuildHasher, FxHashMap, FxHashSet, FxHasher};
 #[cfg(feature = "json")]
 pub use json_writer::{JsonWriter, write_array, write_or_null};
 pub use location::{ByteToCharMap, LocationMapper, LocationTracker, Position};
