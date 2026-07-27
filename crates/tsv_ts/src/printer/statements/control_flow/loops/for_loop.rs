@@ -7,6 +7,7 @@ use crate::ast::internal::{self, Expression, Statement};
 use crate::printer::{CommentVec, LeadingGlue, Printer};
 use smallvec::smallvec;
 use tsv_lang::Comment;
+use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -517,6 +518,37 @@ impl<'a> Printer<'a> {
             close_paren: close_paren_approx,
         };
 
+        // Where each clause's leading run emits from. Resolved once, so the freeze gate
+        // below and the emitter further down cannot read different gaps — the directive
+        // that freezes a clause has to be exactly the one printed above it.
+        let test_search_start =
+            self.for_clause_search_start(stmt.span.start, open_paren, first_semi, init_end);
+        let update_search_start = self.for_clause_search_start(
+            stmt.span.start,
+            open_paren,
+            second_semi,
+            test_end.or(init_end),
+        );
+
+        // Rule: an own-line directive in a clause's leading gap freezes that WHOLE clause
+        // ([`Printer::value_head_frozen_span`]). The slice is the clause's node span, so
+        // the header's `;` stays parent-owned — prettier's slice swallows it and emits a
+        // header that no longer parses
+        // (`init_declaration_prettier_ignore_head_prettier_divergence`).
+        // Each clause is absent-able independently of its gap, so the clause span is the
+        // `Option` and the gap is a plain offset.
+        let clause_frozen = |gap: u32, start: Option<u32>, end: Option<u32>| {
+            start
+                .zip(end)
+                .and_then(|(start, end)| self.value_head_frozen_span(gap, Span::new(start, end)))
+        };
+        // Init's gap is itself absent when there is no `(` to open one.
+        let init_frozen = spans
+            .init_region_start()
+            .and_then(|gap| clause_frozen(gap, spans.init_start, init_end));
+        let test_frozen = clause_frozen(test_search_start, spans.test_start, test_end);
+        let update_frozen = clause_frozen(update_search_start, spans.update_start, update_end);
+
         // Check if we have any own-line comments that force expansion. A line
         // comment anywhere in the header also forces it: the `//` runs to end of
         // line, so the clauses after it must move to their own lines (matching
@@ -556,7 +588,10 @@ impl<'a> Printer<'a> {
             }
         }
         if let Some(init) = &stmt.init {
-            inner_parts.push(self.build_for_init_doc(init));
+            inner_parts.push(init_frozen.map_or_else(
+                || self.build_for_init_doc(init),
+                |frozen| self.build_frozen_span_item_doc(frozen),
+            ));
         }
         // The init clause→`;` gap comments bind to the `;` like a list separator.
         self.push_for_clause_semicolon(&mut inner_parts, init_end, first_semi);
@@ -567,11 +602,9 @@ impl<'a> Printer<'a> {
             if let (Some(semi), Some(end)) = (first_semi, init_end) {
                 self.push_for_clause_same_line_comments(&mut inner_parts, semi + 1, start, end);
             }
-            let search_start =
-                self.for_clause_search_start(stmt.span.start, open_paren, first_semi, init_end);
             self.push_for_clause_leading_section(
                 &mut inner_parts,
-                search_start,
+                test_search_start,
                 start,
                 init_end,
                 d.line(),
@@ -594,8 +627,10 @@ impl<'a> Printer<'a> {
             // to evaluate fit against — matching how if/while use build_condition_group.
             // Without this, logical operators break with the for-header group (too wide)
             // instead of their own condition width.
-            let condition_doc = self.build_condition_doc(test);
-            inner_parts.push(d.group(condition_doc));
+            inner_parts.push(test_frozen.map_or_else(
+                || d.group(self.build_condition_doc(test)),
+                |frozen| self.build_frozen_expression_doc(test, frozen),
+            ));
         }
         // The test clause→`;` gap comments bind to the `;` like a list separator.
         self.push_for_clause_semicolon(&mut inner_parts, test_end, second_semi);
@@ -609,15 +644,9 @@ impl<'a> Printer<'a> {
             if let (Some(semi), Some(end)) = (second_semi, test_end) {
                 self.push_for_clause_same_line_comments(&mut inner_parts, semi + 1, start, end);
             }
-            let search_start = self.for_clause_search_start(
-                stmt.span.start,
-                open_paren,
-                second_semi,
-                test_end.or(init_end),
-            );
             self.push_for_clause_leading_section(
                 &mut inner_parts,
-                search_start,
+                update_search_start,
                 start,
                 test_end,
                 d.line(),
@@ -625,7 +654,10 @@ impl<'a> Printer<'a> {
         }
 
         if let Some(update) = &stmt.update {
-            inner_parts.push(self.build_for_update_doc(update));
+            inner_parts.push(update_frozen.map_or_else(
+                || self.build_for_update_doc(update),
+                |frozen| self.build_frozen_expression_doc(update, frozen),
+            ));
         }
         if let Some(start) = spans.update_trailing_start() {
             self.push_for_update_trailing_comments(
@@ -959,14 +991,20 @@ impl<'a> Printer<'a> {
         }
         let mut docs = DocBuf::new();
         for (i, e) in seq.expressions.iter().enumerate() {
-            if i > 0 {
-                self.push_for_clause_comma_gap(
-                    &mut docs,
-                    seq.expressions[i - 1].span().end,
-                    e.span().start,
-                );
-            }
-            docs.push(build_elem(e));
+            let frozen = if i > 0 {
+                let prev_end = seq.expressions[i - 1].span().end;
+                self.push_for_clause_comma_gap(&mut docs, prev_end, e.span().start);
+                // Rule A, the same as the general sequence printer's: an own-line
+                // directive in the comma gap freezes the FOLLOWING operand. The `[~In]`
+                // wrap `build_elem` may apply is moot on a verbatim slice.
+                self.gap_frozen_span(prev_end, e.span())
+            } else {
+                None
+            };
+            docs.push(frozen.map_or_else(
+                || build_elem(e),
+                |frozen| self.build_frozen_expression_doc(e, frozen),
+            ));
         }
         // Group + indent so a line-comment break continuation-indents one level,
         // matching the multi-declarator init clause.

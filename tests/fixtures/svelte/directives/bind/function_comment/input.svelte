@@ -38,3 +38,12 @@
 		(v) => (a = v)
 	}
 />
+
+<!-- Mid own-line comment: leads the setter on its own line, where the author wrote it -->
+<input
+	bind:value={
+		() => a,
+		// c
+		(v) => (a = v)
+	}
+/>

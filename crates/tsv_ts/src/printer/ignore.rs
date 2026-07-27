@@ -65,15 +65,16 @@
 
 use super::ParenContext;
 use super::Printer;
-use super::has_newline_after_position;
-use super::has_newline_before_position;
 use super::unwrap_parenthesized;
 use crate::ast::internal::{self, Comment, TSType};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
-use tsv_lang::{Span, comments_in_source_range, is_format_ignore_directive};
+use tsv_lang::{
+    Span, comments_in_source_range, directive_alone_on_line, is_format_ignore_directive,
+    is_honored_format_ignore,
+};
 
 /// The freeze implied by a format-ignore directive alone on its line in a union's or
 /// intersection's leading run (the out-of-span region before the node's `span.start`):
@@ -262,19 +263,21 @@ impl<'a> Printer<'a> {
     /// layout depends on the answer, because an honored directive must keep the line the
     /// author gave it — collapsing it onto the frozen value's line would make it glued,
     /// hence inert, and the freeze would be lost on the next pass.
+    ///
+    /// The document-level `has_format_ignore` gate lives HERE rather than at each call
+    /// site: no directive in the document means no honored one, so a caller that spelled
+    /// the flag itself was restating the predicate — and a caller that forgot to differed
+    /// from its neighbors for no reason. [`Self::member_gap_frozen`] keeps its own copy,
+    /// where the flag buys something this one can't: skipping the range scan entirely.
     pub(in crate::printer) fn is_honored_directive(&self, c: &Comment) -> bool {
-        is_format_ignore_directive(c.content(self.source)) && self.directive_alone_on_line(c)
+        self.has_format_ignore && is_honored_format_ignore(self.source, c)
     }
 
-    /// The placement floor: whether comment `c` is the only thing on its physical line
-    /// (whitespace aside) — the sole placement a directive freezes from. A file
-    /// boundary counts as a line boundary, so a directive at byte 0 or at EOF still
-    /// qualifies. A line comment trivially satisfies the after side (it consumes to
-    /// EOL); only a block spelling can share its line with what follows.
+    /// The placement floor alone — [`tsv_lang::directive_alone_on_line`] against this
+    /// document's source, for the emitters that ask about placement without the
+    /// recognizer.
     pub(in crate::printer) fn directive_alone_on_line(&self, c: &Comment) -> bool {
-        (c.span.start == 0 || has_newline_before_position(self.source, c.span.start))
-            && (c.span.end as usize == self.source.len()
-                || has_newline_after_position(self.source, c.span.end))
+        directive_alone_on_line(self.source, c)
     }
 
     /// [`Self::member_gap_frozen`] for a mapped type's two key-side gaps, anchored per
@@ -523,6 +526,38 @@ impl<'a> Printer<'a> {
     #[inline]
     pub(in crate::printer) fn gap_frozen_span(&self, prev_end: u32, span: Span) -> Option<Span> {
         self.member_gap_frozen(prev_end, span.start).then_some(span)
+    }
+
+    /// The value-side analog of [`Self::single_child_frozen`]: a construct that holds ONE
+    /// value behind a delimiter of its own — a `for` header's `(`→init / `;`→test /
+    /// `;`→update clauses, a restricted production's grouping `(` (`return` / `throw` /
+    /// `yield`), a Svelte `{…}` directive value or expression tag. An alone-on-line
+    /// directive in the delimiter→value gap freezes the value WHOLE.
+    ///
+    /// `Some` is the span to freeze: the value's own node span, so the delimiter that
+    /// CLOSES it (the header's `;`, the grouping `)`, the closing `}`) stays parent-owned —
+    /// prettier's `for`-init slice swallows the `;` and emits a header that no longer
+    /// parses (`init_declaration_prettier_ignore_head_prettier_divergence`).
+    ///
+    /// Span-shaped rather than node-shaped because a `for` init is a `VariableDeclaration`
+    /// as often as an `Expression`, and **not** composite-transparent: a value's own
+    /// member rules apply only where the value's leading run REACHES the directive, and
+    /// every delimiter here blocks that run — so a sequence value rides whole inside the
+    /// slice, which is exactly what prettier does, and the head rules and the member rules
+    /// can never both claim one directive. The member half is the sequence's inter-operand
+    /// gap, which asks [`Self::gap_frozen_span`] per operand.
+    ///
+    /// The same predicate as [`Self::gap_frozen_span`] — the gap is a gap either way, and
+    /// the `has_format_ignore` gate is already spent inside it. The two names exist because
+    /// the *rules* differ (a head claims the whole value; a member claims one item), and a
+    /// call site that spells which one it is documents the shape it froze.
+    #[inline]
+    pub(in crate::printer) fn value_head_frozen_span(
+        &self,
+        gap_start: u32,
+        value: Span,
+    ) -> Option<Span> {
+        self.gap_frozen_span(gap_start, value)
     }
 
     /// [`Self::list_item_frozen`] for a value-side ARGUMENT list item `i` — a call's,
