@@ -664,19 +664,12 @@ impl<'a> Printer<'a> {
         if has_line { d.indent(body) } else { body }
     }
 
-    /// One header gap — the comments authored in it plus the separator that follows —
-    /// with **no** `indent` applied. Also reports whether a *line* comment ended the
-    /// line, which is the caller's cue that a break happened.
-    ///
-    /// Split out from [`build_keyword_to_name_continuation`](Self::build_keyword_to_name_continuation)
-    /// so a caller with *several* gaps can emit each one and then decide **once** what
-    /// to indent. Indenting per gap compounds: two broken gaps would put the keyword's
-    /// last word two levels deep, below the value that follows it at one.
-    ///
-    /// Whether a declaration-header gap ENDS ON ITS OWN LINE — the one predicate behind both
-    /// [`Self::build_keyword_gap_doc`]'s broken-and-indented layout and any caller that must
+    /// Whether a header gap ENDS ON ITS OWN LINE — the one predicate behind
+    /// [`Self::build_keyword_gap_doc`]'s broken-and-indented layout, any caller that must
     /// stop supplying its own continuation indent because this gap's `indent` already covers
-    /// it (the multi-declarator variable list).
+    /// it (the multi-declarator variable list), and any caller that must choose a *breaking*
+    /// header layout because this gap's comment needs a line of its own (the for-in/for-of
+    /// header's `(`→binding region).
     ///
     /// A line comment breaks the gap, and so does an honored format-ignore directive in
     /// either spelling: [`Self::build_header_comment_run`] ends it on its own line, because

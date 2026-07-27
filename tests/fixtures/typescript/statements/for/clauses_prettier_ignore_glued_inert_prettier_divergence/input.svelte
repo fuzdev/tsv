@@ -8,4 +8,9 @@
 		// the same at a restricted production's grouping `(`
 		return /* prettier-ignore */ a + b;
 	}
+
+	// and at a condition head's `(`
+	if (/* prettier-ignore */ a + b) {
+		fn();
+	}
 </script>

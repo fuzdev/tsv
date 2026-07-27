@@ -208,9 +208,11 @@ is always the one you wrote.
 
 A construct that holds a single value behind a delimiter of its own freezes that
 **whole value** when an own-line directive sits in the gap — a `for` header's
-init / test / update clauses, a `return` / `throw` / `yield` operand written in
-grouping parens, and a Svelte `{…}` value (`bind:`, `on:`, `class:`, `style:`, an
-expression tag):
+init / test / update clauses and a for-in/for-of header's left clause, a
+condition head's `(` (`if`, `else if`, `while`, `do…while`, a `switch`
+discriminant, a `catch` parameter), a `return` / `throw` / `yield` operand
+written in grouping parens, and a Svelte `{…}` value (`bind:`, `on:`, `class:`,
+`style:`, an expression tag):
 
 ```ts
 for (
@@ -218,6 +220,13 @@ for (
 	i  =  0;
 	i < 10;
 	i++
+) {
+	fn();
+}
+
+if (
+	// format-ignore
+	aaa  &&  bbb
 ) {
 	fn();
 }
@@ -232,11 +241,13 @@ for (
 ></div>
 ```
 
-The delimiter that closes the value — the header's `;`, the grouping `)`, the
-closing `}` — is parent-owned and stays outside the frozen slice, and a sibling
-clause or attribute the freeze does not reach still reformats. As in a
-declaration header, tsv keeps the directive on its own line rather than pulling
-it up beside the `{`, where it would be inert.
+The delimiter that closes the value — the header's `;`, the `in`/`of` keyword,
+the condition's `)`, the grouping `)`, the closing `}` — is parent-owned and
+stays outside the frozen slice, and a sibling clause or attribute the freeze does
+not reach still reformats. Parens the printer supplies for clarity are
+parent-owned too: an assignment condition still prints as `if ((a = b))` around
+the frozen slice. As in a declaration header, tsv keeps the directive on its own
+line rather than pulling it up beside the `{`, where it would be inert.
 
 A comma **sequence** is a member list inside that: an own-line directive between
 two operands freezes the **next operand** only.

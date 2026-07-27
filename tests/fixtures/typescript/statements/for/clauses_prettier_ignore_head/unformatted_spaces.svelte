@@ -63,4 +63,15 @@
 	) {
 			fn();
 	}
+
+	// an assignment test's clarity parens are the printer's, so they stay OUTSIDE the
+	// frozen slice — the same shell the unfrozen clause prints
+	for (
+		i   =   0;
+		// prettier-ignore
+		(  jjj  =  kkk  );
+		i  ++
+	) {
+			fn();
+	}
 </script>

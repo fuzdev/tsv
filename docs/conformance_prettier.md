@@ -1688,14 +1688,24 @@ hang) —
 
 **On delimiter-owned value heads, and on sequence operands.** A construct that holds a single
 value behind a delimiter of its own — a `for` header's `(`→init, `;`→test and `;`→update
-clauses, a restricted production's grouping `(` (`return` / `throw` / `yield`), and a Svelte
+clauses and a for-in/for-of header's `(`→left clause, a **condition head**'s `(` (`if` /
+`else if` / `while` / `do…while`, a `switch` discriminant, a `catch` parameter), a restricted
+production's grouping `(` (`return` / `throw` / `yield`), and a Svelte
 `{…}` value (`bind:` / `on:` / `class:` / `style:` and an expression tag) — freezes that
 **whole value** when an own-line directive sits in the gap. The slice is the value's own node
-span, so the delimiter that closes it (the header's `;`, the grouping `)`, the closing `}`)
+span, so the delimiter that closes it (the header's `;`, the `in`/`of` keyword, the condition's
+`)`, the grouping `)`, the closing `}`)
 stays parent-owned, and a sibling clause or attribute the freeze does not reach still
 normalizes. Prettier agrees at every one of those positions, so the ordinary fixtures
-`for/clauses_prettier_ignore_head`, `return_throw/operand_prettier_ignore_head` and
+`for/clauses_prettier_ignore_head`, `statements/condition_prettier_ignore_head`,
+`return_throw/operand_prettier_ignore_head` and
 `bind/value_prettier_ignore_head` **match**.
+
+A test position carries one more parent-owned fact: the **clarity parens the printer supplies**
+for a value that would otherwise read as a typo — an assignment prints `if ((a = b))`, and
+`for (; (a = b); )` — belong outside the frozen slice, exactly as an argument's do, so the
+frozen inner keeps the parens around it (`if (⏎// prettier-ignore⏎(aaa  =  bbb))`, prettier
+agreeing at both hosts).
 
 Inside a sequence the classification is Rule A again, unchanged: an own-line directive in an
 **inter-operand** gap freezes only the **following** operand, and the operands on either side
@@ -1710,12 +1720,13 @@ grouping parens *outside* its node span, so a frozen sequence operand re-synthes
 loses its grouping.
 
 A **glued** directive is inert here as everywhere — `for (/* prettier-ignore */ i = 0; …)`,
-`return /* prettier-ignore */ a + b` — where prettier honors the glued placement and freezes;
+`return /* prettier-ignore */ a + b`, `if (/* prettier-ignore */ a + b)` — where prettier honors
+the glued placement and freezes;
 each fixture's `prettier_variant_frozen` pins prettier's stable frozen form, which tsv
 normalizes ([clauses glued
 inert](../tests/fixtures/typescript/statements/for/clauses_prettier_ignore_glued_inert_prettier_divergence/)).
 
-tsv diverges at five places:
+tsv diverges at six places:
 
 - Directive written in an **empty `for` clause slot** — ◆comment_preservation — it stays in
   that slot, so it freezes nothing: the clause it would freeze is on the other side of the
@@ -1737,6 +1748,16 @@ tsv diverges at five places:
   four-clause header that **does not parse**. tsv keeps the separator parent-owned, as at
   every other frozen list item —
   [init declaration](../tests/fixtures/typescript/statements/for/init_declaration_prettier_ignore_head_prettier_divergence/)
+- **for-in / for-of left clause** — ◆comment_preservation ◆prettier_bug — prettier relocates the
+  directive flush against the `(` (`for (// prettier-ignore⏎const  xxx …`), a placement tsv never
+  writes; and where the left is a **declaration** its frozen slice is followed by a `;`, giving
+  `for (const  xxx; of yyy)` — the same unparseable output as the `for`-init form above. A
+  **pattern** left freezes correctly for both, so there only the relocation differs. tsv keeps
+  the directive on its own line, which holds the header in the standing for-in/for-of
+  line-comment layout (binding, keyword and iterable each on their own line) — for **both**
+  spellings, unlike an ordinary block comment, which still rides inline. The same placement
+  rule holds in the header's keyword→binding gap, where nothing freezes yet —
+  [in/of left](../tests/fixtures/typescript/statements/for/in_of_left_prettier_ignore_head_prettier_divergence/)
 - Frozen **function-binding sequence** in a `bind:` value — ◆comment_preservation ◆prettier_bug —
   tsv emits the getter/setter pair bare, as it does for every other function-binding value.
   Prettier parenthesizes it (which Svelte reads as a grouped expression, not a binding pair)
