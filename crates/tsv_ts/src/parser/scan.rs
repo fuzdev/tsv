@@ -76,14 +76,46 @@ pub(super) fn skip_whitespace_and_comments(bytes: &[u8], mut pos: usize) -> usiz
     pos
 }
 
+/// 256-entry lookup tables for the lookahead identifier classes. Each entry is computed
+/// from the same predicate the byte tests below expand to, so the tables are exact — a
+/// lookup replaces the OR-chain with one L1 load.
+///
+/// These are the **lookahead** classes, deliberately *not* the lexer's
+/// (`lexer::core::ID_START_LUT` / `ID_CONTINUE_LUT`): both include every byte `> 127`,
+/// since a lookahead only needs to step over a multi-byte UTF-8 sequence, not validate
+/// it. That extra term is also why the table beats the chain by more here than it does
+/// in the lexer — `> 127` cannot fold into a 64-bit bitmask test, so LLVM emits the
+/// full arithmetic chain, and it orders the common case (a letter) *last*, behind the
+/// `> 127`, `$`, `_` and digit tests.
+const LOOKAHEAD_ID_START_LUT: [bool; 256] = {
+    let mut t = [false; 256];
+    let mut i = 0;
+    while i < 256 {
+        let b = i as u8;
+        t[i] = b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b > 127;
+        i += 1;
+    }
+    t
+};
+const LOOKAHEAD_ID_CONTINUE_LUT: [bool; 256] = {
+    let mut t = [false; 256];
+    let mut i = 0;
+    while i < 256 {
+        let b = i as u8;
+        t[i] = b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127;
+        i += 1;
+    }
+    t
+};
+
 /// Check if a byte can start an identifier (letter, underscore, dollar sign, or non-ASCII)
 ///
 /// Non-ASCII bytes (> 127) are included for lookahead purposes - they're part of multi-byte
 /// UTF-8 sequences that are likely unicode identifier chars. The actual lexer uses proper
 /// `ID_Start` validation (`lexer::ident::is_id_start`) on the decoded char.
 #[inline]
-pub(super) fn is_identifier_start(b: u8) -> bool {
-    b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b > 127
+pub(super) const fn is_identifier_start(b: u8) -> bool {
+    LOOKAHEAD_ID_START_LUT[b as usize]
 }
 
 /// Check if a byte can continue an identifier (alphanumeric, underscore, dollar sign, or non-ASCII)
@@ -92,8 +124,8 @@ pub(super) fn is_identifier_start(b: u8) -> bool {
 /// UTF-8 sequences that are likely unicode identifier chars. The actual lexer uses proper
 /// `ID_Continue` validation (`lexer::ident::is_id_continue`) on the decoded char.
 #[inline]
-pub(super) fn is_identifier_continue(b: u8) -> bool {
-    b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127
+pub(super) const fn is_identifier_continue(b: u8) -> bool {
+    LOOKAHEAD_ID_CONTINUE_LUT[b as usize]
 }
 
 /// Check if `word` sits at `pos` as a whole identifier, not as the prefix of a longer
@@ -210,4 +242,29 @@ fn parse_radix_f64(digits: &str, radix: u32) -> f64 {
             acc * f64::from(radix) + f64::from(c.to_digit(radix).unwrap_or(0))
         }
     })
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    // The lookahead scanners decide identifier bytes from the `[bool; 256]` tables
+    // rather than the OR-chain they were written as. The tables are const-derived
+    // from that chain, so this grades the lookup against a plain re-spelling of the
+    // predicate — the guard against a table and its documented membership drifting.
+    #[test]
+    fn lookahead_id_luts_match_the_predicates_they_replace() {
+        for b in 0..=u8::MAX {
+            assert_eq!(
+                is_identifier_start(b),
+                b.is_ascii_alphabetic() || b == b'_' || b == b'$' || b > 127,
+                "id_start mismatch at byte {b:#x}"
+            );
+            assert_eq!(
+                is_identifier_continue(b),
+                b.is_ascii_alphanumeric() || b == b'_' || b == b'$' || b > 127,
+                "id_continue mismatch at byte {b:#x}"
+            );
+        }
+    }
 }
