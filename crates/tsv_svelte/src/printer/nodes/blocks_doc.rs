@@ -13,6 +13,7 @@ use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
 
+use super::element_doc::MultilineCause;
 use super::helpers::each_expr_comment_end;
 
 // Opening-tag literals for control-flow blocks. Every offset that locates the
@@ -912,7 +913,11 @@ impl<'a> Printer<'a> {
     ///
     fn build_section_body_doc(&self, fragment: &Fragment<'_>) -> DocId {
         let nodes = fragment.nodes;
-        self.build_nodes_doc_trimmed(nodes, Self::nodes_have_breakable_expression(nodes), false)
+        self.build_nodes_doc_trimmed(
+            nodes,
+            Self::nodes_have_breakable_expression(nodes),
+            MultilineCause::None,
+        )
     }
 
     /// The `{:then …}` keyword doc — `{:then value}` if a `then` value binds, else
@@ -1070,7 +1075,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for an await block (no preceding context / sibling `>`).
     ///
     /// Uses same inline/multiline pattern as if blocks.
-    pub(crate) fn build_await_block_doc(&self, block: &internal::AwaitBlock<'_>) -> DocId {
+    pub(super) fn build_await_block_doc(&self, block: &internal::AwaitBlock<'_>) -> DocId {
         self.build_await_block_doc_with_full_context(block, false, false, None)
     }
 
@@ -1186,7 +1191,7 @@ impl<'a> Printer<'a> {
     /// Build a doc for a key block (no preceding context / sibling `>`).
     ///
     /// Uses same inline/multiline pattern as if blocks.
-    pub(crate) fn build_key_block_doc(&self, block: &internal::KeyBlock<'_>) -> DocId {
+    pub(super) fn build_key_block_doc(&self, block: &internal::KeyBlock<'_>) -> DocId {
         self.build_key_block_doc_with_full_context(block, false, false, None)
     }
 
@@ -1237,7 +1242,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for a snippet block (no sibling `>` to fold).
-    pub(crate) fn build_snippet_block_doc(&self, block: &internal::SnippetBlock<'_>) -> DocId {
+    pub(super) fn build_snippet_block_doc(&self, block: &internal::SnippetBlock<'_>) -> DocId {
         self.build_snippet_block_doc_with_full_context(block, None)
     }
 
@@ -1249,7 +1254,7 @@ impl<'a> Printer<'a> {
     /// **width** (the `conditional_group` in `build_expanding_block`) — never by whether the
     /// head may wrap, which would let a render-free boundary select the layout (see
     /// `fragment_inline_authored`).
-    pub(crate) fn build_snippet_block_doc_with_full_context(
+    pub(super) fn build_snippet_block_doc_with_full_context(
         &self,
         block: &internal::SnippetBlock<'_>,
         gt_prefix: Option<DocId>,

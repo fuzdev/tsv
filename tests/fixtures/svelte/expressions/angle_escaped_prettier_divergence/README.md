@@ -46,5 +46,12 @@ pinned by
 which owns them. The control that belongs *here* is the sibling fixture above: the same escape
 syntax, one boundary shape away, converging with prettier.
 
+The run here sits in the **root fragment**, which is why the rule applies at all. Inside an
+element whose content went multiline *because of* these same newlines, collapsing them would
+delete the break that chose the multiline layout, and the next pass would split the run back
+apart — so the rule stands down there and the tags keep their authored lines. That boundary is
+pinned by
+[inline_content_spaced_tags_tail_long](../../elements/inline_content_spaced_tags_tail_long/).
+
 See
 [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).

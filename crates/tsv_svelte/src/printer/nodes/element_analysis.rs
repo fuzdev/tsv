@@ -11,7 +11,9 @@ use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
 use tsv_ts::ast::internal::Expression;
 
-use super::element_doc::{BoundaryMode, ElementContext, ElementKind, ElementLayout, ElementParts};
+use super::element_doc::{
+    BoundaryMode, ElementContext, ElementKind, ElementLayout, ElementParts, MultilineCause,
+};
 
 /// Whether each edge of an element's content is newline-authored.
 ///
@@ -39,7 +41,7 @@ impl BoundaryBreaks {
     }
 }
 
-/// Inputs to the [`Printer::compute_needs_multiline`] decision.
+/// Inputs to the [`Printer::compute_multiline_cause`] decision.
 ///
 /// Bundles the per-element flags the predicate reads so they pass by name
 /// rather than as positional bools that are easy to misorder at the call site.
@@ -159,7 +161,7 @@ impl<'a> Printer<'a> {
     /// Check if element content has source breaks (newlines) that should trigger multiline.
     ///
     /// Only reached for content with a non-text child — the caller
-    /// (`compute_needs_multiline`) skips it for text-only content, where newlines are word
+    /// (`compute_multiline_cause`) skips it for text-only content, where newlines are word
     /// separators and width alone decides layout (`<p>\ntext\n</p>` glues when it fits).
     ///
     /// The logic differs by element type:
@@ -290,7 +292,7 @@ impl<'a> Printer<'a> {
         };
 
         // Block flow children → whether they force multiline. Computed once here (a non-trivial
-        // traversal) and cached, since `will_go_multiline` and `compute_needs_multiline` both
+        // traversal) and cached, since `will_go_multiline` and `compute_multiline_cause` both
         // read exactly this combination.
         let has_block_flow_children = nodes.iter().any(super::helpers::is_control_flow_block);
         let block_flow_multiline =
@@ -303,13 +305,16 @@ impl<'a> Printer<'a> {
         let only_text_content =
             !is_empty && nodes.iter().all(|n| matches!(n, FragmentNode::Text(_)));
 
-        // Compute needs_multiline. A whitespace-collapsing container (`<table>`, `<select>`, …)
+        // The multiline decision. A whitespace-collapsing container (`<table>`, `<select>`, …)
         // with content always lays out block-style: its inter-sibling whitespace is render-free
         // (the compiler removes it), so the children sit one-per-line with the space trimmed, the
         // same block-style stance every other render-free boundary takes. `build_content_element_doc`
         // reads `collapses_child_ws` off the same `parts` to build that trimmed one-per-line content.
-        let needs_multiline = (collapses_child_ws && !is_empty)
-            || self.compute_needs_multiline(
+        // That is a property of the tag, not of the authoring, so it is `Structural`.
+        let multiline = if collapses_child_ws && !is_empty {
+            MultilineCause::Structural
+        } else {
+            self.compute_multiline_cause(
                 nodes,
                 MultilineInputs {
                     kind,
@@ -318,18 +323,29 @@ impl<'a> Printer<'a> {
                     block_flow_multiline,
                     only_text_content,
                 },
-            );
+            )
+        };
 
         ElementContext {
             is_self_closing,
             is_empty,
-            needs_multiline,
+            multiline,
             has_multiline_attr,
         }
     }
 
-    /// Compute whether children need multiline formatting
-    fn compute_needs_multiline(&self, nodes: &[FragmentNode<'_>], inputs: MultilineInputs) -> bool {
+    /// Compute whether children need multiline formatting, and why.
+    ///
+    /// Every **structural** trigger is tested before either authoring-derived one, so an element
+    /// that would go multiline regardless of its source newlines reports
+    /// [`MultilineCause::Structural`] even when it also happens to be authored across lines. That
+    /// ordering is what makes the cause meaningful to read — see [`MultilineCause`]. It is
+    /// otherwise inert: every arm answers the same "multiline", so the *fact* is order-independent.
+    fn compute_multiline_cause(
+        &self,
+        nodes: &[FragmentNode<'_>],
+        inputs: MultilineInputs,
+    ) -> MultilineCause {
         let MultilineInputs {
             kind,
             is_empty,
@@ -339,7 +355,7 @@ impl<'a> Printer<'a> {
         } = inputs;
 
         if is_empty {
-            return false;
+            return MultilineCause::None;
         }
 
         // Multiple block children
@@ -348,7 +364,7 @@ impl<'a> Printer<'a> {
             .filter(|n| self.is_block_element_child(n))
             .count();
         if block_child_count > 1 {
-            return true;
+            return MultilineCause::Structural;
         }
 
         // Mixed content (block + non-block children)
@@ -366,8 +382,30 @@ impl<'a> Printer<'a> {
                 _ => !super::helpers::is_control_flow_block(n),
             });
             if has_non_block {
-                return true;
+                return MultilineCause::Structural;
             }
+        }
+
+        // Elements with expanding blocks (if/each/key, or those inside await) always expand to
+        // block-style multiline — inline elements too, not just block. The expanding block forces
+        // block-style layout in `build_collapsible_element_doc` regardless; matching the multiline
+        // decision here so the children are *built* multiline (one node per line) keeps the
+        // expanding block from overshooting printWidth when authored compactly (it would otherwise
+        // flow inline). Note: await blocks alone do NOT force expansion.
+        if super::helpers::has_any_expanding_blocks(nodes) {
+            return MultilineCause::Structural;
+        }
+
+        // await/snippet (which don't force-expand on their own) still go multiline when they
+        // follow a sibling, so their body-drop matches if/each (via the multiline path) and
+        // the sibling-`>` dangle / block-on-own-line separation resolves in one pass.
+        if kind.is_block() && super::helpers::has_control_flow_after_sibling(nodes) {
+            return MultilineCause::Structural;
+        }
+
+        // Block flow forces multiline
+        if block_flow_multiline {
+            return MultilineCause::Structural;
         }
 
         // Source breaks in content
@@ -375,38 +413,16 @@ impl<'a> Printer<'a> {
         // text words collapse to spaces, so the group mechanism should decide layout
         // based on whether the joined text fits inline.
         if !only_text_content && self.has_source_breaks_in_content(nodes, kind, boundary) {
-            return true;
-        }
-
-        // Elements with expanding blocks (if/each/key, or those inside await) always expand to
-        // block-style multiline — inline elements too, not just block. The expanding block forces
-        // block-style layout in `build_collapsible_element_doc` regardless; matching `needs_multiline` here so
-        // the children are *built* multiline (one node per line) keeps the expanding block from
-        // overshooting printWidth when authored compactly (it would otherwise flow inline).
-        // Note: await blocks alone do NOT force expansion.
-        if super::helpers::has_any_expanding_blocks(nodes) {
-            return true;
-        }
-
-        // await/snippet (which don't force-expand on their own) still go multiline when they
-        // follow a sibling, so their body-drop matches if/each (via the multiline path) and
-        // the sibling-`>` dangle / block-on-own-line separation resolves in one pass.
-        if kind.is_block() && super::helpers::has_control_flow_after_sibling(nodes) {
-            return true;
-        }
-
-        // Block flow forces multiline
-        if block_flow_multiline {
-            return true;
+            return MultilineCause::SourceBreaks;
         }
 
         // Text with internal newlines
         // Skip for text-only content — newlines between words are just whitespace
         if !only_text_content && self.text_has_internal_newlines(nodes, boundary.leading) {
-            return true;
+            return MultilineCause::SourceBreaks;
         }
 
-        false
+        MultilineCause::None
     }
 
     /// Check if block flow children force parent to multiline
@@ -499,7 +515,7 @@ impl<'a> Printer<'a> {
         // `<pre>`/`<textarea>` are dispatched to `build_whitespace_sensitive_element_doc` before
         // any of this — there boundary whitespace IS render-significant and the dangle is
         // mandatory. See conformance_prettier.md §Svelte: Inline content block-style.
-        let mode = if ctx.needs_multiline {
+        let mode = if ctx.multiline.is_multiline() {
             BoundaryMode::Hard
         } else {
             BoundaryMode::Soft

@@ -490,7 +490,7 @@ There is no runtime configuration. Print width / tab width / indent are compile-
 
 One type carries genuine per-input *state* (not configuration), threaded only where it varies:
 
-- `tsv_lang::EmbedContext { base_indent_offset, first_line_offset, suffix_width, mode: LayoutMode }` — embedding state for nested formatting (CSS in `<style>`, Svelte template expressions). `LayoutMode { Standalone, Embedded }` controls binary-expression indent style.
+- `tsv_lang::EmbedContext { base_indent_offset, first_line_offset, suffix_width, mode: LayoutMode }` — embedding state for nested formatting (CSS in `<style>`, Svelte template expressions). `LayoutMode { Standalone, Embedded }` controls binary-expression indent style. The three width fields are read at **render** (they act only on the context passed to an `arena_print_doc_*` call); on the context passed to a `build_*_doc` call only `mode` survives, so a width set there is inert.
 
 TypeScript formatting is identical for standalone `.ts` and Svelte-embedded TS, so there is a single entry point:
 

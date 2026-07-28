@@ -23,7 +23,7 @@ impl<'a> Printer<'a> {
     /// (`<slot><div>a</div><div>b</div></slot>` stayed on one line, where `<span>` expands), and
     /// the special path still dangled its tag delimiters after regular elements had moved to
     /// block-style layout.
-    pub(crate) fn build_special_element_doc(
+    pub(super) fn build_special_element_doc(
         &self,
         element: &internal::SpecialElement<'_>,
     ) -> DocId {
@@ -154,7 +154,7 @@ impl<'a> Printer<'a> {
     ///
     /// `separator`: emitted between attributes — `d.line()` for the wrapping
     /// (line-separated) layout, `d.text(" ")` for hug mode (space-separated).
-    pub(crate) fn build_special_element_attrs_doc(
+    pub(super) fn build_special_element_attrs_doc(
         &self,
         element: &internal::SpecialElement<'_>,
         separator: DocId,
