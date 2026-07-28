@@ -1,0 +1,448 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 733,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 559,
+				"data": "\n\tAn inline element whose content is a run of inline siblings, authored with a newline BETWEEN\n\ttwo of them and the content boundaries hugged. The inter-sibling newline flows back onto the\n\tcontent line (Svelte 5 collapses the run to one space, so its spelling carries no signal), and\n\tthe hugged boundaries are preserved, so the element converges on the fully inline form. That\n\tmust settle in ONE pass: the flow and the layout it feeds are decided together, not on\n\tsuccessive passes. Covers an HTML inline element, a table cell (inline-classified).\n"
+			},
+			{
+				"type": "Text",
+				"start": 559,
+				"end": 560,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 560,
+				"end": 647,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 561
+					},
+					"end": {
+						"line": 9,
+						"column": 4,
+						"character": 564
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 565,
+							"end": 567,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 567,
+							"end": 640,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 10,
+									"column": 2,
+									"character": 568
+								},
+								"end": {
+									"line": 10,
+									"column": 6,
+									"character": 572
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "RegularElement",
+										"start": 573,
+										"end": 587,
+										"name": "code",
+										"name_loc": {
+											"start": {
+												"line": 10,
+												"column": 8,
+												"character": 574
+											},
+											"end": {
+												"line": 10,
+												"column": 12,
+												"character": 578
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 579,
+													"end": 580,
+													"raw": "a",
+													"data": "a"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 587,
+										"end": 588,
+										"raw": " ",
+										"data": " "
+									},
+									{
+										"type": "RegularElement",
+										"start": 588,
+										"end": 602,
+										"name": "code",
+										"name_loc": {
+											"start": {
+												"line": 10,
+												"column": 23,
+												"character": 589
+											},
+											"end": {
+												"line": 10,
+												"column": 27,
+												"character": 593
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 594,
+													"end": 595,
+													"raw": "b",
+													"data": "b"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 602,
+										"end": 604,
+										"raw": ", ",
+										"data": ", "
+									},
+									{
+										"type": "RegularElement",
+										"start": 604,
+										"end": 618,
+										"name": "code",
+										"name_loc": {
+											"start": {
+												"line": 10,
+												"column": 39,
+												"character": 605
+											},
+											"end": {
+												"line": 10,
+												"column": 43,
+												"character": 609
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 610,
+													"end": 611,
+													"raw": "c",
+													"data": "c"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 618,
+										"end": 619,
+										"raw": " ",
+										"data": " "
+									},
+									{
+										"type": "RegularElement",
+										"start": 619,
+										"end": 633,
+										"name": "code",
+										"name_loc": {
+											"start": {
+												"line": 10,
+												"column": 54,
+												"character": 620
+											},
+											"end": {
+												"line": 10,
+												"column": 58,
+												"character": 624
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 625,
+													"end": 626,
+													"raw": "d",
+													"data": "d"
+												}
+											]
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 640,
+							"end": 641,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 647,
+				"end": 649,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 649,
+				"end": 732,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 650
+					},
+					"end": {
+						"line": 13,
+						"column": 4,
+						"character": 653
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 654,
+							"end": 656,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 656,
+							"end": 725,
+							"name": "td",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 2,
+									"character": 657
+								},
+								"end": {
+									"line": 14,
+									"column": 4,
+									"character": 659
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "RegularElement",
+										"start": 660,
+										"end": 674,
+										"name": "code",
+										"name_loc": {
+											"start": {
+												"line": 14,
+												"column": 6,
+												"character": 661
+											},
+											"end": {
+												"line": 14,
+												"column": 10,
+												"character": 665
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 666,
+													"end": 667,
+													"raw": "a",
+													"data": "a"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 674,
+										"end": 675,
+										"raw": " ",
+										"data": " "
+									},
+									{
+										"type": "RegularElement",
+										"start": 675,
+										"end": 689,
+										"name": "code",
+										"name_loc": {
+											"start": {
+												"line": 14,
+												"column": 21,
+												"character": 676
+											},
+											"end": {
+												"line": 14,
+												"column": 25,
+												"character": 680
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 681,
+													"end": 682,
+													"raw": "b",
+													"data": "b"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 689,
+										"end": 691,
+										"raw": ", ",
+										"data": ", "
+									},
+									{
+										"type": "RegularElement",
+										"start": 691,
+										"end": 705,
+										"name": "code",
+										"name_loc": {
+											"start": {
+												"line": 14,
+												"column": 37,
+												"character": 692
+											},
+											"end": {
+												"line": 14,
+												"column": 41,
+												"character": 696
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 697,
+													"end": 698,
+													"raw": "c",
+													"data": "c"
+												}
+											]
+										}
+									},
+									{
+										"type": "Text",
+										"start": 705,
+										"end": 706,
+										"raw": " ",
+										"data": " "
+									},
+									{
+										"type": "RegularElement",
+										"start": 706,
+										"end": 720,
+										"name": "code",
+										"name_loc": {
+											"start": {
+												"line": 14,
+												"column": 52,
+												"character": 707
+											},
+											"end": {
+												"line": 14,
+												"column": 56,
+												"character": 711
+											}
+										},
+										"attributes": [],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": [
+												{
+													"type": "Text",
+													"start": 712,
+													"end": 713,
+													"raw": "d",
+													"data": "d"
+												}
+											]
+										}
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 725,
+							"end": 726,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
