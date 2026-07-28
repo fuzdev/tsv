@@ -37,22 +37,28 @@ pub(crate) enum ClassItem {
     Range(char, char),
 }
 
-/// A path segment paired with its chars, collected once. `match_segments` runs
-/// the same path against many rules across many ancestor prefixes; collecting
-/// each segment's chars here (in [`path_segments`](super::path_segments), once
-/// per path) keeps the inner glob match from re-collecting them per rule. `text`
-/// powers the cheap `&str` anchor comparison in `Layer::relativize`.
+/// A path segment, classified once per query as all-ASCII or not.
+///
+/// `match_segments` runs the same path against many rules across many ancestor
+/// prefixes, so the inner glob match wants O(1) indexed character access. For an
+/// ASCII segment — every segment of essentially every real path — the segment's
+/// own bytes already *are* that array, so the flag buys the whole amortization
+/// with no collection at all: one `is_ascii` word-scan per segment replaces the
+/// `Vec<char>` it used to collect (a heap allocation, plus its `realloc` growth
+/// chain, per segment per query). `text` also powers the cheap `&str` anchor
+/// comparison in `Layer::relativize`.
 #[derive(Debug)]
 pub(crate) struct PathSeg<'a> {
     pub(crate) text: &'a str,
-    chars: Vec<char>,
+    /// Whether `text` is wholly ASCII, so a byte index is a character index.
+    ascii: bool,
 }
 
 impl<'a> PathSeg<'a> {
     pub(crate) fn new(text: &'a str) -> Self {
         Self {
             text,
-            chars: text.chars().collect(),
+            ascii: text.is_ascii(),
         }
     }
 }
@@ -169,6 +175,18 @@ fn class_matches(negated: bool, items: &[ClassItem], c: char) -> bool {
     hit != negated
 }
 
+/// The `char` at byte offset `i` of a **non-ASCII** segment (`i` must be a char
+/// boundary), paired with its UTF-8 width. Only this path decodes UTF-8; an
+/// ASCII segment reads its byte inline in [`glob_seg_match`], which keeps that
+/// loop indexing a hoisted byte slice — the shape the win depends on, since it
+/// is what lets the bounds check and the stride fold away.
+fn char_at(s: &str, i: usize) -> (char, usize) {
+    // `i` is a char boundary, so this always yields; the fallback is unreachable
+    // and, being a replacement char, could only fail to match anyway.
+    let c = s[i..].chars().next().unwrap_or(char::REPLACEMENT_CHARACTER);
+    (c, c.len_utf8())
+}
+
 /// Matches a pattern's segments against a path's segments, with `**` consuming
 /// zero or more path segments.
 pub(crate) fn match_segments(pat: &[Seg], path: &[PathSeg<'_>]) -> bool {
@@ -198,7 +216,7 @@ pub(crate) fn match_segments(pat: &[Seg], path: &[PathSeg<'_>]) -> bool {
             }
         }
         Some((Seg::Glob(toks), rest)) => match path.split_first() {
-            Some((head, tail)) if glob_seg_match(toks, &head.chars) => match_segments(rest, tail),
+            Some((head, tail)) if glob_seg_match(toks, head) => match_segments(rest, tail),
             _ => false,
         },
     }
@@ -207,13 +225,27 @@ pub(crate) fn match_segments(pat: &[Seg], path: &[PathSeg<'_>]) -> bool {
 /// Matches one path segment against a segment's tokens. Classic two-pointer
 /// glob match with single-star backtracking; segments are short so this is
 /// cheap.
-fn glob_seg_match(toks: &[Tok], seg: &[char]) -> bool {
+///
+/// Both cursors index *bytes*, but every advance steps one whole code point, so
+/// `?`, `*` and `[...]` stay code-point granular — the granularity
+/// `glob_is_code_point_granular` pins. `si` is therefore always on a char
+/// boundary. On an ASCII segment (the universal case) the character *is* the
+/// byte and the step is a constant 1, so a read costs exactly what indexing a
+/// pre-collected `Vec<char>` did; `seg.ascii` is loop-invariant, so the decode
+/// branch unswitches rather than running per character.
+fn glob_seg_match(toks: &[Tok], seg: &PathSeg<'_>) -> bool {
+    let bytes = seg.text.as_bytes();
     let mut ti = 0;
     let mut si = 0;
-    // (token index after the last `*`, path index where that `*` started)
+    // (token index after the last `*`, byte offset where that `*` started)
     let mut star: Option<(usize, usize)> = None;
-    while si < seg.len() {
+    while si < bytes.len() {
         if ti < toks.len() {
+            let (c, width) = if seg.ascii {
+                (char::from(bytes[si]), 1)
+            } else {
+                char_at(seg.text, si)
+            };
             let matched = match &toks[ti] {
                 Tok::Star => {
                     star = Some((ti + 1, si));
@@ -221,12 +253,12 @@ fn glob_seg_match(toks: &[Tok], seg: &[char]) -> bool {
                     continue;
                 }
                 Tok::Question => true,
-                Tok::Lit(c) => *c == seg[si],
-                Tok::Class { negated, items } => class_matches(*negated, items, seg[si]),
+                Tok::Lit(lit) => *lit == c,
+                Tok::Class { negated, items } => class_matches(*negated, items, c),
             };
             if matched {
                 ti += 1;
-                si += 1;
+                si += width;
                 continue;
             }
         }
@@ -234,8 +266,16 @@ fn glob_seg_match(toks: &[Tok], seg: &[char]) -> bool {
         // swallow one more character
         if let Some((sti, ssi)) = star {
             ti = sti;
-            si = ssi + 1;
-            star = Some((sti, ssi + 1));
+            // `ssi` was recorded inside the loop, so it is a valid char boundary
+            // below the segment's length — advancing by that char's width keeps
+            // it one.
+            let width = if seg.ascii {
+                1
+            } else {
+                char_at(seg.text, ssi).1
+            };
+            si = ssi + width;
+            star = Some((sti, si));
         } else {
             return false;
         }
