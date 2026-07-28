@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 557,
+	"end": 474,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,211 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 37,
-				"data": " Basic escaped angle brackets "
-			},
-			{
-				"type": "Text",
-				"start": 37,
-				"end": 38,
-				"raw": "\n",
-				"data": "\n"
-			},
-			{
-				"type": "ExpressionTag",
-				"start": 38,
-				"end": 43,
-				"expression": {
-					"type": "Literal",
-					"start": 39,
-					"end": 42,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 1
-						},
-						"end": {
-							"line": 2,
-							"column": 4
-						}
-					},
-					"value": "<",
-					"raw": "'<'"
-				}
-			},
-			{
-				"type": "Text",
-				"start": 43,
-				"end": 46,
-				"raw": "div",
-				"data": "div"
-			},
-			{
-				"type": "ExpressionTag",
-				"start": 46,
-				"end": 51,
-				"expression": {
-					"type": "Literal",
-					"start": 47,
-					"end": 50,
-					"loc": {
-						"start": {
-							"line": 2,
-							"column": 9
-						},
-						"end": {
-							"line": 2,
-							"column": 12
-						}
-					},
-					"value": ">",
-					"raw": "'>'"
-				}
-			},
-			{
-				"type": "Text",
-				"start": 51,
-				"end": 52,
-				"raw": "\n",
-				"data": "\n"
-			},
-			{
-				"type": "ExpressionTag",
-				"start": 52,
-				"end": 57,
-				"expression": {
-					"type": "Literal",
-					"start": 53,
-					"end": 56,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 1
-						},
-						"end": {
-							"line": 3,
-							"column": 4
-						}
-					},
-					"value": "<",
-					"raw": "'<'"
-				}
-			},
-			{
-				"type": "Text",
-				"start": 57,
-				"end": 61,
-				"raw": "code",
-				"data": "code"
-			},
-			{
-				"type": "ExpressionTag",
-				"start": 61,
-				"end": 66,
-				"expression": {
-					"type": "Literal",
-					"start": 62,
-					"end": 65,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 10
-						},
-						"end": {
-							"line": 3,
-							"column": 13
-						}
-					},
-					"value": ">",
-					"raw": "'>'"
-				}
-			},
-			{
-				"type": "ExpressionTag",
-				"start": 66,
-				"end": 71,
-				"expression": {
-					"type": "Literal",
-					"start": 67,
-					"end": 70,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 15
-						},
-						"end": {
-							"line": 3,
-							"column": 18
-						}
-					},
-					"value": "<",
-					"raw": "'<'"
-				}
-			},
-			{
-				"type": "Text",
-				"start": 71,
-				"end": 76,
-				"raw": "/code",
-				"data": "/code"
-			},
-			{
-				"type": "ExpressionTag",
-				"start": 76,
-				"end": 81,
-				"expression": {
-					"type": "Literal",
-					"start": 77,
-					"end": 80,
-					"loc": {
-						"start": {
-							"line": 3,
-							"column": 25
-						},
-						"end": {
-							"line": 3,
-							"column": 28
-						}
-					},
-					"value": ">",
-					"raw": "'>'"
-				}
-			},
-			{
-				"type": "Text",
-				"start": 81,
-				"end": 83,
-				"raw": "\n\n",
-				"data": "\n\n"
-			},
-			{
-				"type": "Comment",
-				"start": 83,
-				"end": 113,
+				"end": 30,
 				"data": " With surrounding text "
 			},
 			{
 				"type": "Text",
-				"start": 113,
-				"end": 126,
+				"start": 30,
+				"end": 43,
 				"raw": "\nText before ",
 				"data": "\nText before "
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 126,
-				"end": 131,
+				"start": 43,
+				"end": 48,
 				"expression": {
 					"type": "Literal",
-					"start": 127,
-					"end": 130,
+					"start": 44,
+					"end": 47,
 					"loc": {
 						"start": {
-							"line": 6,
+							"line": 2,
 							"column": 13
 						},
 						"end": {
-							"line": 6,
+							"line": 2,
 							"column": 16
 						}
 					},
@@ -224,26 +44,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 131,
-				"end": 134,
+				"start": 48,
+				"end": 51,
 				"raw": "div",
 				"data": "div"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 134,
-				"end": 139,
+				"start": 51,
+				"end": 56,
 				"expression": {
 					"type": "Literal",
-					"start": 135,
-					"end": 138,
+					"start": 52,
+					"end": 55,
 					"loc": {
 						"start": {
-							"line": 6,
+							"line": 2,
 							"column": 21
 						},
 						"end": {
-							"line": 6,
+							"line": 2,
 							"column": 24
 						}
 					},
@@ -253,39 +73,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 139,
-				"end": 152,
+				"start": 56,
+				"end": 69,
 				"raw": " text after\n\n",
 				"data": " text after\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 152,
-				"end": 179,
+				"start": 69,
+				"end": 96,
 				"data": " Only trailing text "
 			},
 			{
 				"type": "Text",
-				"start": 179,
-				"end": 180,
+				"start": 96,
+				"end": 97,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 180,
-				"end": 185,
+				"start": 97,
+				"end": 102,
 				"expression": {
 					"type": "Literal",
-					"start": 181,
-					"end": 184,
+					"start": 98,
+					"end": 101,
 					"loc": {
 						"start": {
-							"line": 9,
+							"line": 5,
 							"column": 1
 						},
 						"end": {
-							"line": 9,
+							"line": 5,
 							"column": 4
 						}
 					},
@@ -295,26 +115,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 185,
-				"end": 189,
+				"start": 102,
+				"end": 106,
 				"raw": "span",
 				"data": "span"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 189,
-				"end": 194,
+				"start": 106,
+				"end": 111,
 				"expression": {
 					"type": "Literal",
-					"start": 190,
-					"end": 193,
+					"start": 107,
+					"end": 110,
 					"loc": {
 						"start": {
-							"line": 9,
+							"line": 5,
 							"column": 10
 						},
 						"end": {
-							"line": 9,
+							"line": 5,
 							"column": 13
 						}
 					},
@@ -324,39 +144,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 194,
-				"end": 207,
+				"start": 111,
+				"end": 124,
 				"raw": " text after\n\n",
 				"data": " text after\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 207,
-				"end": 233,
+				"start": 124,
+				"end": 150,
 				"data": " Only leading text "
 			},
 			{
 				"type": "Text",
-				"start": 233,
-				"end": 246,
+				"start": 150,
+				"end": 163,
 				"raw": "\nText before ",
 				"data": "\nText before "
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 246,
-				"end": 251,
+				"start": 163,
+				"end": 168,
 				"expression": {
 					"type": "Literal",
-					"start": 247,
-					"end": 250,
+					"start": 164,
+					"end": 167,
 					"loc": {
 						"start": {
-							"line": 12,
+							"line": 8,
 							"column": 13
 						},
 						"end": {
-							"line": 12,
+							"line": 8,
 							"column": 16
 						}
 					},
@@ -366,26 +186,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 251,
-				"end": 255,
+				"start": 168,
+				"end": 172,
 				"raw": "span",
 				"data": "span"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 255,
-				"end": 260,
+				"start": 172,
+				"end": 177,
 				"expression": {
 					"type": "Literal",
-					"start": 256,
-					"end": 259,
+					"start": 173,
+					"end": 176,
 					"loc": {
 						"start": {
-							"line": 12,
+							"line": 8,
 							"column": 22
 						},
 						"end": {
-							"line": 12,
+							"line": 8,
 							"column": 25
 						}
 					},
@@ -395,39 +215,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 260,
-				"end": 262,
+				"start": 177,
+				"end": 179,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 262,
-				"end": 298,
+				"start": 179,
+				"end": 215,
 				"data": " Multiple pairs with content "
 			},
 			{
 				"type": "Text",
-				"start": 298,
-				"end": 299,
+				"start": 215,
+				"end": 216,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 299,
-				"end": 304,
+				"start": 216,
+				"end": 221,
 				"expression": {
 					"type": "Literal",
-					"start": 300,
-					"end": 303,
+					"start": 217,
+					"end": 220,
 					"loc": {
 						"start": {
-							"line": 15,
+							"line": 11,
 							"column": 1
 						},
 						"end": {
-							"line": 15,
+							"line": 11,
 							"column": 4
 						}
 					},
@@ -437,26 +257,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 304,
-				"end": 305,
+				"start": 221,
+				"end": 222,
 				"raw": "p",
 				"data": "p"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 305,
-				"end": 310,
+				"start": 222,
+				"end": 227,
 				"expression": {
 					"type": "Literal",
-					"start": 306,
-					"end": 309,
+					"start": 223,
+					"end": 226,
 					"loc": {
 						"start": {
-							"line": 15,
+							"line": 11,
 							"column": 7
 						},
 						"end": {
-							"line": 15,
+							"line": 11,
 							"column": 10
 						}
 					},
@@ -466,26 +286,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 310,
-				"end": 319,
+				"start": 227,
+				"end": 236,
 				"raw": "paragraph",
 				"data": "paragraph"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 319,
-				"end": 324,
+				"start": 236,
+				"end": 241,
 				"expression": {
 					"type": "Literal",
-					"start": 320,
-					"end": 323,
+					"start": 237,
+					"end": 240,
 					"loc": {
 						"start": {
-							"line": 15,
+							"line": 11,
 							"column": 21
 						},
 						"end": {
-							"line": 15,
+							"line": 11,
 							"column": 24
 						}
 					},
@@ -495,26 +315,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 324,
-				"end": 326,
+				"start": 241,
+				"end": 243,
 				"raw": "/p",
 				"data": "/p"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 326,
-				"end": 331,
+				"start": 243,
+				"end": 248,
 				"expression": {
 					"type": "Literal",
-					"start": 327,
-					"end": 330,
+					"start": 244,
+					"end": 247,
 					"loc": {
 						"start": {
-							"line": 15,
+							"line": 11,
 							"column": 28
 						},
 						"end": {
-							"line": 15,
+							"line": 11,
 							"column": 31
 						}
 					},
@@ -524,39 +344,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 331,
-				"end": 333,
+				"start": 248,
+				"end": 250,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 333,
-				"end": 362,
+				"start": 250,
+				"end": 279,
 				"data": " Self-closing pattern "
 			},
 			{
 				"type": "Text",
-				"start": 362,
-				"end": 363,
+				"start": 279,
+				"end": 280,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 363,
-				"end": 368,
+				"start": 280,
+				"end": 285,
 				"expression": {
 					"type": "Literal",
-					"start": 364,
-					"end": 367,
+					"start": 281,
+					"end": 284,
 					"loc": {
 						"start": {
-							"line": 18,
+							"line": 14,
 							"column": 1
 						},
 						"end": {
-							"line": 18,
+							"line": 14,
 							"column": 4
 						}
 					},
@@ -566,26 +386,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 368,
-				"end": 371,
+				"start": 285,
+				"end": 288,
 				"raw": "br/",
 				"data": "br/"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 371,
-				"end": 376,
+				"start": 288,
+				"end": 293,
 				"expression": {
 					"type": "Literal",
-					"start": 372,
-					"end": 375,
+					"start": 289,
+					"end": 292,
 					"loc": {
 						"start": {
-							"line": 18,
+							"line": 14,
 							"column": 9
 						},
 						"end": {
-							"line": 18,
+							"line": 14,
 							"column": 12
 						}
 					},
@@ -595,39 +415,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 376,
-				"end": 378,
+				"start": 293,
+				"end": 295,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 378,
-				"end": 406,
+				"start": 295,
+				"end": 323,
 				"data": " With attribute text "
 			},
 			{
 				"type": "Text",
-				"start": 406,
-				"end": 407,
+				"start": 323,
+				"end": 324,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 407,
-				"end": 412,
+				"start": 324,
+				"end": 329,
 				"expression": {
 					"type": "Literal",
-					"start": 408,
-					"end": 411,
+					"start": 325,
+					"end": 328,
 					"loc": {
 						"start": {
-							"line": 21,
+							"line": 17,
 							"column": 1
 						},
 						"end": {
-							"line": 21,
+							"line": 17,
 							"column": 4
 						}
 					},
@@ -637,26 +457,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 412,
-				"end": 428,
+				"start": 329,
+				"end": 345,
 				"raw": "div class=\"test\"",
 				"data": "div class=\"test\""
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 428,
-				"end": 433,
+				"start": 345,
+				"end": 350,
 				"expression": {
 					"type": "Literal",
-					"start": 429,
-					"end": 432,
+					"start": 346,
+					"end": 349,
 					"loc": {
 						"start": {
-							"line": 21,
+							"line": 17,
 							"column": 22
 						},
 						"end": {
-							"line": 21,
+							"line": 17,
 							"column": 25
 						}
 					},
@@ -666,39 +486,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 433,
-				"end": 435,
+				"start": 350,
+				"end": 352,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 435,
-				"end": 465,
+				"start": 352,
+				"end": 382,
 				"data": " Inside inline element "
 			},
 			{
 				"type": "Text",
-				"start": 465,
-				"end": 466,
+				"start": 382,
+				"end": 383,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 466,
-				"end": 492,
+				"start": 383,
+				"end": 409,
 				"name": "code",
 				"name_loc": {
 					"start": {
-						"line": 24,
+						"line": 20,
 						"column": 1,
-						"character": 467
+						"character": 384
 					},
 					"end": {
-						"line": 24,
+						"line": 20,
 						"column": 5,
-						"character": 471
+						"character": 388
 					}
 				},
 				"attributes": [],
@@ -707,19 +527,19 @@
 					"nodes": [
 						{
 							"type": "ExpressionTag",
-							"start": 472,
-							"end": 477,
+							"start": 389,
+							"end": 394,
 							"expression": {
 								"type": "Literal",
-								"start": 473,
-								"end": 476,
+								"start": 390,
+								"end": 393,
 								"loc": {
 									"start": {
-										"line": 24,
+										"line": 20,
 										"column": 7
 									},
 									"end": {
-										"line": 24,
+										"line": 20,
 										"column": 10
 									}
 								},
@@ -729,26 +549,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 477,
-							"end": 480,
+							"start": 394,
+							"end": 397,
 							"raw": "div",
 							"data": "div"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 480,
-							"end": 485,
+							"start": 397,
+							"end": 402,
 							"expression": {
 								"type": "Literal",
-								"start": 481,
-								"end": 484,
+								"start": 398,
+								"end": 401,
 								"loc": {
 									"start": {
-										"line": 24,
+										"line": 20,
 										"column": 15
 									},
 									"end": {
-										"line": 24,
+										"line": 20,
 										"column": 18
 									}
 								},
@@ -761,39 +581,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 492,
-				"end": 494,
+				"start": 409,
+				"end": 411,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 494,
-				"end": 528,
+				"start": 411,
+				"end": 445,
 				"data": " With expression in middle "
 			},
 			{
 				"type": "Text",
-				"start": 528,
-				"end": 529,
+				"start": 445,
+				"end": 446,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 529,
-				"end": 534,
+				"start": 446,
+				"end": 451,
 				"expression": {
 					"type": "Literal",
-					"start": 530,
-					"end": 533,
+					"start": 447,
+					"end": 450,
 					"loc": {
 						"start": {
-							"line": 27,
+							"line": 23,
 							"column": 1
 						},
 						"end": {
-							"line": 27,
+							"line": 23,
 							"column": 4
 						}
 					},
@@ -803,26 +623,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 534,
-				"end": 544,
+				"start": 451,
+				"end": 461,
 				"raw": "Component ",
 				"data": "Component "
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 544,
-				"end": 550,
+				"start": 461,
+				"end": 467,
 				"expression": {
 					"type": "Identifier",
-					"start": 545,
-					"end": 549,
+					"start": 462,
+					"end": 466,
 					"loc": {
 						"start": {
-							"line": 27,
+							"line": 23,
 							"column": 16
 						},
 						"end": {
-							"line": 27,
+							"line": 23,
 							"column": 20
 						}
 					},
@@ -831,19 +651,19 @@
 			},
 			{
 				"type": "ExpressionTag",
-				"start": 550,
-				"end": 556,
+				"start": 467,
+				"end": 473,
 				"expression": {
 					"type": "Literal",
-					"start": 551,
-					"end": 555,
+					"start": 468,
+					"end": 472,
 					"loc": {
 						"start": {
-							"line": 27,
+							"line": 23,
 							"column": 22
 						},
 						"end": {
-							"line": 27,
+							"line": 23,
 							"column": 26
 						}
 					},

@@ -65,6 +65,24 @@ impl SiblingPosition {
     }
 }
 
+/// The per-call layout facts `handle_text_child` cannot derive from `trimmed_nodes[i]` alone —
+/// each is decided by the *caller's* context rather than by the text node's own position.
+#[derive(Clone, Copy)]
+struct TextChildContext {
+    /// A break-capable expression tag is present in the fragment, so boundary text adjacent to a
+    /// tag emits a plain space instead of a fill `line` (which would short-circuit an earlier
+    /// expression group's `fits()` lookahead).
+    breakable_exprs: bool,
+    /// The convergence path (the multiline element arm), the only caller that routes blocks and
+    /// control-flow blocks through their own dispatch.
+    multiline: bool,
+    /// Whether this node's inline run holds prose — the gate on the sibling-newline flow rule at
+    /// its standalone-separator site. Computed once per run by the caller
+    /// ([`Printer::scan_inline_run`]) and only on the `multiline` path; `false` everywhere else,
+    /// which is inert because that site returns before reading it in the non-multiline arm.
+    run_has_prose: bool,
+}
+
 /// Whether `raw` begins with a linebreak, ignoring leading horizontal whitespace — matches
 /// prettier-plugin-svelte's `startsWithLinebreak` (`^([\t\f\r ]*\n)`). Used by the block-child
 /// boundary logic to tell a leading-linebreak text (which supplies its own break) from
@@ -240,7 +258,17 @@ impl<'a> Printer<'a> {
         // `trimmed_nodes[..i]` through the `continue`s (format-ignore, whitespace-run collapse,
         // glued-run skip).
         let mut has_preceding_breakable = false;
+        // Inline-run prose cursor for the sibling-newline flow rule at its standalone-separator
+        // site (`handle_text_child`'s whitespace-only arm). Runs partition `trimmed_nodes`, so
+        // advancing the cursor here — at the TOP of the body, ahead of every `continue` — visits
+        // each node once and keeps the total cost O(n). Reading it at the separator instead would
+        // rescan per separator, and a mid-run `continue` (a glued run skips its tail) would leave
+        // a later rescan blind to the prose *before* it in the same run.
+        let (mut run_end, mut run_has_prose) = (0usize, false);
         for (i, node) in trimmed_nodes.iter().enumerate() {
+            if multiline && i >= run_end {
+                (run_end, run_has_prose) = self.scan_inline_run(trimmed_nodes, i);
+            }
             if i > 0 && is_inline_content(&trimmed_nodes[i - 1]) {
                 has_preceding_breakable = true;
             }
@@ -294,8 +322,11 @@ impl<'a> Printer<'a> {
                 self.handle_text_child(
                     trimmed_nodes,
                     i,
-                    breakable_exprs,
-                    multiline,
+                    TextChildContext {
+                        breakable_exprs,
+                        multiline,
+                        run_has_prose,
+                    },
                     &mut child_docs,
                     &mut handle_whitespace_of_prev_text,
                 );
@@ -471,11 +502,15 @@ impl<'a> Printer<'a> {
         &self,
         trimmed_nodes: &[FragmentNode<'_>],
         i: usize,
-        breakable_exprs: bool,
-        multiline: bool,
+        ctx: TextChildContext,
         child_docs: &mut DocBuf,
         handle_whitespace_of_prev_text: &mut bool,
     ) {
+        let TextChildContext {
+            breakable_exprs,
+            multiline,
+            run_has_prose,
+        } = ctx;
         let FragmentNode::Text(text) = &trimmed_nodes[i] else {
             return;
         };
@@ -579,15 +614,32 @@ impl<'a> Printer<'a> {
             // newline before an *inline element* therefore breaks (matching prettier and path 1),
             // rather than collapsing as it did before this convergence.
             //
-            // NOTE the sibling-newline flow rule ([`Self::sibling_newline_flows`]) deliberately
-            // does NOT reach this site. Here the separator is a whitespace-only node *between two
-            // non-text siblings*, so its doc goes straight into `child_docs` rather than into a
-            // text fill — a collapsible `line` there breaks all-or-nothing with the parent group
-            // instead of per width, which mixes a flowed first boundary with hard-broken later
-            // ones in the same run. The rule applies only where the separator is part of a
-            // content text's own run (its leading/trailing whitespace), which is where the fill
-            // can reflow it.
             let newline_count = text.newline_count as usize;
+            // The sibling-newline flow rule ([`Self::sibling_newline_flows`]) reaches this site —
+            // a whitespace-only separator between two *non-text* siblings — but only when the
+            // separator's own inline RUN holds prose (`run_has_prose`, computed once per run by
+            // the caller). That gate is the rule's boundary, and it is structural rather than
+            // mechanical: flowing means *reflowing into a text fill*, and a run with no content
+            // text has no fill to reflow into. Its newlines are then the author's only structure —
+            // a vertical list of siblings — and collapsing them packs independent items onto one
+            // line (and, for a short list, lets the collapse cascade into the parent element's own
+            // hug decision, an F1 break). See the standalone-separator paragraph in
+            // [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+            // Both spellings of a *flowing* separator — an authored space and an authored single
+            // newline — must land on the same doc, or the pair diverges (and, once the formatter
+            // emits one of them, flip-flops). So the flow test is spelling-independent and the
+            // newline arm below simply re-spells itself as the space.
+            let separator_flows = run_has_prose
+                && prev_node.is_some_and(|n| self.sibling_newline_flows(n))
+                && next_node.is_some_and(|n| self.sibling_newline_flows(n));
+            let ws_flows = newline_count == 1 && separator_flows;
+            // The rule's own claim, applied literally: a flowing single newline IS the space
+            // separator, differently spelled. So it takes the space arm verbatim rather than a
+            // parallel one — same doc, same layout, and idempotency by construction. Emitting a
+            // *different* collapsible form here (`group([line, el])` where the space emits a bare
+            // `line`) is what made the first attempt flip-flop: pass 1 wrote a newline that pass 2
+            // then re-read as flowable and collapsed.
+            let newline_count = if ws_flows { 0 } else { newline_count };
             let trim_to_collapsible = (next_is_inline_el && newline_count == 0)
                 || (next_is_block_el && newline_count < 2);
             if trim_to_collapsible {
@@ -610,6 +662,21 @@ impl<'a> Printer<'a> {
                     child_docs.push(d.hardline());
                 }
                 child_docs.push(d.hardline());
+            } else if next_is_tag && separator_flows {
+                // A flowing separator before a TAG. `trim_to_collapsible` above covers only a next
+                // inline *element*, so without this arm the boundary would fall to the bare `line`
+                // below — which resolves all-or-nothing with the parent group, and the parent is
+                // already broken whenever the fragment is multiline. The whole run would then hard-
+                // break while the one boundary owned by a content text's fill flowed: the mixed
+                // layout this rule exists to remove, just relocated from elements to tags. Deferring
+                // to the next sibling gives the tag the same per-width `group([line, tag])` an inline
+                // element gets, so the run reflows as one.
+                //
+                // Gated on `separator_flows` — NOT on `next_is_tag` alone. A plain authored space
+                // before a tag keeps the bare `line`: its neighbour may be a **comment**, whose own
+                // line is authorship (`<!-- c -->` `{expr}` must not weld — `root_expressions_spaced`),
+                // and the flow predicate is exactly what excludes it.
+                *handle_whitespace_of_prev_text = true;
             } else {
                 child_docs.push(d.line());
             }
@@ -648,6 +715,13 @@ impl<'a> Printer<'a> {
         // Shared by both the leading run here and the trailing run below — see
         // [`Self::is_separator_like_text`] for why such a node is excluded, and why this one
         // reads the decoded text where the rest of the path reads `raw`.
+        //
+        // This is the node-local face of the flow rule's prose gate: here the text node IS the
+        // run's fill, so `!separator_like_text` answers the same question `run_has_prose` answers
+        // for the whitespace-only separator site, which owns no fill (see [`Self::is_run_prose`]).
+        // Node-local is the stricter reading and is the one that belongs here — a separator-like
+        // node must not flow even when its run holds prose elsewhere, or the fill re-reads a break
+        // it emitted itself (the NBSP F1 break).
         let separator_like_text = Self::is_separator_like_text(&text.data(self.source));
         let leading_run = &raw[..raw.len()
             - raw
@@ -946,6 +1020,57 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Whether `node` ends the inline run it sits in — anything that owns its own line (a block
+    /// element, a control-flow block, a comment: the `sibling_newline_flows` complement) or an
+    /// authored blank line. A whitespace-only node with a single newline is a *separator within*
+    /// the run, and a content text is run content, so neither breaks it.
+    ///
+    /// ⚠️ The two `Text` arms must stay **ahead** of the delegation, not fold into it.
+    /// [`Self::sibling_newline_flows`] deliberately does not model `Text` (its `_ => false` arm
+    /// is about neighbours it never sees), so delegating a content text would read back as
+    /// "breaks the run" and cut every run at its own prose — the one thing the run exists to
+    /// find.
+    fn breaks_inline_run(&self, node: &FragmentNode<'_>) -> bool {
+        match node {
+            FragmentNode::Text(t) if t.is_ascii_ws_only => t.newline_count >= 2,
+            FragmentNode::Text(_) => false,
+            _ => !self.sibling_newline_flows(node),
+        }
+    }
+
+    /// Whether `node` is **prose** — a text node carrying a word for a `fill` to pack. An
+    /// NBSP-only node is a separator wearing content's clothing
+    /// ([`Self::is_separator_like_text`]) and is not prose, for the same reason it is excluded
+    /// from the flow rule itself.
+    ///
+    /// This is the run-level spelling of the node-local `!separator_like_text` test the content
+    /// text sites already make: at those sites the node *is* the run's fill, so asking about the
+    /// node and asking about the run are the same question. Only the whitespace-only separator
+    /// site, which owns no fill, has to ask it of the run.
+    fn is_run_prose(&self, node: &FragmentNode<'_>) -> bool {
+        matches!(node, FragmentNode::Text(t)
+            if !t.is_ascii_ws_only && !Self::is_separator_like_text(&t.data(self.source)))
+    }
+
+    /// Scan the inline run beginning at `start`: its exclusive end, and whether it holds prose
+    /// ([`Self::is_run_prose`]) — which is what puts a `fill` in the run for a flowing separator
+    /// to reflow into.
+    ///
+    /// Called only when the caller's cursor reaches a fresh run, so the scans partition
+    /// `trimmed_nodes` and cost O(n) across the whole fragment — not the O(n²) a per-separator
+    /// rescan would cost on a long all-flowing run (a generated per-token `<span>` list). A
+    /// run-breaking node at `start` is its own one-node span: the loop stops immediately and the
+    /// `max` advances the cursor past it, so the caller cannot stall on it.
+    fn scan_inline_run(&self, nodes: &[FragmentNode<'_>], start: usize) -> (usize, bool) {
+        let mut end = start;
+        let mut has_prose = false;
+        while end < nodes.len() && !self.breaks_inline_run(&nodes[end]) {
+            has_prose = has_prose || self.is_run_prose(&nodes[end]);
+            end += 1;
+        }
+        (end.max(start + 1), has_prose)
+    }
+
     /// Whether a **single-newline** separator beside `node` may collapse to a plain space.
     ///
     /// Svelte 5 collapses an inter-sibling whitespace run to one whitespace, so a space and a
@@ -959,16 +1084,26 @@ impl<'a> Printer<'a> {
     ///   would relocate it across a semantic boundary (§Comment Position Philosophy);
     /// - a **block element**, which owns its own line via `handle_block_child`;
     /// - a **blank line** (2+ newlines), a Tier-2 authoring signal, screened by the callers;
-    /// - a **control-flow block** (`{#if}` / `{#each}` / `{#key}` / `{#await}` / `{#snippet}`).
-    ///   Its head and tail wrap a *fragment*, so paying an overflow by expanding the body pulls
-    ///   a **body** node onto its own line and welds the flowed sibling text to the tail
-    ///   (`{#key key}⏎text6⏎{/key}text7`) — a layout decision about one construct reaching
-    ///   inside another. ⚠️ Be honest about the strength of this: a breaking `{expr}` tag
-    ///   expands mid-run too (`{f(⏎…⏎)}text4`), so "width is not fixed" does *not* by itself
-    ///   separate blocks from tags. The exclusion is **empirical first** — flowing blocks
-    ///   regressed a real fixture (`root_text_control_flow_adjacent`) into a clearly worse
-    ///   layout, while flowing tags regressed nothing across the fixture suite or the corpus.
-    ///   The breaking-tag shape is a known rough edge, not a settled win.
+    /// - a **control-flow block** (`{#if}` / `{#each}` / `{#key}` / `{#await}` / `{#snippet}`),
+    ///   which has **no way to pay an overflow except by tearing itself open**. An inline element
+    ///   that cannot fit drops to its own line *whole*, tags intact (`break_before_wide_flow`) —
+    ///   that escape is what makes flowing safe for elements, and it does not reach a block. A
+    ///   block's head and tail wrap a *fragment*, so its only available break is at its own
+    ///   head↔body seam: the body node lands on its own line and the flowed sibling text welds
+    ///   to the tail (`{#key key}⏎text6⏎{/key}text7` — `root_text_control_flow_adjacent`), and
+    ///   in a run of several blocks only the ones straddling the width boundary expand, so
+    ///   identical constructs render differently by horizontal accident.
+    ///
+    ///   ⚠️ Do NOT re-derive this as "a block's width is not fixed" — that is false, and was the
+    ///   doc's old wording: a breaking `{expr}` tag expands mid-run too (`{f(⏎…⏎)}text4`). The
+    ///   difference is *where the break lands* — inside the tag's own expression (its call
+    ///   arguments), leaving both of the tag's outer adjacencies untouched, versus at a block's
+    ///   seam with its own children. So this exclusion is a consequence of a **missing
+    ///   mechanism**, not a property of blocks: admitting them is gated on giving a block the
+    ///   same whole-unit drop (widening the `next_is_flow` / `break_before_wide_flow` coupling
+    ///   past `is_inline_el_or_comp`), not on widening this predicate. The yield is real —
+    ///   admitting blocks as-is converges ~39 more `authoring_audit` sites — which is exactly
+    ///   why the bar is the resulting layout rather than the count.
     ///
     /// Note this is orthogonal to whether the *element* lays out multiline, which an authored
     /// newline does still decide and which is preserved — so the convergence target is the

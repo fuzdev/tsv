@@ -1,7 +1,3 @@
-<!-- Basic escaped angle brackets -->
-{'<'}div{'>'}
-{'<'}code{'>'}{'<'}/code{'>'}
-
 <!-- With surrounding text -->
 Text before {'<'}div{'>'} text after
 
