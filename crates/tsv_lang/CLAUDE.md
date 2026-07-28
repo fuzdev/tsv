@@ -179,6 +179,16 @@ than as plausible code. See [../../CLAUDE.md §Comment Handling](../../CLAUDE.md
 Axis-free (provably): `has_line_comments_in_range()` — ownership only ever binds a **block**
 comment, so skip ≡ count. If a line comment ever becomes ownable, it must grow an axis.
 
+**The ownership lookup itself** — `owned_leading_comment_at(source, comments, start)` returns the
+block comment **owned** by the token beginning at `start`, or `None`. It is not a fourth axis but
+the question *behind* the split: it names the comment the to-emit axis skips, so a builder that
+**replaces** a token's doc (a format-ignore freeze, a reassembled arrow signature) can print it
+instead — otherwise the comment reaches no emitter at all (hazard 1). It lives here rather than
+as a twin in each printer because both `tsv_ts` and `tsv_svelte` ask it and the answer is a pure
+function of the source bytes plus the comment array; a second copy is exactly the drift the
+shared-emitter rule exists to prevent, and it has already cost one recurrence of hazard 1 across
+the two crates.
+
 Shared:
 
 - `find_first_comment_from()` — Binary-search index of first comment with `span.start >= pos`

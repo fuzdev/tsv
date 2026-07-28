@@ -1908,6 +1908,55 @@ merely redundant tsv drops them and the directive leads the statement, matching 
   **dropped** every comment in this gap, scanning it over an inverted range —
   [before export](../tests/fixtures/typescript/typescript_specific/decorators/before_export_comment_prettier_divergence/)
 
+**On prefixed Svelte braced heads.** The head rule reaches one delimiter further out: a `{`
+that carries a **prefix** before its value. An own-line directive in the prefix→value gap
+freezes that whole value — the tags `{@html }`, `{@render }`, `{@attach }` and `{@debug }`, the
+`{...}` spread attribute, and every block head (`{#if }` / `{:else if }`, `{#each }` and an
+`{#each}` key's own `(`, `{#key }`, `{#await }`). The prefix, the `as` clause, the key's parens
+and the closing `}` are all parent-owned and stay outside the slice; a sibling tag, spread or
+block the freeze does not reach still normalizes. `{@debug}`'s slice is the identifier **list**
+(first identifier through last), which is what that tag normalizes. `{@const}` is not in this
+family — its `=` makes it an assignment head, where prettier agrees
+([svelte/tags/const/value_prettier_ignore_head](../tests/fixtures/svelte/tags/const/value_prettier_ignore_head/)).
+
+Three Svelte positions look like heads but are not: `{#snippet ⟨name⟩}`, `{#each … as ⟨pattern⟩}`
+and `{#await … then ⟨pattern⟩}` reject a comment in that gap in **both** parsers, so there is
+nothing to bind to.
+
+Every one of these is a divergence, for a single reason: prettier **relocates** the directive
+flush onto the prefix's line (`{@html // prettier-ignore`, `{#if // prettier-ignore`) and
+freezes anyway. That placement is inert under tsv's floor, so following it would lose the freeze
+on tsv's own second pass. The unprefixed `{…}` values already have an own-line form to fall back
+on (`wrap_in_block_structure` — the `{⏎…⏎}` block that
+[bind/value_prettier_ignore_head](../tests/fixtures/svelte/directives/bind/value_prettier_ignore_head/)
+pins); a prefixed head had none, so it takes the same shape one prefix out — the prefix alone on
+its line, the directive and the frozen slice indented below it, and the closing token dangling.
+The block heads already reach that geometry whenever a leading line comment breaks the head, so
+only the directive's own line is new there. Inside a whitespace-significant element (`<pre>` /
+`<textarea>`) the dangle is suppressed as always and the closer hugs the slice.
+
+- **Prefixed tag heads** — ◆comment_preservation —
+  [`{@html}` / `{@render}` / `{@attach}`](../tests/fixtures/svelte/tags/prefixed_value_prettier_ignore_head_prettier_divergence/),
+  [`{...}` spread](../tests/fixtures/svelte/attributes/spread_prettier_ignore_head_prettier_divergence/)
+- **Block heads** — ◆comment_preservation — the `}` dangle is the block layout tsv already
+  takes for a broken head (§Svelte: Blocks) —
+  [block heads](../tests/fixtures/svelte/blocks/head_prettier_ignore_prettier_divergence/)
+- **A frozen head whose value takes clarity parens** — ◆comment_preservation ◆prettier_bug —
+  an assignment value is parenthesized by the printer (`{@html (a = b)}`), and those parens
+  stay **outside** the verbatim slice, like the prefix and the `}`. Prettier has no freeze to
+  compare against here: its `remove_parens` pass **deletes** the directive along with the
+  wrapper it attached to, so the value normalizes and the comment is lost outright. Also a
+  `_svelte_divergence` — the same pass moves the parser's attachment (§Comment Attachment
+  Differences in [conformance_svelte.md](./conformance_svelte.md)) —
+  [assignment head](../tests/fixtures/svelte/tags/assignment_prettier_ignore_head_svelte_prettier_divergence/)
+- **`{@debug}` head** — ◆comment_preservation ◆prettier_bug — prettier supplies no freeze
+  semantics to compare against, because it **deletes** every comment inside a `{@debug}`,
+  directive included (the content loss
+  [debug_comment](../tests/fixtures/svelte/tags/debug/debug_comment_prettier_divergence/)
+  already catalogs). tsv preserves the comment, so it must also answer where the comment goes
+  and what it freezes, and answers both the way the rest of the family does —
+  [debug head](../tests/fixtures/svelte/tags/debug/value_prettier_ignore_head_prettier_divergence/)
+
 See [directives.md](./directives.md) for the user-facing reference.
 
 ---

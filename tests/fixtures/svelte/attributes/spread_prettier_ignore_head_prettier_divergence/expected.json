@@ -1,0 +1,306 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 284,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 85,
+				"data": " an own-line directive in a `{...}` spread's head gap freezes the whole value "
+			},
+			{
+				"type": "Text",
+				"start": 85,
+				"end": 86,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 86,
+				"end": 142,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 87
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 90
+					}
+				},
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 92,
+						"end": 134,
+						"expression": {
+							"type": "MemberExpression",
+							"start": 120,
+							"end": 131,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 2
+								},
+								"end": {
+									"line": 5,
+									"column": 13
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 120,
+								"end": 123,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 5
+									}
+								},
+								"name": "aaa"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 128,
+								"end": 131,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 10
+									},
+									"end": {
+										"line": 5,
+										"column": 13
+									}
+								},
+								"name": "bbb"
+							},
+							"computed": false,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 99,
+									"end": 117
+								}
+							]
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 142,
+				"end": 144,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 144,
+				"end": 212,
+				"data": " a sibling spread the freeze does not reach still normalizes "
+			},
+			{
+				"type": "Text",
+				"start": 212,
+				"end": 213,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 213,
+				"end": 283,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 214
+					},
+					"end": {
+						"line": 10,
+						"column": 4,
+						"character": 217
+					}
+				},
+				"attributes": [
+					{
+						"type": "SpreadAttribute",
+						"start": 219,
+						"end": 261,
+						"expression": {
+							"type": "MemberExpression",
+							"start": 247,
+							"end": 258,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 2
+								},
+								"end": {
+									"line": 13,
+									"column": 13
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 247,
+								"end": 250,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 5
+									}
+								},
+								"name": "ccc"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 255,
+								"end": 258,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 10
+									},
+									"end": {
+										"line": 13,
+										"column": 13
+									}
+								},
+								"name": "ddd"
+							},
+							"computed": false,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 226,
+									"end": 244
+								}
+							]
+						}
+					},
+					{
+						"type": "SpreadAttribute",
+						"start": 263,
+						"end": 275,
+						"expression": {
+							"type": "MemberExpression",
+							"start": 267,
+							"end": 274,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 5
+								},
+								"end": {
+									"line": 15,
+									"column": 12
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 267,
+								"end": 270,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 5
+									},
+									"end": {
+										"line": 15,
+										"column": 8
+									}
+								},
+								"name": "eee"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 271,
+								"end": 274,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 9
+									},
+									"end": {
+										"line": 15,
+										"column": 12
+									}
+								},
+								"name": "fff"
+							},
+							"computed": false,
+							"optional": false
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 99,
+			"end": 117,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 2
+				},
+				"end": {
+					"line": 4,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 226,
+			"end": 244,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 20
+				}
+			}
+		}
+	]
+}

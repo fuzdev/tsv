@@ -49,6 +49,35 @@ enum CommentSection {
     Style,
 }
 
+/// A head's content doc plus whether that head **froze** it — the pair every head builder
+/// hands back, and the one argument [`Printer::build_prefixed_head_doc`] assembles from.
+///
+/// **The rationale every head builder shares, stated once here.** The verdict comes back
+/// OUT of the builder rather than going in, because it selects the value's doc (verbatim vs
+/// formatted) AND the head's layout (space-less prefix, no tail hug, already broken), and
+/// those must never disagree — a hugged frozen value would pull the directive flush against
+/// the `{`, an inert placement that loses the freeze on the second pass. Threading them as
+/// two values let a caller pass one and forget the other; as one value there is nothing to
+/// forget, and a caller that can't supply the flag can't supply a wrong one.
+///
+/// `doc` is the head's content in its **final shape** — a frozen one is already broken onto
+/// its own indented lines ([`Printer::indent_frozen_head`]), because the block heads consume
+/// it directly rather than through the prefixed-head assembler.
+///
+/// `ends_with_line_comment` records that the content's last emitted comment was a **line**
+/// comment, whose doc ends in a `hardline` that already drops the closing token to the next
+/// line. Every consumer that would otherwise supply its own break must skip it, or the two
+/// breaks stack into a blank line — the hazard the unfrozen paths already guard
+/// (`build_expression_doc_parts_with_span`'s `has_trailing_line_comment`). It rides here
+/// rather than being re-derived from source by each consumer because the builder that
+/// *emitted* the run is the one that knows.
+#[derive(Clone, Copy)]
+pub(in crate::printer) struct HeadExpr {
+    pub(in crate::printer) doc: DocId,
+    pub(in crate::printer) frozen: bool,
+    pub(in crate::printer) ends_with_line_comment: bool,
+}
+
 /// Printer state for building output
 pub(crate) struct Printer<'a> {
     /// Output buffer
@@ -199,6 +228,92 @@ impl<'a> Printer<'a> {
         // `verbatim_source_span`, not `source_span`: a format-ignored slice's
         // embedded newlines are source layout, opaque to `will_break`.
         self.d().verbatim_source_span(span, self.source)
+    }
+
+    /// The frozen slice for a node the freeze resolved, **plus the owned-comment claim it
+    /// owes** — the Svelte twin of `tsv_ts`'s `build_frozen_node_doc`, and the emitter
+    /// every value-head freeze in this printer goes through.
+    ///
+    /// A block comment glued before the frozen node is *owned* by it: it rides inside the
+    /// doc the verbatim slice replaces, and every gap emitter skips it (the to-emit axis),
+    /// so unless the freeze prints it here nothing does — docs/comments.md hazard 1, the
+    /// ownership-is-about-who-PRINTS rule. It sits outside the slice's own span, so
+    /// widening the slice is not the fix; the claim is. Prettier keeps the comment right
+    /// where the author glued it, before the frozen value, and so does this.
+    pub(in crate::printer) fn build_frozen_node_doc(&self, span: Span) -> DocId {
+        let doc = self.verbatim_source_doc(span);
+        if !self.has_owned_comments {
+            return doc;
+        }
+        let comment = tsv_lang::owned_leading_comment_at(self.source, self.comments, span.start);
+        let Some(comment) = comment else {
+            return doc;
+        };
+        let d = self.d();
+        let comment_doc = tsv_ts::build_comment_doc(d, comment, &self.ts_inputs());
+        d.concat(&[comment_doc, d.text(" "), doc])
+    }
+
+    /// The frozen head's content, broken onto its own indented lines: a hardline, then the
+    /// directive run and the verbatim slice one level in.
+    ///
+    /// A **prefixed** braced head (`{@html`, `{#if`, `{...`) has no own-line form of its
+    /// own — its ordinary emitter pulls a leading comment run flush onto the prefix's line,
+    /// which is what prettier does too. That placement is inert under tsv's floor, so a
+    /// freeze printed there would be gone on the second pass; the break is what makes the
+    /// freeze survive, not a nicety. The unprefixed `{…}` values reach the same shape
+    /// through `wrap_in_block_structure`, and the hardline here is also what breaks the
+    /// enclosing head group — a [`Self::verbatim_source_doc`] slice is deliberately opaque
+    /// to `will_break`, so it cannot break anything by itself.
+    ///
+    /// The caller supplies the prefix via [`Self::head_open_doc`] and its own closing token
+    /// after the break.
+    pub(in crate::printer) fn indent_frozen_head(&self, content: DocId) -> DocId {
+        let d = self.d();
+        d.indent(d.concat(&[d.hardline(), content]))
+    }
+
+    /// The opening literal of a prefixed head, as a doc. A **frozen** head drops the
+    /// literal's trailing space: its content begins with its own hardline, so the space
+    /// would be trailing whitespace on the prefix's line.
+    pub(in crate::printer) fn head_open_doc(&self, open: &'static str, frozen: bool) -> DocId {
+        self.d().text(if frozen { open.trim_end() } else { open })
+    }
+
+    /// A whole prefixed head — the opening literal, the content, the closing token — for
+    /// every head that owns its closing token directly: the tags (`{@html …}`,
+    /// `{@render …}`, `{@debug …}`), the braced attribute heads (`{...}`, `{@attach}`), and
+    /// an `{#each}` key's parens. **The single assembler for that shape**, so the frozen
+    /// head's three coupled adjustments — space-less prefix, own-line content, dangling
+    /// closer — cannot be applied at one site and forgotten at the next.
+    ///
+    /// The block heads are the deliberate exception: they close with their own tail (an
+    /// `{#each}` ends `as item}`), so they take [`Self::head_open_doc`] and let their
+    /// existing dangle supply the break. Both paths render the same content shape.
+    ///
+    /// `head.doc` is the content in its final shape — already through
+    /// [`Self::indent_frozen_head`] when frozen (see [`HeadExpr`]).
+    pub(in crate::printer) fn build_prefixed_head_doc(
+        &self,
+        open: &'static str,
+        head: HeadExpr,
+        close: &'static str,
+    ) -> DocId {
+        let d = self.d();
+        if !head.frozen {
+            return d.concat(&[d.text(open), head.doc, d.text(close)]);
+        }
+        // A trailing line comment already ended the content with a `hardline`; adding the
+        // closer's own break on top of it would leave a blank line above the `}`.
+        if head.ends_with_line_comment {
+            return d.concat(&[self.head_open_doc(open, true), head.doc, d.text(close)]);
+        }
+        d.concat(&[
+            self.head_open_doc(open, true),
+            head.doc,
+            d.hardline(),
+            d.text(close),
+        ])
     }
 
     /// Get the source code

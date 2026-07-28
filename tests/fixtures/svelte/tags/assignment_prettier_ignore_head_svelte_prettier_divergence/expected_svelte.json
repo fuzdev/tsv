@@ -1,0 +1,273 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 395,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 168,
+				"data": " an assignment value needs clarity parens, and those are the PRINTER's, so a frozen\n\thead keeps them outside the verbatim slice — the interior stays as authored "
+			},
+			{
+				"type": "Text",
+				"start": 168,
+				"end": 169,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 169,
+				"end": 212,
+				"expression": {
+					"type": "AssignmentExpression",
+					"start": 198,
+					"end": 209,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 2
+						},
+						"end": {
+							"line": 5,
+							"column": 13
+						}
+					},
+					"operator": "=",
+					"left": {
+						"type": "Identifier",
+						"start": 198,
+						"end": 201,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 5,
+								"column": 5
+							}
+						},
+						"name": "jjj"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 206,
+						"end": 209,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 10
+							},
+							"end": {
+								"line": 5,
+								"column": 13
+							}
+						},
+						"name": "kkk"
+					}
+				}
+			},
+			{
+				"type": "Text",
+				"start": 212,
+				"end": 214,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 214,
+				"end": 256,
+				"data": " a block head takes the same shape "
+			},
+			{
+				"type": "Text",
+				"start": 256,
+				"end": 257,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 257,
+				"end": 311,
+				"test": {
+					"type": "AssignmentExpression",
+					"start": 284,
+					"end": 295,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 2
+						},
+						"end": {
+							"line": 11,
+							"column": 13
+						}
+					},
+					"operator": "=",
+					"left": {
+						"type": "Identifier",
+						"start": 284,
+						"end": 287,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 2
+							},
+							"end": {
+								"line": 11,
+								"column": 5
+							}
+						},
+						"name": "lll"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 292,
+						"end": 295,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 10
+							},
+							"end": {
+								"line": 11,
+								"column": 13
+							}
+						},
+						"name": "mmm"
+					}
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 298,
+							"end": 306,
+							"raw": "\n\ttext1\n",
+							"data": "\n\ttext1\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 311,
+				"end": 313,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 313,
+				"end": 374,
+				"data": " an unfrozen sibling still normalizes, parens and all "
+			},
+			{
+				"type": "Text",
+				"start": 374,
+				"end": 375,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 375,
+				"end": 394,
+				"expression": {
+					"type": "AssignmentExpression",
+					"start": 383,
+					"end": 392,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 8
+						},
+						"end": {
+							"line": 17,
+							"column": 17
+						}
+					},
+					"operator": "=",
+					"left": {
+						"type": "Identifier",
+						"start": 383,
+						"end": 386,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 8
+							},
+							"end": {
+								"line": 17,
+								"column": 11
+							}
+						},
+						"name": "nnn"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 389,
+						"end": 392,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 14
+							},
+							"end": {
+								"line": 17,
+								"column": 17
+							}
+						},
+						"name": "ooo"
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 177,
+			"end": 195,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 263,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 19
+				}
+			}
+		}
+	]
+}

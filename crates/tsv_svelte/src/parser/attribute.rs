@@ -597,8 +597,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Extract content: "attach expr"
         let content = &self.source[content_start..content_end];
 
-        // Parse: "attach expr"
-        let Some(after_attach) = content.strip_prefix("attach ") else {
+        // Parse: "attach expr". The keyword must be followed by whitespace — Svelte's
+        // `require_whitespace()`, which accepts any of it, so a newline or a tab
+        // separates the keyword from its expression just as a space does.
+        //
+        // Deliberately NOT `strip_keyword_value` (the `{@…}` tags' shared spelling of this
+        // rule): those reach their parser through a keyword dispatch that has already proven
+        // the keyword, so the helper can report a missing space specifically. This reader is
+        // dispatched on a bare `{@`, so a wrong keyword (`<div {@html x}>`) arrives here too
+        // and the two failures share one error.
+        let Some(after_attach) = content
+            .strip_prefix("attach")
+            .filter(|rest| rest.starts_with(char::is_whitespace))
+        else {
             return Err(self.error_expected_at("'attach' keyword", content_start));
         };
         let expr_str = after_attach.trim();

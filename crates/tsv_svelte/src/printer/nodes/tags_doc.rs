@@ -4,7 +4,7 @@
 // {@const} initializer break rules.
 
 use crate::ast::internal;
-use crate::printer::Printer;
+use crate::printer::{HeadExpr, Printer};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::arena::DocId;
@@ -24,24 +24,21 @@ const AT_CONST_TAG_OPEN: &str = "{@const ";
 
 impl<'a> Printer<'a> {
     /// Build a doc for {@html expr}
+    /// Build a doc for {@html expr}
+    ///
+    /// An assignment's clarity parens (`{@html (a = b)}`) are applied inside
+    /// [`Printer::build_expression_with_comments_doc`], so they land inside a frozen head's
+    /// break rather than around it.
     pub(crate) fn build_html_tag_doc(&self, tag: &internal::HtmlTag<'_>) -> DocId {
-        let d = self.d();
         // Build expression doc with surrounding comments
         // Span range: after "{@html " to before "}"
-        let expr_doc = self.build_expression_with_comments_doc(
+        let head = self.build_expression_with_comments_doc(
             &tag.expression,
             tag.span.start + HTML_TAG_OPEN.len() as u32,
             tag.span.end - 1,
         );
 
-        // Assignment expressions need parens: {@html (a = b)}
-        let expr_doc = if matches!(tag.expression, Expression::AssignmentExpression(_)) {
-            d.parens(expr_doc)
-        } else {
-            expr_doc
-        };
-
-        d.concat(&[d.text(HTML_TAG_OPEN), expr_doc, d.text("}")])
+        self.build_prefixed_head_doc(HTML_TAG_OPEN, head, "}")
     }
 
     /// Build a doc for {@const declaration}
@@ -215,7 +212,7 @@ impl<'a> Printer<'a> {
         };
 
         let expr_doc = if self.honored_directive_in_gap(span_start, expr_start) {
-            self.verbatim_source_doc(expr.span())
+            self.build_frozen_node_doc(expr.span())
         } else {
             tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed)
         };
@@ -258,9 +255,53 @@ impl<'a> Printer<'a> {
             return d.text("{@debug}");
         }
 
-        let mut parts: DocBuf = smallvec![d.text("{@debug ")];
         // Track position as we emit content, starting after the "{@debug" keyword.
         let mut last_end = tag.span.start + DEBUG_TAG_OPEN.len() as u32;
+
+        // The `{@debug`→identifiers head: an own-line directive there freezes the whole
+        // identifier **list** — the run from the first identifier to the last, which is
+        // what the tag normalizes (`{@debug  a ,  b }` → `{@debug a, b}`). The prefix and
+        // the `}` stay parent-owned, as at every other prefixed head.
+        //
+        // `verbatim_source_doc`, not `build_frozen_node_doc`: this builder is the sole
+        // POSITIONAL emitter of every comment in its content (the in-source axis its doc
+        // comment above explains), so the head-gap run — an owned glued block included — is
+        // already printed below. A second claim inside the slice would double-print it.
+        if let (Some(first), Some(last)) = (tag.identifiers.first(), tag.identifiers.last())
+            && self.honored_directive_in_gap(last_end, first.span().start)
+        {
+            let list = Span::new(first.span().start, last.span().end);
+            let mut frozen_parts: DocBuf = tag_comments
+                .iter()
+                .filter(|c| c.span.end <= list.start)
+                .map(|c| self.build_leading_js_comment_doc(c))
+                .collect();
+            frozen_parts.push(self.verbatim_source_doc(list));
+            frozen_parts.extend(
+                tag_comments
+                    .iter()
+                    .filter(|c| c.span.start >= list.end)
+                    .map(|c| self.build_trailing_js_comment_doc(c)),
+            );
+            // This builder emits its own trailing run above, so it answers
+            // `ends_with_line_comment` from the same loop rather than from a rescan.
+            let ends_with_line_comment = tag_comments
+                .iter()
+                .rfind(|c| c.span.start >= list.end)
+                .is_some_and(|c| !c.is_block);
+            let doc = self.indent_frozen_head(d.concat(&frozen_parts));
+            return self.build_prefixed_head_doc(
+                DEBUG_TAG_OPEN,
+                HeadExpr {
+                    doc,
+                    frozen: true,
+                    ends_with_line_comment,
+                },
+                "}",
+            );
+        }
+
+        let mut parts: DocBuf = smallvec![d.text("{@debug ")];
 
         for (i, id) in tag.identifiers.iter().enumerate() {
             let id_start = id.span().start;
@@ -314,15 +355,14 @@ impl<'a> Printer<'a> {
 
     /// Build a doc for {@render snippet(args)}
     pub(crate) fn build_render_tag_doc(&self, tag: &internal::RenderTag<'_>) -> DocId {
-        let d = self.d();
         // Build expression doc with surrounding comments
         // Span range: after "{@render " to before "}"
-        let expr_doc = self.build_expression_with_comments_doc(
+        let head = self.build_expression_with_comments_doc(
             &tag.expression,
             tag.span.start + RENDER_TAG_OPEN.len() as u32,
             tag.span.end - 1,
         );
 
-        d.concat(&[d.text(RENDER_TAG_OPEN), expr_doc, d.text("}")])
+        self.build_prefixed_head_doc(RENDER_TAG_OPEN, head, "}")
     }
 }

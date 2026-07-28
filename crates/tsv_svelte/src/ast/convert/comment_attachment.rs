@@ -16,7 +16,7 @@
 use std::borrow::Cow;
 use std::collections::VecDeque;
 
-use tsv_lang::{Comment, printing, source_scan::skip_comment};
+use tsv_lang::{Comment, Span, printing, source_scan::skip_comment};
 use tsv_ts::ast::convert::{AttachedComment, SkeletonTree, WriterComments};
 
 /// Context for the comment attachment process.
@@ -479,32 +479,35 @@ pub(super) fn try_attach_comments_to_node(
 /// a same-line `[,) \t]*` gap trails the *preceding* item; anything else leads
 /// the *following* item.
 ///
-/// `wrapper_end` is the discarded parse wrapper's `end` for acorn's
-/// `node.end == parent.end` trailing suppression: the last identifier's end
-/// for `{@debug}`'s `SequenceExpression` (so its last item never claims a
-/// trailing comment), `None` for snippet params (the function wrapper ends
-/// past every param, so the guard never fires). Leftover comments belonged to
-/// the discarded wrapper and stay unattached — they still emit in the root
-/// `comments` array. (A single-identifier `{@debug}` has no wrapper — the
-/// identifier is the parse root itself — so it takes the
-/// `try_attach_comments_to_node` path with its root-fallback trailing, not
-/// this one.)
+/// `wrapper` is the discarded parse wrapper's own span — `{@debug}`'s
+/// `SequenceExpression`, which spans first identifier to last; `None` for
+/// snippet params, whose function wrapper encloses the whole list. Everything
+/// the wrapper would have claimed dies with it, at both ends: its `end` drives
+/// acorn's `node.end == parent.end` trailing suppression (so `{@debug}`'s last
+/// identifier never claims a trailing comment), and its `start` bounds the
+/// queue, so the leading run *before* the list — which acorn hands to the
+/// wrapper, the outermost node opening after it — reaches no identifier. Both
+/// leftovers stay unattached and still emit in the root `comments` array. (A
+/// single-identifier `{@debug}` has no wrapper — the identifier is the parse
+/// root itself — so it takes the `try_attach_comments_to_node` path with its
+/// root-fallback trailing, and its leading run does attach.)
 pub(super) fn attach_expression_list(
     tree: &SkeletonTree,
     template_comments: &[&Comment],
     source: &str,
     c_start: u32,
     range_end: u32,
-    wrapper_end: Option<u32>,
+    wrapper: Option<Span>,
     out: &mut WriterComments,
 ) {
-    let comment_queue = window_queue(template_comments, c_start, range_end);
+    let queue_start = wrapper.map_or(c_start, |w| w.start);
+    let comment_queue = window_queue(template_comments, queue_start, range_end);
     if comment_queue.is_empty() {
         return;
     }
     let mut ctx = CommentAttachmentContext::new(comment_queue, source);
-    let parent = wrapper_end.map(|end| ParentInfo {
-        end,
+    let parent = wrapper.map(|w| ParentInfo {
+        end: w.end,
         last_body_start: None,
     });
     for &root in tree.roots() {

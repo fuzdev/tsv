@@ -1,0 +1,142 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 213,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 85,
+				"data": " an own-line directive in the `{@debug}` head gap freezes the identifier list "
+			},
+			{
+				"type": "Text",
+				"start": 85,
+				"end": 86,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 86,
+				"end": 127,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 115,
+						"end": 118,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 4
+							}
+						},
+						"name": "aaa"
+					},
+					{
+						"type": "Identifier",
+						"start": 122,
+						"end": 125,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 8
+							},
+							"end": {
+								"line": 4,
+								"column": 11
+							}
+						},
+						"name": "bbb"
+					}
+				]
+			},
+			{
+				"type": "Text",
+				"start": 127,
+				"end": 129,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 129,
+				"end": 194,
+				"data": " a sibling tag the freeze does not reach still normalizes "
+			},
+			{
+				"type": "Text",
+				"start": 194,
+				"end": 195,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 195,
+				"end": 212,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 203,
+						"end": 206,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 8
+							},
+							"end": {
+								"line": 8,
+								"column": 11
+							}
+						},
+						"name": "ccc"
+					},
+					{
+						"type": "Identifier",
+						"start": 208,
+						"end": 211,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 13
+							},
+							"end": {
+								"line": 8,
+								"column": 16
+							}
+						},
+						"name": "ddd"
+					}
+				]
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 95,
+			"end": 113,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 19
+				}
+			}
+		}
+	]
+}
