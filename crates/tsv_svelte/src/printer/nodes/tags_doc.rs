@@ -24,7 +24,6 @@ const AT_CONST_TAG_OPEN: &str = "{@const ";
 
 impl<'a> Printer<'a> {
     /// Build a doc for {@html expr}
-    /// Build a doc for {@html expr}
     ///
     /// An assignment's clarity parens (`{@html (a = b)}`) are applied inside
     /// [`Printer::build_expression_with_comments_doc`], so they land inside a frozen head's
@@ -193,9 +192,11 @@ impl<'a> Printer<'a> {
 
     /// Build init expression doc for @const with assignment-appropriate config.
     ///
-    /// Like `build_expression_with_comments_doc` but uses `first_line_offset = 0`
-    /// so binary chains use Grouped style (not ContinuationIndent). The @const
-    /// assignment layout handles indentation; ContinuationIndent would stack.
+    /// Like `build_expression_with_comments_doc` but **without** its
+    /// `mode: LayoutMode::Embedded` — inheriting the host's Standalone mode is what keeps
+    /// binary chains on Grouped style rather than ContinuationIndent, since the printers
+    /// that choose between them read `EmbedContext::is_embedded()`. The @const assignment
+    /// layout handles indentation; ContinuationIndent would stack on top of it.
     ///
     /// The `=`→value head: an own-line directive anywhere in the binding→value gap
     /// freezes the whole value. The window is the whole gap rather than the part past

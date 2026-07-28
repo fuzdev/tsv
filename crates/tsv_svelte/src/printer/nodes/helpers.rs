@@ -585,10 +585,19 @@ impl<'a> Printer<'a> {
         // Build docs for leading comments (between span_start and expression start)
         let leading_docs = self.leading_comment_docs(span_start, expr_start);
 
-        // Embed for embedded expression context: binary chains use ContinuationIndent style.
-        // first_line_offset estimates the column position for width calculations.
+        // Embed for embedded expression context. `mode` is the load-bearing field: the
+        // binary and conditional printers read `is_embedded()` to pick ContinuationIndent
+        // over Grouped style.
+        //
+        // `first_line_offset` is a width estimate that reaches nothing on this path — it is
+        // read only by `tsv_ts`'s own render entry (`write_arena_doc`, which a
+        // Svelte-embedded expression never takes: this printer builds the doc and renders it
+        // with its OWN embed) and by the renderer's `effective_suffix_width`, gated on a
+        // `suffix_width` that is 0 here. Perturbing it changes no byte of any fixture or of a
+        // 9k-file real corpus. It is set to the same shape the block heads use so the two
+        // don't read as deliberately different; see `build_expression_doc_for_block`.
         let context_indent = TAB_WIDTH;
-        let opening_offset = 5; // typical tag prefix, e.g. `{#if `
+        let opening_offset = 5; // a tag prefix's rough width, e.g. `{@html `
         let first_line_offset = context_indent + opening_offset;
         let embed = tsv_lang::EmbedContext {
             first_line_offset,
