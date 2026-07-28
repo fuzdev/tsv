@@ -548,6 +548,28 @@ is only comparable to another anchor over the same corpus.
 4. **Check the size axis if the change shrank a hot function** — see
    [An instruction A/B is blind to code size](#an-instruction-ab-is-blind-to-code-size); no `check` gate covers it
 
+### Grading a change that touches the `format` worker pool
+
+Two traps specific to the parallel path, both of which produce confident wrong numbers.
+
+**Measure the pool, not the process.** Timing `tsv format` end to end folds in process
+startup and the machine's mood. Instrument the pool itself — its makespan, each worker's
+busy time, and `idle = makespan × workers − total_busy`. Beyond removing the startup floor,
+`total_busy` makes visible the assumption every scheduling model rests on: that per-file cost
+is independent of the order and width you run at. It is not. Formatting the largest files
+concurrently raises the cost of each of them, so a change that improves the *schedule* can
+still lose on the wall.
+
+**The wall is topology-sensitive, and `taskset` lets one machine stand in for several.** SMT
+siblings are paired (`/sys/devices/system/cpu/cpuN/topology/thread_siblings_list` reads `0-1`,
+`2-3`, …), so masking to one CPU per pair gives a no-SMT machine and masking fewer pairs gives a
+smaller one — no root needed. `available_parallelism()` reads `sched_getaffinity`, so tsv's own
+default worker count follows the mask; confirm that before trusting a sweep (under `-c 0,2` the
+default run should match `--jobs 2`). Score a candidate default by its **worst case across
+corpora**, not its best: the optimum width differs by repo shape — a large tree where discovery
+dominates wants fewer workers than a flat repo of the same file count, because the walk thread is
+then competing with them for cores.
+
 ### Before optimizing a scan, print what it finds
 
 A hot scan is not necessarily a scan that is *doing* anything. Stamp a throwaway
