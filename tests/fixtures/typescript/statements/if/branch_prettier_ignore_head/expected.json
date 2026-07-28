@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 564,
+	"end": 747,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -137,24 +137,88 @@
 					"column": 23
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a block comment glued before the frozen statement is OWNED by it, so the freeze",
+			"start": 556,
+			"end": 638,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " claims it — nothing else would print it",
+			"start": 640,
+			"end": 682,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 695,
+			"end": 713,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 716,
+			"end": 723,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 2
+				},
+				"end": {
+					"line": 32,
+					"column": 9
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 563,
+		"end": 746,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 554,
+			"end": 737,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 27,
+					"line": 33,
 					"column": 9
 				}
 			},
@@ -819,6 +883,131 @@
 							"value": " an own-line block comment behaves identically — placement keys the freeze",
 							"start": 428,
 							"end": 504
+						}
+					]
+				},
+				{
+					"type": "IfStatement",
+					"start": 684,
+					"end": 736,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 22
+						}
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 688,
+						"end": 691,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 5
+							},
+							"end": {
+								"line": 30,
+								"column": 8
+							}
+						},
+						"name": "aaa"
+					},
+					"consequent": {
+						"type": "ExpressionStatement",
+						"start": 724,
+						"end": 736,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 10
+							},
+							"end": {
+								"line": 32,
+								"column": 22
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 724,
+							"end": 735,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 10
+								},
+								"end": {
+									"line": 32,
+									"column": 21
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 724,
+								"end": 726,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 10
+									},
+									"end": {
+										"line": 32,
+										"column": 12
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 729,
+									"end": 732,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 15
+										},
+										"end": {
+											"line": 32,
+											"column": 18
+										}
+									},
+									"name": "bbb"
+								}
+							],
+							"optional": false
+						},
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " prettier-ignore",
+								"start": 695,
+								"end": 713
+							},
+							{
+								"type": "Block",
+								"value": " c ",
+								"start": 716,
+								"end": 723
+							}
+						]
+					},
+					"alternate": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment glued before the frozen statement is OWNED by it, so the freeze",
+							"start": 556,
+							"end": 638
+						},
+						{
+							"type": "Line",
+							"value": " claims it — nothing else would print it",
+							"start": 640,
+							"end": 682
 						}
 					]
 				}

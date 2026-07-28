@@ -603,7 +603,7 @@ impl<'a> Printer<'a> {
         if let Some(init) = &stmt.init {
             inner_parts.push(init_frozen.map_or_else(
                 || self.build_for_init_doc(init),
-                |frozen| self.build_frozen_span_item_doc(frozen),
+                |frozen| self.build_frozen_node_doc(frozen),
             ));
         }
         // The init clause→`;` gap comments bind to the `;` like a list separator.
@@ -1767,7 +1767,7 @@ impl<'a> Printer<'a> {
                     // directive in the keyword→first-declarator gap or between two
                     // declarators freezes the FOLLOWING one over its own node span.
                     if self.list_item_frozen(keyword_end, &item_span, i) {
-                        decl_docs.push(self.build_frozen_span_item_doc(declarator.span));
+                        decl_docs.push(self.build_frozen_node_doc(declarator.span));
                         continue;
                     }
                     let mut one: DocBuf = smallvec![self.build_expression_doc(&declarator.id)];
@@ -1872,7 +1872,7 @@ impl<'a> Printer<'a> {
             && let Some(frozen) =
                 self.value_head_frozen_span(open + 1, Span::new(spans.left_start, spans.left_end))
         {
-            let doc = self.build_frozen_span_item_doc(frozen);
+            let doc = self.build_frozen_node_doc(frozen);
             return if wrap_async_paren { d.parens(doc) } else { doc };
         }
         match left {

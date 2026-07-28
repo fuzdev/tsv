@@ -12,7 +12,7 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 527
+# shapes: 525
 DROPPED	!)⟨⟩!.	annotation,block,jsdoc_cast
 DROPPED	#⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DROPPED	#⟨⟩\	annotation,block,jsdoc_cast,line,multiline
@@ -336,7 +336,6 @@ DROPPED	case⟨⟩␣	line
 DROPPED	class⟨⟩<	annotation,block,jsdoc_cast,line,multiline
 DROPPED	class⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	const⟨⟩,	line
-DROPPED	export⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	function⟨⟩*	annotation,block,jsdoc_cast,line,multiline
 DROPPED	function⟨⟩*/*	annotation,block,jsdoc_cast,line,multiline
 DROPPED	function⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
@@ -442,7 +441,6 @@ DROPPED	␣⟨⟩[/*	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩]	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩];	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩as	annotation,block,jsdoc_cast,line,multiline
-DROPPED	␣⟨⟩class	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩{	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩{})	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩}	annotation,block,jsdoc_cast,line,multiline

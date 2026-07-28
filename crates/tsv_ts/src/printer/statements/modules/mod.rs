@@ -22,6 +22,7 @@ use crate::printer::calls::PartitionedComments;
 use crate::printer::needs_parens::export_default_needs_parens;
 use smallvec::SmallVec;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -40,17 +41,20 @@ impl<'a> Printer<'a> {
         decl: &internal::TSExportAssignment<'_>,
     ) -> DocId {
         let d = self.d();
-        let expr_doc = self.build_expression_doc(&decl.expression);
-        let argument_end = decl.expression.span().end;
+        let value_span = decl.expression.span();
         // `export =` word by word: the `export`→`=` gap is a position an author can
         // comment in. Emitting the two as one text never scans it — the comment would
-        // be dropped.
-        let head = self.build_keyword_header_doc(
+        // be dropped. The `=`→value gap is a freeze head, `export default`'s twin, so the
+        // value is built from the keyword's end and an own-line directive there claims it
+        // whole. (The `export`→`=` gap one delimiter earlier is not a head — a `=` begins
+        // no node — and cannot reach this window either.)
+        let head = self.build_keyword_header_doc_with(
             &["export", "="],
             decl.span.start,
-            decl.expression.span().start,
-            expr_doc,
+            value_span.start,
+            |keyword_end| self.build_value_head_doc(keyword_end, &decl.expression),
         );
+        let argument_end = value_span.end;
         let has_trailing_comments = self.has_comments_to_emit_between(argument_end, decl.span.end);
         if has_trailing_comments {
             // `export =` keeps a same-line trailing block comment *before* the `;`
@@ -79,80 +83,37 @@ impl<'a> Printer<'a> {
             // the type/interface/declare keyword is part of the declaration itself
             let export_keyword = "export";
             let export_keyword_end = decl.span.start + export_keyword.len() as u32;
-            let decl_start = declaration.span().start;
+            let decl_span = declaration.span();
+            let decl_start = decl_span.start;
 
             // A comment between `export` and the declaration is preserved in
             // place; a line comment indents the declaration one level (uniform
             // header rule). The keyword→declaration gap routes through the shared
             // continuation helper, so block/no-comment cases stay inline.
             //
+            // An own-line directive in that gap freezes the declaration whole (Rule A),
+            // and the shared helper keeps its own line for free (`keyword_gap_breaks`).
+            // Resolved BEFORE the decorator fork below: an export-first decorated class's
+            // slice already carries its own decorators, so a frozen one wants the plain
+            // continuation rather than the decorator layout.
+            let frozen = self.value_head_frozen_span(export_keyword_end, decl_span);
             // Decorated classes are the exception: the decorators and `export` can
             // appear in either order (`@dec export class` / `export @dec class`), so
-            // the block below emits them in the source order rather than through the
-            // plain keyword→declaration continuation.
-            if let internal::Statement::ClassDeclaration(class) = declaration
-                && let Some(decorators) = class.decorators.filter(|d| !d.is_empty())
+            // they print in the source order rather than through the plain
+            // keyword→declaration continuation.
+            if frozen.is_none()
+                && let internal::Statement::ClassDeclaration(class) = declaration
+                && let Some(doc) =
+                    self.build_export_named_decorated_class_doc(decl, class, export_keyword_end)
             {
-                let continuation = self.build_class_declaration_without_decorators_doc(class);
-                // Decorators can sit before OR after `export` — prettier preserves the
-                // author's choice as two distinct stable forms (`@dec export class` vs
-                // `export @dec class`). The parser records which by the export decl's
-                // start: the first-decorator start for the decorator-first form, the
-                // `export` keyword for the export-first form. So a first decorator
-                // positioned *after* the export start is the export-first form.
-                let export_first = decorators[0].span.start > decl.span.start;
-
-                // The token right after the decorators is the trailing-comment boundary
-                // for `build_decorators_doc`: the class keyword (`abstract`/`class`) for
-                // the export-first form, `export` for the decorator-first form.
-                let next_after_decorators = if export_first {
-                    let class_kw = if class.r#abstract {
-                        "abstract"
-                    } else {
-                        "class"
-                    };
-                    self.find_keyword_after_decorators(class.decorators, class_kw, class.span.start)
-                } else {
-                    self.find_keyword_after_decorators(class.decorators, "export", decl.span.start)
-                };
-
-                // `decorators` is non-empty, so this is always `Some`; the `if let`
-                // keeps the code off `expect()` (clippy::expect_used) and falls through
-                // to the plain declaration path in the (unreachable) `None` case.
-                if let Some(dec_doc) =
-                    self.build_decorators_doc(class.decorators, next_after_decorators)
-                {
-                    if export_first {
-                        // `export` on its own line, then the (always own-line) decorators,
-                        // then the class.
-                        let mut parts: DocBuf = smallvec![d.text(export_keyword)];
-                        // A comment between `export` and the first decorator is rare but
-                        // must be preserved (never dropped).
-                        if let Some(c) = self.build_inline_comments_between_doc_opt(
-                            export_keyword_end,
-                            decorators[0].span.start,
-                        ) {
-                            parts.push(c);
-                        }
-                        parts.push(d.hardline());
-                        parts.push(dec_doc);
-                        parts.push(continuation);
-                        return d.concat(&parts);
-                    }
-
-                    // Decorator-first (`@dec export class`): decorators, then `export`,
-                    // then the class.
-                    let tail = self.build_keyword_to_name_continuation(
-                        export_keyword_end,
-                        decl_start,
-                        continuation,
-                    );
-                    return d.concat(&[dec_doc, d.text(export_keyword), tail]);
-                }
+                return doc;
             }
             // `declaration` is always a declaration form (never an
             // ExpressionStatement), so `in_program_or_block` is never consulted here.
-            let continuation = self.build_statement_doc(declaration, true);
+            let continuation = match frozen {
+                Some(span) => self.build_frozen_node_doc(span),
+                None => self.build_statement_doc(declaration, true),
+            };
             let tail = self.build_keyword_to_name_continuation(
                 export_keyword_end,
                 decl_start,
@@ -289,134 +250,102 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The DECORATED `export <class>` forms, which emit the decorators and `export` in the
+    /// author's own source order rather than through the plain keyword→declaration
+    /// continuation — `None` when the class carries no decorators and the ordinary path
+    /// applies.
+    ///
+    /// Decorators can sit before OR after `export` (`@dec export class` / `export @dec
+    /// class`), and prettier preserves the author's choice as two distinct stable forms. The
+    /// parser records which by the export declaration's start: the first-decorator start for
+    /// the decorator-first form, the `export` keyword for the export-first form — so a first
+    /// decorator positioned *after* the export start is the export-first form.
+    ///
+    /// Asked only where the keyword→declaration gap did NOT freeze: an export-first
+    /// decorated class's frozen slice already carries its own decorators, so a frozen one
+    /// wants the plain continuation instead.
+    fn build_export_named_decorated_class_doc(
+        &self,
+        decl: &internal::ExportNamedDeclaration<'_>,
+        class: &internal::ClassDeclaration<'_>,
+        export_keyword_end: u32,
+    ) -> Option<DocId> {
+        let d = self.d();
+        let decorators = class.decorators.filter(|dec| !dec.is_empty())?;
+        let continuation = self.build_class_declaration_without_decorators_doc(class);
+        let export_first = decorators[0].span.start > decl.span.start;
+
+        // The token right after the decorators is the trailing-comment boundary for
+        // `build_decorators_doc`: the class keyword (`abstract`/`class`) for the
+        // export-first form, `export` for the decorator-first form.
+        let next_after_decorators = if export_first {
+            let class_kw = if class.r#abstract {
+                "abstract"
+            } else {
+                "class"
+            };
+            self.find_keyword_after_decorators(class.decorators, class_kw, class.span.start)
+        } else {
+            self.find_keyword_after_decorators(class.decorators, "export", decl.span.start)
+        };
+
+        // `decorators` is non-empty, so this is always `Some`; the `?` keeps the code off
+        // `expect()` (clippy::expect_used) and falls back to the plain declaration path in
+        // the (unreachable) `None` case.
+        let dec_doc = self.build_decorators_doc(class.decorators, next_after_decorators)?;
+        if export_first {
+            // `export` on its own line, then the (always own-line) decorators, then the
+            // class. A comment between `export` and the first decorator is rare but must be
+            // preserved (never dropped).
+            let mut parts: DocBuf = smallvec![d.text("export")];
+            if let Some(c) = self
+                .build_inline_comments_between_doc_opt(export_keyword_end, decorators[0].span.start)
+            {
+                parts.push(c);
+            }
+            parts.push(d.hardline());
+            parts.push(dec_doc);
+            parts.push(continuation);
+            return Some(d.concat(&parts));
+        }
+
+        // Decorator-first (`@dec export class`): decorators, then `export`, then the class.
+        // The gap runs from the REAL `export` keyword — `next_after_decorators` here — to
+        // the class's own first keyword. `decl.span.start` is the DECORATOR in this form, so
+        // anchoring the scan on it inverted the window and dropped every comment in the gap.
+        // The gap sits inside the declaration's span rather than before it, so nothing
+        // freezes here: there is no following node for Rule A to bind to (the
+        // decorator→declaration gap's mirror image).
+        let tail = self.build_keyword_to_name_continuation(
+            next_after_decorators + MODULE_KW_LEN,
+            self.class_declaration_keyword_start(class),
+            continuation,
+        );
+        Some(d.concat(&[dec_doc, d.text("export"), tail]))
+    }
+
     /// Build a Doc for an export default declaration
     pub(super) fn build_export_default_declaration_doc(
         &self,
         decl: &internal::ExportDefaultDeclaration<'_>,
     ) -> DocId {
         let d = self.d();
-        // Decorator-*first* `@dec export default class` — the decorators precede
-        // `export`, and the whole thing parses as a ClassDeclaration. Emit the
-        // decorators, then `export default`, then the class without them.
-        if let internal::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration {
-            let export_start =
-                self.find_keyword_after_decorators(class.decorators, "export", decl.span.start);
-            if let Some(dec_doc) = self.build_decorators_doc(class.decorators, export_start) {
-                // `export default` word by word, bounded by the class's own first
-                // keyword: both the gap *inside* the keyword and the one after it are
-                // positions an author can comment in. Emitting the two words as one
-                // fixed text scans neither, so both comments are dropped.
-                return d.concat(&[
-                    dec_doc,
-                    self.build_keyword_header_doc(
-                        &["export", "default"],
-                        export_start,
-                        self.class_declaration_keyword_start(class),
-                        self.build_class_declaration_without_decorators_doc(class),
-                    ),
-                ]);
-            }
+        // The two decorated forms print declaration-style layouts of their own, neither of
+        // which is the keyword→value shape below.
+        if let Some(doc) = self.build_export_default_decorated_doc(decl) {
+            return doc;
         }
 
-        // Decorator-*after*-`default` `export default @dec class {}` — the decorator
-        // makes it a class *expression* (acorn), so it lands in the generic Expression
-        // arm below. But prettier formats it declaration-style: `export default` on its
-        // own line, the (always own-line) decorators, and NO trailing `;`. The class-
-        // expression doc already renders the decorators own-line, so emit `export
-        // default`, a hardline, then that doc.
-        if let internal::ExportDefaultValue::Expression(internal::Expression::ClassExpression(
-            class_expr,
-        )) = &decl.declaration
-            && let Some(decorators) = class_expr.decorators.filter(|dec| !dec.is_empty())
-        {
-            // `export default` word by word: the gap *inside* the keyword is a
-            // position an author can comment in, so the words are located rather than
-            // measured (measuring never scans that gap — the comment would be dropped).
-            let (keyword_doc, keyword_end) = self.build_keyword_words_doc(
-                &["export", "default"],
-                decl.span.start,
-                decorators[0].span.start,
-            );
-            let mut parts: DocBuf = smallvec![keyword_doc];
-            // A comment between `export default` and the first decorator is rare but
-            // must be preserved (never dropped). Two authorings, two owners: a comment
-            // *glued* to `@dec` is owned by the class expression (every glued block
-            // comment is), so it is skipped here by design and claimed below; one the
-            // author left on its own line is unowned and belongs to this gap.
-            if let Some(c) =
-                self.build_inline_comments_between_doc_opt(keyword_end, decorators[0].span.start)
-            {
-                parts.push(c);
-            }
-            parts.push(d.hardline());
-            // This path **reassembles** the class expression rather than routing it
-            // through `build_expression_doc`, so the owned-comment seam there never
-            // runs for it — the comment must be claimed here or nothing prints it.
-            parts.push(self.prepend_owned_leading_comment_at(
-                class_expr.span.start,
-                self.build_class_expression_doc(class_expr),
-            ));
-            return d.concat(&parts);
-        }
-
-        let value_doc = match &decl.declaration {
-            internal::ExportDefaultValue::Expression(expr) => {
-                let mut expr_doc = self.build_expression_doc(expr);
-                // Prettier wraps the exported expression when its leftmost
-                // (first-printed) token is a function/class keyword — else
-                // `export default function () {}.m()` reparses the function as a
-                // *declaration* and the trailing `.m()` / `= …` / `as T` dangles.
-                // Mirrors prettier's `startsWithNoLookaheadToken(expr, isFunctionOrClass)`
-                // (parentheses/needs-parentheses.js). Decorated class expressions are
-                // handled above; the FunctionDeclaration/ClassDeclaration arms cover
-                // bare `export default function/class …`.
-                if export_default_needs_parens(expr) {
-                    expr_doc = d.concat(&[d.text("("), expr_doc, d.text(")")]);
-                }
-                let argument_end = expr.span().end;
-                let has_trailing_comments =
-                    self.has_comments_to_emit_between(argument_end, decl.span.end);
-                if has_trailing_comments {
-                    let mut parts = smallvec![expr_doc];
-                    let after = self.split_terminator_gap_comments(
-                        &mut parts,
-                        argument_end,
-                        decl.span.end,
-                        false,
-                    );
-                    parts.push(d.text(";"));
-                    parts.extend(after);
-                    d.concat(&parts)
-                } else {
-                    d.concat(&[expr_doc, d.text(";")])
-                }
-            }
-            internal::ExportDefaultValue::FunctionDeclaration(func) => {
-                self.build_function_declaration_doc(func)
-            }
-            internal::ExportDefaultValue::TSDeclareFunction(func) => {
-                self.build_declare_function_doc(func)
-            }
-            internal::ExportDefaultValue::ClassDeclaration(class) => {
-                self.build_class_declaration_doc(class)
-            }
-            internal::ExportDefaultValue::TSInterfaceDeclaration(iface) => {
-                self.build_interface_declaration_doc(iface)
-            }
-        };
-
-        let decl_start = match &decl.declaration {
-            internal::ExportDefaultValue::Expression(expr) => expr.span().start,
-            internal::ExportDefaultValue::FunctionDeclaration(func) => func.span.start,
-            internal::ExportDefaultValue::TSDeclareFunction(func) => func.span.start,
-            internal::ExportDefaultValue::ClassDeclaration(class) => class.span.start,
-            internal::ExportDefaultValue::TSInterfaceDeclaration(iface) => iface.span.start,
-        };
+        let value_span = decl.declaration.span();
+        let decl_start = value_span.start;
         // The `export default`→value gap (a line comment indents the value). The
         // keyword's own words are located, not measured — the gap *between* them is a
-        // position an author can comment in, and measuring never scans it.
+        // position an author can comment in, and measuring never scans it. Located
+        // before the value is built, so the value can ask whether this gap freezes it.
         let (keyword_doc, keyword_end) =
             self.build_keyword_words_doc(&["export", "default"], decl.span.start, decl_start);
+        let value_doc = self.build_export_default_value_doc(decl, keyword_end, value_span);
+
         // A comment that can't stay inline forces the value onto its own indented
         // line, keeping the comment where the author wrote it. This gap uses the
         // SHARED keyword→value gate — the same one `as`/`satisfies`, `keyof`/`typeof`,
@@ -439,6 +368,163 @@ impl<'a> Printer<'a> {
             keyword_doc,
             self.build_keyword_to_name_continuation(keyword_end, decl_start, value_doc),
         ])
+    }
+
+    /// The `export default` value's own doc, built from `keyword_end` — the start of the
+    /// keyword→value gap, which the caller emits around this.
+    ///
+    /// An own-line directive in that gap freezes the value whole (Rule A). A DECLARATION
+    /// value's whole doc is the slice, so each form asks the shared statement head
+    /// ([`Printer::build_statement_head_doc`]); an EXPRESSION value keeps its `;`, its
+    /// trailing comments and the `export default (…)` clarity parens outside the freeze, so
+    /// only the expression's own doc is swapped.
+    fn build_export_default_value_doc(
+        &self,
+        decl: &internal::ExportDefaultDeclaration<'_>,
+        keyword_end: u32,
+        value_span: Span,
+    ) -> DocId {
+        let d = self.d();
+        match &decl.declaration {
+            internal::ExportDefaultValue::Expression(expr) => {
+                let mut expr_doc = self.build_value_head_doc(keyword_end, expr);
+                // Prettier wraps the exported expression when its leftmost
+                // (first-printed) token is a function/class keyword — else
+                // `export default function () {}.m()` reparses the function as a
+                // *declaration* and the trailing `.m()` / `= …` / `as T` dangles.
+                // Mirrors prettier's `startsWithNoLookaheadToken(expr, isFunctionOrClass)`
+                // (parentheses/needs-parentheses.js). Decorated class expressions are
+                // handled by the decorated forms; the FunctionDeclaration/ClassDeclaration
+                // arms cover bare `export default function/class …`.
+                if export_default_needs_parens(expr) {
+                    expr_doc = d.concat(&[d.text("("), expr_doc, d.text(")")]);
+                }
+                let argument_end = value_span.end;
+                if !self.has_comments_to_emit_between(argument_end, decl.span.end) {
+                    return d.concat(&[expr_doc, d.text(";")]);
+                }
+                let mut parts = smallvec![expr_doc];
+                let after = self.split_terminator_gap_comments(
+                    &mut parts,
+                    argument_end,
+                    decl.span.end,
+                    false,
+                );
+                parts.push(d.text(";"));
+                parts.extend(after);
+                d.concat(&parts)
+            }
+            internal::ExportDefaultValue::FunctionDeclaration(func) => self
+                .build_statement_head_doc(keyword_end, value_span, || {
+                    self.build_function_declaration_doc(func)
+                }),
+            internal::ExportDefaultValue::TSDeclareFunction(func) => {
+                self.build_statement_head_doc(keyword_end, value_span, || {
+                    self.build_declare_function_doc(func)
+                })
+            }
+            internal::ExportDefaultValue::ClassDeclaration(class) => {
+                self.build_statement_head_doc(keyword_end, value_span, || {
+                    self.build_class_declaration_doc(class)
+                })
+            }
+            internal::ExportDefaultValue::TSInterfaceDeclaration(iface) => self
+                .build_statement_head_doc(keyword_end, value_span, || {
+                    self.build_interface_declaration_doc(iface)
+                }),
+        }
+    }
+
+    /// The DECORATED `export default` forms, which print declaration-style layouts of their
+    /// own rather than the plain keyword→value shape — `None` when the value carries no
+    /// decorators and the ordinary path applies.
+    ///
+    /// Two source orders, two AST shapes. Decorator-*first* `@dec export default class`
+    /// parses as a ClassDeclaration whose span opens at the decorator, so the decorators are
+    /// emitted, then `export default`, then the class without them.
+    /// Decorator-*after*-`default` `export default @dec class {}` is a class *expression*
+    /// (acorn), which prettier still formats declaration-style: `export default` on its own
+    /// line, the (always own-line) decorators, and NO trailing `;`.
+    fn build_export_default_decorated_doc(
+        &self,
+        decl: &internal::ExportDefaultDeclaration<'_>,
+    ) -> Option<DocId> {
+        let d = self.d();
+        if let internal::ExportDefaultValue::ClassDeclaration(class) = &decl.declaration {
+            let export_start =
+                self.find_keyword_after_decorators(class.decorators, "export", decl.span.start);
+            let dec_doc = self.build_decorators_doc(class.decorators, export_start)?;
+            // `export default` word by word, bounded by the class's own first keyword:
+            // both the gap *inside* the keyword and the one after it are positions an
+            // author can comment in. Emitting the two words as one fixed text scans
+            // neither, so both comments are dropped.
+            //
+            // Nothing freezes in that gap: the declaration begins at its first decorator,
+            // so the gap sits INSIDE the value rather than before it and there is no
+            // following node for Rule A to bind to (the decorator→declaration gap's
+            // mirror image, and the same reason the decorator-first named export doesn't
+            // freeze).
+            return Some(d.concat(&[
+                dec_doc,
+                self.build_keyword_header_doc(
+                    &["export", "default"],
+                    export_start,
+                    self.class_declaration_keyword_start(class),
+                    self.build_class_declaration_without_decorators_doc(class),
+                ),
+            ]));
+        }
+
+        let internal::ExportDefaultValue::Expression(internal::Expression::ClassExpression(
+            class_expr,
+        )) = &decl.declaration
+        else {
+            return None;
+        };
+        let decorators = class_expr.decorators.filter(|dec| !dec.is_empty())?;
+        // `export default` word by word: the gap *inside* the keyword is a position an
+        // author can comment in, so the words are located rather than measured (measuring
+        // never scans that gap — the comment would be dropped).
+        let (keyword_doc, keyword_end) = self.build_keyword_words_doc(
+            &["export", "default"],
+            decl.span.start,
+            decorators[0].span.start,
+        );
+        let mut parts: DocBuf = smallvec![keyword_doc];
+        // An own-line directive in the gap freezes the class expression whole — its
+        // slice carries the decorators, so this path's hand-rolled decorator layout
+        // yields to the verbatim form. The shared own-line-preserving run keeps the
+        // directive's line, which the inline emitter below would take away: a
+        // keyword-trailing placement is inert under the floor, so the relocated form
+        // would lose the freeze on the second pass.
+        if let Some(frozen) = self.value_head_frozen_span(keyword_end, class_expr.span) {
+            self.append_keyword_value_line_comments(
+                &mut parts,
+                keyword_end,
+                frozen.start,
+                self.build_frozen_node_doc(frozen),
+            );
+            return Some(d.concat(&parts));
+        }
+        // A comment between `export default` and the first decorator is rare but
+        // must be preserved (never dropped). Two authorings, two owners: a comment
+        // *glued* to `@dec` is owned by the class expression (every glued block
+        // comment is), so it is skipped here by design and claimed below; one the
+        // author left on its own line is unowned and belongs to this gap.
+        if let Some(c) =
+            self.build_inline_comments_between_doc_opt(keyword_end, decorators[0].span.start)
+        {
+            parts.push(c);
+        }
+        parts.push(d.hardline());
+        // This path **reassembles** the class expression rather than routing it
+        // through `build_expression_doc`, so the owned-comment seam there never
+        // runs for it — the comment must be claimed here or nothing prints it.
+        parts.push(self.prepend_owned_leading_comment_at(
+            class_expr.span.start,
+            self.build_class_expression_doc(class_expr),
+        ));
+        Some(d.concat(&parts))
     }
 
     /// Build a Doc for an export all declaration
@@ -626,7 +712,7 @@ impl<'a> Printer<'a> {
                 parts.push(self.gap_comment_continuation_tail(
                     header_end,
                     ns_spec.span.start,
-                    self.build_frozen_span_item_doc(frozen),
+                    self.build_frozen_node_doc(frozen),
                 ));
             } else {
                 // keyword(s)→namespace-`*` gap, preserved in place. A line comment

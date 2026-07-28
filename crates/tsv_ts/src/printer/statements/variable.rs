@@ -326,7 +326,7 @@ impl<'a> Printer<'a> {
             // declarator over its own node span — the annotation, `=`, and initializer all
             // ride inside it; the separating `,` is parent-owned and was emitted above.
             if self.list_item_frozen(keyword_end, &item_span, i) {
-                let frozen_doc = self.build_frozen_span_item_doc(declarator.span);
+                let frozen_doc = self.build_frozen_node_doc(declarator.span);
                 if goes_in_parts {
                     parts.push(frozen_doc);
                 } else {

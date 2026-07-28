@@ -1,0 +1,369 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 372,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a redundant paren pair around the expression is dropped, so the directive it holds",
+			"start": 10,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " leads the statement and freezes it (the variant carries the authored form)",
+			"start": 97,
+			"end": 174,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 176,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 213,
+			"end": 231,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line block comment behaves identically — placement keys the freeze",
+			"start": 248,
+			"end": 324,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 326,
+			"end": 347,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 371,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 362,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 196,
+					"end": 210,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 196,
+						"end": 209,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 14
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 196,
+							"end": 198,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 1
+								},
+								"end": {
+									"line": 5,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 203,
+								"end": 206,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 8
+									},
+									"end": {
+										"line": 5,
+										"column": 11
+									}
+								},
+								"name": "aaa"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a redundant paren pair around the expression is dropped, so the directive it holds",
+							"start": 10,
+							"end": 95
+						},
+						{
+							"type": "Line",
+							"value": " leads the statement and freezes it (the variant carries the authored form)",
+							"start": 97,
+							"end": 174
+						},
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 176,
+							"end": 194
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 233,
+					"end": 245,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 13
+						}
+					},
+					"expression": {
+						"type": "BinaryExpression",
+						"start": 233,
+						"end": 244,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 12
+							}
+						},
+						"left": {
+							"type": "Identifier",
+							"start": 233,
+							"end": 236,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 1
+								},
+								"end": {
+									"line": 8,
+									"column": 4
+								}
+							},
+							"name": "bbb"
+						},
+						"operator": "+",
+						"right": {
+							"type": "Identifier",
+							"start": 241,
+							"end": 244,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 9
+								},
+								"end": {
+									"line": 8,
+									"column": 12
+								}
+							},
+							"name": "ccc"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 213,
+							"end": 231
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 349,
+					"end": 361,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 13
+						}
+					},
+					"expression": {
+						"type": "MemberExpression",
+						"start": 349,
+						"end": 360,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 12
+							}
+						},
+						"object": {
+							"type": "Identifier",
+							"start": 349,
+							"end": 352,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 1
+								},
+								"end": {
+									"line": 12,
+									"column": 4
+								}
+							},
+							"name": "ddd"
+						},
+						"property": {
+							"type": "Identifier",
+							"start": 357,
+							"end": 360,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 9
+								},
+								"end": {
+									"line": 12,
+									"column": 12
+								}
+							},
+							"name": "eee"
+						},
+						"computed": false,
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line block comment behaves identically — placement keys the freeze",
+							"start": 248,
+							"end": 324
+						},
+						{
+							"type": "Block",
+							"value": " prettier-ignore ",
+							"start": 326,
+							"end": 347
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
