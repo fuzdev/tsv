@@ -1,21 +1,21 @@
 {
 	"css": {
 		"type": "StyleSheet",
-		"start": 254,
-		"end": 483,
+		"start": 253,
+		"end": 482,
 		"attributes": [],
 		"children": [
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 263,
-					"end": 276,
+					"start": 262,
+					"end": 275,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 263,
-							"end": 276,
+							"start": 262,
+							"end": 275,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -24,12 +24,12 @@
 										{
 											"type": "ClassSelector",
 											"name": "test-unicode",
-											"start": 263,
-											"end": 276
+											"start": 262,
+											"end": 275
 										}
 									],
-									"start": 263,
-									"end": 276
+									"start": 262,
+									"end": 275
 								}
 							]
 						}
@@ -37,32 +37,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 277,
-					"end": 305,
+					"start": 276,
+					"end": 304,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 281,
-							"end": 301,
+							"start": 280,
+							"end": 300,
 							"property": "content",
 							"value": "'\\41\\42\\43'"
 						}
 					]
 				},
-				"start": 263,
-				"end": 305
+				"start": 262,
+				"end": 304
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 308,
-					"end": 320,
+					"start": 307,
+					"end": 319,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 308,
-							"end": 320,
+							"start": 307,
+							"end": 319,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -71,12 +71,12 @@
 										{
 											"type": "ClassSelector",
 											"name": "test-6digit",
-											"start": 308,
-											"end": 320
+											"start": 307,
+											"end": 319
 										}
 									],
-									"start": 308,
-									"end": 320
+									"start": 307,
+									"end": 319
 								}
 							]
 						}
@@ -84,32 +84,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 321,
-					"end": 347,
+					"start": 320,
+					"end": 346,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 325,
-							"end": 343,
+							"start": 324,
+							"end": 342,
 							"property": "content",
 							"value": "'\\01F4A9'"
 						}
 					]
 				},
-				"start": 308,
-				"end": 347
+				"start": 307,
+				"end": 346
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 350,
-					"end": 366,
+					"start": 349,
+					"end": 365,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 350,
-							"end": 366,
+							"start": 349,
+							"end": 365,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -118,12 +118,12 @@
 										{
 											"type": "ClassSelector",
 											"name": "test-with-space",
-											"start": 350,
-											"end": 366
+											"start": 349,
+											"end": 365
 										}
 									],
-									"start": 350,
-									"end": 366
+									"start": 349,
+									"end": 365
 								}
 							]
 						}
@@ -131,32 +131,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 367,
-					"end": 391,
+					"start": 366,
+					"end": 390,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 371,
-							"end": 387,
+							"start": 370,
+							"end": 386,
 							"property": "content",
 							"value": "'\\41 B'"
 						}
 					]
 				},
-				"start": 350,
-				"end": 391
+				"start": 349,
+				"end": 390
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 394,
-					"end": 409,
+					"start": 393,
+					"end": 408,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 394,
-							"end": 409,
+							"start": 393,
+							"end": 408,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -165,12 +165,12 @@
 										{
 											"type": "ClassSelector",
 											"name": "test-backslash",
-											"start": 394,
-											"end": 409
+											"start": 393,
+											"end": 408
 										}
 									],
-									"start": 394,
-									"end": 409
+									"start": 393,
+									"end": 408
 								}
 							]
 						}
@@ -178,32 +178,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 410,
-					"end": 431,
+					"start": 409,
+					"end": 430,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 414,
-							"end": 427,
+							"start": 413,
+							"end": 426,
 							"property": "content",
 							"value": "'\\\\'"
 						}
 					]
 				},
-				"start": 394,
-				"end": 431
+				"start": 393,
+				"end": 430
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 434,
-					"end": 448,
+					"start": 433,
+					"end": 447,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 434,
-							"end": 448,
+							"start": 433,
+							"end": 447,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -212,12 +212,12 @@
 										{
 											"type": "ClassSelector",
 											"name": "test-adjacent",
-											"start": 434,
-											"end": 448
+											"start": 433,
+											"end": 447
 										}
 									],
-									"start": 434,
-									"end": 448
+									"start": 433,
+									"end": 447
 								}
 							]
 						}
@@ -225,32 +225,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 449,
-					"end": 474,
+					"start": 448,
+					"end": 473,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 453,
-							"end": 470,
+							"start": 452,
+							"end": 469,
 							"property": "content",
 							"value": "'\\41\\42'"
 						}
 					]
 				},
-				"start": 434,
-				"end": 474
+				"start": 433,
+				"end": 473
 			}
 		],
 		"content": {
-			"start": 261,
-			"end": 475,
+			"start": 260,
+			"end": 474,
 			"styles": "\n\t.test-unicode {\n\t\tcontent: '\\41\\42\\43';\n\t}\n\n\t.test-6digit {\n\t\tcontent: '\\01F4A9';\n\t}\n\n\t.test-with-space {\n\t\tcontent: '\\41 B';\n\t}\n\n\t.test-backslash {\n\t\tcontent: '\\\\';\n\t}\n\n\t.test-adjacent {\n\t\tcontent: '\\41\\42';\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 484,
+	"end": 483,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -258,7 +258,7 @@
 			{
 				"type": "RegularElement",
 				"start": 0,
-				"end": 252,
+				"end": 251,
 				"name": "div",
 				"name_loc": {
 					"start": {
@@ -279,49 +279,49 @@
 						{
 							"type": "Text",
 							"start": 5,
-							"end": 26,
-							"raw": "\n\tCSS escape tests:\n\t",
-							"data": "\n\tCSS escape tests:\n\t"
+							"end": 25,
+							"raw": "\n\tCSS escape tests: ",
+							"data": "\n\tCSS escape tests: "
 						},
 						{
 							"type": "RegularElement",
-							"start": 26,
-							"end": 67,
+							"start": 25,
+							"end": 66,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 3,
-									"column": 2,
-									"character": 27
+									"line": 2,
+									"column": 20,
+									"character": 26
 								},
 								"end": {
-									"line": 3,
-									"column": 6,
-									"character": 31
+									"line": 2,
+									"column": 24,
+									"character": 30
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 32,
-									"end": 52,
+									"start": 31,
+									"end": 51,
 									"name": "class",
 									"name_loc": {
 										"start": {
-											"line": 3,
-											"column": 7,
-											"character": 32
+											"line": 2,
+											"column": 25,
+											"character": 31
 										},
 										"end": {
-											"line": 3,
-											"column": 12,
-											"character": 37
+											"line": 2,
+											"column": 30,
+											"character": 36
 										}
 									},
 									"value": [
 										{
-											"start": 39,
-											"end": 51,
+											"start": 38,
+											"end": 50,
 											"type": "Text",
 											"raw": "test-unicode",
 											"data": "test-unicode"
@@ -334,8 +334,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 53,
-										"end": 60,
+										"start": 52,
+										"end": 59,
 										"raw": "Unicode",
 										"data": "Unicode"
 									}
@@ -344,50 +344,50 @@
 						},
 						{
 							"type": "Text",
-							"start": 67,
-							"end": 69,
+							"start": 66,
+							"end": 68,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 69,
-							"end": 109,
+							"start": 68,
+							"end": 108,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 4,
+									"line": 3,
 									"column": 2,
-									"character": 70
+									"character": 69
 								},
 								"end": {
-									"line": 4,
+									"line": 3,
 									"column": 6,
-									"character": 74
+									"character": 73
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 75,
-									"end": 94,
+									"start": 74,
+									"end": 93,
 									"name": "class",
 									"name_loc": {
 										"start": {
-											"line": 4,
+											"line": 3,
 											"column": 7,
-											"character": 75
+											"character": 74
 										},
 										"end": {
-											"line": 4,
+											"line": 3,
 											"column": 12,
-											"character": 80
+											"character": 79
 										}
 									},
 									"value": [
 										{
-											"start": 82,
-											"end": 93,
+											"start": 81,
+											"end": 92,
 											"type": "Text",
 											"raw": "test-6digit",
 											"data": "test-6digit"
@@ -400,8 +400,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 95,
-										"end": 102,
+										"start": 94,
+										"end": 101,
 										"raw": "6-digit",
 										"data": "6-digit"
 									}
@@ -410,50 +410,50 @@
 						},
 						{
 							"type": "Text",
-							"start": 109,
-							"end": 111,
+							"start": 108,
+							"end": 110,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 111,
-							"end": 153,
+							"start": 110,
+							"end": 152,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 5,
+									"line": 4,
 									"column": 2,
-									"character": 112
+									"character": 111
 								},
 								"end": {
-									"line": 5,
+									"line": 4,
 									"column": 6,
-									"character": 116
+									"character": 115
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 117,
-									"end": 140,
+									"start": 116,
+									"end": 139,
 									"name": "class",
 									"name_loc": {
 										"start": {
-											"line": 5,
+											"line": 4,
 											"column": 7,
-											"character": 117
+											"character": 116
 										},
 										"end": {
-											"line": 5,
+											"line": 4,
 											"column": 12,
-											"character": 122
+											"character": 121
 										}
 									},
 									"value": [
 										{
-											"start": 124,
-											"end": 139,
+											"start": 123,
+											"end": 138,
 											"type": "Text",
 											"raw": "test-with-space",
 											"data": "test-with-space"
@@ -466,8 +466,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 141,
-										"end": 146,
+										"start": 140,
+										"end": 145,
 										"raw": "Space",
 										"data": "Space"
 									}
@@ -476,50 +476,50 @@
 						},
 						{
 							"type": "Text",
-							"start": 153,
-							"end": 155,
+							"start": 152,
+							"end": 154,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 155,
-							"end": 200,
+							"start": 154,
+							"end": 199,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 6,
+									"line": 5,
 									"column": 2,
-									"character": 156
+									"character": 155
 								},
 								"end": {
-									"line": 6,
+									"line": 5,
 									"column": 6,
-									"character": 160
+									"character": 159
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 161,
-									"end": 183,
+									"start": 160,
+									"end": 182,
 									"name": "class",
 									"name_loc": {
 										"start": {
-											"line": 6,
+											"line": 5,
 											"column": 7,
-											"character": 161
+											"character": 160
 										},
 										"end": {
-											"line": 6,
+											"line": 5,
 											"column": 12,
-											"character": 166
+											"character": 165
 										}
 									},
 									"value": [
 										{
-											"start": 168,
-											"end": 182,
+											"start": 167,
+											"end": 181,
 											"type": "Text",
 											"raw": "test-backslash",
 											"data": "test-backslash"
@@ -532,8 +532,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 184,
-										"end": 193,
+										"start": 183,
+										"end": 192,
 										"raw": "Backslash",
 										"data": "Backslash"
 									}
@@ -542,50 +542,50 @@
 						},
 						{
 							"type": "Text",
-							"start": 200,
-							"end": 202,
+							"start": 199,
+							"end": 201,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 202,
-							"end": 245,
+							"start": 201,
+							"end": 244,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 7,
+									"line": 6,
 									"column": 2,
-									"character": 203
+									"character": 202
 								},
 								"end": {
-									"line": 7,
+									"line": 6,
 									"column": 6,
-									"character": 207
+									"character": 206
 								}
 							},
 							"attributes": [
 								{
 									"type": "Attribute",
-									"start": 208,
-									"end": 229,
+									"start": 207,
+									"end": 228,
 									"name": "class",
 									"name_loc": {
 										"start": {
-											"line": 7,
+											"line": 6,
 											"column": 7,
-											"character": 208
+											"character": 207
 										},
 										"end": {
-											"line": 7,
+											"line": 6,
 											"column": 12,
-											"character": 213
+											"character": 212
 										}
 									},
 									"value": [
 										{
-											"start": 215,
-											"end": 228,
+											"start": 214,
+											"end": 227,
 											"type": "Text",
 											"raw": "test-adjacent",
 											"data": "test-adjacent"
@@ -598,8 +598,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 230,
-										"end": 238,
+										"start": 229,
+										"end": 237,
 										"raw": "Adjacent",
 										"data": "Adjacent"
 									}
@@ -608,8 +608,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 245,
-							"end": 246,
+							"start": 244,
+							"end": 245,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -618,8 +618,8 @@
 			},
 			{
 				"type": "Text",
-				"start": 252,
-				"end": 254,
+				"start": 251,
+				"end": 253,
 				"raw": "\n\n",
 				"data": "\n\n"
 			}

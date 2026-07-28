@@ -8,13 +8,11 @@
 	See README.
 -->
 <p>
-	alpha bravo charlie delta echo foxtrot golf hotel india
-	<code>preferences</code> and set <code>example.dev</code> as one exception here plus a little more
-	text
+	alpha bravo charlie delta echo foxtrot golf hotel india <code>preferences</code> and set
+	<code>example.dev</code> as one exception here plus a little more text
 </p>
 
 <p>
-	alpha bravo charlie delta echo foxtrot golf hotel india
-	<code>preferences</code> and sett <code>example.dev</code> as one exception here plus a little
-	more text
+	alpha bravo charlie delta echo foxtrot golf hotel india <code>preferences</code> and sett
+	<code>example.dev</code> as one exception here plus a little more text
 </p>

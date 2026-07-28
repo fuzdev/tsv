@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 615,
+	"end": 505,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -327,95 +327,6 @@
 							"end": 500,
 							"raw": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15\n\ttext16 text17.\n",
 							"data": "\n\ttext1 text2 text3 text4 text5 text6 text7 text8 text9 text10 text11 text12 text13 text14 text15\n\ttext16 text17.\n"
-						}
-					]
-				}
-			},
-			{
-				"type": "Text",
-				"start": 504,
-				"end": 506,
-				"raw": "\n\n",
-				"data": "\n\n"
-			},
-			{
-				"type": "Comment",
-				"start": 506,
-				"end": 578,
-				"data": " Text with inline element child - stays multiline (control case) "
-			},
-			{
-				"type": "Text",
-				"start": 578,
-				"end": 579,
-				"raw": "\n",
-				"data": "\n"
-			},
-			{
-				"type": "RegularElement",
-				"start": 579,
-				"end": 614,
-				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 23,
-						"column": 1,
-						"character": 580
-					},
-					"end": {
-						"line": 23,
-						"column": 2,
-						"character": 581
-					}
-				},
-				"attributes": [],
-				"fragment": {
-					"type": "Fragment",
-					"nodes": [
-						{
-							"type": "Text",
-							"start": 582,
-							"end": 591,
-							"raw": "\n\ttext1\n\t",
-							"data": "\n\ttext1\n\t"
-						},
-						{
-							"type": "RegularElement",
-							"start": 591,
-							"end": 609,
-							"name": "span",
-							"name_loc": {
-								"start": {
-									"line": 25,
-									"column": 2,
-									"character": 592
-								},
-								"end": {
-									"line": 25,
-									"column": 6,
-									"character": 596
-								}
-							},
-							"attributes": [],
-							"fragment": {
-								"type": "Fragment",
-								"nodes": [
-									{
-										"type": "Text",
-										"start": 597,
-										"end": 602,
-										"raw": "text2",
-										"data": "text2"
-									}
-								]
-							}
-						},
-						{
-							"type": "Text",
-							"start": 609,
-							"end": 610,
-							"raw": "\n",
-							"data": "\n"
 						}
 					]
 				}
