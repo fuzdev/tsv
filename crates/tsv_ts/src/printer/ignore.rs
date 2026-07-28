@@ -560,6 +560,28 @@ impl<'a> Printer<'a> {
         self.gap_frozen_span(gap_start, value)
     }
 
+    /// [`Self::value_head_frozen_span`] resolved to the doc it emits, for a value head whose
+    /// unfrozen emission is the plain [`Self::build_expression_doc`] — the `export`→value and
+    /// `export default`→value gaps, the twin heads that must not disagree.
+    ///
+    /// Deliberately NOT for a head with an ordinary builder of its own (an `if` condition, a
+    /// `for` update clause, an assignment RHS, an object property value): those resolve the
+    /// span themselves and pair it with the builder the position calls for, and routing them
+    /// through here would silently substitute the plain one. The statement analog
+    /// ([`Self::build_statement_head_doc`]) takes its ordinary builder lazily for exactly
+    /// that reason — every statement head has a different one.
+    #[inline]
+    pub(in crate::printer) fn build_value_head_doc(
+        &self,
+        gap_start: u32,
+        value: &internal::Expression<'_>,
+    ) -> DocId {
+        match self.value_head_frozen_span(gap_start, value.span()) {
+            Some(frozen) => self.build_frozen_expression_doc(value, frozen),
+            None => self.build_expression_doc(value),
+        }
+    }
+
     /// The statement-side analog of [`Self::value_head_frozen_span`]: a head that introduces
     /// ONE statement, clause or body behind a delimiter of its own — an `if`'s `)`→consequent
     /// and `else`→alternate gaps, a `label:`→body gap, the `}`→`catch` / `}`→`finally` gap,
@@ -571,7 +593,7 @@ impl<'a> Printer<'a> {
     /// parent-owned: a `case` label rides inside its own frozen case, and a class name and
     /// `extends` clause stay outside the frozen body. Unlike the value heads there is no
     /// paren shell to re-synthesize — a statement is never parenthesized by the printer — so
-    /// the span emits directly through [`Self::build_frozen_span_doc`].
+    /// the emission is the plain [`Self::build_frozen_node_doc`].
     ///
     /// A head whose ordinary layout would pull the gap's comment onto the head's line must
     /// ask this BEFORE choosing that layout and keep the directive's own line when it fires:
@@ -586,7 +608,7 @@ impl<'a> Printer<'a> {
         ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
         match self.gap_frozen_span(gap_start, body) {
-            Some(frozen) => self.build_frozen_span_doc(frozen),
+            Some(frozen) => self.build_frozen_node_doc(frozen),
             None => ordinary(),
         }
     }
@@ -698,6 +720,32 @@ impl<'a> Printer<'a> {
         self.with_frozen_must_break(self.raw_source_range(span.start, span.end), span)
     }
 
+    /// What a freeze over a NODE's own span EMITS: the verbatim slice
+    /// ([`Self::build_frozen_span_doc`]) plus the one node-level fact the span alone can't
+    /// carry — a block comment **glued** before the node is owned by it, rides *inside* the
+    /// doc the slice replaces, and is skipped by every gap emitter, so the freeze must claim
+    /// it or nothing prints it (docs/comments.md hazard 1, the ownership-is-about-who-PRINTS
+    /// rule). Prettier keeps the comment right where it is, glued before the frozen slice.
+    ///
+    /// The one emitter every node-shaped freeze shares, whatever rule resolved it: a list
+    /// item over its own span (a declarator, a namespace binding), a statement head's body
+    /// ([`Self::build_statement_head_doc`], and the `export` / `export default` heads that
+    /// resolve their own span because their gap emitter is the shared declaration-header run
+    /// they need either way), and the delimiter-owned value heads whose value is span-shaped
+    /// rather than an `Expression` (a `for` init clause, a for-in/of left, a restricted
+    /// production's operand). [`Self::build_frozen_expression_doc`] is this plus the one rule
+    /// that belongs to an `Expression` node rather than to its span.
+    ///
+    /// `gaps:audit` found every miss this claim exists to prevent, by injecting a block
+    /// comment before a frozen node — which the print-once ledger over the fixtures as
+    /// authored cannot see, since no fixture glues a comment to a frozen item: a frozen
+    /// argument dropped it, and so did `if (a)⏎// prettier-ignore⏎/* c */ fn( b );` and
+    /// `export default⏎// prettier-ignore⏎/* c */ @dec class {}`.
+    #[inline]
+    pub(in crate::printer) fn build_frozen_node_doc(&self, frozen: Span) -> DocId {
+        self.prepend_owned_leading_comment_at(frozen.start, self.build_frozen_span_doc(frozen))
+    }
+
     /// The frozen verbatim slice for a value in a paren-context position, with the clarity
     /// parens that context supplies re-synthesized around it: an assignment prints as
     /// `fn((a = b))` as an argument and as `if ((a = b))` as a condition, and those parens
@@ -740,35 +788,28 @@ impl<'a> Printer<'a> {
         self.build_frozen_value_doc(arg, frozen, ParenContext::Argument)
     }
 
-    /// The frozen verbatim slice for an EXPRESSION, with the glued leading comment the
-    /// expression OWNS claimed onto it.
+    /// [`Self::build_frozen_node_doc`] for an EXPRESSION — the verbatim slice and the
+    /// owned-comment claim, plus the one rule that is a property of the *node* rather than
+    /// of its span.
     ///
-    /// A block comment glued before a node is owned by it and rides *inside* that node's
-    /// ordinary doc, which is exactly the doc a freeze replaces — and the slice starts at
-    /// the node's own span, so the comment is not in it either. Nothing else prints it (the
-    /// gap emitters all skip owned comments), so without this claim it is DROPPED:
-    /// docs/comments.md hazard 1, the ownership-is-about-who-PRINTS rule. Prettier keeps
-    /// the comment right where it is, glued before the frozen slice.
+    /// A **`SequenceExpression`** gets back the grouping parens it prints for itself. Those
+    /// parens are required (`fn((0, 1))` passes ONE argument; `fn(0, 1)` passes two) but
+    /// they are printed by `build_sequence_doc`, not by the enclosing context — which is why
+    /// `needs_parens` deliberately answers `false` for it — and they sit OUTSIDE the node's
+    /// span, so a verbatim slice of the span alone drops them and changes the meaning. The
+    /// rule belongs here rather than at [`Self::build_frozen_value_doc`] because it is a
+    /// property of the node, not of the position: the cast interior needs it too.
     ///
-    /// Found by `gaps:audit` injecting a block comment before a frozen argument — the
-    /// print-once ledger over the fixtures as authored could not see it, since no fixture
-    /// glues a comment to a frozen item.
-    ///
-    /// A **`SequenceExpression`** additionally gets back the grouping parens it prints for
-    /// itself. Those parens are required (`fn((0, 1))` passes ONE argument; `fn(0, 1)`
-    /// passes two) but they are printed by `build_sequence_doc`, not by the enclosing
-    /// context — which is why `needs_parens` deliberately answers `false` for it — and they
-    /// sit OUTSIDE the node's span, so a verbatim slice of the span alone drops them and
-    /// changes the meaning. The rule belongs here rather than at
-    /// [`Self::build_frozen_value_doc`] because it is a property of the node, not of the
-    /// position: the cast interior needs it too.
+    /// The value heads whose value is span-shaped rather than an `Expression` (a `for` init
+    /// clause, a for-in/of left, a restricted production's operand — where the layout's own
+    /// hanging parens ARE the grouping, so a re-synthesized pair would double it) take
+    /// [`Self::build_frozen_node_doc`] directly.
     pub(in crate::printer) fn build_frozen_expression_doc(
         &self,
         expr: &internal::Expression<'_>,
         frozen: Span,
     ) -> DocId {
-        let doc =
-            self.prepend_owned_leading_comment_at(frozen.start, self.build_frozen_span_doc(frozen));
+        let doc = self.build_frozen_node_doc(frozen);
         if matches!(expr, internal::Expression::SequenceExpression(_)) {
             self.d().parens(doc)
         } else {
@@ -810,11 +851,12 @@ impl<'a> Printer<'a> {
     /// families whose item is not an `Expression`, so no list loop spells the dispatch itself.
     ///
     /// The slice is the item's own node span; the list's `,` is parent-owned and stays
-    /// outside it. A block comment **glued** before the item is owned by it and rides inside
-    /// the doc the slice replaces, so the freeze claims it (docs/comments.md hazard 1) — the
-    /// same node-level fact [`Self::build_frozen_expression_doc`] carries for arguments. The
+    /// outside it — so the emission is the plain [`Self::build_frozen_node_doc`], which
+    /// claims the glued comment the item owns (docs/comments.md hazard 1). The
     /// grouping-paren fact does not apply here: none of these item kinds prints parens of its
-    /// own around its span.
+    /// own around its span. A caller whose ordinary path is the rest of a loop body rather
+    /// than a closure (the variable declarator list) asks [`Self::list_item_frozen`] and that
+    /// emitter directly, so the two dispatch shapes still share one emitter.
     ///
     /// `build_ordinary` is lazy so the common path builds the item doc exactly once;
     /// [`Self::list_item_frozen`] already opens on the document-level flag, so a
@@ -828,20 +870,10 @@ impl<'a> Printer<'a> {
         build_ordinary: impl FnOnce() -> DocId,
     ) -> DocId {
         if self.list_item_frozen(container_start, item_span, i) {
-            self.build_frozen_span_item_doc(item_span(i))
+            self.build_frozen_node_doc(item_span(i))
         } else {
             build_ordinary()
         }
-    }
-
-    /// What a resolved span-shaped list-item freeze EMITS: the verbatim slice with the
-    /// glued leading comment the item owns claimed onto it. Split from
-    /// [`Self::build_span_item_doc`] for the caller whose ordinary path is the rest of a
-    /// loop body rather than a closure (the variable declarator list), so the two dispatch
-    /// shapes still share one emitter.
-    #[inline]
-    pub(in crate::printer) fn build_frozen_span_item_doc(&self, frozen: Span) -> DocId {
-        self.prepend_owned_leading_comment_at(frozen.start, self.build_frozen_span_doc(frozen))
     }
 
     /// Paren-transparent frozen doc for a union / intersection member — and, through
