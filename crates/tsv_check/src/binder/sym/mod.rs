@@ -485,11 +485,17 @@ impl<'a> SymbolBinder<'a> {
                 // a code+span but must share this message arg too, or sort/dedup can't
                 // collapse the pair (a latent span-multiset extra). tsgo prints
                 // `Duplicate identifier '#foo'.` — the `#` is included.
-                // TODO: member-key display-string derivation is duplicated across the
-                // bind (`sym/`) and check (`duplicate_members.rs`) sides with no
-                // shared helper (span derivation is centralized in `span_scan.rs`;
-                // display is not) — a shared display helper would prevent this class of
-                // mismatch.
+                // TODO: member-key derivation is duplicated across the bind (`sym/`) and
+                // check (`duplicate_members.rs`) sides with no shared helper — span
+                // derivation is centralized in `span_scan.rs`, key and display are not.
+                // The two already disagree on numerics: `string_atom` keys a numeric
+                // literal on its raw source text while `duplicate_members::literal_key`
+                // canonicalizes through ECMA `Number::toString`, so `[0]` and `[0.0]`
+                // collide on the check side but not the bind side. Latent today (the
+                // check walk covers every member surface that reports, and a raw-text
+                // key can only under-report relative to a canonical one), but a
+                // bind-only reporting surface would expose it. tsgo canonicalizes in
+                // exactly one place.
                 let display = self.atoms.intern(&format!("#{raw}"));
                 // Mangle with the class symbol id so same-name privates in one
                 // class collide (tsgo GetSymbolNameForPrivateIdentifier). The mangled

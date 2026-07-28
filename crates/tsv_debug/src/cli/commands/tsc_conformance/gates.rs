@@ -1,6 +1,6 @@
 //! The run's gate/invariant logic: triage-filter parsing, the always-on invariant
 //! checks, the zero-valued and snapshot pin comparisons, and the index/query
-//! denominator gates. Split out of `tsc_conformance.rs` for navigability.
+//! denominator gates.
 
 use crate::cli::CliError;
 use crate::tsc_conformance::index::IndexReport;

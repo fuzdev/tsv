@@ -11,6 +11,15 @@
 //
 // tsgo: internal/checker/checker.go reportDuplicateMemberErrors — the squiggle is
 //       getNameOfDeclaration -> the ComputedPropertyName node (bracket-inclusive).
+//
+// TODO: both scans are comment-blind — a raw byte loop takes the first `[`/`]` it
+// meets, so a comment carrying one between the bracket and the key expression wins
+// (`[/* a[0] */ 'k']` spans `[0] */ 'k']`). The wrong span also becomes the wrong
+// `args` entry, which is the leg tsgo's comparer keys on. The fix is the
+// comment-aware `tsv_lang::source_scan::{rfind,find}_char_skipping_comments`;
+// `bracket_start` then needs a lower bound to scan forward from (the enclosing
+// member's start), since the file-start bound it would otherwise take is O(offset)
+// per computed key.
 
 /// The byte offset of the `[` opening a computed key, scanning back from the key
 /// expression's start (a plain byte loop — `[` is ASCII). Falls back to the

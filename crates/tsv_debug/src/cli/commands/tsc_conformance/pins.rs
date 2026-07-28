@@ -1,7 +1,6 @@
 //! The pin snapshot machinery: the regression-pin consts (oracle-side baseline/index
 //! counts, the always-zero invariants), the [`PIN_TABLE`] row schema, [`RunPins`], and
-//! the snapshot parse/render/measure/update functions. Split out of `tsc_conformance.rs`
-//! for navigability.
+//! the snapshot parse/render/measure/update functions.
 
 use crate::cli::CliError;
 use crate::tsc_conformance::runner::SkeletonReport;
@@ -679,8 +678,7 @@ mod tests {
 
     #[test]
     fn every_graded_family_has_partition_pins() {
-        // The guard that used to be a fixed-length `[_; FAMILIES.len()]` table: adding a
-        // graded family must add its `(match, missing)` snapshot keys too.
+        // Adding a graded family must add its `(match, missing)` snapshot keys too.
         for family in &FAMILIES {
             for suffix in ["match", "missing"] {
                 let key = format!("{}_{suffix}", family.key);

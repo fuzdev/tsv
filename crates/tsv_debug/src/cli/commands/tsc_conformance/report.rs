@@ -1,7 +1,6 @@
 //! The run's reporting artifacts: the `--emit-manifest` JSON, the committed
 //! `--report` (JSON + Markdown), the failure-diff dump, and the generic JSON
-//! printer every subcommand shares. Split out of `tsc_conformance.rs` for
-//! navigability.
+//! printer every subcommand shares.
 
 use crate::cli::CliError;
 use crate::tsc_conformance::runner::SkeletonReport;
