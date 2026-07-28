@@ -17,6 +17,18 @@ and both are already sanctioned:
   hugged, spaced and newline authorings of one document converge — see
   [§Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
 
+The last four cases pin the second rule's own predicate. What makes the boundary inert is that
+the content is a **fill to reflow into** — asked of the RUN, never of the separator's shape or
+the sibling count. A separator carrying words (`text1`) is as much a fill as a space-only one,
+and a lone element beside prose is one too, so all of them must reach the same form the
+space-separated twin already reaches. Otherwise one document has two layouts depending on
+whether the author happened to put words between the siblings.
+
+The predicate's other conjunct is a **whitespace seam** to reflow at, and the negative is pinned
+next door: glued content (`<a>{expr}text</a>`) is a single unbreakable unit with nothing to
+reflow, so there the boundary *is* the only signal and the authored lines stay — see
+[inline_multiline_nontext](../inline_multiline_nontext/), where prettier agrees.
+
 Together they leave exactly one form: the flowed content, boundaries hugged. Prettier converges
 neither axis, so it keeps a stable form for each authoring — the dangled form for the
 inter-sibling newline, and the block-style form for the boundary newline
@@ -30,8 +42,10 @@ point (F1), and the authorings of one document land on two forms.
 
 ## Cases
 
-An HTML inline element and a table cell (inline-classified, so it takes the same layout), each
-in the converged inline form, with the inter-sibling-newline authoring as
+An HTML inline element and a table cell (inline-classified, so it takes the same layout), then
+the rest of the fill class: a component pair and an expression-tag pair whose only separator
+carries words, and a lone element with prose leading and trailing. Each is in the converged
+inline form, with the inter-sibling-newline authoring as
 `unformatted_ours_newline.svelte` (tsv normalizes it to `input`; prettier instead dangles the tag
 delimiters around it, a form it keeps stable — pinned as `prettier_variant_dangle.svelte`) and the
 boundary-newline authoring as `prettier_variant_boundary_newline.svelte` (prettier keeps it
