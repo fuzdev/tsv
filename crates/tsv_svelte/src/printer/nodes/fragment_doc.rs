@@ -1068,7 +1068,7 @@ impl<'a> Printer<'a> {
     /// is about neighbours it never sees), so delegating a content text would read back as
     /// "breaks the run" and cut every run at its own prose — the one thing the run exists to
     /// find.
-    fn breaks_inline_run(&self, node: &FragmentNode<'_>) -> bool {
+    pub(super) fn breaks_inline_run(&self, node: &FragmentNode<'_>) -> bool {
         match node {
             FragmentNode::Text(t) if t.is_ascii_ws_only => t.newline_count >= 2,
             FragmentNode::Text(_) => false,
@@ -1083,9 +1083,13 @@ impl<'a> Printer<'a> {
     ///
     /// This is the run-level spelling of the node-local `!separator_like_text` test the content
     /// text sites already make: at those sites the node *is* the run's fill, so asking about the
-    /// node and asking about the run are the same question. Only the whitespace-only separator
-    /// site, which owns no fill, has to ask it of the run.
-    fn is_run_prose(&self, node: &FragmentNode<'_>) -> bool {
+    /// node and asking about the run are the same question. The sites that own no fill have to
+    /// ask it of the run instead — the whitespace-only separator here, and
+    /// `Printer::content_is_reflowable_fill` in `element_analysis.rs`, which decides whether an
+    /// element's render-free content boundary may select its layout. Both are the one "is there
+    /// a fill to reflow into?" question, so they share this predicate rather than each spelling
+    /// out what counts as prose.
+    pub(super) fn is_run_prose(&self, node: &FragmentNode<'_>) -> bool {
         matches!(node, FragmentNode::Text(t)
             if !t.is_ascii_ws_only && !Self::is_separator_like_text(&t.data(self.source)))
     }
