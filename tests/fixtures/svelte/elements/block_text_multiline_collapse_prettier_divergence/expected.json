@@ -1,0 +1,96 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 209,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 173,
+				"data": " A text node and an inline element child isolated by an authored newline: the newline flows\n     back onto the content line, while the element itself stays multiline "
+			},
+			{
+				"type": "Text",
+				"start": 173,
+				"end": 174,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 174,
+				"end": 208,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 175
+					},
+					"end": {
+						"line": 3,
+						"column": 2,
+						"character": 176
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 177,
+							"end": 185,
+							"raw": "\n\ttext1 ",
+							"data": "\n\ttext1 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 185,
+							"end": 203,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 8,
+									"character": 186
+								},
+								"end": {
+									"line": 4,
+									"column": 12,
+									"character": 190
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 191,
+										"end": 196,
+										"raw": "text2",
+										"data": "text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 203,
+							"end": 204,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 62,
+	"end": 61,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "RegularElement",
 				"start": 0,
-				"end": 61,
+				"end": 60,
 				"name": "div",
 				"name_loc": {
 					"start": {
@@ -61,25 +61,25 @@
 						{
 							"type": "Text",
 							"start": 24,
-							"end": 39,
-							"raw": "\n\ttext3 text4\n\t",
-							"data": "\n\ttext3 text4\n\t"
+							"end": 38,
+							"raw": " text3 text4\n\t",
+							"data": " text3 text4\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 39,
-							"end": 45,
+							"start": 38,
+							"end": 44,
 							"name": "hr",
 							"name_loc": {
 								"start": {
-									"line": 4,
+									"line": 3,
 									"column": 2,
-									"character": 40
+									"character": 39
 								},
 								"end": {
-									"line": 4,
+									"line": 3,
 									"column": 4,
-									"character": 42
+									"character": 41
 								}
 							},
 							"attributes": [],
@@ -90,26 +90,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 45,
-							"end": 47,
+							"start": 44,
+							"end": 46,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 47,
-							"end": 54,
+							"start": 46,
+							"end": 53,
 							"name": "img",
 							"name_loc": {
 								"start": {
-									"line": 5,
+									"line": 4,
 									"column": 2,
-									"character": 48
+									"character": 47
 								},
 								"end": {
-									"line": 5,
+									"line": 4,
 									"column": 5,
-									"character": 51
+									"character": 50
 								}
 							},
 							"attributes": [],
@@ -120,8 +120,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 54,
-							"end": 55,
+							"start": 53,
+							"end": 54,
 							"raw": "\n",
 							"data": "\n"
 						}

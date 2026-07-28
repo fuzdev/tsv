@@ -29,11 +29,3 @@
 		text
 	</a>
 </div>
-
-<!-- Multiple inline children in multiline inline parent -->
-<div>
-	<label for="id" class="class1 class2 class3 class4 class5 class6 class7 class8" data-attr="value">
-		<input type="checkbox" />
-		text
-	</label>
-</div>

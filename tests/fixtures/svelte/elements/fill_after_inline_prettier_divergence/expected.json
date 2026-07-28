@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 320,
+	"end": 319,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "RegularElement",
 				"start": 80,
-				"end": 319,
+				"end": 318,
 				"name": "p",
 				"name_loc": {
 					"start": {
@@ -110,9 +110,9 @@
 						{
 							"type": "Text",
 							"start": 204,
-							"end": 315,
-							"raw": "\n\tin the middle and continues with more text that should wrap naturally across multiple lines when\n\tformatted.\n",
-							"data": "\n\tin the middle and continues with more text that should wrap naturally across multiple lines when\n\tformatted.\n"
+							"end": 314,
+							"raw": " in the middle and\n\tcontinues with more text that should wrap naturally across multiple lines when formatted.\n",
+							"data": " in the middle and\n\tcontinues with more text that should wrap naturally across multiple lines when formatted.\n"
 						}
 					]
 				}

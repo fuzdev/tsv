@@ -8,8 +8,7 @@
 </script>
 
 <div>
-	TypeScript escape tests:
-	<span>{newline}</span>
+	TypeScript escape tests: <span>{newline}</span>
 	<span>{tab}</span>
 	<span>{quotes}</span>
 	<span>{unicode}</span>

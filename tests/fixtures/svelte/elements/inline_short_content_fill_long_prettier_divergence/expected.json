@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 947,
+	"end": 945,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -23,7 +23,7 @@
 			{
 				"type": "RegularElement",
 				"start": 601,
-				"end": 772,
+				"end": 771,
 				"name": "p",
 				"name_loc": {
 					"start": {
@@ -44,25 +44,25 @@
 						{
 							"type": "Text",
 							"start": 604,
-							"end": 663,
-							"raw": "\n\talpha bravo charlie delta echo foxtrot golf hotel india\n\t",
-							"data": "\n\talpha bravo charlie delta echo foxtrot golf hotel india\n\t"
+							"end": 662,
+							"raw": "\n\talpha bravo charlie delta echo foxtrot golf hotel india ",
+							"data": "\n\talpha bravo charlie delta echo foxtrot golf hotel india "
 						},
 						{
 							"type": "RegularElement",
-							"start": 663,
-							"end": 687,
+							"start": 662,
+							"end": 686,
 							"name": "code",
 							"name_loc": {
 								"start": {
-									"line": 12,
-									"column": 2,
-									"character": 664
+									"line": 11,
+									"column": 58,
+									"character": 663
 								},
 								"end": {
-									"line": 12,
-									"column": 6,
-									"character": 668
+									"line": 11,
+									"column": 62,
+									"character": 667
 								}
 							},
 							"attributes": [],
@@ -71,8 +71,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 669,
-										"end": 680,
+										"start": 668,
+										"end": 679,
 										"raw": "preferences",
 										"data": "preferences"
 									}
@@ -81,10 +81,10 @@
 						},
 						{
 							"type": "Text",
-							"start": 687,
+							"start": 686,
 							"end": 696,
-							"raw": " and set ",
-							"data": " and set "
+							"raw": " and set\n\t",
+							"data": " and set\n\t"
 						},
 						{
 							"type": "RegularElement",
@@ -94,12 +94,12 @@
 							"name_loc": {
 								"start": {
 									"line": 12,
-									"column": 35,
+									"column": 2,
 									"character": 697
 								},
 								"end": {
 									"line": 12,
-									"column": 39,
+									"column": 6,
 									"character": 701
 								}
 							},
@@ -120,35 +120,35 @@
 						{
 							"type": "Text",
 							"start": 720,
-							"end": 768,
-							"raw": " as one exception here plus a little more\n\ttext\n",
-							"data": " as one exception here plus a little more\n\ttext\n"
+							"end": 767,
+							"raw": " as one exception here plus a little more text\n",
+							"data": " as one exception here plus a little more text\n"
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 772,
-				"end": 774,
+				"start": 771,
+				"end": 773,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 774,
-				"end": 946,
+				"start": 773,
+				"end": 944,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 16,
+						"line": 15,
 						"column": 1,
-						"character": 775
+						"character": 774
 					},
 					"end": {
-						"line": 16,
+						"line": 15,
 						"column": 2,
-						"character": 776
+						"character": 775
 					}
 				},
 				"attributes": [],
@@ -157,26 +157,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 777,
-							"end": 836,
-							"raw": "\n\talpha bravo charlie delta echo foxtrot golf hotel india\n\t",
-							"data": "\n\talpha bravo charlie delta echo foxtrot golf hotel india\n\t"
+							"start": 776,
+							"end": 834,
+							"raw": "\n\talpha bravo charlie delta echo foxtrot golf hotel india ",
+							"data": "\n\talpha bravo charlie delta echo foxtrot golf hotel india "
 						},
 						{
 							"type": "RegularElement",
-							"start": 836,
-							"end": 860,
+							"start": 834,
+							"end": 858,
 							"name": "code",
 							"name_loc": {
 								"start": {
-									"line": 18,
-									"column": 2,
-									"character": 837
+									"line": 16,
+									"column": 58,
+									"character": 835
 								},
 								"end": {
-									"line": 18,
-									"column": 6,
-									"character": 841
+									"line": 16,
+									"column": 62,
+									"character": 839
 								}
 							},
 							"attributes": [],
@@ -185,8 +185,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 842,
-										"end": 853,
+										"start": 840,
+										"end": 851,
 										"raw": "preferences",
 										"data": "preferences"
 									}
@@ -195,26 +195,26 @@
 						},
 						{
 							"type": "Text",
-							"start": 860,
-							"end": 870,
-							"raw": " and sett ",
-							"data": " and sett "
+							"start": 858,
+							"end": 869,
+							"raw": " and sett\n\t",
+							"data": " and sett\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 870,
-							"end": 894,
+							"start": 869,
+							"end": 893,
 							"name": "code",
 							"name_loc": {
 								"start": {
-									"line": 18,
-									"column": 36,
-									"character": 871
+									"line": 17,
+									"column": 2,
+									"character": 870
 								},
 								"end": {
-									"line": 18,
-									"column": 40,
-									"character": 875
+									"line": 17,
+									"column": 6,
+									"character": 874
 								}
 							},
 							"attributes": [],
@@ -223,8 +223,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 876,
-										"end": 887,
+										"start": 875,
+										"end": 886,
 										"raw": "example.dev",
 										"data": "example.dev"
 									}
@@ -233,10 +233,10 @@
 						},
 						{
 							"type": "Text",
-							"start": 894,
-							"end": 942,
-							"raw": " as one exception here plus a little\n\tmore text\n",
-							"data": " as one exception here plus a little\n\tmore text\n"
+							"start": 893,
+							"end": 940,
+							"raw": " as one exception here plus a little more text\n",
+							"data": " as one exception here plus a little more text\n"
 						}
 					]
 				}
