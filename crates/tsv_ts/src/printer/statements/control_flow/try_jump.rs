@@ -26,29 +26,100 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Append ` keyword`, preserving where the author put any comments in the gap
-    /// before it: one that trailed the previous `}` stays trailing, one on its own
-    /// line keeps its own line. The keyword-preceding mirror of
-    /// `append_keyword_to_body_comments`, shared by the `catch` and `finally` heads
-    /// (`gap_start` = previous block end, `keyword_pos` = the comment-skipping
-    /// keyword position).
+    /// Append the `}`→continuation-keyword gap and then the clause it introduces — `catch` or
+    /// `finally`. Comments in the gap keep where the author put them: one that trailed the
+    /// previous `}` stays trailing, one on its own line keeps its own line. The
+    /// keyword-preceding mirror of [`Self::append_keyword_to_body_comments`].
     ///
-    /// This is the `}`→continuation-keyword gap, so it partitions by line exactly as
-    /// the `}`→`else` path does — the authored position is the whole signal, and a
-    /// blank line above an own-line comment is authoring intent
-    /// ([`ControlFlowGap::BlockToKeyword`]). Prettier is no oracle here: it relocates
-    /// these comments into the following block's body, which it does *not* do at
-    /// `else`. See `conformance_prettier.md` §Comment relocation.
-    fn append_comments_then_keyword(
+    /// The gap partitions by line exactly as the `}`→`else` path does — the authored position is
+    /// the whole signal, and a blank line above an own-line comment is authoring intent
+    /// ([`ControlFlowGap::BlockToKeyword`]). Prettier is no oracle here: it relocates these
+    /// comments into the following block's body, which it does *not* do at `else`. See
+    /// `conformance_prettier.md` §Comment relocation.
+    ///
+    /// An own-line directive in the gap freezes the WHOLE clause — keyword, any binding and the
+    /// body all ride inside the verbatim slice — and the return is then `true`, telling the
+    /// caller to emit nothing further for this clause. `clause_end` rather than a span because
+    /// the two clauses anchor differently: a `CatchClause`'s span already starts at its keyword,
+    /// while a finalizer's starts at its `{` (the keyword sits in the gap), so the frozen slice
+    /// is keyed on `keyword_pos` for both. Prettier instead relocates the directive into the
+    /// clause body and freezes the first statement there
+    /// (`handler_prettier_ignore_head_prettier_divergence`).
+    fn append_clause_head(
         &self,
         parts: &mut DocBuf,
         gap_start: u32,
         keyword_pos: u32,
         keyword: &'static str,
-    ) {
+        clause_end: u32,
+    ) -> bool {
         // A `try`/`catch` body is always a block, so the keyword can hug `}`.
         self.push_block_to_keyword_gap(parts, gap_start, keyword_pos, true);
-        parts.push(self.d().text(keyword));
+        match self.gap_frozen_span(gap_start, Span::new(keyword_pos, clause_end)) {
+            Some(frozen) => {
+                parts.push(self.build_frozen_span_doc(frozen));
+                true
+            }
+            None => {
+                parts.push(self.d().text(keyword));
+                false
+            }
+        }
+    }
+
+    /// Append a `catch` clause's binding and body — everything after the keyword, which
+    /// [`Self::append_clause_head`] has already emitted. Split out of
+    /// `build_try_statement_doc` so the freeze guard reads as one branch rather than wrapping
+    /// this whole run.
+    fn append_catch_clause_body(
+        &self,
+        parts: &mut DocBuf,
+        stmt: &internal::TryStatement<'_>,
+        handler: &internal::CatchClause<'_>,
+    ) {
+        let d = self.d();
+        let catch_keyword_end = handler.span.start + "catch".len() as u32;
+        if let Some(param) = &handler.param {
+            // Find paren positions for comment handling
+            let open_paren = self.find_open_paren_after(stmt.block.span.end);
+            let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
+
+            // Preserve comments between catch keyword and ( in place:
+            //   catch/* comment */(e) → catch /* comment */ (e)
+            if let Some(kc) = self.build_keyword_paren_comments(catch_keyword_end, open_paren) {
+                parts.push(kc);
+                parts.push(d.text("("));
+            } else {
+                parts.push(d.text(" ("));
+            }
+
+            // Check for comments in catch parameter
+            if let (Some(open), Some(close)) = (open_paren, close_paren)
+                && (self.has_comments_to_emit_between(open + 1, param.span().start)
+                    || self.has_comments_to_emit_between(param.span().end, close))
+            {
+                parts.push(self.build_condition_group_with_comments(param, open, close));
+            } else {
+                parts.push(self.build_expression_doc(param));
+            }
+            parts.push(d.text(")"));
+
+            // Comments between ) and body: `catch (e) /* comment */ {`
+            let paren_end = close_paren.unwrap_or_else(|| param.span().end) + 1;
+            self.append_keyword_to_body_comments(parts, paren_end, handler.body.span.start);
+        } else {
+            // No param: comments between catch keyword and body: `catch /* comment */ {`
+            self.append_keyword_to_body_comments(parts, catch_keyword_end, handler.body.span.start);
+        }
+        // Catch block stays inline (`catch (e) {}`) UNLESS a `finally` follows, in which case
+        // it expands empty like `try`/`finally` do (Prettier's `block.js`:
+        // `parent.type === "CatchClause" && !parentParent.finalizer` is the only case that
+        // stays collapsed).
+        if stmt.finalizer.is_some() {
+            parts.push(self.build_block_statement_expand_empty_doc(&handler.body));
+        } else {
+            parts.push(self.build_block_statement_doc(&handler.body));
+        }
     }
 
     pub(in crate::printer::statements) fn build_try_statement_doc(
@@ -67,62 +138,18 @@ impl<'a> Printer<'a> {
         parts.push(self.build_block_statement_expand_empty_doc(&stmt.block));
 
         if let Some(handler) = &stmt.handler {
-            // `handler.span.start` is the position of the "catch" keyword.
+            // `handler.span.start` is the position of the "catch" keyword. A frozen clause
+            // rides out whole in the verbatim slice — keyword, binding and body — so the
+            // per-part emission is skipped entirely for it.
             let try_end = stmt.block.span.end;
-            let catch_keyword_pos = handler.span.start;
-            self.append_comments_then_keyword(&mut parts, try_end, catch_keyword_pos, "catch");
-            if let Some(param) = &handler.param {
-                // Find paren positions for comment handling
-                let catch_keyword_end = handler.span.start + "catch".len() as u32;
-                let open_paren = self.find_open_paren_after(stmt.block.span.end);
-                let close_paren = open_paren.and_then(|o| self.matching_close_paren(o));
-
-                // Preserve comments between catch keyword and ( in place:
-                //   catch/* comment */(e) → catch /* comment */ (e)
-                let keyword_comments =
-                    self.build_keyword_paren_comments(catch_keyword_end, open_paren);
-                if let Some(kc) = keyword_comments {
-                    parts.push(kc);
-                    parts.push(d.text("("));
-                } else {
-                    parts.push(d.text(" ("));
-                }
-
-                // Check for comments in catch parameter
-                if let (Some(open), Some(close)) = (open_paren, close_paren)
-                    && (self.has_comments_to_emit_between(open + 1, param.span().start)
-                        || self.has_comments_to_emit_between(param.span().end, close))
-                {
-                    parts.push(self.build_condition_group_with_comments(param, open, close));
-                } else {
-                    parts.push(self.build_expression_doc(param));
-                }
-                parts.push(d.text(")"));
-
-                // Comments between ) and body: `catch (e) /* comment */ {`
-                let paren_end = close_paren.unwrap_or_else(|| param.span().end) + 1;
-                self.append_keyword_to_body_comments(
-                    &mut parts,
-                    paren_end,
-                    handler.body.span.start,
-                );
-            } else {
-                // No param: comments between catch keyword and body: `catch /* comment */ {`
-                let catch_keyword_end = handler.span.start + "catch".len() as u32;
-                self.append_keyword_to_body_comments(
-                    &mut parts,
-                    catch_keyword_end,
-                    handler.body.span.start,
-                );
-            }
-            // Catch block stays inline (`catch (e) {}`) UNLESS a `finally`
-            // follows, in which case it expands empty like `try`/`finally` do
-            // (Prettier's `block.js`: `parent.type === "CatchClause" &&
-            // !parentParent.finalizer` is the only case that stays collapsed).
-            if stmt.finalizer.is_some() {
-                parts.push(self.build_block_statement_expand_empty_doc(&handler.body));
-            } else {
-                parts.push(self.build_block_statement_doc(&handler.body));
+            if !self.append_clause_head(
+                &mut parts,
+                try_end,
+                handler.span.start,
+                "catch",
+                handler.span.end,
+            ) {
+                self.append_catch_clause_body(&mut parts, stmt, handler);
             }
         }
         if let Some(finalizer) = &stmt.finalizer {
@@ -139,16 +166,23 @@ impl<'a> Printer<'a> {
             let finally_keyword_pos = self
                 .find_keyword_in_range(prev_end, finalizer.span.start, "finally")
                 .unwrap_or(finalizer.span.start);
-            self.append_comments_then_keyword(&mut parts, prev_end, finally_keyword_pos, "finally");
-            // Comments between finally keyword and body: `finally /* comment */ {`
-            let finally_keyword_end = finally_keyword_pos + "finally".len() as u32;
-            self.append_keyword_to_body_comments(
+            if !self.append_clause_head(
                 &mut parts,
-                finally_keyword_end,
-                finalizer.span.start,
-            );
-            // Finally block expands empty: `finally {\n}` not `finally {}`
-            parts.push(self.build_block_statement_expand_empty_doc(finalizer));
+                prev_end,
+                finally_keyword_pos,
+                "finally",
+                finalizer.span.end,
+            ) {
+                // Comments between finally keyword and body: `finally /* comment */ {`
+                let finally_keyword_end = finally_keyword_pos + "finally".len() as u32;
+                self.append_keyword_to_body_comments(
+                    &mut parts,
+                    finally_keyword_end,
+                    finalizer.span.start,
+                );
+                // Finally block expands empty: `finally {\n}` not `finally {}`
+                parts.push(self.build_block_statement_expand_empty_doc(finalizer));
+            }
         }
         d.concat(&parts)
     }
@@ -232,7 +266,16 @@ impl<'a> Printer<'a> {
 
         // Build the `: body` tail (including any colon→body comments).
         let mut tail_parts: DocBuf = smallvec![];
-        if self.has_comments_to_emit_between(colon_end, body_start) {
+        if let Some(frozen) = self.gap_frozen_span(colon_end, stmt.body.span()) {
+            // An own-line directive in the `:`→body gap freezes the body. The inline
+            // emission below would trail the run on the label's line (`lll: // c`), an
+            // inert placement that loses the freeze on the second pass, so route through
+            // the own-line-preserving header→body emitter instead — the declaration-header
+            // rule of `conformance_prettier.md` §On module and declarator lists.
+            tail_parts.push(d.text(":"));
+            self.push_header_to_body_gap(&mut tail_parts, colon_end, body_start);
+            tail_parts.push(self.build_frozen_node_doc(frozen));
+        } else if self.has_comments_to_emit_between(colon_end, body_start) {
             let has_line_comment = self.has_line_comments_between(colon_end, body_start);
             tail_parts.push(d.text(":"));
             tail_parts.push(self.build_inline_comments_between_doc(colon_end, body_start));

@@ -15,6 +15,7 @@
 
 use crate::ast::internal::{self, Expression, JsdocCast};
 use crate::printer::ArrowChainContext;
+use crate::printer::OwnedCommentEffect;
 use crate::printer::Printer;
 use crate::printer::conditional_should_break_after_op;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
@@ -23,6 +24,7 @@ use crate::printer::is_string_literal;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use tsv_lang::Comment;
 use tsv_lang::PRINT_WIDTH;
+use tsv_lang::Span;
 use tsv_lang::doc::GroupId;
 use tsv_lang::doc::arena::DocId;
 
@@ -902,12 +904,12 @@ pub fn is_simple_value(expr: &Expression<'_>) -> bool {
     )
 }
 
-/// The RHS comment / stripped-paren-boundary controls for
-/// `build_assignment_layout_with_line_comment`.
+/// The RHS comment / freeze / stripped-paren-boundary controls for
+/// [`Printer::build_assignment_layout`].
 ///
-/// Bundles the three inputs describing comments and grouping-paren boundaries
-/// around the RHS, so the layout entry point takes one value instead of three
-/// loose args.
+/// Bundles the inputs describing comments, the value-head freeze and grouping-paren
+/// boundaries around the RHS, so the layout entry point takes one value instead of
+/// four loose args.
 pub struct RhsCommentInfo {
     /// Inline comments between the operator and the RHS (e.g. `x = /** @type {T} */ (e)`);
     /// `None` when the caller handles comments separately.
@@ -918,6 +920,23 @@ pub struct RhsCommentInfo {
     /// When `Some`, scan for trailing comments from stripped grouping parens between
     /// the RHS end and this boundary, wrapping in parens if found.
     pub boundary: Option<u32>,
+    /// The value-head freeze the operator→RHS gap resolved (an own-line directive there
+    /// freezes the whole RHS, per [`Printer::value_head_frozen_span`]): the span to emit
+    /// verbatim in place of the RHS's doc.
+    pub frozen: Option<Span>,
+}
+
+impl RhsCommentInfo {
+    /// The gap carries nothing but a freeze verdict — the shape most callers want, and
+    /// the one the zero-comment fast paths reach with `None`.
+    pub fn frozen_only(frozen: Option<Span>) -> Self {
+        Self {
+            comments: None,
+            has_line_comment: false,
+            boundary: None,
+            frozen,
+        }
+    }
 }
 
 impl<'a> Printer<'a> {
@@ -928,38 +947,11 @@ impl<'a> Printer<'a> {
     /// `is_short_key`: True for property keys shorter than `tabWidth + MIN_OVERLAP_FOR_BREAK`.
     /// For non-property assignments (e.g., `x = value`), pass `false`.
     ///
-    /// `rhs_comments`: Optional inline comments between the operator and the RHS expression
-    /// (e.g., `x = /** @type {T} */ (expr)`). Pass `None` for callers that handle
-    /// comments separately (object properties, variable declarations).
+    /// `rhs_info` carries the operator→RHS gap's facts — inline comments, whether the gap
+    /// forces `BreakAfterOperator`, a stripped-paren boundary to scan, and the value-head
+    /// freeze. [`RhsCommentInfo::frozen_only`] is the shape for a caller that has nothing
+    /// but the freeze verdict.
     pub fn build_assignment_layout(
-        &self,
-        left_doc: DocId,
-        operator: &'static str,
-        right_expr: &Expression<'_>,
-        is_short_key: bool,
-        rhs_comments: Option<DocId>,
-    ) -> DocId {
-        self.build_assignment_layout_with_line_comment(
-            left_doc,
-            operator,
-            right_expr,
-            is_short_key,
-            RhsCommentInfo {
-                comments: rhs_comments,
-                has_line_comment: false,
-                boundary: None,
-            },
-        )
-    }
-
-    /// Like `build_assignment_layout`, but with explicit control over line comment handling.
-    ///
-    /// When `rhs_has_line_comment` is true, forces `BreakAfterOperator` layout so the
-    /// line comment and expression get proper indentation instead of being placed inline.
-    ///
-    /// When `right_boundary` is `Some`, checks for trailing comments from stripped grouping
-    /// parens between `right_expr.span().end` and the boundary. If found, wraps in parens.
-    pub fn build_assignment_layout_with_line_comment(
         &self,
         left_doc: DocId,
         operator: &'static str,
@@ -968,6 +960,19 @@ impl<'a> Printer<'a> {
         rhs_info: RhsCommentInfo,
     ) -> DocId {
         let d = self.d();
+        // A frozen RHS bypasses layout selection entirely: the slice prints verbatim, so
+        // every choice `choose_layout` makes about how the value breaks is moot, and the
+        // heuristic assertions below reason about a doc the value no longer has. The
+        // directive's own line already hangs the value under the operator.
+        if let Some(frozen) = rhs_info.frozen {
+            return self.build_frozen_assignment_doc(
+                left_doc,
+                operator,
+                right_expr,
+                frozen,
+                rhs_info.comments,
+            );
+        }
         let mut layout = choose_layout(
             right_expr,
             is_short_key,
@@ -997,12 +1002,25 @@ impl<'a> Printer<'a> {
         }
         // A comment the RHS *owns* (a JSDoc cast, a bundler annotation) is glued to its
         // first token and travels inside its doc, so it is never in `rhs_comments` — the
-        // gap emits nothing for it. It is still on the page and still hangs the value, so
-        // ask the node. See `owned_leading_comment_hangs_value`.
+        // gap emits nothing for it. It is still on the page and still decides the layout,
+        // so ask the node. Both halves come off one lookup; see
+        // `owned_leading_comment_effect`.
+        let owned_comment_effect = self.owned_leading_comment_effect(right_expr);
+        // An indentable owned comment hangs the value.
         if layout != AssignmentLayout::BreakAfterOperator
-            && self.owned_leading_comment_hangs_value(right_expr)
+            && owned_comment_effect == Some(OwnedCommentEffect::Hangs)
         {
             layout = AssignmentLayout::BreakAfterOperator;
+        }
+        // The other half: a *preserved* multi-line owned comment ends the operator's line
+        // inside itself, so a width-decided break at the operator decides nothing — take
+        // the never-break form, as for a self-expanding value. Only `Fluid` is affected in
+        // practice (it is the one width-decided layout here), and this deliberately does
+        // not override a `BreakAfterOperator` the value itself earned.
+        if layout == AssignmentLayout::Fluid
+            && owned_comment_effect == Some(OwnedCommentEffect::Pins)
+        {
+            layout = AssignmentLayout::NeverBreakAfterOperator;
         }
         // Member-only AND call chains with line comments break internally at the
         // comment location (the chain formatter does this — see
@@ -1048,7 +1066,7 @@ impl<'a> Printer<'a> {
         // - A comment the RHS *owns* prints inside the RHS's doc (a JSDoc cast, a bundler
         //   annotation), so an owned multi-line annotation on a trivial call
         //   (`a = /**⏎ * @__PURE__⏎ */ fn();`) force-breaks the doc without being a chain
-        //   break. The layout already hangs the value for it (`owned_leading_comment_hangs_value`).
+        //   break. The layout already hangs the value for it (`owned_leading_comment_effect`).
         // - An *interior line comment* in the chain (`a = foo // c⏎.bar!`) forces the break
         //   at the comment — a `//` must end its line — and the layout override above already
         //   handled it (`has_line_comments_in_*_chain` → NeverBreakAfterOperator, keeping the
@@ -1068,7 +1086,7 @@ impl<'a> Printer<'a> {
         debug_assert!(
             {
                 let core_expr = unwrap_expression(right_expr);
-                self.owned_leading_comment_hangs_value(right_expr)
+                owned_comment_effect == Some(OwnedCommentEffect::Hangs)
                     || self.has_line_comments_in_chain(right_expr)
                     || chain_has_line_continuation_string_arg(core_expr, self.source)
                     || !is_poorly_breakable_chain(
@@ -1132,6 +1150,52 @@ impl<'a> Printer<'a> {
                 ]))
             }
         }
+    }
+
+    /// The `BreakAfterOperator` shape for a FROZEN right-hand side: the gap's comment run
+    /// (which holds the directive that froze it) and the verbatim slice, hung under the
+    /// operator.
+    ///
+    /// Always this one layout — the directive is alone on its line, so the run ends in a
+    /// hardline and no width-decided form could keep the value beside the operator anyway.
+    /// The slice replaces the RHS's doc, so no paren shell is added here: the ordinary path
+    /// leaves that to the caller too (an object property and a class field each apply
+    /// their own `needs_parens` before choosing this layout).
+    fn build_frozen_assignment_doc(
+        &self,
+        left_doc: DocId,
+        operator: &'static str,
+        right_expr: &Expression<'_>,
+        frozen: Span,
+        comments: Option<DocId>,
+    ) -> DocId {
+        let d = self.d();
+        let frozen_doc = self.build_frozen_expression_doc(right_expr, frozen);
+        let rhs = match comments {
+            Some(comments_doc) => d.concat(&[comments_doc, frozen_doc]),
+            None => frozen_doc,
+        };
+        self.build_frozen_assignment_shape(left_doc, operator, rhs)
+    }
+
+    /// The doc shape [`Self::build_frozen_assignment_doc`] emits, over an RHS the caller
+    /// already built: `group([group(left), operator, hang(rhs)])`.
+    ///
+    /// Split out for the one host that arrives with its RHS in hand — an object-pattern
+    /// left, whose ordinary arm deliberately never breaks after the operator and so builds
+    /// the value on its own path — so the frozen layout is still stated once.
+    pub(in crate::printer) fn build_frozen_assignment_shape(
+        &self,
+        left_doc: DocId,
+        operator: &'static str,
+        rhs: DocId,
+    ) -> DocId {
+        let d = self.d();
+        d.group(d.concat(&[
+            d.group(left_doc),
+            d.text(operator),
+            hang_after_operator(d, rhs),
+        ]))
     }
 
     /// Check if an expression is a member-only chain with line comments.

@@ -19,11 +19,33 @@ use super::{
 };
 use tsv_lang::Span;
 
+/// What a call/member/non-null node has inherited from its parent about the
+/// optional chain it sits on.
+///
+/// The two decided states are the opposite verdicts of the same question, so
+/// they are one value rather than two flags — a node reaches at most one, and
+/// both let it skip the `has_optional_in_chain` walk entirely.
+#[derive(Clone, Copy, Default, PartialEq, Eq)]
+pub(super) enum ChainState {
+    /// Nothing inherited — the node resolves the question for itself. A
+    /// parenthesized child seals its own chain and lands here.
+    #[default]
+    Unresolved,
+    /// The node emits inside an optional chain a `ChainExpression` already
+    /// wraps further up the spine.
+    InChain,
+    /// The node's spine is already known optional-free: the parent's own walk
+    /// covered it and reached it unsealed, so the answer would be the tail of a
+    /// walk already run. Without this, every spine node re-walks its own suffix
+    /// and an `n`-deep chain costs `O(n²)`.
+    KnownFree,
+}
+
 /// Emission-time expression state.
 ///
-/// `in_chain` marks whether this node emits inside an optional chain. The other
-/// two are pre-computed decisions that adjust the `optional` field along a
-/// call/member spine:
+/// `chain` is the inherited optional-chain verdict (see [`ChainState`]). The
+/// two flags are pre-computed decisions that adjust the `optional` field along
+/// a call/member spine:
 ///
 /// - `force_optional` — the acorn `?.<T>(...)` quirk: the callee node of an
 ///   optional call with type arguments is itself marked optional.
@@ -32,10 +54,11 @@ use tsv_lang::Span;
 ///
 /// Both flags survive a `JsdocCast` unwrap (they act on the unwrapped inner
 /// expression) and die on any arm other than call/member — including a
-/// `ChainExpression` wrap, which they fall through without touching.
+/// `ChainExpression` wrap, which they fall through without touching. `chain`
+/// does *not* survive the unwrap: a cast's parens seal the chain.
 #[derive(Clone, Copy, Default)]
 pub(super) struct ExprFlags {
-    pub(super) in_chain: bool,
+    pub(super) chain: ChainState,
     pub(super) force_optional: bool,
     pub(super) strip_optional: bool,
 }
@@ -86,7 +109,10 @@ pub(super) fn write_expression_inner(
                 cast.inner,
                 ctx,
                 ExprFlags {
-                    in_chain: false,
+                    // The cast's parens seal the chain, so the inner
+                    // expression inherits no verdict — `/** @type {T} */
+                    // (a?.b)` still opens its own wrap.
+                    chain: ChainState::Unresolved,
                     ..flags
                 },
             );
@@ -192,32 +218,32 @@ pub(super) fn write_expression_inner(
             close_node(w, "SpreadElement", spread.span, ctx);
         }
         internal::Expression::CallExpression(call) => {
-            let needs_chain = !flags.in_chain && expr.has_optional_in_chain();
-            let callee_in_chain = child_in_chain(
+            let needs_chain = needs_chain_wrap(expr, flags);
+            let callee_chain = child_chain(
                 call.span.start,
                 call.callee.span().start,
                 needs_chain,
-                flags.in_chain,
+                flags,
             );
             let (force, strip) = flags_after_wrap(flags, needs_chain);
             maybe_wrap_chain(w, needs_chain, call.span, ctx, |w| {
-                write_call_expression(w, call, ctx, callee_in_chain, force, strip);
+                write_call_expression(w, call, ctx, callee_chain, force, strip);
             });
         }
         internal::Expression::NewExpression(new_expr) => {
             write_new_expression(w, new_expr, ctx);
         }
         internal::Expression::MemberExpression(member) => {
-            let needs_chain = !flags.in_chain && expr.has_optional_in_chain();
-            let object_in_chain = child_in_chain(
+            let needs_chain = needs_chain_wrap(expr, flags);
+            let object_chain = child_chain(
                 member.span.start,
                 member.object.span().start,
                 needs_chain,
-                flags.in_chain,
+                flags,
             );
             let (force, strip) = flags_after_wrap(flags, needs_chain);
             maybe_wrap_chain(w, needs_chain, member.span, ctx, |w| {
-                write_member_expression(w, member, ctx, object_in_chain, force, strip);
+                write_member_expression(w, member, ctx, object_chain, force, strip);
             });
         }
         internal::Expression::ConditionalExpression(cond) => {
@@ -341,14 +367,14 @@ pub(super) fn write_expression_inner(
             close_node(w, "TSInstantiationExpression", inst_expr.span, ctx);
         }
         internal::Expression::TSNonNullExpression(non_null_expr) => {
-            let needs_chain = !flags.in_chain && expr.has_optional_in_chain();
+            let needs_chain = needs_chain_wrap(expr, flags);
             // A parenthesized inner chain seals at the parens, so the
             // paren-aware child check applies like it does for calls/members.
-            let inner_in_chain = child_in_chain(
+            let inner_chain = child_chain(
                 non_null_expr.span.start,
                 non_null_expr.expression.span().start,
                 needs_chain,
-                flags.in_chain,
+                flags,
             );
             maybe_wrap_chain(w, needs_chain, non_null_expr.span, ctx, |w| {
                 node_header(w, "TSNonNullExpression", non_null_expr.span, ctx);
@@ -360,7 +386,7 @@ pub(super) fn write_expression_inner(
                     non_null_expr.expression,
                     ctx,
                     ExprFlags {
-                        in_chain: inner_in_chain,
+                        chain: inner_chain,
                         ..ExprFlags::default()
                     },
                 );
@@ -436,12 +462,37 @@ pub(super) fn write_expression_inner(
     }
 }
 
-/// Whether a member's object / a call's callee emits as part of the current
-/// optional chain: a parenthesized child seals its own chain (the span gap over
-/// the stripped `(` is the signal).
-fn child_in_chain(parent_start: u32, child_start: u32, needs_chain: bool, in_chain: bool) -> bool {
-    let parenthesized = parent_start < child_start;
-    !parenthesized && (needs_chain || in_chain)
+/// Whether this call/member/non-null node opens a `ChainExpression` wrap.
+///
+/// Only an [`ChainState::Unresolved`] node walks: the other two states are the
+/// parent handing down an answer already established.
+fn needs_chain_wrap(expr: &internal::Expression<'_>, flags: ExprFlags) -> bool {
+    flags.chain == ChainState::Unresolved && expr.has_optional_in_chain()
+}
+
+/// What a member's object / a call's callee inherits about the current optional
+/// chain: a parenthesized child seals its own chain (the span gap over the
+/// stripped `(` is the signal), so it inherits nothing and resolves for itself.
+///
+/// An unsealed child inherits exactly one verdict. Sitting on an optional chain
+/// (this node opened one, or was already inside one) puts the child in it.
+/// Otherwise this node resolved `has_optional_in_chain` to `false` — by walking
+/// or by inheritance — and an optional-free unsealed node has an optional-free
+/// child.
+fn child_chain(
+    parent_start: u32,
+    child_start: u32,
+    needs_chain: bool,
+    flags: ExprFlags,
+) -> ChainState {
+    if parent_start < child_start {
+        return ChainState::Unresolved;
+    }
+    if needs_chain || flags.chain == ChainState::InChain {
+        ChainState::InChain
+    } else {
+        ChainState::KnownFree
+    }
 }
 
 /// Emit `inner` wrapped in a `ChainExpression` node when `needs_chain`, bare

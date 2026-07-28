@@ -886,68 +886,46 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Create an error with custom message at current position
     pub(super) fn error_msg(&self, message: &str) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: message.to_string(),
-            position: self.current_pos().0,
-            context: None,
-        }
+        ParseError::invalid_syntax(message.to_string(), self.current_pos().0)
     }
 
     /// Create an error with custom message at custom position
     pub(super) fn error_msg_at(&self, message: &str, position: usize) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: message.to_string(),
-            position,
-            context: None,
-        }
+        ParseError::invalid_syntax(message.to_string(), position)
     }
 
     /// Create an error: "Expected X"
     pub(super) fn error_expected(&self, what: &str) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: format!("Expected {what}"),
-            position: self.current_pos().0,
-            context: None,
-        }
+        ParseError::invalid_syntax(format!("Expected {what}"), self.current_pos().0)
     }
 
     /// Create an error: "Expected X, found Y"
     pub(super) fn error_expected_found(&self, what: &str) -> ParseError {
         let kind = &self.current.kind;
-        ParseError::InvalidSyntax {
-            message: format!("Expected {what}, found {kind}"),
-            position: self.current_pos().0,
-            context: None,
-        }
+        ParseError::invalid_syntax(
+            format!("Expected {what}, found {kind}"),
+            self.current_pos().0,
+        )
     }
 
     /// Create an error: "Expected X, found Y" at custom position
     pub(super) fn error_expected_found_at(&self, what: &str, position: usize) -> ParseError {
         let kind = &self.current.kind;
-        ParseError::InvalidSyntax {
-            message: format!("Expected {what}, found {kind}"),
-            position,
-            context: None,
-        }
+        ParseError::invalid_syntax(format!("Expected {what}, found {kind}"), position)
     }
 
     /// Create an error: "Expected X after Y, found Z"
     pub(super) fn error_expected_after(&self, what: &str, after: &str) -> ParseError {
         let kind = &self.current.kind;
-        ParseError::InvalidSyntax {
-            message: format!("Expected {what} after '{after}', found {kind}"),
-            position: self.current_pos().0,
-            context: None,
-        }
+        ParseError::invalid_syntax(
+            format!("Expected {what} after '{after}', found {kind}"),
+            self.current_pos().0,
+        )
     }
 
     /// Create an error: "Unexpected keyword 'X'"
     pub(super) fn error_unexpected_keyword(&self, kw: KeywordKind) -> ParseError {
-        ParseError::InvalidSyntax {
-            message: format!("Unexpected keyword '{kw}'"),
-            position: self.current_pos().0,
-            context: None,
-        }
+        ParseError::invalid_syntax(format!("Unexpected keyword '{kw}'"), self.current_pos().0)
     }
 
     /// Create an error: "Expected 'X' or 'Y' after list element, found Z"
@@ -957,13 +935,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         terminator: &TokenKind,
     ) -> ParseError {
         let kind = &self.current.kind;
-        ParseError::InvalidSyntax {
-            message: format!(
-                "Expected '{separator}' or '{terminator}' after list element, found {kind}"
-            ),
-            position: self.current_pos().0,
-            context: None,
-        }
+        ParseError::invalid_syntax(
+            format!("Expected '{separator}' or '{terminator}' after list element, found {kind}"),
+            self.current_pos().0,
+        )
     }
 
     pub(super) fn check(&self, kind: &TokenKind) -> bool {
@@ -1041,9 +1016,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         self.peek_decoded = self.decoded_to_arena();
                     }
                     Err(err) => {
-                        // Store error to be returned on next advance() (unbox: the
-                        // lexer returns Box<ParseError>, `lexer_error` is ParseError).
-                        self.lexer_error = Some(*err);
+                        // Store error to be returned on next advance().
+                        self.lexer_error = Some(err);
                     }
                 }
                 break;
@@ -1325,12 +1299,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     #[cold]
     #[inline(never)]
     fn unexpected_token_err(&self, kind: &TokenKind) -> ParseError {
-        ParseError::UnexpectedToken {
-            expected: kind.to_string(),
-            found: self.current.kind.to_string(),
-            position: self.current_pos().0,
-            context: None,
-        }
+        ParseError::unexpected_token(
+            kind.to_string(),
+            self.current.kind.to_string(),
+            self.current_pos().0,
+        )
     }
 
     /// Expect `>` in type context, handling compound token splitting
@@ -1403,12 +1376,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.peek_decoded = None;
                 Ok(())
             }
-            _ => Err(ParseError::UnexpectedToken {
-                expected: "'>'".to_string(),
-                found: format!("'{}'", self.current.kind),
-                position: self.current_pos().0,
-                context: None,
-            }),
+            _ => Err(ParseError::unexpected_token(
+                "'>'".to_string(),
+                format!("'{}'", self.current.kind),
+                self.current_pos().0,
+            )),
         }
     }
 
@@ -1436,12 +1408,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.current.kind = TokenKind::LessThan;
                 Ok(())
             }
-            _ => Err(ParseError::UnexpectedToken {
-                expected: "'<'".to_string(),
-                found: format!("'{}'", self.current.kind),
-                position: self.current_pos().0,
-                context: None,
-            }),
+            _ => Err(ParseError::unexpected_token(
+                "'<'".to_string(),
+                format!("'{}'", self.current.kind),
+                self.current_pos().0,
+            )),
         }
     }
 

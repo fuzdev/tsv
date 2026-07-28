@@ -112,15 +112,35 @@ pub(crate) fn is_string_literal(expr: &internal::Expression<'_>) -> bool {
 /// Pure property chains like `obj.a.b.c` or `obj!.a!.b!` should use fluid assignment wrapping
 /// (break after `=` if doesn't fit). Expressions containing calls, objects,
 /// arrays, or ternaries handle their own wrapping internally.
+///
+/// **At least one member link is required** — a bare `x` / `this` / `x!` is a chain *root*,
+/// not a chain, exactly as prettier's `isPoorlyBreakableMemberOrCallChain` opens on
+/// `isMemberish`. Answering `true` for a lone root made every `const a = x` pick
+/// break-after-operator, which renders identically whenever the value can't force a break —
+/// so the over-approximation stayed invisible until a value that *does* force one arrived
+/// (a glued preserved multi-line comment), and then it hung a value prettier leaves inline.
+/// The two questions are split below so the entry point cannot answer the root's.
 pub(crate) fn is_pure_property_chain(expr: &internal::Expression<'_>) -> bool {
     match expr {
-        // A member expression is a property chain if its object is also a pure chain
-        internal::Expression::MemberExpression(member) => is_pure_property_chain(member.object),
+        // One link, plus a pure-chain root beneath it
+        internal::Expression::MemberExpression(member) => is_property_chain_root(member.object),
         // TSNonNullExpression is transparent - recurse through it
         internal::Expression::TSNonNullExpression(non_null) => {
             is_pure_property_chain(non_null.expression)
         }
-        // Base case: identifiers, this, super are valid chain roots
+        _ => false,
+    }
+}
+
+/// Whether `expr` can sit at the bottom of a [`is_pure_property_chain`] — the chain's own
+/// links, or the identifier / `this` / `super` they bottom out in.
+fn is_property_chain_root(expr: &internal::Expression<'_>) -> bool {
+    match expr {
+        internal::Expression::MemberExpression(member) => is_property_chain_root(member.object),
+        // TSNonNullExpression is transparent - recurse through it
+        internal::Expression::TSNonNullExpression(non_null) => {
+            is_property_chain_root(non_null.expression)
+        }
         internal::Expression::Identifier(_)
         | internal::Expression::ThisExpression(_)
         | internal::Expression::Super(_) => true,
@@ -300,45 +320,6 @@ pub(crate) fn is_multiline_template_expression(expr: &internal::Expression<'_>) 
         }
         _ => false,
     }
-}
-
-/// Check if there's a newline immediately before a position (skipping spaces/tabs).
-///
-/// Walks backwards from `pos` in the source, skipping horizontal whitespace.
-/// Returns true if a newline is found before any non-whitespace character.
-///
-/// Mirrors Prettier's `!hasNewline(text, locStart(node), { backwards: true })`
-/// used by `isTemplateOnItsOwnLine` to detect if a template literal was placed
-/// on its own line by the author.
-pub(crate) fn has_newline_before_position(source: &str, pos: u32) -> bool {
-    let pos = pos as usize;
-    for &b in source.as_bytes()[..pos].iter().rev() {
-        match b {
-            b' ' | b'\t' => continue,
-            b'\n' | b'\r' => return true,
-            _ => return false,
-        }
-    }
-    false
-}
-
-/// Check if there's a newline immediately after a position (skipping spaces/tabs).
-///
-/// Walks forward from `pos` in the source, skipping horizontal whitespace.
-/// Returns true if a newline is found before any non-whitespace character.
-///
-/// Mirrors Prettier's `hasNewline(text, locEnd(comment))` used by
-/// `printLeadingComment` to choose the separator after a leading block comment.
-pub(crate) fn has_newline_after_position(source: &str, pos: u32) -> bool {
-    let pos = pos as usize;
-    for &b in &source.as_bytes()[pos..] {
-        match b {
-            b' ' | b'\t' => continue,
-            b'\n' | b'\r' => return true,
-            _ => return false,
-        }
-    }
-    false
 }
 
 /// Check if an expression contains multiline content (e.g., line continuation strings)

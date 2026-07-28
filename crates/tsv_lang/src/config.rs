@@ -44,6 +44,14 @@ pub enum LayoutMode {
 /// tsv_svelte) constructs it when invoking an embedded language's printer.
 /// Defaults to a standalone, column-0, no-suffix, no-base-offset layout.
 ///
+/// ⚠️ **Read at render, not at doc-build.** The three width fields are consumed by the
+/// renderer, so they act only on the context handed to `arena_print_doc_*`. The context
+/// handed to a `build_*_doc` call reaches nothing but [`LayoutMode`]: that doc is rendered
+/// later, under whatever context its host passes — so a width set there is inert, and a
+/// layout choice that looks keyed to one is really keyed to `mode`. (Same reason a
+/// build-time `current_column()` is always 0: build-time width state is disconnected from
+/// the render column, and only `fits()` knows it.)
+///
 /// Deliberately lifetime-free and `Copy`: borrowed per-document inputs
 /// (source, comments, the `line_breaks` table) travel as separate parameters
 /// on the embedding entry points — folding one in here would force a lifetime
@@ -58,12 +66,20 @@ pub struct EmbedContext {
     /// Used when formatting expressions that start mid-line (e.g.,
     /// `{#each expr as item}`). The expression starts at column
     /// `first_line_offset`, not column 0.
+    ///
+    /// Its live effect is as a **gate**, not an offset: it is the column past which
+    /// `suffix_width` is reserved, and (in `write_indentation`) the flag that a
+    /// `base_indent_offset` applies at all. So with `suffix_width: 0` it does nothing on its
+    /// own, and the two retire together.
     pub first_line_offset: usize,
     /// Expected suffix width after the expression (default: 0).
     /// Used when formatting expressions followed by known suffix text
     /// (e.g., ` as item}...`). Reduces the effective line width for wrapping
     /// decisions.
-    // TODO: delete once the doc-tree embedding migration makes lookahead native.
+    // TODO: delete once the doc-tree embedding migration makes lookahead native. Nonzero at
+    // four producers, all handing a local context straight to a render call: tsv_svelte's
+    // empty-`<script></script>` closing tag, and tsv_css's selector (x2) + at-rule-prelude
+    // writers (which also carry it as a fill's `trailing_reserve`, since fills don't read it).
     pub suffix_width: usize,
     /// How the renderer should treat the outer doc — see [`LayoutMode`].
     pub mode: LayoutMode,

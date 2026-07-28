@@ -1,0 +1,236 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 340,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 183,
+				"data": " Multiple inline children in a multiline inline parent: the void element and the text after it\n     are isolated by an authored newline, which flows back onto the content line "
+			},
+			{
+				"type": "Text",
+				"start": 183,
+				"end": 184,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 184,
+				"end": 339,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 185
+					},
+					"end": {
+						"line": 3,
+						"column": 4,
+						"character": 188
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 189,
+							"end": 191,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 191,
+							"end": 332,
+							"name": "label",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 2,
+									"character": 192
+								},
+								"end": {
+									"line": 4,
+									"column": 7,
+									"character": 197
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 198,
+									"end": 206,
+									"name": "for",
+									"name_loc": {
+										"start": {
+											"line": 4,
+											"column": 8,
+											"character": 198
+										},
+										"end": {
+											"line": 4,
+											"column": 11,
+											"character": 201
+										}
+									},
+									"value": [
+										{
+											"start": 203,
+											"end": 205,
+											"type": "Text",
+											"raw": "id",
+											"data": "id"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 207,
+									"end": 270,
+									"name": "class",
+									"name_loc": {
+										"start": {
+											"line": 4,
+											"column": 17,
+											"character": 207
+										},
+										"end": {
+											"line": 4,
+											"column": 22,
+											"character": 212
+										}
+									},
+									"value": [
+										{
+											"start": 214,
+											"end": 269,
+											"type": "Text",
+											"raw": "class1 class2 class3 class4 class5 class6 class7 class8",
+											"data": "class1 class2 class3 class4 class5 class6 class7 class8"
+										}
+									]
+								},
+								{
+									"type": "Attribute",
+									"start": 271,
+									"end": 288,
+									"name": "data-attr",
+									"name_loc": {
+										"start": {
+											"line": 4,
+											"column": 81,
+											"character": 271
+										},
+										"end": {
+											"line": 4,
+											"column": 90,
+											"character": 280
+										}
+									},
+									"value": [
+										{
+											"start": 282,
+											"end": 287,
+											"type": "Text",
+											"raw": "value",
+											"data": "value"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 289,
+										"end": 292,
+										"raw": "\n\t\t",
+										"data": "\n\t\t"
+									},
+									{
+										"type": "RegularElement",
+										"start": 292,
+										"end": 317,
+										"name": "input",
+										"name_loc": {
+											"start": {
+												"line": 5,
+												"column": 3,
+												"character": 293
+											},
+											"end": {
+												"line": 5,
+												"column": 8,
+												"character": 298
+											}
+										},
+										"attributes": [
+											{
+												"type": "Attribute",
+												"start": 299,
+												"end": 314,
+												"name": "type",
+												"name_loc": {
+													"start": {
+														"line": 5,
+														"column": 9,
+														"character": 299
+													},
+													"end": {
+														"line": 5,
+														"column": 13,
+														"character": 303
+													}
+												},
+												"value": [
+													{
+														"start": 305,
+														"end": 313,
+														"type": "Text",
+														"raw": "checkbox",
+														"data": "checkbox"
+													}
+												]
+											}
+										],
+										"fragment": {
+											"type": "Fragment",
+											"nodes": []
+										}
+									},
+									{
+										"type": "Text",
+										"start": 317,
+										"end": 324,
+										"raw": " text\n\t",
+										"data": " text\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 332,
+							"end": 333,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

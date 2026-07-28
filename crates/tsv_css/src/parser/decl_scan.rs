@@ -275,7 +275,7 @@ fn scan_rule_or_declaration_tokens(source: &str, from: usize) -> Result<bool, Pa
     // `u32` so an unbalanced close saturates at zero — see `scan_value_tokens`.
     let mut paren: u32 = 0;
     loop {
-        let token = lexer.next_token().map_err(|err| *err)?;
+        let token = lexer.next_token()?;
         match token.kind {
             TokenKind::LeftParen => paren += 1,
             TokenKind::RightParen => paren = paren.saturating_sub(1),
@@ -711,7 +711,7 @@ fn scan_value_tokens(source: &str, value_start: usize) -> Result<ValueFacts, Par
     // The terminator token's own start — where the parser re-seats its lexer. At EOF the
     // token is zero-width at end-of-source, so the same field serves both exits.
     let (terminator, terminator_kind) = loop {
-        let token = lexer.next_token().map_err(|err| *err)?;
+        let token = lexer.next_token()?;
         let decoded = lexer.decoded_str();
         if token.kind == TokenKind::Eof {
             break (token.start as usize, TerminatorKind::Eof);

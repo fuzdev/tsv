@@ -10,13 +10,11 @@
 	See README.
 -->
 <p>
-	alpha bravo charlie delta echo foxtrot golf hotel india
-	<Comp>preferences</Comp> and set <Comp>example.dev</Comp> as one exception here plus a little more
-	text
+	alpha bravo charlie delta echo foxtrot golf hotel india <Comp>preferences</Comp> and set
+	<Comp>example.dev</Comp> as one exception here plus a little more text
 </p>
 
 <p>
-	alpha bravo charlie delta echo foxtrot golf hotel india
-	<Comp>preferences</Comp> and sett <Comp>example.dev</Comp> as one exception here plus a little
-	more text
+	alpha bravo charlie delta echo foxtrot golf hotel india <Comp>preferences</Comp> and sett
+	<Comp>example.dev</Comp> as one exception here plus a little more text
 </p>

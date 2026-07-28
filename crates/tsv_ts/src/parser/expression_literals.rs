@@ -373,11 +373,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             } else if self.check(&TokenKind::BracketClose) {
                 break;
             } else {
-                return Err(ParseError::InvalidExpression {
-                    found: format!("'{}'", self.current_kind()),
-                    position: self.current_pos().0,
-                    context: None,
-                });
+                return Err(ParseError::invalid_expression(
+                    format!("'{}'", self.current_kind()),
+                    self.current_pos().0,
+                ));
             }
         }
 

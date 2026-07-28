@@ -140,7 +140,7 @@ cargo install cargo-watch  # optional, for `deno task dev`
 
 Parser auto-detected from extension (`.ts`/`.svelte`/`.css`). `--content` and `--stdin` modes require `--parser svelte|typescript|css`.
 
-`format` writes paths **in place** (only when output differs) and prints changed paths to stdout; `--content`/`--stdin` print formatted source to stdout. Directories recurse over the JS/TS family (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`, all parsed as TypeScript — JSX/TSX is out of scope), `.svelte`, and `.css` with gitignore-aware, reproducible discovery (see [Configuration](#configuration); full rules in ./docs/cli.md §Multi-File Formatting); an explicitly named file argument bypasses the ignore files. `--list` prints the discovered in-scope files without formatting (path mode only; an empty scope still exits 0). Files format in parallel (`--jobs N` overrides the thread count; path mode only). Exit codes: 0 clean, 1 would-change (`--check`, which also works with `--content`/`--stdin`), 2 errors; missing path args fail the run upfront, while per-file and traversal errors report and continue.
+`format` writes paths **in place** (only when output differs) and prints changed paths to stdout; `--content`/`--stdin` print formatted source to stdout. Directories recurse over the JS/TS family (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`, all parsed as TypeScript — JSX/TSX is out of scope), `.svelte`, and `.css` with gitignore-aware, reproducible discovery (see [Configuration](#configuration); full rules in ./docs/cli.md §Multi-File Formatting); an explicitly named file argument bypasses the ignore files. `--list` prints the discovered in-scope files without formatting (path mode only; an empty scope still exits 0). Files format in parallel (`--jobs N` overrides the thread count; path mode only). The default worker count is `min(logical CPUs, ceil(1.5 × physical cores))` — not one per logical CPU, since the work doesn't scale onto SMT siblings and surplus workers compete with the discovery walk for cores; on a machine without SMT it is the logical count unchanged. Exit codes: 0 clean, 1 would-change (`--check`, which also works with `--content`/`--stdin`), 2 errors; missing path args fail the run upfront, while per-file and traversal errors report and continue.
 
 ```bash
 cargo run -p tsv_cli parse file.ts                                       # compact JSON
@@ -498,7 +498,7 @@ There is no runtime configuration. Print width / tab width / indent are compile-
 
 One type carries genuine per-input *state* (not configuration), threaded only where it varies:
 
-- `tsv_lang::EmbedContext { base_indent_offset, first_line_offset, suffix_width, mode: LayoutMode }` — embedding state for nested formatting (CSS in `<style>`, Svelte template expressions). `LayoutMode { Standalone, Embedded }` controls binary-expression indent style.
+- `tsv_lang::EmbedContext { base_indent_offset, first_line_offset, suffix_width, mode: LayoutMode }` — embedding state for nested formatting (CSS in `<style>`, Svelte template expressions). `LayoutMode { Standalone, Embedded }` controls binary-expression indent style. The three width fields are read at **render** (they act only on the context passed to an `arena_print_doc_*` call); on the context passed to a `build_*_doc` call only `mode` survives, so a width set there is inert.
 
 TypeScript formatting is identical for standalone `.ts` and Svelte-embedded TS, so there is a single entry point:
 
@@ -1087,7 +1087,7 @@ the gap via `blank_scan_start` / `blank_scan_end`, not just the ones this caller
 that *reassembles* a node instead of routing through `build_expression_doc` must claim it
 on its own seam (`prepend_owned_leading_comment_at`); (2) an owned comment travels
 *inside* its node's doc, so the gap around it can't see it — ask the node instead
-(`owned_leading_comment_hangs_value`, the single seam for that question); (3) a region the
+(`owned_leading_comment_effect`, the single seam for that question); (3) a region the
 parser *lifts out* of its container is still inside the container's gap, so two emitters
 print it (`AttrGaps::claimed` is that seam) — and ownership masks it: only a line comment
 (never owned) exposes the double-print; (4) an **alternate-layout container builder** that

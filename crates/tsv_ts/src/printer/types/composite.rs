@@ -18,14 +18,13 @@ use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
 use crate::printer::CommentVec;
-use crate::printer::analysis::has_newline_after_position;
 use crate::printer::layout::{bracketed_list_body, hang_after_operator};
 use smallvec::smallvec;
 use tsv_lang::Comment;
 use tsv_lang::INDENT;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::source_scan::{find_char_skipping_comments, has_newline_after_position};
 
 /// Whether each conditional branch gap holds an alone-on-line format-ignore directive
 /// — the ROUTING verdicts, resolved by `build_conditional_type_doc`'s break gate (the

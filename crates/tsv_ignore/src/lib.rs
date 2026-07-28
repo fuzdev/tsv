@@ -345,13 +345,18 @@ impl IgnoreStack {
     }
 }
 
-/// Split a `/`-separated path into its meaningful segments, dropping empty and
-/// `.` components (so `""`, `"."`, `"a//b"`, and `"./a"` all normalize cleanly).
-/// The shared primitive behind every path-to-segments conversion here.
+/// Whether one `/`-delimited component of a path is a meaningful segment. Empty
+/// and `.` components are dropped, so `""`, `"."`, `"a//b"`, and `"./a"` all
+/// normalize cleanly. The single definition of "segment" — every
+/// path-to-segments conversion here filters on this, each keeping its own split
+/// so the hot one ([`path_segments`]) is free to pre-size.
+fn is_segment(component: &str) -> bool {
+    !component.is_empty() && component != "."
+}
+
+/// A `/`-separated path's meaningful segments.
 fn split_segments(path: &str) -> Vec<&str> {
-    path.split('/')
-        .filter(|s| !s.is_empty() && *s != ".")
-        .collect()
+    path.split('/').filter(|s| is_segment(s)).collect()
 }
 
 /// [`split_segments`] into owned segments, for a layer's stored anchor.
@@ -359,11 +364,19 @@ fn split_path(path: &str) -> Vec<String> {
     split_segments(path).into_iter().map(String::from).collect()
 }
 
-/// [`split_segments`] into [`PathSeg`]s, collecting each segment's chars once so
-/// the glob matcher never re-collects them across rules/prefixes. The form every
-/// path query (`is_ignored`, `is_reincluded`) feeds into the matcher.
+/// [`split_segments`] into [`PathSeg`]s — the form every path query
+/// (`is_ignored`, `is_ignored_leaf`, `is_reincluded`) feeds into the matcher.
+///
+/// Built in **one** pre-sized pass, unlike [`split_path`]: this runs per file
+/// *and* per ancestor prefix during discovery, where neither collecting an
+/// intermediate `Vec<&str>` first (`PathSeg` is wider, so `collect` cannot reuse
+/// that allocation) nor the doubling growth chain is worth paying for. The
+/// separator count is an upper bound — empty and `.` components only make it
+/// slack.
 fn path_segments(path: &str) -> Vec<PathSeg<'_>> {
-    split_segments(path).into_iter().map(PathSeg::new).collect()
+    let mut segments = Vec::with_capacity(path.bytes().filter(|&b| b == b'/').count() + 1);
+    segments.extend(path.split('/').filter(|s| is_segment(s)).map(PathSeg::new));
+    segments
 }
 
 /// Walk `path`'s ancestors top-down, returning `true` as soon as `polarity`
@@ -565,6 +578,16 @@ mod tests {
         let rules = ig("x[a-z].ts\n");
         assert!(rules.is_ignored("xa.ts", false));
         assert!(!rules.is_ignored("xé.ts", false));
+
+        // `*` backtracking advances by whole code points as well — the retry
+        // after a mismatch resumes one *character* past the star, not one byte,
+        // so a multibyte segment neither mis-aligns nor (since the matcher
+        // indexes bytes) lands mid-character.
+        let rules = ig("*.ts\n");
+        assert!(rules.is_ignored("é.ts", false));
+        let rules = ig("x*é.ts\n");
+        assert!(rules.is_ignored("xéé.ts", false));
+        assert!(!rules.is_ignored("xéc.ts", false));
     }
 
     #[test]

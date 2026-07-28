@@ -531,8 +531,7 @@ pub(super) fn node_header_wide_end(
         w.u32(ctx.loc.pos(wire_end));
         return;
     }
-    let (start_pos, start) = ctx.loc.pos_and_position(span.start);
-    let (_, end) = ctx.loc.pos_and_position(span.end);
+    let ((start_pos, start), (_, end)) = ctx.loc.span_positions(span.start, span.end);
     w.raw(",\"start\":");
     w.u32(start_pos);
     w.raw(",\"end\":");
@@ -569,49 +568,54 @@ fn node_header_impl<const CHARACTER: bool>(
         "node type must be escape-free: {node_type:?}"
     );
     record_open(node_type, span, ctx);
-    w.raw("{\"type\":\"");
-    w.raw(node_type);
-    w.raw("\"");
+    w.stage_begin();
+    w.stage_raw("{\"type\":\"");
+    w.stage_raw(node_type);
+    w.stage_raw("\"");
     position_fields::<CHARACTER>(w, span, ctx);
+    w.stage_flush();
 }
 
 /// The `,"start":…,"end":…,"loc":{…}` position fields (final char space) —
 /// the tail of `node_header_impl`, also emitted after a leading `name` for
 /// the Svelte-constructed identifiers whose fields precede the positions.
+///
+/// Emits into the writer's **staged run**, so the caller owns the
+/// `stage_begin` / `stage_flush` pair around it — the whole header reaches the
+/// output buffer as one append (see [`JsonWriter::stage_begin`] for why).
 fn position_fields<const CHARACTER: bool>(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
     if !ctx.emit_loc {
         // `no-locations` variant: offsets only, no `loc` (and no `character`,
         // which lives inside `loc`). Only the byte→char `pos` is needed, so the
         // per-node line/column lookup is skipped entirely.
-        w.raw(",\"start\":");
-        w.u32(ctx.loc.pos(span.start));
-        w.raw(",\"end\":");
-        w.u32(ctx.loc.pos(span.end));
+        w.stage_raw(",\"start\":");
+        w.stage_u32(ctx.loc.pos(span.start));
+        w.stage_raw(",\"end\":");
+        w.stage_u32(ctx.loc.pos(span.end));
         return;
     }
-    let (start_pos, start) = ctx.loc.pos_and_position(span.start);
-    let (end_pos, end) = ctx.loc.pos_and_position(span.end);
-    w.raw(",\"start\":");
-    w.u32(start_pos);
-    w.raw(",\"end\":");
-    w.u32(end_pos);
-    w.raw(",\"loc\":{\"start\":{\"line\":");
-    w.usize(start.line);
-    w.raw(",\"column\":");
-    w.usize(adjusted_column(ctx, span.start, start.line, start.column));
+    let ((start_pos, start), (end_pos, end)) = ctx.loc.span_positions(span.start, span.end);
+    w.stage_raw(",\"start\":");
+    w.stage_u32(start_pos);
+    w.stage_raw(",\"end\":");
+    w.stage_u32(end_pos);
+    w.stage_raw(",\"loc\":{\"start\":{\"line\":");
+    w.stage_usize(start.line);
+    w.stage_raw(",\"column\":");
+    w.stage_usize(adjusted_column(ctx, span.start, start.line, start.column));
     if CHARACTER {
-        w.raw(",\"character\":");
-        w.u32(start_pos);
+        w.stage_raw(",\"character\":");
+        w.stage_u32(start_pos);
     }
-    w.raw("},\"end\":{\"line\":");
-    w.usize(end.line);
-    w.raw(",\"column\":");
-    w.usize(adjusted_column(ctx, span.end, end.line, end.column));
+    w.stage_raw("},\"end\":{\"line\":");
+    w.stage_usize(end.line);
+    w.stage_raw(",\"column\":");
+    w.stage_usize(adjusted_column(ctx, span.end, end.line, end.column));
     if CHARACTER {
-        w.raw(",\"character\":");
-        w.u32(end_pos);
+        w.stage_raw(",\"character\":");
+        w.stage_u32(end_pos);
     }
-    w.raw("}}");
+    w.stage_raw("}}");
 }
 
 /// Emit `,"typeParameters":<declaration>` when present (skip-if-none field).
@@ -830,7 +834,11 @@ pub(super) fn write_identifier_parts_with_character(
     record_open("Identifier", span, ctx);
     w.raw("{\"type\":\"Identifier\",\"name\":");
     write_name(w, name, span.start, ctx);
+    // `name` is escape-sensitive and precedes the positions, so it can't join
+    // the staged run — the run opens after it and covers the positions alone.
+    w.stage_begin();
     position_fields::<true>(w, span, ctx);
+    w.stage_flush();
     write_identifier_tail(w, span, optional, type_annotation, decorators, ctx);
 }
 

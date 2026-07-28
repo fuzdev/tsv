@@ -317,8 +317,8 @@ fn write_root_comment(w: &mut JsonWriter, comment: &Comment, ctx: &Ctx<'_>) {
         w.raw("}");
         return;
     }
-    let start_pos = ctx.loc.pos_and_position(comment.span.start).1;
-    let end_pos = ctx.loc.pos_and_position(comment.span.end).1;
+    let ((_, start_pos), (_, end_pos)) =
+        ctx.loc.span_positions(comment.span.start, comment.span.end);
     // The block-pattern synthetic-`(` column shift (`bump_pattern_columns`);
     // a multiline block comment's `end` sits on an unshifted later line.
     let bump = usize::from(comment.bump_pattern_columns);
@@ -393,8 +393,8 @@ fn write_generic_island(
 /// The shared `NameLocation` shape: `start`/`end` each `{line, column, character}`
 /// (all three, always). Char-space via one fused translation per endpoint.
 fn write_name_loc(w: &mut JsonWriter, span: Span, ctx: &Ctx<'_>) {
-    let (start_char, start_pos) = ctx.loc.pos_and_position(span.start);
-    let (end_char, end_pos) = ctx.loc.pos_and_position(span.end);
+    let ((start_char, start_pos), (end_char, end_pos)) =
+        ctx.loc.span_positions(span.start, span.end);
     w.raw("{\"start\":{\"line\":");
     w.usize(start_pos.line);
     w.raw(",\"column\":");
@@ -839,13 +839,18 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"identifiers\":");
-    if tag.identifiers.len() > 1 && ctx.any_comment_in(tag.span.start, tag.span.end) {
+    // `[first, .., last]` is the multi-identifier case AND the wrapper's own bounds: the
+    // discarded `SequenceExpression` spans first identifier to last, and a single identifier
+    // (which the pattern excludes) has no wrapper at all.
+    if let [first, .., last] = tag.identifiers
+        && ctx.any_comment_in(tag.span.start, tag.span.end)
+    {
         let wc = build_expression_list_writer_comments(
             tag.identifiers,
             ctx.attach(),
             tag.span.start,
             tag.span.end,
-            tag.identifiers.last().map(|id| id.span().end),
+            Some(Span::new(first.span().start, last.span().end)),
         );
         write_array(w, tag.identifiers, |w, id| {
             write_expression_embedded(w, id, ctx.embed(CommentMode::Emit(&wc)));

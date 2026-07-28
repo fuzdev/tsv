@@ -380,12 +380,35 @@ impl<'a> Printer<'a> {
         continuation_start: u32,
         continuation: DocId,
     ) -> DocId {
+        self.build_keyword_header_doc_with(words, start, continuation_start, |_| continuation)
+    }
+
+    /// [`Self::build_keyword_header_doc`] for a caller whose continuation depends on where
+    /// the keyword ENDS — `build_continuation` is handed the offset just past its final
+    /// word, the start of the keyword→continuation gap.
+    ///
+    /// That gap is a **freeze head**: an own-line format-ignore directive in it claims the
+    /// whole continuation ([`Printer::value_head_frozen_span`]), which is a question about
+    /// the continuation's own doc and so has to be answered before it is built. Without
+    /// this the header's shape gets respelled at the call site just to hold `keyword_end`
+    /// — which is how `export =` drifted from its twin `export default`.
+    pub(crate) fn build_keyword_header_doc_with(
+        &self,
+        words: &[&'static str],
+        start: u32,
+        continuation_start: u32,
+        build_continuation: impl FnOnce(u32) -> DocId,
+    ) -> DocId {
         let d = self.d();
         let (keyword_doc, keyword_end) =
             self.build_keyword_words_doc(words, start, continuation_start);
         d.concat(&[
             keyword_doc,
-            self.build_keyword_to_name_continuation(keyword_end, continuation_start, continuation),
+            self.build_keyword_to_name_continuation(
+                keyword_end,
+                continuation_start,
+                build_continuation(keyword_end),
+            ),
         ])
     }
 
@@ -462,6 +485,28 @@ impl<'a> Printer<'a> {
             .concat(&[self.build_comments_between(start, end, spacing), tail])
     }
 
+    /// The keyword's words joined by one space, with its end *measured* rather than
+    /// located — the shape used where the words cannot be located: the source does not
+    /// hold them, or there is no window of source to hold them in.
+    ///
+    /// It assumes exactly one space per interior gap, so it scans no gap and can emit
+    /// no interior comment. Every caller must therefore have established that there is
+    /// none to emit — which an empty window proves, and which the located path below
+    /// makes unnecessary.
+    fn measured_keyword_doc(&self, words: &[&'static str], start: u32) -> (DocId, u32) {
+        let d = self.d();
+        let mut parts: DocBuf = DocBuf::new();
+        for (i, w) in words.iter().enumerate() {
+            if i > 0 {
+                parts.push(d.text(" "));
+            }
+            parts.push(d.text(w));
+        }
+        let width: u32 = words.iter().map(|w| w.len() as u32).sum();
+        let measured = start + width + words.len() as u32 - 1;
+        (d.concat(&parts), measured)
+    }
+
     /// Build a **multi-word keyword** (`export default`, `await using`, `declare
     /// const`, `export as namespace`), preserving a comment authored in one of its
     /// interior gaps.
@@ -487,28 +532,6 @@ impl<'a> Printer<'a> {
     /// `search_end` do: every caller bounds the search at the token before the
     /// continuation, and no operator can occur in that gap. A caller that widens those
     /// bounds must re-check that itself.
-    /// The keyword's words joined by one space, with its end *measured* rather than
-    /// located — the shape used where the words cannot be located: the source does not
-    /// hold them, or there is no window of source to hold them in.
-    ///
-    /// It assumes exactly one space per interior gap, so it scans no gap and can emit
-    /// no interior comment. Every caller must therefore have established that there is
-    /// none to emit — which an empty window proves, and which the located path below
-    /// makes unnecessary.
-    fn measured_keyword_doc(&self, words: &[&'static str], start: u32) -> (DocId, u32) {
-        let d = self.d();
-        let mut parts: DocBuf = DocBuf::new();
-        for (i, w) in words.iter().enumerate() {
-            if i > 0 {
-                parts.push(d.text(" "));
-            }
-            parts.push(d.text(w));
-        }
-        let width: u32 = words.iter().map(|w| w.len() as u32).sum();
-        let measured = start + width + words.len() as u32 - 1;
-        (d.concat(&parts), measured)
-    }
-
     pub(crate) fn build_keyword_words_doc(
         &self,
         words: &[&'static str],
@@ -664,19 +687,12 @@ impl<'a> Printer<'a> {
         if has_line { d.indent(body) } else { body }
     }
 
-    /// One header gap — the comments authored in it plus the separator that follows —
-    /// with **no** `indent` applied. Also reports whether a *line* comment ended the
-    /// line, which is the caller's cue that a break happened.
-    ///
-    /// Split out from [`build_keyword_to_name_continuation`](Self::build_keyword_to_name_continuation)
-    /// so a caller with *several* gaps can emit each one and then decide **once** what
-    /// to indent. Indenting per gap compounds: two broken gaps would put the keyword's
-    /// last word two levels deep, below the value that follows it at one.
-    ///
-    /// Whether a declaration-header gap ENDS ON ITS OWN LINE — the one predicate behind both
-    /// [`Self::build_keyword_gap_doc`]'s broken-and-indented layout and any caller that must
+    /// Whether a header gap ENDS ON ITS OWN LINE — the one predicate behind
+    /// [`Self::build_keyword_gap_doc`]'s broken-and-indented layout, any caller that must
     /// stop supplying its own continuation indent because this gap's `indent` already covers
-    /// it (the multi-declarator variable list).
+    /// it (the multi-declarator variable list), and any caller that must choose a *breaking*
+    /// header layout because this gap's comment needs a line of its own (the for-in/for-of
+    /// header's `(`→binding region).
     ///
     /// A line comment breaks the gap, and so does an honored format-ignore directive in
     /// either spelling: [`Self::build_header_comment_run`] ends it on its own line, because
@@ -805,7 +821,7 @@ impl<'a> Printer<'a> {
             // instead of a flag threaded through nine header call sites, and no position can
             // be silently disqualified before its cluster reaches it. The layout cost is
             // fixtured (`keyword_gap_prettier_ignore_own_line_prettier_divergence`).
-            if self.has_format_ignore && self.is_honored_directive(comment) {
+            if self.is_honored_directive(comment) {
                 if !at_line_start {
                     parts.push(d.hardline());
                 }

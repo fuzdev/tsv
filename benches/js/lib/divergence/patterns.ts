@@ -1988,6 +1988,91 @@ const forced_continuation_indent: DivergencePattern = {
 	}
 };
 
+const inline_sibling_newline_flow: DivergencePattern = {
+	id: 'inline_sibling_newline_flow',
+	description:
+		'tsv flows an inline sibling isolated by authored newlines back onto the content line (Svelte 5 collapses the inter-sibling run to one space, so the SPELLING of the separator carries no signal); prettier keeps the authored newline',
+	languages: ['svelte'],
+	conformance_sections: ['Svelte: Inline content block-style'],
+	fixtures: [
+		'svelte/elements/inline_sibling_newline_flow_prettier_divergence',
+		'svelte/expressions/angle_escaped_prettier_divergence'
+	],
+	// NOT a char-frequency alterer: the rule respells a separator (newline -> space) and
+	// never adds or drops a semantic character. Left at the default `false` so it can
+	// explain a hunk for bucketing but can never vouch for a SAFETY differential.
+	detect(ctx) {
+		if (ctx.language !== 'svelte') return null;
+
+		const ours_regions = ctx.ours_code_regions ?? [];
+		const prettier_regions = ctx.prettier_code_regions ?? [];
+
+		// A blank line is an authored separator the flow rule never crosses — it is one of
+		// the rule's documented exclusions — so a hunk carrying one on either side is not
+		// this pattern's business. Declining outright is also what keeps the weld below
+		// honest: dropping blanks before welding would let an EATEN blank line satisfy the
+		// equality (`A⏎⏎B` and `A B` both weld to `A B`), absorbing a real authoring-intent
+		// change into a layout claim.
+		const has_blank_line = (lines: string[]): boolean => lines.some((l) => l.trim().length === 0);
+
+		// The normalized form both checks below read. Safe to compare directly once the
+		// blank-line guard above has run: every line carries content.
+		const trimmed_lines = (lines: string[]): string[] => lines.map((l) => l.trim());
+
+		// FAMILY SIGNATURE: at least one welded seam must sit at a sibling boundary — the
+		// left line ends a tag/expression (`>` or `}`) or the right line opens one (`<` or
+		// `{`). A pure prose rewrap has neither and belongs to the fill patterns.
+		const opens_tag = /^[<{]/;
+		const has_sibling_seam = (trimmed: string[]): boolean =>
+			trimmed.some(
+				(left, i) =>
+					i + 1 < trimmed.length &&
+					(left.endsWith('>') || left.endsWith('}') || opens_tag.test(trimmed[i + 1]))
+			);
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			// A hunk inside <script>/<style> is program/string bytes, never a template
+			// separator — refuse it outright. Checked per side against that side's own
+			// line ranges, since the diff shifts them independently.
+			if (
+				overlaps_code_region(hunk.ours_range, ours_regions) ||
+				overlaps_code_region(hunk.prettier_range, prettier_regions)
+			) {
+				return false;
+			}
+			if (hunk.added_lines.length === 0 || hunk.removed_lines.length === 0) return false;
+			// DIRECTIONAL: flowing collapses lines, so ours must be the shorter side. This
+			// pattern never claims a hunk where ours is the side that BROKE.
+			if (hunk.added_lines.length >= hunk.removed_lines.length) return false;
+			if (has_blank_line(hunk.removed_lines) || has_blank_line(hunk.added_lines)) return false;
+
+			const prettier_trimmed = trimmed_lines(hunk.removed_lines);
+			if (!has_sibling_seam(prettier_trimmed)) return false;
+
+			// CONTENT-PRESERVATION PROOF: welding each side's trimmed lines with a single
+			// space yields the same string. The rule's whole effect is respelling a line
+			// boundary as the space it already renders as, so both spellings weld to one
+			// form; anything else fails. A dropped or added character fails it, and so does
+			// a change in intra-line spacing (the weld normalizes only at line boundaries,
+			// never inside a line) — which is what keeps this strictly narrower than a
+			// `strip_all_ws` equality. Crucially it also fails on the GLUE direction
+			// (prettier `A⏎B` vs ours `AB`, no separator at all): that welds to `A B`
+			// against `AB`, so a formatter that ate an inter-sibling space is never
+			// absorbed here.
+			return prettier_trimmed.join(' ') === trimmed_lines(hunk.added_lines).join(' ');
+		});
+
+		if (hunk_indices.length === 0) return null;
+		return {
+			pattern: 'inline_sibling_newline_flow',
+			confidence: 'likely',
+			hunk_indices,
+			reason:
+				'inline sibling flowed back onto the content line (the authored newline respelled as the space it renders as); prettier keeps the newline'
+		};
+	}
+};
+
 const inline_content_block_style: DivergencePattern = {
 	id: 'inline_content_block_style',
 	description:
@@ -2009,14 +2094,25 @@ const inline_content_block_style: DivergencePattern = {
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
-		// SAFETY GATE — the whole ours/prettier difference is whitespace-only, so no
-		// content can be lost: this is provably a pure-layout reflow. A single
-		// non-whitespace difference anywhere (a dropped comment, a normalized quote, a
-		// real content change) fails the gate and disables the detector, so it can
-		// never mask a content loss. This content-preservation proof is also what
-		// makes claiming the whole diff below sound: there is provably nothing hidden
-		// in any hunk, unlike a width/property heuristic that only inspects one line.
-		if (strip_all_ws(ctx.ours) !== strip_all_ws(ctx.prettier)) return null;
+		// SAFETY GATE — a claim is admissible only where the ours/prettier text carries the
+		// same non-whitespace characters in the same order, so "pure-layout reflow" is
+		// proven rather than plausible and a real content change (a dropped comment, a
+		// normalized quote) can never be absorbed. Held at two scopes, because the scope
+		// decides how far one relocation may be claimed to reach:
+		//   - WHOLE FILE — nothing is hidden in ANY hunk, so the reflow may claim the whole
+		//     diff (see the claim below: its relocated content and dangled delimiters land
+		//     in separate, sometimes non-adjacent hunks).
+		//   - otherwise — some OTHER pattern's char-changing divergence coexists in the file
+		//     (`self_closing_nonvoid`'s `<i />` → `<i></i>` beside this reflow, the
+		//     `prettier/tests/format/html/tags/tags.html` shape). Disabling the detector
+		//     wholesale there left this pattern's own hunks unexplained and collapsed
+		//     `safety_vouched` on a file where every hunk was separately sanctioned — a
+		//     gated SAFETY violation with no formatter change. So fall back to the same
+		//     proof applied PER HUNK: strictly local, and for the hunk it claims strictly
+		//     stronger than the whole-file form.
+		const file_ws_only = strip_all_ws(ctx.ours) === strip_all_ws(ctx.prettier);
+		const hunk_ws_only = (hunk: DiffHunk): boolean =>
+			strip_all_ws(hunk.removed_lines.join('\n')) === strip_all_ws(hunk.added_lines.join('\n'));
 
 		// FAMILY SIGNATURE — confirm the reflow is the block-style design choice, not
 		// some other whitespace-only difference. Two markers on a CHANGED line, both
@@ -2086,34 +2182,38 @@ const inline_content_block_style: DivergencePattern = {
 		// after `<` excludes a closing `</tag`; the tag-name class admits `:`/`.` /`-`
 		// (`<svelte:element`, `<Foo.Bar`, custom elements) like the dangle markers above.
 		const dangle_open_tag_after_text = /\S[ \t]<[A-Za-z][\w.:-]*(?:[ \t][^<>]*>)?[ \t]*$/;
-		let has_signature = false;
-		for (const hunk of ctx.hunks) {
-			if (
-				hunk.removed_lines
-					.concat(hunk.added_lines)
-					.some((l) => dangle_close.test(l) || dangle_open.test(l)) ||
-				hunk.removed_lines.some((l) => dangle_open_tag_after_text.test(l)) ||
-				hunk.added_lines.some(
-					(l) =>
-						block_head_alone.test(l) ||
-						block_head_at_eol.test(l) ||
-						block_branch_alone.test(l) ||
-						container_tag_alone.test(l)
-				)
-			) {
-				has_signature = true;
-				break;
-			}
-		}
-		if (!has_signature) return null;
+		const has_signature = (hunk: DiffHunk): boolean =>
+			hunk.removed_lines
+				.concat(hunk.added_lines)
+				.some((l) => dangle_close.test(l) || dangle_open.test(l)) ||
+			hunk.removed_lines.some((l) => dangle_open_tag_after_text.test(l)) ||
+			hunk.added_lines.some(
+				(l) =>
+					block_head_alone.test(l) ||
+					block_head_at_eol.test(l) ||
+					block_branch_alone.test(l) ||
+					container_tag_alone.test(l)
+			);
+		const signature_hunks = ctx.hunks.filter(has_signature);
+		if (signature_hunks.length === 0) return null;
 
 		// The reflow is one content-preserving block-style relocation spanning the
 		// whole diff (the relocated content and the dangled delimiters land in
-		// separate, sometimes non-adjacent hunks), so claim every hunk.
+		// separate, sometimes non-adjacent hunks), so claim every hunk. Only the
+		// whole-file proof establishes that span, though — under the per-hunk fallback
+		// a hunk is claimable only on its own evidence: it must carry the signature AND
+		// prove preservation on its own lines. An unrelated whitespace divergence
+		// (verbatim `format-ignore`, `{}` vs `{ }`) therefore still stays unclaimed for
+		// its own detector rather than being absorbed here.
+		const hunk_indices = file_ws_only
+			? ctx.hunks.map((h) => h.index)
+			: signature_hunks.filter(hunk_ws_only).map((h) => h.index);
+		if (hunk_indices.length === 0) return null;
+
 		return {
 			pattern: 'inline_content_block_style',
 			confidence: 'likely',
-			hunk_indices: ctx.hunks.map((h) => h.index),
+			hunk_indices,
 			reason:
 				'inline/block content laid out block-style (tags intact, content on its own line), or an inline element broken before onto a fresh line; prettier dangles the tag delimiters / dangles the opening tag'
 		};
@@ -3103,6 +3203,7 @@ export const PATTERNS: DivergencePattern[] = [
 	// 4. Svelte-specific patterns
 	menu_block,
 	inline_content_hug,
+	inline_sibling_newline_flow,
 	inline_content_block_style,
 	svelte_boundary_ws_trim,
 	fill_after_inline,

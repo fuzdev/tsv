@@ -1,0 +1,618 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 814,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 83,
+				"data": " an own-line directive in a prefixed tag's head gap freezes the whole value "
+			},
+			{
+				"type": "Text",
+				"start": 83,
+				"end": 84,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 84,
+				"end": 125,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 112,
+					"end": 123,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 12
+						}
+					},
+					"left": {
+						"type": "Identifier",
+						"start": 112,
+						"end": 115,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 4
+							}
+						},
+						"name": "aaa"
+					},
+					"operator": "+",
+					"right": {
+						"type": "Identifier",
+						"start": 120,
+						"end": 123,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 9
+							},
+							"end": {
+								"line": 4,
+								"column": 12
+							}
+						},
+						"name": "bbb"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 92,
+							"end": 110
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 125,
+				"end": 127,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 127,
+				"end": 181,
+				"data": " an own-line block comment behaves identically "
+			},
+			{
+				"type": "Text",
+				"start": 181,
+				"end": 182,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 182,
+				"end": 226,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 213,
+					"end": 224,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 12
+						}
+					},
+					"left": {
+						"type": "Identifier",
+						"start": 213,
+						"end": 216,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 4
+							}
+						},
+						"name": "ccc"
+					},
+					"operator": "+",
+					"right": {
+						"type": "Identifier",
+						"start": 221,
+						"end": 224,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 9
+							},
+							"end": {
+								"line": 10,
+								"column": 12
+							}
+						},
+						"name": "ddd"
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " prettier-ignore ",
+							"start": 190,
+							"end": 211
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 226,
+				"end": 228,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 228,
+				"end": 282,
+				"data": " `{@render}` is the same head, one keyword out "
+			},
+			{
+				"type": "Text",
+				"start": 282,
+				"end": 283,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RenderTag",
+				"start": 283,
+				"end": 328,
+				"expression": {
+					"type": "CallExpression",
+					"start": 313,
+					"end": 326,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 14
+						}
+					},
+					"callee": {
+						"type": "Identifier",
+						"start": 313,
+						"end": 315,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 1
+							},
+							"end": {
+								"line": 16,
+								"column": 3
+							}
+						},
+						"name": "fn"
+					},
+					"arguments": [
+						{
+							"type": "Identifier",
+							"start": 320,
+							"end": 323,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 8
+								},
+								"end": {
+									"line": 16,
+									"column": 11
+								}
+							},
+							"name": "eee"
+						}
+					],
+					"optional": false,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 293,
+							"end": 311
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 328,
+				"end": 330,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 330,
+				"end": 382,
+				"data": " `{@attach}` likewise, in attribute position "
+			},
+			{
+				"type": "Text",
+				"start": 382,
+				"end": 383,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 383,
+				"end": 445,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 20,
+						"column": 1,
+						"character": 384
+					},
+					"end": {
+						"line": 20,
+						"column": 4,
+						"character": 387
+					}
+				},
+				"attributes": [
+					{
+						"type": "AttachTag",
+						"start": 389,
+						"end": 437,
+						"expression": {
+							"type": "CallExpression",
+							"start": 421,
+							"end": 434,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 2
+								},
+								"end": {
+									"line": 23,
+									"column": 15
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 421,
+								"end": 423,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 4
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [
+								{
+									"type": "Identifier",
+									"start": 428,
+									"end": 431,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 9
+										},
+										"end": {
+											"line": 23,
+											"column": 12
+										}
+									},
+									"name": "ggg"
+								}
+							],
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 400,
+									"end": 418
+								}
+							]
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 445,
+				"end": 447,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 447,
+				"end": 674,
+				"data": " an ordinary trailing comment coexists with the freeze: its own break drops the `}`,\n\tdedented out of the frozen content, so the head adds no second break and the `}` lands\n\twhere it does with no trailing comment at all "
+			},
+			{
+				"type": "Text",
+				"start": 674,
+				"end": 675,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 675,
+				"end": 728,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 703,
+					"end": 714,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 12
+						}
+					},
+					"left": {
+						"type": "Identifier",
+						"start": 703,
+						"end": 706,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 1
+							},
+							"end": {
+								"line": 32,
+								"column": 4
+							}
+						},
+						"name": "jjj"
+					},
+					"operator": "+",
+					"right": {
+						"type": "Identifier",
+						"start": 711,
+						"end": 714,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 9
+							},
+							"end": {
+								"line": 32,
+								"column": 12
+							}
+						},
+						"name": "kkk"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 683,
+							"end": 701
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " trailing",
+							"start": 715,
+							"end": 726
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 728,
+				"end": 730,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 730,
+				"end": 795,
+				"data": " a sibling tag the freeze does not reach still normalizes "
+			},
+			{
+				"type": "Text",
+				"start": 795,
+				"end": 796,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 796,
+				"end": 813,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 803,
+					"end": 812,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 7
+						},
+						"end": {
+							"line": 36,
+							"column": 16
+						}
+					},
+					"left": {
+						"type": "Identifier",
+						"start": 803,
+						"end": 806,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 7
+							},
+							"end": {
+								"line": 36,
+								"column": 10
+							}
+						},
+						"name": "hhh"
+					},
+					"operator": "+",
+					"right": {
+						"type": "Identifier",
+						"start": 809,
+						"end": 812,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 13
+							},
+							"end": {
+								"line": 36,
+								"column": 16
+							}
+						},
+						"name": "iii"
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 92,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " prettier-ignore ",
+			"start": 190,
+			"end": 211,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 293,
+			"end": 311,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 400,
+			"end": 418,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 683,
+			"end": 701,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trailing",
+			"start": 715,
+			"end": 726,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 13
+				},
+				"end": {
+					"line": 32,
+					"column": 24
+				}
+			}
+		}
+	]
+}

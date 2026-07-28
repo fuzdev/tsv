@@ -8,7 +8,7 @@ use tsv_lang::ParseError;
 /// Numbers: 42, 1.5, .5, -42, +1.5
 /// Percentages: 50%, -100%
 /// Dimensions: 16px, 1.5em, -2.5rem
-pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, Box<ParseError>> {
+pub(crate) fn read_number(source: &str, pos: &mut usize) -> Result<Token, ParseError> {
     let start = *pos;
     let bytes = source.as_bytes();
     let len = bytes.len();

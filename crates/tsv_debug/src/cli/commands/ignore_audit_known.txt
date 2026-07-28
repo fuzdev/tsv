@@ -23,46 +23,21 @@
 # ARE pinned (this is a ratchet over a live bug family, born red).
 #
 # Format: KIND<TAB>POSITION
-# shapes: 57
+# shapes: 25
 UNHONORED	ArrowFunctionExpression.body
 UNHONORED	ArrowFunctionExpression.typeParameters
-UNHONORED	AssignmentExpression.right
 UNHONORED	BinaryExpression.left
 UNHONORED	BinaryExpression.right
-UNHONORED	BindDirective.expression
 UNHONORED	CallExpression.callee
-UNHONORED	ChainExpression.expression
-UNHONORED	ClassDeclaration.body
 UNHONORED	ClassDeclaration.superClass
-UNHONORED	ClassExpression.body
 UNHONORED	ConditionalExpression.alternate
 UNHONORED	ConditionalExpression.consequent
 UNHONORED	ConditionalExpression.test
-UNHONORED	ExportDefaultDeclaration.declaration
-UNHONORED	ExportNamedDeclaration.declaration
-UNHONORED	ExpressionStatement.expression
-UNHONORED	ForInStatement.left
-UNHONORED	ForOfStatement.left
-UNHONORED	ForStatement.init
-UNHONORED	ForStatement.test
-UNHONORED	ForStatement.update
-UNHONORED	IfStatement.alternate
-UNHONORED	IfStatement.consequent
-UNHONORED	IfStatement.test
-UNHONORED	LabeledStatement.body
 UNHONORED	LogicalExpression.left
 UNHONORED	LogicalExpression.right
 UNHONORED	MemberExpression.object
 UNHONORED	NewExpression.callee
-UNHONORED	OnDirective.expression
 UNHONORED	Program.body
-UNHONORED	Property.value
-UNHONORED	PropertyDefinition.value
-UNHONORED	ReturnStatement.argument
-UNHONORED	SequenceExpression.expressions
-UNHONORED	SwitchCase.consequent
-UNHONORED	SwitchStatement.cases
-UNHONORED	SwitchStatement.discriminant
 UNHONORED	TSAsExpression.expression
 UNHONORED	TSImportEqualsDeclaration.moduleReference
 UNHONORED	TSNonNullExpression.expression
@@ -70,14 +45,7 @@ UNHONORED	TSParenthesizedType.typeAnnotation
 UNHONORED	TSTypeAssertion.expression
 UNHONORED	TSTypeLiteral.members
 UNHONORED	TemplateLiteral.expressions
-UNHONORED	ThrowStatement.argument
-UNHONORED	TryStatement.handler
 UNHONORED	UnaryExpression.argument
-UNHONORED	VariableDeclarator.init
-UNHONORED	WhileStatement.test
-UNHONORED	YieldExpression.argument
-UNSTABLE	ClassDeclaration.superClass
 UNSTABLE	MemberExpression.object
 UNSTABLE	TSNonNullExpression.expression
 UNSTABLE	TSUnionType.types
-UNSTABLE	VariableDeclarator.init

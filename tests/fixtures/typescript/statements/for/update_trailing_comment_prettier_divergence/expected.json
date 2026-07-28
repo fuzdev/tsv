@@ -1,0 +1,577 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 285,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " An own-line comment after the update clause keeps its own line before `)`",
+			"start": 10,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 112,
+			"end": 117,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 160,
+			"end": 168,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A comment on the update's own line stays trailing it",
+			"start": 187,
+			"end": 242,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 56
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 259,
+			"end": 267,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 16
+				},
+				"end": {
+					"line": 22,
+					"column": 24
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 284,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 275,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ForStatement",
+					"start": 88,
+					"end": 133,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "Identifier",
+						"start": 96,
+						"end": 97,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 2
+							},
+							"end": {
+								"line": 4,
+								"column": 3
+							}
+						},
+						"name": "a"
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 101,
+						"end": 102,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 5,
+								"column": 3
+							}
+						},
+						"name": "b"
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 106,
+						"end": 109,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 2
+							},
+							"end": {
+								"line": 6,
+								"column": 5
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 106,
+							"end": 107,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 3
+								}
+							},
+							"name": "c"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 121,
+						"end": 133,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 3
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 125,
+								"end": 130,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 125,
+									"end": 129,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 125,
+										"end": 127,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 112,
+								"end": 117
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line comment after the update clause keeps its own line before `)`",
+							"start": 10,
+							"end": 86
+						}
+					]
+				},
+				{
+					"type": "ForStatement",
+					"start": 136,
+					"end": 184,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 2
+						}
+					},
+					"init": {
+						"type": "Identifier",
+						"start": 144,
+						"end": 145,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 2
+							},
+							"end": {
+								"line": 13,
+								"column": 3
+							}
+						},
+						"name": "a"
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 149,
+						"end": 150,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 2
+							},
+							"end": {
+								"line": 14,
+								"column": 3
+							}
+						},
+						"name": "b"
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 154,
+						"end": 157,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 2
+							},
+							"end": {
+								"line": 15,
+								"column": 5
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 154,
+							"end": 155,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 2
+								},
+								"end": {
+									"line": 15,
+									"column": 3
+								}
+							},
+							"name": "c"
+						}
+					},
+					"body": {
+						"type": "BlockStatement",
+						"start": 172,
+						"end": 184,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 3
+							},
+							"end": {
+								"line": 19,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "ExpressionStatement",
+								"start": 176,
+								"end": 181,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 7
+									}
+								},
+								"expression": {
+									"type": "CallExpression",
+									"start": 176,
+									"end": 180,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 6
+										}
+									},
+									"callee": {
+										"type": "Identifier",
+										"start": 176,
+										"end": 178,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 4
+											}
+										},
+										"name": "fn"
+									},
+									"arguments": [],
+									"optional": false
+								}
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Block",
+								"value": " c2 ",
+								"start": 160,
+								"end": 168
+							}
+						]
+					}
+				},
+				{
+					"type": "ForStatement",
+					"start": 244,
+					"end": 274,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 31
+						}
+					},
+					"init": {
+						"type": "Identifier",
+						"start": 249,
+						"end": 250,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 6
+							},
+							"end": {
+								"line": 22,
+								"column": 7
+							}
+						},
+						"name": "a"
+					},
+					"test": {
+						"type": "Identifier",
+						"start": 252,
+						"end": 253,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 9
+							},
+							"end": {
+								"line": 22,
+								"column": 10
+							}
+						},
+						"name": "b"
+					},
+					"update": {
+						"type": "UpdateExpression",
+						"start": 255,
+						"end": 258,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 12
+							},
+							"end": {
+								"line": 22,
+								"column": 15
+							}
+						},
+						"operator": "++",
+						"prefix": false,
+						"argument": {
+							"type": "Identifier",
+							"start": 255,
+							"end": 256,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 12
+								},
+								"end": {
+									"line": 22,
+									"column": 13
+								}
+							},
+							"name": "c"
+						},
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c3 ",
+								"start": 259,
+								"end": 267
+							}
+						]
+					},
+					"body": {
+						"type": "ExpressionStatement",
+						"start": 269,
+						"end": 274,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 26
+							},
+							"end": {
+								"line": 22,
+								"column": 31
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 269,
+							"end": 273,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 26
+								},
+								"end": {
+									"line": 22,
+									"column": 30
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 269,
+								"end": 271,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 26
+									},
+									"end": {
+										"line": 22,
+										"column": 28
+									}
+								},
+								"name": "fn"
+							},
+							"arguments": [],
+							"optional": false
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment on the update's own line stays trailing it",
+							"start": 187,
+							"end": 242
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

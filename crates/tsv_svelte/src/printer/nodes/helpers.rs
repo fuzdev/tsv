@@ -5,7 +5,7 @@
 // used in inline run grouping and multiline formatting decisions.
 
 use crate::ast::internal::{EachBlock, FragmentNode};
-use crate::printer::Printer;
+use crate::printer::{HeadExpr, Printer};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::TAB_WIDTH;
@@ -22,7 +22,7 @@ use tsv_ts::Expression;
 /// (`{#each items /* c */ as item}`) in place rather than relocating it to trail
 /// the collection expression. Shared by the standard and whitespace-sensitive each
 /// builders so the two can't drift.
-pub(crate) fn each_expr_comment_end(block: &EachBlock<'_>) -> u32 {
+pub(super) fn each_expr_comment_end(block: &EachBlock<'_>) -> u32 {
     block
         .context
         .as_ref()
@@ -48,7 +48,7 @@ pub(crate) fn is_control_flow_block(node: &FragmentNode<'_>) -> bool {
 ///
 /// Only if/each/key blocks force expansion. Await blocks do NOT - they stay inline
 /// in block elements (e.g., `<div>{#await promise}loading{/await}</div>` stays inline).
-pub(crate) fn is_expanding_control_flow_block(node: &FragmentNode<'_>) -> bool {
+pub(super) fn is_expanding_control_flow_block(node: &FragmentNode<'_>) -> bool {
     matches!(
         node,
         FragmentNode::IfBlock(_) | FragmentNode::EachBlock(_) | FragmentNode::KeyBlock(_)
@@ -59,7 +59,7 @@ pub(crate) fn is_expanding_control_flow_block(node: &FragmentNode<'_>) -> bool {
 ///
 /// This is a convenience function combining `is_expanding_control_flow_block` and
 /// `has_expanding_block_in_await` checks that are commonly used together.
-pub(crate) fn has_any_expanding_blocks(nodes: &[FragmentNode<'_>]) -> bool {
+pub(super) fn has_any_expanding_blocks(nodes: &[FragmentNode<'_>]) -> bool {
     nodes.iter().any(is_expanding_control_flow_block) || has_expanding_block_in_await(nodes)
 }
 
@@ -72,7 +72,7 @@ pub(crate) fn has_any_expanding_blocks(nodes: &[FragmentNode<'_>]) -> bool {
 ///
 /// Single source of truth for the `has_preceding_breakable` test in `fragment_doc`'s node
 /// loops and for [`has_control_flow_after_sibling`]'s breakable-sibling gate.
-pub(crate) fn is_inline_content(node: &FragmentNode<'_>) -> bool {
+pub(super) fn is_inline_content(node: &FragmentNode<'_>) -> bool {
     matches!(
         node,
         FragmentNode::Element(_)
@@ -98,7 +98,7 @@ pub(crate) fn is_inline_content(node: &FragmentNode<'_>) -> bool {
 /// siblings are skipped. (Block elements are `Element`, hence breakable, so their
 /// separation still fires.) The force is also gated on `kind.is_block()` at the call site,
 /// so it only applies to block-element parents.
-pub(crate) fn has_control_flow_after_sibling(nodes: &[FragmentNode<'_>]) -> bool {
+pub(super) fn has_control_flow_after_sibling(nodes: &[FragmentNode<'_>]) -> bool {
     let mut seen_breakable = false;
     for node in nodes {
         if node.is_whitespace_only_text() {
@@ -156,6 +156,45 @@ impl<'a> Printer<'a> {
             .collect()
     }
 
+    /// Collect the trailing-comment run in `[from, to)` — one doc per comment via
+    /// [`build_trailing_js_comment_doc`](Self::build_trailing_js_comment_doc) — paired with
+    /// whether the run **ends** in a line comment.
+    ///
+    /// That flag is [`HeadExpr::ends_with_line_comment`], read off the run being emitted
+    /// rather than rescanned from source, so the two answers cannot disagree — which is why
+    /// the run and the flag come from one call.
+    ///
+    /// `closer_owns_break` — **whether the caller's closing token sits outside an
+    /// `indent(…)` wrapping this content.** It decides which emitter supplies the newline
+    /// after a run-final `//`, and therefore what column the closer lands in: the renderer
+    /// indents a line from the line command that produced it, so a break emitted from inside
+    /// the indent puts the closer at CONTENT indent while the closer's own break puts it at
+    /// the closer's. Pass `true` from the two wrappers that indent
+    /// ([`Printer::indent_frozen_head`], `wrap_in_block_structure`) and `false` everywhere
+    /// else, where the closer already sits on the content's own level and the comment's
+    /// `hardline` is exactly the break it needs. Interior comments always keep their
+    /// `hardline` — the break *between* two comments is the run's own business.
+    ///
+    /// Getting this wrong is not subtle in one direction and invisible in the other: too
+    /// eager and a `//` swallows the closer (`deno task swallow:audit` gates it), too lazy
+    /// and the closer is indented one level too deep.
+    pub(in crate::printer) fn trailing_comment_docs(
+        &self,
+        from: u32,
+        to: u32,
+        closer_owns_break: bool,
+    ) -> (DocBuf, bool) {
+        let mut comments = comments_to_emit_in_range(self.comments, from, to).peekable();
+        let mut ends_with_line_comment = false;
+        let mut docs = DocBuf::new();
+        while let Some(c) = comments.next() {
+            ends_with_line_comment = !c.is_block;
+            let last = comments.peek().is_none();
+            docs.push(self.build_trailing_js_comment_doc(c, last && closer_owns_break));
+        }
+        (docs, ends_with_line_comment)
+    }
+
     /// Emit every comment in `[start, end)` in **leading** style: a block comment as
     /// `/* … */ ` (inline, trailing space); a line comment as `// …` + `hardline` (a `//`
     /// runs to end of line, so the following token drops to the next line to avoid
@@ -168,9 +207,7 @@ impl<'a> Printer<'a> {
     /// ` /* … */` (inline, leading space); a line comment as ` // …` + `hardline`. Empty
     /// doc when the range holds no comments.
     fn build_pattern_trailing_comments(&self, start: u32, end: u32) -> DocId {
-        let docs: DocBuf = comments_to_emit_in_range(self.comments, start, end)
-            .map(|c| self.build_trailing_js_comment_doc(c))
-            .collect();
+        let (docs, _) = self.trailing_comment_docs(start, end, false);
         self.d().concat(&docs)
     }
 
@@ -240,15 +277,21 @@ impl<'a> Printer<'a> {
             // Comment-aware so an owned leading comment glued to the key (`[/* c */ k]`)
             // is claimed by the key's own doc — the `[`→key gap emitter above skips it
             // (owned comments are off the positional axis), so nothing else would print it.
+            //
+            // The non-computed arm below is comment-aware too, and there it is inert rather
+            // than load-bearing: `bind_leading_comment` has a single call site, the expression
+            // HEAD path, and a non-computed property key is read by the property parser without
+            // passing through it — so a comment glued to such a key is never `owned_by_node`,
+            // and the enclosing `{`→property gap emitter prints it positionally. Both builders
+            // therefore emit the same doc for that key (byte-identical over tests/fixtures and
+            // a pattern-key shape matrix). Using the comment-aware one anyway keeps the two
+            // arms the same shape, so neither can quietly become a comment sink.
             let key_doc = self.build_ts_expression_doc(key);
             let trail = self.build_pattern_trailing_comments(key_end, close);
             let doc = d.concat(&[d.text("["), lead, key_doc, trail, d.text("]")]);
             (doc, close + 1)
         } else {
-            (
-                self.build_ts_expression_doc_no_comments(key),
-                key.span().end,
-            )
+            (self.build_ts_expression_doc(key), key.span().end)
         }
     }
 
@@ -529,23 +572,38 @@ impl<'a> Printer<'a> {
     /// so binary chains use ContinuationIndent style. The surrounding Svelte doc tree
     /// (e.g., the closing `}`) provides natural lookahead for fits checks — no
     /// `suffix_width` estimation needed.
+    ///
+    /// Returns the [`Printer::honored_directive_in_gap`] verdict alongside the doc, the way
+    /// the attribute-value builder does: an own-line directive in the prefix→value gap
+    /// freezes the value whole, and the caller owes it the broken prefixed form
+    /// ([`Printer::build_prefixed_head_doc`]), which is what keeps the directive on its own
+    /// line. See [`HeadExpr`] for why the verdict travels back out rather than in.
     pub(super) fn build_expression_with_comments_doc(
         &self,
         expr: &Expression<'_>,
         span_start: u32,
         span_end: u32,
-    ) -> DocId {
-        let d = self.d();
+    ) -> HeadExpr {
         let expr_start = expr.span().start;
         let expr_end = expr.span().end;
+        let frozen = self.honored_directive_in_gap(span_start, expr_start);
 
         // Build docs for leading comments (between span_start and expression start)
         let leading_docs = self.leading_comment_docs(span_start, expr_start);
 
-        // Embed for embedded expression context: binary chains use ContinuationIndent style.
-        // first_line_offset estimates the column position for width calculations.
+        // Embed for embedded expression context. `mode` is the load-bearing field: the
+        // binary and conditional printers read `is_embedded()` to pick ContinuationIndent
+        // over Grouped style.
+        //
+        // `first_line_offset` is a width estimate that reaches nothing on this path — it is
+        // read only by `tsv_ts`'s own render entry (`write_arena_doc`, which a
+        // Svelte-embedded expression never takes: this printer builds the doc and renders it
+        // with its OWN embed) and by the renderer's `effective_suffix_width`, gated on a
+        // `suffix_width` that is 0 here. Perturbing it changes no byte of any fixture or of a
+        // 9k-file real corpus. It is set to the same shape the block heads use so the two
+        // don't read as deliberately different; see `build_expression_doc_for_block`.
         let context_indent = TAB_WIDTH;
-        let opening_offset = 5; // typical tag prefix, e.g. `{#if `
+        let opening_offset = 5; // a tag prefix's rough width, e.g. `{@html `
         let first_line_offset = context_indent + opening_offset;
         let embed = tsv_lang::EmbedContext {
             first_line_offset,
@@ -556,15 +614,26 @@ impl<'a> Printer<'a> {
         // Build expression doc directly in the shared arena.
         // No suffix_width needed — the surrounding doc tree (closing `}`, etc.)
         // provides natural lookahead via arena_fits_with_lookahead's rest_commands.
-        let expr_doc =
-            tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed);
+        let value_doc = self.build_head_value_doc(expr, frozen, &embed);
+        let expr_doc = self.wrap_value_clarity_parens(expr, value_doc);
 
-        // Build docs for trailing comments (between expression end and span_end)
-        let trailing_docs: DocBuf = comments_to_emit_in_range(self.comments, expr_end, span_end)
-            .map(|c| self.build_trailing_js_comment_doc(c))
-            .collect();
+        // Build docs for trailing comments (between expression end and span_end).
+        let (trailing_docs, ends_with_line_comment) =
+            self.trailing_comment_docs(expr_end, span_end, frozen);
 
-        self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
+        let body = self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs);
+        // A frozen head is broken here, at the builder that knows the freeze happened, so
+        // every caller assembles the same shape (`Printer::build_prefixed_head_doc`).
+        let doc = if frozen {
+            self.indent_frozen_head(body)
+        } else {
+            body
+        };
+        HeadExpr {
+            doc,
+            frozen,
+            ends_with_line_comment,
+        }
     }
 
     /// Build expression doc for block expressions (if, each, await, key).
@@ -583,6 +652,11 @@ impl<'a> Printer<'a> {
     /// - `opening_offset` - Characters before the expression (e.g., 5 for `{#if `). Used to
     ///   calculate `first_line_offset` for width estimation.
     /// - `in_multiline_context` - Whether the block is on its own line (multiline) or inline
+    ///
+    /// Returns the [`Printer::honored_directive_in_gap`] verdict alongside the doc — see
+    /// [`Self::build_expression_with_comments_doc`] for why the verdict travels back out.
+    /// A frozen head is already broken (`Printer::indent_frozen_head`), so its caller owes
+    /// it the space-less prefix and must not hug its tail onto the slice's last line.
     pub(super) fn build_expression_doc_for_block(
         &self,
         expr: &Expression<'_>,
@@ -590,10 +664,11 @@ impl<'a> Printer<'a> {
         span_end: u32,
         opening_offset: usize,
         in_multiline_context: bool,
-    ) -> DocId {
+    ) -> HeadExpr {
         let d = self.d();
         let expr_start = expr.span().start;
         let expr_end = expr.span().end;
+        let frozen = self.honored_directive_in_gap(span_start, expr_start);
 
         // Build docs for leading comments
         let leading_docs = self.leading_comment_docs(span_start, expr_start);
@@ -613,14 +688,8 @@ impl<'a> Printer<'a> {
         };
 
         // Build expression doc tree
-        // Assignment expressions need parens in block conditions: {#if (a = b)}
-        let expr_doc = if matches!(expr, Expression::AssignmentExpression(_)) {
-            let inner =
-                tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed);
-            d.parens(inner)
-        } else {
-            tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed)
-        };
+        let inner_doc = self.build_head_value_doc(expr, frozen, &embed);
+        let expr_doc = self.wrap_value_clarity_parens(expr, inner_doc);
 
         // Apply remove_lines() only in INLINE contexts to prevent the condition
         // from being the first thing to break when there's other content on the line.
@@ -631,10 +700,9 @@ impl<'a> Printer<'a> {
             d.remove_lines(expr_doc)
         };
 
-        // Build docs for trailing comments
-        let trailing_docs: DocBuf = comments_to_emit_in_range(self.comments, expr_end, span_end)
-            .map(|c| self.build_trailing_js_comment_doc(c))
-            .collect();
+        // Build docs for trailing comments.
+        let (trailing_docs, ends_with_line_comment) =
+            self.trailing_comment_docs(expr_end, span_end, frozen);
 
         let body = self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs);
 
@@ -654,9 +722,24 @@ impl<'a> Printer<'a> {
         // multi-line one's newlines live *inside* its verbatim source span, which renders
         // with no context indent by design (the interior stays as authored), so its
         // continuation is the comment's own line and there is nothing to indent.
+        //
+        // A frozen head takes the same indent from one level up: `indent_frozen_head` also
+        // supplies the hardline that puts the directive on its own line, which the ordinary
+        // path gets from the line comment's own trailing hardline.
+        if frozen {
+            return HeadExpr {
+                doc: self.indent_frozen_head(body),
+                frozen: true,
+                ends_with_line_comment,
+            };
+        }
         let breaks_head =
             comments_to_emit_in_range(self.comments, span_start, expr_start).any(|c| !c.is_block);
-        if breaks_head { d.indent(body) } else { body }
+        HeadExpr {
+            doc: if breaks_head { d.indent(body) } else { body },
+            frozen: false,
+            ends_with_line_comment,
+        }
     }
 
     /// Build a block head's expression doc, deriving both the comment-scan start offset
@@ -677,7 +760,7 @@ impl<'a> Printer<'a> {
         expr: &Expression<'_>,
         comment_end: u32,
         wrapping: bool,
-    ) -> DocId {
+    ) -> HeadExpr {
         self.build_expression_doc_for_block(
             expr,
             opening_tag_span.start + open.len() as u32,
@@ -690,8 +773,8 @@ impl<'a> Printer<'a> {
     /// Assemble `[leading…, expr, trailing…]` into one doc, returning `expr` unchanged
     /// when there are no surrounding comments. Shared tail of the expression+comment
     /// builders (`build_expression_with_comments_doc`, `build_expression_doc_for_block`,
-    /// `build_const_init_doc`).
-    pub(super) fn concat_with_surrounding_comments(
+    /// `build_const_init_doc`, `build_expression_content_with_comments`).
+    pub(in crate::printer) fn concat_with_surrounding_comments(
         &self,
         leading_docs: DocBuf,
         expr_doc: DocId,

@@ -78,11 +78,11 @@ const INDEX_UNIT_ROUNDTRIP_PRETTY_PIN: usize = 14;
 const RUN_IN_SCOPE_TESTS_PIN: usize = 9389;
 const RUN_IN_SCOPE_VARIANTS_PIN: usize = 9888;
 const RUN_EXPECT_CLEAN_PIN: usize = 4436;
-const RUN_BASELINED_PARSED_PIN: usize = 4462;
-const RUN_PARSE_REJECTED_PIN: usize = 990;
+const RUN_BASELINED_PARSED_PIN: usize = 4464;
+const RUN_PARSE_REJECTED_PIN: usize = 988;
 const RUN_PARSE_REJECTED_NO_BASELINE_PIN: usize = 44;
 const RUN_PARSE_REJECTED_TS1XXX_PIN: usize = 456;
-const RUN_PARSE_REJECTED_OTHER_PIN: usize = 490;
+const RUN_PARSE_REJECTED_OTHER_PIN: usize = 488;
 const RUN_SCRIPT_RETRY_PIN: usize = 25;
 /// Tracked parser crashes carved out of the sweep (the `CRASH_EXCLUSIONS`
 /// ledger). Pinned so the ledger can't grow or shrink silently — a move means a
@@ -111,7 +111,7 @@ const RUN_CRASH_EXCLUDED_PIN: usize = 0;
 /// (matches gained) is a real improvement that re-pins; a rise in `other` fails the
 /// run. `family_match` / `family_missing` are the aggregate totals (573 / 37);
 /// `dup_*` / `flow_*` pin the sub-family partitions.
-const RUN_FAMILY_GRADED_PIN: usize = 4083;
+const RUN_FAMILY_GRADED_PIN: usize = 4085;
 const RUN_FAMILY_POSITIVE_PIN: usize = 140;
 const RUN_FAMILY_MATCH_PIN: usize = 573;
 const RUN_FAMILY_MISSING_PIN: usize = 37;

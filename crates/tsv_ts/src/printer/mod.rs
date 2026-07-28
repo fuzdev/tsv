@@ -46,14 +46,13 @@ mod types;
 pub use analysis::conditional_should_break_after_op;
 pub(crate) use analysis::{
     PatternContext, build_entity_name_doc, container_may_have_multiline_content,
-    has_multiline_content, has_newline_after_position, has_newline_before_position,
-    is_brace_block_multiline, is_effectively_empty_body, is_module_path_fluid_call,
-    is_multiline_string_literal, is_multiline_template_expression, is_pure_property_chain,
-    is_string_literal, next_printed_stmt_start, object_pattern_should_expand,
-    template_literal_has_newlines,
+    has_multiline_content, is_brace_block_multiline, is_effectively_empty_body,
+    is_module_path_fluid_call, is_multiline_string_literal, is_multiline_template_expression,
+    is_pure_property_chain, is_string_literal, next_printed_stmt_start,
+    object_pattern_should_expand, template_literal_has_newlines,
 };
 pub(crate) use comments::{
-    CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
+    CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue, OwnedCommentEffect,
 };
 pub use expressions::assignment::should_inline_logical_expression;
 pub(crate) use expressions::assignment::{
@@ -76,7 +75,9 @@ use tsv_lang::{
         arena::{DocArena, DocId},
     },
     has_comments_to_emit_in_range, has_line_comments_in_range, printing,
-    source_scan::{TriviaProfile, is_regex_start, skip_regex_literal, skip_trivia},
+    source_scan::{
+        TriviaProfile, has_newline_before_position, is_regex_start, skip_regex_literal, skip_trivia,
+    },
 };
 
 /// The parent context that routes a curried arrow chain (`(a) => (b) => …`)
@@ -937,6 +938,22 @@ impl<'a> Printer<'a> {
     /// anchor — each comment is judged against whatever immediately precedes it.
     pub(crate) fn is_own_line_comment(&self, comment: &internal::Comment) -> bool {
         !comment.is_block || has_newline_before_position(self.source, comment.span.start)
+    }
+
+    /// Whether a multi-line block comment **prints as indented lines**
+    /// ([`tsv_lang::is_indentable_block`]) — the form `build_comment_doc` reprints as a
+    /// [`tsv_lang::doc::arena::DocNode::MultilineText`] whose newlines are hard lines.
+    ///
+    /// The layout question a *glued* multi-line comment poses, and **not** `multiline`:
+    /// only this form carries a break out to the enclosing group.
+    ///
+    /// ⚠️ **Not** `DocArena::will_break` on the comment's doc, which answers `true` for
+    /// both shapes: tsv emits a preserved block's interior through `literalline`s (a
+    /// genuine newline in the output, so `fits` must see it), where prettier emits one
+    /// opaque string. That difference is deliberate and lives in the renderer; the
+    /// *layout* question is this one.
+    pub(crate) fn block_comment_is_indentable(&self, comment: &internal::Comment) -> bool {
+        tsv_lang::is_indentable_block(self.source, comment)
     }
 
     /// Whether a block comment in `(start, end)` sits **alone on its own physical

@@ -89,7 +89,7 @@ impl ElementKind {
 /// the same shape: a name, attributes, a fragment, and an open/close tag pair. Projecting
 /// both onto one view lets the layout decisions (multiline-ness, boundary modes, hugging)
 /// live in a single place. They used to be duplicated — `special_doc.rs` carried its own
-/// hug predicates and its own `needs_multiline`, and the copies had drifted: `<slot>` never
+/// hug predicates and its own multiline decision, and the copies had drifted: `<slot>` never
 /// went multiline for block children, and the special path still dangled its delimiters
 /// where regular elements had moved to block-style.
 ///
@@ -162,19 +162,47 @@ pub(super) struct AttrGaps {
     pub(super) claimed: Option<Span>,
 }
 
+/// Why an element's content lays out multiline — and whether that reason survives reformatting.
+///
+/// The distinction is load-bearing, not bookkeeping. [`BoundaryMode::Hard`] is exactly
+/// "multiline", so a rule that reads the boundary mode reads this decision too — and a
+/// [`Self::SourceBreaks`] decision is one tsv's **own output** rewrites, since converging an
+/// authoring to block-style adds or removes exactly those newlines. A layout keyed on it can
+/// therefore be re-decided on the next pass; a layout keyed on [`Self::Structural`] cannot.
+/// [`Printer::handle_text_child`]'s sibling-newline flow rule is the consumer.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(super) enum MultilineCause {
+    /// Not multiline: the content collapses to one line, and width alone decides the layout.
+    None,
+    /// A property of the content itself forces it, however the source was authored — block
+    /// children, mixed block/inline content, an expanding control-flow block, block flow, or a
+    /// whitespace-collapsing container. Reformatting cannot change the answer.
+    Structural,
+    /// The content's own authored newlines forced it (`has_source_breaks_in_content` /
+    /// `text_has_internal_newlines`) — the Tier-2 element-expansion signal. Reformatting the
+    /// content can add or remove those newlines, so this decision is not stable across passes.
+    SourceBreaks,
+}
+
+impl MultilineCause {
+    /// Whether the content lays out multiline at all — `Hard` boundary, block-style tags.
+    pub(super) fn is_multiline(self) -> bool {
+        self != Self::None
+    }
+}
+
 /// Analysis context for element formatting decisions
 ///
 /// Computed once per element from its [`ElementParts`], used to determine layout and build
 /// docs. Strictly the *derived* half — anything readable straight off `ElementParts` (the tag
 /// kind, void-ness) stays there, so no fact has two sources that could drift apart.
-#[allow(clippy::struct_excessive_bools)]
 pub(super) struct ElementContext {
     /// Whether element was self-closing in source
     pub(super) is_self_closing: bool,
     /// Whether element has no meaningful content
     pub(super) is_empty: bool,
-    /// Whether children need multiline formatting
-    pub(super) needs_multiline: bool,
+    /// Whether children need multiline formatting, and why — see [`MultilineCause`]
+    pub(super) multiline: MultilineCause,
     /// Whether any attribute source contains embedded newlines (forces attr group break)
     pub(super) has_multiline_attr: bool,
 }
@@ -247,7 +275,7 @@ impl<'a> Printer<'a> {
     /// 1. Analyze: Compute all formatting-relevant properties
     /// 2. Classify: Determine layout strategy (void, empty, hug modes, etc.)
     /// 3. Build: Construct doc based on layout
-    pub(crate) fn build_element_doc(&self, element: &internal::Element<'_>) -> DocId {
+    pub(super) fn build_element_doc(&self, element: &internal::Element<'_>) -> DocId {
         let class = self.classify_tag(element);
         let is_html = element.kind == internal::ElementKind::Html;
 
@@ -316,7 +344,7 @@ impl<'a> Printer<'a> {
     /// where splitting the `>` off is render-safe and well-defined. Returns `None`
     /// otherwise so the caller keeps the element (and its `>`) intact. The caller emits the
     /// `>` itself (see `build_expanding_construct`'s `gt_prefix`).
-    pub(crate) fn build_inline_element_omit_close_gt(
+    pub(super) fn build_inline_element_omit_close_gt(
         &self,
         element: &internal::Element<'_>,
     ) -> Option<DocId> {
@@ -372,7 +400,7 @@ impl<'a> Printer<'a> {
                 let children_doc = self.build_nodes_doc_trimmed(
                     element.fragment.nodes,
                     Self::nodes_have_breakable_expression(element.fragment.nodes),
-                    false,
+                    MultilineCause::None,
                 );
                 Some((parts, ctx, attr_docs, children_doc))
             }
@@ -385,7 +413,7 @@ impl<'a> Printer<'a> {
     /// `>` to the following sibling (`external_close = true`) and/or **receives** a preceding
     /// sibling's `>` as a leading `if_break` inside its attrs group (`gt_prefix = Some`) — a mid-run
     /// element does both. `None` for any non-Soft shape (the boundary stays an intact `>`).
-    pub(crate) fn build_inline_element_sibling_gt(
+    pub(super) fn build_inline_element_sibling_gt(
         &self,
         element: &internal::Element<'_>,
         external_close: bool,
@@ -421,7 +449,7 @@ impl<'a> Printer<'a> {
     /// placement differs), and `children_doc` is shared with `block_state` too — a `conditional_group`
     /// candidate that never renders never records its comments (the print-once ledger keys on the
     /// rendered node), so the shared subtrees are sound.
-    pub(crate) fn build_inline_element_close_gt_dangle(
+    pub(super) fn build_inline_element_close_gt_dangle(
         &self,
         element: &internal::Element<'_>,
     ) -> Option<DocId> {
@@ -573,17 +601,23 @@ impl<'a> Printer<'a> {
         // line, oscillates between two layouts (a non-idempotent 2-cycle, `authoring_audit`'s
         // hard bucket).
         // A whitespace-collapsing container lays its children out one-per-line with the
-        // inter-sibling whitespace trimmed (render-free — the compiler removes it). Its
-        // `needs_multiline` is forced (see `analyze_element`), so `boundary` is always `Hard` here
-        // and this content flows into the multiline arm below.
+        // inter-sibling whitespace trimmed (render-free — the compiler removes it). Its multiline
+        // decision is forced (see `analyze_element`), so `boundary` is always `Hard` here and this
+        // content flows into the multiline arm below.
+        //
+        // The multiline arm carries the *cause* (see [`MultilineCause`]), not just the fact:
+        // `Hard` derived from the content's own authored newlines is a layout the next pass can
+        // re-decide, which the sibling-newline flow rule has to know. `boundary` stays the source
+        // of the multiline-ness itself, so a `Soft` boundary builds the inline arm as before.
         let children_doc = if parts.collapses_child_ws {
             self.build_container_content_doc(nodes)
         } else {
-            self.build_nodes_doc_trimmed(
-                nodes,
-                Self::nodes_have_breakable_expression(nodes),
-                boundary == BoundaryMode::Hard,
-            )
+            let cause = if boundary == BoundaryMode::Hard {
+                ctx.multiline
+            } else {
+                MultilineCause::None
+            };
+            self.build_nodes_doc_trimmed(nodes, Self::nodes_have_breakable_expression(nodes), cause)
         };
 
         // Soft boundaries: collapse when the element fits, break block-style when it doesn't.
@@ -629,7 +663,7 @@ impl<'a> Printer<'a> {
     /// own indented line (block-style, both tags intact) when it doesn't. Since the boundary run
     /// is render-free and always trimmed, a glued authoring and a spaced one reach this same
     /// builder — that is what makes them converge. No hardline force is needed — every multiline
-    /// trigger (an expanding control-flow block, block-flow children, any other `needs_multiline`)
+    /// trigger (an expanding control-flow block, block-flow children, any other [`MultilineCause`])
     /// already resolves the boundary to `Hard` in [`Printer::compute_element_layout`], so it never
     /// reaches this builder.
     ///
@@ -887,7 +921,7 @@ impl<'a> Printer<'a> {
     /// `name_end`: end position of the element tag name (for finding comments before first attr).
     /// `open_tag_end`: position of the `>` that closes the open tag (for trailing comment range).
     /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
-    pub(crate) fn build_element_attrs_doc(
+    pub(super) fn build_element_attrs_doc(
         &self,
         attrs: &[internal::AttributeNode<'_>],
         separator: DocId,

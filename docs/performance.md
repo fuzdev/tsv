@@ -208,6 +208,60 @@ For those, dump everything and search by source line instead:
 perf annotate --stdio > annotate.txt   # then search for the fn's source lines
 ```
 
+⚠️ **`annotate` has two more silent-empty modes, and neither says why.** A
+recording made with `--call-graph=dwarf` annotates empty — record *without* it
+when the goal is line-level attribution (keep the dwarf recording separately for
+callchain work). And `-s <exact name>` can still return nothing where an
+unfiltered dump annotates that same symbol fine. **When `-s` is empty, dump
+everything before concluding anything about the symbol** — an empty `-s` is
+evidence about `perf`, not about the binary:
+
+```bash
+perf record -q -F 4000 -o flat.data -- <workload>       # no --call-graph
+perf annotate -i flat.data --stdio > annotate.txt       # then slice the symbol out
+```
+
+`perf annotate` may segfault after writing usable output; the already-written
+portion is still valid, so redirect to a file rather than piping to a reader.
+
+**A name on the board is not necessarily a function.** With debug info present,
+`perf` attributes samples to *inlined* frames too, so a symbol can top the report
+while having no out-of-line copy anywhere in the binary — its cost is the work of
+one source site, scattered across every caller. `perf annotate -s` returning
+nothing is the tell; `nm` is the confirmation:
+
+```bash
+nm -C target/release/tsv_debug | grep node_header_impl   # empty ⇒ fully inlined
+```
+
+This matters because it changes what a fix can even look like. A leaf that topped
+the wire-writer board at ~16% had **no out-of-line copy in either the release or
+the profiling build**; the lead recorded against it ("take that function apart")
+was unbuildable as stated. Source-line attribution said what the cost actually
+was — `Vec` append bookkeeping, because the node header issues ~16 separate
+appends per AST node, each with its own capacity check:
+
+```bash
+perf report --stdio --no-children -q -s srcline -g none   # flat, by source line
+perf report --stdio --no-children -q -s srcfile,srcline   # + per-line callchains
+```
+
+⚠️ **An inlining verdict is a fact about one build, and it expires.** That same
+leaf is out-of-line a few commits later, with `perf annotate` working on it
+directly — nothing about it changed, the surrounding code did. Inlining, symbol
+presence and monomorphization counts are all emergent from whole-program codegen,
+so **re-run `nm` against the binary in front of you** rather than trusting a
+recorded finding. The method is durable; the finding is not.
+
+⚠️ Only **basenames** are printed, so std's `alloc/src/vec/mod.rs` and a crate's
+own `mod.rs` are indistinguishable in the flat view — read a line's callchain
+(drop `-g none`) to tell them apart.
+
+⚠️ Board **shares** move when only the denominator does. That same leaf rose
+15.97% → 16.63% across a change that made *other* things faster and left it
+untouched. Compare absolute instruction or cycle counts across boards, never
+percentages.
+
 **Telling real work from a code-layout artifact — `perf stat`.** When a logically
 tiny change moves the native wall, count instructions before chasing a function:
 **instruction count is layout-independent** (code placement cannot change how many
@@ -494,6 +548,30 @@ is only comparable to another anchor over the same corpus.
    the full `deno task bench` also runs the node conformance coverage surface — a
    pre-flight parse-coverage pass, no timed phase)
 3. **Record results** — for regression detection, use `deno task bench:deno:run -- --save-baseline` / `-- --compare-baseline` (or the `bench:node:run` / `bench:bun:run` siblings for the other runtimes)
+4. **Check the size axis if the change shrank a hot function** — see
+   [An instruction A/B is blind to code size](#an-instruction-ab-is-blind-to-code-size); no `check` gate covers it
+
+### Grading a change that touches the `format` worker pool
+
+Two traps specific to the parallel path, both of which produce confident wrong numbers.
+
+**Measure the pool, not the process.** Timing `tsv format` end to end folds in process
+startup and the machine's mood. Instrument the pool itself — its makespan, each worker's
+busy time, and `idle = makespan × workers − total_busy`. Beyond removing the startup floor,
+`total_busy` makes visible the assumption every scheduling model rests on: that per-file cost
+is independent of the order and width you run at. It is not. Formatting the largest files
+concurrently raises the cost of each of them, so a change that improves the *schedule* can
+still lose on the wall.
+
+**The wall is topology-sensitive, and `taskset` lets one machine stand in for several.** SMT
+siblings are paired (`/sys/devices/system/cpu/cpuN/topology/thread_siblings_list` reads `0-1`,
+`2-3`, …), so masking to one CPU per pair gives a no-SMT machine and masking fewer pairs gives a
+smaller one — no root needed. `available_parallelism()` reads `sched_getaffinity`, so tsv's own
+default worker count follows the mask; confirm that before trusting a sweep (under `-c 0,2` the
+default run should match `--jobs 2`). Score a candidate default by its **worst case across
+corpora**, not its best: the optimum width differs by repo shape — a large tree where discovery
+dominates wants fewer workers than a flat repo of the same file count, because the walk thread is
+then competing with them for cores.
 
 ### Before optimizing a scan, print what it finds
 
@@ -530,7 +608,18 @@ by the exhaustive equivalence test that sits beside the function.
 So a numeric change ships with an **equivalence test at its declaration**, graded
 against the shape it replaced, over inputs chosen to hit every branch (the corpus
 will not) — then **corrupt it and watch the test fail**. An oracle you have never
-seen fail proves nothing. See the same rule applied to CSS keyword sets in
+seen fail proves nothing.
+
+**The same rule covers scans, with one extra axis: alignment.** A word-at-a-time
+rewrite of a byte scan fails on *where the pattern lands relative to the stride*,
+which a corpus samples arbitrarily. So grade a scan over every input length and
+**every alignment across the word stride** — the line-start scans are checked
+against the byte-at-a-time shapes they replaced over every string of length 0–4
+on an alphabet covering each arm (`\n`, `\r`, `\0`, ordinary, `0x7f`) × every
+alignment 0–16. Note what no corpus could have covered: real source contains no
+`\r` at all, so the entire CRLF arm is corpus-dead. Both corruptions tried
+(dropping the scalar tail; reading the highest set lane of the SWAR mask instead
+of the lowest) were caught only there. See the same rule applied to CSS keyword sets in
 [`crates/tsv_css/CLAUDE.md`](../crates/tsv_css/CLAUDE.md), and to text width in
 [`crates/tsv_lang/CLAUDE.md`](../crates/tsv_lang/CLAUDE.md).
 
@@ -545,6 +634,130 @@ a result here:
   binaries.** Building a `codegen-units=16` variant inside the baseline's checkout
   overwrites its `target/`, after which a "cu1" run silently compares cu16-baseline
   against cu1-candidate. A build that finishes suspiciously fast is the tell.
+
+### An instruction A/B is blind to code size
+
+**A lever that makes a hot leaf smaller or simpler gets inlined at more call
+sites, and pays for itself in bytes at every one of them.** The instruction
+counter cannot see that, and neither can any gate in `deno task check` — the size
+bounds live in `scripts/validate_artifacts.ts`, which runs at **publish** time
+(`deno task publish` Step 3), not in `check`.
+
+The worked case: rewriting the wire writer's integer emitter to end in a
+fixed-width copy instead of a runtime-length one removed a libc `memmove` call
+and measured a clean **−3.2% parse-product instructions**. It also grew
+`@fuzdev/tsv_parse_wasm` **+6% raw, past its `max` bound** — the smaller body was
+now inlined at ~200 writer call sites, each carrying the fixed-width blit.
+`cargo test --workspace`, `deno task check`, an 8,257-file byte-identity diff and
+the instruction A/B were **all green through the regression**.
+
+So a "make a hot leaf smaller" change ships with the size axis measured too:
+
+```bash
+deno task build:wasm:parse:deno && deno task build:wasm:deno
+# compare raw bytes against BOUNDS in scripts/validate_artifacts.ts
+```
+
+Two rules fall out:
+
+- **Measure HEAD's bundle too, not just the bound.** A bound can already sit near
+  its limit from unrelated work, and attributing that to your change wastes a
+  session (the mirror of the general "verify HEAD is green before blaming
+  yourself" rule).
+- **Reach for `#[inline(never)]` before abandoning the win.** Where the win comes
+  from work removed *inside* a function body, keeping the body out-of-line costs
+  nothing — the caller was already paying the call. In the case above it kept the
+  entire instruction win and left both bundles *smaller* than baseline. ⚠️ The
+  converse also happens: where the win *is* the inlining (see the reload tax
+  below), out-of-lining costs the whole thing, and the size growth is the price
+  of the lever rather than an accident to optimize away.
+
+**Recentering the bounds is a deliberate act with a rule.** `BOUNDS` in
+`scripts/validate_artifacts.ts` is ±8% around a measured value, and `DELTAS`
+(`all − format` = the parse feature, `all − parse` = the format feature) the
+same. When a size change is accepted, **recenter every variant on freshly
+measured values rather than raising the one ceiling that failed** — a band left
+stale goes asymmetric as unrelated work accumulates, and an asymmetric band both
+false-positives on ordinary growth and stops catching a suspicious *shrink*,
+which is the half of the check with no other tripwire. Watch the deltas
+especially: they are the tighter constraint in practice, and a delta failure
+reads as "a feature gate broke", which is a confusing way to learn that a bundle
+merely grew. Record the new measurements and the date in the comment above the
+constants, and note that `format` cannot move on a convert-path change at all
+(it builds without the `json` feature) — if it did, something else is going on.
+
+### An instruction A/B is blind to stalls and to store traffic
+
+The companion to the section above, and the reason a lever must be graded on the
+counter that matches what it *moves*:
+
+| what the change moves | counter that can see it |
+| --- | --- |
+| work (fewer operations) | `instructions:u` |
+| bytes, alignment, access width or ordering | `cycles:u` |
+| code size | the WASM bounds (see above) |
+
+The worked case is the direct sequel to the fixed-width-copy change described
+above. That copy loaded 16 bytes out of a stack scratch which the digit loop had
+just filled with **2-byte stores** — a narrow-store → wide-load pattern that
+**never store-forwards** — and it wrote the scratch's full width (20 bytes to
+keep ~3). One store instruction ended up carrying **71% of that function's
+self-time, ~22% of the whole parse→JSON run.** Packing the digits into a register
+and appending one word instead measured **−7.3..−7.7% cycles across four
+corpora with instructions FLAT (−0.06..−0.25%)** — a win an instruction-only A/B
+scores as noise and discards.
+
+Two practical rules:
+
+- **`perf annotate` before theorizing about a hot leaf.** A percentage tells you
+  *where*; only the per-instruction breakdown tells you the cost is one store
+  rather than the arithmetic around it.
+- **Cycles are far noisier than instructions** — on the reference machine the
+  same binary pair reads a ±2% band run to run, and a format-path control drifted
+  2.2–3.3 G for identical work. Use **best-of-N interleaved** (minimum cycles is
+  the least contaminated estimator), never a single pair, and keep a control
+  corpus the lever's code never runs.
+
+### An `inline(never)` leaf's real cost is paid by its caller
+
+`#[inline(never)]` on a hot leaf is often correct — it is how the fixed-width
+copy above kept its win without blowing a WASM bound. But the call is not the
+whole price. **An opaque call de-registerizes the caller's state around every
+call site**: anything the callee might touch has to be re-loaded from memory
+afterwards. When such a leaf is invoked repeatedly *between* other operations on
+the same object, that reload tax is charged to the surrounding code, where no
+profile line attributes it to the leaf.
+
+The worked case is the node header. It emitted 16 `Vec` appends per AST node, six
+of them out-of-line integer calls. The obvious model — "an append is a capacity
+check plus a store, call it three instructions" — makes 16 appends look cheap
+against any alternative that ends in a `memmove`. That model was wrong by a large
+factor, because each opaque integer call forced the *following* append to re-load
+the buffer's pointer, length and capacity. Assembling the header in a
+writer-owned scratch and appending it **once** measured **−8.2..−10.0%
+instructions and −5.7..−6.6% cycles across four corpora**.
+
+The instructive part is the ledger, not the headline:
+
+| | before | after | delta |
+| --- | --- | --- | --- |
+| run cycles | 3158M | 2944M | **−214M** |
+| libc (the single flush `memmove`) | 219M | 399M | +180M |
+| everything else | 2939M | 2545M | −395M |
+
+**The memmove cost exactly what the pessimistic prediction said it would** —
+libc nearly doubled. The prediction failed on the *benefit* side. So:
+
+- **When a lever is predicted to lose, check whether the prediction priced the
+  benefit or only the cost.** A correct cost estimate is not a correct verdict.
+- **Read the instruction stream, not just the source-line board.** The reload tax
+  is visible as the object's length/pointer reappearing in a `mov` between
+  fragments that should have kept it in a register; no source line names it.
+- Staging is the shape that buys both: the leaf inlines at **one** site (so the
+  code-size bound survives) while the destination becomes a fixed-base,
+  constant-bounded, register-resident cursor. Keep the scratch a **struct field,
+  not a local** — a per-call `[0; N]` is a memset LLVM cannot prove dead when
+  only a dynamic prefix is read, and that alone can eat the win.
 
 ## WASM bundle size
 

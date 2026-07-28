@@ -93,11 +93,29 @@ impl<'a> Printer<'a> {
             let next_case_start = stmt.cases.get(i + 1).map(|c| c.span.start);
             let inline_comment_boundary = next_case_start.unwrap_or(stmt.span.end - 1);
 
-            case_parts.push(self.build_switch_case_doc_inner(
-                case,
-                inline_comment_boundary,
-                body_has_comments,
-            ));
+            // Rule A over the case list: an own-line directive in the `{`→first-case or
+            // between-case gap freezes the case that follows it, over the case's own node
+            // span — the label rides inside the slice, the sibling cases still normalize.
+            // The gap anchor is the same `prev_end` the leading run above just used.
+            match self.gap_frozen_span(prev_end, case.span) {
+                Some(frozen) => {
+                    case_parts.push(self.build_frozen_span_doc(frozen));
+                    // The frozen slice is the case's own span, so a comment TRAILING its
+                    // last statement sits outside it — and the cursor below skips past
+                    // such a comment on the case builder's behalf. Bypassing that builder
+                    // therefore has to claim the same run here, or the comment has no
+                    // emitter at all (`gaps:audit` `DROPPED );⟨⟩␣`).
+                    case_parts.extend(self.build_trailing_same_line_comment_docs(
+                        case.span.end,
+                        inline_comment_boundary,
+                    ));
+                }
+                None => case_parts.push(self.build_switch_case_doc_inner(
+                    case,
+                    inline_comment_boundary,
+                    body_has_comments,
+                )),
+            }
 
             // Advance past any same-line trailing comment on the case's last
             // statement — the case builder already emitted it (trailing), so the
@@ -351,9 +369,16 @@ impl<'a> Printer<'a> {
             let next_bound = next_printed_stmt_start(case.consequent, i, inline_comment_boundary);
             let trailing = self.build_trailing_same_line_comment_docs(stmt_end, next_bound);
 
+            // Rule A over the consequent list: an own-line directive in the label→first
+            // gap or between statements freezes the statement that follows it. Resolved
+            // BEFORE the layout choice because the hug below would pull the directive onto
+            // the label's line — an inert placement, so the freeze would die on pass 2.
+            let frozen = self.gap_frozen_span(prev_end, stmt.span());
+
             // First block statement hugs the case label: `case 'a': { ... }`
-            // Unless there are line comments (inline after label or between label and block)
-            if i == 0 && first_is_block {
+            // Unless there are line comments (inline after label or between label and
+            // block), or a directive whose own line the hug would take away.
+            if i == 0 && first_is_block && frozen.is_none() {
                 let has_leading_line_comment = leading_comments.iter().any(|c| !c.is_block);
                 if !has_inline_line_comment && !has_leading_line_comment {
                     // Hug: `case 'a': { ... }`
@@ -414,7 +439,12 @@ impl<'a> Printer<'a> {
                     }
                 }
 
-                stmt_parts.push(self.build_statement_doc(stmt, false));
+                stmt_parts.push(match frozen {
+                    // The freeze emitter claims the glued block comment the statement
+                    // owns — the leading run above skips it (docs/comments.md hazard 1).
+                    Some(span) => self.build_frozen_node_doc(span),
+                    None => self.build_statement_doc(stmt, false),
+                });
                 stmt_parts.extend(trailing);
 
                 parts.push(d.indent(d.concat(&stmt_parts)));

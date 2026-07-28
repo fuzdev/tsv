@@ -12,7 +12,7 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 531
+# shapes: 517
 DROPPED	!)⟨⟩!.	annotation,block,jsdoc_cast
 DROPPED	#⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DROPPED	#⟨⟩\	annotation,block,jsdoc_cast,line,multiline
@@ -45,14 +45,12 @@ DROPPED	(((⟨⟩{}!	line
 DROPPED	(()⟨⟩=>	annotation,block,jsdoc_cast
 DROPPED	(()⟨⟩␣	annotation,block,jsdoc_cast
 DROPPED	((<⟨⟩IDENT	annotation,block,jsdoc_cast,multiline
-DROPPED	((⟨⟩'	line
 DROPPED	((⟨⟩...	annotation,jsdoc_cast
 DROPPED	((⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DROPPED	((⟨⟩␣	line
 DROPPED	())⟨⟩!()	annotation,block,jsdoc_cast
 DROPPED	())⟨⟩!`	annotation,block,jsdoc_cast
 DROPPED	())⟨⟩);	annotation,block,jsdoc_cast,line,multiline
-DROPPED	())⟨⟩}	annotation,block,jsdoc_cast,line,multiline
 DROPPED	():⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	()⟨⟩!	annotation,block,jsdoc_cast
 DROPPED	()⟨⟩!.	annotation,block,jsdoc_cast
@@ -65,7 +63,6 @@ DROPPED	(<⟨⟩IDENT	annotation,block,jsdoc_cast,multiline
 DROPPED	([(⟨⟩IDENT	line
 DROPPED	(⟨⟩'	line
 DROPPED	(⟨⟩(	annotation,block,jsdoc_cast,line,multiline
-DROPPED	(⟨⟩('	annotation,block,line,multiline
 DROPPED	(⟨⟩()	annotation,block,jsdoc_cast,line,multiline
 DROPPED	(⟨⟩()=	line
 DROPPED	(⟨⟩(..	line
@@ -93,6 +90,7 @@ DROPPED	))⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	))⟨⟩?];	annotation,block,jsdoc_cast,line,multiline
 DROPPED	))⟨⟩[])	annotation,block,jsdoc_cast
 DROPPED	))⟨⟩[];	annotation,block,jsdoc_cast
+DROPPED	))⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	),⟨⟩␣	multiline
 DROPPED	):⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)=>⟨⟩[	annotation,block,jsdoc_cast
@@ -115,8 +113,6 @@ DROPPED	)⟨⟩?];	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)⟨⟩[])	annotation,block,jsdoc_cast
 DROPPED	)⟨⟩[];	annotation,block,jsdoc_cast
 DROPPED	)⟨⟩[][	annotation,block,jsdoc_cast
-DROPPED	)⟨⟩}	annotation,block,jsdoc_cast,line,multiline
-DROPPED	)⟨⟩}><	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	*#⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DROPPED	*/(⟨⟩IDENT	line,multiline
@@ -156,8 +152,6 @@ DROPPED	:⟨⟩//	multiline
 DROPPED	:⟨⟩{	annotation,block,jsdoc_cast,multiline
 DROPPED	:⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	;#⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
-DROPPED	;}⟨⟩}	annotation,block,jsdoc_cast,line,multiline
-DROPPED	;⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	<⟨⟩IDENT	annotation,block,jsdoc_cast,multiline
 DROPPED	<⟨⟩const	annotation,block,jsdoc_cast,multiline
 DROPPED	<⟨⟩␣	annotation,block,jsdoc_cast,multiline
@@ -222,7 +216,6 @@ DROPPED	IDENT⟨⟩));	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩):	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)=>	annotation,block,jsdoc_cast,line,multiline
-DROPPED	IDENT⟨⟩)}	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩,	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩,/*	line,multiline
 DROPPED	IDENT⟨⟩,//	line
@@ -336,7 +329,6 @@ DROPPED	case⟨⟩␣	line
 DROPPED	class⟨⟩<	annotation,block,jsdoc_cast,line,multiline
 DROPPED	class⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	const⟨⟩,	line
-DROPPED	export⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	function⟨⟩*	annotation,block,jsdoc_cast,line,multiline
 DROPPED	function⟨⟩*/*	annotation,block,jsdoc_cast,line,multiline
 DROPPED	function⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
@@ -388,7 +380,6 @@ DROPPED	}⟨⟩/*	line
 DROPPED	}⟨⟩:	annotation,block,jsdoc_cast,line,multiline
 DROPPED	}⟨⟩:{	annotation,block,jsdoc_cast,line,multiline
 DROPPED	}⟨⟩>(	annotation,block,jsdoc_cast,multiline
-DROPPED	}⟨⟩}/>	annotation,block,jsdoc_cast,line,multiline
 DROPPED	}⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩!.	annotation,block,jsdoc_cast
 DROPPED	␣⟨⟩"	annotation,block,jsdoc_cast,multiline
@@ -413,7 +404,6 @@ DROPPED	␣⟨⟩)!}	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩)(	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩),	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩).	annotation,block,jsdoc_cast,line,multiline
-DROPPED	␣⟨⟩)//	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩);/	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩)}	annotation,block,jsdoc_cast,multiline
@@ -443,7 +433,6 @@ DROPPED	␣⟨⟩[/*	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩]	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩];	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩as	annotation,block,jsdoc_cast,line,multiline
-DROPPED	␣⟨⟩class	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩{	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩{})	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩}	annotation,block,jsdoc_cast,line,multiline
@@ -454,8 +443,6 @@ DOUBLE-PRINTED	',⟨⟩/*	line
 DOUBLE-PRINTED	',⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	'}⟨⟩/*	line
 DOUBLE-PRINTED	'}⟨⟩;	line
-DOUBLE-PRINTED	(;⟨⟩IDENT	line
-DOUBLE-PRINTED	(;⟨⟩␣	annotation,block,line,multiline
 DOUBLE-PRINTED	(@⟨⟩/*	line
 DOUBLE-PRINTED	(@⟨⟩IDENT	line
 DOUBLE-PRINTED	(@⟨⟩␣	line
@@ -479,7 +466,6 @@ DOUBLE-PRINTED	,⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	...⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	:⟨⟩IDENT	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	:⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
-DOUBLE-PRINTED	;;⟨⟩IDENT	line
 DOUBLE-PRINTED	;⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	<⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	=>⟨⟩␣	annotation,block,jsdoc_cast,multiline
@@ -523,7 +509,7 @@ DOUBLE-PRINTED	}⟨⟩)};	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	}⟨⟩;	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	}⟨⟩]	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	}⟨⟩␣	line
-DOUBLE-PRINTED	␣⟨⟩(	annotation,block,jsdoc_cast,line,multiline
+DOUBLE-PRINTED	␣⟨⟩(	jsdoc_cast
 DOUBLE-PRINTED	␣⟨⟩(<	jsdoc_cast
 DOUBLE-PRINTED	␣⟨⟩...	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩/*	annotation,block,jsdoc_cast,line,multiline

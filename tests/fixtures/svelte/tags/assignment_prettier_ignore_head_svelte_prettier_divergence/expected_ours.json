@@ -1,0 +1,627 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 668,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 168,
+				"data": " an assignment value needs clarity parens, and those are the PRINTER's, so a frozen\n\thead keeps them outside the verbatim slice — the interior stays as authored "
+			},
+			{
+				"type": "Text",
+				"start": 168,
+				"end": 169,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 169,
+				"end": 212,
+				"expression": {
+					"type": "AssignmentExpression",
+					"start": 198,
+					"end": 209,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 2
+						},
+						"end": {
+							"line": 5,
+							"column": 13
+						}
+					},
+					"operator": "=",
+					"left": {
+						"type": "Identifier",
+						"start": 198,
+						"end": 201,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 5,
+								"column": 5
+							}
+						},
+						"name": "jjj"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 206,
+						"end": 209,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 10
+							},
+							"end": {
+								"line": 5,
+								"column": 13
+							}
+						},
+						"name": "kkk"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 177,
+							"end": 195
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 212,
+				"end": 214,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 214,
+				"end": 256,
+				"data": " a block head takes the same shape "
+			},
+			{
+				"type": "Text",
+				"start": 256,
+				"end": 257,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 257,
+				"end": 311,
+				"test": {
+					"type": "AssignmentExpression",
+					"start": 284,
+					"end": 295,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 2
+						},
+						"end": {
+							"line": 11,
+							"column": 13
+						}
+					},
+					"operator": "=",
+					"left": {
+						"type": "Identifier",
+						"start": 284,
+						"end": 287,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 2
+							},
+							"end": {
+								"line": 11,
+								"column": 5
+							}
+						},
+						"name": "lll"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 292,
+						"end": 295,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 10
+							},
+							"end": {
+								"line": 11,
+								"column": 13
+							}
+						},
+						"name": "mmm"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 263,
+							"end": 281
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 298,
+							"end": 306,
+							"raw": "\n\ttext1\n",
+							"data": "\n\ttext1\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 311,
+				"end": 313,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 313,
+				"end": 424,
+				"data": " an unprefixed `{…}` value takes the same shape — an attribute value, a spread head,\n\tan expression tag "
+			},
+			{
+				"type": "Text",
+				"start": 424,
+				"end": 425,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 425,
+				"end": 531,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 18,
+						"column": 1,
+						"character": 426
+					},
+					"end": {
+						"line": 18,
+						"column": 4,
+						"character": 429
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 431,
+						"end": 477,
+						"name": "prop",
+						"name_loc": {
+							"start": {
+								"line": 19,
+								"column": 1,
+								"character": 431
+							},
+							"end": {
+								"line": 19,
+								"column": 5,
+								"character": 435
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 436,
+							"end": 477,
+							"expression": {
+								"type": "AssignmentExpression",
+								"start": 462,
+								"end": 473,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 3
+									},
+									"end": {
+										"line": 21,
+										"column": 14
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 462,
+									"end": 465,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 3
+										},
+										"end": {
+											"line": 21,
+											"column": 6
+										}
+									},
+									"name": "ppp"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 470,
+									"end": 473,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 11
+										},
+										"end": {
+											"line": 21,
+											"column": 14
+										}
+									},
+									"name": "qqq"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 440,
+										"end": 458
+									}
+								]
+							}
+						}
+					},
+					{
+						"type": "SpreadAttribute",
+						"start": 479,
+						"end": 523,
+						"expression": {
+							"type": "AssignmentExpression",
+							"start": 508,
+							"end": 519,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 3
+								},
+								"end": {
+									"line": 25,
+									"column": 14
+								}
+							},
+							"operator": "=",
+							"left": {
+								"type": "Identifier",
+								"start": 508,
+								"end": 511,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 3
+									},
+									"end": {
+										"line": 25,
+										"column": 6
+									}
+								},
+								"name": "rrr"
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 516,
+								"end": 519,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 11
+									},
+									"end": {
+										"line": 25,
+										"column": 14
+									}
+								},
+								"name": "sss"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 486,
+									"end": 504
+								}
+							]
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 531,
+				"end": 533,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 533,
+				"end": 584,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 29,
+						"column": 1,
+						"character": 534
+					},
+					"end": {
+						"line": 29,
+						"column": 2,
+						"character": 535
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 536,
+							"end": 538,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 538,
+							"end": 579,
+							"expression": {
+								"type": "AssignmentExpression",
+								"start": 564,
+								"end": 575,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 3
+									},
+									"end": {
+										"line": 32,
+										"column": 14
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 564,
+									"end": 567,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 3
+										},
+										"end": {
+											"line": 32,
+											"column": 6
+										}
+									},
+									"name": "ttt"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 572,
+									"end": 575,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 11
+										},
+										"end": {
+											"line": 32,
+											"column": 14
+										}
+									},
+									"name": "uuu"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 542,
+										"end": 560
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 579,
+							"end": 580,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 584,
+				"end": 586,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 586,
+				"end": 647,
+				"data": " an unfrozen sibling still normalizes, parens and all "
+			},
+			{
+				"type": "Text",
+				"start": 647,
+				"end": 648,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 648,
+				"end": 667,
+				"expression": {
+					"type": "AssignmentExpression",
+					"start": 656,
+					"end": 665,
+					"loc": {
+						"start": {
+							"line": 37,
+							"column": 8
+						},
+						"end": {
+							"line": 37,
+							"column": 17
+						}
+					},
+					"operator": "=",
+					"left": {
+						"type": "Identifier",
+						"start": 656,
+						"end": 659,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 8
+							},
+							"end": {
+								"line": 37,
+								"column": 11
+							}
+						},
+						"name": "nnn"
+					},
+					"right": {
+						"type": "Identifier",
+						"start": 662,
+						"end": 665,
+						"loc": {
+							"start": {
+								"line": 37,
+								"column": 14
+							},
+							"end": {
+								"line": 37,
+								"column": 17
+							}
+						},
+						"name": "ooo"
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 177,
+			"end": 195,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 263,
+			"end": 281,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 440,
+			"end": 458,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 486,
+			"end": 504,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 24,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 542,
+			"end": 560,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 20
+				}
+			}
+		}
+	]
+}

@@ -6,8 +6,8 @@
 // - Building argument lists split into head/last patterns
 
 use super::super::{
-    ArrowChainContext, CommentSpacing, Printer, has_newline_before_position,
-    is_curried_arrow_chain, is_multiline_template_expression,
+    ArrowChainContext, CommentSpacing, Printer, is_curried_arrow_chain,
+    is_multiline_template_expression,
 };
 use super::arg_comments::{
     emit_first_arg_leading_comments, find_comma_pos, is_inline_block_after_comma,
@@ -22,6 +22,7 @@ use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
+use tsv_lang::source_scan::has_newline_before_position;
 
 /// Build an inline arrow function signature without break points.
 ///

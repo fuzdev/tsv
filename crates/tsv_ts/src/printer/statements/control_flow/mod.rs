@@ -76,6 +76,25 @@ impl<'a> Printer<'a> {
         (inline_prev, own_line, inline_next)
     }
 
+    /// Whether any comment between two positions falls in the `own_line` bucket of
+    /// [`Self::partition_comments_by_line`] — the same classification, asked without
+    /// building the two buckets the caller would throw away. For a caller that only
+    /// needs the *existence* answer (a break gate) this short-circuits on the first hit
+    /// and allocates nothing.
+    ///
+    /// Isolation is judged by position for **every** comment kind, which is what
+    /// separates this from [`Printer::comment_isolated_from_neighbors`] (and the
+    /// param-list gate over it): there a line comment counts as own-line wherever it
+    /// sits, because it forces the list open either way. Here a `//` sharing the
+    /// previous clause's line is that clause's trailing comment and belongs to the
+    /// `inline_prev` bucket, so it must not answer yes.
+    fn has_isolated_comment_between(&self, prev_end: u32, next_start: u32) -> bool {
+        comments_to_emit_in_range(self.comments, prev_end, next_start).any(|comment| {
+            !self.is_same_line(prev_end, comment.span.start)
+                && !self.is_same_line(comment.span.end, next_start)
+        })
+    }
+
     /// Does a header→body gap's comment run force the body onto its own line?
     ///
     /// Two independent reasons, and the second is easy to miss: a **line** comment must
@@ -242,19 +261,25 @@ impl<'a> Printer<'a> {
         let (inline_prev, mut own_line, inline_next) =
             self.partition_comments_by_line(gap_start, body_start);
 
-        // `inline_next` (a comment sharing the body's line) is treated the same as
-        // own-line — it is not trailing the anchor, so it gets its own line.
-        own_line.extend(inline_next);
+        // A comment sharing the body's line is not trailing the anchor, so it does not
+        // stay up there — but a **block** one glued to the body leads it inline
+        // ([`Printer::split_glued_comments`]); the rest take their own line.
+        let (rest, glued) = self.split_glued_comments(inline_next, body_start);
+        own_line.extend(rest);
 
         self.build_comments_between_parts(parts, &inline_prev, &own_line, None);
 
         // Anything on its own line already forced a break; otherwise only a `//` does,
-        // since it would swallow the body.
-        if !own_line.is_empty() || inline_prev.iter().any(|c| !c.is_block) {
+        // since it would swallow the body. A glued comment is one of the own-line ones:
+        // `partition_comments_by_line` hands the anchor's line to `inline_prev`, so
+        // everything in `glued` was authored *below* the anchor and keeps that line —
+        // gluing it to the body must not also hoist it up onto the header's.
+        if !own_line.is_empty() || !glued.is_empty() || inline_prev.iter().any(|c| !c.is_block) {
             parts.push(d.hardline());
         } else {
             parts.push(d.text(" "));
         }
+        self.push_glued_comment_run(parts, &glued);
     }
 
     /// The header→body gap for a **non-block** body: the comment run, then the body on
@@ -293,7 +318,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let (anchor_line, mut own_line, inline_next) =
             self.partition_comments_by_line(gap_start, body_start);
-        own_line.extend(inline_next);
+        // A block comment glued to the body leads it inline rather than taking a line of
+        // its own — see [`Printer::split_glued_comments`].
+        let (rest, glued) = self.split_glued_comments(inline_next, body_start);
+        own_line.extend(rest);
 
         // Only a **block** comment can stay on the anchor's line. A line comment authored
         // trailing `)` normalizes to its own line — that is the position-agnostic half
@@ -315,6 +343,7 @@ impl<'a> Printer<'a> {
         let mut inner = DocBuf::new();
         self.build_comments_between_parts(&mut inner, &inline_prev, &run, None);
         inner.push(d.hardline());
+        self.push_glued_comment_run(&mut inner, &glued);
         inner.push(body_doc);
         parts.push(d.indent(d.concat(&inner)));
     }
@@ -644,8 +673,20 @@ impl<'a> Printer<'a> {
             return self.build_condition_group(test_expr);
         }
 
-        // Build with comments
-        let test_doc = self.build_condition_doc(test_expr);
+        // Build with comments.
+        //
+        // Rule: an own-line directive in the `(`→condition gap freezes the condition WHOLE
+        // ([`Printer::value_head_frozen_span`]) — the condition head is a delimiter-owned
+        // value head like a `for` clause or a `return` operand. The slice is the
+        // condition's node span, so the `)` this layout supplies stays parent-owned; the
+        // `StatementTest` clarity parens (`if ((a = b))`) stay outside it too, since they
+        // are the printer's rather than the author's.
+        let test_doc = match self.value_head_frozen_span(open_paren_pos + 1, test_expr.span()) {
+            Some(frozen) => {
+                self.build_frozen_value_doc(test_expr, frozen, super::ParenContext::StatementTest)
+            }
+            None => self.build_condition_doc(test_expr),
+        };
         let mut inner_parts = DocBuf::new();
 
         // Collect leading comments

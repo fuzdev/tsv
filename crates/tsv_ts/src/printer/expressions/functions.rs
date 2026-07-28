@@ -15,15 +15,14 @@ use crate::printer::needs_parens::leftmost_no_lookahead;
 use crate::printer::types::helpers::is_huggable_type;
 use crate::printer::{CommentFilter, CommentSpacing, LeadingGlue};
 use crate::printer::{
-    CommentVec, ParenContext, Printer, has_newline_before_position,
-    is_multiline_template_expression, unwrap_parenthesized,
+    CommentVec, ParenContext, Printer, is_multiline_template_expression, unwrap_parenthesized,
 };
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
-use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::source_scan::{find_char_skipping_comments, has_newline_before_position};
 
 /// Check if an arrow body should stay on the same line as `=>` (no line break option).
 ///
@@ -1934,7 +1933,10 @@ impl<'a> Printer<'a> {
                     class_expr.body.span.start,
                     CommentSpacing::Leading,
                 ));
-                parts.push(self.build_class_body_doc(&class_expr.body, false));
+                parts.push(self.build_class_body_doc(
+                    &class_expr.body,
+                    self.gap_frozen_span(class_keyword_start, class_expr.body.span),
+                ));
                 return d.concat(&parts);
             }
             if let Some(comment_doc) = self.build_comments_between_filtered_opt(
@@ -1972,6 +1974,9 @@ impl<'a> Printer<'a> {
 
         // Assemble the header (group-wrapped); the body is appended outside the
         // group so its hardlines don't affect the header's fit check.
+        // Resolved once for the header placement and the body emission, as in the
+        // declaration printer.
+        let frozen_body = self.gap_frozen_span(positions.header_end, class_expr.body.span);
         let header_doc = self.build_class_header_doc(
             parts,
             &positions,
@@ -1983,12 +1988,13 @@ impl<'a> Printer<'a> {
                 body_start: class_expr.body.span.start,
                 layout: ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments),
                 emit_pre_body_comments,
+                body_frozen: frozen_body.is_some(),
             },
         );
 
         d.concat(&[
             header_doc,
-            self.build_class_body_doc(&class_expr.body, false),
+            self.build_class_body_doc(&class_expr.body, frozen_body),
         ])
     }
 }

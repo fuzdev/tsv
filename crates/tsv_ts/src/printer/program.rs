@@ -111,9 +111,13 @@ impl<'a> Printer<'a> {
             }
 
             // Statement — if preceded by a format-ignore directive, emit raw source.
-            // A Program's body is always directive-prologue eligible.
+            // A Program's body is always directive-prologue eligible. The freeze emitter
+            // (not the bare slice) claims the block comment **glued** before the statement:
+            // that comment is owned by whatever node heads it, rides inside the doc the
+            // slice replaces, and is skipped by the leading run above — so nothing else
+            // prints it (docs/comments.md hazard 1).
             if has_ignore {
-                parts.push(self.raw_source_doc(statement.span()));
+                parts.push(self.build_frozen_node_doc(statement.span()));
             } else {
                 parts.push(self.build_statement_doc(statement, true));
             }

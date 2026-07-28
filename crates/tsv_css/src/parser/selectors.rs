@@ -233,10 +233,9 @@ fn extract_selector_until_comma_or_end<'a>(
             }
             TokenKind::Eof => {
                 // Unexpected EOF - stop here
-                return Err(ParseError::UnexpectedEof {
-                    position: parser.base_offset() + parser.current_start(),
-                    context: None,
-                });
+                return Err(ParseError::unexpected_eof(
+                    parser.base_offset() + parser.current_start(),
+                ));
             }
             _ => {
                 parser.advance()?;

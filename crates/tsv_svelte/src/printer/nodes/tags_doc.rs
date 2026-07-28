@@ -4,13 +4,13 @@
 // {@const} initializer break rules.
 
 use crate::ast::internal;
-use crate::printer::Printer;
+use crate::printer::{CommentRun, HeadExpr, Printer};
 use smallvec::smallvec;
 use tsv_lang::Span;
+use tsv_lang::comments_in_source_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
 use tsv_lang::source_scan::TriviaProfile;
-use tsv_lang::{comments_in_source_range, comments_to_emit_in_range};
 use tsv_ts::Expression;
 
 // Opening-tag literals whose `.len()` locates the embedded expression past the
@@ -24,28 +24,24 @@ const AT_CONST_TAG_OPEN: &str = "{@const ";
 
 impl<'a> Printer<'a> {
     /// Build a doc for {@html expr}
-    pub(crate) fn build_html_tag_doc(&self, tag: &internal::HtmlTag<'_>) -> DocId {
-        let d = self.d();
+    ///
+    /// An assignment's clarity parens (`{@html (a = b)}`) are applied inside
+    /// [`Printer::build_expression_with_comments_doc`], so they land inside a frozen head's
+    /// break rather than around it.
+    pub(super) fn build_html_tag_doc(&self, tag: &internal::HtmlTag<'_>) -> DocId {
         // Build expression doc with surrounding comments
         // Span range: after "{@html " to before "}"
-        let expr_doc = self.build_expression_with_comments_doc(
+        let head = self.build_expression_with_comments_doc(
             &tag.expression,
             tag.span.start + HTML_TAG_OPEN.len() as u32,
             tag.span.end - 1,
         );
 
-        // Assignment expressions need parens: {@html (a = b)}
-        let expr_doc = if matches!(tag.expression, Expression::AssignmentExpression(_)) {
-            d.parens(expr_doc)
-        } else {
-            expr_doc
-        };
-
-        d.concat(&[d.text(HTML_TAG_OPEN), expr_doc, d.text("}")])
+        self.build_prefixed_head_doc(HTML_TAG_OPEN, head, "}")
     }
 
     /// Build a doc for {@const declaration}
-    pub(crate) fn build_const_tag_doc(&self, tag: &internal::ConstTag<'_>) -> DocId {
+    pub(super) fn build_const_tag_doc(&self, tag: &internal::ConstTag<'_>) -> DocId {
         self.build_assignment_tag_doc(AT_CONST_TAG_OPEN, &tag.id, &tag.init, tag.span)
     }
 
@@ -54,7 +50,7 @@ impl<'a> Printer<'a> {
     /// comments) is delegated to `tsv_ts`. The `}` terminates the tag, so the
     /// trailing `;` is dropped — except for a bare single declarator (`{let a}` →
     /// `{let a;}`), which prettier keeps.
-    pub(crate) fn build_declaration_tag_doc(&self, tag: &internal::DeclarationTag<'_>) -> DocId {
+    pub(super) fn build_declaration_tag_doc(&self, tag: &internal::DeclarationTag<'_>) -> DocId {
         let d = self.d();
         let decl = &tag.declaration;
         let emit_semicolon = decl.declarations.len() == 1 && decl.declarations[0].init.is_none();
@@ -90,14 +86,20 @@ impl<'a> Printer<'a> {
         // Build init with LayoutMode::Standalone so binary chains use Grouped style
         // (not ContinuationIndent). The assignment layout handles indentation —
         // ContinuationIndent would double-indent continuation lines.
+        // Nothing indents the init, so a trailing line comment's own `hardline` is already
+        // the break this `}` needs, on the tag's own column — the closer adds none
+        // ([`Printer::trailing_comment_docs`]'s `closer_owns_break`, passed `false` there).
         let init_doc = self.build_const_init_doc(
             init,
             id.span().end, // scan from after the id so a comment between `=` and init survives
             span.end - 1,  // before "}"
         );
+        let close = d.text("}");
 
         // Choose layout matching prettier's assignment layout selection.
-        if Self::const_should_break_after_op(init) {
+        if Self::const_should_break_after_op(init)
+            || self.gap_comment_hangs_value(id.span().end, init.span().start)
+        {
             // Binary expressions, conditional with binary test, etc.
             // Break-after-operator: group with line at "=" so the doc printer
             // can break when the flat form exceeds print width. This takes
@@ -109,14 +111,14 @@ impl<'a> Printer<'a> {
             // Prettier ref: shouldBreakAfterOperator (assignment.js:196-259)
             let rhs = d.concat(&[d.line(), init_doc]);
             let rhs_indented = d.indent(rhs);
-            let assignment = d.group(d.concat(&[d.text(" ="), rhs_indented, d.text("}")]));
+            let assignment = d.group(d.concat(&[d.text(" ="), rhs_indented, close]));
 
             d.concat(&[d.text(prefix), id_doc, assignment])
         } else if d.will_break(init_doc) {
             // Init has forced breaks (object/array/template, etc.) that aren't
             // break-after-operator — keep "= init" together, init's own breaks
             // handle formatting.
-            d.concat(&[d.text(prefix), id_doc, d.text(" = "), init_doc, d.text("}")])
+            d.concat(&[d.text(prefix), id_doc, d.text(" = "), init_doc, close])
         } else {
             // Fluid layout: break at `=` only when the full line exceeds
             // print width. Uses indentIfBreak so the RHS is evaluated
@@ -130,9 +132,40 @@ impl<'a> Printer<'a> {
                 d.group_with_id(d.indent(d.line()), GroupId::Assignment),
                 d.line_suffix_boundary(),
                 d.indent_if_break(init_doc, GroupId::Assignment),
-                d.text("}"),
+                close,
             ])
         }
+    }
+
+    /// Whether a comment in the binding→value gap hangs the value — prettier's
+    /// `hasLeadingOwnLineComment` (`hasNewline` at the comment's END, the same shape
+    /// `tsv_ts`'s object-property gap asks), which forces break-after-operator so the
+    /// comment and the value indent together under the `=`.
+    ///
+    /// A comment the author did not glue to the value cannot ride on the operator's line:
+    /// a `//` would swallow what follows, and an own-line block pulled flush against the
+    /// `=` loses the line the author gave it — which for an honored directive makes the
+    /// placement inert, so the freeze would die on the second pass. `tsv_ts`'s assignment
+    /// printer states the same rule for `<script>` code; this is the `{@const}` tag's copy
+    /// of it, and without it a self-expanding value (object, array) took the fluid layout
+    /// and glued the run to `=`, diverging from prettier for a plain comment too.
+    ///
+    /// **on page**, not to-emit: hanging the value is a LAYOUT decision, and a block glued
+    /// to the value is *owned* by it — emitted from inside the value's own doc, so an
+    /// emit-keyed scan never sees it and the gate went blind to exactly the comments that
+    /// sit closest to the value. That blindness is what let `{@const b = /**⏎ * c⏎ */ x}`
+    /// stay inline where `<script>`'s `const b = …` hung it, on the same input.
+    ///
+    /// An **indentable** block hangs even when glued (its reprint is hard lines); a
+    /// preserved multi-line block glued to the value does not (see
+    /// [`tsv_lang::is_indentable_block`]) — the shared rule, so the two hosts cannot
+    /// answer it differently.
+    fn gap_comment_hangs_value(&self, gap_start: u32, value_start: u32) -> bool {
+        tsv_lang::comments_on_page_in_range(self.comments, gap_start, value_start).any(|c| {
+            !c.is_block
+                || tsv_lang::is_indentable_block(self.source, c)
+                || tsv_lang::source_scan::has_newline_after_position(self.source, c.span.end)
+        })
     }
 
     /// Check if a @const init expression needs break-after-operator layout.
@@ -159,13 +192,21 @@ impl<'a> Printer<'a> {
 
     /// Build init expression doc for @const with assignment-appropriate config.
     ///
-    /// Like `build_expression_with_comments_doc` but uses `first_line_offset = 0`
-    /// so binary chains use Grouped style (not ContinuationIndent). The @const
-    /// assignment layout handles indentation; ContinuationIndent would stack.
+    /// Like `build_expression_with_comments_doc` but **without** its
+    /// `mode: LayoutMode::Embedded` — inheriting the host's Standalone mode is what keeps
+    /// binary chains on Grouped style rather than ContinuationIndent, since the printers
+    /// that choose between them read `EmbedContext::is_embedded()`. The @const assignment
+    /// layout handles indentation; ContinuationIndent would stack on top of it.
+    ///
+    /// The `=`→value head: an own-line directive anywhere in the binding→value gap
+    /// freezes the whole value. The window is the whole gap rather than the part past
+    /// the `=`, because this tag has no separate before-`=` emitter — `leading_docs`
+    /// prints every comment in it directly above the value, and the directive that
+    /// freezes a value is the one printed above it.
     fn build_const_init_doc(&self, expr: &Expression<'_>, span_start: u32, span_end: u32) -> DocId {
-        let d = self.d();
         let expr_start = expr.span().start;
         let expr_end = expr.span().end;
+        let frozen = self.honored_directive_in_gap(span_start, expr_start);
 
         let leading_docs = self.leading_comment_docs(span_start, expr_start);
 
@@ -175,12 +216,17 @@ impl<'a> Printer<'a> {
             ..self.embed
         };
 
-        let expr_doc =
-            tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embed);
+        // No clarity parens (`wrap_value_clarity_parens`, which this site deliberately does
+        // not call): here the paren is fully redundant and prettier drops it (`{@const a = (b = c)}` →
+        // `{@const a = b = c}`), so the frozen arm drops it too — consistent with this
+        // site's own unfrozen normalization, which is what the freeze must not contradict.
+        let expr_doc = self.build_head_value_doc(expr, frozen, &embed);
 
-        let trailing_docs: DocBuf = comments_to_emit_in_range(self.comments, expr_end, span_end)
-            .map(|c| self.build_trailing_js_comment_doc(c))
-            .collect();
+        // The run's last comment decides whether the tag's `}` owes itself a break —
+        // `build_assignment_tag_doc` places it in all three of its layouts.
+        // `closer_owns_break: false` — the tag's `}` sits on the init's own column, so the
+        // comment's own hardline is the break it needs.
+        let (trailing_docs, _) = self.trailing_comment_docs(expr_end, span_end, false);
 
         self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
     }
@@ -205,20 +251,65 @@ impl<'a> Printer<'a> {
     /// the previous identifier, one after it leads the next. Without the split a
     /// pre-comma comment (`{@debug x /* c */, y}`) falls through both
     /// per-identifier buckets and is dropped.
-    pub(crate) fn build_debug_tag_doc(&self, tag: &internal::DebugTag<'_>) -> DocId {
+    pub(super) fn build_debug_tag_doc(&self, tag: &internal::DebugTag<'_>) -> DocId {
         let d = self.d();
 
         // Comments within the tag's content (after "{@debug" and before "}").
-        let tag_comments: Vec<&tsv_lang::Comment> =
+        let tag_comments: CommentRun<'_> =
             comments_in_source_range(self.comments, tag.span.start, tag.span.end).collect();
 
         if tag.identifiers.is_empty() && tag_comments.is_empty() {
             return d.text("{@debug}");
         }
 
-        let mut parts: DocBuf = smallvec![d.text("{@debug ")];
         // Track position as we emit content, starting after the "{@debug" keyword.
         let mut last_end = tag.span.start + DEBUG_TAG_OPEN.len() as u32;
+
+        // The `{@debug`→identifiers head: an own-line directive there freezes the whole
+        // identifier **list** — the run from the first identifier to the last, which is
+        // what the tag normalizes (`{@debug  a ,  b }` → `{@debug a, b}`). The prefix and
+        // the `}` stay parent-owned, as at every other prefixed head.
+        //
+        // `verbatim_source_doc`, not `build_frozen_node_doc`: this builder is the sole
+        // POSITIONAL emitter of every comment in its content (the in-source axis its doc
+        // comment above explains), so the head-gap run — an owned glued block included — is
+        // already printed below. A second claim inside the slice would double-print it.
+        if let (Some(first), Some(last)) = (tag.identifiers.first(), tag.identifiers.last())
+            && self.honored_directive_in_gap(last_end, first.span().start)
+        {
+            let list = Span::new(first.span().start, last.span().end);
+            let mut frozen_parts: DocBuf = tag_comments
+                .iter()
+                .filter(|c| c.span.end <= list.start)
+                .map(|c| self.build_leading_js_comment_doc(c))
+                .collect();
+            frozen_parts.push(self.verbatim_source_doc(list));
+            // This builder emits its own trailing run, so it answers `ends_with_line_comment`
+            // off that one run rather than from a second scan that could disagree with it.
+            let trailing: CommentRun<'_> = tag_comments
+                .iter()
+                .copied()
+                .filter(|c| c.span.start >= list.end)
+                .collect();
+            let ends_with_line_comment = trailing.last().is_some_and(|c| !c.is_block);
+            frozen_parts.extend(
+                trailing
+                    .iter()
+                    .map(|c| self.build_trailing_js_comment_doc(c, false)),
+            );
+            let doc = self.indent_frozen_head(d.concat(&frozen_parts));
+            return self.build_prefixed_head_doc(
+                DEBUG_TAG_OPEN,
+                HeadExpr {
+                    doc,
+                    frozen: true,
+                    ends_with_line_comment,
+                },
+                "}",
+            );
+        }
+
+        let mut parts: DocBuf = smallvec![d.text("{@debug ")];
 
         for (i, id) in tag.identifiers.iter().enumerate() {
             let id_start = id.span().start;
@@ -242,7 +333,7 @@ impl<'a> Printer<'a> {
                 // Comments before the comma trail the previous identifier.
                 for comment in &tag_comments {
                     if comment.span.start >= last_end && comment.span.end <= comma {
-                        parts.push(self.build_trailing_js_comment_doc(comment));
+                        parts.push(self.build_trailing_js_comment_doc(comment, false));
                     }
                 }
                 parts.push(d.text(", "));
@@ -262,7 +353,7 @@ impl<'a> Printer<'a> {
         // Trailing comments (after the last identifier).
         for comment in &tag_comments {
             if comment.span.start >= last_end {
-                parts.push(self.build_trailing_js_comment_doc(comment));
+                parts.push(self.build_trailing_js_comment_doc(comment, false));
             }
         }
 
@@ -271,16 +362,15 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for {@render snippet(args)}
-    pub(crate) fn build_render_tag_doc(&self, tag: &internal::RenderTag<'_>) -> DocId {
-        let d = self.d();
+    pub(super) fn build_render_tag_doc(&self, tag: &internal::RenderTag<'_>) -> DocId {
         // Build expression doc with surrounding comments
         // Span range: after "{@render " to before "}"
-        let expr_doc = self.build_expression_with_comments_doc(
+        let head = self.build_expression_with_comments_doc(
             &tag.expression,
             tag.span.start + RENDER_TAG_OPEN.len() as u32,
             tag.span.end - 1,
         );
 
-        d.concat(&[d.text(RENDER_TAG_OPEN), expr_doc, d.text("}")])
+        self.build_prefixed_head_doc(RENDER_TAG_OPEN, head, "}")
     }
 }

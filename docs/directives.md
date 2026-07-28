@@ -204,6 +204,256 @@ nothing freezes (`function`, `class`): a directive is never reflowed onto the
 line above it, so its placement — the thing that decides whether it is honored —
 is always the one you wrote.
 
+### On value heads and sequence operands
+
+A construct that holds a single value behind a delimiter of its own freezes that
+**whole value** when an own-line directive sits in the gap — a `for` header's
+init / test / update clauses and a for-in/for-of header's left clause, a
+condition head's `(` (`if`, `else if`, `while`, `do…while`, a `switch`
+discriminant, a `catch` parameter), a `return` / `throw` / `yield` operand
+written in grouping parens, and a Svelte `{…}` value (`bind:`, `on:`, `class:`,
+`style:`, an expression tag):
+
+```ts
+for (
+	// format-ignore
+	i  =  0;
+	i < 10;
+	i++
+) {
+	fn();
+}
+
+if (
+	// format-ignore
+	aaa  &&  bbb
+) {
+	fn();
+}
+```
+
+```svelte
+<div
+	class:active={
+		// format-ignore
+		a  &&  b
+	}
+></div>
+```
+
+The delimiter that closes the value — the header's `;`, the `in`/`of` keyword,
+the condition's `)`, the grouping `)`, the closing `}` — is parent-owned and
+stays outside the frozen slice, and a sibling clause or attribute the freeze does
+not reach still reformats. Parens the printer supplies for clarity are
+parent-owned too: an assignment condition still prints as `if ((a = b))` around
+the frozen slice. As in a declaration header, tsv keeps the directive on its own
+line rather than pulling it up beside the `{`, where it would be inert.
+
+A comma **sequence** is a member list inside that: an own-line directive between
+two operands freezes the **next operand** only.
+
+```ts
+fn(
+	(a,
+	// format-ignore
+	b  (  1  ),
+	c)
+);
+```
+
+At a sequence's leading gap the directive leads the *sequence* rather than its
+first operand, so the whole sequence freezes — the value-head rule above. A
+sequence prints its own grouping parens, and they are re-synthesized around a
+frozen operand so its grouping survives.
+
+### On assignment-family value heads
+
+An assignment operator is a delimiter like any other, so an own-line directive in
+an `=`→value or `:`→value gap freezes the **whole value** — a declarator
+initializer, an assignment RHS (including a compound operator and each segment of
+a chain), an object property value, a class field value, and a default value:
+
+```ts
+const aaa =
+	// format-ignore
+	bbb  +  ccc;
+
+obj = {
+	ddd:
+		// format-ignore
+		eee  +  fff
+};
+
+class Single {
+	ggg =
+		// format-ignore
+		hhh  +  iii;
+}
+
+function fn(
+	jjj =
+		// format-ignore
+		kkk  +  lll
+) {}
+```
+
+```svelte
+{@const mmm =
+	// format-ignore
+	nnn  +  ooo}
+```
+
+The binding, the operator and the enclosing list are parent-owned and stay
+outside the frozen slice, so a sibling declarator or property the freeze does not
+reach still reformats. Parens the printer supplies for clarity stay outside too:
+an assignment initializer still prints as `const aaa = (bbb = ccc)` around the
+frozen slice.
+
+### On statement positions
+
+Statements follow the same rule. In a statement **list** — a `switch` body's
+cases, a case label's consequent statements, and (already) a program or block
+body — an own-line directive freezes the **following** statement or case:
+
+```ts
+switch (aaa) {
+	// format-ignore
+	case   1:
+		fn(  bbb  );
+	case 2:
+		fn(ccc);
+}
+```
+
+At a statement **head** it freezes the single statement, clause or body that
+follows — the consequent and alternate of an `if`, any loop's body, a labeled
+statement's body, a `catch` or `finally` clause, and a class body:
+
+```ts
+if (aaa)
+	// format-ignore
+	fn(  bbb  );
+
+while (aaa)
+	// format-ignore
+	fn(  bbb  );
+
+lll:
+// format-ignore
+for (;;) {
+	fn(  ccc  );
+	break lll;
+}
+
+try {
+	fn(aaa);
+}
+// format-ignore
+catch (  eee  ) {
+	fn(  ddd  );
+}
+
+class Aaa
+// format-ignore
+{
+	mmm(  ) {}
+}
+```
+
+A `case` label rides inside its own frozen case, and a class name and `extends`
+clause stay parent-owned outside the frozen body — so the siblings the freeze
+does not reach still reformat.
+
+One position is inert: a directive between a **decorator** and its declaration
+freezes nothing, because the decorator belongs to the declaration and the gap is
+inside the statement rather than before it.
+
+### On declaration heads
+
+The `export` and `export default` keywords introduce a declaration the same way,
+so a directive in the gap after either freezes it. The keyword stays outside the
+frozen slice; decorators written *after* it belong to the declaration and ride
+inside:
+
+```ts
+export
+	// format-ignore
+	const  aaa  =  1;
+
+export default
+	// format-ignore
+	@dec
+	class  Ddd  {}
+```
+
+A decorator written *before* `export` is the inert case again: the declaration
+begins at the decorator, so the `export`→class gap is inside it and a directive
+there freezes nothing.
+
+An expression statement the printer wraps in parens freezes the same way, with
+the parens left outside the slice:
+
+```ts
+(
+	// format-ignore
+	{ aaa:  1 }
+);
+```
+
+### On prefixed Svelte braced heads
+
+A `{` that carries a prefix before its value is a head like any other, so an
+own-line directive in the prefix→value gap freezes that whole value. The prefix,
+the `as` clause, an `{#each}` key's parens and the closing `}` all stay outside
+the slice, and a sibling the freeze does not reach still reformats:
+
+```svelte
+{@html
+	// format-ignore
+	aaa  +  bbb
+}
+
+<div
+	{...
+		// format-ignore
+		ccc  .  ddd
+	}
+	{@attach
+		// format-ignore
+		fn  (  eee  )
+	}
+></div>
+
+{#if
+	// format-ignore
+	fff  &&  ggg
+}
+	text1
+{/if}
+
+{#each
+	// format-ignore
+	hhh  .  iii
+as item (
+	// format-ignore
+	item  .  id
+)}
+	text2
+{/each}
+```
+
+The same holds for `{@render }`, `{@debug }`, `{:else if }`, `{#key }` and
+`{#await }`. A `{@debug}`'s slice is the identifier **list**, from the first
+identifier to the last. `{@const}` belongs to the assignment family above (its
+`=` is the delimiter), not here.
+
+As in a declaration header, tsv keeps the directive on its own line rather than
+pulling it up beside the prefix, where it would be inert — which is why a frozen
+head breaks even when it would otherwise fit. Three gaps that look like heads
+are not: the name in `{#snippet ⟨name⟩}` and the patterns in
+`{#each … as ⟨pattern⟩}` / `{#await … then ⟨pattern⟩}` reject a comment outright,
+in Svelte's parser as well as tsv's.
+
 ## `format-ignore-start` / `format-ignore-end`
 
 In Svelte templates, a pair of range markers preserves every node between them:

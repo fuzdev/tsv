@@ -505,6 +505,16 @@ Because it is render-free, that whitespace does **not select the layout**. Where
 
 The corollary is that whitespace *inside* the content — a **separator between two siblings** — is render-significant and therefore does still decide layout. Whitespace between two adjacent expression tags (`{a} {b}`) is a collapsible break: a space while the element fits, a newline once it goes block-style, so each tag takes its own line ([inline_content_spaced_tags_long](../tests/fixtures/svelte/elements/inline_content_spaced_tags_long_prettier_divergence/)); a text run between them flows as one fill and keeps them on the content line. The boundary carries no signal and must not select the layout; the separator carries one and must.
 
+**But it is the separator's *presence* that carries the signal, not its *spelling*.** A separator's **existence** decides layout — a *glued* boundary is never split, since breaking there would inject a rendered space. Its **form** does not: Svelte 5 collapses an inter-sibling run to one whitespace, so a space and a newline there render identically, and `text1⏎<span>inline1</span>⏎text2` is the same document as `text1 <span>inline1</span> text2`. tsv therefore flows an inline sibling isolated by authored newlines back onto the content line, converging those authorings; prettier lets each boundary decide and holds a stable form for each. This is what turns the large majority of `authoring_audit`'s `content-leading` / `content-trailing` sites from `diverge (dual-stable)` to `converge`; the remainder are shapes the exclusions below deliberately keep.
+
+Note this is **orthogonal to whether the element lays out multiline at all**, which an authored newline *does* decide and which is preserved: a newline anywhere in the content keeps the element multiline (want air, author multiline), and the fully hugged authoring stays hugged — both are shared fixed points with prettier. So the convergence target is the **multiline** form, not a collapsed one-liner; flowing the siblings must not also destroy the air the author asked for.
+
+Four things are **not** reshaped, because none is a mere spelling difference. A **comment** keeps its authored line (its position is authorship — folding one into a fill would relocate it across a semantic boundary, see [§Comment Position Philosophy](#comment-position-philosophy)); a **blank line** still breaks (a Tier-2 authoring signal independent of render); a **block sibling** still takes its own line (blocks merely partition a fragment into inline runs, each of which flows on its own); and a **control-flow block** (`{#if}` / `{#each}` / `{#key}` / `{#await}` / `{#snippet}`) keeps its own line too. The reason for that last one is neither "a block's width is not fixed" (a breaking `{expr}` tag expands mid-run too — `{f(⏎…⏎)}text4` — so width separates nothing) nor a bare appeal to a regressed fixture. It is that **a flowed block has no way to pay an overflow except by tearing itself open.** An inline element that cannot fit drops to its own line *whole*, tags intact — that is what `break_before_wide_flow` buys, and it is what makes flowing safe for elements. No such escape reaches a control-flow block, whose head and tail wrap a *fragment*: the only break available is at its own head↔body seam, so the body node lands on its own line and the flowed sibling text welds to the tail (`{#key key}⏎text6⏎{/key}text7`). The visible cost is that identical constructs then render differently by horizontal accident — in a run of five blocks, the two that happen to straddle the width boundary expand while their siblings stay inline. So the exclusion is a **consequence of a missing mechanism, not a property of blocks**: admitting them is gated on giving a block the same whole-unit drop an element has (widening the `next_is_flow` / `break_before_wide_flow` coupling past `is_inline_el_or_comp`), not on re-litigating this predicate. Measured against the fixture suite, admitting blocks as-is converges ~39 more `authoring_audit` sites — the yield is real, which is exactly why the bar is the layout, not the count. A breaking `{expr}` tag, by contrast, expands *inside its own expression* (the call's argument list) and leaves both of its outer adjacencies untouched, so it flows without this hazard — a settled choice rather than a rough edge.
+
+**The rule's boundary is the presence of a `fill` to reflow into, not the shape of the separator node.** Flowing means reflowing a run per width, and a run reflows only where there is prose for a `fill` to pack. So the rule reaches a whitespace-only separator standing *between two non-text siblings* — `text1⏎<span>a</span>` and `<span>a</span>⏎<span>b</span>` converge alike — **when that separator's inline run holds a content text**, and not otherwise. A run of pure elements or tags (`<Comp {a} />⏎<Comp {b} />`) keeps its authored lines: with no prose its newlines are the only structure the author has, collapsing them packs independent siblings onto one line, and on a short run the collapse cascades into the parent element's own hug decision — an outright idempotency break (`<mrow>` re-hugs on the second pass once its children fold). A run is bounded by whatever owns its own line — a block element, a control-flow block, a comment — and by an authored blank line, so a fragment's prose does not license flow in a neighbouring run that has none. Two mechanics keep this sound and are load-bearing. First, a flowing single newline takes the **space arm verbatim** rather than a parallel one: emitting a different collapsible form for the newline than for the space it claims to equal makes the formatter write a newline that its next pass re-reads as flowable and collapses. Second, the boundary must defer to the next sibling for a **tag** as well as an element — a bare `line` in the child list resolves all-or-nothing with the parent group, and a multiline fragment's parent group is always broken, so without that the one boundary owned by a content text's `fill` would flow while the rest of the same run hard-broke. That deferral is gated on the flow predicate and not on "next is a tag", because a plain authored space before a tag may have a **comment** on its other side, whose line is authorship. Note `authoring_audit` is blind to the tag half: both spellings already agreed there — on the hard-broken form — so it scores them as converging either way. — [inline_sibling_newline_flow](../tests/fixtures/svelte/elements/inline_sibling_newline_flow_prettier_divergence/) (an inline element, a component, an expression tag and a render tag, plus all five controls) and [expressions/angle_escaped](../tests/fixtures/svelte/expressions/angle_escaped_prettier_divergence/) (the tag-separator case, where prettier's plain `line` holds each tag on its authored line), and the shapes the rule reaches across the suite: [fill_text_inline_collapse](../tests/fixtures/svelte/elements/fill_text_inline_collapse_prettier_divergence/), [root_text_newline_inline](../tests/fixtures/svelte/elements/root_text_newline_inline_prettier_divergence/), [block_text_multiline_collapse](../tests/fixtures/svelte/elements/block_text_multiline_collapse_prettier_divergence/), [inline_attrs_multiline_content](../tests/fixtures/svelte/elements/inline_attrs_multiline_content_prettier_divergence/), [components/root_with_text](../tests/fixtures/svelte/components/root_with_text_prettier_divergence/). An element-separator run where both formatters agree once tsv flows it is pinned by `tests/fixtures/svelte/script/escapes` and `tests/fixtures/svelte/style/escapes`.
+
+**The rule's second boundary is the enclosing element's own multiline cause.** Landing both spellings on one doc converges them only if the *arm* they land in is itself spelling-independent, and it is not when the enclosing element went multiline **because of** those very newlines. Collapsing the separator there deletes the break that chose the multiline arm, so the next pass takes the inline arm — whose separator before a tag is a bare `line`, all-or-nothing with the already-broken parent group — and splits the run apart again. The two spellings become each other's *output* rather than one fixed point: `<small>⏎{a}⏎{b}x⏎</small>` ⇄ `<small>⏎{a} {b}x⏎</small>`, forever. So the rule stands down exactly there — inside such an element the newline is not pure spelling, it is the sanctioned Tier-2 element-expansion signal — and holds wherever the multiline layout is **structural**: the root fragment, block bodies, and any element forced multiline by block children, an expanding control-flow block, or a whitespace-collapsing container. This is what makes the orthogonality claimed above real rather than aspirational; before it, the flow rule and the expansion signal read the same newline and answered differently. Pinned by [inline_content_spaced_tags_tail_long](../tests/fixtures/svelte/elements/inline_content_spaced_tags_tail_long/), whose overflowing `<small>` holds a spaced tag pair with a trailing text run (the shape that makes the run prose) — one case each for a tag lead and an element lead, plus the 100-char control that stays inline and an `unformatted_shared_line` variant carrying the other spelling.
+
 **Scope: every fragment in the language, not just an element's content.** Svelte has two families of fragments — an element's/component's content, and **block bodies** (`{#if}` / `{:else}` / `{#each}` and its `{:else}` fallback / `{#key}` / each `{#await}` phase / `{#snippet}`) — and their boundaries are **equally render-free** (verified against `svelte/compiler`: every fragment boundary in the language is trimmed at compile; only inter-sibling whitespace and `<pre>`/`<textarea>` are significant). The stance applies to both: a block whose body renders multiline lays out block-style — head and tail intact, body on its own indented lines — however the author wrote that boundary, collapsing inline when the body fits. Prettier instead lets the boundary decide, keeping a hugged body hugged (`{#if c}<div>b1</div>⏎<div>b2</div>{/if}`) even as it breaks across lines, so it holds a different stable form for each authoring of one document.
 
 Two corollaries specific to blocks, both following from "the boundary carries no signal":
@@ -541,7 +551,7 @@ Both formatters keep the block-style form once produced (`prettier(input) == inp
 
 ### Svelte: Attributes
 
-**Trailing comments in `{...}`** (◆content_preservation) — [expr_trailing](../tests/fixtures/svelte/syntax/comments/expr_trailing_prettier_divergence/) (block comments, inline); [expr_trailing_line](../tests/fixtures/svelte/syntax/comments/expr_trailing_line_prettier_divergence/) (line comments — `}` kept on its own line so the `//` doesn't swallow it). Each fixture's README lists the contexts; they include `<svelte:element this={…}>` / `<svelte:component this={…}>`, whose expression Svelte's AST holds bare (no `ExpressionTag` around it) but which is the same `{…}` attribute value as any other. The *leading* and *interior* positions there are preserved by both formatters — [expr_special_this](../tests/fixtures/svelte/syntax/comments/expr_special_this/).
+**Trailing comments in `{...}`** (◆content_preservation) — [expr_trailing](../tests/fixtures/svelte/syntax/comments/expr_trailing_prettier_divergence/) (block comments, inline); [expr_trailing_line](../tests/fixtures/svelte/syntax/comments/expr_trailing_line_prettier_divergence/) (line comments — `}` kept on its own line so the `//` doesn't swallow it). Each fixture's README lists the contexts; they include `<svelte:element this={…}>` / `<svelte:component this={…}>`, whose expression Svelte's AST holds bare (no `ExpressionTag` around it) but which is the same `{…}` attribute value as any other. The *leading* and *interior* positions there are preserved by both formatters — [expr_special_this](../tests/fixtures/svelte/syntax/comments/expr_special_this/). A **run** of trailing comments is not the one-comment rule twice: prettier deletes them all, so tsv alone answers where the second one goes, and it answers with the run's own shape — a `//` ends the line, so what follows starts a fresh one and drops the separator space that would otherwise be leading whitespace; and the run's LAST comment decides the closer (a run ending in a block comment leaves no break for `}` to reuse, so a directive value takes the block form rather than hugging) — [expr_trailing_run](../tests/fixtures/svelte/syntax/comments/expr_trailing_run_prettier_divergence/). The `bind:` **function-binding sequence** is the same position one host in: prettier keeps the sequence's leading and inter-operand comments (so [function_comment](../tests/fixtures/svelte/directives/bind/function_comment/) matches) and deletes only the one past the last operand — [value_sequence_trailing_comment](../tests/fixtures/svelte/directives/bind/value_sequence_trailing_comment_prettier_divergence/).
 
 **Leading/interior comments in a `bind:` function-binding sequence** (◆content_preservation) — `bind:value={getter, setter}` carries getter/setter expressions as a bare (parens-stripped) sequence; tsv preserves a comment at the author's position where prettier keeps it. A leading line or multi-line block comment, mid (between getter/setter) block, and mid line comment all match prettier (regular fixture [function_comment](../tests/fixtures/svelte/directives/bind/function_comment/)). A **single-line block** comment *leading* the sequence is the one divergence — [function_comment_inline_block](../tests/fixtures/svelte/directives/bind/function_comment_inline_block_prettier_divergence/): prettier re-parenthesizes it (`{/* c */ (a, b)}`) then drops the comment on the next pass (non-idempotent), so tsv keeps the sequence bare and the comment in place. Trailing comments after the last operand are dropped by both. See [Comment Position Philosophy](#comment-position-philosophy).
 
@@ -724,6 +734,7 @@ This input is **valid** by tsv's parse oracle (Svelte / acorn-typescript / `pars
 - Bare definite-assignment class property (`b!;` — no type annotation, no initializer) — `Declarations with definite assignment assertions must also have type annotations.` (TS1264; acorn-typescript defers the early error, tsv follows) — [property_definite_no_init](../tests/fixtures/typescript/statements/class/property_definite_no_init_prettier_divergence/)
 - `@supports (margin: 0))` — unbalanced-paren `@supports` prelude; prettier's CSS parser (postcss, not `typescript`) throws — `Unbalanced parenthesis` — [supports_unbalanced_paren](../tests/fixtures/css/at_rules/supports_unbalanced_paren_prettier_divergence/)
 - `url(a\)b)` — unquoted `url()` with an escaped `)`; per CSS Syntax 3 §4.3.6 a url-token ends at the first *unescaped* `)`, so this is valid (parseCss accepts), but prettier's postcss miscounts the escaped `)` and throws — `Unbalanced parenthesis` — [url_escaped_paren](../tests/fixtures/css/values/functions/url_escaped_paren_prettier_divergence/)
+- Own-line format-ignore directive before an **empty** class body (`class Aaa⏎// prettier-ignore⏎{}`) — prettier's own every-comment-printed assertion fires, because its empty-body path emits no member for the relocated directive to lead — `Comment "prettier-ignore" was not printed` — [body_prettier_ignore_empty](../tests/fixtures/typescript/class/body_prettier_ignore_empty_prettier_divergence/)
 
 **Optional chain to private field**: `x?.#a` is valid modern JS (ecma262 `OptionalChain : ?. PrivateIdentifier`, from the private-fields-in-`in` era). typescript-estree rejects it; tsv keeps it stable. The comprehensive (prettier-formattable) private-field cases live in [private_fields](../tests/fixtures/typescript/declarations/class/private_fields/).
 
@@ -805,6 +816,10 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Switch discriminant trailing → Switch body — [discriminant_trailing_comment](../tests/fixtures/typescript/statements/switch/discriminant_trailing_comment_prettier_divergence/)
 - For empty clauses (line comments) → Outside parentheses (broken); tsv keeps each inside the parens, breaking only where a `//` forces a line end so `;;` stay together — [empty_clauses_comment](../tests/fixtures/typescript/statements/for/empty_clauses_comment_prettier_divergence/)
 - For empty clauses (block comments) → Outside parentheses; tsv keeps them inline in place and the trivially-short header on one line (`for (/* a */ ;;)`) — [empty_clauses_block_comment](../tests/fixtures/typescript/statements/for/empty_clauses_block_comment_prettier_divergence/)
+- For clause **leading own-line block** comment (`for (⏎/* a */⏎x = 0; …)`, and the same gap before the test / update clauses) → The whole header pulled onto one line; tsv keeps the authored line and expands around it, the same rule its own-line siblings follow. A block written *on* the `(`/`;` line takes the other outcome and keeps the header on one line, matching prettier ([clause_leading_comment_run](../tests/fixtures/typescript/statements/for/clause_leading_comment_run/)); a glued run stays on one line in both — [clause_leading_own_line_run](../tests/fixtures/typescript/statements/for/clause_leading_own_line_run_prettier_divergence/)
+- For update clause→`)` **own-line** comment → Out of the header entirely, stranded between `)` and the body `{`; tsv keeps it inside the parens on its own line before `)`, the same treatment an [empty update slot](#comment-relocation) gets, and for the same reason — `)` is all that closes the region. Not preserving drops it: the gap had no emitter but the same-line trail — [update_trailing_comment](../tests/fixtures/typescript/statements/for/update_trailing_comment_prettier_divergence/)
+- For **partially**-empty clause slot (one or two clauses present) → Into the next clause across the `;` (empty init / empty test slot) or out of the header entirely, stranded between `)` and the body `{` (empty update slot); tsv keeps the comment in the slot it was written in, the partially-empty header's form of the fully-empty rule above. The slot is what the comment is about — one in the empty test slot documents the missing condition, not the update prettier binds it to. Not preserving drops it: an empty slot has no other emitter — [empty_slot_comment](../tests/fixtures/typescript/statements/for/empty_slot_comment_prettier_divergence/)
+- For partially-empty clause slot, **a run of comments** → The whole run relocated the same way; tsv keeps it in the slot, in order, separated by the slot's own `line` — a space while the header fits, a fresh line once a `//` forces the header open. The run is where that separator becomes observable, since a single comment has nothing between it and could be held as one glued blob unnoticed — [empty_slot_comment_run](../tests/fixtures/typescript/statements/for/empty_slot_comment_run_prettier_divergence/)
 - For-of broken header line comments → Header collapsed inline, `// before const` kept trailing `(`, the rest scattered into the body (two-pass); tsv keeps each inside the broken header — [of_line_comment](../tests/fixtures/typescript/statements/for/of_line_comment_prettier_divergence/)
 - For-of/for-in keyword→binding line comment → Comment kept trailing `const`, but `x of y` pulled back onto one indented line; tsv keeps each inside the broken header (a same-gap *block* comment matches — `decl_keyword_binding_comment`; C-style `for`/standalone agree, only for-of/for-in diverges) — [of_in_keyword_binding_line_comment](../tests/fixtures/typescript/statements/for/of_in_keyword_binding_line_comment_prettier_divergence/)
 - For-in/of interior line comment → Header collapsed inline, the comment relocated to after `)`; tsv keeps the header broken with the comment between the operands (inline block comments match) — [in_of_own_line_comment](../tests/fixtures/typescript/statements/for/in_of_own_line_comment_prettier_divergence/)
@@ -877,7 +892,8 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Anon func keyword to `(` → After `)` or inside parens — [expr_anon_keyword_comment](../tests/fixtures/typescript/declarations/function/expr_anon_keyword_comment_prettier_divergence/)
 - Anon func keyword to `(` (line) → After `)` or inside parens — [expr_anon_line_comment](../tests/fixtures/typescript/declarations/function/expr_anon_line_comment_prettier_divergence/)
 - Anon class keyword to `{` (line) → Into class body — [expr_anon_line_comment](../tests/fixtures/typescript/declarations/class/expr_anon_line_comment_prettier_divergence/)
-- Bare parenthesized decorated class expr, own-line cmt after `(` (line or block) → Out of parens, onto its own line before `(`; tsv keeps it inside the parens after `(`. (A same-line block comment is still dropped — separate inline case.) — [decorated_expr_open_paren_comment](../tests/fixtures/typescript/expressions/class/decorated_expr_open_paren_comment_prettier_divergence/)
+- Bare parenthesized decorated class expr, cmt after `(` → Out of parens, onto its own line before `(`; tsv keeps it inside the parens after `(`. The decorated-class form of the required-paren statement case below — [decorated_expr_open_paren_comment](../tests/fixtures/typescript/expressions/class/decorated_expr_open_paren_comment_prettier_divergence/)
+- Expression statement whose parens are **required** (object / class / function expression at statement start, or a bare string that would read as a directive), cmt after `(` → Out of parens, onto its own line before `(`; tsv breaks the parens open and keeps the comment inside them, all spellings alike (a block glued to the *expression* is owned by it and stays inline — not a divergence). Not preserving drops it: the flat `(`/`)` wrap has nowhere to put a comment the expression doesn't own. Where the paren is *redundant* tsv drops it and the comment leads the statement, matching prettier (`expression_statement_paren_comment`) — [expression_statement_paren_kept_comment](../tests/fixtures/typescript/statements/expression_statement_paren_kept_comment_prettier_divergence/)
 - Constructor type `new` to `(` → After `)`, before param, or place — [constructor_type_new_comment](../tests/fixtures/typescript/types/constructor_type_new_comment_prettier_divergence/)
 - Constructor type `abstract` to `new` → After `new` (mirrors the `new`-to-params relocation) — [constructor_type_abstract_comment](../tests/fixtures/typescript/types/constructor_type_abstract_comment_prettier_divergence/)
 - Name to type params (line) → End of declaration line — [name_type_params_line_comment](../tests/fixtures/typescript/declarations/class/name_type_params_line_comment_prettier_divergence/)
@@ -1047,7 +1063,7 @@ Two carve-outs keep the operand break instead of collapsing: **`export default`*
 
 **The `}`→continuation-keyword gap keeps the blank**, and is a different question that merely shares an emitter. There is no body `{` to sit below the blank: it separates two branches of a chain (`}⏎⏎// c⏎else`, `}⏎⏎// c⏎catch (e) {`, `}⏎⏎// c⏎while (a);`), which is real authoring intent, so tsv preserves it. The gap covers `else`, `catch`, `finally`, and a do-while's `while` — every keyword that continues a construct across a `}`. Prettier agrees at `else` ([else_blank_before_comment](../tests/fixtures/typescript/statements/if/else_blank_before_comment/)). At `catch`/`finally` and at a do-while's `while` Prettier is no oracle — it relocates the comment away (into the following block's body, or into the condition parens; see the `divergent_variant_*` note above), discarding the blank with it — so tsv's own preservation stance governs there ([try/catch_between_comment](../tests/fixtures/typescript/statements/try/catch_between_comment_prettier_divergence/), [do_while/line_before_while_comment](../tests/fixtures/typescript/statements/do_while/line_before_while_comment_prettier_divergence/)). The comment's *position* is unchanged in every case — only the blank differs.
 
-**A blank line BETWEEN two own-line comments is always preserved**, in every gap — this is a separate question from the blank *above* the first comment, which the two entries above split by gap. An authored blank between two comments separates two distinct remarks, exactly as a blank between two statements does, so tsv keeps it in statement lists, class bodies ([syntax/comments/consecutive_blank_lines](../tests/fixtures/typescript/syntax/comments/consecutive_blank_lines/)), object literals, array elements, parameter lists, the header→body gap for **both** block and non-block bodies across `if`/`while`/`for`/for-in/for-of ([syntax/comments/between_head_and_body](../tests/fixtures/typescript/syntax/comments/between_head_and_body/)) and `try`/`catch`/`finally` ([try/keyword_body_blank_comment](../tests/fixtures/typescript/statements/try/keyword_body_blank_comment_prettier_divergence/)), and the `}`→continuation-keyword gaps. Prettier agrees in all of them but **one**: it collapses the blank in the `}`→`else` / `}`→`else if` gap — for line comments, block comments, and every blank in a longer run alike — [if/else_blank_between_comments](../tests/fixtures/typescript/statements/if/else_blank_between_comments_prettier_divergence/). The divergence is Prettier's own inconsistency rather than a tsv stance: where it *relocates* these comments (into the `catch` body, into a do-while's condition parens) it carries the blank along with them, so it treats the blank as meaningful everywhere except the one gap it prints through a different path. Prettier's collapsed form is dual-stable under tsv (that fixture's `variant_collapsed`), so an already-prettier-formatted file does not churn.
+**A blank line BETWEEN two own-line comments is always preserved**, in every gap — this is a separate question from the blank *above* the first comment, which the two entries above split by gap. An authored blank between two comments separates two distinct remarks, exactly as a blank between two statements does, so tsv keeps it in statement lists, class bodies ([syntax/comments/consecutive_blank_lines](../tests/fixtures/typescript/syntax/comments/consecutive_blank_lines/)), object literals, array elements, parameter lists, the header→body gap for **both** block and non-block bodies across `if`/`while`/`for`/for-in/for-of ([syntax/comments/between_head_and_body](../tests/fixtures/typescript/syntax/comments/between_head_and_body/)), the `for` header's own clause gaps ([for/clause_leading_comment_run](../tests/fixtures/typescript/statements/for/clause_leading_comment_run/)) and `try`/`catch`/`finally` ([try/keyword_body_blank_comment](../tests/fixtures/typescript/statements/try/keyword_body_blank_comment_prettier_divergence/)), and the `}`→continuation-keyword gaps. Prettier agrees in all of them but **one**: it collapses the blank in the `}`→`else` / `}`→`else if` gap — for line comments, block comments, and every blank in a longer run alike — [if/else_blank_between_comments](../tests/fixtures/typescript/statements/if/else_blank_between_comments_prettier_divergence/). The divergence is Prettier's own inconsistency rather than a tsv stance: where it *relocates* these comments (into the `catch` body, into a do-while's condition parens) it carries the blank along with them, so it treats the blank as meaningful everywhere except the one gap it prints through a different path. Prettier's collapsed form is dual-stable under tsv (that fixture's `variant_collapsed`), so an already-prettier-formatted file does not churn.
 
 **Type-construct gap line comments** (swallow prevention): a line comment in a type construct's delimiter/keyword/operator gap is kept where the author wrote it, the following token dropped to the next line so the `//` cannot swallow it (the shared `build_trailing_comments_hang_next` / `build_leading_comments_break_for_line`). Prettier relocates each differently — out to a statement-trailing position, into/after the enclosing brackets, or trailing the source. tsv preserves the authored position uniformly. Emitting the comment inline (the previous behavior at these sites) let the `//` run to end-of-line and absorb the following token — non-idempotent **content loss**. Covered: indexed access [indexed_access_line_comment](../tests/fixtures/typescript/types/indexed_access_line_comment_prettier_divergence/), mapped `in`/`as` [mapped/keyword_line_comment](../tests/fixtures/typescript/types/mapped/keyword_line_comment_prettier_divergence/), import-type qualifier [import_type_qualifier_line_comment](../tests/fixtures/typescript/types/import_type_qualifier_line_comment_prettier_divergence/), and tuple rest / named / optional members [tuple/member_line_comment](../tests/fixtures/typescript/types/tuple/member_line_comment_prettier_divergence/). (`infer` lands a break too but takes the indented keyword→value hang rather than this flush form, so it diverges — see the Infer keyword entry above.)
 
@@ -1680,6 +1696,282 @@ tsv is likewise inert to the flush form and never moves a comment *up*, so prett
 output is a form tsv only re-indents (`divergent_variant_flush`, the pre-existing keyword→value
 hang) —
 [keyword-gap own line](../tests/fixtures/typescript/syntax/comments/keyword_gap_prettier_ignore_own_line_prettier_divergence/)
+
+**On delimiter-owned value heads, and on sequence operands.** A construct that holds a single
+value behind a delimiter of its own — a `for` header's `(`→init, `;`→test and `;`→update
+clauses and a for-in/for-of header's `(`→left clause, a **condition head**'s `(` (`if` /
+`else if` / `while` / `do…while`, a `switch` discriminant, a `catch` parameter), a restricted
+production's grouping `(` (`return` / `throw` / `yield`), and a Svelte
+`{…}` value (`bind:` / `on:` / `class:` / `style:` and an expression tag) — freezes that
+**whole value** when an own-line directive sits in the gap. The slice is the value's own node
+span, so the delimiter that closes it (the header's `;`, the `in`/`of` keyword, the condition's
+`)`, the grouping `)`, the closing `}`)
+stays parent-owned, and a sibling clause or attribute the freeze does not reach still
+normalizes. Prettier agrees at every one of those positions, so the ordinary fixtures
+`for/clauses_prettier_ignore_head`, `statements/condition_prettier_ignore_head`,
+`return_throw/operand_prettier_ignore_head` and
+`bind/value_prettier_ignore_head` **match**.
+
+A test position carries one more parent-owned fact: the **clarity parens the printer supplies**
+for a value that would otherwise read as a typo — an assignment prints `if ((a = b))`, and
+`for (; (a = b); )` — belong outside the frozen slice, exactly as an argument's do, so the
+frozen inner keeps the parens around it (`if (⏎// prettier-ignore⏎(aaa  =  bbb))`, prettier
+agreeing at both hosts).
+
+Inside a sequence the classification is Rule A again, unchanged: an own-line directive in an
+**inter-operand** gap freezes only the **following** operand, and the operands on either side
+of it reformat. The two rules meet at a sequence's leading gap, where the directive leads the
+*sequence node* rather than its first operand — so the whole sequence rides inside one
+verbatim slice, in a `for` clause, a `return`/`throw` operand and a Svelte value alike
+(`sequence/operands_prettier_ignore_member` covers the inter-operand half and matches
+prettier). Two node-level facts the slice carries are the same ones every value-side freeze
+carries: a block comment glued before the value is **owned** by it and rides inside the doc
+the slice replaces, so the freeze claims it; and a `SequenceExpression` prints its own
+grouping parens *outside* its node span, so a frozen sequence operand re-synthesizes them or
+loses its grouping.
+
+A **glued** directive is inert here as everywhere — `for (/* prettier-ignore */ i = 0; …)`,
+`return /* prettier-ignore */ a + b`, `if (/* prettier-ignore */ a + b)` — where prettier honors
+the glued placement and freezes;
+each fixture's `prettier_variant_frozen` pins prettier's stable frozen form, which tsv
+normalizes ([clauses glued
+inert](../tests/fixtures/typescript/statements/for/clauses_prettier_ignore_glued_inert_prettier_divergence/)).
+
+tsv diverges at six places:
+
+- Directive written in an **empty `for` clause slot** — ◆comment_preservation — it stays in
+  that slot, so it freezes nothing: the clause it would freeze is on the other side of the
+  `;`. Prettier moves it across into the next clause and freezes there. This is the freeze
+  consequence of the already-sanctioned empty-slot rule (§Comment relocation), and it follows
+  from the general one — the directive that freezes a value is the one printed above it. The
+  relocated authoring is dual-stable (`variant_relocated`): there the directive really does
+  lead the test clause, and tsv freezes it too —
+  [empty slot inert](../tests/fixtures/typescript/statements/for/empty_slot_prettier_ignore_inert_prettier_divergence/)
+- `yield` / `yield*` operand — ◆comment_preservation ◆prettier_bug — tsv freezes and keeps the
+  hanging-paren layout the own-line comment forces; prettier relocates the directive onto the
+  keyword's line and strips the parens (the pre-existing `yield` relocation in §Comment
+  relocation, here carrying the directive). Its relocated form is **not a fixed point** — the
+  next pass reformats the plain-`yield` operand and **loses the freeze**, pinned in
+  `audit_signature.txt`. `return` / `throw` match prettier —
+  [yield operand](../tests/fixtures/typescript/statements/return_throw/yield_operand_prettier_ignore_head_prettier_divergence/)
+- `for` init that is a **declaration** — ◆prettier_bug — prettier's frozen slice swallows the
+  header's `;` and then emits the separator after it (`let i  =  0, j = 1;;`), producing a
+  four-clause header that **does not parse**. tsv keeps the separator parent-owned, as at
+  every other frozen list item —
+  [init declaration](../tests/fixtures/typescript/statements/for/init_declaration_prettier_ignore_head_prettier_divergence/)
+- **for-in / for-of left clause** — ◆comment_preservation ◆prettier_bug — prettier relocates the
+  directive flush against the `(` (`for (// prettier-ignore⏎const  xxx …`), a placement tsv never
+  writes; and where the left is a **declaration** its frozen slice is followed by a `;`, giving
+  `for (const  xxx; of yyy)` — the same unparseable output as the `for`-init form above. A
+  **pattern** left freezes correctly for both, so there only the relocation differs. tsv keeps
+  the directive on its own line, which holds the header in the standing for-in/for-of
+  line-comment layout (binding, keyword and iterable each on their own line) — for **both**
+  spellings, unlike an ordinary block comment, which still rides inline. The same placement
+  rule holds in the header's keyword→binding gap, where nothing freezes yet —
+  [in/of left](../tests/fixtures/typescript/statements/for/in_of_left_prettier_ignore_head_prettier_divergence/)
+- Frozen **function-binding sequence** in a `bind:` value — ◆comment_preservation ◆prettier_bug —
+  tsv emits the getter/setter pair bare, as it does for every other function-binding value.
+  Prettier parenthesizes it (which Svelte reads as a grouped expression, not a binding pair)
+  and then **drops the directive entirely** on its second pass, reformatting the value — the
+  same non-idempotent loss the plain-comment case already has —
+  [bind value sequence](../tests/fixtures/svelte/directives/bind/value_sequence_prettier_ignore_head_prettier_divergence/),
+  sibling [function_comment_inline_block](../tests/fixtures/svelte/directives/bind/function_comment_inline_block_prettier_divergence/)
+- Directive in a **`{…}` value gap** — ◆design_choice ◆comment_preservation — tsv keeps it on
+  its own line, so the value takes the broken block form; prettier pulls it flush against the
+  `{` (`class:active={// prettier-ignore`) and freezes anyway. This is the `{…}` instance of
+  the header-gap rule above — the flush form is inert under the placement floor, so following
+  prettier would lose the freeze on tsv's own second pass. Per the placement-only
+  classification, **both spellings** take the broken form: a `//` directive ends in a hardline
+  of its own, while a `/*…*/` one is emitted inline into a softline-hung group, so the block
+  half is pinned explicitly across every braced value shape (directive value, expression tag,
+  `bind:` value, `bind:` function-binding sequence). `bind:` needs no divergence for the line
+  spelling, where it already writes the broken form —
+  [braced value own line](../tests/fixtures/svelte/syntax/prettier_ignore/braced_value_own_line_prettier_divergence/)
+
+  The value's **closing** `}` follows the ordinary rule, freeze or not: a trailing run ending
+  in a line comment already ended the line, so the closer reuses that break rather than adding
+  a second one (which would render as a blank line above it). Reusing a break also means
+  inheriting its column, so the run's final break is emitted **dedented** out of the content's
+  indent — the `}` then lands where it lands with no trailing comment at all, rather than one
+  level deeper because a comment happened to be there. This is what
+  `build_prefixed_head_doc` does one delimiter out for the prefixed heads, and the unprefixed
+  `{…}` values — expression tag, attribute value, `bind:` value — owe the identical shape —
+  [braced value trailing line](../tests/fixtures/svelte/syntax/prettier_ignore/braced_value_trailing_line_prettier_divergence/)
+
+`yield`'s hanging-paren layout carries its own pre-existing comment relocation (see
+[§Comment relocation](#comment-relocation)); the freeze rides on it rather than adding a
+second divergence.
+
+**On assignment-family value heads.** The same head rule, with the assignment operator as the
+delimiter: an own-line directive in an `=`→value or `:`→value gap freezes that **whole value**.
+The hosts are a declarator initializer (`const a =`, and a Svelte `{@const a =}`), an assignment
+RHS (`a =`, a compound `a +=`, and each segment of a chain), an object property value (`k:`), a
+class field value (`f =`, `static f =`, `#f =`, `accessor f =`), and a default value (a
+parameter default, a destructuring default, an array-pattern default). The slice is the value's
+own node span, so the binding, the operator and the enclosing list stay parent-owned and a
+sibling declarator or property the freeze does not reach still normalizes. Prettier agrees at
+every unprefixed host, so the ordinary fixtures
+`statements/variable/init_prettier_ignore_head`, `expressions/assignment/rhs_prettier_ignore_head`
+and `svelte/tags/const/value_prettier_ignore_head` **match**.
+
+The clarity parens rule carries over unchanged — an initializer that is an assignment prints as
+`const a = (b = c)`, and those parens are the printer's, so the frozen inner keeps them around
+it. So does the placement rule: the pattern-family gaps trail an ordinary own-line comment onto
+the operator's line (`aaa = // c`, a relocation §Comment relocation already sanctions at
+`param_default_*_comment_prettier_divergence`), but an **honored directive keeps its own line**
+there, since the trailing placement is inert under the floor and following it would lose the
+freeze on tsv's own second pass. That is the declaration-header rule of §On module and declarator
+lists, one delimiter out.
+
+tsv diverges at one place:
+
+- **Default value** — ◆design_choice — tsv breaks the enclosing list around the frozen value,
+  because the directive's own line is a mandatory break inside that list and a list holding a
+  break prints expanded — the same layout a plain own-line comment in that gap already produces.
+  Prettier keeps the list flat and glues the closer to the frozen value's last line
+  (`function fn(aaa =⏎…⏎bbb  +  ccc) {}`, `const [iii =⏎…⏎jjj  ||  kkk] = lll`) —
+  [default head](../tests/fixtures/typescript/expressions/assignment/default_prettier_ignore_head_prettier_divergence/)
+
+**On statement positions.** Rule A once more, over statements. An own-line directive in a
+statement **list** — a `switch` body's `{`→first-case and between-case gaps, a case label's
+`:`→first-statement and between-statement gaps — freezes the **following** member over its own
+node span, exactly as it already does in a program body and a block body. A statement **head**
+— the `)`→consequent and `else`→alternate gaps, every loop's →body gap (`while`, C-style `for`,
+for-in / for-of, and `do`, which introduces its body with no `)` of its own), a `label:`→body
+gap, the `}`→`catch` / `}`→`finally` gap, and a class head's →`{` gap — freezes the single
+statement, clause or body that follows it. The slice is that node's own span, so a `case` label
+rides inside its own frozen case while the sibling cases normalize, and a class name and
+`extends` clause stay parent-owned while the body freezes. A **block** body freezes with its
+braces, and a loop's collapsed-empty-block form (`for (…) {}`) yields to the verbatim slice.
+
+Two of those heads relocate an ordinary own-line comment — a labeled statement's trails the
+label (`lll: // c`) and a class head's trails the heritage (`class Aaa // c`) — and there, as
+at the declaration headers of §On module and declarator lists, an **honored directive keeps its
+own line** instead: the trailing placement is inert under the floor, so following the
+relocation would lose the freeze on tsv's own second pass.
+
+Prettier agrees at the list positions and at the `if` heads — including the freeze's SCOPE
+there, which the fixtures' `unformatted_spaces` variants pin by perturbing the head outside the
+slice — so the ordinary fixtures `statements/switch/case_prettier_ignore_head`,
+`statements/switch/consequent_prettier_ignore_head`,
+`statements/if/branch_prettier_ignore_head` and
+`statements/loops/body_prettier_ignore_head` **match**. tsv diverges at three heads:
+
+- **`catch` / `finally` clause** — ◆comment_preservation — prettier moves the directive inside
+  the clause's block body and freezes the **first statement** there, so its `catch` binding
+  normalizes while tsv freezes the whole clause. The plain-comment form of the same relocation
+  is already sanctioned at
+  [catch_between_comment](../tests/fixtures/typescript/statements/try/catch_between_comment_prettier_divergence/) —
+  [handler head](../tests/fixtures/typescript/statements/try/handler_prettier_ignore_head_prettier_divergence/)
+- **Class body** — ◆comment_preservation — prettier pulls the `{` up onto the head line, moves
+  the directive inside the body and freezes the **first member**; tsv freezes the whole body —
+  [class body head](../tests/fixtures/typescript/class/body_prettier_ignore_head_prettier_divergence/)
+- **Labeled body** — ◆design_choice — a SCOPE difference rather than a relocation: prettier
+  freezes the whole labeled statement (its comment attaches to the `LabeledStatement`, since a
+  `:` begins no node), so a spaced label survives; tsv freezes the body the directive actually
+  precedes and normalizes the label. Pinned by a `prettier_variant_label_spaces` form, and
+  shown to be the freeze's doing by the same label normalizing without a directive —
+  [labeled body head](../tests/fixtures/typescript/statements/labeled/body_prettier_ignore_head_prettier_divergence/)
+
+One statement position is **inert by agreement**: a directive between a **decorator** and its
+declaration (`@dec⏎// prettier-ignore⏎export class D {}`) freezes nothing, in prettier or in
+tsv. The decorator belongs to the declaration it decorates, so the gap is inside the statement
+rather than before it, and there is no following member for the rule to bind to.
+
+**On declaration heads and parenthesized statements.** The last two statement-level heads are
+the ones where prettier **relocates the directive out of the gap** and freezes anyway — the
+`export`→declaration, `export default`→value and `export =`→value gaps, and the `(`→expression
+gap of a statement whose parens the printer keeps. tsv freezes the same node at all four and
+keeps the directive
+where the author wrote it, which at the two `export` heads is the uniform declaration-header
+layout an ordinary comment already takes there (the keyword alone on its line, the continuation
+indented) and at the paren head is inside the broken parens. Both spellings behave alike;
+placement keys the freeze.
+
+The `export` keyword is parent-owned and stays outside the slice, while decorators written
+*after* it belong to the declaration and ride inside it. The gap one delimiter *earlier* — the
+`export`→`=` interior of `export =` — is not a head at all: a `=` begins no node, so Rule A has
+nothing to bind to and a directive there freezes nothing (prettier reaches past the `=` and
+freezes the value). At the paren head the parens are the
+printer's, so they too stay outside — and when a frozen slice's own leftmost token needs them
+(`{ bbb: 2 }.ccc`, which would otherwise reparse as a block) the shell goes around the **whole**
+slice, since a verbatim slice has no interior for the printer to wrap. Where the parens are
+merely redundant tsv drops them and the directive leads the statement, matching prettier
+(`statements/expression_statement_paren_dropped_prettier_ignore_head`).
+
+- **`export`→declaration head** — ◆comment_preservation — prettier pulls the directive flush
+  onto the `export` line (`export // prettier-ignore`) and freezes anyway; tsv keeps the
+  author's line, since the flush placement is inert under the floor and would lose the freeze
+  on the second pass. The plain-comment form of the same relocation is already sanctioned at
+  [export_declaration_line_comment](../tests/fixtures/typescript/syntax/comments/export_declaration_line_comment_prettier_divergence/) —
+  [named head](../tests/fixtures/typescript/modules/exports/named_declaration_prettier_ignore_head_prettier_divergence/),
+  [default head](../tests/fixtures/typescript/modules/exports/default_declaration_prettier_ignore_head_prettier_divergence/),
+  [`export =` head](../tests/fixtures/typescript/modules/exports/export_equals_prettier_ignore_head_prettier_divergence/)
+- **Paren-kept expression statement** — ◆comment_preservation ◆prettier_bug — prettier hoists
+  the directive out before the `(` and glues the frozen slice back inside parens on one line.
+  On the leftmost-token case it also drops the shell, emitting `{ bbb:  2 }.ccc;`, which does
+  not reparse —
+  [paren head](../tests/fixtures/typescript/statements/expression_statement_prettier_ignore_head_prettier_divergence/)
+- **`export`→class gap of a decorator-FIRST class** — ◆comment_preservation
+  ◆content_preservation — `@dec⏎export⏎// c⏎class C {}`. The declaration's span opens at the
+  decorator, so this gap is *inside* it, and a directive there freezes nothing in either tool —
+  the mirror image of the decorator→declaration gap above. Prettier hoists a line comment above
+  `export` and trails a block comment on the decorator; tsv keeps both in place. tsv previously
+  **dropped** every comment in this gap, scanning it over an inverted range —
+  [before export](../tests/fixtures/typescript/typescript_specific/decorators/before_export_comment_prettier_divergence/)
+
+**On prefixed Svelte braced heads.** The head rule reaches one delimiter further out: a `{`
+that carries a **prefix** before its value. An own-line directive in the prefix→value gap
+freezes that whole value — the tags `{@html }`, `{@render }`, `{@attach }` and `{@debug }`, the
+`{...}` spread attribute, and every block head (`{#if }` / `{:else if }`, `{#each }` and an
+`{#each}` key's own `(`, `{#key }`, `{#await }`). The prefix, the `as` clause, the key's parens
+and the closing `}` are all parent-owned and stay outside the slice; a sibling tag, spread or
+block the freeze does not reach still normalizes. `{@debug}`'s slice is the identifier **list**
+(first identifier through last), which is what that tag normalizes. `{@const}` is not in this
+family — its `=` makes it an assignment head, where prettier agrees
+([svelte/tags/const/value_prettier_ignore_head](../tests/fixtures/svelte/tags/const/value_prettier_ignore_head/)).
+
+Three Svelte positions look like heads but are not: `{#snippet ⟨name⟩}`, `{#each … as ⟨pattern⟩}`
+and `{#await … then ⟨pattern⟩}` reject a comment in that gap in **both** parsers, so there is
+nothing to bind to.
+
+Every one of these is a divergence, for a single reason: prettier **relocates** the directive
+flush onto the prefix's line (`{@html // prettier-ignore`, `{#if // prettier-ignore`) and
+freezes anyway. That placement is inert under tsv's floor, so following it would lose the freeze
+on tsv's own second pass. The unprefixed `{…}` values already have an own-line form to fall back
+on (`wrap_in_block_structure` — the `{⏎…⏎}` block that
+[bind/value_prettier_ignore_head](../tests/fixtures/svelte/directives/bind/value_prettier_ignore_head/)
+pins); a prefixed head had none, so it takes the same shape one prefix out — the prefix alone on
+its line, the directive and the frozen slice indented below it, and the closing token dangling.
+The block heads already reach that geometry whenever a leading line comment breaks the head, so
+only the directive's own line is new there. Inside a whitespace-significant element (`<pre>` /
+`<textarea>`) the dangle is suppressed as always and the closer hugs the slice.
+
+- **Prefixed tag heads** — ◆comment_preservation —
+  [`{@html}` / `{@render}` / `{@attach}`](../tests/fixtures/svelte/tags/prefixed_value_prettier_ignore_head_prettier_divergence/),
+  [`{...}` spread](../tests/fixtures/svelte/attributes/spread_prettier_ignore_head_prettier_divergence/)
+- **Block heads** — ◆comment_preservation — the `}` dangle is the block layout tsv already
+  takes for a broken head (§Svelte: Blocks) —
+  [block heads](../tests/fixtures/svelte/blocks/head_prettier_ignore_prettier_divergence/)
+- **A frozen head whose value takes clarity parens** — ◆comment_preservation ◆prettier_bug —
+  an assignment value is parenthesized by the printer (`{@html (a = b)}`), and those parens
+  stay **outside** the verbatim slice, like the prefix and the `}`. The rule keys on the
+  **value**, so every braced position answers it identically — the prefixed heads (tag,
+  block, `{...}` spread) and the unprefixed `{…}` values (attribute value, expression tag)
+  alike; the lone exception is `{@const}`'s initializer, where the paren is fully redundant
+  and normalizes away frozen or not. Prettier has no freeze to
+  compare against here: its `remove_parens` pass **deletes** the directive along with the
+  wrapper it attached to, so the value normalizes and the comment is lost outright. Also a
+  `_svelte_divergence` — the same pass moves the parser's attachment (§Comment Attachment
+  Differences in [conformance_svelte.md](./conformance_svelte.md)) —
+  [assignment head](../tests/fixtures/svelte/tags/assignment_prettier_ignore_head_svelte_prettier_divergence/)
+- **`{@debug}` head** — ◆comment_preservation ◆prettier_bug — prettier supplies no freeze
+  semantics to compare against, because it **deletes** every comment inside a `{@debug}`,
+  directive included (the content loss
+  [debug_comment](../tests/fixtures/svelte/tags/debug/debug_comment_prettier_divergence/)
+  already catalogs). tsv preserves the comment, so it must also answer where the comment goes
+  and what it freezes, and answers both the way the rest of the family does —
+  [debug head](../tests/fixtures/svelte/tags/debug/value_prettier_ignore_head_prettier_divergence/)
 
 See [directives.md](./directives.md) for the user-facing reference.
 

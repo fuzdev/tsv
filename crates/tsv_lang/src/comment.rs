@@ -1,6 +1,7 @@
 // Shared comment type and utilities used across languages
 use crate::Span;
 use crate::printing;
+use crate::source_scan::{self, has_newline_after_position, has_newline_before_position};
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy)]
@@ -84,6 +85,24 @@ impl Comment {
     }
 }
 
+/// Whether `comment` is a multi-line block comment that **prints as indented lines** —
+/// the comment-level form of [`printing::is_indentable_block_comment`] (prettier's
+/// `isIndentableBlockComment`), which every printer reprints with hard lines.
+///
+/// The layout question a *glued* multi-line comment poses. Its sibling, a **preserved**
+/// (non-indentable) block, is emitted verbatim and carries no break out to the enclosing
+/// group, so a value glued to its `*/` stays on the operator's line. `multiline` alone
+/// cannot tell the two apart, and answering with it hangs values prettier leaves inline.
+///
+/// Shared across the language printers for the same reason
+/// [`is_honored_format_ignore`] is: two printers answering it differently means one host
+/// hangs a value its sibling keeps inline (`<script>`'s `=` vs the `{@const}` tag's).
+pub fn is_indentable_block(source: &str, comment: &Comment) -> bool {
+    comment.is_block
+        && comment.multiline
+        && printing::is_indentable_block_comment(comment.content(source).split('\n'))
+}
+
 //
 // Format-Ignore Directive Recognition
 //
@@ -104,6 +123,30 @@ impl Comment {
 #[inline]
 pub fn is_format_ignore_directive(content: &str) -> bool {
     matches!(content.trim(), "format-ignore" | "prettier-ignore")
+}
+
+/// Whether `comment` is a format-ignore directive that HONORS — the recognizer above
+/// plus the **placement floor**: the directive must be the only thing on its physical
+/// line (whitespace aside). Every other placement — trailing a token, glued before the
+/// construct, sharing a line with an opening delimiter — is an ordinary comment.
+///
+/// A file boundary counts as a line boundary, so a directive at byte 0 or at EOF still
+/// qualifies. A line comment trivially satisfies the after side (it consumes to EOL);
+/// only a block spelling can share its line with what follows.
+///
+/// Shared across the language printers because it is the one question they must not
+/// answer differently: a printer that freezes from a placement its own emitter would
+/// then relocate loses the freeze on the next pass.
+pub fn is_honored_format_ignore(source: &str, comment: &Comment) -> bool {
+    is_format_ignore_directive(comment.content(source)) && directive_alone_on_line(source, comment)
+}
+
+/// The placement floor of [`is_honored_format_ignore`], split out for the emitters that
+/// need the placement question alone.
+pub fn directive_alone_on_line(source: &str, comment: &Comment) -> bool {
+    (comment.span.start == 0 || has_newline_before_position(source, comment.span.start))
+        && (comment.span.end as usize == source.len()
+            || has_newline_after_position(source, comment.span.end))
 }
 
 /// Whether `content` opens an ignore range (`format-ignore-start` /
@@ -452,6 +495,40 @@ pub fn comments_in_source_range(
 pub fn comments_in_source_after(comments: &[Comment], pos: u32) -> impl Iterator<Item = &Comment> {
     let first_idx = find_first_comment_from(comments, pos);
     comments[first_idx..].iter()
+}
+
+/// The block comment **owned** by the token beginning at `start`, when there is one.
+///
+/// The lookup behind every owned-comment claim: an owned comment is skipped by the
+/// to-emit axis, so whoever prints the token must print it too, and a builder that
+/// replaces the token's doc (a format-ignore freeze, a reassembled arrow signature)
+/// inherits that debt — otherwise the comment reaches no printer at all
+/// (docs/comments.md hazard 1).
+///
+/// Both language printers ask it, so it lives here rather than as a twin in each: the
+/// answer is a pure function of the source bytes and the comment array, and a second
+/// copy is exactly the drift the shared-emitter rule exists to prevent.
+///
+/// `CommentGlue::SameLine` mirrors the parser's own binding scan — only a glued block
+/// comment is bound to its token — so `owned ⇒ is_block` holds and a line comment is
+/// never returned.
+pub fn owned_leading_comment_at<'c>(
+    source: &str,
+    comments: &'c [Comment],
+    start: u32,
+) -> Option<&'c Comment> {
+    // Cheap reject before the span search — almost every token bails here.
+    let glued_end = source_scan::block_comment_end_before(
+        source.as_bytes(),
+        start as usize,
+        source_scan::CommentGlue::SameLine,
+    )?;
+
+    let idx = comments
+        .partition_point(|c| c.span.end <= start)
+        .checked_sub(1)?;
+    let comment = comments.get(idx)?;
+    (comment.owned_by_node && comment.span.end as usize == glued_end).then_some(comment)
 }
 
 #[cfg(test)]
