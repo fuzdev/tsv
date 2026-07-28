@@ -578,6 +578,15 @@ impl<'a> Printer<'a> {
             // space-separated `{/if} {x}` drop once the `{#if}` forces the parent multiline). A
             // newline before an *inline element* therefore breaks (matching prettier and path 1),
             // rather than collapsing as it did before this convergence.
+            //
+            // NOTE the sibling-newline flow rule ([`Self::sibling_newline_flows`]) deliberately
+            // does NOT reach this site. Here the separator is a whitespace-only node *between two
+            // non-text siblings*, so its doc goes straight into `child_docs` rather than into a
+            // text fill — a collapsible `line` there breaks all-or-nothing with the parent group
+            // instead of per width, which mixes a flowed first boundary with hard-broken later
+            // ones in the same run. The rule applies only where the separator is part of a
+            // content text's own run (its leading/trailing whitespace), which is where the fill
+            // can reflow it.
             let newline_count = text.newline_count as usize;
             let trim_to_collapsible = (next_is_inline_el && newline_count == 0)
                 || (next_is_block_el && newline_count < 2);
@@ -629,7 +638,25 @@ impl<'a> Printer<'a> {
         // incorrectly separating the closing tag from trailing text.
         let prev_will_break = child_docs.last().is_some_and(|&doc| d.will_break(doc));
         let mut leading_line = false;
-        if multiline && text_starts_with_linebreak(raw) && !is_first {
+        // The mirror of the whitespace-only rule above, on a content text's *leading* run: a
+        // SINGLE leading newline after flowing inline content is a spelling difference only, so
+        // it falls through to the space arms below and reflows with the fill instead of pinning a
+        // hardline. A blank line (2+) still breaks, and a comment predecessor pins its authored
+        // line; a block-element predecessor keeps the hardline arm it already had. See
+        // [`Self::sibling_newline_flows`].
+        //
+        // Shared by both the leading run here and the trailing run below — see
+        // [`Self::is_separator_like_text`] for why such a node is excluded, and why this one
+        // reads the decoded text where the rest of the path reads `raw`.
+        let separator_like_text = Self::is_separator_like_text(&text.data(self.source));
+        let leading_run = &raw[..raw.len()
+            - raw
+                .trim_start_matches(|c: char| c.is_ascii_whitespace())
+                .len()];
+        let leading_newline_flows = leading_run.matches('\n').count() == 1
+            && !separator_like_text
+            && prev_node.is_some_and(|n| self.sibling_newline_flows(n));
+        if multiline && text_starts_with_linebreak(raw) && !is_first && !leading_newline_flows {
             // splitTextToDocs (prettier-plugin-svelte): a content text whose leading whitespace
             // carries a newline puts a hardline before its first word — the newline is a
             // structural break (path 1's line-buffer flushes on it), NOT a fold into the prev
@@ -750,7 +777,15 @@ impl<'a> Printer<'a> {
             0
         };
         let mut trailing_hardlines = 0usize;
-        if multiline && trailing_ws_newlines >= 1 && !is_last {
+        // The third face of the same rule (after the whitespace-only separator and a content
+        // text's leading run): a SINGLE trailing newline before flowing inline content is a
+        // spelling difference only, so it falls through to the space arms below and reflows with
+        // the fill. Blank lines, comments and block elements keep the structural hardline. See
+        // [`Self::sibling_newline_flows`].
+        let trailing_newline_flows = trailing_ws_newlines == 1
+            && !separator_like_text
+            && next_node.is_some_and(|n| self.sibling_newline_flows(n));
+        if multiline && trailing_ws_newlines >= 1 && !is_last && !trailing_newline_flows {
             // splitTextToDocs (prettier-plugin-svelte): a content text whose trailing whitespace
             // carries a newline ends with a structural `hardline` (a blank line — 2+ newlines —
             // becomes `[hardline, hardline]`). prettier never trims a linebreak boundary, so this
@@ -909,6 +944,69 @@ impl<'a> Printer<'a> {
         } else {
             child_docs.push(node_doc);
         }
+    }
+
+    /// Whether a **single-newline** separator beside `node` may collapse to a plain space.
+    ///
+    /// Svelte 5 collapses an inter-sibling whitespace run to one whitespace, so a space and a
+    /// newline between two siblings render identically — the newline's *spelling* carries no
+    /// signal and the fill may reflow it. (Its *presence* still does: a glued boundary is never
+    /// split, since breaking there would inject a rendered space.) So an inline sibling isolated
+    /// by authored newlines flows back onto the content line, converging those authorings.
+    ///
+    /// Four neighbours are excluded, none of them a mere spelling difference:
+    /// - a **comment**, whose authored position is authorship — folding one into a text fill
+    ///   would relocate it across a semantic boundary (§Comment Position Philosophy);
+    /// - a **block element**, which owns its own line via `handle_block_child`;
+    /// - a **blank line** (2+ newlines), a Tier-2 authoring signal, screened by the callers;
+    /// - a **control-flow block** (`{#if}` / `{#each}` / `{#key}` / `{#await}` / `{#snippet}`).
+    ///   Its head and tail wrap a *fragment*, so paying an overflow by expanding the body pulls
+    ///   a **body** node onto its own line and welds the flowed sibling text to the tail
+    ///   (`{#key key}⏎text6⏎{/key}text7`) — a layout decision about one construct reaching
+    ///   inside another. ⚠️ Be honest about the strength of this: a breaking `{expr}` tag
+    ///   expands mid-run too (`{f(⏎…⏎)}text4`), so "width is not fixed" does *not* by itself
+    ///   separate blocks from tags. The exclusion is **empirical first** — flowing blocks
+    ///   regressed a real fixture (`root_text_control_flow_adjacent`) into a clearly worse
+    ///   layout, while flowing tags regressed nothing across the fixture suite or the corpus.
+    ///   The breaking-tag shape is a known rough edge, not a settled win.
+    ///
+    /// Note this is orthogonal to whether the *element* lays out multiline, which an authored
+    /// newline does still decide and which is preserved — so the convergence target is the
+    /// multiline form, never a collapsed one-liner. See
+    /// [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+    fn sibling_newline_flows(&self, node: &FragmentNode<'_>) -> bool {
+        match node {
+            // A tag has fixed width and no structure to protect — always flows.
+            FragmentNode::ExpressionTag(_)
+            | FragmentNode::RenderTag(_)
+            | FragmentNode::HtmlTag(_) => true,
+            // An inline element/component flows; a block one owns its line.
+            FragmentNode::Element(_) | FragmentNode::SpecialElement(_) => {
+                !self.is_block_element_node(node)
+            }
+            // Everything else keeps its authored line — the exclusions the doc comment argues
+            // for: a `Comment` (its position is authorship) and a control-flow block (its width
+            // is not fixed, so packing a run of them is paid for by expanding their bodies).
+            // `Text` never appears here: a run this rule inspects belongs to the text node.
+            _ => false,
+        }
+    }
+
+    /// Whether this text node is a **separator** wearing content's clothing: every non-ASCII-
+    /// whitespace character it holds is itself whitespace (an NBSP / narrow NBSP acting as the
+    /// gap between two siblings). Such a node carries no word for the fill to pack, so treating
+    /// its surrounding run as reflowable would merely re-read a break the fill itself emitted —
+    /// `<span>a</span>⏎<nbsp><span>b</span>` collapses onto one line on the next pass, an F1
+    /// break. Its ASCII whitespace bounds a separator, not content, which is why it is excluded
+    /// for the same reason a whitespace-only node is.
+    ///
+    /// Keyed on the **decoded** text, not the raw bytes: `&nbsp;` and a literal U+00A0 are the
+    /// same document to the compiler, so spelling the separator as an entity must not buy it a
+    /// different layout. (Every other read on this path uses `raw` — this is the one question
+    /// about what the characters *are* rather than where they sit.)
+    fn is_separator_like_text(data: &str) -> bool {
+        let content = data.trim_matches(|c: char| c.is_ascii_whitespace());
+        !content.is_empty() && content.chars().all(char::is_whitespace)
     }
 
     /// Whether a node is a block-level *element* — the `handleBlockChild` set in

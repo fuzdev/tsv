@@ -1,0 +1,190 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 209,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 146,
+				"data": " Whitespace-only text between two inline elements: the authored newline flows back onto the\n     content line, so both authorings converge "
+			},
+			{
+				"type": "Text",
+				"start": 146,
+				"end": 147,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 147,
+				"end": 208,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 148
+					},
+					"end": {
+						"line": 3,
+						"column": 4,
+						"character": 151
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 152,
+							"end": 160,
+							"raw": "\n\ttext1 ",
+							"data": "\n\ttext1 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 160,
+							"end": 177,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 8,
+									"character": 161
+								},
+								"end": {
+									"line": 4,
+									"column": 9,
+									"character": 162
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 163,
+									"end": 171,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 4,
+											"column": 10,
+											"character": 163
+										},
+										"end": {
+											"line": 4,
+											"column": 14,
+											"character": 167
+										}
+									},
+									"value": [
+										{
+											"start": 169,
+											"end": 170,
+											"type": "Text",
+											"raw": "x",
+											"data": "x"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 172,
+										"end": 173,
+										"raw": "a",
+										"data": "a"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 177,
+							"end": 184,
+							"raw": " text2 ",
+							"data": " text2 "
+						},
+						{
+							"type": "RegularElement",
+							"start": 184,
+							"end": 201,
+							"name": "a",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 32,
+									"character": 185
+								},
+								"end": {
+									"line": 4,
+									"column": 33,
+									"character": 186
+								}
+							},
+							"attributes": [
+								{
+									"type": "Attribute",
+									"start": 187,
+									"end": 195,
+									"name": "href",
+									"name_loc": {
+										"start": {
+											"line": 4,
+											"column": 34,
+											"character": 187
+										},
+										"end": {
+											"line": 4,
+											"column": 38,
+											"character": 191
+										}
+									},
+									"value": [
+										{
+											"start": 193,
+											"end": 194,
+											"type": "Text",
+											"raw": "y",
+											"data": "y"
+										}
+									]
+								}
+							],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 196,
+										"end": 197,
+										"raw": "b",
+										"data": "b"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 201,
+							"end": 202,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
