@@ -10,18 +10,33 @@
 // Uses Doc IR for all formatting - build_*_doc methods are the canonical implementations.
 
 use crate::ast::internal;
-use crate::printer::{HeadExpr, Printer};
-use smallvec::{SmallVec, smallvec};
+use crate::printer::{CommentRun, HeadExpr, Printer};
+use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, Span};
 use tsv_ts::ast::internal::Expression;
 
-/// A buffered run of comments from one gap — collected rather than iterated because the
-/// callers ask two questions of it (is it all blocks? then how does each one lay out?).
-/// Mirrors `tsv_ts`'s `CommentVec`, which this crate can't see (`pub(crate)` there).
-type CommentRun<'a> = SmallVec<[&'a Comment; 8]>;
+/// How a directive prints its expression value — the only axis the expression-valued
+/// directive builders differ on, so [`Printer::build_directive_doc`] serves them all.
+#[derive(Clone, Copy)]
+enum DirectiveValue {
+    /// `on:` / `use:` / `animate:` / `transition:`(`in:`/`out:`) — the value is always
+    /// emitted; `on:click={click}` is not a shorthand and keeps its value.
+    Always,
+    /// `class:` / `let:` — `name={name}` is the shorthand form and collapses to bare `name`.
+    Shorthand,
+    /// `bind:` — the shorthand rule plus the bare (no-parens) `{getter, setter}` sequence.
+    ShorthandBind,
+}
+
+impl DirectiveValue {
+    /// Whether `name={name}` collapses to bare `name` for this directive.
+    const fn suppresses_shorthand(self) -> bool {
+        matches!(self, Self::Shorthand | Self::ShorthandBind)
+    }
+}
 
 // Opening prefixes for brace-wrapped attribute expressions. `build_braced_expression_doc`
 // emits the prefix and derives the expression offset from its `.len()`, so these are the
@@ -172,6 +187,39 @@ impl<'a> Printer<'a> {
         if glued { d.text(" ") } else { d.hardline() }
     }
 
+    /// Whether a trailing comment **starts its own output line**: the comment immediately
+    /// before it — whitespace only in between — is a LINE comment, whose emitted form ends
+    /// in a `hardline`. The separator space then has nothing to separate; it would render as
+    /// leading whitespace on a fresh line, an indent tsv emits nowhere else.
+    ///
+    /// The trailing twin of [`Self::leading_js_comment_separator`], and keyed the same way:
+    /// on what actually gets emitted, not on the author's line treatment. A newline in
+    /// source is the wrong test — two block comments the author split across lines
+    /// (`a /* c */⏎/* d */`) are emitted on ONE line, where the space is a real separator.
+    /// Only a `//` forces the break, so only a `//` before it can take the space away.
+    ///
+    /// Asked of the comment itself rather than threaded through each caller's run, so the
+    /// three builders that emit trailing runs ([`Self::trailing_comment_docs`] for the value
+    /// heads, the `bind:` sequence's comma gaps, `{@debug}`) cannot answer it differently — or
+    /// forget to.
+    fn trailing_comment_starts_line(&self, comment: &Comment) -> bool {
+        // A `//` runs to end of line, so a line comment before this one necessarily left it
+        // starting a fresh line — which the source bytes answer in a couple of steps. Almost
+        // every trailing comment bails here, before the span search.
+        if !tsv_lang::source_scan::has_newline_before_position(self.source, comment.span.start) {
+            return false;
+        }
+        let idx = tsv_lang::find_first_comment_from(self.comments, comment.span.start);
+        let Some(prev) = idx.checked_sub(1).map(|i| &self.comments[i]) else {
+            return false;
+        };
+        !prev.is_block
+            && self
+                .source
+                .get(prev.span.end as usize..comment.span.start as usize)
+                .is_some_and(|between| between.trim().is_empty())
+    }
+
     /// Build a Doc for a trailing JS comment (after content), before a closing
     /// `}` / `)` / ` as ` token emitted by the caller.
     ///
@@ -186,20 +234,44 @@ impl<'a> Printer<'a> {
     /// is the only placement that preserves the comment and stays idempotent. See
     /// `docs/conformance_prettier.md` §Comment Position Philosophy and the
     /// `expr_trailing_line` divergence fixture.
-    pub(super) fn build_trailing_js_comment_doc(&self, comment: &Comment) -> DocId {
+    ///
+    /// The leading space is a **separator from the content this comment trails**, so it is
+    /// dropped when there is no such content on the line — see
+    /// [`Self::trailing_comment_starts_line`].
+    ///
+    /// `dedent_break` — this comment ends the run **and** the run sits inside an
+    /// `indent(…)`, so its `hardline` is emitted one level out. **The break decides the
+    /// closing token's column**: the renderer writes a line's indentation from the line
+    /// command that produced it, and the closing token that reuses this break (rather than
+    /// adding a second one, which would render as a blank line) sits *outside* that indent —
+    /// so without the dedent the `}` lands one level too deep.
+    ///
+    /// Dedenting the existing break rather than moving it to the closer is deliberate: a
+    /// `break_parent` in the closer's place makes `fits()` fail for every group still open
+    /// on the line, which re-breaks operands that were fitting fine.
+    pub(super) fn build_trailing_js_comment_doc(
+        &self,
+        comment: &Comment,
+        dedent_break: bool,
+    ) -> DocId {
         let d = self.d();
+        let starts_line = self.trailing_comment_starts_line(comment);
         let doc = if comment.is_block {
             d.concat(&[
-                d.text(" /*"),
+                d.text(if starts_line { "/*" } else { " /*" }),
                 d.source_span(comment.content_span, self.source),
                 d.text("*/"),
             ])
         } else {
             // Content already includes the space after // (e.g., " comment" from "// comment")
             d.concat(&[
-                d.text(" //"),
+                d.text(if starts_line { "//" } else { " //" }),
                 d.source_span(comment.content_span, self.source),
-                d.hardline(),
+                if dedent_break {
+                    d.dedent(d.hardline())
+                } else {
+                    d.hardline()
+                },
             ])
         };
         // The renderer records the emit when it reaches the node — see
@@ -338,7 +410,7 @@ impl<'a> Printer<'a> {
                 self.build_attribute_text_doc(text.raw(self.source), Some(text.raw_span))
             }
             internal::AttributeValue::ExpressionTag(expr_tag) => {
-                self.build_attribute_expression_doc(expr_tag)
+                self.build_expression_tag_doc(expr_tag)
             }
         }
     }
@@ -364,14 +436,9 @@ impl<'a> Printer<'a> {
                 }
             }
             internal::AttributeValue::ExpressionTag(expr_tag) => {
-                self.build_attribute_expression_doc(expr_tag)
+                self.build_expression_tag_doc(expr_tag)
             }
         }
-    }
-
-    /// Build a Doc for an expression tag inside an attribute value.
-    fn build_attribute_expression_doc(&self, expr_tag: &internal::ExpressionTag<'_>) -> DocId {
-        self.build_expression_tag_doc(expr_tag)
     }
 
     /// Build a Doc for attribute text content, handling newlines as literallines.
@@ -440,21 +507,17 @@ impl<'a> Printer<'a> {
         // verdicts.
         let mut parts: DocBuf = self.leading_comment_docs(comment_start, expr_start);
 
-        // Expression doc with any nested comments
-        parts.push(if frozen {
-            self.build_frozen_node_doc(expr.span())
-        } else {
-            self.build_ts_expression_doc(expr)
-        });
+        // Expression doc with any nested comments, under the host's own embed (this head
+        // is measured where it sits, unlike an unprefixed `{…}` value), plus the clarity
+        // parens an assignment owes (`{...(a = b)}`, `{@attach (a = b)}`).
+        let value_doc = self.build_head_value_doc(expr, frozen, &self.embed);
+        parts.push(self.wrap_value_clarity_parens(expr, value_doc));
 
         // Trailing comments (between expression and `}`). A line comment last in the run
         // ends the content with its own hardline — see [`HeadExpr`].
-        let expr_end = expr.span().end;
-        let mut ends_with_line_comment = false;
-        for comment in comments_to_emit_in_range(self.comments, expr_end, span_end - 1) {
-            ends_with_line_comment = !comment.is_block;
-            parts.push(self.build_trailing_js_comment_doc(comment));
-        }
+        let (trailing_docs, ends_with_line_comment) =
+            self.trailing_comment_docs(expr.span().end, span_end - 1, frozen);
+        parts.extend(trailing_docs);
 
         let content = d.concat(&parts);
         let doc = if frozen {
@@ -477,80 +540,92 @@ impl<'a> Printer<'a> {
     // Directive Doc builders
     //
 
-    /// Build a Doc for a directive with no shorthand suppression: `prefix` + name +
-    /// modifiers + optional `={expr}`. Backs the `on:` / `use:` / `animate:` / transition
-    /// (`transition:`/`in:`/`out:`) builders, which differ only in the prefix; each passes
-    /// its own `modifiers`. Directives with shorthand suppression (`bind`/`class`/`let`) or
-    /// non-expression values (`style`) keep their own builders (they also emit modifiers).
-    fn build_simple_directive_doc(
+    /// The head every directive starts with — `prefix` + name + `|modifier` run — as the
+    /// parts buffer the caller appends its value to. The name is a span-identity source
+    /// slice, so the emitted text is the author's.
+    fn directive_head_parts(
         &self,
-        prefix: DocId,
+        prefix: &'static str,
+        name_span: Span,
+        modifiers: &[&str],
+    ) -> DocBuf {
+        let d = self.d();
+        let mut parts: DocBuf = smallvec![d.text(prefix), d.source_span(name_span, self.source)];
+        parts.extend(self.build_modifiers_doc(modifiers));
+        parts
+    }
+
+    /// Build a Doc for a directive with an **expression** value: the head above plus an
+    /// optional `={expr}`. Backs every directive except `style:`, whose value is a quoted
+    /// text/tag list rather than an expression; `value` is the only thing they differ on
+    /// beyond the prefix, so the shorthand rule is stated once here instead of per builder.
+    fn build_directive_doc(
+        &self,
+        prefix: &'static str,
         name_span: Span,
         modifiers: &[&str],
         expression: Option<&Expression<'_>>,
         expression_tag_span: Option<Span>,
+        value: DirectiveValue,
     ) -> DocId {
-        let d = self.d();
-        let mut parts: DocBuf = smallvec![prefix, d.source_span(name_span, self.source)];
-        parts.extend(self.build_modifiers_doc(modifiers));
-        if let Some(expr) = expression {
-            parts.extend(self.build_expression_doc_parts_with_span(expr, expression_tag_span));
+        let mut parts = self.directive_head_parts(prefix, name_span, modifiers);
+        if let Some(expr) = expression
+            // Shorthand (`class:foo={foo}` → `class:foo`) suppresses the value entirely.
+            && !(value.suppresses_shorthand()
+                && self.is_identifier_with_name(expr, name_span.extract(self.source)))
+        {
+            parts.extend(match value {
+                // bind: uses {getter, setter} syntax where SequenceExpression is bare (no parens)
+                DirectiveValue::ShorthandBind => {
+                    self.build_expression_doc_parts_with_span_for_bind(expr, expression_tag_span)
+                }
+                _ => self.build_expression_doc_parts_with_span(expr, expression_tag_span),
+            });
         }
-        d.concat(&parts)
+        self.d().concat(&parts)
     }
 
     /// Build a Doc for on:event directive
     fn build_on_directive_doc(&self, dir: &internal::OnDirective<'_>) -> DocId {
-        self.build_simple_directive_doc(
-            self.d().text("on:"),
+        self.build_directive_doc(
+            "on:",
             dir.name_span,
             dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
+            DirectiveValue::Always,
         )
     }
 
     /// Build a Doc for bind:prop directive
     fn build_bind_directive_doc(&self, dir: &internal::BindDirective<'_>) -> DocId {
-        let d = self.d();
-        let name = dir.name_span.extract(self.source);
-        let mut parts: DocBuf =
-            smallvec![d.text("bind:"), d.source_span(dir.name_span, self.source)];
-        parts.extend(self.build_modifiers_doc(dir.modifiers));
-        // Only include expression if not shorthand
-        if !self.is_identifier_with_name(&dir.expression, name) {
-            // bind: uses {getter, setter} syntax where SequenceExpression is bare (no parens)
-            parts.extend(self.build_expression_doc_parts_with_span_for_bind(
-                &dir.expression,
-                dir.expression_tag_span,
-            ));
-        }
-        d.concat(&parts)
+        self.build_directive_doc(
+            "bind:",
+            dir.name_span,
+            dir.modifiers,
+            Some(&dir.expression),
+            dir.expression_tag_span,
+            DirectiveValue::ShorthandBind,
+        )
     }
 
     /// Build a Doc for class:name directive
     fn build_class_directive_doc(&self, dir: &internal::ClassDirective<'_>) -> DocId {
-        let d = self.d();
-        let name = dir.name_span.extract(self.source);
-        let mut parts: DocBuf =
-            smallvec![d.text("class:"), d.source_span(dir.name_span, self.source)];
-        parts.extend(self.build_modifiers_doc(dir.modifiers));
-        // Only include expression if not shorthand
-        if !self.is_identifier_with_name(&dir.expression, name) {
-            parts.extend(
-                self.build_expression_doc_parts_with_span(&dir.expression, dir.expression_tag_span),
-            );
-        }
-        d.concat(&parts)
+        self.build_directive_doc(
+            "class:",
+            dir.name_span,
+            dir.modifiers,
+            Some(&dir.expression),
+            dir.expression_tag_span,
+            DirectiveValue::Shorthand,
+        )
     }
 
     /// Build a Doc for style:prop directive
     fn build_style_directive_doc(&self, dir: &internal::StyleDirective<'_>) -> DocId {
         let d = self.d();
         let name = dir.name_span.extract(self.source);
-        let mut parts: DocBuf =
-            smallvec![d.text("style:"), d.source_span(dir.name_span, self.source)];
-        parts.extend(self.build_modifiers_doc(dir.modifiers));
+        let mut parts = self.directive_head_parts("style:", dir.name_span, dir.modifiers);
         match &dir.value {
             internal::StyleDirectiveValue::True => {}
             internal::StyleDirectiveValue::ExpressionTag(tag) => {
@@ -574,51 +649,50 @@ impl<'a> Printer<'a> {
 
     /// Build a Doc for use:action directive
     fn build_use_directive_doc(&self, dir: &internal::UseDirective<'_>) -> DocId {
-        self.build_simple_directive_doc(
-            self.d().text("use:"),
+        self.build_directive_doc(
+            "use:",
             dir.name_span,
             dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
+            DirectiveValue::Always,
         )
     }
 
     /// Build a Doc for transition/in/out directive
     fn build_transition_directive_doc(&self, dir: &internal::TransitionDirective<'_>) -> DocId {
-        self.build_simple_directive_doc(
-            self.d().text(dir.direction.prefix_with_colon()),
+        self.build_directive_doc(
+            dir.direction.prefix_with_colon(),
             dir.name_span,
             dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
+            DirectiveValue::Always,
         )
     }
 
     /// Build a Doc for animate:name directive
     fn build_animate_directive_doc(&self, dir: &internal::AnimateDirective<'_>) -> DocId {
-        self.build_simple_directive_doc(
-            self.d().text("animate:"),
+        self.build_directive_doc(
+            "animate:",
             dir.name_span,
             dir.modifiers,
             dir.expression.as_ref(),
             dir.expression_tag_span,
+            DirectiveValue::Always,
         )
     }
 
     /// Build a Doc for let:name directive
     fn build_let_directive_doc(&self, dir: &internal::LetDirective<'_>) -> DocId {
-        let d = self.d();
-        let name = dir.name_span.extract(self.source);
-        let mut parts: DocBuf =
-            smallvec![d.text("let:"), d.source_span(dir.name_span, self.source)];
-        parts.extend(self.build_modifiers_doc(dir.modifiers));
-        // Only include expression if not shorthand (let:foo={foo} → let:foo)
-        if let Some(expr) = &dir.expression
-            && !self.is_identifier_with_name(expr, name)
-        {
-            parts.extend(self.build_expression_doc_parts_with_span(expr, dir.expression_tag_span));
-        }
-        d.concat(&parts)
+        self.build_directive_doc(
+            "let:",
+            dir.name_span,
+            dir.modifiers,
+            dir.expression.as_ref(),
+            dir.expression_tag_span,
+            DirectiveValue::Shorthand,
+        )
     }
 
     //
@@ -633,25 +707,23 @@ impl<'a> Printer<'a> {
             .collect()
     }
 
-    /// Build expression doc for attribute context (embedded expression).
+    /// The value stage of an **unprefixed** `{…}` — an attribute value or an expression tag:
+    /// [`Printer::build_head_value_doc`] under this context's `EmbedContext`, which sets
+    /// `LayoutMode::Embedded` so binary expressions use ContinuationIndent style.
     ///
-    /// Sets `LayoutMode::Embedded` so binary expressions use ContinuationIndent style.
-    /// Assignment expressions get wrapped in parens: `prop={(a = b)}`.
-    fn build_expression_doc_for_attribute(&self, expr: &Expression<'_>) -> DocId {
-        let d = self.d();
-        let embedded = tsv_lang::EmbedContext {
+    /// The embed starts from [`tsv_lang::EmbedContext::default`], not the host's `self.embed`
+    /// — such a value is measured from its own `{`, not from the enclosing embedding. That is
+    /// the one thing separating it from the prefixed heads' value stage.
+    ///
+    /// Assignment expressions get the printer's clarity parens: `prop={(a = b)}`, on the
+    /// frozen arm too — see [`Printer::wrap_value_clarity_parens`].
+    fn build_unprefixed_value_doc(&self, expr: &Expression<'_>, frozen: bool) -> DocId {
+        let embed = tsv_lang::EmbedContext {
             mode: tsv_lang::LayoutMode::Embedded,
             ..tsv_lang::EmbedContext::default()
         };
-
-        // Assignment expressions need parens in attribute values: prop={(a = b)}
-        if let Expression::AssignmentExpression(_) = expr {
-            let inner =
-                tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embedded);
-            return d.parens(inner);
-        }
-
-        tsv_ts::build_expression_doc_with_comments(d, expr, &self.ts_inputs(), &embedded)
+        let value_doc = self.build_head_value_doc(expr, frozen, &embed);
+        self.wrap_value_clarity_parens(expr, value_doc)
     }
 
     /// Build Doc parts for an expression with optional span for comment lookup: `={expr}`
@@ -671,7 +743,7 @@ impl<'a> Printer<'a> {
         // The verdict comes back OUT of the content builder rather than going in — it
         // selects the value's doc AND its layout (block vs hug) below, and the two must
         // never disagree. See [`HeadExpr`]; one resolution, so there is no second to drift.
-        let head = self.build_expression_content_with_comments(expr, tag_span);
+        let head = self.build_expression_content_with_comments(expr, tag_span, false);
 
         // For expressions with internal group structure, keep them hugged with the braces.
         // Prettier lets their internal structure handle wrapping.
@@ -708,13 +780,12 @@ impl<'a> Printer<'a> {
                 | Expression::BinaryExpression(_)
         );
 
-        // A trailing line comment already forces `}` onto its own line (its doc ends
+        // A run ENDING in a line comment already forces `}` onto its own line (its doc ends
         // in a hardline). Hug it directly — block structure would add its own softline
-        // before `}`, leaving a stray blank line (`={\n\texpr // c\n\n}`).
-        let has_trailing_line_comment = tag_span.is_some_and(|span| {
-            tsv_lang::has_line_comments_in_range(self.comments, expr.span().end, span.end - 1)
-        });
-
+        // before `}`, leaving a stray blank line (`={\n\texpr // c\n\n}`). The question is
+        // how the run ENDED, not whether it held a line comment anywhere: a block comment
+        // after one (`{a // c⏎/* d */}`) leaves no break for the `}` to reuse, so that run
+        // takes the ordinary block form. `head` carries the answer off the emitted run.
         let d = self.d();
         let inner = if head.frozen {
             // Never hug a frozen value: the hug supplies its own braces with no block to
@@ -722,82 +793,91 @@ impl<'a> Printer<'a> {
             // placement floor, and the freeze would be gone on the next pass. The block
             // itself needs no forcing; the directive's own hardline (see
             // `build_leading_js_comment_doc`) breaks the group from inside.
-            self.wrap_in_block_structure(head.doc)
-        } else if is_hugged || has_trailing_line_comment {
+            self.wrap_in_block_structure(head.doc, head.ends_with_line_comment)
+        } else if is_hugged || head.ends_with_line_comment {
             // Hugged: the expression's internal doc handles wrapping
             d.braces(head.doc)
         } else {
             // Block structure for other expressions
-            self.wrap_in_block_structure(head.doc)
+            self.wrap_in_block_structure(head.doc, false)
         };
 
         smallvec![d.text("="), inner]
     }
 
     /// Build expression content with leading/trailing comments — leading comments,
-    /// the expression doc, trailing comments — paired with the [`Self::value_gap_frozen`]
-    /// verdict that produced them. An honored directive in the `{`→value gap freezes the
-    /// value whole, and the caller owes it the block form, which is what keeps the directive
-    /// on its own line. See [`HeadExpr`] for why the verdict travels back out rather than in.
+    /// the expression doc, trailing comments — paired with the
+    /// [`Printer::honored_directive_in_gap`] verdict that produced them. An honored directive
+    /// in the `{`→value gap freezes the value whole, and the caller owes it the block form,
+    /// which is what keeps the directive on its own line. See [`HeadExpr`] for why the verdict
+    /// travels back out rather than in.
     ///
     /// This is the **unprefixed** `{…}` value's head builder; the prefixed ones live in
     /// `nodes/helpers.rs` and return the same pair.
+    ///
+    /// A `tag_span` of `None` is a value with no braces: no gap to hold a directive, and no
+    /// gap to hold a comment either, so the whole freeze-and-comment stage is the braced case.
+    ///
+    /// `always_block` — the caller wraps the content in block structure whatever the freeze
+    /// verdict says (only `bind:`'s block-structure path does). A frozen value is
+    /// block-wrapped anyway, so the two together are the
+    /// [`Printer::trailing_comment_docs`] `closer_owns_break` question: an indented content's
+    /// break cannot serve a closer sitting outside that indent.
     fn build_expression_content_with_comments(
         &self,
         expr: &Expression<'_>,
         tag_span: Option<Span>,
+        always_block: bool,
     ) -> HeadExpr {
-        let frozen = self.value_gap_frozen(expr, tag_span);
-
-        // Collect leading comments
-        let leading_comments: DocBuf = match tag_span {
-            Some(span) => self.leading_comment_docs(span.start + 1, expr.span().start),
-            None => DocBuf::new(),
+        let Some(span) = tag_span else {
+            return HeadExpr {
+                doc: self.build_unprefixed_value_doc(expr, false),
+                frozen: false,
+                ends_with_line_comment: false,
+            };
         };
+        // The `{`→value gap: everything from just past the brace to the value's first byte.
+        let value_start = expr.span().start;
+        let frozen = self.honored_directive_in_gap(span.start + 1, value_start);
 
-        let expr_doc = if frozen {
-            self.build_frozen_node_doc(expr.span())
-        } else {
-            self.build_expression_doc_for_attribute(expr)
-        };
+        let leading_comments = self.leading_comment_docs(span.start + 1, value_start);
+        let expr_doc = self.build_unprefixed_value_doc(expr, frozen);
+        let (trailing_comments, ends_with_line_comment) =
+            self.trailing_comment_docs(expr.span().end, span.end - 1, frozen || always_block);
 
-        // Collect trailing comments
-        let mut ends_with_line_comment = false;
-        let mut trailing_comments: DocBuf = DocBuf::new();
-        if let Some(span) = tag_span {
-            let expr_end = expr.span().end;
-            for comment in comments_to_emit_in_range(self.comments, expr_end, span.end - 1) {
-                ends_with_line_comment = !comment.is_block;
-                trailing_comments.push(self.build_trailing_js_comment_doc(comment));
-            }
-        }
-
-        // Build the expression content (leading comments + expr + trailing comments)
-        let mut expr_content = leading_comments;
-        expr_content.push(expr_doc);
-        expr_content.extend(trailing_comments);
         HeadExpr {
-            doc: self.d().concat(&expr_content),
+            doc: self.concat_with_surrounding_comments(
+                leading_comments,
+                expr_doc,
+                trailing_comments,
+            ),
             frozen,
             ends_with_line_comment,
         }
     }
 
-    /// The value-head rule ([`Printer::honored_directive_in_gap`]) for a `{…}` value whose
-    /// brace span the caller holds as an `Option` — the tag span is absent for a value with
-    /// no braces to open a gap, where nothing can freeze.
-    fn value_gap_frozen(&self, expr: &Expression<'_>, tag_span: Option<Span>) -> bool {
-        tag_span
-            .is_some_and(|span| self.honored_directive_in_gap(span.start + 1, expr.span().start))
-    }
-
     /// Wrap expression content in block structure: `{\n\texpr\n}`
-    fn wrap_in_block_structure(&self, content: DocId) -> DocId {
+    ///
+    /// `content_ends_line` — the content's last emission is a line comment, so it already
+    /// ended the line. The closing `}` then **reuses that break** instead of adding its own;
+    /// a second one renders as a blank line above the `}`. This is the rule
+    /// [`Printer::build_prefixed_head_doc`] applies one delimiter out, and the reason the
+    /// answer travels on [`HeadExpr`] rather than being rescanned here: the run that was
+    /// emitted is the only thing that knows how it ended.
+    fn wrap_in_block_structure(&self, content: DocId, content_ends_line: bool) -> DocId {
         let d = self.d();
         let softline = d.softline();
         let inner = d.concat(&[softline, content]);
         let indented = d.indent(inner);
-        let concat = d.concat(&[d.text("{"), indented, softline, d.text("}")]);
+        let close = d.text("}");
+        let concat = if content_ends_line {
+            // The content's run-final `//` already broke the line, dedented to this level
+            // (`build_trailing_js_comment_doc`), so the `}` reuses that break — a second
+            // would render as a blank line above it.
+            d.concat(&[d.text("{"), indented, close])
+        } else {
+            d.concat(&[d.text("{"), indented, softline, close])
+        };
         d.group(concat)
     }
 
@@ -827,20 +907,29 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // For SequenceExpression, use the bare (no parens) version for getter/setter syntax
         if let Expression::SequenceExpression(seq) = expr {
-            // The per-operand path below is comment-blind, so a leading or interior
-            // comment prettier preserves (`{// c\n get, set}`, `{get, /* c */ set}`)
-            // was silently dropped — real content loss. Route those through the
-            // comment-aware builder. Trailing comments after the last operand are NOT
-            // included in the range: prettier drops them, so tsv matches by dropping.
-            if let Some(span) = tag_span {
-                let last_end = seq.expressions[seq.expressions.len() - 1].span().end;
-                if tsv_lang::has_comments_to_emit_in_range(self.comments, span.start + 1, last_end)
-                {
-                    return smallvec![
-                        d.text("="),
-                        self.build_bind_sequence_with_comments_doc(seq, span),
-                    ];
-                }
+            // The per-operand path below is comment-blind, so any comment in the value —
+            // leading (`{// c\n get, set}`), interior (`{get, /* c */ set}`), or trailing
+            // (`{get, set /* c */}`) — is silently dropped there. Route the whole
+            // comment-bearing case to the comment-aware builder.
+            //
+            // The gate spans the WHOLE value, `{` to `}`. Scanning only as far as the last
+            // operand made a trailing comment invisible *to the gate*, so a document that had
+            // one still took the comment-blind path and lost it — the rerouting inherits the
+            // destination's blindness (docs/comments.md hazard 4). Prettier drops that comment,
+            // but tsv preserves trailing comments at every other `{…}` value position
+            // (conformance_prettier.md §Svelte: Attributes), and matching the drop here made
+            // the sequence the one host that didn't.
+            if let Some(span) = tag_span
+                && tsv_lang::has_comments_to_emit_in_range(
+                    self.comments,
+                    span.start + 1,
+                    span.end - 1,
+                )
+            {
+                return smallvec![
+                    d.text("="),
+                    self.build_bind_sequence_with_comments_doc(seq, span),
+                ];
             }
 
             let len = seq.expressions.len();
@@ -867,7 +956,7 @@ impl<'a> Printer<'a> {
 
             // Bare block structure (shared with every other bind value): flat
             // `={getter, setter}`, broken `={\n\tgetter,\n\tsetter\n}`.
-            return smallvec![d.text("="), self.wrap_in_block_structure(items_doc)];
+            return smallvec![d.text("="), self.wrap_in_block_structure(items_doc, false)];
         }
 
         // For bind: directives, BinaryExpression should use block structure (not hugging).
@@ -880,9 +969,9 @@ impl<'a> Printer<'a> {
         self.build_expression_doc_parts_with_span(expr, tag_span)
     }
 
-    /// Build the bare (no-parens) function-binding sequence value when it carries
-    /// a leading or interior comment, preserving each comment at the author's
-    /// position to match prettier. A line comment, or a multi-line block comment,
+    /// Build the bare (no-parens) function-binding sequence value when it carries any
+    /// comment — leading, interior, or trailing — preserving each at the author's
+    /// position. A line comment, or a multi-line block comment,
     /// forces the broken `{\n …\n}` layout; a lone mid block comment stays inline.
     ///
     /// ```svelte
@@ -896,9 +985,10 @@ impl<'a> Printer<'a> {
     /// A single-line *leading* block comment (`{/* c */ a, b}`) stays inline and
     /// bare: prettier parenthesizes it (`{/* c */ (a, b)}`) but that form is
     /// non-idempotent — it drops the comment on the next pass — so tsv keeps the
-    /// comment bare and idempotent instead. Trailing comments after the last
-    /// operand are dropped (prettier drops them too); the caller's range excludes
-    /// them.
+    /// comment bare and idempotent instead. A comment after the last operand is
+    /// **preserved** where prettier deletes it — the trailing-position content loss
+    /// tsv declines at every other `{…}` value, reaching the sequence host (see the
+    /// `value_sequence_trailing_comment` divergence fixture).
     fn build_bind_sequence_with_comments_doc(
         &self,
         seq: &tsv_ts::ast::internal::SequenceExpression<'_>,
@@ -936,7 +1026,7 @@ impl<'a> Printer<'a> {
 
         if head_frozen {
             content.push(self.build_frozen_node_doc(seq.span));
-            return self.wrap_in_block_structure(d.concat(&content));
+            return self.wrap_in_block_structure(d.concat(&content), false);
         }
 
         let mut items: DocBuf = DocBuf::new();
@@ -957,7 +1047,7 @@ impl<'a> Printer<'a> {
 
                 // Comments before the comma trail the previous operand.
                 for comment in comments_to_emit_in_range(self.comments, prev_end, comma_pos) {
-                    items.push(self.build_trailing_js_comment_doc(comment));
+                    items.push(self.build_trailing_js_comment_doc(comment, false));
                 }
 
                 items.push(d.text(","));
@@ -997,18 +1087,16 @@ impl<'a> Printer<'a> {
                         items.push(if in_leading_run {
                             self.build_leading_js_comment_doc(comment)
                         } else {
-                            self.build_trailing_js_comment_doc(comment)
+                            self.build_trailing_js_comment_doc(comment, false)
                         });
                         pos = comment.span.end;
                     }
                 }
             }
 
-            items.push(if frozen {
-                self.build_frozen_node_doc(sub_expr.span())
-            } else {
-                self.build_ts_expression_doc(sub_expr)
-            });
+            // Rule A resolved the operand's own freeze, so this is the ordinary value stage
+            // under the host's embed — the operand is measured where it sits.
+            items.push(self.build_head_value_doc(sub_expr, frozen, &self.embed));
         }
 
         // The operands sit in their own group so a forced break in the *surrounding*
@@ -1018,10 +1106,18 @@ impl<'a> Printer<'a> {
         let items_doc = d.concat(&items);
         content.push(d.group(items_doc));
 
+        // The run past the last operand — outside that group, so it never breaks the pair.
+        // The whole reason this builder is reached for a trailing-only comment: the
+        // comment-blind path has no emitter for this gap at all.
+        let last_end = seq.expressions[seq.expressions.len() - 1].span().end;
+        let (trailing_docs, ends_with_line_comment) =
+            self.trailing_comment_docs(last_end, tag_span.end - 1, true);
+        content.extend(trailing_docs);
+
         // Same bare block structure as the comment-free path: flat `{a, b}`, broken
         // `{\n\ta,\n\tb\n}`. Comment hardlines force the break; a lone inline block
         // comment leaves the operand group free to stay flat.
-        self.wrap_in_block_structure(d.concat(&content))
+        self.wrap_in_block_structure(d.concat(&content), ends_with_line_comment)
     }
 
     /// Build Doc parts using block structure: `={\n\texpr\n}`
@@ -1033,8 +1129,11 @@ impl<'a> Printer<'a> {
         tag_span: Option<Span>,
     ) -> DocBuf {
         // Always the block form, so the freeze verdict changes nothing about the layout here.
-        let head = self.build_expression_content_with_comments(expr, tag_span);
-        smallvec![self.d().text("="), self.wrap_in_block_structure(head.doc)]
+        let head = self.build_expression_content_with_comments(expr, tag_span, true);
+        smallvec![
+            self.d().text("="),
+            self.wrap_in_block_structure(head.doc, head.ends_with_line_comment)
+        ]
     }
 
     /// Build a Doc for an expression tag: `{expr}`
@@ -1048,37 +1147,19 @@ impl<'a> Printer<'a> {
     /// ```
     pub(super) fn build_expression_tag_doc(&self, tag: &internal::ExpressionTag<'_>) -> DocId {
         let d = self.d();
-        let expr_start = tag.expression.span().start;
-        // The same `{`→value question `value_gap_frozen` asks for a directive value; this
-        // tag always has its braces, so the span is never absent.
-        let frozen = self.value_gap_frozen(&tag.expression, Some(tag.span));
+        // The same value-head content every unprefixed `{…}` builds — the tag always has its
+        // braces, so the span is never absent. Only the assembly below is the tag's own: it
+        // hugs its braces where an attribute value chooses between hug and block.
+        let head =
+            self.build_expression_content_with_comments(&tag.expression, Some(tag.span), false);
 
-        // `parts` is the value's CONTENT only. A frozen value takes the broken block form,
-        // which supplies its own braces — so the directive keeps its own line; flush against
-        // the `{` it would be inert and the freeze would be lost on the second pass.
-        // Add leading comments between { and expression (block inline, line + hardline;
-        // a multi-line block reindents + forces the break — see `build_leading_js_comment_doc`).
-        let mut parts: DocBuf = self.leading_comment_docs(tag.span.start + 1, expr_start);
-
-        // An honored directive in the `{`→value gap freezes the value whole.
-        parts.push(if frozen {
-            self.build_frozen_node_doc(tag.expression.span())
-        } else {
-            self.build_expression_doc_for_attribute(&tag.expression)
-        });
-
-        // Add trailing comments. A line comment forces `}` onto its own line (the
-        // helper appends a hardline) so the `//` doesn't swallow the brace.
-        let expr_end = tag.expression.span().end;
-        for comment in comments_to_emit_in_range(self.comments, expr_end, tag.span.end - 1) {
-            parts.push(self.build_trailing_js_comment_doc(comment));
+        if head.frozen {
+            // A frozen value takes the broken block form, which supplies its own braces — so
+            // the directive keeps its own line; flush against the `{` it would be inert and
+            // the freeze would be lost on the second pass.
+            return self.wrap_in_block_structure(head.doc, head.ends_with_line_comment);
         }
-
-        let content = d.concat(&parts);
-        if frozen {
-            return self.wrap_in_block_structure(content);
-        }
-        d.concat(&[d.text("{"), content, d.text("}")])
+        d.concat(&[d.text("{"), head.doc, d.text("}")])
     }
 
     /// Check if an attribute is a shorthand: {name} where value is ExpressionTag(Identifier(name))

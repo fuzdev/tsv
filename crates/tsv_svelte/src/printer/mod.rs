@@ -38,6 +38,11 @@ use tsv_lang::{
 };
 use tsv_ts::Expression;
 
+/// A buffered run of comments from one gap — collected rather than iterated because the
+/// callers ask two questions of it (how does each one lay out? and how did the run end?).
+/// Mirrors `tsv_ts`'s `CommentVec`, which this crate can't see (`pub(crate)` there).
+pub(in crate::printer) type CommentRun<'a> = smallvec::SmallVec<[&'a Comment; 8]>;
+
 /// Which section a fragment comment should travel with during canonical reordering.
 /// Comments attach to the nearest section that follows them in source order.
 #[derive(Debug, Clone, Copy, PartialEq)]
@@ -67,10 +72,11 @@ enum CommentSection {
 /// `ends_with_line_comment` records that the content's last emitted comment was a **line**
 /// comment, whose doc ends in a `hardline` that already drops the closing token to the next
 /// line. Every consumer that would otherwise supply its own break must skip it, or the two
-/// breaks stack into a blank line — the hazard the unfrozen paths already guard
-/// (`build_expression_doc_parts_with_span`'s `has_trailing_line_comment`). It rides here
-/// rather than being re-derived from source by each consumer because the builder that
-/// *emitted* the run is the one that knows.
+/// breaks stack into a blank line — the three closer assemblers
+/// ([`Printer::build_prefixed_head_doc`], `wrap_in_block_structure`,
+/// `build_block_head`) all read it for exactly that. It is set by
+/// [`Printer::trailing_comment_docs`] off the run it emits rather than re-derived from
+/// source by each consumer, because the builder that *emitted* the run is the one that knows.
 #[derive(Clone, Copy)]
 pub(in crate::printer) struct HeadExpr {
     pub(in crate::printer) doc: DocId,
@@ -254,6 +260,70 @@ impl<'a> Printer<'a> {
         d.concat(&[comment_doc, d.text(" "), doc])
     }
 
+    /// A braced head's **value stage**: the frozen slice when the head's gap resolved a
+    /// freeze, else the comment-aware TS expression doc built under `embed`.
+    ///
+    /// Every braced value in this printer asks exactly this question — the tags
+    /// (`{@html …}`, `{@render …}`, `{@const … = …}`), the block heads (`{#if …}`,
+    /// `{#each …}`, an `{#each}` key), the attribute `={…}` values, the `{expr}` tag, and
+    /// the braced attribute heads (`{...rest}`, `{@attach …}`) — after each has resolved
+    /// its own freeze verdict ([`Self::honored_directive_in_gap`]) and its own
+    /// [`EmbedContext`]. One spelling, because the frozen arm owes the owned-comment claim
+    /// ([`Self::build_frozen_node_doc`], docs/comments.md hazard 1) and a site that
+    /// re-spells the branch is a site that can forget it.
+    ///
+    /// What stays with the caller is what genuinely differs per head, and each difference
+    /// is load-bearing, so the bodies around this call are deliberately NOT shared:
+    ///
+    /// - the **`EmbedContext`** — four distinct recipes (a block head's
+    ///   `first_line_offset` is derived from its own opening literal; `{@const}`'s init
+    ///   takes `0` so binary chains stay Grouped under the assignment layout; an attribute
+    ///   value starts from [`EmbedContext::default`], not the host's).
+    /// - the **post-processing** — `remove_lines` for an inline block head,
+    ///   [`Self::indent_frozen_head`] for a prefixed head, the leading-line-comment
+    ///   continuation indent for a block head, nothing for the rest.
+    pub(in crate::printer) fn build_head_value_doc(
+        &self,
+        expr: &Expression<'_>,
+        frozen: bool,
+        embed: &EmbedContext,
+    ) -> DocId {
+        if frozen {
+            self.build_frozen_node_doc(expr.span())
+        } else {
+            tsv_ts::build_expression_doc_with_comments(self.d(), expr, &self.ts_inputs(), embed)
+        }
+    }
+
+    /// The **clarity parens** an assignment used as a value needs (`{@html (a = b)}`,
+    /// `prop={(a = b)}`, `{...(a = b)}`) — `value_doc` wrapped for an assignment, returned
+    /// unchanged for every other expression, which prints whatever parens it needs itself.
+    ///
+    /// They are the *printer's* parens, not the author's, which is why they are applied here
+    /// rather than inside [`Self::build_head_value_doc`]: a frozen slice keeps its interior
+    /// exactly as authored and the parens are **re-synthesized around it**, the same way the
+    /// prefix keyword and the closing `}` stay outside the freeze (docs/conformance_prettier.md
+    /// §Format-ignore directive). Skipping them on the frozen arm doesn't preserve more of the
+    /// author's text — it *deletes* the parens they wrote. They must also land inside the
+    /// head's own break: applied after the head is assembled instead, a frozen `{@html`
+    /// emitted `{@html(`.
+    ///
+    /// Every braced value position owes them **except `{@const}`'s initializer**, where the
+    /// paren is fully redundant and prettier drops it (`{@const a = (b = c)}` →
+    /// `{@const a = b = c}`, though the same tool keeps it for a `<script>`'s
+    /// `const a = (b = c)`) — that site calls `build_head_value_doc` alone.
+    pub(in crate::printer) fn wrap_value_clarity_parens(
+        &self,
+        expr: &Expression<'_>,
+        value_doc: DocId,
+    ) -> DocId {
+        if matches!(expr, Expression::AssignmentExpression(_)) {
+            self.d().parens(value_doc)
+        } else {
+            value_doc
+        }
+    }
+
     /// The frozen head's content, broken onto its own indented lines: a hardline, then the
     /// directive run and the verbatim slice one level in.
     ///
@@ -301,10 +371,14 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         if !head.frozen {
+            // Nothing indents this content, so a trailing line comment's own `hardline` is
+            // already the break the `}` needs, on the right column.
             return d.concat(&[d.text(open), head.doc, d.text(close)]);
         }
-        // A trailing line comment already ended the content with a `hardline`; adding the
-        // closer's own break on top of it would leave a blank line above the `}`.
+        // A run-final line comment already broke the line, dedented out of the frozen
+        // content's indent (`build_trailing_js_comment_doc`), so the closer reuses that
+        // break and lands at the head's own column — where it also lands with no trailing
+        // comment at all. A second break would render as a blank line above it.
         if head.ends_with_line_comment {
             return d.concat(&[self.head_open_doc(open, true), head.doc, d.text(close)]);
         }
@@ -393,11 +467,12 @@ impl<'a> Printer<'a> {
 impl<'a> Printer<'a> {
     /// Build a DocId for a TS expression (with comments) in our arena.
     ///
-    /// Uses the standard parameters: self.comments, self.embed, self.line_breaks.
-    /// For calls that need a custom embed context or empty comments, use the
+    /// Uses the standard parameters: self.comments, self.embed, self.line_breaks — i.e. the
+    /// unfrozen arm of [`Self::build_head_value_doc`] under the host's own embed, spelled
+    /// once there. For calls that need a custom embed context or empty comments, use the
     /// tsv_ts functions directly.
     pub(crate) fn build_ts_expression_doc(&self, expr: &Expression<'_>) -> DocId {
-        tsv_ts::build_expression_doc_with_comments(self.d(), expr, &self.ts_inputs(), &self.embed)
+        self.build_head_value_doc(expr, false, &self.embed)
     }
 
     /// Build a DocId for a TS expression without comments.

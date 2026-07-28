@@ -199,48 +199,61 @@ impl<'a> Printer<'a> {
         (allow_wrapping || in_multiline_context) && self.block_dangle_allowed()
     }
 
-    /// Wrap a block-tag head so its closing `}` dangles on its own line when the head wraps.
+    /// The shared block-head tail every block builder ends with: wrap a block-tag head so its
+    /// closing `}` dangles on its own line when the head wraps.
     ///
-    /// `open` is the opening literal (`{#if `, `{#each `, …) and `head_inner` is everything
-    /// between it and the closing `}` — the breakable expression plus any clause (` as item`,
-    /// ` then value`). When `can_wrap` is set (the same condition under which the expression is
-    /// allowed to break), `[head_inner, softline]` is grouped so the trailing softline — and thus
-    /// `}` — drops to its own line at the tag's base indent whenever the head exceeds print width
-    /// (a deliberate `_prettier_divergence`, consistent with tsv's JS `if (⏎…⏎) {` and broken-element
-    /// `>`). When the head fits, the softline collapses and `}` hugs the head, byte-identical to the
+    /// `open` is the opening literal (`{#if `, `{#each `, …); `head` carries the already-built
+    /// expression doc (the `{#each}` degenerate index/key form passes a concat of the
+    /// expression plus its tail, so `head.doc` and `expr` are distinct) plus the freeze and
+    /// trailing-line-comment verdicts; `clause` is the optional ` as …` / ` then …` /
+    /// ` catch …` tail (without leading space); `expr` is the head expression, used only for
+    /// the `clause_hugs_expr` classification. `can_wrap` stays caller-computed — its sources
+    /// differ across builders and several reuse it afterward for the body-drop.
+    ///
+    /// When `can_wrap` is set (the same condition under which the expression is allowed to
+    /// break), the head is grouped so the trailing break — and thus `}` — drops to its own line
+    /// at the tag's base indent whenever the head exceeds print width (a deliberate
+    /// `_prettier_divergence`, consistent with tsv's JS `if (⏎…⏎) {` and broken-element `>`).
+    /// When the head fits, the break collapses and `}` hugs the head, byte-identical to the
     /// inline form. When `can_wrap` is false (inline context, `remove_lines` applied) the head is
     /// emitted flat with `}` hugged, unchanged.
     ///
-    /// `expr_ends_with_line_comment` (from `head_trailing_line_comment`) short-circuits both
-    /// paths: the comment's own `hardline` already drops the clause + `}` to the next line, so
-    /// the dangle/hug break is skipped to avoid a spurious blank line.
+    /// `head.ends_with_line_comment` short-circuits both paths: the comment's own `hardline`
+    /// already drops the clause + `}` to the next line, so the dangle/hug break is skipped to
+    /// avoid a spurious blank line. It comes from `head`, not from a second scan here: the
+    /// content builder emitted that run and already knows. The two answers were always over the
+    /// same range (every caller passes one `comment_end` to both), so this is the same verdict
+    /// asked once.
     ///
-    /// `frozen` drops the opening literal's trailing space (`Printer::head_open_doc`):
+    /// `head.frozen` drops the opening literal's trailing space (`Printer::head_open_doc`):
     /// the head's content begins with its own hardline, so the space would be trailing
     /// whitespace on the keyword's line. Everything below is unchanged — the frozen
     /// content's hardline breaks the head group, so the clause + `}` take the same dangle
-    /// a width-wrapped head takes.
-    pub(super) fn build_block_head_doc(
+    /// a width-wrapped head takes. A frozen head also never hugs: the hug rule reads the
+    /// *printed* shape of the expression (a call whose args wrapped ends with `)` on its own
+    /// line, so the clause continues that line), and a verbatim slice has no such shape to
+    /// read — its last line is whatever the author left there.
+    fn build_block_head(
         &self,
         open: &'static str,
+        expr: &tsv_ts::Expression<'_>,
         head: HeadExpr,
         clause: Option<DocId>,
         can_wrap: bool,
-        hug: bool,
-        expr_ends_with_line_comment: bool,
     ) -> DocId {
         let d = self.d();
         let HeadExpr {
             doc: expr_doc,
             frozen,
-            ..
+            ends_with_line_comment,
         } = head;
+        let hug = clause_hugs_expr(expr) && !frozen;
         let open_doc = self.head_open_doc(open, frozen);
         let close = d.text("}");
-        if expr_ends_with_line_comment {
-            // The trailing line comment already emitted a `hardline` that drops the
-            // clause + `}` to the next line at base indent. Emit them directly with no
-            // dangle/hug break. Still group the expression on the wrapping path so the
+        if ends_with_line_comment {
+            // The trailing line comment leaves the break to whatever follows it, so the
+            // clause + `}` drop themselves to the next line at base indent — no dangle/hug
+            // break beyond that. Still group the expression on the wrapping path so the
             // body-expand keyed to `BlockHead` sees the (comment-forced) break.
             let head = if can_wrap {
                 d.group_with_id(expr_doc, GroupId::BlockHead)
@@ -295,43 +308,6 @@ impl<'a> Printer<'a> {
                 None => d.concat(&[open_doc, expr_doc, close]),
             }
         }
-    }
-
-    /// The shared block-head tail every block builder ends with: build the head doc via
-    /// [`Printer::build_block_head_doc`].
-    ///
-    /// `expr` is the head expression — used for its span and the `clause_hugs_expr`
-    /// classification; `head` carries the already-built expression doc (the `{#each}`
-    /// degenerate index/key form passes a concat of the expression plus its tail here,
-    /// so the two are distinct) plus the freeze and trailing-line-comment verdicts.
-    /// `clause` is the optional ` as …` / ` then …` / ` catch …` tail (without leading
-    /// space). `can_wrap` stays caller-computed — its sources differ across builders and
-    /// several reuse it afterward for the body-drop.
-    ///
-    /// Whether the head's trailing run ends in a line comment comes from `head`, not from a
-    /// second scan here: the content builder emitted that run and already knows. The two
-    /// answers were always over the same range (every caller passes one `comment_end` to
-    /// both), so this is the same verdict asked once.
-    fn build_block_head(
-        &self,
-        open: &'static str,
-        expr: &tsv_ts::Expression<'_>,
-        head: HeadExpr,
-        clause: Option<DocId>,
-        can_wrap: bool,
-    ) -> DocId {
-        // A frozen head never hugs: the hug rule reads the *printed* shape of the
-        // expression (a call whose args wrapped ends with `)` on its own line, so the
-        // clause continues that line), and a verbatim slice has no such shape to read —
-        // its last line is whatever the author left there.
-        self.build_block_head_doc(
-            open,
-            head,
-            clause,
-            can_wrap,
-            clause_hugs_expr(expr) && !head.frozen,
-            head.ends_with_line_comment,
-        )
     }
 
     /// Build a **section-free** block (key, plain each/if/await, snippet) whose body
@@ -818,7 +794,7 @@ impl<'a> Printer<'a> {
         // Separate the breakable expression from its clause so the clause + `}` can
         // dedent together onto their own line when the head wraps. `clause` is the
         // `as pattern[, index][ (key)]` tail WITHOUT its leading space (added by
-        // `build_block_head_doc`); the degenerate index/key-without-`as` cases (not
+        // `build_block_head`); the degenerate index/key-without-`as` cases (not
         // valid Svelte) keep hugging the expression unchanged.
         let (head_expr, clause) = if let Some(context) = &block.context {
             let mut clause_parts: DocBuf = smallvec![d.text("as ")];

@@ -13,5 +13,25 @@
 	text1
 {/if}
 
+<!-- an unprefixed `{…}` value takes the same shape — an attribute value, a spread head,
+	an expression tag -->
+<div
+	prop={
+		// prettier-ignore
+		(ppp  =  qqq)
+	}
+	{...
+		// prettier-ignore
+		(rrr  =  sss)
+	}
+></div>
+
+<p>
+	{
+		// prettier-ignore
+		(ttt  =  uuu)
+	}
+</p>
+
 <!-- an unfrozen sibling still normalizes, parens and all -->
 {@html (nnn = ooo)}

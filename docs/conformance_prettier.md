@@ -549,7 +549,7 @@ Both formatters keep the block-style form once produced (`prettier(input) == inp
 
 ### Svelte: Attributes
 
-**Trailing comments in `{...}`** (◆content_preservation) — [expr_trailing](../tests/fixtures/svelte/syntax/comments/expr_trailing_prettier_divergence/) (block comments, inline); [expr_trailing_line](../tests/fixtures/svelte/syntax/comments/expr_trailing_line_prettier_divergence/) (line comments — `}` kept on its own line so the `//` doesn't swallow it). Each fixture's README lists the contexts; they include `<svelte:element this={…}>` / `<svelte:component this={…}>`, whose expression Svelte's AST holds bare (no `ExpressionTag` around it) but which is the same `{…}` attribute value as any other. The *leading* and *interior* positions there are preserved by both formatters — [expr_special_this](../tests/fixtures/svelte/syntax/comments/expr_special_this/).
+**Trailing comments in `{...}`** (◆content_preservation) — [expr_trailing](../tests/fixtures/svelte/syntax/comments/expr_trailing_prettier_divergence/) (block comments, inline); [expr_trailing_line](../tests/fixtures/svelte/syntax/comments/expr_trailing_line_prettier_divergence/) (line comments — `}` kept on its own line so the `//` doesn't swallow it). Each fixture's README lists the contexts; they include `<svelte:element this={…}>` / `<svelte:component this={…}>`, whose expression Svelte's AST holds bare (no `ExpressionTag` around it) but which is the same `{…}` attribute value as any other. The *leading* and *interior* positions there are preserved by both formatters — [expr_special_this](../tests/fixtures/svelte/syntax/comments/expr_special_this/). A **run** of trailing comments is not the one-comment rule twice: prettier deletes them all, so tsv alone answers where the second one goes, and it answers with the run's own shape — a `//` ends the line, so what follows starts a fresh one and drops the separator space that would otherwise be leading whitespace; and the run's LAST comment decides the closer (a run ending in a block comment leaves no break for `}` to reuse, so a directive value takes the block form rather than hugging) — [expr_trailing_run](../tests/fixtures/svelte/syntax/comments/expr_trailing_run_prettier_divergence/). The `bind:` **function-binding sequence** is the same position one host in: prettier keeps the sequence's leading and inter-operand comments (so [function_comment](../tests/fixtures/svelte/directives/bind/function_comment/) matches) and deletes only the one past the last operand — [value_sequence_trailing_comment](../tests/fixtures/svelte/directives/bind/value_sequence_trailing_comment_prettier_divergence/).
 
 **Leading/interior comments in a `bind:` function-binding sequence** (◆content_preservation) — `bind:value={getter, setter}` carries getter/setter expressions as a bare (parens-stripped) sequence; tsv preserves a comment at the author's position where prettier keeps it. A leading line or multi-line block comment, mid (between getter/setter) block, and mid line comment all match prettier (regular fixture [function_comment](../tests/fixtures/svelte/directives/bind/function_comment/)). A **single-line block** comment *leading* the sequence is the one divergence — [function_comment_inline_block](../tests/fixtures/svelte/directives/bind/function_comment_inline_block_prettier_divergence/): prettier re-parenthesizes it (`{/* c */ (a, b)}`) then drops the comment on the next pass (non-idempotent), so tsv keeps the sequence bare and the comment in place. Trailing comments after the last operand are dropped by both. See [Comment Position Philosophy](#comment-position-philosophy).
 
@@ -1786,6 +1786,16 @@ tsv diverges at six places:
   spelling, where it already writes the broken form —
   [braced value own line](../tests/fixtures/svelte/syntax/prettier_ignore/braced_value_own_line_prettier_divergence/)
 
+  The value's **closing** `}` follows the ordinary rule, freeze or not: a trailing run ending
+  in a line comment already ended the line, so the closer reuses that break rather than adding
+  a second one (which would render as a blank line above it). Reusing a break also means
+  inheriting its column, so the run's final break is emitted **dedented** out of the content's
+  indent — the `}` then lands where it lands with no trailing comment at all, rather than one
+  level deeper because a comment happened to be there. This is what
+  `build_prefixed_head_doc` does one delimiter out for the prefixed heads, and the unprefixed
+  `{…}` values — expression tag, attribute value, `bind:` value — owe the identical shape —
+  [braced value trailing line](../tests/fixtures/svelte/syntax/prettier_ignore/braced_value_trailing_line_prettier_divergence/)
+
 `yield`'s hanging-paren layout carries its own pre-existing comment relocation (see
 [§Comment relocation](#comment-relocation)); the freeze rides on it rather than adding a
 second divergence.
@@ -1943,7 +1953,11 @@ only the directive's own line is new there. Inside a whitespace-significant elem
   [block heads](../tests/fixtures/svelte/blocks/head_prettier_ignore_prettier_divergence/)
 - **A frozen head whose value takes clarity parens** — ◆comment_preservation ◆prettier_bug —
   an assignment value is parenthesized by the printer (`{@html (a = b)}`), and those parens
-  stay **outside** the verbatim slice, like the prefix and the `}`. Prettier has no freeze to
+  stay **outside** the verbatim slice, like the prefix and the `}`. The rule keys on the
+  **value**, so every braced position answers it identically — the prefixed heads (tag,
+  block, `{...}` spread) and the unprefixed `{…}` values (attribute value, expression tag)
+  alike; the lone exception is `{@const}`'s initializer, where the paren is fully redundant
+  and normalizes away frozen or not. Prettier has no freeze to
   compare against here: its `remove_parens` pass **deletes** the directive along with the
   wrapper it attached to, so the value normalizes and the comment is lost outright. Also a
   `_svelte_divergence` — the same pass moves the parser's attachment (§Comment Attachment

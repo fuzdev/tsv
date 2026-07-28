@@ -16,8 +16,9 @@ fn  (  eee  )}
 	fn  (  ggg  )}
 ></div>
 
-<!-- an ordinary trailing comment coexists with the freeze: its own hardline drops the
-	`}`, so the head adds no second break -->
+<!-- an ordinary trailing comment coexists with the freeze: its own break drops the `}`,
+	dedented out of the frozen content, so the head adds no second break and the `}` lands
+	where it does with no trailing comment at all -->
 {@html // prettier-ignore
 jjj  +  kkk}
 
