@@ -7,3 +7,4 @@ pub mod fixtures;
 pub mod render_browser;
 pub mod render_normalize;
 pub mod test262;
+pub mod tsc_conformance;

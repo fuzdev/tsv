@@ -44,6 +44,8 @@ node_modules
 !/benches/js/results/report.conformance.bun.md
 !/benches/js/results/report.json
 !/benches/js/results/report.md
+!/benches/js/results/report.tsc-conformance.json
+!/benches/js/results/report.tsc-conformance.md
 
 # Env
 .env*

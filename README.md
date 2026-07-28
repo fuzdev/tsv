@@ -76,6 +76,7 @@ Future features (unknown order):
     - svelte-check replacement
     - LSP
     - linter - type aware, initially focused on serializable data-only plugins for extensibility
+    - includes an experimental first-party typechecker `tsv_check` (which may never ship)
   - bundling is probably out of scope 
   - [discussion](https://github.com/fuzdev/tsv/discussions) welcome
 
@@ -260,6 +261,7 @@ tsv/
 │   ├── tsv_ts/        # TypeScript parser/formatter (standalone)
 │   ├── tsv_css/       # CSS parser/formatter (standalone)
 │   ├── tsv_svelte/    # Svelte parser/formatter (uses tsv_ts + tsv_css)
+│   ├── tsv_check/     # experimental TypeScript binder/checker (may never ship; not in any shipped artifact)
 │   ├── tsv_cli/       # unified CLI (binary: `tsv`)
 │   ├── tsv_debug/     # dev utilities (binary: `tsv_debug`, uses Deno)
 │   ├── tsv_ffi/       # C FFI bindings
