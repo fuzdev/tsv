@@ -813,11 +813,23 @@ impl<'a> Printer<'a> {
                 // Last child after breaking element (e.g. multiline attrs):
                 // skip wrapping because group([breaking_element, line()]) forces
                 // line() to break too, incorrectly separating closing tag from text.
-                // Note: non-last text after a breaking tag (prev_is_tag && !is_last
-                // && prev_will_break) also falls through without action — group()
-                // would force line() to break, and leading_line is only for
-                // non-breaking continuation. The text's leading ws handles spacing.
-            } else if !prev_will_break {
+                // That forced break is exactly what a TERMINAL tail must not take — it hugs the
+                // intact closing tag per the author's space (`inline_wide_content_trailing_long`).
+                // Note: non-last text after a breaking *tag* (`prev_is_tag && !is_last &&
+                // prev_will_break`) still falls through without action — group() would force
+                // line() to break, and leading_line is only for non-breaking continuation. The
+                // text's leading ws handles spacing.
+            } else if !prev_will_break || !prev_is_tag {
+                // The second disjunct is the NON-TERMINAL guard. A text run followed by another
+                // flowing element must keep its own line — hugging it onto the closing tag shifts
+                // where that element lands, which feeds back into the fit decision
+                // (`inline_wide_content_text_sibling_long` is the guard, and its README the
+                // reasoning). The wrap below is what produces that own line, so a *breaking*
+                // previous element must reach it too: `prev_will_break` says the element already
+                // carries a hard break, and skipping the wrap there left the boundary unhandled —
+                // the leading run then rode `sibling_newline_flows`' space arm and the text hugged.
+                // Reachable only since that flow rule landed: before it a leading newline pinned a
+                // hardline, so the fall-through happened to render as the own line anyway.
                 trim_left = true;
                 add_leading_space = false; // line() handles the space
                 // Pop the last doc (the inline element) and rejoin it with the trailing text.

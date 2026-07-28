@@ -2059,7 +2059,28 @@ const inline_sibling_newline_flow: DivergencePattern = {
 			// (prettier `A⏎B` vs ours `AB`, no separator at all): that welds to `A B`
 			// against `AB`, so a formatter that ate an inter-sibling space is never
 			// absorbed here.
-			return prettier_trimmed.join(' ') === trimmed_lines(hunk.added_lines).join(' ');
+			const prettier_weld = prettier_trimmed.join(' ');
+			const ours_weld = trimmed_lines(hunk.added_lines).join(' ');
+			if (prettier_weld === ours_weld) return true;
+
+			// COMPOSED WITH THE FRAGMENT-EDGE TRIM. One hunk can carry this respelling AND
+			// the Svelte-mirror boundary trim at once (`<a> x </a>⏎and y` → `<a>x</a> and
+			// y`): the weld above fails on the trimmed run, and the trim rule's own
+			// equality fails on the collapsed line, so the hunk falls through BOTH and the
+			// file surfaces as `unknown` though every byte of it is sanctioned. Re-run the
+			// weld through the trim's own normalizer (`collapse_fragment_edge_ws`, shared
+			// with `svelte_boundary_ws_trim` below) so the composition is claimable without
+			// either rule widening the class it claims alone.
+			//
+			// Still a proof, not an escape hatch: the normalizer erases only FRAGMENT-EDGE
+			// runs — the exact class the compiler deletes — so an eaten INTER-SIBLING space
+			// survives on both sides and still fails the equality, and the `count_ws` guard
+			// mirrors the trim's direction (it only ever removes), so ours ADDING boundary
+			// whitespace is never claimed here.
+			return (
+				count_ws(ours_weld) < count_ws(prettier_weld) &&
+				collapse_fragment_edge_ws(prettier_weld) === collapse_fragment_edge_ws(ours_weld)
+			);
 		});
 
 		if (hunk_indices.length === 0) return null;
@@ -2283,6 +2304,12 @@ const erase_fragment_edges = (s: string): string =>
  * already hold the cached regions for `s` (the whole-file arm, via
  * `enrich_detection_context`) pass them to skip the rescan.
  */
+/**
+ * Whitespace character count — the DIRECTION guard for every trim claim: the
+ * Svelte-mirror trim only ever removes, so a side that ADDED whitespace is some other
+ * reflow. Shared with `inline_sibling_newline_flow`'s composed arm above.
+ */
+const count_ws = (s: string): number => (s.match(/[ \t\r\n]/g) ?? []).length;
 const collapse_fragment_edge_ws = (
 	s: string,
 	regions: CodeRegion[] = compute_code_regions(s)
@@ -2338,7 +2365,6 @@ const svelte_boundary_ws_trim: DivergencePattern = {
 		// shared glued context line (`<span> hi</span>` → `<span>hi</span>` where an
 		// identical glued line sits between them), leaving per-hunk pairs asymmetric.
 		// A mixed file falls back to the per-hunk pair check for the trim hunks alone.
-		const count_ws = (s: string): number => (s.match(/[ \t\r\n]/g) ?? []).length;
 		const ours_regions = ctx.ours_code_regions ?? [];
 		const prettier_regions = ctx.prettier_code_regions ?? [];
 		if (
