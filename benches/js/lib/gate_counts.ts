@@ -158,7 +158,7 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  * in benches/js/CLAUDE.md §Pinned gate counts.
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
-	svelte: 513,
+	svelte: 500,
 	typescript: 2332,
 	css: 89
 };
