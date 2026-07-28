@@ -390,7 +390,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Pass false for in_multiline_context: inside whitespace-sensitive elements,
         // block expressions must not wrap (adding line breaks changes visible content)
-        let expr_doc = self.build_block_head_expr(
+        let head = self.build_block_head_expr(
             IF_BLOCK_OPEN,
             block.opening_tag_span,
             &block.test,
@@ -400,7 +400,11 @@ impl<'a> Printer<'a> {
 
         let body_doc = self.build_whitespace_sensitive_content_doc(block.consequent.nodes);
 
-        let mut parts: DocBuf = smallvec![d.text(IF_BLOCK_OPEN), expr_doc, d.text("}"), body_doc];
+        // The `}` hugs the frozen slice's last line here, as it does on every
+        // dangle-suppressed path — inside a whitespace-significant element the dangle is
+        // off by construction (`block_dangle_allowed`).
+        let open_doc = self.head_open_doc(IF_BLOCK_OPEN, head.frozen);
+        let mut parts: DocBuf = smallvec![open_doc, head.doc, d.text("}"), body_doc];
 
         if let Some(alt) = &block.alternate {
             self.build_ws_sensitive_if_alternate(alt, &mut parts);
@@ -416,11 +420,11 @@ impl<'a> Printer<'a> {
 
         // Check if this can be flattened to {:else if ...}
         if let Some(else_if) = Self::get_flattenable_else_if(alt) {
-            let expr_doc = self.build_else_if_expr_doc(else_if, false);
+            let head = self.build_else_if_expr_doc(else_if, false);
 
             let body_doc = self.build_whitespace_sensitive_content_doc(else_if.consequent.nodes);
-            parts.push(d.text(ELSE_IF_BLOCK_OPEN));
-            parts.push(expr_doc);
+            parts.push(self.head_open_doc(ELSE_IF_BLOCK_OPEN, head.frozen));
+            parts.push(head.doc);
             parts.push(d.text("}"));
             parts.push(body_doc);
 
@@ -444,7 +448,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let expr_comment_end = each_expr_comment_end(block);
         // Pass false for in_multiline_context: expressions must not wrap in ws-sensitive context
-        let expr_doc = self.build_block_head_expr(
+        let head = self.build_block_head_expr(
             EACH_BLOCK_OPEN,
             block.opening_tag_span,
             &block.expression,
@@ -452,7 +456,8 @@ impl<'a> Printer<'a> {
             false,
         );
 
-        let mut opening: DocBuf = smallvec![d.text(EACH_BLOCK_OPEN), expr_doc];
+        let open_doc = self.head_open_doc(EACH_BLOCK_OPEN, head.frozen);
+        let mut opening: DocBuf = smallvec![open_doc, head.doc];
 
         if let Some(context) = &block.context {
             opening.push(d.text(" as "));
@@ -468,6 +473,8 @@ impl<'a> Printer<'a> {
         }
 
         if let Some(key) = &block.key {
+            // The `(` carries no trailing space, and the dangle is suppressed here, so the
+            // key's freeze verdict changes nothing about this layout.
             let key_doc = if let Some(key_span) = block.key_span {
                 self.build_expression_doc_for_block(
                     key,
@@ -476,6 +483,7 @@ impl<'a> Printer<'a> {
                     1,
                     false,
                 )
+                .doc
             } else {
                 self.build_ts_expression_doc(key)
             };

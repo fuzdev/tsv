@@ -6,8 +6,14 @@ comma:
 
 - After the comma (leads the next identifier): `{@debug a, /* c */ b}`
 - Before the comma (trails the previous identifier): `{@debug x /* t */, y}`
+- Before the first identifier (`{@debug /* l */ m, n}`) — preserved in the printed
+  output, but attached to **no** node in the wire AST: a multi-identifier `{@debug}` is
+  one canonical `SequenceExpression` parse whose wrapper is discarded after the
+  identifiers are extracted, so acorn's leading run binds to the wrapper and never
+  reaches `m`. (The single-identifier form has no wrapper, so there the run does attach —
+  [debug_comment](../debug_comment_prettier_divergence/).)
 
-Prettier: `{@debug a, b}` / `{@debug x, y}` (comments stripped)
+Prettier: `{@debug a, b}` / `{@debug x, y}` / `{@debug m, n}` (comments stripped)
 
 ## Reason
 

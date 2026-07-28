@@ -190,15 +190,16 @@ pub(super) fn build_declaration_tag_writer_comments(
 /// skeleton tree (one root per item), attached via one shared queue
 /// (`attach_expression_list` — an inter-item comment is claimed exactly once,
 /// per acorn's same-line rule), and folded into one map keyed by each item's
-/// spans. `wrapper_end` is the discarded parse wrapper's end (`{@debug}`'s
-/// `SequenceExpression` — its last item never claims a trailing comment);
-/// `None` for snippet parameters.
+/// spans. `wrapper` is the discarded parse wrapper's own span (`{@debug}`'s
+/// `SequenceExpression`, which spans first identifier to last) — every comment
+/// outside it binds to the wrapper and dies with it; `None` for snippet
+/// parameters, whose function wrapper encloses the whole list.
 pub(super) fn build_expression_list_writer_comments(
     items: &[tsv_ts::ast::internal::Expression<'_>],
     attach: AttachInputs<'_>,
     container_start: u32,
     range_end: u32,
-    wrapper_end: Option<u32>,
+    wrapper: Option<Span>,
 ) -> WriterComments {
     let recorder = SkeletonRecorder::new();
     let mut w = skeleton_writer(Span::new(container_start, range_end));
@@ -214,7 +215,7 @@ pub(super) fn build_expression_list_writer_comments(
         attach.source,
         container_start,
         range_end,
-        wrapper_end,
+        wrapper,
         &mut out,
     );
     out

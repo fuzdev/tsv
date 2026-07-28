@@ -8,9 +8,8 @@
 #![allow(clippy::literal_string_with_formatting_args)]
 
 use crate::ast::internal::{self, Fragment, FragmentNode};
-use crate::printer::Printer;
+use crate::printer::{HeadExpr, Printer};
 use smallvec::smallvec;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::doc::{DocBuf, GroupId};
 
@@ -191,23 +190,6 @@ fn await_shorthand(block: &internal::AwaitBlock<'_>) -> AwaitShorthand {
 }
 
 impl<'a> Printer<'a> {
-    /// Whether the trailing comments in `[start, end)` end with a line (`//`) comment.
-    ///
-    /// A trailing line comment is emitted (by `build_trailing_js_comment_doc`) with a
-    /// closing `hardline` — a `//` runs to end of line, so the following clause + `}`
-    /// already drop to the next line. The head dangle (and the flat hug) must then not
-    /// add their own break, or a spurious blank line / leading space appears. A trailing
-    /// *block* comment carries no `hardline`, so it does not suppress the dangle.
-    ///
-    /// **to emit**, deliberately: the question is whether the comment *this gap prints last*
-    /// is a line comment, because that emission is what carries the closing `hardline`. A
-    /// comment the gap does not print carries no hardline, so it must not answer this.
-    pub(super) fn head_trailing_line_comment(&self, start: u32, end: u32) -> bool {
-        comments_to_emit_in_range(self.comments, start, end)
-            .last()
-            .is_some_and(|c| !c.is_block)
-    }
-
     /// Whether a wrapped block head may dangle its `}` here. The head expression is
     /// allowed to break (`allow_wrapping` or a multiline context) AND the context permits
     /// the dangle — false only inside a whitespace-significant element (`<pre>` /
@@ -232,17 +214,28 @@ impl<'a> Printer<'a> {
     /// `expr_ends_with_line_comment` (from `head_trailing_line_comment`) short-circuits both
     /// paths: the comment's own `hardline` already drops the clause + `}` to the next line, so
     /// the dangle/hug break is skipped to avoid a spurious blank line.
+    ///
+    /// `frozen` drops the opening literal's trailing space (`Printer::head_open_doc`):
+    /// the head's content begins with its own hardline, so the space would be trailing
+    /// whitespace on the keyword's line. Everything below is unchanged — the frozen
+    /// content's hardline breaks the head group, so the clause + `}` take the same dangle
+    /// a width-wrapped head takes.
     pub(super) fn build_block_head_doc(
         &self,
         open: &'static str,
-        expr_doc: DocId,
+        head: HeadExpr,
         clause: Option<DocId>,
         can_wrap: bool,
         hug: bool,
         expr_ends_with_line_comment: bool,
     ) -> DocId {
         let d = self.d();
-        let open_doc = d.text(open);
+        let HeadExpr {
+            doc: expr_doc,
+            frozen,
+            ..
+        } = head;
+        let open_doc = self.head_open_doc(open, frozen);
         let close = d.text("}");
         if expr_ends_with_line_comment {
             // The trailing line comment already emitted a `hardline` that drops the
@@ -304,35 +297,40 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// The shared block-head tail every block builder ends with: detect whether the
-    /// head expression's trailing comments (over `[expr.end, comment_end)`) end with a
-    /// line comment, then build the head doc via [`Printer::build_block_head_doc`].
+    /// The shared block-head tail every block builder ends with: build the head doc via
+    /// [`Printer::build_block_head_doc`].
     ///
     /// `expr` is the head expression — used for its span and the `clause_hugs_expr`
-    /// classification; `expr_doc` is the already-built expression doc (the `{#each}`
+    /// classification; `head` carries the already-built expression doc (the `{#each}`
     /// degenerate index/key form passes a concat of the expression plus its tail here,
-    /// so the two are distinct). `clause` is the optional ` as …` / ` then …` / ` catch …`
-    /// tail (without leading space), and `comment_end` bounds the trailing-comment scan
-    /// (the head end for `{#if}`/`{:else if}`/`{#key}`, or the pattern-start-narrowed
-    /// end for `{#each}`/`{#await}`). `can_wrap` stays caller-computed — its sources
-    /// differ across builders and several reuse it afterward for the body-drop.
+    /// so the two are distinct) plus the freeze and trailing-line-comment verdicts.
+    /// `clause` is the optional ` as …` / ` then …` / ` catch …` tail (without leading
+    /// space). `can_wrap` stays caller-computed — its sources differ across builders and
+    /// several reuse it afterward for the body-drop.
+    ///
+    /// Whether the head's trailing run ends in a line comment comes from `head`, not from a
+    /// second scan here: the content builder emitted that run and already knows. The two
+    /// answers were always over the same range (every caller passes one `comment_end` to
+    /// both), so this is the same verdict asked once.
     fn build_block_head(
         &self,
         open: &'static str,
         expr: &tsv_ts::Expression<'_>,
-        expr_doc: DocId,
+        head: HeadExpr,
         clause: Option<DocId>,
-        comment_end: u32,
         can_wrap: bool,
     ) -> DocId {
-        let elc = self.head_trailing_line_comment(expr.span().end, comment_end);
+        // A frozen head never hugs: the hug rule reads the *printed* shape of the
+        // expression (a call whose args wrapped ends with `)` on its own line, so the
+        // clause continues that line), and a verbatim slice has no such shape to read —
+        // its last line is whatever the author left there.
         self.build_block_head_doc(
             open,
-            expr_doc,
+            head,
             clause,
             can_wrap,
-            clause_hugs_expr(expr),
-            elc,
+            clause_hugs_expr(expr) && !head.frozen,
+            head.ends_with_line_comment,
         )
     }
 
@@ -509,13 +507,12 @@ impl<'a> Printer<'a> {
             if let Some(else_if) = Self::get_flattenable_else_if(a) {
                 // Build the else-if head with wrapping enabled so it can dangle within the
                 // expanded form; in the inline form `BlockHead` resolves flat (no dangle).
-                let expr_doc = self.build_else_if_expr_doc(else_if, true);
+                let head_expr = self.build_else_if_expr_doc(else_if, true);
                 let head = self.build_block_head(
                     ELSE_IF_BLOCK_OPEN,
                     &else_if.test,
-                    expr_doc,
+                    head_expr,
                     None,
-                    else_if.opening_tag_span.end - 1,
                     self.block_dangle_allowed(),
                 );
                 let body = self.build_section_body_doc(&else_if.consequent);
@@ -584,7 +581,7 @@ impl<'a> Printer<'a> {
         // Use remove_lines only if there's preceding breakable content (so it breaks first).
         // Otherwise, allow natural wrapping to respect print_width.
         let allow_wrapping = !has_preceding_breakable;
-        let expr_doc = self.build_block_head_expr(
+        let head = self.build_block_head_expr(
             IF_BLOCK_OPEN,
             block.opening_tag_span,
             &block.test,
@@ -593,14 +590,7 @@ impl<'a> Printer<'a> {
         );
 
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
-        let head_doc = self.build_block_head(
-            IF_BLOCK_OPEN,
-            &block.test,
-            expr_doc,
-            None,
-            block.opening_tag_span.end - 1,
-            can_wrap,
-        );
+        let head_doc = self.build_block_head(IF_BLOCK_OPEN, &block.test, head, None, can_wrap);
 
         // Inline-authored block (consequent + every alternate branch): expand the
         // whole block — bodies, `{:else if}`/`{:else}` sections, and `{/if}` — onto
@@ -688,7 +678,7 @@ impl<'a> Printer<'a> {
         &self,
         else_if: &internal::IfBlock<'_>,
         in_multiline_context: bool,
-    ) -> DocId {
+    ) -> HeadExpr {
         self.build_block_head_expr(
             ELSE_IF_BLOCK_OPEN,
             else_if.opening_tag_span,
@@ -708,7 +698,7 @@ impl<'a> Printer<'a> {
         // Check if this can be flattened to {:else if ...}
         if let Some(else_if) = Self::get_flattenable_else_if(alt) {
             // {:else if condition}
-            let expr_doc = self.build_else_if_expr_doc(else_if, in_multiline_context);
+            let head_expr = self.build_else_if_expr_doc(else_if, in_multiline_context);
 
             let body_doc = self.build_nodes_doc_multiline(else_if.consequent.nodes);
             let indented_body = self.indent_body_expand(body_doc, true);
@@ -718,9 +708,8 @@ impl<'a> Printer<'a> {
             let head_doc = self.build_block_head(
                 ELSE_IF_BLOCK_OPEN,
                 &else_if.test,
-                expr_doc,
+                head_expr,
                 None,
-                else_if.opening_tag_span.end - 1,
                 in_multiline_context && self.block_dangle_allowed(),
             );
             let mut parts: DocBuf = smallvec![head_doc, indented_body];
@@ -798,7 +787,7 @@ impl<'a> Printer<'a> {
         // Build expression doc with context-dependent behavior
         let allow_wrapping = !has_preceding_breakable;
         let expr_comment_end = each_expr_comment_end(block);
-        let expr_doc = self.build_block_head_expr(
+        let head = self.build_block_head_expr(
             EACH_BLOCK_OPEN,
             block.opening_tag_span,
             &block.expression,
@@ -807,20 +796,23 @@ impl<'a> Printer<'a> {
         );
 
         // Build the optional key doc (shared between the clause and degenerate paths).
+        // An `{#each}` key is a prefixed head of its own — its `(` opens the gap, and a
+        // frozen key takes the same broken form with the `)` dangling, so the whole
+        // ` (…)` is assembled here rather than by the clause below.
         let key_doc = block.key.as_ref().map(|key| {
             // The key expression is inside parens, so the offset accounts for that.
-            if let Some(key_span) = block.key_span {
-                self.build_expression_doc_for_block(
-                    key,
-                    key_span.start + 1, // after "("
-                    key_span.end - 1,   // before ")"
-                    1,                  // "(" = 1 char (key is inside parens)
-                    allow_wrapping || in_multiline_context,
-                )
-            } else {
+            let Some(key_span) = block.key_span else {
                 // No key_span: build doc directly
-                self.build_ts_expression_doc(key)
-            }
+                return self.build_ts_expression_doc(key);
+            };
+            let key_head = self.build_expression_doc_for_block(
+                key,
+                key_span.start + 1, // after "("
+                key_span.end - 1,   // before ")"
+                1,                  // "(" = 1 char (key is inside parens)
+                allow_wrapping || in_multiline_context,
+            );
+            self.build_prefixed_head_doc("(", key_head, ")")
         });
 
         // Separate the breakable expression from its clause so the clause + `}` can
@@ -836,24 +828,28 @@ impl<'a> Printer<'a> {
                 clause_parts.push(d.text_pooled(index));
             }
             if let Some(kd) = key_doc {
-                clause_parts.push(d.text(" ("));
+                clause_parts.push(d.text(" "));
                 clause_parts.push(kd);
-                clause_parts.push(d.text(")"));
             }
-            (expr_doc, Some(d.concat(&clause_parts)))
+            (head, Some(d.concat(&clause_parts)))
         } else {
             // No `as`: any index/key is degenerate — keep it hugging the expression.
-            let mut e: DocBuf = smallvec![expr_doc];
+            let mut e: DocBuf = smallvec![head.doc];
             if let Some(index) = block.index {
                 e.push(d.text(", "));
                 e.push(d.text_pooled(index));
             }
             if let Some(kd) = key_doc {
-                e.push(d.text(" ("));
+                e.push(d.text(" "));
                 e.push(kd);
-                e.push(d.text(")"));
             }
-            (d.concat(&e), None)
+            (
+                HeadExpr {
+                    doc: d.concat(&e),
+                    ..head
+                },
+                None,
+            )
         };
 
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
@@ -862,7 +858,6 @@ impl<'a> Printer<'a> {
             &block.expression,
             head_expr,
             clause,
-            expr_comment_end,
             can_wrap,
         );
 
@@ -1132,7 +1127,7 @@ impl<'a> Printer<'a> {
             AwaitShorthand::Catch => block.error.as_ref().map_or(head_end, |e| e.span().start),
             AwaitShorthand::None => head_end,
         };
-        let expr_doc = self.build_block_head_expr(
+        let head = self.build_block_head_expr(
             AWAIT_BLOCK_OPEN,
             block.opening_tag_span,
             &block.expression,
@@ -1183,14 +1178,8 @@ impl<'a> Printer<'a> {
         // comment *inside* a shorthand pattern isn't mistaken for a trailing line comment
         // on the awaited expression — that would drop the space before the `then`/`catch`
         // clause.
-        let head_doc = self.build_block_head(
-            AWAIT_BLOCK_OPEN,
-            &block.expression,
-            expr_doc,
-            clause,
-            expr_comment_end,
-            can_wrap,
-        );
+        let head_doc =
+            self.build_block_head(AWAIT_BLOCK_OPEN, &block.expression, head, clause, can_wrap);
 
         // Fast path: every present section is inline-authored → body-expand like the other
         // blocks. The section bodies + `{:then}`/`{:catch}` keywords + `{/await}` all drop to
@@ -1238,7 +1227,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         // Build expression doc with context-dependent behavior
         let allow_wrapping = !has_preceding_breakable;
-        let expr_doc = self.build_block_head_expr(
+        let head = self.build_block_head_expr(
             KEY_BLOCK_OPEN,
             block.opening_tag_span,
             &block.expression,
@@ -1247,14 +1236,8 @@ impl<'a> Printer<'a> {
         );
 
         let can_wrap = self.block_head_can_wrap(allow_wrapping, in_multiline_context);
-        let head_doc = self.build_block_head(
-            KEY_BLOCK_OPEN,
-            &block.expression,
-            expr_doc,
-            None,
-            block.opening_tag_span.end - 1,
-            can_wrap,
-        );
+        let head_doc =
+            self.build_block_head(KEY_BLOCK_OPEN, &block.expression, head, None, can_wrap);
         let close = d.text("{/key}");
 
         // Inline-authored (no newline-authored boundary, no forced break; a space-only
