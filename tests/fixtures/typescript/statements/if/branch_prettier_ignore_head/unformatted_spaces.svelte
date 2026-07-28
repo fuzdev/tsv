@@ -24,4 +24,10 @@
 	if (    aaa    )
 		/* prettier-ignore */
 		fn(  bbb  );
+
+	// a block comment glued before the frozen statement is OWNED by it, so the freeze
+	// claims it — nothing else would print it
+	if (    aaa    )
+		// prettier-ignore
+		/* c */ fn(  bbb  );
 </script>

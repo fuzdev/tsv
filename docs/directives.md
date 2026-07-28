@@ -368,6 +368,38 @@ One position is inert: a directive between a **decorator** and its declaration
 freezes nothing, because the decorator belongs to the declaration and the gap is
 inside the statement rather than before it.
 
+### On declaration heads
+
+The `export` and `export default` keywords introduce a declaration the same way,
+so a directive in the gap after either freezes it. The keyword stays outside the
+frozen slice; decorators written *after* it belong to the declaration and ride
+inside:
+
+```ts
+export
+	// format-ignore
+	const  aaa  =  1;
+
+export default
+	// format-ignore
+	@dec
+	class  Ddd  {}
+```
+
+A decorator written *before* `export` is the inert case again: the declaration
+begins at the decorator, so the `export`→class gap is inside it and a directive
+there freezes nothing.
+
+An expression statement the printer wraps in parens freezes the same way, with
+the parens left outside the slice:
+
+```ts
+(
+	// format-ignore
+	{ aaa:  1 }
+);
+```
+
 ## `format-ignore-start` / `format-ignore-end`
 
 In Svelte templates, a pair of range markers preserves every node between them:

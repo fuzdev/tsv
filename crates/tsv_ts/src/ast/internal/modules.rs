@@ -75,6 +75,20 @@ pub enum ExportDefaultValue<'arena> {
     TSInterfaceDeclaration(TSInterfaceDeclaration<'arena>),
 }
 
+impl ExportDefaultValue<'_> {
+    /// The exported value's own span — where the `export default` keyword's gap ends,
+    /// whichever form follows it.
+    pub fn span(&self) -> Span {
+        match self {
+            ExportDefaultValue::Expression(expr) => expr.span(),
+            ExportDefaultValue::FunctionDeclaration(func) => func.span,
+            ExportDefaultValue::TSDeclareFunction(func) => func.span,
+            ExportDefaultValue::ClassDeclaration(class) => class.span,
+            ExportDefaultValue::TSInterfaceDeclaration(iface) => iface.span,
+        }
+    }
+}
+
 /// Export all declaration: `export * from "y"` or `export * as ns from "y"`
 /// Also handles type-only: `export type * from "y"`
 #[derive(Debug, Clone)]

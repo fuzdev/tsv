@@ -1866,6 +1866,48 @@ declaration (`@dec⏎// prettier-ignore⏎export class D {}`) freezes nothing, i
 tsv. The decorator belongs to the declaration it decorates, so the gap is inside the statement
 rather than before it, and there is no following member for the rule to bind to.
 
+**On declaration heads and parenthesized statements.** The last two statement-level heads are
+the ones where prettier **relocates the directive out of the gap** and freezes anyway — the
+`export`→declaration, `export default`→value and `export =`→value gaps, and the `(`→expression
+gap of a statement whose parens the printer keeps. tsv freezes the same node at all four and
+keeps the directive
+where the author wrote it, which at the two `export` heads is the uniform declaration-header
+layout an ordinary comment already takes there (the keyword alone on its line, the continuation
+indented) and at the paren head is inside the broken parens. Both spellings behave alike;
+placement keys the freeze.
+
+The `export` keyword is parent-owned and stays outside the slice, while decorators written
+*after* it belong to the declaration and ride inside it. The gap one delimiter *earlier* — the
+`export`→`=` interior of `export =` — is not a head at all: a `=` begins no node, so Rule A has
+nothing to bind to and a directive there freezes nothing (prettier reaches past the `=` and
+freezes the value). At the paren head the parens are the
+printer's, so they too stay outside — and when a frozen slice's own leftmost token needs them
+(`{ bbb: 2 }.ccc`, which would otherwise reparse as a block) the shell goes around the **whole**
+slice, since a verbatim slice has no interior for the printer to wrap. Where the parens are
+merely redundant tsv drops them and the directive leads the statement, matching prettier
+(`statements/expression_statement_paren_dropped_prettier_ignore_head`).
+
+- **`export`→declaration head** — ◆comment_preservation — prettier pulls the directive flush
+  onto the `export` line (`export // prettier-ignore`) and freezes anyway; tsv keeps the
+  author's line, since the flush placement is inert under the floor and would lose the freeze
+  on the second pass. The plain-comment form of the same relocation is already sanctioned at
+  [export_declaration_line_comment](../tests/fixtures/typescript/syntax/comments/export_declaration_line_comment_prettier_divergence/) —
+  [named head](../tests/fixtures/typescript/modules/exports/named_declaration_prettier_ignore_head_prettier_divergence/),
+  [default head](../tests/fixtures/typescript/modules/exports/default_declaration_prettier_ignore_head_prettier_divergence/),
+  [`export =` head](../tests/fixtures/typescript/modules/exports/export_equals_prettier_ignore_head_prettier_divergence/)
+- **Paren-kept expression statement** — ◆comment_preservation ◆prettier_bug — prettier hoists
+  the directive out before the `(` and glues the frozen slice back inside parens on one line.
+  On the leftmost-token case it also drops the shell, emitting `{ bbb:  2 }.ccc;`, which does
+  not reparse —
+  [paren head](../tests/fixtures/typescript/statements/expression_statement_prettier_ignore_head_prettier_divergence/)
+- **`export`→class gap of a decorator-FIRST class** — ◆comment_preservation
+  ◆content_preservation — `@dec⏎export⏎// c⏎class C {}`. The declaration's span opens at the
+  decorator, so this gap is *inside* it, and a directive there freezes nothing in either tool —
+  the mirror image of the decorator→declaration gap above. Prettier hoists a line comment above
+  `export` and trails a block comment on the decorator; tsv keeps both in place. tsv previously
+  **dropped** every comment in this gap, scanning it over an inverted range —
+  [before export](../tests/fixtures/typescript/typescript_specific/decorators/before_export_comment_prettier_divergence/)
+
 See [directives.md](./directives.md) for the user-facing reference.
 
 ---

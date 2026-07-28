@@ -177,12 +177,9 @@ impl<'a> Printer<'a> {
         span.start < expr_start && self.source.as_bytes().get(span.start as usize) == Some(&b'(')
     }
 
-    /// Build a Doc for an expression statement
-    ///
-    /// Handles parentheses for object patterns and the "avoid becoming a
-    /// directive" rule for bare string literals (see
-    /// [`Printer::needs_avoid_directive_parens`]); `in_program_or_block` is
-    /// threaded from [`Printer::build_statement_doc`].
+    /// Build a Doc for an expression statement: the value
+    /// ([`Self::build_expression_statement_value_doc`], or the verbatim text of a
+    /// directive-prologue entry) plus the `;` and the comments bound to it.
     fn build_expression_statement_doc(
         &self,
         stmt: &internal::ExpressionStatement<'_>,
@@ -190,135 +187,15 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
 
-        let mut parts = DocBuf::new();
-
-        if stmt.is_directive {
+        let mut parts: DocBuf = if stmt.is_directive {
             // Directives are exact code-unit sequences; `format_directive` mirrors
             // Prettier's `printDirective` (swap the outer quote to single only when
             // the content has no quote, else verbatim). Never parenthesized.
             let raw = stmt.expression.span().extract(self.source);
-            parts.push(d.text_pooled(&format_directive(raw)));
+            smallvec![d.text_pooled(&format_directive(raw))]
         } else {
-            // Parens required for correctness (object expressions, object pattern
-            // assignments) OR to avoid a bare string statement being read as a
-            // directive (recomputed fresh, not preserved from source).
-            let needs_parens = self
-                .needs_parens(&stmt.expression, ParenContext::ExpressionStatement)
-                || self.needs_avoid_directive_parens(stmt, in_program_or_block);
-
-            // A comment between a source `(` and the expression (`(// c⏎ expr)` /
-            // `(/* c */⏎ expr)` — e.g. a bare parenthesized decorated class
-            // expression) is preserved inside the parens, breaking them open; the flat
-            // `(`/`)` wrap below would drop it, since there is nowhere on one line for
-            // a comment the expression doesn't own to go. prettier hoists the comment
-            // before `(` — a divergence (`expression_statement_paren_kept_comment`,
-            // `decorated_expr_open_paren_comment`).
-            let expr_start = stmt.expression.span().start;
-            let source_paren = self.statement_opens_with_paren(stmt.span, expr_start);
-            // The `(`→expression gap, resolved in one place so the gate below and the two
-            // emitters that can claim it cannot read different ranges.
-            let paren_gap =
-                || comments_to_emit_in_range(self.comments, stmt.span.start + 1, expr_start);
-            // Deliberately **to emit**, not on-page: this branch also *prints* the comments it
-            // finds. A block glued to the *expression* is owned by it, rides inside its doc and
-            // is skipped here — which is what keeps `(/* c */ expr)` flat.
-            let paren_open_comments = needs_parens
-                && source_paren
-                && self.has_comments_to_emit_between(stmt.span.start + 1, expr_start);
-
-            // When the whole expression isn't wrapped, a nested leftmost
-            // object/function/class still needs parens around itself
-            // (`(class {}).foo`, `({}).foo`, `(class {}) + 1`). The matching node's
-            // doc builder consumes this span-matched target and wraps itself.
-            if !needs_parens {
-                let leftmost = leftmost_no_lookahead(&stmt.expression);
-                if matches!(
-                    leftmost,
-                    Expression::ObjectExpression(_)
-                        | Expression::FunctionExpression(_)
-                        | Expression::ClassExpression(_)
-                ) {
-                    self.expr_stmt_paren_target.set(Some(leftmost.span()));
-                } else if let Some(Expression::Identifier(id)) =
-                    strip_statement_casts(&stmt.expression)
-                    && self.with_ident_name(id, is_statement_ambiguous_keyword)
-                {
-                    // `(type) as T;` / `(module) satisfies U;` — a contextual keyword
-                    // heading an `as`/`satisfies` cast at statement level reparses as a
-                    // `type`/`module`/… declaration without the parens. The identifier's
-                    // doc builder consumes this span-matched target and wraps itself.
-                    self.expr_stmt_paren_target.set(Some(id.span));
-                }
-            }
-
-            // Build the expression once. Context flags for chain handling:
-            // is_expression_statement allows short identifier names to merge with the
-            // first call; in_top_level_assignment selects the regular assignment
-            // layout (not chain formatting). Clear the (non-consuming, span-matched)
-            // paren target afterward so it can't leak into a sibling statement.
-            self.is_expression_statement.set(true);
-            self.in_top_level_assignment.set(true);
-            let expr_doc = self.build_expression_doc(&stmt.expression);
-            self.in_top_level_assignment.set(false);
-            self.is_expression_statement.set(false);
-            self.expr_stmt_paren_target.set(None);
-
-            // A parenthesized *decorated* class expression breaks its parens open and
-            // indents the content (prettier): `(⏎\t@dec⏎\tclass {}⏎)`. The decorators
-            // force the break; an undecorated `(class {})` / `(function () {})` stays
-            // inline (flat `else` below).
-            let decorated_class_expr = needs_parens
-                && matches!(
-                    &stmt.expression,
-                    Expression::ClassExpression(c) if class_expr_has_decorators(c)
-                );
-
-            if paren_open_comments {
-                // The parens break open around the run. Only the first `hardline` is
-                // the site's own — the run's internal separators come from the shared
-                // leading-comment emitter, so a run the author glued onto one line
-                // stays glued and a blank line between two comments survives.
-                let mut inner: DocBuf = smallvec![d.hardline()];
-                self.push_leading_comment_run(
-                    &mut inner,
-                    paren_gap(),
-                    expr_start,
-                    LeadingGlue::Adjacent,
-                    d.empty(),
-                );
-                inner.push(expr_doc);
-                parts.push(d.text("("));
-                parts.push(d.indent(d.concat(&inner)));
-                parts.push(d.hardline());
-                parts.push(d.text(")"));
-            } else if decorated_class_expr {
-                parts.push(self.build_break_open_parens(expr_doc));
-            } else {
-                if needs_parens {
-                    parts.push(d.text("("));
-                } else if source_paren {
-                    // The statement had a source `(` that this print DROPS as
-                    // redundant. A comment inside it then has no emitter left: the
-                    // statement-list gap ends at the `(`, and the expression's own doc
-                    // starts past the comment — so it must be emitted here or it is
-                    // lost. It leads the statement, which is where prettier hoists it
-                    // too. (An owned/glued comment rides inside `expr_doc` and is
-                    // skipped by the emit iterator; the paren-KEPT cases are the two
-                    // branches above.)
-                    self.push_leading_comment_run(
-                        &mut parts,
-                        paren_gap(),
-                        expr_start,
-                        LeadingGlue::Adjacent,
-                        d.empty(),
-                    );
-                }
-                parts.push(expr_doc);
-                if needs_parens {
-                    parts.push(d.text(")"));
-                }
-            }
-        }
+            smallvec![self.build_expression_statement_value_doc(stmt, in_program_or_block)]
+        };
 
         // Comments between the expression and the `;`, with the `;` bound to the
         // statement: a same-line block trails *after* it (`fn() /* c */;` → `fn(); /* c */`,
@@ -330,6 +207,177 @@ impl<'a> Printer<'a> {
         let semicolon_pos = stmt.span.end.saturating_sub(1);
         self.push_semicolon_with_gap_comments(&mut parts, expr_end, semicolon_pos, true);
         d.concat(&parts)
+    }
+
+    /// The non-directive expression statement's VALUE — the expression plus whatever parens
+    /// this print gives it (required, directive-avoiding, or a source pair it keeps) and the
+    /// comments only those parens can emit. The statement's `;` and the comments bound to it
+    /// stay with the caller.
+    ///
+    /// `in_program_or_block` is threaded from [`Printer::build_statement_doc`] for the
+    /// "avoid becoming a directive" rule (see [`Printer::needs_avoid_directive_parens`]).
+    fn build_expression_statement_value_doc(
+        &self,
+        stmt: &internal::ExpressionStatement<'_>,
+        in_program_or_block: bool,
+    ) -> DocId {
+        let d = self.d();
+        let mut parts = DocBuf::new();
+        // A comment between a source `(` and the expression (`(// c⏎ expr)` /
+        // `(/* c */⏎ expr)` — e.g. a bare parenthesized decorated class
+        // expression) is preserved inside the parens, breaking them open; the flat
+        // `(`/`)` wrap below would drop it, since there is nowhere on one line for
+        // a comment the expression doesn't own to go. prettier hoists the comment
+        // before `(` — a divergence (`expression_statement_paren_kept_comment`,
+        // `decorated_expr_open_paren_comment`).
+        let expr_start = stmt.expression.span().start;
+        let source_paren = self.statement_opens_with_paren(stmt.span, expr_start);
+        // An own-line directive in that `(`→expression gap freezes the expression
+        // (Rule A). Only a SOURCE paren opens the gap: without one the directive
+        // leads the statement, where the statement list's own rule already claims it.
+        let frozen = source_paren
+            .then(|| self.value_head_frozen_span(stmt.span.start + 1, stmt.expression.span()))
+            .flatten();
+
+        // Parens required for correctness (object expressions, object pattern
+        // assignments) OR to avoid a bare string statement being read as a
+        // directive (recomputed fresh, not preserved from source).
+        let mut needs_parens = self
+            .needs_parens(&stmt.expression, ParenContext::ExpressionStatement)
+            || self.needs_avoid_directive_parens(stmt, in_program_or_block);
+
+        // When the whole expression isn't wrapped, a nested leftmost
+        // object/function/class still needs parens around itself
+        // (`(class {}).foo`, `({}).foo`, `(class {}) + 1`).
+        let nested_paren = if needs_parens {
+            None
+        } else {
+            self.expr_stmt_nested_paren_target(&stmt.expression)
+        };
+        // A frozen slice is verbatim, so the printer has no interior left to wrap:
+        // the nested target's parens go around the WHOLE slice instead. Without the
+        // widening `({ a: 1 }.b)` would print as `{ a: 1 }.b;`, which reparses as a
+        // block — prettier's own output there does exactly that.
+        needs_parens |= frozen.is_some() && nested_paren.is_some();
+
+        // The `(`→expression gap, resolved in one place so the gate below and the two
+        // emitters that can claim it cannot read different ranges.
+        let paren_gap =
+            || comments_to_emit_in_range(self.comments, stmt.span.start + 1, expr_start);
+        // Deliberately **to emit**, not on-page: this branch also *prints* the comments it
+        // finds. A block glued to the *expression* is owned by it, rides inside its doc and
+        // is skipped here — which is what keeps `(/* c */ expr)` flat.
+        let paren_open_comments = needs_parens
+            && source_paren
+            && self.has_comments_to_emit_between(stmt.span.start + 1, expr_start);
+
+        // Build the expression once — or not at all, when the freeze replaces its doc
+        // with the verbatim slice. Context flags for chain handling:
+        // is_expression_statement allows short identifier names to merge with the
+        // first call; in_top_level_assignment selects the regular assignment
+        // layout (not chain formatting). The matching node's doc builder consumes the
+        // (non-consuming, span-matched) paren target and wraps itself; clear it
+        // afterward so it can't leak into a sibling statement.
+        let expr_doc = match frozen {
+            Some(span) => self.build_frozen_expression_doc(&stmt.expression, span),
+            None => {
+                self.expr_stmt_paren_target.set(nested_paren);
+                self.is_expression_statement.set(true);
+                self.in_top_level_assignment.set(true);
+                let doc = self.build_expression_doc(&stmt.expression);
+                self.in_top_level_assignment.set(false);
+                self.is_expression_statement.set(false);
+                self.expr_stmt_paren_target.set(None);
+                doc
+            }
+        };
+
+        // A parenthesized *decorated* class expression breaks its parens open and
+        // indents the content (prettier): `(⏎\t@dec⏎\tclass {}⏎)`. The decorators
+        // force the break; an undecorated `(class {})` / `(function () {})` stays
+        // inline (flat `else` below).
+        let decorated_class_expr = needs_parens
+            && matches!(
+                &stmt.expression,
+                Expression::ClassExpression(c) if class_expr_has_decorators(c)
+            );
+
+        if paren_open_comments {
+            // The parens break open around the run. Only the first `hardline` is
+            // the site's own — the run's internal separators come from the shared
+            // leading-comment emitter, so a run the author glued onto one line
+            // stays glued and a blank line between two comments survives.
+            let mut inner: DocBuf = smallvec![d.hardline()];
+            self.push_leading_comment_run(
+                &mut inner,
+                paren_gap(),
+                expr_start,
+                LeadingGlue::Adjacent,
+                d.empty(),
+            );
+            inner.push(expr_doc);
+            parts.push(d.text("("));
+            parts.push(d.indent(d.concat(&inner)));
+            parts.push(d.hardline());
+            parts.push(d.text(")"));
+        } else if decorated_class_expr {
+            parts.push(self.build_break_open_parens(expr_doc));
+        } else {
+            if needs_parens {
+                parts.push(d.text("("));
+            } else if source_paren {
+                // The statement had a source `(` that this print DROPS as
+                // redundant. A comment inside it then has no emitter left: the
+                // statement-list gap ends at the `(`, and the expression's own doc
+                // starts past the comment — so it must be emitted here or it is
+                // lost. It leads the statement, which is where prettier hoists it
+                // too. (An owned/glued comment rides inside `expr_doc` and is
+                // skipped by the emit iterator; the paren-KEPT cases are the two
+                // branches above.)
+                self.push_leading_comment_run(
+                    &mut parts,
+                    paren_gap(),
+                    expr_start,
+                    LeadingGlue::Adjacent,
+                    d.empty(),
+                );
+            }
+            parts.push(expr_doc);
+            if needs_parens {
+                parts.push(d.text(")"));
+            }
+        }
+        d.concat(&parts)
+    }
+
+    /// The nested span an *unwrapped* expression statement must parenthesize around
+    /// ITSELF, or `None` when nothing does — the leftmost object / function / class
+    /// (`(class {}).foo`, `({}).foo`, `(class {}) + 1`), or a contextual keyword heading
+    /// an `as` / `satisfies` cast (`(type) as T;` / `(module) satisfies U;`, which
+    /// reparse as a `type` / `module` declaration without the parens).
+    ///
+    /// Asked only where the whole expression isn't already wrapped. Two callers, one
+    /// question: the ordinary path hands the span to `expr_stmt_paren_target` for the
+    /// matching node's doc builder to consume, and the format-ignore path — which has no
+    /// interior to hand it to — reads it as "the frozen slice needs a shell".
+    fn expr_stmt_nested_paren_target(&self, expression: &Expression<'_>) -> Option<Span> {
+        let leftmost = leftmost_no_lookahead(expression);
+        if matches!(
+            leftmost,
+            Expression::ObjectExpression(_)
+                | Expression::FunctionExpression(_)
+                | Expression::ClassExpression(_)
+        ) {
+            return Some(leftmost.span());
+        }
+        match strip_statement_casts(expression) {
+            Some(Expression::Identifier(id))
+                if self.with_ident_name(id, is_statement_ambiguous_keyword) =>
+            {
+                Some(id.span)
+            }
+            _ => None,
+        }
     }
 
     /// Whether a bare string-literal expression statement needs synthetic parens
@@ -680,7 +728,7 @@ impl<'a> Printer<'a> {
         // so re-synthesizing the sequence's own pair would double it.
         let paren_gap = open_paren.map_or(keyword_end, |p| p + 1);
         let expr_doc = match self.value_head_frozen_span(paren_gap, arg.span()) {
-            Some(frozen) => self.build_frozen_span_item_doc(frozen),
+            Some(frozen) => self.build_frozen_node_doc(frozen),
             None => match arg {
                 Expression::SequenceExpression(seq) => self.build_sequence_doc_bare(seq),
                 _ => self.build_expression_doc(arg),
