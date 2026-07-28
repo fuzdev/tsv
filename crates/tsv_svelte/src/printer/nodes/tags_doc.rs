@@ -28,7 +28,7 @@ impl<'a> Printer<'a> {
     /// An assignment's clarity parens (`{@html (a = b)}`) are applied inside
     /// [`Printer::build_expression_with_comments_doc`], so they land inside a frozen head's
     /// break rather than around it.
-    pub(crate) fn build_html_tag_doc(&self, tag: &internal::HtmlTag<'_>) -> DocId {
+    pub(super) fn build_html_tag_doc(&self, tag: &internal::HtmlTag<'_>) -> DocId {
         // Build expression doc with surrounding comments
         // Span range: after "{@html " to before "}"
         let head = self.build_expression_with_comments_doc(
@@ -41,7 +41,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for {@const declaration}
-    pub(crate) fn build_const_tag_doc(&self, tag: &internal::ConstTag<'_>) -> DocId {
+    pub(super) fn build_const_tag_doc(&self, tag: &internal::ConstTag<'_>) -> DocId {
         self.build_assignment_tag_doc(AT_CONST_TAG_OPEN, &tag.id, &tag.init, tag.span)
     }
 
@@ -50,7 +50,7 @@ impl<'a> Printer<'a> {
     /// comments) is delegated to `tsv_ts`. The `}` terminates the tag, so the
     /// trailing `;` is dropped — except for a bare single declarator (`{let a}` →
     /// `{let a;}`), which prettier keeps.
-    pub(crate) fn build_declaration_tag_doc(&self, tag: &internal::DeclarationTag<'_>) -> DocId {
+    pub(super) fn build_declaration_tag_doc(&self, tag: &internal::DeclarationTag<'_>) -> DocId {
         let d = self.d();
         let decl = &tag.declaration;
         let emit_semicolon = decl.declarations.len() == 1 && decl.declarations[0].init.is_none();
@@ -251,7 +251,7 @@ impl<'a> Printer<'a> {
     /// the previous identifier, one after it leads the next. Without the split a
     /// pre-comma comment (`{@debug x /* c */, y}`) falls through both
     /// per-identifier buckets and is dropped.
-    pub(crate) fn build_debug_tag_doc(&self, tag: &internal::DebugTag<'_>) -> DocId {
+    pub(super) fn build_debug_tag_doc(&self, tag: &internal::DebugTag<'_>) -> DocId {
         let d = self.d();
 
         // Comments within the tag's content (after "{@debug" and before "}").
@@ -362,7 +362,7 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a doc for {@render snippet(args)}
-    pub(crate) fn build_render_tag_doc(&self, tag: &internal::RenderTag<'_>) -> DocId {
+    pub(super) fn build_render_tag_doc(&self, tag: &internal::RenderTag<'_>) -> DocId {
         // Build expression doc with surrounding comments
         // Span range: after "{@render " to before "}"
         let head = self.build_expression_with_comments_doc(

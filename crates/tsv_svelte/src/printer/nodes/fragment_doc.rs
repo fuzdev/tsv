@@ -12,6 +12,7 @@
 // look like Rust format args but are valid Svelte template syntax.
 #![allow(clippy::literal_string_with_formatting_args)]
 
+use super::element_doc::MultilineCause;
 use super::helpers::{is_control_flow_block, is_inline_content};
 use crate::ast::internal::{self, Fragment, FragmentNode};
 use crate::printer::Printer;
@@ -73,13 +74,18 @@ struct TextChildContext {
     /// tag emits a plain space instead of a fill `line` (which would short-circuit an earlier
     /// expression group's `fits()` lookahead).
     breakable_exprs: bool,
-    /// The convergence path (the multiline element arm), the only caller that routes blocks and
-    /// control-flow blocks through their own dispatch.
-    multiline: bool,
-    /// Whether this node's inline run holds prose — the gate on the sibling-newline flow rule at
-    /// its standalone-separator site. Computed once per run by the caller
-    /// ([`Printer::scan_inline_run`]) and only on the `multiline` path; `false` everywhere else,
-    /// which is inert because that site returns before reading it in the non-multiline arm.
+    /// Whether the fragment is built on the convergence path (the multiline element arm, the only
+    /// caller that routes blocks and control-flow blocks through their own dispatch) — and, when
+    /// it is, *why* the layout went multiline. The cause is read by the sibling-newline flow rule
+    /// alone; every other site asks only [`MultilineCause::is_multiline`].
+    cause: MultilineCause,
+    /// Whether this node's inline run holds prose — one of the two gates on the sibling-newline
+    /// flow rule at its standalone-separator site (`cause` is the other). Computed once per run by
+    /// the caller ([`Printer::scan_inline_run`]) and only on the `multiline` path; `false`
+    /// everywhere else, which is inert because that site returns before reading it in the
+    /// non-multiline arm. Note "inert per arm" is NOT "the arms agree" — the inline arm reaches
+    /// the same separator through its own `next_is_tag` case, and the two emitting a different doc
+    /// for one logical separator is exactly the period-2 cycle `cause` exists to close.
     run_has_prose: bool,
 }
 
@@ -98,7 +104,7 @@ impl<'a> Printer<'a> {
     /// This is the entry point for doc-based inline content formatting.
     /// The resulting doc includes all nodes, so fits() checks will
     /// naturally account for siblings.
-    pub(crate) fn build_fragment_doc(&self, fragment: &Fragment<'_>) -> DocId {
+    pub(super) fn build_fragment_doc(&self, fragment: &Fragment<'_>) -> DocId {
         self.build_nodes_doc(fragment.nodes)
     }
 
@@ -192,23 +198,26 @@ impl<'a> Printer<'a> {
     ///   it flat and overshooting printWidth (`fill_multiple_expr_long`). Plain spaces keep the
     ///   expression group's full `fits()` obligation so it breaks instead. Callers with no
     ///   break-capable expression pass `false`.
-    /// - `multiline`: the convergence mode — set only by the element multiline arm
-    ///   (`compute_needs_multiline`). It turns on the ported prettier-plugin-svelte printChildren
-    ///   handling that the legacy inline callers don't need (and would be churned by): block
-    ///   children via `handle_block_child` + `forceBreakContent`; `printWhitespace` (a
-    ///   whitespace-only text at a non-HTML-element boundary becomes a hardline/blank/bare-line);
-    ///   the `splitTextToDocs` leading-linebreak rule (content text with a leading newline emits a
-    ///   hardline rather than folding into the prev element); and the first/last whitespace-only
-    ///   boundary deferring to the parent's leading/trailing break (emit nothing) instead of the
-    ///   inline single space. The legacy callers pass `false` and stay byte-identical. (Path 1,
-    ///   `build_nodes_doc_multiline`, still serves block bodies / root / special elements — its
-    ///   reroute onto this path + deletion is the remaining Slice-2/3 work.)
-    pub(crate) fn build_nodes_doc_trimmed(
+    /// - `cause`: the convergence mode — [`MultilineCause::None`] is the legacy inline arm;
+    ///   anything else is the element multiline arm (`compute_multiline_cause`). Multiline turns on
+    ///   the ported prettier-plugin-svelte printChildren handling that the legacy inline callers
+    ///   don't need (and would be churned by): block children via `handle_block_child` +
+    ///   `forceBreakContent`; `printWhitespace` (a whitespace-only text at a non-HTML-element
+    ///   boundary becomes a hardline/blank/bare-line); the `splitTextToDocs` leading-linebreak rule
+    ///   (content text with a leading newline emits a hardline rather than folding into the prev
+    ///   element); and the first/last whitespace-only boundary deferring to the parent's
+    ///   leading/trailing break (emit nothing) instead of the inline single space. The legacy
+    ///   callers pass `None` and stay byte-identical. (Path 1, `build_nodes_doc_multiline`, still
+    ///   serves block bodies / root / special elements — its reroute onto this path + deletion is
+    ///   the remaining Slice-2/3 work.) The `Structural` / `SourceBreaks` split is read only by the
+    ///   sibling-newline flow rule in [`Self::handle_text_child`].
+    pub(super) fn build_nodes_doc_trimmed(
         &self,
         nodes: &[FragmentNode<'_>],
         breakable_exprs: bool,
-        multiline: bool,
+        cause: MultilineCause,
     ) -> DocId {
+        let multiline = cause.is_multiline();
         let d = self.d();
         if nodes.is_empty() {
             return d.empty();
@@ -324,7 +333,7 @@ impl<'a> Printer<'a> {
                     i,
                     TextChildContext {
                         breakable_exprs,
-                        multiline,
+                        cause,
                         run_has_prose,
                     },
                     &mut child_docs,
@@ -508,9 +517,10 @@ impl<'a> Printer<'a> {
     ) {
         let TextChildContext {
             breakable_exprs,
-            multiline,
+            cause,
             run_has_prose,
         } = ctx;
+        let multiline = cause.is_multiline();
         let FragmentNode::Text(text) = &trimmed_nodes[i] else {
             return;
         };
@@ -629,7 +639,23 @@ impl<'a> Printer<'a> {
             // newline — must land on the same doc, or the pair diverges (and, once the formatter
             // emits one of them, flip-flops). So the flow test is spelling-independent and the
             // newline arm below simply re-spells itself as the space.
+            //
+            // The enclosing element's [`MultilineCause`] is the rule's other boundary — the same
+            // claim read one level up. Landing both spellings on one doc converges them only if
+            // the *arm* they land in is itself spelling-independent, and it is not when the
+            // element went multiline BECAUSE of these newlines (`MultilineCause::SourceBreaks`).
+            // There, collapsing the separator deletes the very break that chose the multiline arm,
+            // so the next pass takes the inline arm, whose `next_is_tag` case emits a bare `line`
+            // (all-or-nothing with the already-broken parent group) and splits the run apart
+            // again — the two spellings become each other's output, a period-2 cycle rather than a
+            // fixed point. So the rule stands down exactly there: inside such an element the
+            // newline is not pure spelling, it is the sanctioned Tier-2 element-expansion signal.
+            // It holds wherever the multiline layout is structural — the root fragment, block
+            // bodies, and any element forced multiline by block children, an expanding block, or a
+            // whitespace-collapsing container. Pinned by
+            // `elements/inline_content_spaced_tags_tail_long`.
             let separator_flows = run_has_prose
+                && cause == MultilineCause::Structural
                 && prev_node.is_some_and(|n| self.sibling_newline_flows(n))
                 && next_node.is_some_and(|n| self.sibling_newline_flows(n));
             let ws_flows = newline_count == 1 && separator_flows;
@@ -1238,7 +1264,10 @@ impl<'a> Printer<'a> {
     /// (`fill_multiple_expr_long`).
     pub(crate) fn build_nodes_doc_multiline(&self, nodes: &[FragmentNode<'_>]) -> DocId {
         let breakable_exprs = Self::nodes_have_breakable_expression(nodes);
-        self.build_nodes_doc_trimmed(nodes, breakable_exprs, true)
+        // `Structural`: these callers are the root fragment, block bodies, and special elements —
+        // none of them has an enclosing element whose multiline-ness the content's own newlines
+        // could flip, so the sibling-newline flow rule stays in force here.
+        self.build_nodes_doc_trimmed(nodes, breakable_exprs, MultilineCause::Structural)
     }
 
     /// Build the content of a **whitespace-collapsing container** (`<table>`, `<select>`, … —
@@ -1436,7 +1465,7 @@ impl<'a> Printer<'a> {
     /// Applies to all five block heads (`{#if}` / `{#each}` / `{#key}` / `{#await}` /
     /// `{#snippet}`). A control-flow block with any preceding sibling routes its block
     /// parent through the multiline-fragment layout (`has_control_flow_after_sibling` →
-    /// `compute_needs_multiline`), so the block's body-drop keys on `can_wrap` (true here)
+    /// `compute_multiline_cause`), so the block's body-drop keys on `can_wrap` (true here)
     /// and the dangle is a one-pass fixed point — including for `{#await}` / `{#snippet}`,
     /// whose body-drop is likewise gated on `can_wrap`.
     fn try_block_sibling_gt_dangle(

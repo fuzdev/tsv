@@ -22,7 +22,7 @@ use tsv_ts::Expression;
 /// (`{#each items /* c */ as item}`) in place rather than relocating it to trail
 /// the collection expression. Shared by the standard and whitespace-sensitive each
 /// builders so the two can't drift.
-pub(crate) fn each_expr_comment_end(block: &EachBlock<'_>) -> u32 {
+pub(super) fn each_expr_comment_end(block: &EachBlock<'_>) -> u32 {
     block
         .context
         .as_ref()
@@ -48,7 +48,7 @@ pub(crate) fn is_control_flow_block(node: &FragmentNode<'_>) -> bool {
 ///
 /// Only if/each/key blocks force expansion. Await blocks do NOT - they stay inline
 /// in block elements (e.g., `<div>{#await promise}loading{/await}</div>` stays inline).
-pub(crate) fn is_expanding_control_flow_block(node: &FragmentNode<'_>) -> bool {
+pub(super) fn is_expanding_control_flow_block(node: &FragmentNode<'_>) -> bool {
     matches!(
         node,
         FragmentNode::IfBlock(_) | FragmentNode::EachBlock(_) | FragmentNode::KeyBlock(_)
@@ -59,7 +59,7 @@ pub(crate) fn is_expanding_control_flow_block(node: &FragmentNode<'_>) -> bool {
 ///
 /// This is a convenience function combining `is_expanding_control_flow_block` and
 /// `has_expanding_block_in_await` checks that are commonly used together.
-pub(crate) fn has_any_expanding_blocks(nodes: &[FragmentNode<'_>]) -> bool {
+pub(super) fn has_any_expanding_blocks(nodes: &[FragmentNode<'_>]) -> bool {
     nodes.iter().any(is_expanding_control_flow_block) || has_expanding_block_in_await(nodes)
 }
 
@@ -72,7 +72,7 @@ pub(crate) fn has_any_expanding_blocks(nodes: &[FragmentNode<'_>]) -> bool {
 ///
 /// Single source of truth for the `has_preceding_breakable` test in `fragment_doc`'s node
 /// loops and for [`has_control_flow_after_sibling`]'s breakable-sibling gate.
-pub(crate) fn is_inline_content(node: &FragmentNode<'_>) -> bool {
+pub(super) fn is_inline_content(node: &FragmentNode<'_>) -> bool {
     matches!(
         node,
         FragmentNode::Element(_)
@@ -98,7 +98,7 @@ pub(crate) fn is_inline_content(node: &FragmentNode<'_>) -> bool {
 /// siblings are skipped. (Block elements are `Element`, hence breakable, so their
 /// separation still fires.) The force is also gated on `kind.is_block()` at the call site,
 /// so it only applies to block-element parents.
-pub(crate) fn has_control_flow_after_sibling(nodes: &[FragmentNode<'_>]) -> bool {
+pub(super) fn has_control_flow_after_sibling(nodes: &[FragmentNode<'_>]) -> bool {
     let mut seen_breakable = false;
     for node in nodes {
         if node.is_whitespace_only_text() {
@@ -277,15 +277,21 @@ impl<'a> Printer<'a> {
             // Comment-aware so an owned leading comment glued to the key (`[/* c */ k]`)
             // is claimed by the key's own doc — the `[`→key gap emitter above skips it
             // (owned comments are off the positional axis), so nothing else would print it.
+            //
+            // The non-computed arm below is comment-aware too, and there it is inert rather
+            // than load-bearing: `bind_leading_comment` has a single call site, the expression
+            // HEAD path, and a non-computed property key is read by the property parser without
+            // passing through it — so a comment glued to such a key is never `owned_by_node`,
+            // and the enclosing `{`→property gap emitter prints it positionally. Both builders
+            // therefore emit the same doc for that key (byte-identical over tests/fixtures and
+            // a pattern-key shape matrix). Using the comment-aware one anyway keeps the two
+            // arms the same shape, so neither can quietly become a comment sink.
             let key_doc = self.build_ts_expression_doc(key);
             let trail = self.build_pattern_trailing_comments(key_end, close);
             let doc = d.concat(&[d.text("["), lead, key_doc, trail, d.text("]")]);
             (doc, close + 1)
         } else {
-            (
-                self.build_ts_expression_doc_no_comments(key),
-                key.span().end,
-            )
+            (self.build_ts_expression_doc(key), key.span().end)
         }
     }
 
