@@ -22,7 +22,8 @@ use crate::tsc_conformance::corpus::{
     BasenameCollision, CorpusTest, basename_collisions, discover_corpus, read_corpus_file,
 };
 use crate::tsc_conformance::directives::{
-    classify_units, extract_settings, harness_current_directory, section_display_name, split_units,
+    classify_units, extract_settings, harness_current_directory, section_display_name, split_lines,
+    split_units,
 };
 use crate::tsc_conformance::discovery::{Baseline, discover_baselines};
 use crate::tsc_conformance::options_meta::{
@@ -437,23 +438,7 @@ fn positional_mismatch(
 /// Split a unit's content into physical lines on `\r?\n` (the section-body
 /// coordinate the baseline reprints).
 fn split_content_lines(content: &str) -> Vec<String> {
-    let bytes = content.as_bytes();
-    let mut lines = Vec::new();
-    let mut start = 0;
-    let mut i = 0;
-    while i < bytes.len() {
-        if bytes[i] == b'\n' {
-            let mut end = i;
-            if end > start && bytes[end - 1] == b'\r' {
-                end -= 1;
-            }
-            lines.push(content[start..end].to_string());
-            start = i + 1;
-        }
-        i += 1;
-    }
-    lines.push(content[start..].to_string());
-    lines
+    split_lines(content).into_iter().map(String::from).collect()
 }
 
 /// Whether a test is JSX-scoped: a `.tsx` file, an `@jsx` directive, or a path

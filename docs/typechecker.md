@@ -159,7 +159,7 @@ mangled by a bad merge, so it must not be blocked behind the file it repairs.
 
 **The Rust consts** — never machine-written, each for its own reason:
 
-- The **semantically-zero gates** in `crates/tsv_debug/src/cli/commands/tsc_conformance.rs`:
+- The **semantically-zero gates** in `crates/tsv_debug/src/cli/commands/tsc_conformance/pins.rs`:
   `family_extra`, the unclassified (`other`) misses, `family_span_mismatch`, the
   related-info `missing` / `extra` / `span_mismatch`, the four lib error channels, and zero
   panics. A zero here is a contract, not a measurement — a red one means the run is broken,

@@ -236,6 +236,27 @@ pub fn run_skeleton(checkout: &Path, options: &RunOptions) -> Result<SkeletonRep
         .map_err(|_| "skeleton worker panicked".to_string())?
 }
 
+/// Resolve the single corpus test `name` names, by exact relative path or exact
+/// basename — the one-test lookup both `check_one` and `dump_flow_dot` front.
+/// An ambiguous name lists its candidates rather than silently picking one.
+fn find_corpus_test<'a>(corpus: &'a [CorpusTest], name: &str) -> Result<&'a CorpusTest, String> {
+    let matches: Vec<&CorpusTest> = corpus
+        .iter()
+        .filter(|t| t.relative_path == name || t.basename == name)
+        .collect();
+    match matches.as_slice() {
+        [] => Err(format!("no corpus test matches {name:?}")),
+        [one] => Ok(one),
+        many => {
+            let paths: Vec<String> = many
+                .iter()
+                .map(|t| format!("{}/{}", t.suite, t.relative_path))
+                .collect();
+            Err(format!("{name:?} is ambiguous: {}", paths.join(", ")))
+        }
+    }
+}
+
 /// Run one corpus test (optionally one variant) and build its check-test report.
 ///
 /// `name` matches a corpus test by exact relative path or exact basename.
@@ -252,21 +273,7 @@ pub fn check_one(
     let corpus = discover_corpus(checkout)?;
     let baselines = discover_baselines(&baselines_dir(checkout))?;
 
-    let matches: Vec<&CorpusTest> = corpus
-        .iter()
-        .filter(|t| t.relative_path == name || t.basename == name)
-        .collect();
-    let test = match matches.as_slice() {
-        [] => return Err(format!("no corpus test matches {name:?}")),
-        [one] => *one,
-        many => {
-            let paths: Vec<String> = many
-                .iter()
-                .map(|t| format!("{}/{}", t.suite, t.relative_path))
-                .collect();
-            return Err(format!("{name:?} is ambiguous: {}", paths.join(", ")));
-        }
-    };
+    let test = find_corpus_test(&corpus, name)?;
 
     let content = read_corpus_file(&test.path)?;
     let settings = extract_settings(&content);
@@ -393,21 +400,7 @@ pub fn check_one(
 /// so the renderer can slice subject-node source text from its span column.
 pub fn dump_flow_dot(checkout: &Path, name: &str) -> Result<String, String> {
     let corpus = discover_corpus(checkout)?;
-    let matches: Vec<&CorpusTest> = corpus
-        .iter()
-        .filter(|t| t.relative_path == name || t.basename == name)
-        .collect();
-    let test = match matches.as_slice() {
-        [] => return Err(format!("no corpus test matches {name:?}")),
-        [one] => *one,
-        many => {
-            let paths: Vec<String> = many
-                .iter()
-                .map(|t| format!("{}/{}", t.suite, t.relative_path))
-                .collect();
-            return Err(format!("{name:?} is ambiguous: {}", paths.join(", ")));
-        }
-    };
+    let test = find_corpus_test(&corpus, name)?;
 
     let content = read_corpus_file(&test.path)?;
     let units = split_units(&content, &test.basename);

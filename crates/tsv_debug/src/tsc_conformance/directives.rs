@@ -36,7 +36,7 @@ pub struct Unit {
 /// Split `content` into physical lines on `\r?\n` (tsgo's `lineDelimiter`). The
 /// `\r` before a `\n` is part of the separator; a lone `\r` is not — so a
 /// CR-only file is a single line.
-fn split_lines(content: &str) -> Vec<&str> {
+pub(crate) fn split_lines(content: &str) -> Vec<&str> {
     let bytes = content.as_bytes();
     let mut lines = Vec::new();
     let mut start = 0;

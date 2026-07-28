@@ -110,7 +110,12 @@
     flow-node/container/statement-list driver, `statements.rs` and
     `expressions.rs` each contribute an `impl FlowBuilder` block of per-node
     visitors, and `predicates.rs` holds the pure AST predicates the walk
-    dispatches on), and `tests.rs`. The per-file control-flow graph
+    dispatches on), and `tests/` (a directory-module split mirroring
+    `build/`'s own: `mod.rs` holds the shared fixtures/helpers plus the
+    flow-node/container/label-pool tests that exercise `build/mod.rs` itself,
+    `statements.rs` and `expressions.rs` cover the tests for their `build/`
+    namesakes, and `predicates.rs` covers `build/predicates.rs`). The
+    per-file control-flow graph
     (`build_flow`) is a faithful port of tsgo's binder flow construction
     (`bind`/`bindContainer`/`bindChildren` + the per-statement flow shapers).
     A `FlowGraph` in SoA form (`u16` `FlowFlags`, kind-discriminated

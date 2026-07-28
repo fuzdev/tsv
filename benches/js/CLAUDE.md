@@ -522,7 +522,7 @@ every real move in a number is a deliberate, visible edit.
   `deno task conformance:tsc-check:update`. The oracle-side pins
   (baseline/roundtrip/pretty + the `INDEX_*` denominators) and the
   semantically-zero invariant gates stay hand-edited consts in
-  `cli/commands/tsc_conformance.rs`; the crash-exclusion count sits beside its
+  `cli/commands/tsc_conformance/pins.rs`; the crash-exclusion count sits beside its
   ledger in `tsc_conformance/runner/grade.rs`. Re-pin ritual:
   ../../docs/typechecker.md.
 

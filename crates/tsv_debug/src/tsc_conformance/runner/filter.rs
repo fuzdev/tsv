@@ -57,6 +57,15 @@ pub struct RunFilter {
 }
 
 impl RunFilter {
+    /// Whether either baseline-interrogating filter (`--code` / `--family`) is
+    /// active. Both ask the same "does this baseline carry code X" question, so a
+    /// caller uses this to parse the baseline once up front instead of once per
+    /// code asked.
+    #[must_use]
+    pub(super) fn needs_baseline_codes(&self) -> bool {
+        self.code.is_some() || self.family.is_some()
+    }
+
     /// Whether any filter is active (drives pin skipping).
     #[must_use]
     pub fn is_active(&self) -> bool {

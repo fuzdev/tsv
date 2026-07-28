@@ -349,16 +349,24 @@ fn grade_test(
         if !options.filter.keeps_variant(&variant.config) {
             continue;
         }
-        if !options
+        // `--code` and `--family` both ask "does this baseline carry code X", and
+        // `--family` asks once per code in the family. Parse the baseline once here
+        // rather than per question — the filters are the only readers, so an
+        // unfiltered sweep still never touches a baseline on their behalf.
+        let filter_codes: Option<Vec<i32>> = options
             .filter
-            .keeps_code(|code| baseline.is_some_and(|b| baseline_carries_code(b, code)))
-        {
+            .needs_baseline_codes()
+            .then(|| baseline.map(baseline_codes).unwrap_or_default());
+        let carries = |code: u32| {
+            let want = i32::try_from(code).unwrap_or(-1);
+            filter_codes
+                .as_ref()
+                .is_some_and(|codes| codes.contains(&want))
+        };
+        if !options.filter.keeps_code(carries) {
             continue;
         }
-        if !options
-            .filter
-            .keeps_family(|code| baseline.is_some_and(|b| baseline_carries_code(b, code)))
-        {
+        if !options.filter.keeps_family(carries) {
             continue;
         }
 
@@ -498,16 +506,16 @@ fn record_manifest(
     }
 }
 
-/// Whether a baseline carries a given TS code (the `--code` / `--family` filters).
-/// Uses the category-generic [`parse_base_diags`] (not the error-only
+/// Every TS code a baseline carries (the `--code` / `--family` filters). Uses the
+/// category-generic [`parse_base_diags`] (not the error-only
 /// `parse_summary_block`), so a `--code 7027` / `--family flow` triage matches
 /// suggestion- and message-category flow lines too, not just error-category ones.
-fn baseline_carries_code(baseline: &Baseline, code: u32) -> bool {
+/// An unreadable baseline reports no codes, so it filters out.
+fn baseline_codes(baseline: &Baseline) -> Vec<i32> {
     let Ok(content) = std::fs::read_to_string(&baseline.path) else {
-        return false;
+        return Vec::new();
     };
-    let want = i32::try_from(code).unwrap_or(-1);
-    parse_base_diags(&content).iter().any(|d| d.code == want)
+    parse_base_diags(&content).iter().map(|d| d.code).collect()
 }
 
 /// Render one failing family variant's ours-vs-baseline diff for a `.diff` artifact.

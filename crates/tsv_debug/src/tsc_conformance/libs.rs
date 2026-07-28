@@ -261,8 +261,6 @@ pub struct LibResolver {
     missing_files: Vec<String>,
     /// `@lib` / reference names `GetLibFileName` did not recognize — expected empty.
     unknown_libs: Vec<String>,
-    /// Distinct resolved sets folded into a base (informational).
-    sets_built: usize,
 }
 
 impl LibResolver {
@@ -277,7 +275,6 @@ impl LibResolver {
             parse_errors: Vec::new(),
             missing_files: Vec::new(),
             unknown_libs: Vec::new(),
-            sets_built: 0,
         }
     }
 
@@ -387,7 +384,6 @@ impl LibResolver {
         let files: Vec<Rc<LibFile>> = set.iter().filter_map(|f| self.bound_file(f)).collect();
         let refs: Vec<&LibFile> = files.iter().map(AsRef::as_ref).collect();
         let base = Rc::new(LibBase::build(&refs));
-        self.sets_built += 1;
         self.base_cache.insert(key, Rc::clone(&base));
         Some(base)
     }
@@ -432,10 +428,13 @@ impl LibResolver {
         self.file_cache.values().filter(|v| v.is_some()).count()
     }
 
-    /// Distinct resolved lib sets folded into a base this run.
+    /// Distinct resolved lib sets folded into a base this run. Derived from the
+    /// cache rather than counted alongside it — every fold inserts exactly once,
+    /// so the cache's size IS the count (the sibling `files_bound` reads the same
+    /// way).
     #[must_use]
     pub fn sets_built(&self) -> usize {
-        self.sets_built
+        self.base_cache.len()
     }
 }
 
