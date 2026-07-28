@@ -1,12 +1,12 @@
 {
   "oracle": "tsgo committed .errors.txt baselines (bind + merge + flow family)",
   "denominators": {
-    "in_scope_tests": 9388,
-    "in_scope_variants": 9887,
-    "expect_clean_graded": 4435,
-    "clean_pass": 4435,
-    "baselined_parsed": 4446,
-    "family_graded_variants": 4066,
+    "in_scope_tests": 9389,
+    "in_scope_variants": 9888,
+    "expect_clean_graded": 4436,
+    "clean_pass": 4436,
+    "baselined_parsed": 4464,
+    "family_graded_variants": 4085,
     "family_positive_variants": 140
   },
   "family": {
@@ -49,29 +49,32 @@
     "span_mismatch": 0
   },
   "carve_outs": {
-    "recovery_ast_rule_a": 380,
+    "recovery_ast_rule_a": 379,
     "recovery_ast_rule_a_family": 11,
     "module_detection_variants": 1
   },
   "census": {
-    "parse_rejected_total": 1006,
-    "parse_rejected_no_baseline": 45,
-    "parse_rejected_ts1xxx_only": 451,
-    "parse_rejected_other": 510,
+    "parse_rejected_total": 988,
+    "parse_rejected_no_baseline": 44,
+    "parse_rejected_ts1xxx_only": 456,
+    "parse_rejected_other": 488,
     "script_retry": 25,
-    "crash_excluded": 1
+    "crash_excluded": 0
   },
   "lib": {
     "files_bound": 107,
     "sets_folded": 50
   },
   "pins": {
-    "in_scope_tests": 9388,
-    "in_scope_variants": 9887,
-    "expect_clean": 4435,
-    "baselined_parsed": 4446,
-    "parse_rejected": 1006,
-    "family_graded": 4066,
+    "in_scope_tests": 9389,
+    "in_scope_variants": 9888,
+    "expect_clean": 4436,
+    "baselined_parsed": 4464,
+    "parse_rejected": 988,
+    "parse_rejected_no_baseline": 44,
+    "parse_rejected_ts1xxx_only": 456,
+    "parse_rejected_other": 488,
+    "family_graded": 4085,
     "family_positive": 140,
     "family_match": 573,
     "family_missing": 37,
@@ -90,11 +93,11 @@
     "related_missing": 0,
     "related_extra": 0,
     "related_span_mismatch": 0,
-    "carve_out_rule_a": 380,
+    "carve_out_rule_a": 379,
     "carve_out_rule_a_family": 11,
     "module_detection": 1,
     "script_retry": 25,
-    "crash_excluded": 1,
+    "crash_excluded": 0,
     "lib_files_bound": 107,
     "lib_sets": 50
   }

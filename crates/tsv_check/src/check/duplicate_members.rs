@@ -31,10 +31,9 @@
 //       + reportDuplicateMemberErrors
 
 use crate::diag::{Category, Diagnostic};
-use crate::hash::FxHashMap;
 use crate::ids::FileId;
 use crate::span_scan::{bracket_end, bracket_start};
-use tsv_lang::Span;
+use tsv_lang::{FxHashMap, Span};
 use tsv_ts::ast::internal::{
     ClassMember, Expression, Literal, LiteralValue, MethodKind, TSTypeElement,
     TSTypeParameterDeclaration,

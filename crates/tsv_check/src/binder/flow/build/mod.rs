@@ -94,7 +94,7 @@ pub(super) struct FlowBuilder<'a> {
     /// Per-active-label scratch antecedent lists, keyed by the label's
     /// `FlowNodeId`, flushed to `pool` at `finish_flow_label`
     /// (the `newFlowList` cons-list analog).
-    label_scratch: crate::hash::FxHashMap<FlowNodeId, SmallVec<[FlowNodeId; 4]>>,
+    label_scratch: tsv_lang::FxHashMap<FlowNodeId, SmallVec<[FlowNodeId; 4]>>,
 
     // products
     flow_of_node: Vec<Option<FlowNodeId>>,
@@ -163,7 +163,7 @@ impl<'a> FlowBuilder<'a> {
             subject: Vec::new(),
             antecedent: Vec::new(),
             pool: Vec::new(),
-            label_scratch: crate::hash::FxHashMap::default(),
+            label_scratch: tsv_lang::FxHashMap::default(),
             flow_of_node: vec![None; n],
             node_flags: vec![0u8; n],
             end_flow: Vec::new(),

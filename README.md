@@ -72,12 +72,8 @@ Future features (unknown order):
 - CSS error recovery (recover past invalid CSS per the spec)
 - Svelte compiler (partially implemented, not ready for usage)
 - later:
-  - TypeScript type checking (`tsv_check`, in development — a from-scratch Rust
-    binder/checker graded for exact conformance against TypeScript 7 (the Go
-    impl)'s own test baselines), unlocking:
-    - svelte-check replacement
-    - LSP
-    - linter - type aware, initially focused on serializable data-only plugins for extensibility
+  - TypeScript type checking (`tsv_check` - experimental, may never ship; would
+    unlock a svelte-check replacement, LSP, and type-aware linting)
   - bundling is probably out of scope 
   - [discussion](https://github.com/fuzdev/tsv/discussions) welcome
 
@@ -262,7 +258,7 @@ tsv/
 │   ├── tsv_ts/        # TypeScript parser/formatter (standalone)
 │   ├── tsv_css/       # CSS parser/formatter (standalone)
 │   ├── tsv_svelte/    # Svelte parser/formatter (uses tsv_ts + tsv_css)
-│   ├── tsv_check/     # TypeScript binder/checker (in development; not in any shipped artifact)
+│   ├── tsv_check/     # experimental TypeScript binder/checker (may never ship; not in any shipped artifact)
 │   ├── tsv_cli/       # unified CLI (binary: `tsv`)
 │   ├── tsv_debug/     # dev utilities (binary: `tsv_debug`, uses Deno)
 │   ├── tsv_ffi/       # C FFI bindings

@@ -46,6 +46,7 @@ mod tests;
 mod watchdog;
 
 pub use filter::{FamilyFilter, RunFilter, RunOptions};
+pub use grade::CRASH_EXCLUDED_PIN;
 pub use report::{CheckTestReport, SkeletonReport};
 
 use grade::{check_options_for, run_skeleton_inner};

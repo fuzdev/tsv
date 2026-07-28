@@ -38,6 +38,6 @@ pub use index::run_index;
 pub use query::{denominators, histogram, tests_by_code};
 pub use roundtrip::run_roundtrip;
 pub use runner::{
-    FAMILIES, FamilyFilter, MissingCause, RunFilter, RunOptions, check_one, dump_flow_dot,
-    run_skeleton,
+    CRASH_EXCLUDED_PIN, FAMILIES, FamilyFilter, MissingCause, RunFilter, RunOptions, check_one,
+    dump_flow_dot, run_skeleton,
 };

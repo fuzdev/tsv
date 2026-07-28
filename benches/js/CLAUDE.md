@@ -454,29 +454,27 @@ green-skipping (the baselines are the oracle; publish Step 3b's probe is the
 tolerance point). Full-corpus runs freshness-check `KNOWN_GAPS` (stale entries fail).
 
 **Pre-release aggregate — `deno task conformance` (+ `conformance:test262` = `conformance:all`).** The three parse-conformance
-gates (svelte-fixtures, ts-fixtures, ts-repo), the two `tsc_conformance` legs
-(`tsc-roundtrip` — the baseline parse↔render self-check — then `tsc-check` — the
-tsv_check binder-family conformance gate, which also writes the committed
-`results/report.tsc-conformance.{json,md}`; both pure-Rust, shelled out via
-`cargo`, so the task carries `--allow-run=cargo`; `tsc-check` additionally needs
-the materialized `_submodules/TypeScript` corpus + `internal/bundled/libs`), plus
-`corpus:compare:parse --all` and `corpus:compare:format --all`, are the
-release-cadence correctness gates that run against external oracles (and so can't
-live in `deno task check`). `deno task conformance:all` runs the pure-Rust **test262
+gates (svelte-fixtures, ts-fixtures, ts-repo), plus `corpus:compare:parse --all`
+and `corpus:compare:format --all`, are the release-cadence correctness gates that
+run against external oracles (and so can't live in `deno task check`). The
+typechecker's `tsc_conformance` tasks are deliberately NOT legs here — `tsv_check`
+is experimental and may never ship, so its gates stay on-demand (see
+../../docs/typechecker.md). `deno task conformance:all` runs the pure-Rust **test262
 positive gate** FIRST (`conformance:test262` — `tsv_debug test262 --gate`, gating the
 exact positive-pass count; the ~2.5k negatives are the deferred early-error frontier,
 reported not gated), THEN the aggregate — fail-fast, so a positive-parse regression
 trips the ~1-min gate before the multi-minute FFI legs run. That superset is what
 publish Step 3b runs. `deno task conformance` builds the corpus FFI once and
-runs all seven legs in **ONE process** (`conformance.ts`, the driver): the canonical
+runs all six legs in **ONE process** (`conformance.ts`, the driver): the canonical
 oracle modules (prettier, the svelte plugin, svelte/compiler, acorn, acorn-ts) load
-once via the module cache instead of once per leg (the two `tsc_conformance` legs are
-pure-Rust `cargo` shell-outs), each leg gets a timing line, and failure semantics
-match a `&&` chain exactly (every leg exits the process on a finding — fail-fast). The
-driver takes no arguments; the per-leg tasks remain the scoped/triage entries.
-`conformance:all` is wired into `scripts/publish.ts` **Step 3b** (skipped by
-`--no-check`). Step 3b preflights the oracles (`../svelte`, `../acorn-typescript`,
-`../typescript`, `../typescript-go`, `../test262`, this dir's `node_modules`): a missing one
+once via the module cache instead of once per leg (`render:audit`, the lone non-JS
+leg, is a `cargo` subprocess — which is why the task carries `--allow-run=cargo`),
+each leg gets a timing line, and failure semantics match a `&&` chain exactly
+(every leg exits the process on a finding — fail-fast). The driver takes no
+arguments; the per-leg tasks remain the scoped/triage entries. `conformance:all`
+is wired into `scripts/publish.ts` **Step 3b** (skipped by `--no-check`). Step 3b
+preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`,
+`../test262`, this dir's `node_modules`): a missing one
 **FAILS a `--wetrun`** (only the explicit `--no-check` releases without gates),
 warn-and-skips a dry-run, and any skip is re-warned in the run's final summary.
 The gates themselves fail closed on a missing checkout (0 scanned = FAIL), so a
@@ -514,10 +512,19 @@ every real move in a number is a deliberate, visible edit.
   small shrink warns and still writes, only a >10% collapse fails).
 - Rust-side counts are consts in their commands — grep `REGRESSION PIN`:
   test262 (discovered + graded-manifest), `fixtures_validate` (total fixtures —
-  protects the primary gate against a discovery collapse), `swallow_audit`
-  (formatted files — closes its vacuous-pass), and `tsc_conformance` (the
-  largest set: baseline/roundtrip/pretty pins + the `INDEX_*` denominators +
-  the `RUN_*` family-gate pins, all in `cli/commands/tsc_conformance.rs`).
+  protects the primary gate against a discovery collapse), and `swallow_audit`
+  (formatted files — closes its vacuous-pass).
+- `tsc_conformance` (the largest set) splits its pins by what they mean, and
+  gates the ON-DEMAND experimental-typechecker tasks, not a release leg. The
+  drifting tsv-side counts (denominators, parse-divergence census, family
+  partitions, carve-outs) live in the machine-regenerated snapshot
+  `crates/tsv_debug/src/cli/commands/tsc_conformance_pins.txt`, rewritten by
+  `deno task conformance:tsc-check:update`. The oracle-side pins
+  (baseline/roundtrip/pretty + the `INDEX_*` denominators) and the
+  semantically-zero invariant gates stay hand-edited consts in
+  `cli/commands/tsc_conformance.rs`; the crash-exclusion count sits beside its
+  ledger in `tsc_conformance/runner/grade.rs`. Re-pin ritual:
+  ../../docs/typechecker.md.
 
 **Semantics — three pin categories, chosen per surface:**
 
@@ -1240,7 +1247,7 @@ benches/js/
 ├── install_deps.ts        # `bench:install`: npm install + force-fetch the oxc wasi binding
 ├── harvest_test262.ts     # `bench:harvest:test262`: graded positives → .cache/test262_files.json (Deno-only)
 ├── bench.ts               # Benchmark entry point (runtime-neutral — runs under Deno AND Node)
-├── conformance.ts         # Single-process pre-release aggregate driver (deno task conformance): all seven legs, one module cache
+├── conformance.ts         # Single-process pre-release aggregate driver (deno task conformance): all six legs, one module cache
 ├── smoke.ts               # Smoke test for formatters and parsers (runtime-neutral: smoke / smoke:node / smoke:bun)
 ├── compose_reports.ts     # Fold report.{deno,node,bun}.json → combined report.{json,md} (bench:compose)
 ├── idempotency_sweep.ts   # F1 sweep over the `perf` corpus view — format(format(x)) == format(x) on real code (deno task idempotency:sweep; drives tsv_debug `fuzz --iterations 0`)

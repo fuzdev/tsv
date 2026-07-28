@@ -83,7 +83,7 @@ tsv/
 ├── tsv_ts       # TypeScript parser/formatter (standalone)
 ├── tsv_css      # CSS parser/formatter (standalone)
 ├── tsv_svelte   # Svelte parser/formatter (uses tsv_ts + tsv_css)
-├── tsv_check    # TypeScript binder/checker (in development; uses tsv_ts + tsv_lang; consumed only by tsv_debug)
+├── tsv_check    # experimental TypeScript binder/checker, may never ship (uses tsv_ts + tsv_lang; consumed only by tsv_debug)
 ├── tsv_cli      # Production CLI binary (pure Rust)
 ├── tsv_debug    # Dev utilities (uses embedded Deno sidecar for JS tools)
 ├── tsv_arena    # Per-thread reusable AST/doc arenas for the bindings' hot loop
@@ -119,9 +119,9 @@ dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
  tsv_cli     tsv_debug     tsv_ffi    tsv_napi           tsv_wasm
 (production) (dev, Deno)   (C FFI)    (N-API, Node/Bun)  (browser/Node/Deno)
                 ↑
-            tsv_check  (TypeScript binder/checker, in development — depends on
-                        tsv_lang + tsv_ts; consumed ONLY by tsv_debug, so no
-                        shipped format/parse artifact links it)
+            tsv_check  (experimental TypeScript binder/checker, may never ship —
+                        depends on tsv_lang + tsv_ts; consumed ONLY by tsv_debug,
+                        so no shipped format/parse artifact links it)
 
    tsv_cli and tsv_wasm also consume tsv_discover (→ tsv_ignore).
    tsv_ffi, tsv_napi, and tsv_wasm also consume tsv_arena — per-thread
@@ -136,7 +136,7 @@ dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
 
 **Clean API Boundaries** — Each language exports `parse()`, `format()`, and `convert_ast_json_bytes()` / `convert_ast_json_string()` (with `convert_ast_json()` a thin `Value` wrapper over the bytes). tsv_ts and tsv_css also provide embedding APIs (`parse_embedded`, expression formatting, `build_*_doc`) used by tsv_svelte for nested language support.
 
-**Scalability** — Easy to add new crates (`tsv_ffi`, `tsv_wasm`, and the in-development `tsv_check` typechecker already done as crate additions; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
+**Scalability** — Easy to add new crates (`tsv_ffi`, `tsv_wasm`, and the experimental `tsv_check` typechecker — which may never ship — already done as crate additions; `tsv_linter`/`tsv_lsp`/`tsv_md` planned).
 
 ### Closed Scope, Open Convention
 

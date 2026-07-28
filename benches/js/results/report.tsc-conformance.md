@@ -4,11 +4,11 @@ Oracle: tsgo committed `.errors.txt` baselines (bind + merge + flow family). Det
 
 ## Denominators
 
-- in-scope tests: 9388
-- in-scope variants: 9887
-- expect-clean graded / clean pass: 4435 / 4435
-- baselined + parsed: 4446
-- family graded / family-positive: 4066 / 140
+- in-scope tests: 9389
+- in-scope variants: 9888
+- expect-clean graded / clean pass: 4436 / 4436
+- baselined + parsed: 4464
+- family graded / family-positive: 4085 / 140
 
 ## Family (dup 2300 / 2451 / 2567 / 2528 + merge 2397 / 2649 / 2664 / 2671; flow 7027 / 7028)
 
@@ -37,14 +37,14 @@ Oracle: tsgo committed `.errors.txt` baselines (bind + merge + flow family). Det
 
 ## Carve-outs
 
-- recovery-AST rule (a): 380 (family-positive 11)
+- recovery-AST rule (a): 379 (family-positive 11)
 - moduleDetection variants (inert for family): 1
 
 ## Parse-divergence census
 
-- parse-rejected: 1006 (no baseline 45, TS1xxx-only 451, other 510)
+- parse-rejected: 988 (no baseline 44, TS1xxx-only 456, other 488)
 - script-goal retries: 25
-- crash-excluded (tracked): 1
+- crash-excluded (tracked): 0
 
 ## Lib base
 

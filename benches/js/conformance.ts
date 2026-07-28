@@ -43,48 +43,6 @@ if (Deno.args.length > 0) {
 }
 
 /**
- * The tsc_conformance roundtrip self-check — pure-Rust, reads tsgo's committed
- * `.errors.txt` baselines from `../typescript-go`. Shelled out (the only non-JS
- * leg) so it rides the same fail-fast + one summary as the parse gates. The
- * command prints its own report and exits non-zero on a pin mismatch or a
- * missing checkout, so mirror the other legs' "exit the process on a finding".
- */
-async function run_tsc_roundtrip(): Promise<void> {
-	const {code} = await new Deno.Command('cargo', {
-		args: ['run', '-p', 'tsv_debug', '--quiet', 'tsc_conformance', 'roundtrip'],
-		stdout: 'inherit',
-		stderr: 'inherit',
-	}).output();
-	if (code !== 0) Deno.exit(1);
-}
-
-/**
- * The tsc_conformance checker sweep — the standing bind+merge family gate over the
- * in-scope corpus, writing the committed deterministic report Rust-side (so no
- * extra Deno write perms are needed — the cargo subprocess writes it). Same
- * pure-Rust shell-out + fail-fast contract as the roundtrip leg; unlike roundtrip
- * it also needs the corpus inputs + bundled libs (publish Step 3b's preflight
- * probes them).
- */
-async function run_tsc_check(): Promise<void> {
-	const {code} = await new Deno.Command('cargo', {
-		args: [
-			'run',
-			'-p',
-			'tsv_debug',
-			'--quiet',
-			'tsc_conformance',
-			'run',
-			'--report',
-			'benches/js/results/report.tsc-conformance',
-		],
-		stdout: 'inherit',
-		stderr: 'inherit',
-	}).output();
-	if (code !== 0) Deno.exit(1);
-}
-
-/**
  * `render:audit` over the version-pinned checkouts — does `tsv format` change
  * what a Svelte component RENDERS?
  *
@@ -141,8 +99,6 @@ const legs: [string, () => Promise<void>][] = [
 	['conformance:svelte-fixtures', () => run_fixtures_gate(SVELTE_FIXTURES_GATE)],
 	['conformance:ts-fixtures', () => run_fixtures_gate(TS_FIXTURES_GATE)],
 	['conformance:ts-repo', () => run_ts_repo_compare([])],
-	['conformance:tsc-roundtrip', run_tsc_roundtrip],
-	['conformance:tsc-check', run_tsc_check],
 	['corpus:compare:parse --all', () => run_corpus_compare_parse(['--all'])],
 	['corpus:compare:format --all', () => run_corpus_compare_format(['--all'])],
 	['render:audit (pinned checkouts)', run_render_audit]

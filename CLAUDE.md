@@ -158,7 +158,7 @@ cargo run -p tsv_cli format --content '<div>x</div>' --parser svelte     # forma
 
 ```bash
 deno task check          # full committed-tree gate: fmt, audits, typecheck, tests, clippy (benches/js/CLAUDE.md §Gate map)
-deno task doctor         # one-pass setup check: runtimes, canonical pins + checkout alignment, node_modules freshness, oracle checkouts, corpus entries, build artifacts. Exit 1 only on MISLEADING state (pin drift, skew, stale deps); absences are warnings (--strict promotes warnings to failures)
+deno task doctor         # one-pass setup check: runtimes, canonical pins + checkout alignment, node_modules freshness, oracle checkouts, corpus entries, build artifacts. Exit 1 only on MISLEADING state (pin drift, skew, stale deps); absences are warnings (--strict promotes warnings to failures) — except in the explicitly optional experimental-typechecker tier, whose absences are informational at any strictness (a BROKEN checkout there still warns)
 deno task typecheck      # cargo check
 deno task test           # cargo test
 deno task lint           # cargo clippy
@@ -283,7 +283,7 @@ Package shape: built from the wasm-pack `web` target, then `scripts/patch_npm_pa
 
 `scripts/publish.ts` orchestrates the release end to end (preflight → bump → check → conformance:all → build npm packages + deno bundles → verify → artifact validation: size bounds + Deno smoke + Node tests → idempotent npm publish → git commit + tag + push), printing a wasm size summary (raw + gzipped) at the end. It stamps CHANGELOG.md's `## Unreleased` section into the released version's section — that section must be non-empty and carry a `<!-- bump: <level> -->` marker that matches `--bump` (required in **both** places, must agree; on stamp a fresh empty `## Unreleased` at `bump: patch` is seeded). The user keeps it updated as work lands — agents don't touch `CHANGELOG.md` (see [Committing](#committing)). A failed wetrun is resumable: re-run `--wetrun` without `--bump`.
 
-**Conformance gates (Step 3b).** The external-oracle correctness gates (see [Corpus Comparison](#corpus-comparison)) run here via `deno task conformance:all`; skipped by `--no-check`. The step preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../typescript-go`, `../test262` checkouts — for the tsc-check leg also the materialized `_submodules/TypeScript` corpus + `internal/bundled/libs` — + the `benches/js` `node_modules` sidecar, `deno task bench:install`): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`), a dry-run warn-and-skips, and any skip is re-warned in the run's final summary. `deno task doctor` checks the same setup (and more) ahead of time. Only the CSS-WPT harvest stays manual. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format is re-run and must reproduce byte-identically), so treat it as real; FFI nondeterminism surfaces as a loud `native format nondeterminism` per-file error instead (see ./benches/js/CLAUDE.md §Known Issues).
+**Conformance gates (Step 3b).** The external-oracle correctness gates (see [Corpus Comparison](#corpus-comparison)) run here via `deno task conformance:all`; skipped by `--no-check`. The step preflights the oracles (`../svelte`, `../acorn-typescript`, `../typescript`, `../test262` checkouts + the `benches/js` `node_modules` sidecar, `deno task bench:install`): a **`--wetrun` FAILS** when any is missing (releasing without gates requires the explicit `--no-check`), a dry-run warn-and-skips, and any skip is re-warned in the run's final summary. `deno task doctor` checks the same setup (and more) ahead of time. Only the CSS-WPT harvest stays manual. A `corpus:compare:format` SAFETY hit is self-verified in-run (the native format is re-run and must reproduce byte-identically), so treat it as real; FFI nondeterminism surfaces as a loud `native format nondeterminism` per-file error instead (see ./benches/js/CLAUDE.md §Known Issues).
 
 ```bash
 deno task publish                        # dry-run: validate everything, no mutation
@@ -339,10 +339,9 @@ deno task conformance:ts-repo          # tsv's TS parser vs the tsc corpus (../t
 # The three gates above accept: -v, --json, <subtree>.
 
 deno task conformance                  # the pre-release aggregate: the three gates above +
-# conformance:tsc-roundtrip + conformance:tsc-check + corpus:compare:parse --all + corpus:compare:format
-# --all, in ONE process (benches/js/conformance.ts; oracle modules load once, fail-fast, corpus FFI built
-# once; the two tsc legs are pure-Rust cargo shell-outs), then render:audit over the version-pinned
-# checkouts (also a subprocess — it drives its own sidecar). The external-oracle correctness gates that
+# corpus:compare:parse --all + corpus:compare:format --all, in ONE process (benches/js/conformance.ts;
+# oracle modules load once, fail-fast, corpus FFI built once), then render:audit over the version-pinned
+# checkouts (a subprocess — it drives its own sidecar). The external-oracle correctness gates that
 # can't live in `deno task check`. The format leg's prettier calls ride a content-addressed cache
 # (benches/js/lib/prettier_cache.ts; TSV_PRETTIER_CACHE=0 disables).
 
@@ -522,7 +521,7 @@ tsv/
 │   ├── tsv_css/     # CSS: parse(), format(), convert_ast_json_bytes()
 │   ├── tsv_svelte/  # Svelte: parse(), format(), convert_ast_json_bytes()
 │   ├── tsv_svelte_compile/ # Svelte→JS compiler (Svelte's compile() oracle) + JS canonicalizer (intent-erased reprint); consumed by tsv_debug — no shipped artifact links it
-│   ├── tsv_check/   # TypeScript binder + checker (tsgo-conformance target; consumed only by tsv_debug — no shipped artifact links it)
+│   ├── tsv_check/   # EXPERIMENTAL TypeScript binder + checker — may never ship (tsgo-conformance target; consumed only by tsv_debug — no shipped artifact links it)
 │   ├── tsv_cli/     # Production CLI (binary: tsv) - pure Rust
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
@@ -876,56 +875,22 @@ cargo run -p tsv_debug test262 language/expressions  # filter by path pattern
 
 See ./docs/conformance_test262.md (command interface; §Differential for the tsv-vs-oxc comparison).
 
-**tsgo Typechecker-Conformance Harness (`tsc_conformance`)** — pure-Rust harness over
-tsgo's committed `.errors.txt` error baselines (`../typescript-go`, oracle pin `168e7015`,
-read from the checked-in `testdata/baselines/reference/submodule`). No Deno. The
-oracle-side tools (`query`/`roundtrip`/`index`) are **zero checker code**;
-`run`/`check-test` drive the in-development **`tsv_check`** crate against the same
-baselines. `query`/`roundtrip` run on a bare checkout; `index`/`run` also need the
-materialized `_submodules/TypeScript` corpus (`git submodule update --init`), and `run`
-the bundled libs. Distinct from the parser-conformance surfaces: `conformance:ts-repo`
-grades tsv's *parser* against the tsc corpus, this reads tsgo's *checker* error output —
-the seam `tsv_check` emits through.
+**Typechecker conformance (`tsc_conformance`) — EXPERIMENTAL, may never ship.**
+`tsv_check` is a from-scratch TypeScript binder + checker in development; no shipped
+artifact links it (`cargo tree -i tsv_check` → only `tsv_debug`), and the parser and
+formatter are never modified in service of it. `tsv_debug tsc_conformance` grades it
+against tsgo's committed `.errors.txt` baselines (`../typescript-go`, pin `168e7015`),
+surfaced as **on-demand** tasks:
 
 ```bash
-cargo run -p tsv_debug tsc_conformance query histogram           # per-TS-code instance counts + totals
-cargo run -p tsv_debug tsc_conformance query tests-by-code 2454  # baselines mentioning a code
-cargo run -p tsv_debug tsc_conformance query denominators        # test-identity / variant / JSX sizing
-cargo run -p tsv_debug tsc_conformance roundtrip                 # parse every baseline → re-render → byte-compare (the P0 self-check)
-cargo run -p tsv_debug --quiet tsc_conformance run               # the conformance gate over tsv_check
-cargo run -p tsv_debug --quiet tsc_conformance check-test duplicateVar --variant target=es2015  # inner dev loop: one test, diagnostics vs baseline
-cargo run -p tsv_debug tsc_conformance index                     # the corpus-INPUT side: directives, @filename units, varyBy variants
-deno task conformance:tsc-roundtrip                              # roundtrip, as a deno task
-deno task conformance:tsc-check                                  # run + writes benches/js/results/report.tsc-conformance.{json,md}
-# Common options: --path <typescript-go> (default ../typescript-go), --json, --verbose.
-# roundtrip: filter by path substring (skips the pins). run: triage filters --test <substr> /
-#   --code <n> / --variant k=v / --family {dup,flow,all} skip the pins (invariant gates still
-#   hold); --emit-manifest <path>, --report <path> (full-run only).
+deno task conformance:tsc-roundtrip     # baseline parse → re-render → byte-compare (zero checker code)
+deno task conformance:tsc-check         # the tsv_check conformance sweep + committed report
+deno task conformance:tsc-check:update  # re-pin the run's snapshot counts after deliberate drift
 ```
 
-Every full (unfiltered) run enforces exact two-sided pins — a re-pin is deliberate (a code
-change or a tsgo pull). `roundtrip` proves the `.errors.txt` parser + renderer port in one
-move; the 14 ANSI `pretty=true` baselines take their own colored model but stay in the
-denominator, so round-trip is 100%. `run` sweeps every in-scope variant (single-file,
-non-JSX, non-JS-flavored, non-skipped) through parse → lower+bind → check → sort/dedup,
-grading expect-clean variants (zero-diagnostic) plus two families as codes+spans multisets
-— the bind/merge duplicate-conflict family (TS2300/2451/2567/2528 + merge-path codes) and
-the flow family (TS7027 unreachable code, TS7028 unused label). `extra=0` is a hard gate;
-`missing` is classified by deferred cause (merge / lib / deferred_late_bound /
-deferred_cfa / other, the last HARD-zero). It also publishes the parse-divergence census,
-runs each test `catch_unwind`-wrapped on a generous-stack worker (tracked parser crashes in
-a pinned `CRASH_EXCLUSIONS` ledger), and drops per-test `.diff` artifacts under
-`target/tsc_conformance/diffs/` on failure. `index` proves three gates against the on-disk
-baselines: the baseline join, the unit-text round-trip, and the exact denominator pins.
-
-`roundtrip` and `run` are legs of `deno task conformance` (the pre-release aggregate), so
-they run in publish **Step 3b** — their pins fail a release on drift, and `run`'s preflight
-additionally needs the materialized corpus AND `internal/bundled/libs`. `../typescript-go`
-is therefore a release-required oracle (a missing checkout FAILS a `--wetrun`, warn-skips a
-dry-run, is re-warned in the final summary), and `deno task doctor` reports its readiness.
-Like `../typescript` it is a git-SHA checkout, so — matching that precedent — it is **not**
-in `pins:audit` (npm-version only); its tsgo commit is pinned by the Rust count-pins. It
-stays out of `deno task check` (which is external-oracle-free).
+None is in `deno task check`, in `deno task conformance`, or release-gating, and
+`../typescript-go` is not a release-required oracle — until the typechecker ships, no
+ordinary dev or release flow pays for it. Full reference: ./docs/typechecker.md.
 
 **Performance Profiling Commands** (all pure Rust, no Deno — full reference: ./docs/performance.md):
 
@@ -1172,6 +1137,7 @@ formatting behavior. Key files: `src/language-js/print/assignment.js` (assignmen
 - ./docs/comments.md - the detached comment model: ownership, the three axes, hazards, emitters
 - ./docs/compile_tooling.md - the sidecar-dependent compiler harnesses: corpus compare, compile fuzz, erase census
 - ./docs/compile_validation_ratchet.md - the validation-suite ratchet: snapshot, kinds, verdict, triage
+- ./docs/typechecker.md - the experimental `tsv_check` typechecker (may never ship) + its on-demand tsgo-conformance harness
 - ./docs/performance.md - profiling methodology, tooling, and results tracking
 - ./docs/workflow_corpus.md - corpus-driven formatting conformance workflow
 - ./docs/workflow_test262.md - test262 conformance workflow

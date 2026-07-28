@@ -61,10 +61,9 @@ mod sym;
 pub mod symbols;
 
 use crate::diag::Diagnostic;
-use crate::hash::FxHashMap;
 use crate::ids::{FileId, NodeId};
 use crate::merge::FileMerge;
-use tsv_lang::Span;
+use tsv_lang::{FxHashMap, Span};
 use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{Expression, Statement, TSModuleReference};
 
@@ -267,6 +266,12 @@ pub struct BoundFile {
     /// kind is part of the key so the one offset-0 collision pair
     /// (`MethodDefinition` and its inline `value: FunctionExpression`) stays
     /// distinctly resolvable (see [`BoundFile::require_node_id`]).
+    ///
+    /// These keys assume a node's address is stable, which is why the borrow-only
+    /// discipline exists. `tests/clone_discipline.rs` guards the clone half of it, but
+    /// it cannot see the other half: a `Copy` AST type (`TSKeywordType`) is
+    /// re-addressed by a plain `*deref` copy, with no clone syntax to flag. Keep those
+    /// borrowed too.
     pub address_map: FxHashMap<(usize, NodeKind), NodeId>,
     /// Bind diagnostics — the duplicate/conflict family, in emission order (the
     /// caller sorts + dedups across the whole program).

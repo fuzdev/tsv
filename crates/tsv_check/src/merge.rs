@@ -51,9 +51,8 @@
 
 use crate::binder::symbols::SymbolFlags;
 use crate::diag::{Category, Diagnostic};
-use crate::hash::FxHashMap;
 use crate::ids::FileId;
-use tsv_lang::Span;
+use tsv_lang::{FxHashMap, Span};
 
 /// tsgo's `InternalSymbolNameDefault`-style reserved global identifiers the merge
 /// checks by name.

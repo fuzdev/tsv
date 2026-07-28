@@ -8,9 +8,9 @@ use crate::cli::CliError;
 use crate::tsc_conformance::index::IndexReport;
 use crate::tsc_conformance::runner::SkeletonReport;
 use crate::tsc_conformance::{
-    FAMILIES, FamilyFilter, MissingCause, RunFilter, RunOptions, baselines_dir, check_one,
-    corpus_materialized, denominators, discover_baselines, dump_flow_dot, histogram, run_index,
-    run_roundtrip, run_skeleton, tests_by_code,
+    CRASH_EXCLUDED_PIN, FAMILIES, FamilyFilter, MissingCause, RunFilter, RunOptions, baselines_dir,
+    check_one, corpus_materialized, denominators, discover_baselines, dump_flow_dot, histogram,
+    run_index, run_roundtrip, run_skeleton, tests_by_code,
 };
 use argh::FromArgs;
 use std::path::{Path, PathBuf};
@@ -69,122 +69,543 @@ const INDEX_JOIN_MATCHED_PIN: usize = 7033;
 const INDEX_UNIT_ROUNDTRIP_PIN: usize = 7019;
 const INDEX_UNIT_ROUNDTRIP_PRETTY_PIN: usize = 14;
 
-/// REGRESSION PINS (exact, two-sided) for the conformance sweep (`run`).
-/// Measured 2026-07-10, ../typescript-go at 168e7015 (`_submodules/TypeScript`
-/// corpus materialized). `clean_pass == expect_clean_graded` and zero panics
-/// are invariant gates; the counts below pin the in-scope denominators +
-/// parse-divergence census so any drift (a harness-port change, a tsv parser
-/// change, or a typescript-go pull) forces a deliberate re-pin.
-const RUN_IN_SCOPE_TESTS_PIN: usize = 9389;
-const RUN_IN_SCOPE_VARIANTS_PIN: usize = 9888;
-const RUN_EXPECT_CLEAN_PIN: usize = 4436;
-const RUN_BASELINED_PARSED_PIN: usize = 4464;
-const RUN_PARSE_REJECTED_PIN: usize = 988;
-const RUN_PARSE_REJECTED_NO_BASELINE_PIN: usize = 44;
-const RUN_PARSE_REJECTED_TS1XXX_PIN: usize = 456;
-const RUN_PARSE_REJECTED_OTHER_PIN: usize = 488;
-const RUN_SCRIPT_RETRY_PIN: usize = 25;
-/// Tracked parser crashes carved out of the sweep (the `CRASH_EXCLUSIONS`
-/// ledger). Pinned so the ledger can't grow or shrink silently — a move means a
-/// tsv parser robustness change (a fix removes an entry; a regression adds one).
-const RUN_CRASH_EXCLUDED_PIN: usize = 0;
-
-/// REGRESSION PINS (exact, two-sided) for the family grading (the bind + merge +
-/// check + flow gate). Measured vs pin 168e7015. `family_extra` is gated to 0
-/// (hard); the rest pin the buckets so any move (a cascade change, a merge change, a
-/// check-pass change, a flow-shim change, a tsv parser change, a typescript-go pull)
-/// forces a deliberate re-pin. The graded family is now two sub-families: the
-/// duplicate-conflict codes ([`DUP_CODES`], dup match/missing **539 / 11**) and the
-/// flow-construction codes ([`FLOW_CODES`], TS7027/TS7028, flow match/missing
-/// **34 / 26**). The syntactic check pass emits the duplicate-member family (TS2300
-/// over class / interface / type-literal properties and accessors) **and** the
-/// type-parameter identity check (TS2300 over a declaration's own duplicate type
-/// parameters); the flow shim emits TS7027 (unreachable code, construction-only
-/// fast path) + TS7028 (unused label). The missing bucket is classified five ways:
-/// `merge` (merge-phase family — **0**), `lib` (absent-lib conflicts — **0**),
-/// `late-bound` (**11**: the `LATE_BOUND_BASELINES` tests, deferred to the type
-/// engine — literal-type / `unique symbol` computed member names), `cfa` (**26**:
-/// the `DEFERRED_CFA_BASELINES` tests, deferred to the CFA type engine —
-/// never-returning signatures / assertion predicates / switch exhaustiveness /
-/// structural reachability fallback), and `other` (**0**, a HARD gate — any
-/// unclassified miss is a cascade/construction bug). A drop in `late-bound` / `cfa`
-/// (matches gained) is a real improvement that re-pins; a rise in `other` fails the
-/// run. `family_match` / `family_missing` are the aggregate totals (573 / 37);
-/// `dup_*` / `flow_*` pin the sub-family partitions.
-const RUN_FAMILY_GRADED_PIN: usize = 4085;
-const RUN_FAMILY_POSITIVE_PIN: usize = 140;
-const RUN_FAMILY_MATCH_PIN: usize = 573;
-const RUN_FAMILY_MISSING_PIN: usize = 37;
-const RUN_DUP_MATCH_PIN: usize = 539;
-const RUN_DUP_MISSING_PIN: usize = 11;
-const RUN_FLOW_MATCH_PIN: usize = 34;
-const RUN_FLOW_MISSING_PIN: usize = 26;
-const RUN_MISSING_MERGE_PIN: usize = 0;
-const RUN_MISSING_LIB_PIN: usize = 0;
-/// Genuinely-deferred dup-family misses (need the type engine); exact-pinned.
-const RUN_MISSING_DEFERRED_LATE_BOUND_PIN: usize = 11;
-/// Genuinely-deferred flow-family misses (need the CFA type engine); exact-pinned.
-const RUN_MISSING_DEFERRED_CFA_PIN: usize = 26;
-/// Unclassified family misses — a HARD-zero invariant gate (not just a full-run pin),
-/// so a same-table cascade / flow-construction regression fails even a filtered
-/// triage run.
+/// INVARIANT GATES (semantically zero, never snapshot values). Each of these is a
+/// *contract* rather than a measurement — an unclassified family miss, a family
+/// diagnostic the baseline lacks, a span that disagrees — so it stays a Rust const
+/// that `run --update` cannot move. A red one means the run is broken, not that the
+/// corpus shifted.
+///
+/// [`RUN_MISSING_OTHER_PIN`] is the strictest: it gates unconditionally (a filtered
+/// triage run too), since a same-table cascade / flow-construction regression is a
+/// bug at any scope. The rest are checked on full runs beside the snapshot pins.
 const RUN_MISSING_OTHER_PIN: usize = 0;
+const RUN_FAMILY_EXTRA_PIN: usize = 0;
 const RUN_FAMILY_SPAN_MISMATCH_PIN: usize = 0;
-
-/// Per-family `(match, missing)` pins, one row per [`FAMILIES`] entry (same
-/// order — dup, flow); a length mismatch with `FAMILIES` fails to compile.
-/// Adding a family = its two pin consts + a row here.
-const RUN_FAMILY_PARTITION_PINS: [(usize, usize); FAMILIES.len()] = [
-    (RUN_DUP_MATCH_PIN, RUN_DUP_MISSING_PIN),
-    (RUN_FLOW_MATCH_PIN, RUN_FLOW_MISSING_PIN),
-];
-
-/// Exact pins for the missing-cause partition. [`MissingCause::Other`] is NOT
-/// here — it gates unconditionally (a hard invariant, enforced on filtered
-/// triage runs too) rather than as a full-run pin. Adding a deferred cause =
-/// its pin const + a row here.
-const RUN_MISSING_CAUSE_PINS: [(MissingCause, &str, usize); 4] = [
-    (MissingCause::Merge, "missing merge", RUN_MISSING_MERGE_PIN),
-    (MissingCause::Lib, "missing lib", RUN_MISSING_LIB_PIN),
-    (
-        MissingCause::DeferredLateBound,
-        "missing late-bound",
-        RUN_MISSING_DEFERRED_LATE_BOUND_PIN,
-    ),
-    (
-        MissingCause::DeferredCfa,
-        "missing cfa",
-        RUN_MISSING_DEFERRED_CFA_PIN,
-    ),
-];
-const RUN_CARVE_OUT_RULE_A_PIN: usize = 379;
-const RUN_CARVE_OUT_RULE_A_FAMILY_PIN: usize = 11;
-const RUN_MODULE_DETECTION_PIN: usize = 1;
-
-/// REGRESSION PINS (exact, two-sided) for the lib base. Measured 2026-07-10 vs
-/// pin 168e7015 (`_submodules/TypeScript` corpus materialized): the distinct lib
-/// `.d.ts` files parsed+bound and the distinct resolved lib sets folded across the
-/// in-scope variants. A move is a deliberate re-pin (a harness-port change, a lib
-/// set change, or a typescript-go pull). The four error channels are gated to
-/// empty (a lib parse-reject, a missing referenced lib, an unrecognized
-/// `@lib`/reference name, or a lib binding external with no `declare global`
-/// block — all expected never on the pinned checkout).
-const RUN_LIB_FILES_BOUND_PIN: usize = 107;
-const RUN_LIB_SETS_PIN: usize = 50;
-
-/// REGRESSION PINS (exact, two-sided) for the related-info channel — graded on the
-/// matched family primaries only (the primary code gates the per-variant verdict;
-/// related info is its own pinned channel). Measured 2026-07-10 vs pin 168e7015:
-/// the 42 multiple-default-export chains (TS2752/2753/2528's TS6204) plus the 9
-/// lib-conflict related infos S5 added (TS6203/6204 pointing at the masked lib
-/// files: eval 1, Symbol 3, Promise 4, ElementTagNameMap 1). `missing`/`extra`/
-/// `span_mismatch` are 0 (the lib relateds match the baseline's masked
-/// `lib.x.d.ts:--:--` entries by (code, file), loc-agnostic). A rise in
-/// `missing`/`extra` is a regression to explain.
-const RUN_RELATED_MATCH_PIN: usize = 51;
+/// The related-info channel's zero contracts. The lib relateds match the baseline's
+/// masked `lib.x.d.ts:--:--` entries by (code, file), loc-agnostic, so a missing /
+/// extra / span-mismatched related is a real defect to explain, not drift. (The
+/// channel's `match` count IS drift, and lives in the snapshot.)
 const RUN_RELATED_MISSING_PIN: usize = 0;
 const RUN_RELATED_EXTRA_PIN: usize = 0;
 const RUN_RELATED_SPAN_MISMATCH_PIN: usize = 0;
+
+/// The committed pin snapshot, compiled in — the counts a full `run` is graded
+/// against. Machine-regenerated by `run --update` (`deno task
+/// conformance:tsc-check:update`), never hand-edited: a tsv parser change or a
+/// typescript-go pull shifts several of these at once, which is exactly what a
+/// multi-const hand edit gets wrong.
+const PIN_SNAPSHOT: &str = include_str!("tsc_conformance_pins.txt");
+
+/// Repo-relative path of [`PIN_SNAPSHOT`], for user-facing messages.
+const PIN_SNAPSHOT_FILE: &str = "crates/tsv_debug/src/cli/commands/tsc_conformance_pins.txt";
+
+/// The header `--update` writes above the pin lines — the file's own account of what
+/// it is and what deliberately stays out of it. Kept here so the renderer reproduces
+/// the committed file byte-for-byte (the round-trip is unit-tested).
+const PIN_SNAPSHOT_HEADER: &str = "\
+# Generated by `deno task conformance:tsc-check:update` — do NOT hand-edit.
+#
+# The exact, two-sided counts a FULL `tsv_debug tsc_conformance run` is held to: the
+# tsv-side census and denominators, which shift by construction when tsv's parser
+# advances (more corpus files parse) or the harness port changes. A move in either
+# direction fails the run, and re-pinning is the ordinary ritual — so these are
+# machine-written rather than hand-edited.
+#
+# NOT here, deliberately:
+#   - the semantically-ZERO gates (family extra, unclassified misses, span mismatches,
+#     the lib error channels, panics) — a zero is a contract, not a measurement, so it
+#     stays a Rust const no `--update` can move;
+#   - the crash-exclusion count, which lives beside the `CRASH_EXCLUSIONS` ledger it
+#     describes and moves with it in one deliberate edit;
+#   - the oracle-side pins (baseline / roundtrip / pretty / `INDEX_*`), which move only
+#     on a deliberate typescript-go bump.
+#
+# Format: `key = value`, one per line; `#` comments and blank lines are ignored. Every
+# key below is required and may appear exactly once. Full reference:
+# docs/typechecker.md §Pins & re-pinning.
+";
+
+/// How one snapshot key reaches its field. The accessor is `&mut`-shaped so a single
+/// table row serves both the parser and the renderer — they cannot disagree about
+/// which field a key names.
+type PinField = fn(&mut RunPins) -> &mut usize;
+
+/// What the run measured for a pin — the report side of every comparison.
+type PinMeasure = fn(&SkeletonReport) -> usize;
+
+/// One row of the pin table: the snapshot key, the label gate messages use, the
+/// [`RunPins`] field it lives in, the report value it grades against, and — on a row
+/// that opens a section — the section comment written above it.
+struct PinRow {
+    key: &'static str,
+    label: &'static str,
+    field: PinField,
+    measured: PinMeasure,
+    section: Option<&'static str>,
+}
+
+/// A pin row that continues the current section.
+const fn pin_row(
+    key: &'static str,
+    label: &'static str,
+    field: PinField,
+    measured: PinMeasure,
+) -> PinRow {
+    PinRow {
+        key,
+        label,
+        field,
+        measured,
+        section: None,
+    }
+}
+
+/// A pin row that opens a new section (its comment is written above the key).
+const fn pin_section(
+    section: &'static str,
+    key: &'static str,
+    label: &'static str,
+    field: PinField,
+    measured: PinMeasure,
+) -> PinRow {
+    PinRow {
+        key,
+        label,
+        field,
+        measured,
+        section: Some(section),
+    }
+}
+
+/// The pin table — the single source of truth for the snapshot: its key set, file
+/// order, section shape, gate labels, AND which report value each key grades. Parsing
+/// ([`parse_pin_snapshot`]), rendering ([`render_pin_snapshot`]), measuring
+/// ([`measured_pins`]), and grading ([`snapshot_pin_failures`]) all iterate it, so a
+/// new pinned count is exactly one row here plus its [`RunPins`] field — nothing else
+/// to remember, and no way to pin a count nothing measures.
+const PIN_TABLE: [PinRow; 27] = [
+    pin_section(
+        "Sweep denominators",
+        "in_scope_tests",
+        "in-scope tests",
+        |p| &mut p.in_scope_tests,
+        |r| r.in_scope_tests,
+    ),
+    pin_row(
+        "in_scope_variants",
+        "in-scope variants",
+        |p| &mut p.in_scope_variants,
+        |r| r.in_scope_variants,
+    ),
+    pin_row(
+        "expect_clean",
+        "expect-clean graded",
+        |p| &mut p.expect_clean,
+        |r| r.expect_clean_graded,
+    ),
+    pin_row(
+        "baselined_parsed",
+        "baselined parsed",
+        |p| &mut p.baselined_parsed,
+        |r| r.baselined_parsed,
+    ),
+    pin_section(
+        "Parse-divergence census",
+        "parse_rejected",
+        "parse-rejected",
+        |p| &mut p.parse_rejected,
+        |r| r.parse_rejected_total,
+    ),
+    pin_row(
+        "parse_rejected_no_baseline",
+        "parse-rejected (no baseline)",
+        |p| &mut p.parse_rejected_no_baseline,
+        |r| r.parse_rejected_no_baseline,
+    ),
+    pin_row(
+        "parse_rejected_ts1xxx_only",
+        "parse-rejected (TS1xxx-only)",
+        |p| &mut p.parse_rejected_ts1xxx_only,
+        |r| r.parse_rejected_ts1xxx_only,
+    ),
+    pin_row(
+        "parse_rejected_other",
+        "parse-rejected (other)",
+        |p| &mut p.parse_rejected_other,
+        |r| r.parse_rejected_other,
+    ),
+    pin_row(
+        "script_retry",
+        "script retries",
+        |p| &mut p.script_retry,
+        |r| r.script_retry,
+    ),
+    pin_section(
+        "Lib base",
+        "lib_files_bound",
+        "lib files bound",
+        |p| &mut p.lib_files_bound,
+        |r| r.lib_files_bound,
+    ),
+    pin_row(
+        "lib_sets",
+        "lib sets folded",
+        |p| &mut p.lib_sets,
+        |r| r.lib_sets_built,
+    ),
+    pin_section(
+        "Family grading",
+        "family_graded",
+        "family graded",
+        |p| &mut p.family_graded,
+        |r| r.family_graded_variants,
+    ),
+    pin_row(
+        "family_positive",
+        "family positive",
+        |p| &mut p.family_positive,
+        |r| r.family_positive_variants,
+    ),
+    pin_row(
+        "family_match",
+        "family match",
+        |p| &mut p.family_match,
+        |r| r.family_match,
+    ),
+    pin_row(
+        "family_missing",
+        "family missing",
+        |p| &mut p.family_missing,
+        |r| r.family_missing,
+    ),
+    pin_row(
+        "dup_match",
+        "dup match",
+        |p| &mut p.dup_match,
+        SkeletonReport::dup_match,
+    ),
+    pin_row(
+        "dup_missing",
+        "dup missing",
+        |p| &mut p.dup_missing,
+        SkeletonReport::dup_missing,
+    ),
+    pin_row(
+        "flow_match",
+        "flow match",
+        |p| &mut p.flow_match,
+        SkeletonReport::flow_match,
+    ),
+    pin_row(
+        "flow_missing",
+        "flow missing",
+        |p| &mut p.flow_missing,
+        SkeletonReport::flow_missing,
+    ),
+    pin_section(
+        "Family missing, by deferred cause (`other` is a hard-zero invariant, not pinned here)",
+        "missing_merge",
+        "missing merge",
+        |p| &mut p.missing_merge,
+        |r| r.missing(MissingCause::Merge),
+    ),
+    pin_row(
+        "missing_lib",
+        "missing lib",
+        |p| &mut p.missing_lib,
+        |r| r.missing(MissingCause::Lib),
+    ),
+    pin_row(
+        "missing_deferred_late_bound",
+        "missing late-bound",
+        |p| &mut p.missing_deferred_late_bound,
+        |r| r.missing(MissingCause::DeferredLateBound),
+    ),
+    pin_row(
+        "missing_deferred_cfa",
+        "missing cfa",
+        |p| &mut p.missing_deferred_cfa,
+        |r| r.missing(MissingCause::DeferredCfa),
+    ),
+    pin_section(
+        "Related-info channel (matched family primaries)",
+        "related_match",
+        "related match",
+        |p| &mut p.related_match,
+        |r| r.related_match,
+    ),
+    pin_section(
+        "Carve-outs",
+        "carve_out_rule_a",
+        "carve-out rule (a)",
+        |p| &mut p.carve_out_rule_a,
+        |r| r.carve_out_rule_a,
+    ),
+    pin_row(
+        "carve_out_rule_a_family",
+        "carve-out rule (a) family",
+        |p| &mut p.carve_out_rule_a_family,
+        |r| r.carve_out_rule_a_family,
+    ),
+    pin_row(
+        "module_detection",
+        "moduleDetection variants",
+        |p| &mut p.module_detection,
+        |r| r.module_detection_variants,
+    ),
+];
+
+/// The exact pins a `run` is held to: the snapshot counts (regenerated by `--update`)
+/// plus the zero-valued invariant consts, recorded together in the committed report
+/// and the manifest so an artifact states what it was measured against.
+#[derive(Clone, Copy, PartialEq, Eq, Debug, serde::Serialize)]
+struct RunPins {
+    in_scope_tests: usize,
+    in_scope_variants: usize,
+    expect_clean: usize,
+    baselined_parsed: usize,
+    parse_rejected: usize,
+    parse_rejected_no_baseline: usize,
+    parse_rejected_ts1xxx_only: usize,
+    parse_rejected_other: usize,
+    family_graded: usize,
+    family_positive: usize,
+    family_match: usize,
+    family_missing: usize,
+    dup_match: usize,
+    dup_missing: usize,
+    flow_match: usize,
+    flow_missing: usize,
+    missing_merge: usize,
+    missing_lib: usize,
+    missing_deferred_late_bound: usize,
+    missing_deferred_cfa: usize,
+    missing_other: usize,
+    family_extra: usize,
+    family_span_mismatch: usize,
+    related_match: usize,
+    related_missing: usize,
+    related_extra: usize,
+    related_span_mismatch: usize,
+    carve_out_rule_a: usize,
+    carve_out_rule_a_family: usize,
+    module_detection: usize,
+    script_retry: usize,
+    crash_excluded: usize,
+    lib_files_bound: usize,
+    lib_sets: usize,
+}
+
+impl RunPins {
+    /// The invariant (never-snapshot) fields from their consts, every snapshot field
+    /// zeroed — the base [`parse_pin_snapshot`] and [`measured_pins`] fill in.
+    const fn invariants() -> Self {
+        Self {
+            in_scope_tests: 0,
+            in_scope_variants: 0,
+            expect_clean: 0,
+            baselined_parsed: 0,
+            parse_rejected: 0,
+            parse_rejected_no_baseline: 0,
+            parse_rejected_ts1xxx_only: 0,
+            parse_rejected_other: 0,
+            family_graded: 0,
+            family_positive: 0,
+            family_match: 0,
+            family_missing: 0,
+            dup_match: 0,
+            dup_missing: 0,
+            flow_match: 0,
+            flow_missing: 0,
+            missing_merge: 0,
+            missing_lib: 0,
+            missing_deferred_late_bound: 0,
+            missing_deferred_cfa: 0,
+            missing_other: RUN_MISSING_OTHER_PIN,
+            family_extra: RUN_FAMILY_EXTRA_PIN,
+            family_span_mismatch: RUN_FAMILY_SPAN_MISMATCH_PIN,
+            related_match: 0,
+            related_missing: RUN_RELATED_MISSING_PIN,
+            related_extra: RUN_RELATED_EXTRA_PIN,
+            related_span_mismatch: RUN_RELATED_SPAN_MISMATCH_PIN,
+            carve_out_rule_a: 0,
+            carve_out_rule_a_family: 0,
+            module_detection: 0,
+            script_retry: 0,
+            crash_excluded: CRASH_EXCLUDED_PIN,
+            lib_files_bound: 0,
+            lib_sets: 0,
+        }
+    }
+
+    /// Read one pin through a [`PinField`] accessor. `RunPins` is `Copy`, so this
+    /// costs a stack copy and mutates nothing.
+    fn get(&self, field: PinField) -> usize {
+        let mut copy = *self;
+        *field(&mut copy)
+    }
+}
+
+/// Parse the pin snapshot: `#` comments and blank lines ignored, every other line
+/// `key = value`. Strict on purpose — a malformed line, an unknown or duplicate key,
+/// or a missing one is an error naming the offender, since a silently-dropped pin is
+/// an unpinned gate.
+fn parse_pin_snapshot(text: &str) -> Result<RunPins, String> {
+    let mut pins = RunPins::invariants();
+    let mut seen = [false; PIN_TABLE.len()];
+    for (index, raw) in text.lines().enumerate() {
+        let line = raw.trim();
+        if line.is_empty() || line.starts_with('#') {
+            continue;
+        }
+        let lineno = index + 1;
+        let Some((key, value)) = line.split_once('=') else {
+            return Err(format!(
+                "line {lineno}: expected `key = value`, got `{line}`"
+            ));
+        };
+        let (key, value) = (key.trim(), value.trim());
+        let Some(row) = PIN_TABLE.iter().position(|r| r.key == key) else {
+            return Err(format!("line {lineno}: unknown pin key `{key}`"));
+        };
+        if seen[row] {
+            return Err(format!("line {lineno}: duplicate pin key `{key}`"));
+        }
+        let parsed: usize = value
+            .parse()
+            .map_err(|_| format!("line {lineno}: pin `{key}` wants a count, got `{value}`"))?;
+        seen[row] = true;
+        *(PIN_TABLE[row].field)(&mut pins) = parsed;
+    }
+    let missing: Vec<&str> = PIN_TABLE
+        .iter()
+        .zip(seen)
+        .filter(|(_, seen)| !seen)
+        .map(|(row, _)| row.key)
+        .collect();
+    if !missing.is_empty() {
+        return Err(format!("missing pin key(s): {}", missing.join(", ")));
+    }
+    Ok(pins)
+}
+
+/// Load the committed snapshot.
+///
+/// A normal run hard-fails on a malformed file — it has no pins to grade against. An
+/// `--update` run instead warns and falls back to an all-zero baseline, because
+/// regeneration is precisely the fix: a snapshot mangled by a bad merge (conflict
+/// markers, a truncated write) must be recoverable by the command the error message
+/// recommends, not deadlocked behind it. The old→new lines then honestly read
+/// `0 -> N`.
+fn load_pin_snapshot(update: bool) -> Result<RunPins, CliError> {
+    match parse_pin_snapshot(PIN_SNAPSHOT) {
+        Ok(pins) => Ok(pins),
+        Err(e) if update => {
+            eprintln!(
+                "Warning: the pin snapshot {PIN_SNAPSHOT_FILE} is malformed — {e}. Regenerating \
+                 it from this run; every count reports as `0 -> N`."
+            );
+            Ok(RunPins::invariants())
+        }
+        Err(e) => {
+            eprintln!(
+                "Error: the pin snapshot {PIN_SNAPSHOT_FILE} is malformed — {e}. Restore it, or \
+                 regenerate it with `deno task conformance:tsc-check:update` (see \
+                 docs/typechecker.md §Pins & re-pinning)."
+            );
+            Err(CliError::Failed)
+        }
+    }
+}
+
+/// Refuse `--update` unless the checkout is the pinned oracle: the snapshot's counts
+/// are denominators *of this corpus*, so writing them from a different typescript-go
+/// commit would silently launder a checkout swap into the gate. Moving the oracle is a
+/// deliberate two-step — re-pin the oracle-side consts first, then re-pin the counts.
+fn require_pinned_oracle(checkout: &Path) -> Result<(), CliError> {
+    let found = load_baselines(checkout, "run --update")?.len();
+    if found == BASELINE_COUNT_PIN {
+        return Ok(());
+    }
+    eprintln!(
+        "Error: {} is not at the pinned oracle — found {found} baselines, pin \
+         {BASELINE_COUNT_PIN}. --update would write this checkout's denominators into the \
+         snapshot; re-pin the oracle-side consts (BASELINE_COUNT_PIN and friends) \
+         deliberately first (docs/typechecker.md §Pins & re-pinning).",
+        checkout.display()
+    );
+    Err(CliError::Failed)
+}
+
+/// Render the snapshot file: the header, then `key = value` per [`PIN_TABLE`] row in
+/// table order, with each section's comment above it.
+fn render_pin_snapshot(pins: &RunPins) -> String {
+    use std::fmt::Write as _;
+    let mut out = String::from(PIN_SNAPSHOT_HEADER);
+    for row in &PIN_TABLE {
+        if let Some(section) = row.section {
+            let _ = write!(out, "\n# {section}\n");
+        }
+        let _ = writeln!(out, "{} = {}", row.key, pins.get(row.field));
+    }
+    out
+}
+
+/// On-disk path of [`PIN_SNAPSHOT`], for `--update` to rewrite.
+/// `CARGO_MANIFEST_DIR` keeps it cwd-independent, matching the audit snapshots.
+fn pin_snapshot_path() -> PathBuf {
+    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/cli/commands/tsc_conformance_pins.txt")
+}
+
+/// The pins this run MEASURED — every snapshot field read off the report through its
+/// [`PIN_TABLE`] row, the invariant fields left at their consts (a run is only
+/// pinnable when those are green anyway).
+fn measured_pins(report: &SkeletonReport) -> RunPins {
+    let mut pins = RunPins::invariants();
+    for row in &PIN_TABLE {
+        *(row.field)(&mut pins) = (row.measured)(report);
+    }
+    pins
+}
+
+/// Rewrite the snapshot from a green full run: byte-identical → report "no drift" and
+/// leave the file untouched; otherwise write it and print one `old -> new` line per
+/// changed key.
+fn update_pin_snapshot(committed: &RunPins, report: &SkeletonReport) -> Result<(), CliError> {
+    let measured = measured_pins(report);
+    let rendered = render_pin_snapshot(&measured);
+    if rendered == PIN_SNAPSHOT {
+        println!(
+            "\nPins: no drift — all {} count(s) in {PIN_SNAPSHOT_FILE} are current.",
+            PIN_TABLE.len()
+        );
+        return Ok(());
+    }
+    let path = pin_snapshot_path();
+    std::fs::write(&path, &rendered).map_err(|e| {
+        eprintln!("Error writing {}: {e}", path.display());
+        CliError::Failed
+    })?;
+    let changes: Vec<String> = PIN_TABLE
+        .iter()
+        .filter_map(|row| {
+            let (old, new) = (committed.get(row.field), measured.get(row.field));
+            (old != new).then(|| format!("  {} {old} -> {new}", row.key))
+        })
+        .collect();
+    if changes.is_empty() {
+        println!("\nPins: no count moved; rewrote {PIN_SNAPSHOT_FILE} to its canonical shape.");
+    } else {
+        println!(
+            "\nPins: {} moved — rewrote {PIN_SNAPSHOT_FILE}",
+            changes.len()
+        );
+        for change in &changes {
+            println!("{change}");
+        }
+    }
+    Ok(())
+}
 
 /// Query the tsgo TypeScript conformance baselines.
 #[derive(FromArgs, Debug)]
@@ -323,6 +744,11 @@ pub struct RunCommand {
     /// only; deterministic, wall-clock excluded)
     #[argh(option)]
     report: Option<PathBuf>,
+
+    /// rewrite the committed pin snapshot from this run's measured counts (full,
+    /// unfiltered runs only; refuses to pin a run whose invariant gates are red)
+    #[argh(switch)]
+    update: bool,
 }
 
 /// Inner dev loop: run one corpus test (optionally one variant) through
@@ -367,6 +793,9 @@ impl TscConformanceCommand {
 impl RunCommand {
     fn run(self) -> Result<(), CliError> {
         require_corpus(&self.path)?;
+        // Parse the snapshot up front: a malformed pin file must fail before the sweep,
+        // not after it (an `--update` run recovers instead — see `load_pin_snapshot`).
+        let pins = load_pin_snapshot(self.update)?;
 
         let filter = self.build_filter()?;
         let filtered = filter.is_active();
@@ -377,6 +806,10 @@ impl RunCommand {
                  --test/--code/--variant filters."
             );
             return Err(CliError::Failed);
+        }
+        refuse_narrowed_update(self.update, &filter)?;
+        if self.update {
+            require_pinned_oracle(&self.path)?;
         }
 
         let options = RunOptions {
@@ -394,16 +827,31 @@ impl RunCommand {
         }
 
         // Filters skip the exact pins (the roundtrip/query convention); the invariant
-        // gates still hold. Committed artifacts land only when the gates pass (so a
-        // pin miss never writes a bad manifest/report), while a failure dumps per-test
-        // diff artifacts for triage.
-        match enforce_run_gates(&report, !filtered) {
+        // gates still hold. An `--update` run is unfiltered by construction and grades
+        // against everything EXCEPT the snapshot counts — it may re-pin drift, never a
+        // red run. Committed artifacts land only when the gates pass (so a pin miss
+        // never writes a bad manifest/report), while a failure dumps per-test diff
+        // artifacts for triage.
+        let gates = if self.update {
+            refuse_red_update(&report)
+        } else {
+            enforce_run_gates(&report, &pins, !filtered)
+        };
+        match gates {
             Ok(()) => {
+                // Post-update artifacts state the pins the run MEASURED — the values
+                // just written — so an artifact never quotes a stale snapshot.
+                let effective = if self.update {
+                    update_pin_snapshot(&pins, &report)?;
+                    measured_pins(&report)
+                } else {
+                    pins
+                };
                 if let Some(path) = &self.emit_manifest {
-                    write_manifest(&report, &options.filter, path)?;
+                    write_manifest(&report, &options.filter, &effective, path)?;
                 }
                 if let Some(path) = &self.report {
-                    write_report(&report, path)?;
+                    write_report(&report, &effective, path)?;
                 }
                 Ok(())
             }
@@ -453,13 +901,93 @@ fn parse_family_filter(arg: &str) -> Result<FamilyFilter, String> {
     })
 }
 
+/// The triage flags active on this run, by name — `--update` refuses when any is set.
+fn active_filter_flags(filter: &RunFilter) -> Vec<&'static str> {
+    let mut flags = Vec::new();
+    if filter.test.is_some() {
+        flags.push("--test");
+    }
+    if filter.code.is_some() {
+        flags.push("--code");
+    }
+    if filter.variant.is_some() {
+        flags.push("--variant");
+    }
+    if filter.family.is_some() {
+        flags.push("--family");
+    }
+    flags
+}
+
+/// Refuse `--update` on a narrowed run: the snapshot describes the FULL sweep, so
+/// pinning a triage slice's counts would silently unpin everything outside it.
+fn refuse_narrowed_update(update: bool, filter: &RunFilter) -> Result<(), CliError> {
+    let flags = active_filter_flags(filter);
+    if !update || flags.is_empty() {
+        return Ok(());
+    }
+    eprintln!(
+        "Error: --update pins the FULL sweep. This run is narrowed by {}, so its counts are a \
+         slice of what the snapshot means — writing them would silently unpin the rest. Re-run \
+         without {}.",
+        flags.join(" / "),
+        flags.join(" / ")
+    );
+    Err(CliError::Failed)
+}
+
 /// Enforce the skeleton gates: the clean-grade + empty-channel invariants and zero
-/// panics (always), plus — on a full run (`enforce_pins`) — the exact denominator,
-/// family, related, and census pins. A filtered (triage) run skips the pins.
-fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), CliError> {
+/// panics (always), plus — on a full run (`enforce_pins`) — the zero-valued invariant
+/// consts and the exact snapshot counts. A filtered (triage) run skips both pin
+/// blocks.
+fn enforce_run_gates(
+    report: &SkeletonReport,
+    pins: &RunPins,
+    enforce_pins: bool,
+) -> Result<(), CliError> {
+    let mut errs = invariant_failures(report);
+    if enforce_pins {
+        errs.extend(zero_pin_failures(report));
+        errs.extend(snapshot_pin_failures(report, pins));
+    }
+
+    if errs.is_empty() {
+        Ok(())
+    } else {
+        eprintln!(
+            "\nError: {}. If deliberate (a harness-port change, a tsv parser change, or a \
+             typescript-go pull), re-pin with `deno task conformance:tsc-check:update` — it \
+             rewrites {PIN_SNAPSHOT_FILE} and never touches the zero-valued invariant consts or \
+             the crash-exclusion ledger (docs/typechecker.md §Pins & re-pinning).",
+            errs.join("; ")
+        );
+        Err(CliError::Failed)
+    }
+}
+
+/// Gate an `--update` run on everything EXCEPT the snapshot counts (an update run is
+/// unfiltered, so the zero-valued pins apply too). A red run is never pinnable — the
+/// whole point of the snapshot is that only *drift* is machine-writable.
+fn refuse_red_update(report: &SkeletonReport) -> Result<(), CliError> {
+    let mut errs = invariant_failures(report);
+    errs.extend(zero_pin_failures(report));
+    if errs.is_empty() {
+        return Ok(());
+    }
+    eprintln!(
+        "\nError: refusing to re-pin a RED run — {}. Fix the failure first; --update writes \
+         drift, never a broken state (docs/typechecker.md §Pins & re-pinning).",
+        errs.join("; ")
+    );
+    Err(CliError::Failed)
+}
+
+/// The always-on invariant gates: clean grading, no panics, no stale crash exclusion,
+/// no family over-emission, no unclassified miss, and the four empty lib channels.
+/// These hold on a filtered triage run too.
+fn invariant_failures(report: &SkeletonReport) -> Vec<String> {
     let mut errs: Vec<String> = Vec::new();
 
-    // --- Invariant gates (always, even on a filtered run) ---
     if report.clean_pass != report.expect_clean_graded {
         errs.push(format!(
             "clean pass {} != expect-clean graded {} ({} non-clean)",
@@ -484,7 +1012,7 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
         ));
     }
     // The hard family gate: never emit a family diagnostic the baseline lacks.
-    if report.family_extra != 0 {
+    if report.family_extra != RUN_FAMILY_EXTRA_PIN {
         errs.push(format!(
             "family EXTRA {} != 0 (a bind-time over-emission — fix the cascade), e.g. {}",
             report.family_extra,
@@ -538,276 +1066,94 @@ fn enforce_run_gates(report: &SkeletonReport, enforce_pins: bool) -> Result<(), 
         ));
     }
 
-    // --- Exact two-sided pins (full run only; filters skip them) ---
-    if enforce_pins {
-        let pin = |errs: &mut Vec<String>, label: &str, got: usize, want: usize| {
-            if got != want {
-                errs.push(format!("{label} {got} != pinned {want}"));
+    errs
+}
+
+/// Push `{label} {got} != pinned {want}` when a count misses its pin.
+fn pin_failure(errs: &mut Vec<String>, label: &str, got: usize, want: usize) {
+    if got != want {
+        errs.push(format!("{label} {got} != pinned {want}"));
+    }
+}
+
+/// The zero-valued pins: semantically-zero contracts that stay Rust consts (never
+/// snapshot values) but, unlike the always-on invariants above, are checked on full
+/// runs only — a narrowed triage slice can legitimately trip a span comparison it
+/// wasn't meant to grade.
+fn zero_pin_failures(report: &SkeletonReport) -> Vec<String> {
+    let mut errs: Vec<String> = Vec::new();
+    pin_failure(
+        &mut errs,
+        "family span_mismatch",
+        report.family_span_mismatch,
+        RUN_FAMILY_SPAN_MISMATCH_PIN,
+    );
+    pin_failure(
+        &mut errs,
+        "related missing",
+        report.related_missing,
+        RUN_RELATED_MISSING_PIN,
+    );
+    pin_failure(
+        &mut errs,
+        "related extra",
+        report.related_extra,
+        RUN_RELATED_EXTRA_PIN,
+    );
+    pin_failure(
+        &mut errs,
+        "related span_mismatch",
+        report.related_span_mismatch,
+        RUN_RELATED_SPAN_MISMATCH_PIN,
+    );
+    // The crash-exclusion count moves with the `CRASH_EXCLUSIONS` ledger, one
+    // deliberate edit — so it is graded here rather than from the snapshot.
+    pin_failure(
+        &mut errs,
+        "crash-excluded",
+        report.excluded_crashes,
+        CRASH_EXCLUDED_PIN,
+    );
+    errs
+}
+
+/// The committed snapshot counts (`tsc_conformance_pins.txt`), all exact and
+/// two-sided. These are the ones `--update` rewrites — they shift by construction when
+/// tsv's parser advances or the harness port changes. Driven entirely by
+/// [`PIN_TABLE`], so a row cannot be pinned-but-ungraded; the message names the
+/// snapshot key so the offending line in the file is one search away.
+fn snapshot_pin_failures(report: &SkeletonReport, pins: &RunPins) -> Vec<String> {
+    let mut errs: Vec<String> = Vec::new();
+    // Structural guard, computed rather than declared: every graded family must own its
+    // `{key}_match` / `{key}_missing` rows, so a family added without pins fails the run
+    // instead of grading silently unpinned.
+    for family in &FAMILIES {
+        for suffix in ["match", "missing"] {
+            let key = format!("{}_{suffix}", family.key);
+            if !PIN_TABLE.iter().any(|r| r.key == key) {
+                errs.push(format!("graded family `{}` has no `{key}` pin", family.key));
             }
-        };
-        pin(
-            &mut errs,
-            "in-scope tests",
-            report.in_scope_tests,
-            RUN_IN_SCOPE_TESTS_PIN,
-        );
-        pin(
-            &mut errs,
-            "in-scope variants",
-            report.in_scope_variants,
-            RUN_IN_SCOPE_VARIANTS_PIN,
-        );
-        pin(
-            &mut errs,
-            "expect-clean graded",
-            report.expect_clean_graded,
-            RUN_EXPECT_CLEAN_PIN,
-        );
-        pin(
-            &mut errs,
-            "clean pass",
-            report.clean_pass,
-            RUN_EXPECT_CLEAN_PIN,
-        );
-        pin(
-            &mut errs,
-            "baselined parsed",
-            report.baselined_parsed,
-            RUN_BASELINED_PARSED_PIN,
-        );
-        pin(
-            &mut errs,
-            "parse-rejected",
-            report.parse_rejected_total,
-            RUN_PARSE_REJECTED_PIN,
-        );
-        pin(
-            &mut errs,
-            "parse-rejected (no baseline)",
-            report.parse_rejected_no_baseline,
-            RUN_PARSE_REJECTED_NO_BASELINE_PIN,
-        );
-        pin(
-            &mut errs,
-            "parse-rejected (TS1xxx-only)",
-            report.parse_rejected_ts1xxx_only,
-            RUN_PARSE_REJECTED_TS1XXX_PIN,
-        );
-        pin(
-            &mut errs,
-            "parse-rejected (other)",
-            report.parse_rejected_other,
-            RUN_PARSE_REJECTED_OTHER_PIN,
-        );
-        pin(
-            &mut errs,
-            "script retries",
-            report.script_retry,
-            RUN_SCRIPT_RETRY_PIN,
-        );
-        pin(
-            &mut errs,
-            "crash-excluded",
-            report.excluded_crashes,
-            RUN_CRASH_EXCLUDED_PIN,
-        );
-
-        // Lib-base sizing pins.
-        pin(
-            &mut errs,
-            "lib files bound",
-            report.lib_files_bound,
-            RUN_LIB_FILES_BOUND_PIN,
-        );
-        pin(
-            &mut errs,
-            "lib sets folded",
-            report.lib_sets_built,
-            RUN_LIB_SETS_PIN,
-        );
-
-        // Family grading pins.
-        pin(
-            &mut errs,
-            "family graded",
-            report.family_graded_variants,
-            RUN_FAMILY_GRADED_PIN,
-        );
-        pin(
-            &mut errs,
-            "family positive",
-            report.family_positive_variants,
-            RUN_FAMILY_POSITIVE_PIN,
-        );
-        pin(
-            &mut errs,
-            "family match",
-            report.family_match,
-            RUN_FAMILY_MATCH_PIN,
-        );
-        pin(
-            &mut errs,
-            "family missing",
-            report.family_missing,
-            RUN_FAMILY_MISSING_PIN,
-        );
-        // Sub-family partitions, one row per graded family (dup, flow).
-        for (family, (match_pin, missing_pin)) in FAMILIES.iter().zip(RUN_FAMILY_PARTITION_PINS) {
-            pin(
-                &mut errs,
-                &format!("{} match", family.key),
-                report.family_match_for(family),
-                match_pin,
-            );
-            pin(
-                &mut errs,
-                &format!("{} missing", family.key),
-                report.family_missing_for(family),
-                missing_pin,
-            );
         }
-        // The missing-cause partition (`Other` gates unconditionally above).
-        for (cause, label, want) in RUN_MISSING_CAUSE_PINS {
-            pin(&mut errs, label, report.missing(cause), want);
+    }
+    for row in &PIN_TABLE {
+        let (got, want) = ((row.measured)(report), pins.get(row.field));
+        if got != want {
+            errs.push(format!(
+                "{} {got} != pinned {want} [{}]",
+                row.label, row.key
+            ));
         }
-        pin(
-            &mut errs,
-            "family span_mismatch",
-            report.family_span_mismatch,
-            RUN_FAMILY_SPAN_MISMATCH_PIN,
-        );
-
-        // Related-info channel pins (two-sided; does not gate the primary verdict).
-        pin(
-            &mut errs,
-            "related match",
-            report.related_match,
-            RUN_RELATED_MATCH_PIN,
-        );
-        pin(
-            &mut errs,
-            "related missing",
-            report.related_missing,
-            RUN_RELATED_MISSING_PIN,
-        );
-        pin(
-            &mut errs,
-            "related extra",
-            report.related_extra,
-            RUN_RELATED_EXTRA_PIN,
-        );
-        pin(
-            &mut errs,
-            "related span_mismatch",
-            report.related_span_mismatch,
-            RUN_RELATED_SPAN_MISMATCH_PIN,
-        );
-
-        pin(
-            &mut errs,
-            "carve-out rule (a)",
-            report.carve_out_rule_a,
-            RUN_CARVE_OUT_RULE_A_PIN,
-        );
-        pin(
-            &mut errs,
-            "carve-out rule (a) family",
-            report.carve_out_rule_a_family,
-            RUN_CARVE_OUT_RULE_A_FAMILY_PIN,
-        );
-        pin(
-            &mut errs,
-            "moduleDetection variants",
-            report.module_detection_variants,
-            RUN_MODULE_DETECTION_PIN,
-        );
     }
-
-    if errs.is_empty() {
-        Ok(())
-    } else {
-        eprintln!(
-            "\nError: {}. If deliberate (a harness-port change, a tsv parser change, or a \
-             typescript-go pull), re-pin the RUN_* constants.",
-            errs.join("; ")
-        );
-        Err(CliError::Failed)
+    // The one comparison that is not a table row: `clean_pass` is a SECOND measured
+    // value graded against the `expect_clean` pin (the invariant block already asserts
+    // the two agree, so this only fires alongside a denominator move).
+    if report.clean_pass != pins.expect_clean {
+        errs.push(format!(
+            "clean pass {} != pinned {} [expect_clean]",
+            report.clean_pass, pins.expect_clean
+        ));
     }
-}
-
-/// The exact `RUN_*` pins this run is held to — recorded in the committed report and
-/// the manifest so the artifact states what it was measured against.
-#[derive(serde::Serialize)]
-struct RunPins {
-    in_scope_tests: usize,
-    in_scope_variants: usize,
-    expect_clean: usize,
-    baselined_parsed: usize,
-    parse_rejected: usize,
-    family_graded: usize,
-    family_positive: usize,
-    family_match: usize,
-    family_missing: usize,
-    dup_match: usize,
-    dup_missing: usize,
-    flow_match: usize,
-    flow_missing: usize,
-    missing_merge: usize,
-    missing_lib: usize,
-    missing_deferred_late_bound: usize,
-    missing_deferred_cfa: usize,
-    missing_other: usize,
-    family_extra: usize,
-    family_span_mismatch: usize,
-    related_match: usize,
-    related_missing: usize,
-    related_extra: usize,
-    related_span_mismatch: usize,
-    carve_out_rule_a: usize,
-    carve_out_rule_a_family: usize,
-    module_detection: usize,
-    script_retry: usize,
-    crash_excluded: usize,
-    lib_files_bound: usize,
-    lib_sets: usize,
-}
-
-/// Snapshot the `RUN_*` pin constants (the hard family gate `family_extra` is a fixed
-/// zero, folded in for a complete record).
-fn run_pins() -> RunPins {
-    RunPins {
-        in_scope_tests: RUN_IN_SCOPE_TESTS_PIN,
-        in_scope_variants: RUN_IN_SCOPE_VARIANTS_PIN,
-        expect_clean: RUN_EXPECT_CLEAN_PIN,
-        baselined_parsed: RUN_BASELINED_PARSED_PIN,
-        parse_rejected: RUN_PARSE_REJECTED_PIN,
-        family_graded: RUN_FAMILY_GRADED_PIN,
-        family_positive: RUN_FAMILY_POSITIVE_PIN,
-        family_match: RUN_FAMILY_MATCH_PIN,
-        family_missing: RUN_FAMILY_MISSING_PIN,
-        dup_match: RUN_DUP_MATCH_PIN,
-        dup_missing: RUN_DUP_MISSING_PIN,
-        flow_match: RUN_FLOW_MATCH_PIN,
-        flow_missing: RUN_FLOW_MISSING_PIN,
-        missing_merge: RUN_MISSING_MERGE_PIN,
-        missing_lib: RUN_MISSING_LIB_PIN,
-        missing_deferred_late_bound: RUN_MISSING_DEFERRED_LATE_BOUND_PIN,
-        missing_deferred_cfa: RUN_MISSING_DEFERRED_CFA_PIN,
-        missing_other: RUN_MISSING_OTHER_PIN,
-        family_extra: 0,
-        family_span_mismatch: RUN_FAMILY_SPAN_MISMATCH_PIN,
-        related_match: RUN_RELATED_MATCH_PIN,
-        related_missing: RUN_RELATED_MISSING_PIN,
-        related_extra: RUN_RELATED_EXTRA_PIN,
-        related_span_mismatch: RUN_RELATED_SPAN_MISMATCH_PIN,
-        carve_out_rule_a: RUN_CARVE_OUT_RULE_A_PIN,
-        carve_out_rule_a_family: RUN_CARVE_OUT_RULE_A_FAMILY_PIN,
-        module_detection: RUN_MODULE_DETECTION_PIN,
-        script_retry: RUN_SCRIPT_RETRY_PIN,
-        crash_excluded: RUN_CRASH_EXCLUDED_PIN,
-        lib_files_bound: RUN_LIB_FILES_BOUND_PIN,
-        lib_sets: RUN_LIB_SETS_PIN,
-    }
+    errs
 }
 
 /// The active triage filters echoed into a filtered manifest, so a consumer sees
@@ -837,7 +1183,11 @@ struct RunManifest<'a> {
 
 /// Assemble the manifest wrapper, marking whether the run was triage-filtered and
 /// echoing the active filters (`--variant key=value` re-joined for display).
-fn run_manifest<'a>(report: &'a SkeletonReport, filter: &RunFilter) -> RunManifest<'a> {
+fn run_manifest<'a>(
+    report: &'a SkeletonReport,
+    filter: &RunFilter,
+    pins: &RunPins,
+) -> RunManifest<'a> {
     let filtered = filter.is_active();
     let filters = filtered.then(|| ManifestFilters {
         test: filter.test.clone(),
@@ -847,7 +1197,7 @@ fn run_manifest<'a>(report: &'a SkeletonReport, filter: &RunFilter) -> RunManife
     RunManifest {
         filtered,
         filters,
-        pins: run_pins(),
+        pins: *pins,
         report,
     }
 }
@@ -858,9 +1208,10 @@ fn run_manifest<'a>(report: &'a SkeletonReport, filter: &RunFilter) -> RunManife
 fn write_manifest(
     report: &SkeletonReport,
     filter: &RunFilter,
+    pins: &RunPins,
     path: &Path,
 ) -> Result<(), CliError> {
-    let manifest = run_manifest(report, filter);
+    let manifest = run_manifest(report, filter, pins);
     let file = std::fs::File::create(path).map_err(|e| {
         eprintln!("Error creating manifest {}: {e}", path.display());
         CliError::Failed
@@ -879,7 +1230,7 @@ fn write_manifest(
 
 /// Build the committed compact report as a JSON value — deterministic (sorted
 /// per-code maps, wall-clock excluded) so re-runs are diff-clean.
-fn build_report_value(report: &SkeletonReport) -> serde_json::Value {
+fn build_report_value(report: &SkeletonReport, pins: &RunPins) -> serde_json::Value {
     serde_json::json!({
         "oracle": "tsgo committed .errors.txt baselines (bind + merge + flow family)",
         "denominators": {
@@ -935,7 +1286,7 @@ fn build_report_value(report: &SkeletonReport) -> serde_json::Value {
             "files_bound": report.lib_files_bound,
             "sets_folded": report.lib_sets_built,
         },
-        "pins": run_pins(),
+        "pins": pins,
     })
 }
 
@@ -1072,10 +1423,10 @@ fn may_write_report(report_requested: bool, filtered: bool) -> bool {
 
 /// Write the committed compact report to `<base>.json` + `<base>.md` (full runs only;
 /// deterministic). Called only after the gates pass.
-fn write_report(report: &SkeletonReport, base: &Path) -> Result<(), CliError> {
+fn write_report(report: &SkeletonReport, pins: &RunPins, base: &Path) -> Result<(), CliError> {
     let json_path = PathBuf::from(format!("{}.json", base.display()));
     let md_path = PathBuf::from(format!("{}.md", base.display()));
-    let value = build_report_value(report);
+    let value = build_report_value(report, pins);
     let mut json = serde_json::to_string_pretty(&value).map_err(|e| {
         eprintln!("Error serializing report JSON: {e}");
         CliError::Failed
@@ -1627,13 +1978,237 @@ mod tests {
         }
     }
 
+    /// A syntactically valid snapshot text to mutate in the parser tests (the values
+    /// are the sample report's, deliberately not the committed ones — a parser test
+    /// must not go stale on a re-pin).
+    fn valid_snapshot() -> String {
+        render_pin_snapshot(&measured_pins(&sample_report()))
+    }
+
+    #[test]
+    fn committed_snapshot_round_trips() {
+        // The one test that keeps the file, the table, and the header honest at once:
+        // parse the committed snapshot and re-render it — byte-identical means the key
+        // set, the file order, the section shape, and the header all agree with
+        // `PIN_TABLE`. It is also exactly what `--update` compares to decide "no drift".
+        let pins = parse_pin_snapshot(PIN_SNAPSHOT).expect("committed snapshot parses");
+        assert_eq!(render_pin_snapshot(&pins), PIN_SNAPSHOT);
+    }
+
+    #[test]
+    fn committed_snapshot_carries_exactly_the_table_keys() {
+        // Completeness from the file's side: every key the table names is present, and
+        // the file names nothing else (an unknown key is a parse error, a missing one
+        // too — so a successful parse IS the equality, asserted here explicitly).
+        let keys: Vec<&str> = PIN_SNAPSHOT
+            .lines()
+            .map(str::trim)
+            .filter(|l| !l.is_empty() && !l.starts_with('#'))
+            .filter_map(|l| l.split_once('=').map(|(k, _)| k.trim()))
+            .collect();
+        let table: Vec<&str> = PIN_TABLE.iter().map(|r| r.key).collect();
+        assert_eq!(keys, table);
+    }
+
+    #[test]
+    fn zero_invariants_are_not_snapshot_keys() {
+        // The split is the whole design: a semantically-zero contract (and the crash
+        // ledger's count) stays a Rust const, so `--update` can never re-pin one.
+        for key in [
+            "missing_other",
+            "family_extra",
+            "family_span_mismatch",
+            "related_missing",
+            "related_extra",
+            "related_span_mismatch",
+            "crash_excluded",
+        ] {
+            assert!(
+                !PIN_TABLE.iter().any(|r| r.key == key),
+                "{key} must not be a snapshot key"
+            );
+        }
+    }
+
+    #[test]
+    fn every_pin_row_addresses_its_own_field() {
+        // Catches a copy-pasted accessor pointing two keys at one field: write a
+        // distinct value through every row, then read them all back. Aliasing collapses
+        // the sequence (and would round-trip clean today, since both values start 0).
+        let mut pins = RunPins::invariants();
+        for (i, row) in PIN_TABLE.iter().enumerate() {
+            *(row.field)(&mut pins) = i + 1;
+        }
+        let read_back: Vec<usize> = PIN_TABLE.iter().map(|row| pins.get(row.field)).collect();
+        assert_eq!(read_back, (1..=PIN_TABLE.len()).collect::<Vec<_>>());
+    }
+
+    #[test]
+    fn every_graded_family_has_partition_pins() {
+        // The guard that used to be a fixed-length `[_; FAMILIES.len()]` table: adding a
+        // graded family must add its `(match, missing)` snapshot keys too.
+        for family in &FAMILIES {
+            for suffix in ["match", "missing"] {
+                let key = format!("{}_{suffix}", family.key);
+                assert!(
+                    PIN_TABLE.iter().any(|r| r.key == key),
+                    "family `{}` has no `{key}` pin",
+                    family.key
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn every_deferred_missing_cause_is_pinned() {
+        // The match is exhaustive, so a new `MissingCause` variant fails to compile here
+        // until it declares whether it is a pinned deferred cause or an invariant.
+        for cause in [
+            MissingCause::Merge,
+            MissingCause::Lib,
+            MissingCause::DeferredLateBound,
+            MissingCause::DeferredCfa,
+            MissingCause::Other,
+        ] {
+            let key = match cause {
+                MissingCause::Merge => Some("missing_merge"),
+                MissingCause::Lib => Some("missing_lib"),
+                MissingCause::DeferredLateBound => Some("missing_deferred_late_bound"),
+                MissingCause::DeferredCfa => Some("missing_deferred_cfa"),
+                // The hard-zero invariant — deliberately not a snapshot key.
+                MissingCause::Other => None,
+            };
+            match key {
+                Some(key) => assert!(
+                    PIN_TABLE.iter().any(|r| r.key == key),
+                    "{cause:?} has no `{key}` pin"
+                ),
+                None => assert!(
+                    !PIN_TABLE.iter().any(|r| r.key == "missing_other"),
+                    "`missing_other` must stay an invariant const"
+                ),
+            }
+        }
+    }
+
+    #[test]
+    fn update_refuses_a_red_run() {
+        // The slice's core safety claim: only DRIFT is machine-writable. A green report
+        // pins; a broken one never does — including a zero-pin a filtered normal run
+        // would skip.
+        let green = SkeletonReport::default();
+        assert!(refuse_red_update(&green).is_ok());
+
+        let over_emitting = SkeletonReport {
+            family_extra: 1,
+            ..SkeletonReport::default()
+        };
+        assert!(refuse_red_update(&over_emitting).is_err());
+
+        let span_disagreement = SkeletonReport {
+            family_span_mismatch: 1,
+            ..SkeletonReport::default()
+        };
+        assert!(refuse_red_update(&span_disagreement).is_err());
+
+        // ... and an unclassified miss, the invariant that gates even a filtered run.
+        let unclassified = SkeletonReport {
+            family_missing: 1,
+            missing_by_cause: std::collections::BTreeMap::from([(MissingCause::Other, 1usize)]),
+            ..SkeletonReport::default()
+        };
+        assert!(refuse_red_update(&unclassified).is_err());
+    }
+
+    #[test]
+    fn measured_pins_keep_the_invariant_consts() {
+        // A measured record fills the snapshot fields from the report and the invariant
+        // fields from their consts — never from what the run happened to produce.
+        let pins = measured_pins(&sample_report());
+        assert_eq!(pins.in_scope_tests, 10);
+        assert_eq!(pins.missing_other, RUN_MISSING_OTHER_PIN);
+        assert_eq!(pins.family_extra, RUN_FAMILY_EXTRA_PIN);
+        assert_eq!(pins.crash_excluded, CRASH_EXCLUDED_PIN);
+    }
+
+    #[test]
+    fn snapshot_parser_ignores_comments_and_blanks() {
+        let text = format!("# a comment\n\n{}\n\n# trailing\n", valid_snapshot());
+        assert!(parse_pin_snapshot(&text).is_ok());
+    }
+
+    #[test]
+    fn snapshot_parser_rejects_a_malformed_line() {
+        let text = format!("{}nonsense\n", valid_snapshot());
+        let err = parse_pin_snapshot(&text).expect_err("malformed line");
+        assert!(err.contains("expected `key = value`"), "{err}");
+        assert!(err.contains("nonsense"), "{err}");
+    }
+
+    #[test]
+    fn snapshot_parser_rejects_an_unknown_key() {
+        let text = format!("{}bogus_key = 3\n", valid_snapshot());
+        let err = parse_pin_snapshot(&text).expect_err("unknown key");
+        assert!(err.contains("unknown pin key `bogus_key`"), "{err}");
+    }
+
+    #[test]
+    fn snapshot_parser_rejects_a_duplicate_key() {
+        let text = format!("{}in_scope_tests = 3\n", valid_snapshot());
+        let err = parse_pin_snapshot(&text).expect_err("duplicate key");
+        assert!(err.contains("duplicate pin key `in_scope_tests`"), "{err}");
+    }
+
+    #[test]
+    fn snapshot_parser_rejects_a_missing_key() {
+        let text: String = valid_snapshot()
+            .lines()
+            .filter(|l| !l.starts_with("module_detection ="))
+            .fold(String::new(), |mut acc, l| {
+                acc.push_str(l);
+                acc.push('\n');
+                acc
+            });
+        let err = parse_pin_snapshot(&text).expect_err("missing key");
+        assert!(
+            err.contains("missing pin key(s): module_detection"),
+            "{err}"
+        );
+    }
+
+    #[test]
+    fn snapshot_parser_rejects_a_non_numeric_value() {
+        let text = valid_snapshot().replace("module_detection = 0", "module_detection = several");
+        let err = parse_pin_snapshot(&text).expect_err("non-numeric value");
+        assert!(err.contains("wants a count"), "{err}");
+    }
+
+    #[test]
+    fn update_refuses_a_narrowed_run() {
+        // `--update` pins the FULL sweep, so any triage filter refuses; without
+        // `--update` the same filters are fine (they just skip the pins).
+        let full = RunFilter::default();
+        assert!(active_filter_flags(&full).is_empty());
+        assert!(refuse_narrowed_update(true, &full).is_ok());
+
+        let narrowed = RunFilter {
+            code: Some(2300),
+            family: Some(FamilyFilter::All),
+            ..RunFilter::default()
+        };
+        assert_eq!(active_filter_flags(&narrowed), vec!["--code", "--family"]);
+        assert!(refuse_narrowed_update(true, &narrowed).is_err());
+        assert!(refuse_narrowed_update(false, &narrowed).is_ok());
+    }
+
     #[test]
     fn report_json_is_deterministic() {
         // Two builds from the same report serialize byte-for-byte identically (sorted
         // maps, no timing) — the committed artifact must be diff-clean across re-runs.
         let r = sample_report();
-        let a = serde_json::to_string_pretty(&build_report_value(&r)).unwrap();
-        let b = serde_json::to_string_pretty(&build_report_value(&r)).unwrap();
+        let pins = measured_pins(&r);
+        let a = serde_json::to_string_pretty(&build_report_value(&r, &pins)).unwrap();
+        let b = serde_json::to_string_pretty(&build_report_value(&r, &pins)).unwrap();
         assert_eq!(a, b);
     }
 
@@ -1665,8 +2240,10 @@ mod tests {
         let mut slow = sample_report();
         slow.wall_ms = 987_654_321;
         assert_eq!(
-            serde_json::to_string_pretty(&build_report_value(&fast)).unwrap(),
-            serde_json::to_string_pretty(&build_report_value(&slow)).unwrap(),
+            serde_json::to_string_pretty(&build_report_value(&fast, &measured_pins(&fast)))
+                .unwrap(),
+            serde_json::to_string_pretty(&build_report_value(&slow, &measured_pins(&slow)))
+                .unwrap(),
         );
         assert_eq!(render_report_md(&fast), render_report_md(&slow));
     }
@@ -1712,7 +2289,8 @@ mod tests {
         // A full (unfiltered) run: `filtered` is false and no `filters` object is
         // emitted — nothing distinguishes it from a plain full-run manifest.
         let r = sample_report();
-        let full = serde_json::to_value(run_manifest(&r, &RunFilter::default())).unwrap();
+        let pins = measured_pins(&r);
+        let full = serde_json::to_value(run_manifest(&r, &RunFilter::default(), &pins)).unwrap();
         assert_eq!(full["filtered"], serde_json::json!(false));
         assert!(full.get("filters").is_none());
 
@@ -1724,7 +2302,7 @@ mod tests {
             variant: Some(("target".to_string(), "es2015".to_string())),
             family: None,
         };
-        let filtered = serde_json::to_value(run_manifest(&r, &filter)).unwrap();
+        let filtered = serde_json::to_value(run_manifest(&r, &filter, &pins)).unwrap();
         assert_eq!(filtered["filtered"], serde_json::json!(true));
         assert_eq!(filtered["filters"]["code"], serde_json::json!(2300));
         assert_eq!(

@@ -16,16 +16,17 @@
 //! is the planned replacement when multi-file volume makes the string bridge
 //! measurable.
 //!
-//! This is the checker's **own** interner — a small hand-rolled table over the
-//! crate's `FxHashMap` (no external interning crate; the parser is span-identity
-//! and holds no interner). The reserved internal names tsgo mangles (`"default"`,
-//! `"export="`, `"__constructor"`, ambient-module `"name"`, private `\xFE#…`)
-//! intern through the same table on demand; the hot reserved ones are pre-interned
-//! so their [`Atom`]s are `const`-cheap to compare.
+//! This is the checker's **own** interner — a small hand-rolled table over
+//! `tsv_lang`'s `FxHashMap` (no external interning crate; the parser is
+//! span-identity and holds no interner). The reserved internal names tsgo
+//! mangles (`"default"`, `"export="`, `"__constructor"`, ambient-module
+//! `"name"`, private `\xFE#…`) intern through the same table on demand; the hot
+//! reserved ones are pre-interned so their [`Atom`]s are `const`-cheap to
+//! compare.
 //
 // tsgo: internal/ast/symbol.go InternalSymbolName* (the mangled reserved names)
 
-use crate::hash::FxHashMap;
+use tsv_lang::FxHashMap;
 
 /// A dense interned name identity, valid within one file's bind.
 ///

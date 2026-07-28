@@ -1,11 +1,17 @@
 # tsv_check
 
-> TypeScript binder + checker targeting exact TS7/tsgo error conformance —
-> early scaffolding: the pipeline skeleton is real (parse → lower+bind →
-> check → sort/dedup), the semantic phases are landing family by family.
+> **EXPERIMENTAL — may never ship.** TypeScript binder + checker targeting
+> exact TS7/tsgo error conformance — early scaffolding: the pipeline skeleton
+> is real (parse → lower+bind → check → sort/dedup), the semantic phases are
+> landing family by family.
 
 ## Position & invariants
 
+- **Experimental, and it may never ship.** This is a research crate, not a
+  committed product surface. Nothing tsv publishes depends on it, its
+  conformance gates are on-demand only (not in `deno task check`, not in
+  `deno task conformance`, not release-gating — see ../../docs/typechecker.md),
+  and the bet is allowed to come out negative.
 - **Zero cost to shipped artifacts.** No format/parse artifact links this
   crate — `tsv_cli`/`tsv_ffi`/`tsv_wasm`/`tsv_napi` never reference it; the
   only consumer is `tsv_debug` (the conformance harness). Verify with
@@ -22,8 +28,8 @@
   at the departure site; drift from the reference is always intentional,
   never incidental.
 - **The oracle is tsgo's committed `.errors.txt` baselines** over the tsc
-  test corpus, graded by `tsv_debug tsc_conformance` (see the root
-  CLAUDE.md §tsgo Typechecker-Conformance Harness).
+  test corpus, graded by `tsv_debug tsc_conformance` (see
+  ../../docs/typechecker.md).
 - `unsafe_code = "forbid"` (workspace lints inherited).
 
 ## Module map
@@ -89,7 +95,7 @@
     const tables (ported bit-for-bit from tsgo's `symbolflags.go`), pooled
     declaration lists, `TableId` symbol tables.
   - `atoms.rs` — the checker's own **per-file** name interner (a small
-    hand-rolled table over the crate's `FxHashMap`, no external interning
+    hand-rolled table over `tsv_lang`'s `FxHashMap`, no external interning
     crate; the parser is span-identity and holds no interner), reserved
     internal-name atoms. Atoms are file-local (bind products stay relocatable);
     cross-file identity is reconciled at merge via owned name strings, with a
@@ -132,7 +138,9 @@
   `&'arena` references and never clone AST nodes — the AST derives `Clone`,
   and one accidental `.clone()` silently mints differently-addressed copies
   that break the address map; nothing type-level enforces this, so it is a
-  reviewed convention.
+  reviewed convention — enforced by `tests/clone_discipline.rs`, which fails on
+  any clone-shaped call in `src/` that isn't in its reviewed non-AST allow-list
+  (and on any allow-list entry gone stale).
 - `check/` — the post-bind **syntactic** check pass (`check_file_members`), a
   standalone `CheckWalk` over `&Program` that never consults the binder's
   symbol tables (walking the shared interface member table would break
@@ -173,8 +181,30 @@
   `CheckOptions { allow_unreachable_code, allow_unused_labels,
   preserve_const_enums }`, threaded into `check_bound`. Default everywhere
   outside the conformance harness.
-- `hash.rs` — crate-private Fx-style multiply-xor hasher +
-  `FxHashMap`/`FxHashSet` aliases (no external hashing dependency).
+- Hashing has no module here — the tables use `tsv_lang`'s `FxHashMap` (the
+  workspace's one dep-free multiply-xor hasher, shared with the printers and the
+  wire writer). The address map, symbol tables and flow-label scratch are
+  integer-keyed; the atom interner and merge globals key on **names (`str`)**,
+  so unlike the printer/writer tables they exercise the hasher's byte path.
+  ⚠️ Its contract is the
+  constraint to preserve: **substituting it for SipHash is behavior-preserving
+  only while every consumer stays order-free.** Every table here honors that —
+  the atom interner, the address map, the symbol tables, the merge globals and
+  the duplicate-member state machine are used through
+  `get`/`insert`/`entry`/`contains_key` alone, and the two sites that *do*
+  iterate sort first, each on a **total** order so no tie can fall back to the
+  map's order (`SymbolBinder::resolve_table` by first-declaration span then
+  name, `FlowBuilder::finish`'s label flush by `FlowNodeId`). A future consumer that
+  let a map's iteration order reach a diagnostic's order, span, or the flow
+  pool layout would make the hasher observable — the canonical
+  `compare_diagnostics` sort is the backstop, not a license. The former
+  crate-private hasher documented a wasm/native hash-equality property; that
+  note is retired. `tsv_lang`'s integer methods widen to a 64-bit word exactly
+  as it did (so integer keys are target-independent regardless) and its byte
+  path folds native-endian words rather than little-endian ones — a difference
+  only a big-endian target could observe, and one no output depends on, since
+  hashes never leave the process. (Where tsgo reaches for xxh3-128 —
+  variable-arity list hashing — the Fx fold is tsv's dep-free substitute.)
 
 ## Public API
 
@@ -199,7 +229,7 @@ every non-conformance caller.
 
 ## Which tool answers which question
 
-- `tsv_debug tsc_conformance run` — the standing gate: sweeps the in-scope
+- `tsv_debug tsc_conformance run` — the conformance sweep: sweeps the in-scope
   corpus (single-file, non-JSX, non-JS-flavored, non-skipped), grades
   expect-clean variants AND two graded families as codes+spans multisets — the
   **duplicate-conflict** family (`dup`: TS2300/2451/2567/2528 + merge-path
@@ -214,11 +244,14 @@ every non-conformance caller.
   predicates / switch exhaustiveness / structural reachability fallback) /
   `other` (a HARD-zero invariant — any unclassified family miss fails the run).
   It also grades related-info on matched primaries as its own pinned channel
-  and publishes the parse-divergence census; exact `RUN_*` pins.
-  Triage filters (`--test`/`--code`/`--variant`) skip the pins;
+  and publishes the parse-divergence census. The exact pins split by meaning:
+  the drifting counts live in the machine-regenerated snapshot
+  `tsc_conformance_pins.txt` (`--update` rewrites it; it refuses a narrowed or
+  red run), the zero-valued invariant gates and the oracle-side pins stay Rust
+  consts. Triage filters (`--test`/`--code`/`--variant`/`--family`) skip the pins;
   `--emit-manifest` and `--report` (the committed
-  `benches/js/results/report.tsc-conformance.{json,md}`) serve tooling. A
-  release-gating leg of `deno task conformance` (`conformance:tsc-check`).
+  `benches/js/results/report.tsc-conformance.{json,md}`) serve tooling.
+  On-demand only — `deno task conformance:tsc-check`, never a release leg.
 - `tsv_debug profile --bind <paths>` — parse vs lower+bind timing + peak
   RSS (VmHWM); the binder's standing perf anchor form.
 - `tsv_debug tsc_conformance check-test <name> [--variant k=v] [--json]` —

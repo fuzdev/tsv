@@ -32,7 +32,6 @@
 //!
 //! - [`ids`] — `NodeId` / `FileId` dense-integer identities.
 //! - [`diag`] — the `Diagnostic` shape and the canonical sort/dedup kernel.
-//! - `hash` (private) — the crate's Fx-style hasher and `FxHashMap`/`FxHashSet`.
 //! - `span_scan` (private) — the bracket-inclusive computed-key scan the binder
 //!   and check pass share, so their spans agree by construction.
 //! - `binder` (private) — the two cooperating walks (pre-order SoA lowering +
@@ -56,7 +55,6 @@
 
 mod binder;
 mod check;
-mod hash;
 mod options;
 mod program;
 mod span_scan;

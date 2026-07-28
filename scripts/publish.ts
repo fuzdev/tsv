@@ -325,11 +325,10 @@ if (no_check) {
 // alongside Step 3.
 //
 // The gates need the ../svelte + ../acorn-typescript + ../typescript +
-// ../typescript-go + ../test262 checkouts and the benches/js `node_modules`
-// sidecar (`deno task bench:install`). The
-// probe must cover every oracle the aggregate's legs need — the gates
-// themselves fail closed on a missing checkout, so the probe is the ONE
-// tolerance point: a dry-run warn-and-skips (clean machines can still
+// ../test262 checkouts and the benches/js `node_modules` sidecar (`deno task
+// bench:install`). The probe must cover every oracle the aggregate's legs need
+// — the gates themselves fail closed on a missing checkout, so the probe is the
+// ONE tolerance point: a dry-run warn-and-skips (clean machines can still
 // validate), but a --wetrun BLOCKS — releasing with the gates never run
 // requires the explicit --no-check. Any skip is re-warned in the final summary
 // so it can't scroll away. Only the CSS-WPT harvest stays manual.
@@ -343,18 +342,6 @@ if (no_check) {
 		exists('../svelte/packages/svelte/tests') ? null : '../svelte checkout',
 		exists('../acorn-typescript/test') ? null : '../acorn-typescript checkout',
 		exists('../typescript/tests') ? null : '../typescript checkout',
-		exists('../typescript-go/testdata/baselines/reference/submodule')
-			? null
-			: '../typescript-go baselines (tsc-roundtrip)',
-		// The tsc-check leg additionally sweeps the corpus INPUTS + bundled libs
-		// (unlike roundtrip, which reads only the committed baselines) — the corpus is
-		// the often-unmaterialized _submodules/TypeScript submodule.
-		exists('../typescript-go/_submodules/TypeScript/tests/cases')
-			? null
-			: '../typescript-go corpus inputs (git submodule update --init in ../typescript-go)',
-		exists('../typescript-go/internal/bundled/libs')
-			? null
-			: '../typescript-go bundled libs (internal/bundled/libs)',
 		exists('../test262/test') ? null : '../test262 checkout',
 		exists('benches/js/node_modules') ? null : 'benches/js/node_modules (deno task bench:install)'
 	].filter((m): m is string => m !== null);

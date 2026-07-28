@@ -115,6 +115,13 @@ enum CrashKind {
 /// longer panics.)
 const CRASH_EXCLUSIONS: &[(&str, CrashKind)] = &[];
 
+/// REGRESSION PIN (exact, two-sided): tests the sweep actually carved out via
+/// [`CRASH_EXCLUSIONS`]. It lives here, beside the ledger it describes, and is
+/// deliberately NOT in the machine-regenerated pin snapshot: ledger and count move
+/// together in one deliberate edit (a parser fix removes an entry, a regression adds
+/// one), so `run --update` must never re-pin a carve-out on its own.
+pub const CRASH_EXCLUDED_PIN: usize = 0;
+
 /// The [`CrashKind`] of a crash-excluded test, or `None` if not excluded.
 fn crash_exclusion_kind(basename: &str) -> Option<CrashKind> {
     CRASH_EXCLUSIONS

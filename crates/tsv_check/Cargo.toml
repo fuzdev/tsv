@@ -14,7 +14,7 @@ tsv_ts = { workspace = true }
 # contract). Already a workspace dependency.
 bumpalo = { workspace = true }
 # The per-symbol pooled declaration list. A vetted workspace dep. (The binder's
-# own name interner is a hand-rolled table over the crate's FxHashMap — no
+# own name interner is a hand-rolled table over `tsv_lang`'s FxHashMap — no
 # external interning crate.)
 smallvec = { workspace = true }
 

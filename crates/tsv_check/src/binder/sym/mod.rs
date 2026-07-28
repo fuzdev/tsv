@@ -68,10 +68,9 @@ use super::atoms::{Atom, Atoms};
 use super::symbols::{Symbol, SymbolFlags, SymbolId, TableId};
 use super::{FileFacts, NodeKind, addr_of};
 use crate::diag::Diagnostic;
-use crate::hash::FxHashMap;
 use crate::ids::{FileId, NodeId};
 use crate::merge::{FileMerge, MergeDecl, MergeSymbol, ModuleAug};
-use tsv_lang::Span;
+use tsv_lang::{FxHashMap, Span};
 use tsv_ts::ast::Program;
 use tsv_ts::ast::internal::{
     ExportDefaultValue, Expression, Identifier, Literal, LiteralValue, ModuleExportName, Statement,
@@ -312,7 +311,12 @@ impl<'a> SymbolBinder<'a> {
     }
 
     /// Resolve a symbol table into merge symbols, in **declaration order** (first
-    /// declaration's span start) — deterministic iteration, never the hash-map's.
+    /// declaration's span) — deterministic iteration, never the hash-map's.
+    ///
+    /// The order is **total**, deliberately: a stable sort on a non-unique key
+    /// leaves ties in the input's order, which here is the map's iteration order
+    /// — i.e. the hasher. No tie is known to be reachable, but the name breaks
+    /// any that is, so the guarantee doesn't rest on that.
     fn resolve_table(&self, table: TableId) -> Vec<MergeSymbol> {
         let mut symbols: Vec<MergeSymbol> = self.tables[table.index()]
             .values()
@@ -334,7 +338,18 @@ impl<'a> SymbolBinder<'a> {
                 }
             })
             .collect();
-        symbols.sort_by_key(|s| s.decls.first().map_or(u32::MAX, |d| d.error_span.start));
+        // Borrow the name rather than cloning it into a sort key; it is unique
+        // per table by construction, so it terminates the order.
+        let span_key = |s: &MergeSymbol| {
+            s.decls.first().map_or((u32::MAX, u32::MAX), |d| {
+                (d.error_span.start, d.error_span.end)
+            })
+        };
+        symbols.sort_by(|a, b| {
+            span_key(a)
+                .cmp(&span_key(b))
+                .then_with(|| a.name.cmp(&b.name))
+        });
         symbols
     }
 
