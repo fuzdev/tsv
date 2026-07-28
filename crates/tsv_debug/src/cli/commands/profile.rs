@@ -17,6 +17,17 @@ pub struct ProfileCommand {
     #[argh(switch)]
     json: bool,
 
+    /// measure parse vs lower+bind (tsv_check) instead of parse vs format;
+    /// TypeScript files only. Prints peak RSS (VmHWM) once at the end.
+    #[argh(switch)]
+    bind: bool,
+
+    /// with --bind: print the deterministic flow-construction anchors
+    /// (flow-node density = flow nodes / AST nodes, dead-label fraction)
+    /// summed over the corpus
+    #[argh(switch)]
+    flow_stats: bool,
+
     /// file paths, directories, or glob patterns
     #[argh(positional)]
     paths: Vec<String>,
@@ -24,7 +35,11 @@ pub struct ProfileCommand {
 
 impl ProfileCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let (files, skipped) = resolve_profile_files(&self.paths, |_| false)?;
+        // Bind mode is TypeScript-only (the checker binds no Svelte/CSS): exclude
+        // the other languages up front so the "format" column is a bind time.
+        let (files, skipped) = resolve_profile_files(&self.paths, |p| {
+            self.bind && ParserType::from_extension(&p.to_string_lossy()) != ParserType::TypeScript
+        })?;
 
         let mut results = Vec::new();
 
@@ -37,7 +52,7 @@ impl ProfileCommand {
         let mut doc_arena = tsv_lang::doc::arena::DocArena::new();
 
         for path in &files {
-            match profile_file(path, self.iterations, &mut arena, &mut doc_arena) {
+            match profile_file(path, self.iterations, self.bind, &mut arena, &mut doc_arena) {
                 Ok(result) => results.push(result),
                 Err(err) => {
                     eprintln!("Error profiling {}: {err}", path.display());
@@ -66,8 +81,72 @@ impl ProfileCommand {
             print_table(&results, self.iterations, skipped);
         }
 
+        // Peak resident set (VmHWM), printed once — the checker's memory anchor.
+        if self.bind {
+            #[allow(clippy::cast_precision_loss)]
+            match read_vm_hwm_kb() {
+                Some(kb) => eprintln!("peak RSS (VmHWM): {:.1} MiB", kb as f64 / 1024.0),
+                None => eprintln!("peak RSS (VmHWM): unavailable"),
+            }
+            eprintln!("(the `format` column is parse->bind time)");
+            if self.flow_stats {
+                print_flow_stats(&results);
+            }
+        }
+
         Ok(())
     }
+}
+
+/// Sum and print the deterministic flow-construction counters (`--flow-stats`)
+/// — the standing density / dead-label anchors, machine-invariant unlike wall.
+#[allow(clippy::cast_precision_loss)]
+fn print_flow_stats(results: &[FileResult]) {
+    let sum = results
+        .iter()
+        .filter_map(|r| r.bind_stats)
+        .fold(BindStats::default(), |a, s| BindStats {
+            ast_nodes: a.ast_nodes + s.ast_nodes,
+            flow_nodes: a.flow_nodes + s.flow_nodes,
+            branch_labels: a.branch_labels + s.branch_labels,
+            dead_labels: a.dead_labels + s.dead_labels,
+        });
+    let density = if sum.ast_nodes > 0 {
+        sum.flow_nodes as f64 / sum.ast_nodes as f64
+    } else {
+        0.0
+    };
+    let dead_fraction = if sum.branch_labels > 0 {
+        sum.dead_labels as f64 / sum.branch_labels as f64
+    } else {
+        0.0
+    };
+    eprintln!(
+        "flow stats: {} AST nodes, {} flow nodes (density {density:.3}), {} branch labels ({} dead, fraction {dead_fraction:.3})",
+        sum.ast_nodes, sum.flow_nodes, sum.branch_labels, sum.dead_labels
+    );
+}
+
+/// Deterministic per-file flow-construction counters from one bind iteration
+/// (identical across iterations — construction is pure).
+#[derive(Clone, Copy, Default)]
+struct BindStats {
+    ast_nodes: u64,
+    flow_nodes: u64,
+    branch_labels: u64,
+    dead_labels: u64,
+}
+
+/// Peak resident set size in KiB from `/proc/self/status` (`VmHWM`), or `None`
+/// off Linux / when the field is absent.
+fn read_vm_hwm_kb() -> Option<u64> {
+    let status = std::fs::read_to_string("/proc/self/status").ok()?;
+    for line in status.lines() {
+        if let Some(rest) = line.strip_prefix("VmHWM:") {
+            return rest.split_whitespace().next()?.parse().ok();
+        }
+    }
+    None
 }
 
 /// Timing results for a single file
@@ -78,6 +157,8 @@ struct FileResult {
     parse_us: f64,
     format_us: f64,
     total_us: f64,
+    /// Flow-construction counters (`--bind` mode only; `None` in format mode).
+    bind_stats: Option<BindStats>,
 }
 
 /// Aggregate timing over a set of file results (whole run or one language).
@@ -172,6 +253,7 @@ fn files_label(n: usize) -> String {
 fn profile_file(
     path: &Path,
     iterations: usize,
+    bind: bool,
     arena: &mut bumpalo::Bump,
     doc_arena: &mut tsv_lang::doc::arena::DocArena,
 ) -> Result<FileResult, String> {
@@ -180,9 +262,16 @@ fn profile_file(
 
     let mut parse_times = Vec::with_capacity(iterations);
     let mut format_times = Vec::with_capacity(iterations);
+    let mut bind_stats = None;
 
     for _ in 0..iterations {
-        let (parse_dur, format_dur) = profile_once(&source, parser_type, arena, doc_arena)?;
+        let (parse_dur, format_dur) = if bind {
+            let (parse_dur, format_dur, stats) = profile_bind_once(&source, arena)?;
+            bind_stats = Some(stats); // deterministic — any iteration's copy
+            (parse_dur, format_dur)
+        } else {
+            profile_once(&source, parser_type, arena, doc_arena)?
+        };
         parse_times.push(parse_dur);
         format_times.push(format_dur);
         // Arena teardown outside the timed regions, mirroring how arena setup is
@@ -204,7 +293,35 @@ fn profile_file(
         parse_us,
         format_us,
         total_us: parse_us + format_us,
+        bind_stats,
     })
+}
+
+/// Run one parse + lower+bind iteration for TypeScript, returning
+/// `(parse_duration, bind_duration, flow_counters)`. The bind phase runs the
+/// `tsv_check` binder (SoA walk + symbol bind) over the parsed program.
+fn profile_bind_once(
+    source: &str,
+    arena: &bumpalo::Bump,
+) -> Result<(Duration, Duration, BindStats), String> {
+    let t0 = Instant::now();
+    let ast = tsv_ts::parse(source, arena).map_err(|e| format!("parse error: {e}"))?;
+    let parse_dur = t0.elapsed();
+
+    let t1 = Instant::now();
+    // Parse -> lower+bind (F0) -> flow graph (F1). The flow walk is the third
+    // pass, so it belongs in the bind column the checker's perf anchor tracks.
+    let bound = tsv_check::bind_file(&ast, source, tsv_check::FileId::ROOT);
+    let flow = tsv_check::build_flow(&ast, source, &bound);
+    let bind_dur = t1.elapsed();
+
+    let stats = BindStats {
+        ast_nodes: u64::from(bound.node_count),
+        flow_nodes: u64::from(flow.graph.node_count()),
+        branch_labels: u64::from(flow.stats.branch_labels),
+        dead_labels: u64::from(flow.stats.dead_labels),
+    };
+    Ok((parse_dur, bind_dur, stats))
 }
 
 /// Run one parse + format iteration, return (parse_duration, format_duration).

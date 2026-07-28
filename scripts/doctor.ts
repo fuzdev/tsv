@@ -13,7 +13,12 @@
  * of workflows don't need them. So a green doctor means "nothing on this
  * machine will lie to you", not "everything is installed". `--strict` promotes
  * warnings to failures — the "is this machine FULLY provisioned?" mode for a
- * release box.
+ * release box. One exception: in the explicitly optional
+ * experimental-typechecker tier an ABSENCE reports as · info, never ⚠, so it
+ * stays inert even under `--strict` — that oracle serves no release and no
+ * ordinary dev flow, so a fully-provisioned release box legitimately lacks it.
+ * A BROKEN checkout there (present, but its baselines missing) still warns:
+ * that is the misleading state this tool exists to catch.
  *
  * Requires --config benches/js/deno.json (the corpus probe resolves the
  * harness's npm deps via nodeModulesDir: manual).
@@ -194,6 +199,47 @@ else warn(
 
 if (exists('../wpt/css')) ok('../wpt/css checkout (sparse)');
 else warn('../wpt/css checkout missing — bench:harvest:wpt unavailable (manual-cadence tool)');
+
+// --- Optional: the experimental typechecker's oracle -----------------------------
+//
+// `../typescript-go` feeds ONLY the on-demand `conformance:tsc-roundtrip` /
+// `conformance:tsc-check` tasks for the experimental `tsv_check` crate — not
+// `deno task check`, not the release gates. A machine that never touches the
+// typechecker needs none of it, so every finding here is a warning at most.
+// Git-SHA-pinned (not npm-versioned), so it isn't in pins:audit either — its tsgo
+// commit is pinned by the Rust count-pins. See docs/typechecker.md.
+
+section('Optional — experimental typechecker oracle (on-demand tsc_conformance only)');
+
+if (exists('../typescript-go/testdata/baselines/reference/submodule')) {
+	ok('../typescript-go checkout (tsgo baselines present)');
+} else if (exists('../typescript-go')) {
+	warn(
+		'../typescript-go present but testdata/baselines/reference/submodule missing — conformance:tsc-roundtrip would FAIL (partial checkout)'
+	);
+} else info(
+	'../typescript-go checkout absent — needed only by the on-demand tsc_conformance tasks'
+);
+
+// The tsc-check task additionally sweeps the corpus INPUTS + bundled libs (unlike
+// roundtrip, which reads only the committed baselines). The corpus is the
+// often-unmaterialized _submodules/TypeScript submodule.
+if (exists('../typescript-go')) {
+	if (exists('../typescript-go/_submodules/TypeScript/tests/cases')) {
+		ok('../typescript-go corpus inputs (_submodules/TypeScript materialized)');
+	} else {
+		info(
+			'../typescript-go corpus inputs absent — only conformance:tsc-check needs them (git submodule update --init in ../typescript-go)'
+		);
+	}
+	if (exists('../typescript-go/internal/bundled/libs')) {
+		ok('../typescript-go bundled libs present');
+	} else {
+		info(
+			'../typescript-go bundled libs (internal/bundled/libs) absent — only conformance:tsc-check needs them'
+		);
+	}
+}
 
 // --- Corpus entries -------------------------------------------------------------
 

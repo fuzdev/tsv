@@ -10,6 +10,7 @@ members = [
     "crates/tsv_css",
     "crates/tsv_svelte",
     "crates/tsv_svelte_compile",
+    "crates/tsv_check",
     "crates/tsv_cli",
     "crates/tsv_debug",
     "crates/tsv_wasm",
@@ -48,6 +49,11 @@ tsv_svelte = { path = "crates/tsv_svelte", default-features = false }
 # Svelte→JS compiler + JS canonicalizer. Dev-tooling consumer only (tsv_debug);
 # no shipped artifact links it yet.
 tsv_svelte_compile = { path = "crates/tsv_svelte_compile" }
+
+# Experimental TypeScript type-checking. A consumer crate of tsv_ts's concrete
+# types; referenced only by the tsv_debug harness so it never touches the
+# shipped format/parse artifacts (a crate-boundary zero-cost exclusion).
+tsv_check = { path = "crates/tsv_check" }
 
 # External dependencies
 argh = "0.1"

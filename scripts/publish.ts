@@ -324,11 +324,11 @@ if (no_check) {
 // regression the in-repo gate is structurally blind to. Skipped by --no-check
 // alongside Step 3.
 //
-// The gates need the ../svelte + ../acorn-typescript + ../typescript + ../test262
-// checkouts and the benches/js `node_modules` sidecar (`deno task bench:install`).
-// The probe must cover every oracle the aggregate's legs need — the gates
-// themselves fail closed on a missing checkout, so the probe is the ONE
-// tolerance point: a dry-run warn-and-skips (clean machines can still
+// The gates need the ../svelte + ../acorn-typescript + ../typescript +
+// ../test262 checkouts and the benches/js `node_modules` sidecar (`deno task
+// bench:install`). The probe must cover every oracle the aggregate's legs need
+// — the gates themselves fail closed on a missing checkout, so the probe is the
+// ONE tolerance point: a dry-run warn-and-skips (clean machines can still
 // validate), but a --wetrun BLOCKS — releasing with the gates never run
 // requires the explicit --no-check. Any skip is re-warned in the final summary
 // so it can't scroll away. Only the CSS-WPT harvest stays manual.
