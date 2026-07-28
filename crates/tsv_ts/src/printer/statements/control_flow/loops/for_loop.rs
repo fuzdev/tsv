@@ -202,10 +202,10 @@ impl<'a> Printer<'a> {
             // its line or the `//` swallows the next comment / the body. That rule
             // applies both between comments and before the body, so it is written once.
             let sep_after = |p: &Comment, next_start: u32| {
-                if !p.is_block || !self.is_same_line(p.span.end, next_start) {
-                    d.hardline()
-                } else {
+                if self.comment_hugs_next(p, next_start) {
                     d.text(" ")
+                } else {
+                    d.hardline()
                 }
             };
             let mut inner = DocBuf::new();
@@ -235,10 +235,7 @@ impl<'a> Printer<'a> {
             // stays flat, but the comment(s) + body drop to their own indented line when
             // the enclosing for-in/for-of group breaks (overflow). Matches Prettier.
             let mut inner = DocBuf::new();
-            for comment in &inline_prev {
-                inner.push(self.build_comment_doc(comment));
-                inner.push(d.text(" "));
-            }
+            self.push_glued_comment_run(&mut inner, &inline_prev);
             inner.push(body_doc);
             parts.push(d.indent_line(d.concat(&inner)));
         }
@@ -886,18 +883,14 @@ impl<'a> Printer<'a> {
         separator: DocId,
     ) {
         let d = self.d();
-        let mut run = CommentVec::new();
-        let mut hug = CommentVec::new();
-        for comment in comments_to_emit_in_range(self.comments, search_start, clause_start) {
-            if prev_end.is_some_and(|pe| self.is_same_line(pe, comment.span.start)) {
-                continue;
-            }
-            if comment.is_block && self.is_same_line(comment.span.end, clause_start) {
-                hug.push(comment);
-            } else {
-                run.push(comment);
-            }
-        }
+        // A comment trailing the previous clause on its line belongs to that clause, not
+        // to this run. What remains splits at the clause the way every gap does: the
+        // glued suffix leads it inline, the rest take their own lines.
+        let (run, hug) = self.split_glued_comments(
+            comments_to_emit_in_range(self.comments, search_start, clause_start)
+                .filter(|c| !prev_end.is_some_and(|pe| self.is_same_line(pe, c.span.start))),
+            clause_start,
+        );
 
         match run.first() {
             None => parts.push(separator),
@@ -917,10 +910,7 @@ impl<'a> Printer<'a> {
             }
         }
 
-        for comment in hug {
-            parts.push(self.build_comment_doc(comment));
-            parts.push(d.text(" "));
-        }
+        self.push_glued_comment_run(parts, &hug);
     }
 
     /// Emit the comments an **absent** clause's slot holds, joined by `line`, and

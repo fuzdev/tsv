@@ -354,9 +354,12 @@ impl<'a> Printer<'a> {
             // Print leading comments before this statement (with blank line preservation)
             self.push_leading_comments_before(body_parts, &leading_comments, stmt_start);
 
-            // format-ignore: emit raw source instead of formatting
+            // format-ignore: emit raw source instead of formatting. The freeze emitter
+            // claims the block comment **glued** before the statement — owned by whatever
+            // node heads it, so it rides inside the doc the slice replaces and the leading
+            // run above skips it (docs/comments.md hazard 1).
             if body_has_comments && self.member_gap_frozen(prev_end, stmt_start) {
-                body_parts.push(self.raw_source_doc(stmt.span()));
+                body_parts.push(self.build_frozen_node_doc(stmt.span()));
             } else {
                 body_parts.push(self.build_statement_doc(stmt, in_program_or_block));
             }

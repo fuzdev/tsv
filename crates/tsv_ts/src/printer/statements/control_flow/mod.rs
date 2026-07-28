@@ -261,19 +261,25 @@ impl<'a> Printer<'a> {
         let (inline_prev, mut own_line, inline_next) =
             self.partition_comments_by_line(gap_start, body_start);
 
-        // `inline_next` (a comment sharing the body's line) is treated the same as
-        // own-line — it is not trailing the anchor, so it gets its own line.
-        own_line.extend(inline_next);
+        // A comment sharing the body's line is not trailing the anchor, so it does not
+        // stay up there — but a **block** one glued to the body leads it inline
+        // ([`Printer::split_glued_comments`]); the rest take their own line.
+        let (rest, glued) = self.split_glued_comments(inline_next, body_start);
+        own_line.extend(rest);
 
         self.build_comments_between_parts(parts, &inline_prev, &own_line, None);
 
         // Anything on its own line already forced a break; otherwise only a `//` does,
-        // since it would swallow the body.
-        if !own_line.is_empty() || inline_prev.iter().any(|c| !c.is_block) {
+        // since it would swallow the body. A glued comment is one of the own-line ones:
+        // `partition_comments_by_line` hands the anchor's line to `inline_prev`, so
+        // everything in `glued` was authored *below* the anchor and keeps that line —
+        // gluing it to the body must not also hoist it up onto the header's.
+        if !own_line.is_empty() || !glued.is_empty() || inline_prev.iter().any(|c| !c.is_block) {
             parts.push(d.hardline());
         } else {
             parts.push(d.text(" "));
         }
+        self.push_glued_comment_run(parts, &glued);
     }
 
     /// The header→body gap for a **non-block** body: the comment run, then the body on
@@ -312,7 +318,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let (anchor_line, mut own_line, inline_next) =
             self.partition_comments_by_line(gap_start, body_start);
-        own_line.extend(inline_next);
+        // A block comment glued to the body leads it inline rather than taking a line of
+        // its own — see [`Printer::split_glued_comments`].
+        let (rest, glued) = self.split_glued_comments(inline_next, body_start);
+        own_line.extend(rest);
 
         // Only a **block** comment can stay on the anchor's line. A line comment authored
         // trailing `)` normalizes to its own line — that is the position-agnostic half
@@ -334,6 +343,7 @@ impl<'a> Printer<'a> {
         let mut inner = DocBuf::new();
         self.build_comments_between_parts(&mut inner, &inline_prev, &run, None);
         inner.push(d.hardline());
+        self.push_glued_comment_run(&mut inner, &glued);
         inner.push(body_doc);
         parts.push(d.indent(d.concat(&inner)));
     }
