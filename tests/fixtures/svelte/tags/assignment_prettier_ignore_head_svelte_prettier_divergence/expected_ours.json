@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 395,
+	"end": 668,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -186,46 +186,336 @@
 			{
 				"type": "Comment",
 				"start": 313,
-				"end": 374,
+				"end": 424,
+				"data": " an unprefixed `{…}` value takes the same shape — an attribute value, a spread head,\n\tan expression tag "
+			},
+			{
+				"type": "Text",
+				"start": 424,
+				"end": 425,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 425,
+				"end": 531,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 18,
+						"column": 1,
+						"character": 426
+					},
+					"end": {
+						"line": 18,
+						"column": 4,
+						"character": 429
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 431,
+						"end": 477,
+						"name": "prop",
+						"name_loc": {
+							"start": {
+								"line": 19,
+								"column": 1,
+								"character": 431
+							},
+							"end": {
+								"line": 19,
+								"column": 5,
+								"character": 435
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 436,
+							"end": 477,
+							"expression": {
+								"type": "AssignmentExpression",
+								"start": 462,
+								"end": 473,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 3
+									},
+									"end": {
+										"line": 21,
+										"column": 14
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 462,
+									"end": 465,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 3
+										},
+										"end": {
+											"line": 21,
+											"column": 6
+										}
+									},
+									"name": "ppp"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 470,
+									"end": 473,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 11
+										},
+										"end": {
+											"line": 21,
+											"column": 14
+										}
+									},
+									"name": "qqq"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 440,
+										"end": 458
+									}
+								]
+							}
+						}
+					},
+					{
+						"type": "SpreadAttribute",
+						"start": 479,
+						"end": 523,
+						"expression": {
+							"type": "AssignmentExpression",
+							"start": 508,
+							"end": 519,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 3
+								},
+								"end": {
+									"line": 25,
+									"column": 14
+								}
+							},
+							"operator": "=",
+							"left": {
+								"type": "Identifier",
+								"start": 508,
+								"end": 511,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 3
+									},
+									"end": {
+										"line": 25,
+										"column": 6
+									}
+								},
+								"name": "rrr"
+							},
+							"right": {
+								"type": "Identifier",
+								"start": 516,
+								"end": 519,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 11
+									},
+									"end": {
+										"line": 25,
+										"column": 14
+									}
+								},
+								"name": "sss"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 486,
+									"end": 504
+								}
+							]
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 531,
+				"end": 533,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 533,
+				"end": 584,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 29,
+						"column": 1,
+						"character": 534
+					},
+					"end": {
+						"line": 29,
+						"column": 2,
+						"character": 535
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 536,
+							"end": 538,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 538,
+							"end": 579,
+							"expression": {
+								"type": "AssignmentExpression",
+								"start": 564,
+								"end": 575,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 3
+									},
+									"end": {
+										"line": 32,
+										"column": 14
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 564,
+									"end": 567,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 3
+										},
+										"end": {
+											"line": 32,
+											"column": 6
+										}
+									},
+									"name": "ttt"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 572,
+									"end": 575,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 11
+										},
+										"end": {
+											"line": 32,
+											"column": 14
+										}
+									},
+									"name": "uuu"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 542,
+										"end": 560
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 579,
+							"end": 580,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 584,
+				"end": 586,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 586,
+				"end": 647,
 				"data": " an unfrozen sibling still normalizes, parens and all "
 			},
 			{
 				"type": "Text",
-				"start": 374,
-				"end": 375,
+				"start": 647,
+				"end": 648,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "HtmlTag",
-				"start": 375,
-				"end": 394,
+				"start": 648,
+				"end": 667,
 				"expression": {
 					"type": "AssignmentExpression",
-					"start": 383,
-					"end": 392,
+					"start": 656,
+					"end": 665,
 					"loc": {
 						"start": {
-							"line": 17,
+							"line": 37,
 							"column": 8
 						},
 						"end": {
-							"line": 17,
+							"line": 37,
 							"column": 17
 						}
 					},
 					"operator": "=",
 					"left": {
 						"type": "Identifier",
-						"start": 383,
-						"end": 386,
+						"start": 656,
+						"end": 659,
 						"loc": {
 							"start": {
-								"line": 17,
+								"line": 37,
 								"column": 8
 							},
 							"end": {
-								"line": 17,
+								"line": 37,
 								"column": 11
 							}
 						},
@@ -233,15 +523,15 @@
 					},
 					"right": {
 						"type": "Identifier",
-						"start": 389,
-						"end": 392,
+						"start": 662,
+						"end": 665,
 						"loc": {
 							"start": {
-								"line": 17,
+								"line": 37,
 								"column": 14
 							},
 							"end": {
-								"line": 17,
+								"line": 37,
 								"column": 17
 							}
 						},
@@ -282,6 +572,54 @@
 				"end": {
 					"line": 10,
 					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 440,
+			"end": 458,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 486,
+			"end": 504,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 2
+				},
+				"end": {
+					"line": 24,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 542,
+			"end": 560,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 20
 				}
 			}
 		}

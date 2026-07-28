@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 717,
+	"end": 814,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -362,45 +362,45 @@
 			{
 				"type": "Comment",
 				"start": 447,
-				"end": 576,
-				"data": " an ordinary trailing comment coexists with the freeze: its own hardline drops the\n\t`}`, so the head adds no second break "
+				"end": 674,
+				"data": " an ordinary trailing comment coexists with the freeze: its own break drops the `}`,\n\tdedented out of the frozen content, so the head adds no second break and the `}` lands\n\twhere it does with no trailing comment at all "
 			},
 			{
 				"type": "Text",
-				"start": 576,
-				"end": 577,
+				"start": 674,
+				"end": 675,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "HtmlTag",
-				"start": 577,
-				"end": 631,
+				"start": 675,
+				"end": 728,
 				"expression": {
 					"type": "BinaryExpression",
-					"start": 605,
-					"end": 616,
+					"start": 703,
+					"end": 714,
 					"loc": {
 						"start": {
-							"line": 31,
+							"line": 32,
 							"column": 1
 						},
 						"end": {
-							"line": 31,
+							"line": 32,
 							"column": 12
 						}
 					},
 					"left": {
 						"type": "Identifier",
-						"start": 605,
-						"end": 608,
+						"start": 703,
+						"end": 706,
 						"loc": {
 							"start": {
-								"line": 31,
+								"line": 32,
 								"column": 1
 							},
 							"end": {
-								"line": 31,
+								"line": 32,
 								"column": 4
 							}
 						},
@@ -409,15 +409,15 @@
 					"operator": "+",
 					"right": {
 						"type": "Identifier",
-						"start": 613,
-						"end": 616,
+						"start": 711,
+						"end": 714,
 						"loc": {
 							"start": {
-								"line": 31,
+								"line": 32,
 								"column": 9
 							},
 							"end": {
-								"line": 31,
+								"line": 32,
 								"column": 12
 							}
 						},
@@ -427,69 +427,69 @@
 						{
 							"type": "Line",
 							"value": " prettier-ignore",
-							"start": 585,
-							"end": 603
+							"start": 683,
+							"end": 701
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Line",
 							"value": " trailing",
-							"start": 617,
-							"end": 628
+							"start": 715,
+							"end": 726
 						}
 					]
 				}
 			},
 			{
 				"type": "Text",
-				"start": 631,
-				"end": 633,
+				"start": 728,
+				"end": 730,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 633,
-				"end": 698,
+				"start": 730,
+				"end": 795,
 				"data": " a sibling tag the freeze does not reach still normalizes "
 			},
 			{
 				"type": "Text",
-				"start": 698,
-				"end": 699,
+				"start": 795,
+				"end": 796,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "HtmlTag",
-				"start": 699,
-				"end": 716,
+				"start": 796,
+				"end": 813,
 				"expression": {
 					"type": "BinaryExpression",
-					"start": 706,
-					"end": 715,
+					"start": 803,
+					"end": 812,
 					"loc": {
 						"start": {
-							"line": 35,
+							"line": 36,
 							"column": 7
 						},
 						"end": {
-							"line": 35,
+							"line": 36,
 							"column": 16
 						}
 					},
 					"left": {
 						"type": "Identifier",
-						"start": 706,
-						"end": 709,
+						"start": 803,
+						"end": 806,
 						"loc": {
 							"start": {
-								"line": 35,
+								"line": 36,
 								"column": 7
 							},
 							"end": {
-								"line": 35,
+								"line": 36,
 								"column": 10
 							}
 						},
@@ -498,15 +498,15 @@
 					"operator": "+",
 					"right": {
 						"type": "Identifier",
-						"start": 712,
-						"end": 715,
+						"start": 809,
+						"end": 812,
 						"loc": {
 							"start": {
-								"line": 35,
+								"line": 36,
 								"column": 13
 							},
 							"end": {
-								"line": 35,
+								"line": 36,
 								"column": 16
 							}
 						},
@@ -585,15 +585,15 @@
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
-			"start": 585,
-			"end": 603,
+			"start": 683,
+			"end": 701,
 			"loc": {
 				"start": {
-					"line": 30,
+					"line": 31,
 					"column": 1
 				},
 				"end": {
-					"line": 30,
+					"line": 31,
 					"column": 19
 				}
 			}
@@ -601,15 +601,15 @@
 		{
 			"type": "Line",
 			"value": " trailing",
-			"start": 617,
-			"end": 628,
+			"start": 715,
+			"end": 726,
 			"loc": {
 				"start": {
-					"line": 31,
+					"line": 32,
 					"column": 13
 				},
 				"end": {
-					"line": 31,
+					"line": 32,
 					"column": 24
 				}
 			}

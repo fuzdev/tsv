@@ -6,6 +6,15 @@ own-line directive freezes the head they stay **outside** the verbatim slice —
 only the interior stays as authored. This is the same rule the freeze already
 follows for the prefix keyword and the closing `}`, one delimiter further in.
 
+The rule is keyed on the **value**, not on the head's shape, so every braced
+position answers it identically: the prefixed heads (a tag, a block, a `{...}`
+spread) and the unprefixed `{…}` values (an attribute value, an expression tag)
+alike. Skipping the parens on a frozen value would not preserve *more* of what the
+author wrote — it would **delete** the parens they did write, inside the one region
+the directive says not to touch. The single exception is `{@const}`'s initializer,
+where the paren is fully redundant and normalizes away frozen or not (the ordinary
+[const/value_prettier_ignore_head](../const/value_prettier_ignore_head/) pins it).
+
 Both divergences land on one input, so this is a `_svelte_prettier_divergence`.
 
 **Formatter (vs prettier).** On a head with no parens prettier **relocates** the

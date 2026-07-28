@@ -1,0 +1,585 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 495,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 168,
+				"data": " a frozen value's trailing line comment already ends the content with its own break, so\n\tthe closing `}` reuses it — no second break, and no blank line above it "
+			},
+			{
+				"type": "Text",
+				"start": 168,
+				"end": 169,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 169,
+				"end": 223,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 170
+					},
+					"end": {
+						"line": 3,
+						"column": 2,
+						"character": 171
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 172,
+							"end": 174,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 174,
+							"end": 218,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 199,
+								"end": 210,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 13
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 199,
+									"end": 202,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 2
+										},
+										"end": {
+											"line": 6,
+											"column": 5
+										}
+									},
+									"name": "aaa"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 207,
+									"end": 210,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 10
+										},
+										"end": {
+											"line": 6,
+											"column": 13
+										}
+									},
+									"name": "bbb"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 178,
+										"end": 196
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 211,
+										"end": 215
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 218,
+							"end": 219,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 223,
+				"end": 225,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 225,
+				"end": 288,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 226
+					},
+					"end": {
+						"line": 10,
+						"column": 4,
+						"character": 229
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 231,
+						"end": 280,
+						"name": "prop",
+						"name_loc": {
+							"start": {
+								"line": 11,
+								"column": 1,
+								"character": 231
+							},
+							"end": {
+								"line": 11,
+								"column": 5,
+								"character": 235
+							}
+						},
+						"value": {
+							"type": "ExpressionTag",
+							"start": 236,
+							"end": 280,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 261,
+								"end": 272,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 13
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 261,
+									"end": 264,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 5
+										}
+									},
+									"name": "ccc"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 269,
+									"end": 272,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 10
+										},
+										"end": {
+											"line": 13,
+											"column": 13
+										}
+									},
+									"name": "ddd"
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " prettier-ignore",
+										"start": 240,
+										"end": 258
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 273,
+										"end": 277
+									}
+								]
+							}
+						}
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 288,
+				"end": 290,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 290,
+				"end": 356,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 291
+					},
+					"end": {
+						"line": 17,
+						"column": 6,
+						"character": 296
+					}
+				},
+				"attributes": [
+					{
+						"start": 298,
+						"end": 353,
+						"type": "BindDirective",
+						"name": "value",
+						"name_loc": {
+							"start": {
+								"line": 18,
+								"column": 1,
+								"character": 298
+							},
+							"end": {
+								"line": 18,
+								"column": 11,
+								"character": 308
+							}
+						},
+						"expression": {
+							"type": "MemberExpression",
+							"start": 334,
+							"end": 345,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 2
+								},
+								"end": {
+									"line": 20,
+									"column": 13
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 334,
+								"end": 337,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 5
+									}
+								},
+								"name": "eee"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 342,
+								"end": 345,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 10
+									},
+									"end": {
+										"line": 20,
+										"column": 13
+									}
+								},
+								"name": "fff"
+							},
+							"computed": false,
+							"optional": false,
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " prettier-ignore",
+									"start": 313,
+									"end": 331
+								}
+							],
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 346,
+									"end": 350
+								}
+							]
+						},
+						"modifiers": []
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 356,
+				"end": 358,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 358,
+				"end": 447,
+				"data": " the prefixed heads already drop the second break, so the parity is the assertion "
+			},
+			{
+				"type": "Text",
+				"start": 447,
+				"end": 448,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 448,
+				"end": 494,
+				"expression": {
+					"type": "BinaryExpression",
+					"start": 476,
+					"end": 487,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 12
+						}
+					},
+					"left": {
+						"type": "Identifier",
+						"start": 476,
+						"end": 479,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 1
+							},
+							"end": {
+								"line": 27,
+								"column": 4
+							}
+						},
+						"name": "ggg"
+					},
+					"operator": "+",
+					"right": {
+						"type": "Identifier",
+						"start": 484,
+						"end": 487,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 9
+							},
+							"end": {
+								"line": 27,
+								"column": 12
+							}
+						},
+						"name": "hhh"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " prettier-ignore",
+							"start": 456,
+							"end": 474
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 488,
+							"end": 492
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 178,
+			"end": 196,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 211,
+			"end": 215,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 14
+				},
+				"end": {
+					"line": 6,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 240,
+			"end": 258,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 273,
+			"end": 277,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 14
+				},
+				"end": {
+					"line": 13,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 313,
+			"end": 331,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 346,
+			"end": 350,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 14
+				},
+				"end": {
+					"line": 20,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 456,
+			"end": 474,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 488,
+			"end": 492,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 13
+				},
+				"end": {
+					"line": 27,
+					"column": 17
+				}
+			}
+		}
+	]
+}

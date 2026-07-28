@@ -7,5 +7,13 @@
 	text1
 {/if}
 
+<!-- an unprefixed `{…}` value takes the same shape — an attribute value, a spread head,
+	an expression tag -->
+<div prop={(ppp = qqq)} {...(rrr = sss)}></div>
+
+<p>
+	{(ttt = uuu)}
+</p>
+
 <!-- an unfrozen sibling still normalizes, parens and all -->
 {@html (nnn = ooo)}

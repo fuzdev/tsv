@@ -47,6 +47,6 @@ as item}
 {#if
 	// prettier-ignore
 	nnn  +  ooo // trailing
-	}
+}
 	text7
 {/if}
