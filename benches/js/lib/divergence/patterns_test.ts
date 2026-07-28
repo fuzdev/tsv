@@ -399,6 +399,43 @@ Deno.test('inline_sibling_newline_flow: negative - dropped content is never clai
 	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
 });
 
+Deno.test('inline_sibling_newline_flow: positive - composed with the fragment-edge trim', () => {
+	// One hunk carrying BOTH sanctioned respellings at once: the newline before `and`
+	// flows onto the content line, and the render-free run inside the <a> is trimmed.
+	// Neither rule's own equality holds alone, so without the composed arm the hunk
+	// falls through every pattern and the file surfaces as `unknown`.
+	const prettier = '<p>\n\t<a href="/chat"> Discord chatroom </a>\n\tand let us know\n</p>';
+	const ours = '<p>\n\t<a href="/chat">Discord chatroom</a> and let us know\n</p>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertNotEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
+});
+
+Deno.test(
+	'inline_sibling_newline_flow: negative - composed arm never absorbs an eaten separator',
+	() => {
+		// The composed arm normalizes only FRAGMENT-EDGE runs. The run after `</a>` is
+		// inter-sibling — render-significant, so it survives the collapse on both sides —
+		// and ours ate it outright. Claiming this would hide real content loss behind a
+		// layout claim.
+		const prettier = '<p>\n\t<a href="/chat"> Discord </a>\n\tand let us know\n</p>';
+		const ours = '<p>\n\t<a href="/chat">Discord</a>and let us know\n</p>';
+		const ctx = make_context(ours, prettier, 'svelte');
+		assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
+	}
+);
+
+Deno.test(
+	'inline_sibling_newline_flow: negative - composed arm is directional on whitespace',
+	() => {
+		// The trim only ever REMOVES. Here ours is the side that added the fragment-edge
+		// run, so the collapse equality holds but the direction is wrong.
+		const prettier = '<p>\n\t<a href="/chat">Discord chatroom</a>\n\tand let us know\n</p>';
+		const ours = '<p>\n\t<a href="/chat"> Discord chatroom </a> and let us know\n</p>';
+		const ctx = make_context(ours, prettier, 'svelte');
+		assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
+	}
+);
+
 // ─── inline_content_block_style ─────────────────────────────────────────────
 
 Deno.test(
