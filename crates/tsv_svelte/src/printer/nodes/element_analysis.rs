@@ -229,7 +229,7 @@ impl<'a> Printer<'a> {
         }
 
         // Check for newlines in content between first and last non-whitespace nodes
-        nodes[first..=last].iter().enumerate().any(|(i, n)| {
+        nodes[first..=last].iter().any(|n| {
             let FragmentNode::Text(t) = n else {
                 return false;
             };
@@ -242,17 +242,22 @@ impl<'a> Printer<'a> {
                 // Inline, whitespace-only: newlines are separators
                 t.has_newline()
             } else {
-                // Inline, text with content: exclude boundary (ASCII) whitespace.
-                // A non-breaking space is content, so trim_ascii keeps it attached.
-                let is_first_content = i == 0;
-                let is_last_content = i == last - first;
-                let check_str = match (is_first_content, is_last_content) {
-                    (true, true) => raw.trim_ascii(),
-                    (true, false) => raw.trim_ascii_start(),
-                    (false, true) => raw.trim_ascii_end(),
-                    (false, false) => raw,
-                };
-                check_str.contains('\n')
+                // Inline, text with content: exclude the boundary (ASCII) whitespace runs on
+                // BOTH edges, whatever the node's position. A non-breaking space is content, so
+                // trim_ascii keeps it attached.
+                //
+                // The edge run is a *separator* between this text and its neighbour, and the
+                // fill owns it either way — it reflows to a space when the run fits and to a
+                // break when it does not. So its spelling is not the element-expansion signal;
+                // only a newline strictly INSIDE the text's own content is. Trimming just the
+                // fragment-edge sides (the old `is_first_content`/`is_last_content` match) left a
+                // middle text's separator run counted, which made `<span><code>a</code> b,⏎<code>c
+                // </code></span>` report SourceBreaks: the element went block-style on pass 1, the
+                // fill then reflowed that very newline away, and pass 2 — seeing no newline left —
+                // collapsed it inline. Two mechanisms reading one newline and answering
+                // differently, the same class [`MultilineCause`] closed at the separator-flow site
+                // (conformance_prettier.md §Svelte: Inline content block-style).
+                raw.trim_ascii().contains('\n')
             }
         })
     }
