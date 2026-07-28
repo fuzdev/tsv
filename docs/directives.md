@@ -400,6 +400,60 @@ the parens left outside the slice:
 );
 ```
 
+### On prefixed Svelte braced heads
+
+A `{` that carries a prefix before its value is a head like any other, so an
+own-line directive in the prefix→value gap freezes that whole value. The prefix,
+the `as` clause, an `{#each}` key's parens and the closing `}` all stay outside
+the slice, and a sibling the freeze does not reach still reformats:
+
+```svelte
+{@html
+	// format-ignore
+	aaa  +  bbb
+}
+
+<div
+	{...
+		// format-ignore
+		ccc  .  ddd
+	}
+	{@attach
+		// format-ignore
+		fn  (  eee  )
+	}
+></div>
+
+{#if
+	// format-ignore
+	fff  &&  ggg
+}
+	text1
+{/if}
+
+{#each
+	// format-ignore
+	hhh  .  iii
+as item (
+	// format-ignore
+	item  .  id
+)}
+	text2
+{/each}
+```
+
+The same holds for `{@render }`, `{@debug }`, `{:else if }`, `{#key }` and
+`{#await }`. A `{@debug}`'s slice is the identifier **list**, from the first
+identifier to the last. `{@const}` belongs to the assignment family above (its
+`=` is the delimiter), not here.
+
+As in a declaration header, tsv keeps the directive on its own line rather than
+pulling it up beside the prefix, where it would be inert — which is why a frozen
+head breaks even when it would otherwise fit. Three gaps that look like heads
+are not: the name in `{#snippet ⟨name⟩}` and the patterns in
+`{#each … as ⟨pattern⟩}` / `{#await … then ⟨pattern⟩}` reject a comment outright,
+in Svelte's parser as well as tsv's.
+
 ## `format-ignore-start` / `format-ignore-end`
 
 In Svelte templates, a pair of range markers preserves every node between them:

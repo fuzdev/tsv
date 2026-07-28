@@ -235,24 +235,12 @@ impl<'a> Printer<'a> {
             .map(|c| c.span.start)
     }
 
-    /// The owned comment ending immediately before `start`, glued to the token there.
+    /// The owned comment ending immediately before `start`, glued to the token there —
+    /// [`tsv_lang::owned_leading_comment_at`] against this document.
+    ///
+    /// (A JSDoc cast's comment may sit a newline away and is deliberately NOT found here —
+    /// it hangs off its `JsdocCast` node, which carries its own copy.)
     fn owned_leading_comment_at(&self, start: u32) -> Option<&'a internal::Comment> {
-        // Cheap reject before the span search — almost every expression bails here.
-        // `SameLine`, matching the parser's `glued_block_comment_index`, which is what set
-        // `owned_by_node` in the first place: only a glued comment is bound to its token.
-        // (A JSDoc cast's comment may sit a newline away and is deliberately NOT found
-        // here — it hangs off its `JsdocCast` node, which carries its own copy.)
-        let i = source_scan::block_comment_end_before(
-            self.source.as_bytes(),
-            start as usize,
-            source_scan::CommentGlue::SameLine,
-        )?;
-
-        let idx = self
-            .comments
-            .partition_point(|c| c.span.end <= start)
-            .checked_sub(1)?;
-        let comment = self.comments.get(idx)?;
-        (comment.owned_by_node && comment.span.end as usize == i).then_some(comment)
+        tsv_lang::owned_leading_comment_at(self.source, self.comments, start)
     }
 }

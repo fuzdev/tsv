@@ -1,7 +1,7 @@
 // Shared comment type and utilities used across languages
 use crate::Span;
 use crate::printing;
-use crate::source_scan::{has_newline_after_position, has_newline_before_position};
+use crate::source_scan::{self, has_newline_after_position, has_newline_before_position};
 use smallvec::SmallVec;
 
 #[derive(Debug, Clone, Copy)]
@@ -495,6 +495,40 @@ pub fn comments_in_source_range(
 pub fn comments_in_source_after(comments: &[Comment], pos: u32) -> impl Iterator<Item = &Comment> {
     let first_idx = find_first_comment_from(comments, pos);
     comments[first_idx..].iter()
+}
+
+/// The block comment **owned** by the token beginning at `start`, when there is one.
+///
+/// The lookup behind every owned-comment claim: an owned comment is skipped by the
+/// to-emit axis, so whoever prints the token must print it too, and a builder that
+/// replaces the token's doc (a format-ignore freeze, a reassembled arrow signature)
+/// inherits that debt — otherwise the comment reaches no printer at all
+/// (docs/comments.md hazard 1).
+///
+/// Both language printers ask it, so it lives here rather than as a twin in each: the
+/// answer is a pure function of the source bytes and the comment array, and a second
+/// copy is exactly the drift the shared-emitter rule exists to prevent.
+///
+/// `CommentGlue::SameLine` mirrors the parser's own binding scan — only a glued block
+/// comment is bound to its token — so `owned ⇒ is_block` holds and a line comment is
+/// never returned.
+pub fn owned_leading_comment_at<'c>(
+    source: &str,
+    comments: &'c [Comment],
+    start: u32,
+) -> Option<&'c Comment> {
+    // Cheap reject before the span search — almost every token bails here.
+    let glued_end = source_scan::block_comment_end_before(
+        source.as_bytes(),
+        start as usize,
+        source_scan::CommentGlue::SameLine,
+    )?;
+
+    let idx = comments
+        .partition_point(|c| c.span.end <= start)
+        .checked_sub(1)?;
+    let comment = comments.get(idx)?;
+    (comment.owned_by_node && comment.span.end as usize == glued_end).then_some(comment)
 }
 
 #[cfg(test)]
