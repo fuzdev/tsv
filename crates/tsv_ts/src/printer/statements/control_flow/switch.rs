@@ -440,7 +440,9 @@ impl<'a> Printer<'a> {
                 }
 
                 stmt_parts.push(match frozen {
-                    Some(span) => self.build_frozen_span_doc(span),
+                    // The freeze emitter claims the glued block comment the statement
+                    // owns — the leading run above skips it (docs/comments.md hazard 1).
+                    Some(span) => self.build_frozen_node_doc(span),
                     None => self.build_statement_doc(stmt, false),
                 });
                 stmt_parts.extend(trailing);

@@ -179,6 +179,53 @@ impl<'a> Printer<'a> {
         comment.is_block && self.is_same_line(comment.span.end, next)
     }
 
+    /// Split a comment run at `next` into the ones that stay in the RUN and the ones
+    /// **glued** to what follows ([`Self::comment_hugs_next`]) — for a site whose run and
+    /// glued suffix take different separators, so it cannot hand the whole run to
+    /// [`Self::push_leading_comment_run`] (which decides per comment) and must emit the two
+    /// halves itself.
+    ///
+    /// The glued suffix leads the following token inline (`/* c */ for (…)`), where the
+    /// author put it; the rest each take a line. The split is invisible wherever the
+    /// following token heads an **expression** — `bind_leading_comment` is the only general
+    /// binder, so the comment is then owned by that node, rides inside its doc and never
+    /// reaches the gap — leaving only the **keyword** heads (`for` / `if` / `{`, a `for`
+    /// clause's own head; a statement keyword binds nothing) and the positions where a
+    /// freeze replaced the doc with a verbatim slice starting past the comment
+    /// (docs/comments.md hazard 1).
+    ///
+    /// The caller owns the **break** before the suffix — this only says which comments it
+    /// holds. A glued comment is still authored somewhere, and gluing it to what follows
+    /// must not also move it to another line: at a header→body gap
+    /// ([`Printer::push_header_to_body_gap`]) everything reaching the suffix sat below the
+    /// anchor, so it takes a `hardline` even when the run before it is empty.
+    pub(crate) fn split_glued_comments(
+        &self,
+        comments: impl IntoIterator<Item = &'a Comment>,
+        next: u32,
+    ) -> (CommentVec<'a>, CommentVec<'a>) {
+        let mut run: CommentVec<'a> = SmallVec::new();
+        let mut glued: CommentVec<'a> = SmallVec::new();
+        for comment in comments {
+            if self.comment_hugs_next(comment, next) {
+                glued.push(comment);
+            } else {
+                run.push(comment);
+            }
+        }
+        (run, glued)
+    }
+
+    /// Emit the glued suffix [`Self::split_glued_comments`] held back, immediately before
+    /// the doc the caller pushes next: each comment plus the space that keeps it glued.
+    pub(crate) fn push_glued_comment_run(&self, parts: &mut DocBuf, glued: &[&'a Comment]) {
+        let d = self.d();
+        for comment in glued {
+            parts.push(self.build_comment_doc(comment));
+            parts.push(d.text(" "));
+        }
+    }
+
     /// Emit a `hardline` after an own-line comment in a per-line comment list,
     /// preserving an author blank line as a leading `literalline` when the source
     /// left one between `comment_end` and `next` (the following own-line comment, or

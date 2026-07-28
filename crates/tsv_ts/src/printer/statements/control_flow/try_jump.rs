@@ -274,7 +274,7 @@ impl<'a> Printer<'a> {
             // rule of `conformance_prettier.md` §On module and declarator lists.
             tail_parts.push(d.text(":"));
             self.push_header_to_body_gap(&mut tail_parts, colon_end, body_start);
-            tail_parts.push(self.build_frozen_span_doc(frozen));
+            tail_parts.push(self.build_frozen_node_doc(frozen));
         } else if self.has_comments_to_emit_between(colon_end, body_start) {
             let has_line_comment = self.has_line_comments_between(colon_end, body_start);
             tail_parts.push(d.text(":"));
