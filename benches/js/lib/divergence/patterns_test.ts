@@ -341,6 +341,64 @@ Deno.test('inline_content_hug: negative - not svelte', () => {
 	assertEquals(match, null);
 });
 
+// ─── inline_sibling_newline_flow ────────────────────────────────────────────
+
+Deno.test(
+	'inline_sibling_newline_flow: positive - inline element flowed onto the text line',
+	() => {
+		// prettier keeps the authored newline before <strong>; ours respells it as the
+		// space it already renders as. Content identical, ours one line shorter.
+		const prettier = '<div>\n\tLorem ipsum,\n\t<strong>dolor</strong>.\n</div>';
+		const ours = '<div>\n\tLorem ipsum, <strong>dolor</strong>.\n</div>';
+		const ctx = make_context(ours, prettier, 'svelte');
+		const match = run_pattern('inline_sibling_newline_flow', ctx);
+		assertNotEquals(match, null);
+	}
+);
+
+Deno.test('inline_sibling_newline_flow: negative - not svelte', () => {
+	const prettier = '<div>\n\tLorem ipsum,\n\t<strong>dolor</strong>.\n</div>';
+	const ours = '<div>\n\tLorem ipsum, <strong>dolor</strong>.\n</div>';
+	const ctx = make_context(ours, prettier, 'typescript');
+	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
+});
+
+Deno.test('inline_sibling_newline_flow: negative - an EATEN blank line is not a flow', () => {
+	// A blank line is an authored separator the rule never crosses. Welding would
+	// treat `A⏎⏎B` and `A B` as equal, so without the blank-line guard this real
+	// authoring-intent change would be absorbed as a layout claim.
+	const prettier = '<div>\n\t<span>a</span>\n\n\t<span>b</span>\n</div>';
+	const ours = '<div>\n\t<span>a</span> <span>b</span>\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
+});
+
+Deno.test('inline_sibling_newline_flow: negative - GLUE direction (separator eaten)', () => {
+	// ours dropped the inter-sibling space entirely rather than respelling it:
+	// welds to `<span>a</span> <span>b</span>` vs `<span>a</span><span>b</span>`.
+	const prettier = '<div>\n\t<span>a</span>\n\t<span>b</span>\n</div>';
+	const ours = '<div>\n\t<span>a</span><span>b</span>\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
+});
+
+Deno.test('inline_sibling_newline_flow: negative - ours is the side that BROKE', () => {
+	// Directional: the rule only ever collapses lines. A hunk where ours added lines
+	// belongs to some other pattern.
+	const prettier = '<div>\n\tLorem ipsum, <strong>dolor</strong>.\n</div>';
+	const ours = '<div>\n\tLorem ipsum,\n\t<strong>dolor</strong>.\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
+});
+
+Deno.test('inline_sibling_newline_flow: negative - dropped content is never claimed', () => {
+	// The weld equality is the content-preservation proof: lose a word and it fails.
+	const prettier = '<div>\n\tLorem ipsum,\n\t<strong>dolor</strong>.\n</div>';
+	const ours = '<div>\n\tLorem, <strong>dolor</strong>.\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
+});
+
 // ─── inline_content_block_style ─────────────────────────────────────────────
 
 Deno.test(
