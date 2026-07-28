@@ -27,6 +27,44 @@ const PRETTIERIGNORE_FILE: &str = ".prettierignore";
 /// inside a git repo — matching git, which honors `.gitignore` only in a worktree.
 const GITIGNORE_FILE: &str = ".gitignore";
 
+/// Where a walk's in-scope files go.
+///
+/// The walk finds files one directory at a time and has no use for the set as a
+/// whole, so the destination is abstract: [`discover_files`] collects into a
+/// `Vec` and sorts, while [`discover_into`] hands each file straight to a
+/// consumer that can start work on it. Implementors that buffer flush on
+/// [`FileSink::flush`], which the walk calls at every directory boundary.
+pub trait FileSink {
+    fn push(&mut self, path: PathBuf);
+    /// Called when the walk finishes a directory — a buffering sink should
+    /// release what it holds so a consumer isn't waiting on the next directory.
+    fn flush(&mut self) {}
+}
+
+impl FileSink for Vec<PathBuf> {
+    fn push(&mut self, path: PathBuf) {
+        Vec::push(self, path);
+    }
+}
+
+/// The walk's output while it runs: files go to the sink as they're found,
+/// diagnostics accumulate here. Both entry points build their result from this.
+struct Walk<'a> {
+    files: &'a mut dyn FileSink,
+    errors: Vec<String>,
+    warnings: Vec<String>,
+}
+
+/// The non-file half of a walk's result — reported by the caller, and sorted +
+/// deduplicated (overlapping roots re-walk a shared subtree, so the same failure
+/// would otherwise report twice).
+pub struct Diagnostics {
+    /// `path: detail` messages — reported by the caller, counted as errors.
+    pub errors: Vec<String>,
+    /// Non-fatal diagnostics — see [`Discovered::warnings`].
+    pub warnings: Vec<String>,
+}
+
 /// Result of expanding path arguments: the files to format plus any non-fatal
 /// traversal errors (unreadable directories/entries) and discovery warnings.
 /// All three are sorted.
@@ -104,6 +142,40 @@ pub struct Discovered {
 /// path, keeping the first spelling in sorted order. A single root can't produce
 /// duplicates (symlinks aren't followed), so the canonicalization cost is skipped.
 pub fn discover_files(paths: &[String]) -> Result<Discovered, Vec<String>> {
+    let mut files: Vec<PathBuf> = Vec::new();
+    let diagnostics = discover_into(paths, &mut files)?;
+    files.sort_by_cached_key(|p| path_sort_key(p));
+    files.dedup();
+    if paths.len() > 1 {
+        let mut seen: HashSet<PathBuf> = HashSet::with_capacity(files.len());
+        files.retain(|p| seen.insert(fs::canonicalize(p).unwrap_or_else(|_| p.clone())));
+    }
+    Ok(Discovered {
+        files,
+        errors: diagnostics.errors,
+        warnings: diagnostics.warnings,
+    })
+}
+
+/// The walk behind [`discover_files`], with the files handed to `sink` as they
+/// are found rather than returned as a set.
+///
+/// Same scope rules, same file set, same diagnostics — the only difference is
+/// that **nothing orders or deduplicates the files**: they arrive in walk order
+/// (directory listing order, depth-first), and `sink` owns whatever ordering its
+/// consumer needs. `discover_files` is this plus the sort, the exact-duplicate
+/// `dedup`, and the canonical-path dedup that multiple roots require.
+///
+/// A caller that streams therefore takes on two obligations:
+/// - **report in sorted-path order anyway** (the `format` command's contract) —
+///   sort at the end, don't emit as results land;
+/// - **only stream a single root.** Overlapping roots (`tsv format src src/a.ts`)
+///   can yield the same file twice, and the dedup that removes it needs the whole
+///   set. One root can't: symlinks aren't followed, so each entry is visited once.
+pub fn discover_into(
+    paths: &[String],
+    sink: &mut dyn FileSink,
+) -> Result<Diagnostics, Vec<String>> {
     let bad: Vec<String> = paths
         .iter()
         .filter(|p| {
@@ -121,10 +193,10 @@ pub fn discover_files(paths: &[String]) -> Result<Discovered, Vec<String>> {
         .and_then(fs::canonicalize)
         .unwrap_or_else(|_| PathBuf::from("."));
 
-    // accumulate directly into the result struct so the walk threads one `&mut`
-    // sink rather than a parallel set of vectors
-    let mut out = Discovered {
-        files: Vec::new(),
+    // accumulate directly into the walk struct so it threads one `&mut` sink
+    // rather than a parallel set of vectors
+    let mut out = Walk {
+        files: sink,
         errors: Vec::new(),
         warnings: Vec::new(),
     };
@@ -137,13 +209,7 @@ pub fn discover_files(paths: &[String]) -> Result<Discovered, Vec<String>> {
             collect_root(&path, &cwd, &mut out);
         }
     }
-    out.files.sort_by_cached_key(|p| path_sort_key(p));
-    out.files.dedup();
-    if paths.len() > 1 {
-        let mut seen: HashSet<PathBuf> = HashSet::with_capacity(out.files.len());
-        out.files
-            .retain(|p| seen.insert(fs::canonicalize(p).unwrap_or_else(|_| p.clone())));
-    }
+    out.files.flush();
     // dedupe both channels: overlapping roots re-walk the shared subtree, so the
     // same unreadable path / pruned directory would otherwise report twice. The
     // strings are byte-identical only for the same underlying failure, so this
@@ -152,7 +218,10 @@ pub fn discover_files(paths: &[String]) -> Result<Discovered, Vec<String>> {
     out.errors.dedup();
     out.warnings.sort();
     out.warnings.dedup();
-    Ok(out)
+    Ok(Diagnostics {
+        errors: out.errors,
+        warnings: out.warnings,
+    })
 }
 
 /// Set up the ignore evaluation for one directory `root`, then recurse into it.
@@ -167,7 +236,7 @@ pub fn discover_files(paths: &[String]) -> Result<Discovered, Vec<String>> {
 /// seeded off once any `.gitignore` above `root` is in scope. `root`'s display
 /// spelling is preserved for the emitted paths; matching uses the
 /// format-root-relative path threaded down the walk.
-fn collect_root(root: &Path, cwd: &Path, out: &mut Discovered) {
+fn collect_root(root: &Path, cwd: &Path, out: &mut Walk<'_>) {
     let root_abs = fs::canonicalize(root).unwrap_or_else(|_| absolutize(root, cwd));
     // inside a git repo, the repo root is the boundary (reproducible: nothing
     // above it is read); outside one, the filesystem root (so an ancestor
@@ -261,7 +330,7 @@ fn collect_recursive(
     // `.gitignore` governs `dir` or above). `dir`'s own `.gitignore`, read below,
     // turns it off for `dir`'s children.
     heuristic_active: bool,
-    out: &mut Discovered,
+    out: &mut Walk<'_>,
 ) {
     // Materialize the listing once: it's used twice — to read THIS dir's own
     // ignore files (opening one only when the listing actually contains it, so an
@@ -419,6 +488,12 @@ fn collect_recursive(
         }
     }
 
+    // a directory boundary is the natural release point for a buffering sink:
+    // whatever this directory found is complete, and a streaming consumer
+    // shouldn't have to wait for the next one. A no-op for a collecting sink,
+    // and for a buffer that is already empty.
+    out.files.flush();
+
     if git_pushed {
         stack.pop_gitignore();
     }
@@ -500,7 +575,7 @@ fn rel_to(format_root: &Path, path: &Path) -> String {
 /// (`a/y.ts` before `a-b/x.ts`), exactly like `Path::cmp` and the WASM CLI's
 /// `compare_paths`. A filename contains neither the path separator nor `\0`, so
 /// the sentinel is unambiguous.
-fn path_sort_key(path: &Path) -> Vec<u8> {
+pub(crate) fn path_sort_key(path: &Path) -> Vec<u8> {
     let mut key = Vec::new();
     for component in path.components() {
         key.push(0);
