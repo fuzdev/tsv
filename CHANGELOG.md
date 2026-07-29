@@ -11,8 +11,9 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 ## Unreleased
 
 - various formatting fixes
-- feat: wrap Svelte without dangling
-  [#558](https://github.com/fuzdev/tsv/pull/558)
+- feat: more formatting choices to take advantage of Svelte 5 whitespace changes
+  ([#558](https://github.com/fuzdev/tsv/pull/558), [#600](https://github.com/fuzdev/tsv/pull/600),
+  [#601](https://github.com/fuzdev/tsv/pull/601), [#607](https://github.com/fuzdev/tsv/pull/607))
 
 ## 0.2.0
 
