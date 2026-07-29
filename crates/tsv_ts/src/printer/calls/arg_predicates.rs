@@ -211,7 +211,7 @@ pub(in crate::printer) fn is_array_or_object_unwrapped(expr: &Expression<'_>) ->
     )
 }
 
-/// Unwrap the TypeScript cast wrappers (as, satisfies, <T>) to get the inner expression.
+/// Unwrap the TypeScript cast wrappers (`as`, `satisfies`, `<T>`) to get the inner expression.
 /// Returns the innermost non-cast expression.
 ///
 /// Mirrors Prettier's `couldExpandArg`, which looks through `isBinaryCastExpression`

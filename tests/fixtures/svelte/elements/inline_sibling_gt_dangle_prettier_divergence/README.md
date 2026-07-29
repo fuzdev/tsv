@@ -7,13 +7,19 @@ the `>` hugged in both.
 
 - **Dangle case** — `<span>text</span>` directly before a block whose body overflows:
   the `</span>` closing `>` drops to the block-head line. The rule is uniform across
-  **all five block heads** — `{#if}`, `{#each}`, `{#key}`, `{#await}`, and `{#snippet}`.
+  the **four rendering block heads** — `{#if}`, `{#each}`, `{#key}`, and `{#await}`.
+- **`{#snippet}` carve-out** — a snippet glued on one side does not dangle the `>`: it
+  is a declaration and takes its **own line**, so the glued boundary splits instead (the
+  break is render-free — the snippet hoists). A snippet glued to content on BOTH sides
+  keeps the author's line and stays in the dangle regime — its multiline form dangles the
+  preceding `>` exactly like `{#if}`. See
+  [blocks/snippet/own_line](../../blocks/snippet/own_line_prettier_divergence/).
 - **Control** — the same `<span>` before a short `{#if cond}text{/if}` that stays
   inline: the `>` keeps hugging (no dangle), because the block never goes multiline.
 
-`{#await}` / `{#snippet}` don't force their parent multiline on their own (a lone block
-stays inline, matching prettier), but a preceding sibling routes them through the same
-multiline layout the others use, so the dangle resolves in one pass.
+`{#await}` doesn't force its parent multiline on its own (a lone block stays inline,
+matching prettier), but a preceding sibling routes it through the same multiline layout
+the others use, so the dangle resolves in one pass.
 
 The dangle moves the `>` only *inside* the closing tag (`</span⏎>`), injecting no
 whitespace between `</span>` and `{#if}`, so it parses to a byte-identical AST — it is

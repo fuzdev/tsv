@@ -338,6 +338,51 @@ mod tests {
         );
     }
 
+    /// The render key models a `${…}` hole / template-chunk seam as a
+    /// NON-WHITESPACE sentinel. `HOLE = ' '` once merged holes with adjacent
+    /// whitespace, so the key vouched "same page" for real render changes
+    /// (`{x}{z}` vs `{x} {z}` bakes a rendered space into the template;
+    /// `a{@render f()}b` vs its spaced form likewise) — the exact class the
+    /// oracle exists to refuse. Read from the embedded `sidecar.ts` source so a
+    /// "cleanup" back to a space (or to `\x00`, which would collide with the
+    /// block-boundary sentinel `BR`) cannot land silently.
+    #[test]
+    fn sidecar_hole_is_a_non_whitespace_sentinel() {
+        let source = crate::deno::SIDECAR_SCRIPT;
+        let needle = "const HOLE = '";
+        let start = source
+            .find(needle)
+            .expect("sidecar.ts must declare `const HOLE = '…'`");
+        let rest = &source[start + needle.len()..];
+        let end = rest.find('\'').expect("HOLE literal must close");
+        let literal = &rest[..end];
+
+        // Decode the one-character TS string literal (the source text carries the
+        // ESCAPE, e.g. `\x01`, not the control character itself).
+        let decoded: char = if let Some(hex) = literal.strip_prefix("\\x") {
+            char::from(u8::from_str_radix(hex, 16).expect("valid \\xNN escape in HOLE"))
+        } else {
+            match literal {
+                "\\t" => '\t',
+                "\\n" => '\n',
+                "\\r" => '\r',
+                "\\f" => '\u{c}',
+                "\\0" => '\0',
+                other => {
+                    let mut chars = other.chars();
+                    let c = chars.next().expect("HOLE must not be empty");
+                    assert!(chars.next().is_none(), "HOLE must be one character");
+                    c
+                }
+            }
+        };
+        assert!(
+            !decoded.is_whitespace() && decoded != '\0',
+            "HOLE must be a non-whitespace, non-NUL sentinel — got {decoded:?}: a whitespace \
+             hole merges with adjacent runs and blinds the render key, and NUL collides with BR"
+        );
+    }
+
     /// [`BLOCK_TAGS`] must stay identical to the sidecar's own set, or the
     /// fallback arm and the authoritative compile arm would model the same
     /// document differently. Read from the embedded `sidecar.ts` source, so the

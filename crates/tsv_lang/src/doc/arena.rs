@@ -1,6 +1,6 @@
 //! Arena-based document allocation for efficient Doc tree construction and rendering.
 //!
-//! Instead of heap-allocating each Doc node individually (Box<Doc>, Vec<Doc>),
+//! Instead of heap-allocating each Doc node individually (`Box<Doc>`, `Vec<Doc>`),
 //! all nodes are stored in a contiguous `Vec<DocNode>` and referenced by `DocId`
 //! (a u32 index). Child lists are stored in a separate flat `Vec<DocId>` and
 //! referenced by `ChildRange { start, len }`.
@@ -147,7 +147,7 @@ pub enum DocNode {
     /// Try to fit content on one line; if doesn't fit, break ALL lines in group.
     ///
     /// When `expanded_states` is non-empty, this is a "conditional group" that tries
-    /// multiple alternative layouts. `contents` is state[0], expanded_states contains
+    /// multiple alternative layouts. `contents` is `state[0]`, `expanded_states` contains
     /// state[1..].
     Group {
         contents: DocId,
@@ -496,7 +496,7 @@ const FUSED_WIDTH_SCAN_MAX: usize = 32;
 /// past [`FUSED_WIDTH_SCAN_MAX`] take the searcher shape instead.
 ///
 /// Answers identically to probing `contains('\n')` and then
-/// [`visual_width`](crate::printing::visual_width): on an all-ASCII slice the
+/// [`crate::printing::visual_width`]: on an all-ASCII slice the
 /// loop accumulates `1` per byte and `TAB_WIDTH` per tab, which is exactly that
 /// function's ASCII fast path, `len + tabs * (TAB_WIDTH - 1)`; a `\n` seen before
 /// any non-ASCII byte yields the same sentinel the `contains` probe would have;
@@ -1053,7 +1053,8 @@ impl DocArena {
     /// (`// …` or hashbang) — text whose content runs to end-of-line.
     ///
     /// Identical to [`Self::text_pooled`] for output. Under the `swallow_check`
-    /// feature, while the check is enabled ([`super::swallow`]) it additionally
+    /// feature, while the check is enabled (`super::swallow` — not linked, since
+    /// that module only exists under the feature) it additionally
     /// records the node's id so the renderer can flag any content emitted on the
     /// same physical line after it (silent content loss). Without the feature it
     /// is exactly `text_pooled` — no recording, no side-set.
@@ -1459,7 +1460,7 @@ impl DocArena {
 
     /// Create a conditional group that tries multiple alternative layouts.
     ///
-    /// states[0] is tried first (stored as contents), states[1..] stored in expanded_states.
+    /// `states[0]` is tried first (stored as `contents`), `states[1..]` stored in `expanded_states`.
     pub fn conditional_group(&self, states: &[DocId]) -> DocId {
         assert!(
             !states.is_empty(),
@@ -1904,7 +1905,7 @@ impl DocArena {
     /// infinite width its least-expanded state always fits and wins, so this **collapses
     /// it to that state**. Prettier's `removeLines` instead keeps the states (its `mapDoc`
     /// re-derives `contents = expandedStates[0]`), which [`Self::remove_lines`] mirrors —
-    /// tsv's `contents` *is* state[0], so recursing both is the same thing. Keeping the
+    /// tsv's `contents` *is* `state[0]`, so recursing both is the same thing. Keeping the
     /// states here was a bug: render found none fitting at the real width, fell back to
     /// the most-expanded one, and printed its already-flattened separators as literal
     /// spaces (`xs.map( (i) => fn(i) )`).
@@ -2381,7 +2382,7 @@ impl Default for DocArena {
 /// Assembles a dynamic string piecewise in an arena-parked scratch buffer,
 /// replacing the `let s = format!(…); d.text_pooled(&s)` pattern (same copy
 /// count — assembly + one pool copy — minus the transient `String`
-/// alloc/dealloc pair per call). Implements [`fmt::Write`] (never errors) so
+/// alloc/dealloc pair per call). Implements [`std::fmt::Write`] (never errors) so
 /// `write!(w, …)` works for formatted pieces; plain pieces use the infallible
 /// [`Self::push_str`] / [`Self::push`].
 pub struct PoolTextWriter<'a> {

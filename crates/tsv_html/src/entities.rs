@@ -12,7 +12,7 @@
 //! The entity map uses a simplified format matching Svelte's implementation:
 //! - Multi-codepoint entities use only the first codepoint (base character)
 //! - ~200 entities with combining marks are simplified (e.g., NotEqualTilde)
-//! - Source: https://html.spec.whatwg.org/entities.json (first codepoint only)
+//! - Source: <https://html.spec.whatwg.org/entities.json> (first codepoint only)
 //! - Generated at compile time from `src/entities.json` by `build.rs`
 //!
 //! ## Enhancement over Svelte
@@ -22,8 +22,8 @@
 //! - Svelte only supports lowercase: `&#x41;` → 'A', treats `&#X41;` as literal text
 //!
 //! References:
-//! - https://html.spec.whatwg.org/multipage/parsing.html#named-character-reference-state
-//! - https://html.spec.whatwg.org/entities.json
+//! - <https://html.spec.whatwg.org/multipage/parsing.html#named-character-reference-state>
+//! - <https://html.spec.whatwg.org/entities.json>
 //! - Svelte implementation: packages/svelte/src/compiler/phases/1-parse/utils/html.js
 
 use phf::phf_map;
@@ -240,9 +240,9 @@ fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(&str, us
 /// - Invalid/unsupported planes become NUL
 ///
 /// References:
-/// - http://en.wikipedia.org/wiki/Character_encodings_in_HTML#Illegal_characters
-/// - https://en.wikipedia.org/wiki/Plane_(Unicode)
-/// - https://html.spec.whatwg.org/multipage/parsing.html#preprocessing-the-input-stream
+/// - <http://en.wikipedia.org/wiki/Character_encodings_in_HTML#Illegal_characters>
+/// - <https://en.wikipedia.org/wiki/Plane_(Unicode)>
+/// - <https://html.spec.whatwg.org/multipage/parsing.html#preprocessing-the-input-stream>
 fn validate_code(code: u32) -> u32 {
     const NUL: u32 = 0;
 

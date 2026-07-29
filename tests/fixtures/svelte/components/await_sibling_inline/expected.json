@@ -1,0 +1,324 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 789,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 504,
+				"data": "\n\tA component (inline) keeps a following short {#await} inline regardless of\n\tsibling type — text, an inline element, or {@debug} (valid inside a component,\n\tunlike inside a block element). Only block-element parents break; a component\n\tstays inline, matching prettier. A declaration ({@const} / {const} / {let} /\n\t{#snippet}) is the sibling kind that does break, because it takes its own\n\tline — see tags/declaration_own_line_prettier_divergence and\n\tblocks/snippet/own_line_prettier_divergence.\n"
+			},
+			{
+				"type": "Text",
+				"start": 504,
+				"end": 506,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 506,
+				"end": 539,
+				"data": " {@debug} sibling + await "
+			},
+			{
+				"type": "Text",
+				"start": 539,
+				"end": 540,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 540,
+				"end": 582,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 541
+					},
+					"end": {
+						"line": 12,
+						"column": 5,
+						"character": 545
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "DebugTag",
+							"start": 546,
+							"end": 556,
+							"identifiers": [
+								{
+									"type": "Identifier",
+									"start": 554,
+									"end": 555,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 14
+										},
+										"end": {
+											"line": 12,
+											"column": 15
+										}
+									},
+									"name": "x"
+								}
+							]
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 556,
+							"end": 575,
+							"expression": {
+								"type": "Identifier",
+								"start": 564,
+								"end": 565,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 24
+									},
+									"end": {
+										"line": 12,
+										"column": 25
+									}
+								},
+								"name": "p"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 566,
+										"end": 567,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 582,
+				"end": 584,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 584,
+				"end": 672,
+				"data": " inline-element sibling + await (breakable, but a component parent never forces) "
+			},
+			{
+				"type": "Text",
+				"start": 672,
+				"end": 673,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 673,
+				"end": 719,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 15,
+						"column": 1,
+						"character": 674
+					},
+					"end": {
+						"line": 15,
+						"column": 5,
+						"character": 678
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "RegularElement",
+							"start": 679,
+							"end": 693,
+							"name": "span",
+							"name_loc": {
+								"start": {
+									"line": 15,
+									"column": 7,
+									"character": 680
+								},
+								"end": {
+									"line": 15,
+									"column": 11,
+									"character": 684
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 685,
+										"end": 686,
+										"raw": "s",
+										"data": "s"
+									}
+								]
+							}
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 693,
+							"end": 712,
+							"expression": {
+								"type": "Identifier",
+								"start": 701,
+								"end": 702,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 28
+									},
+									"end": {
+										"line": 15,
+										"column": 29
+									}
+								},
+								"name": "p"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 703,
+										"end": 704,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 719,
+				"end": 721,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 721,
+				"end": 750,
+				"data": " text sibling + await "
+			},
+			{
+				"type": "Text",
+				"start": 750,
+				"end": 751,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 751,
+				"end": 788,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 18,
+						"column": 1,
+						"character": 752
+					},
+					"end": {
+						"line": 18,
+						"column": 5,
+						"character": 756
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 757,
+							"end": 762,
+							"raw": "text ",
+							"data": "text "
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 762,
+							"end": 781,
+							"expression": {
+								"type": "Identifier",
+								"start": 770,
+								"end": 771,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 19
+									},
+									"end": {
+										"line": 18,
+										"column": 20
+									}
+								},
+								"name": "p"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 772,
+										"end": 773,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

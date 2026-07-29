@@ -954,7 +954,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse a snippet block: {#snippet name(params)}...{/snippet}
-    /// Also handles TypeScript generics: {#snippet name<T>(params)}
+    /// Also handles TypeScript generics: `{#snippet name<T>(params)}`
     fn parse_snippet_block(&mut self, start: usize) -> Result<FragmentNode<'arena>, ParseError> {
         // Get the content start position (after {#)
         let tag_content_start = self.current_end;

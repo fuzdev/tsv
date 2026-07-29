@@ -26,7 +26,7 @@ impl Span {
         &source[self.start as usize..self.end as usize]
     }
 
-    /// Convert to std::ops::Range<usize> for indexing
+    /// Convert to `std::ops::Range<usize>` for indexing
     #[inline]
     pub fn range(&self) -> std::ops::Range<usize> {
         self.start as usize..self.end as usize

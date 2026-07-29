@@ -1,7 +1,7 @@
 //! Fragment analysis and child printing helpers
 
 use super::Printer;
-use crate::ast::internal::{Fragment, FragmentNode};
+use crate::ast::internal::{Fragment, FragmentNode, is_collapsible_ws_char};
 
 impl<'a> Printer<'a> {
     /// Check if a fragment's content is inline (huggable at both ends).
@@ -36,7 +36,7 @@ impl<'a> Printer<'a> {
     /// fragment edge at compile — `clean_nodes`), so it neither survives inline nor
     /// selects the layout. Interior newlines don't count either — they are fill
     /// separators, not boundary authoring (`{#if c}x\ny{/if}` fills; only the boundary
-    /// run speaks for the boundary). ASCII whitespace only: an NBSP is content.
+    /// run speaks for the boundary). Collapsible whitespace only: an NBSP or form feed is content.
     /// The single boundary-authoring question — the element boundary probes, the block
     /// section paths, and `is_inline_fragment` all route through it.
     /// See conformance_prettier.md §Svelte: Blocks.
@@ -55,14 +55,9 @@ impl<'a> Printer<'a> {
         };
         let raw = text.raw(self.source);
         let run = if is_leading {
-            &raw[..raw.len()
-                - raw
-                    .trim_start_matches(|c: char| c.is_ascii_whitespace())
-                    .len()]
+            &raw[..raw.len() - raw.trim_start_matches(is_collapsible_ws_char).len()]
         } else {
-            &raw[raw
-                .trim_end_matches(|c: char| c.is_ascii_whitespace())
-                .len()..]
+            &raw[raw.trim_end_matches(is_collapsible_ws_char).len()..]
         };
         run.contains('\n')
     }

@@ -26,7 +26,7 @@ mod script_style;
 mod text;
 
 use self::text::TextAnalysis;
-use crate::ast::internal::{self, FragmentNode};
+use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
 use std::cell::{Cell, RefCell};
 use tsv_lang::FxHashSet;
 use tsv_lang::doc::DocBuf;
@@ -439,7 +439,7 @@ impl<'a> Printer<'a> {
     /// preceding output.
     ///
     /// Always uses the preserve-whitespace variant because the doc tree may contain
-    /// whitespace-sensitive elements (<pre>, <textarea>) whose trailing whitespace
+    /// whitespace-sensitive elements (`<pre>`, `<textarea>`) whose trailing whitespace
     /// must be preserved. Normal elements have trailing whitespace stripped during
     /// doc building, not rendering.
     pub(crate) fn render_doc_immediate(&mut self, d: DocId) {
@@ -611,7 +611,7 @@ impl<'a> Printer<'a> {
                 FragmentNode::Comment(comment) => {
                     last_comment = Some(comment);
                 }
-                FragmentNode::Text(text) if text.is_ascii_ws_only => {
+                FragmentNode::Text(text) if text.is_collapsible_ws_only => {
                     // Skip whitespace text nodes
                 }
                 _ => {
@@ -646,7 +646,7 @@ impl<'a> Printer<'a> {
         // Check next non-comment, non-whitespace fragment node
         for node in root.fragment.nodes.iter().skip(comment_idx + 1) {
             match node {
-                FragmentNode::Text(t) if t.is_ascii_ws_only => continue,
+                FragmentNode::Text(t) if t.is_collapsible_ws_only => continue,
                 FragmentNode::Comment(_) => continue,
                 other => {
                     let pos = other.span().start;
@@ -800,7 +800,7 @@ impl<'a> Printer<'a> {
             if printed_comment_indices.contains(&i) {
                 return false;
             }
-            !matches!(node, FragmentNode::Text(text) if text.is_ascii_ws_only)
+            !matches!(node, FragmentNode::Text(text) if text.is_collapsible_ws_only)
         });
 
         if has_content {
@@ -879,13 +879,21 @@ impl<'a> Printer<'a> {
     ///   segments go through the shared builder. (Single-node `format-ignore` is handled by
     ///   the shared builder itself.)
     fn print_root_fragment(&mut self, fragment: &internal::Fragment<'_>, skip_indices: &[usize]) {
-        // Effective template range: drop section comments (`skip_indices`) and Unicode-ws-only
+        // Effective template range: drop section comments (`skip_indices`) and collapsible-ws-only
         // boundary text. Both kinds only occur at the boundaries, so the kept content is a
         // contiguous slice.
+        //
+        // ⚠️ The trim is [`is_collapsible_ws_char`], NOT `str::trim` (the Unicode `White_Space`
+        // property, which is wider). The root fragment is a fragment like any other, so it owes
+        // the same rule every element boundary follows: the trim stops at content. `str::trim`
+        // deleted a root-boundary NBSP — content the compiler keeps (`regex_not_whitespace` =
+        // `/[^ \t\r\n]/` matches U+00A0, so the node is not whitespace-only and survives:
+        // `\u{a0}<div>block</div>` compiles to `<!---->\u{a0}<div>…`). prettier deletes it too,
+        // so only the compiler oracle sees it — `svelte/elements/root_leading_nbsp_prettier_divergence`.
         let source = self.source;
         let skippable = |i: usize, n: &FragmentNode<'_>| {
             skip_indices.contains(&i)
-                || matches!(n, FragmentNode::Text(t) if t.raw(source).trim().is_empty())
+                || matches!(n, FragmentNode::Text(t) if t.raw(source).trim_matches(is_collapsible_ws_char).is_empty())
         };
         let Some(start) = fragment
             .nodes
@@ -1052,7 +1060,7 @@ impl<'a> Printer<'a> {
         start_idx: usize,
     ) -> Option<usize> {
         let is_content_text =
-            |n: &FragmentNode<'_>| matches!(n, FragmentNode::Text(t) if !t.is_ascii_ws_only);
+            |n: &FragmentNode<'_>| matches!(n, FragmentNode::Text(t) if !t.is_collapsible_ws_only);
 
         // The start must be a node that can participate in a run.
         let start = &nodes[start_idx];
@@ -1076,7 +1084,7 @@ impl<'a> Printer<'a> {
             let node = &nodes[j];
             if let FragmentNode::Text(text) = node {
                 // Whitespace-only text separates runs (intentional separation).
-                if text.is_ascii_ws_only {
+                if text.is_collapsible_ws_only {
                     break;
                 }
                 last_idx = j;

@@ -14,15 +14,17 @@
 // Bumping prettier / svelte / acorn / @sveltejs/acorn-typescript / prettier-plugin-svelte
 // is NOT a routine refresh — it re-baselines the entire fixture corpus (these tools define
 // every fixture's expected.json + output_prettier.*). After any bump: run
-// `deno task fixtures:update` and review the churn. See benches/js/CLAUDE.md
-// §"Canonical baseline is coupled" for the full procedure.
+// `deno task fixtures:update` and review the churn, run the two sidecar-dependent gates
+// `deno task check` cannot (`compile:validation`, `bench:harvest`), and grep the repo for
+// the OLD version string — prose that restates a pin goes silently stale, and nothing gates
+// it. See benches/js/CLAUDE.md §"Canonical baseline is coupled" for the full procedure.
 //
 // NOTE: Requires deno.json with "acorn": "npm:acorn@8.16.0" import map
 // to ensure @sveltejs/acorn-typescript uses the same acorn instance.
 const VERSIONS = {
 	prettier: '3.9.6',
 	'prettier-plugin-svelte': '4.1.1',
-	svelte: '5.56.4',
+	svelte: '5.56.8',
 	acorn: '8.16.0',
 	'@sveltejs/acorn-typescript': '1.0.11'
 } as const;
@@ -38,7 +40,7 @@ import {
 	compile as svelteCompile,
 	parse as svelteParse,
 	parseCss
-} from 'npm:svelte@5.56.4/compiler';
+} from 'npm:svelte@5.56.8/compiler';
 // deno-lint-ignore no-import-prefix
 import * as acorn from 'npm:acorn@8.16.0';
 // deno-lint-ignore no-import-prefix
@@ -66,7 +68,17 @@ const ParserWithTS = acorn.Parser.extend(tsPlugin() as any);
 //      space (the browser model), and trim. Two sources with equal keys render identically.
 //
 // This is the methodology of ../test-svelte-prettier-whitespace/whitespace-safety-check.mjs.
-const HOLE = ' ';
+//
+// ⚠️ HOLE is a NON-WHITESPACE sentinel on purpose. A hole is unknown rendered content, not a
+// space: modeling it as ' ' merged the hole with adjacent whitespace, making the key blind to
+// exactly the class this oracle exists to refuse — a formatter injecting or deleting rendered
+// whitespace BESIDE an expression or a template-chunk boundary. `{x}{z}` keyed equal to
+// `{x} {z}` (the compiled bytes differ by a real rendered space), and `a{@render f()}b` keyed
+// equal to `a {@render f()} b`. With a sentinel the hole is content: whitespace beside it is
+// preserved by the collapse and compared, while whitespace-only differences the compiler
+// erases never reach the key at all (the compiled bytes are equal first). U+0001 never
+// appears in compiled template text.
+const HOLE = '\x01';
 
 function bakedSkeleton(code: string): string {
 	const chunks: string[] = [];
@@ -196,6 +208,27 @@ const BLOCK_TAGS = new Set([
 ]);
 const BR = '\x00'; // block-boundary sentinel (never appears in HTML)
 
+/**
+ * Collapse runs of CSS-collapsible whitespace to one space and strip the segment edges.
+ *
+ * ⚠️ The class is `[ \t\r\n]`, NOT `\s` and not `[ \t\r\n\f]`, and the trims are spelled out
+ * rather than delegated to `String.prototype.trim`. CSS white-space processing reaches only
+ * U+0020, U+0009 and segment breaks (U+000A in HTML), so a form feed — and an NBSP, and every
+ * other Unicode separator — is rendered CONTENT. Every character this collapses is one it
+ * declares invisible, so a class one character too wide makes the oracle answer "same render"
+ * for two documents that render differently: with `\f` in the set it reduced
+ * `<span>␌<code>a</code>␌</span>` and its space twin to the same key, blind to exactly the
+ * form-feed rewrite the render check exists to catch. `.trim()` is wider still — it strips
+ * NBSP and U+FEFF. `tsv_debug::render_normalize::is_collapsible_ws` is the Rust twin of this
+ * class (the fallback arm), and had the same defect.
+ */
+function collapseRenderWhitespace(seg: string): string {
+	let text = seg.replace(/[ \t\r\n]+/g, ' ');
+	if (text.startsWith(' ')) text = text.slice(1);
+	if (text.endsWith(' ')) text = text.slice(0, -1);
+	return text;
+}
+
 function visibleSegments(body: string): string[] {
 	const segments: string[] = [];
 	const pre_re = /<pre[\s\S]*?<\/pre>/gi;
@@ -215,7 +248,7 @@ function visibleSegments(body: string): string[] {
 				BLOCK_TAGS.has(tag.toLowerCase()) ? BR : ''
 			);
 		for (const seg of marked.split(BR)) {
-			const text = seg.replace(/[ \t\r\n\f]+/g, ' ').trim();
+			const text = collapseRenderWhitespace(seg);
 			if (text) segments.push(`text:${text}`);
 		}
 	};

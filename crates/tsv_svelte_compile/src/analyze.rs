@@ -320,7 +320,7 @@ const RUNE_KEYPATHS: &[&str] = &[
 /// whole component (script + template), not just recognized rune positions.
 ///
 /// A shadowed rune root needs no scope check here: a `$`-prefixed binding is
-/// refused upstream ([`Refusal::DollarPrefixedBinding`](crate::Refusal::DollarPrefixedBinding)),
+/// refused upstream ([`crate::Refusal::DollarPrefixedBinding`]),
 /// so a `const $state = f; $state(...args)` never reaches a valid compile —
 /// matching the oracle's `get_rune` returning null for a bound root, without
 /// modeling the scope.

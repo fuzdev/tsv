@@ -628,7 +628,7 @@ fn animate_host_element<'arena>(
             FragmentNode::Comment(_)
             | FragmentNode::ConstTag(_)
             | FragmentNode::DeclarationTag(_) => {}
-            FragmentNode::Text(t) if t.is_ascii_ws_only => {}
+            FragmentNode::Text(t) if t.is_collapsible_ws_only => {}
             FragmentNode::Element(el) => {
                 count += 1;
                 sole_element = Some(el);

@@ -31,10 +31,11 @@ A `this={}` line comment also expands its element (the `//` forces the attribute
 so the attributes can no longer sit on the tag's own line) — prettier expands it the same
 way for the positions it does keep, e.g. [expr_special_this](../expr_special_this/).
 
-`{@const x = value // c}` drops the comment like the rest. Under
-prettier-plugin-svelte 3.5.2 this one case instead produced broken output with an
-unmatched paren (`{@const y = it) …} // c`); 4.x drops the comment cleanly, so it is
-once again a usable oracle.
+`{@const x = value // c}` drops the comment like the rest — and this is the one case
+where prettier's output is additionally **corrupt**: under prettier-plugin-svelte 3.5.2
+*and* 4.1.1 alike it emits an unmatched paren, relocating the comment past the tag
+(`{@const y = it)} // c` — the committed `output_prettier.svelte` records those bytes
+verbatim, and prettier is at least stable on them).
 
 ## Reason
 

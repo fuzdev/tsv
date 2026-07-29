@@ -6,8 +6,11 @@ element (`<span>`), an expression tag (`{e}`), `{@html}`, or `{@render}` — ins
 parent goes multiline), while prettier keeps an inline-authored construct inline.
 
 - **tsv** force-breaks the block-element parent so the construct's body-drop and the
-  inline-element sibling-`>` dangle resolve in one pass. The block itself stays hugged to
+  inline-element sibling-`>` dangle resolve in one pass. An `{#await}` stays hugged to
   its sibling — when it is short there is no `>` to dangle — so only the parent breaks.
+  A `{#snippet}` additionally splits onto its **own line**: it is a declaration, and the
+  glued boundary beside it is render-free (the snippet hoists) — see
+  [blocks/snippet/own_line](../../blocks/snippet/own_line_prettier_divergence/).
 - **prettier** is whitespace-preserving here: it keeps the inline-authored form inline
   (and would keep an authored-broken form broken). It never expands the block.
 
@@ -24,12 +27,12 @@ follow a **breakable** sibling (the `is_inline_content` set, which sets
 `has_preceding_breakable`), tsv routes the parent through the multiline layout so the
 body-drop / dangle / block-sibling separation all resolve in one pass — at the cost of
 breaking the parent for the short case, where prettier stays inline. A **non-breakable**
-sibling (plain text, a comment) does not trigger this: tsv keeps it inline, matching
-prettier (see [elements/await_snippet_nonbreakable_sibling_inline](../await_snippet_nonbreakable_sibling_inline/)).
+sibling (plain text, a comment) does not trigger this: tsv keeps `{#await}` inline, matching
+prettier (see [elements/await_nonbreakable_sibling_inline](../await_nonbreakable_sibling_inline/)).
 See [conformance_prettier.md §Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks).
 
 ## Related
 
-- [elements/await_snippet_nonbreakable_sibling_inline](../await_snippet_nonbreakable_sibling_inline/) — the non-breakable (text / comment) counterpart that stays inline
+- [elements/await_nonbreakable_sibling_inline](../await_nonbreakable_sibling_inline/) — the non-breakable (text / comment) counterpart that stays inline
 - [elements/inline_sibling_gt_dangle](../inline_sibling_gt_dangle_prettier_divergence/) — the same breakable inline-element sibling when the block renders multiline (the `>` dangles)
 - [blocks/await/preceding_sibling_body_long](../../blocks/await/preceding_sibling_body_long_prettier_divergence/) — await body-drop after an expression-tag sibling

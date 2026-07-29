@@ -74,7 +74,7 @@ pub struct DocContext {
     /// carrying [`Self::hug_wide_first`]), only the fold's **lead element** is measured, not the whole
     /// element+tail unit — the tail can wrap, so a short element packs after the last word instead of
     /// dropping (prettier's fill is pairwise: last word, separator, element — never the tail). See
-    /// [`crate::doc::DocArena::after_element_fold_lead`].
+    /// [`crate::doc::arena::DocArena::after_element_fold_lead`].
     ///
     /// Scoped to the Svelte text→flow-element boundary fill (a text run whose next sibling is a
     /// flowing inline element/component). Off for every other fill, so a small element after text
@@ -149,9 +149,9 @@ pub const TEXT_WIDTH_HAS_NEWLINE: u16 = u16::MAX;
 /// Used for owned strings that may be expensive to measure upfront.
 pub const TEXT_WIDTH_NOT_COMPUTED: u16 = u16::MAX - 1;
 
-/// A slice into the [`super::DocArena`]'s text pool — the arena-owned `String`
+/// A slice into the [`super::arena::DocArena`]'s text pool — the arena-owned `String`
 /// holding every dynamically-built text body ([`DocText::Pooled`],
-/// [`super::DocNode::MultilineText`]). Offsets are byte indices into that pool,
+/// [`super::arena::DocNode::MultilineText`]). Offsets are byte indices into that pool,
 /// resolved at render time against the pool borrowed from the same arena the
 /// node lives in (the pool-keyed sibling of the source-keyed
 /// [`DocText::SourceSpan`]). Storing a span instead of an owned `String` keeps

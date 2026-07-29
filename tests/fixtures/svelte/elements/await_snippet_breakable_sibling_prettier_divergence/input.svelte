@@ -25,7 +25,9 @@
 	{@render f()}{#await p}x{/await}
 </div>
 
-<!-- inline-element sibling + snippet -->
+<!-- inline-element sibling + snippet: the snippet is a declaration, so it also
+     splits from the glued sibling onto its own line -->
 <div>
-	<span>s</span>{#snippet f()}x{/snippet}
+	<span>s</span>
+	{#snippet f()}x{/snippet}
 </div>

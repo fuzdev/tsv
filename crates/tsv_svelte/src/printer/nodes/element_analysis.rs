@@ -6,7 +6,7 @@
 // `ElementLayout`, `ElementKind`, `ElementContext`) live in `element_doc.rs`
 // alongside the build half that also consumes them.
 
-use crate::ast::internal::FragmentNode;
+use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
 use tsv_lang::doc::arena::DocId;
 use tsv_ts::ast::internal::Expression;
@@ -45,8 +45,9 @@ impl BoundaryBreaks {
 ///
 /// Bundles the per-element flags the predicate reads so they pass by name
 /// rather than as positional bools that are easy to misorder at the call site.
-/// Mirrors the corresponding [`ElementContext`] fields — both are built from
-/// the same locals.
+/// Built from the same `analyze_element` locals that fill [`ElementContext`],
+/// which keeps only the subset its own consumers need (`is_empty` is the one
+/// field both carry).
 #[derive(Clone, Copy)]
 struct MultilineInputs {
     /// Element type classification
@@ -55,8 +56,10 @@ struct MultilineInputs {
     is_empty: bool,
     /// Whether each content boundary is newline-authored
     boundary: BoundaryBreaks,
-    /// Whether block-flow children force this element multiline (cached, mirrors
-    /// [`ElementContext::block_flow_multiline`])
+    /// Whether block-flow children force this element multiline —
+    /// [`Printer::block_flow_forces_multiline`] gated on the element having any.
+    /// Cached by `analyze_element` rather than asked here: it is a non-trivial
+    /// traversal and `will_go_multiline` reads the same combination.
     block_flow_multiline: bool,
     /// Whether all content children are text nodes
     only_text_content: bool,
@@ -99,11 +102,80 @@ fn has_authored_blank_line(raw: &str) -> bool {
                     return true;
                 }
             }
-            b' ' | b'\t' | b'\r' | b'\x0c' => {}
+            b if is_horizontal_ws(b) => {}
             _ => newlines = 0,
         }
     }
     false
+}
+
+/// Whether `b` is **horizontal** collapsible whitespace — whitespace that does not end a line.
+///
+/// [`internal::is_collapsible_ws`] minus the line feed (`[ \t\r]`). The one caller is
+/// [`has_authored_blank_line`]'s scan: does this byte let the newline run continue rather than
+/// reset it. A form feed is content, so it resets the run — an FF between two newlines is not
+/// a blank line, matching the compiler's own class (`regex_not_whitespace` = `/[^ \t\r\n]/`).
+///
+/// Spelled as the explicit set rather than `internal::is_collapsible_ws(b) && b != b'\n'` — the same set,
+/// in the form the scan's `match` arm wants.
+///
+/// A second spelling of this set lives on `text_starts_with_linebreak` in `fragment_doc.rs`. It is
+/// deliberately left alone: it feeds a `str` pattern, and swapping the `[char; 3]` array for a
+/// predicate fn changes the `Pattern` monomorphization (a measured `.text` growth), so folding it
+/// in is a behaviour-neutral-but-not-code-neutral change rather than part of this cleanup.
+#[inline]
+fn is_horizontal_ws(b: u8) -> bool {
+    matches!(b, b' ' | b'\t' | b'\r')
+}
+
+/// Whether `t` is a non-empty separator node that keeps its two neighbours on **one line** —
+/// one whose whole content is whitespace the compiler collapses, spelled without a newline.
+///
+/// An inter-sibling run renders as one whitespace however it is spelled, so a space and a tab
+/// there are the same document and neither may pick a layout ([conformance_prettier.md §Svelte:
+/// Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)
+/// states it as: the separator's *presence* carries signal, its *spelling* carries none — and
+/// records which of the compiler and the browser supplies that equality per sibling kind). A
+/// **newline** is excluded not because it renders differently — it does not — but because a run of
+/// pure siblings has no prose and therefore no fill to reflow into, so its authored lines are the
+/// only structure the author has; see [`Printer::content_is_reflowable_fill`], where this is the
+/// disjunct that reads "the author put the siblings on one line themselves".
+///
+/// ⚠️ The whitespace question is asked of the **decoded** text and the newline question of the
+/// **raw** spelling, and neither may borrow the other's axis. An entity-encoded space or tab
+/// (`&#9;`) is content to [`internal::Text::is_collapsible_ws_only`] — deliberately, since the
+/// printer must emit its bytes verbatim — but it decodes to whitespace the compiler collapses, so
+/// it IS interchangeable with the plain space beside it and reaches this rule
+/// ([inline_separator_entity_collapse](../../../../../tests/fixtures/svelte/elements/inline_separator_entity_collapse_prettier_divergence/)).
+/// An `&nbsp;` does not: it decodes to a non-breaking space, which renders as itself and never
+/// collapses. Conversely "on one line" is a fact about what the author WROTE, so it reads the raw
+/// bytes: a `&#10;` sits inline in the source and keeps its neighbours on one line however it
+/// decodes.
+///
+/// ⚠️ The tail is [`Printer::is_separator_like_text`]'s shape over the NARROW class, and the
+/// two must not be unified — see that function for why the classes differ.
+///
+/// The cheap arms lead so the decode is paid only where it can change the answer: the precomputed
+/// `is_collapsible_ws_only` scalar settles the commonest node in a fragment without reading a
+/// byte, and a first-character test rejects prose before [`internal::Text::data`]'s entity scan.
+fn is_one_line_separator(t: &internal::Text, source: &str) -> bool {
+    if t.has_newline() {
+        return false;
+    }
+    let raw = t.raw(source);
+    if t.is_collapsible_ws_only {
+        // `is_collapsible_ws_only` holds for an EMPTY node too, and an empty node separates
+        // nothing — it is the zero-width seam between two byte-glued siblings.
+        return !raw.is_empty();
+    }
+    // A separator can only open with collapsible whitespace or an entity reference, so prose is
+    // out after one character — before the `data()` scan, and before the `all` below (which
+    // short-circuits on the first non-whitespace char but only once the decode has run).
+    if !raw.starts_with(|c: char| is_collapsible_ws_char(c) || c == '&') {
+        return false;
+    }
+    let data = t.data(source);
+    !data.is_empty() && data.chars().all(is_collapsible_ws_char)
 }
 
 impl<'a> Printer<'a> {
@@ -217,9 +289,25 @@ impl<'a> Printer<'a> {
     ///   has, so it keeps its authored lines — `elements/inline_multiline_nontext`, where
     ///   prettier agrees.
     ///
-    /// The `{a} {b}` arm — a space-only separator standing between two non-text siblings — is a
-    /// disjunct rather than a case of the above: such a run holds no prose, but the author put
-    /// the siblings on one line themselves, so the boundary newline is not air there either.
+    /// The `{a} {b}` arm — a one-line whitespace separator standing between two non-text siblings
+    /// ([`is_one_line_separator`]) in a run the author did leave on one line
+    /// ([`Self::run_is_one_line`]) — is a disjunct rather than a case of the above: such a run holds no
+    /// prose, but the author put the siblings on one line themselves, so the boundary newline is
+    /// not air there either. What that arm reads is the *line structure*, never the spelling: space
+    /// and tab are one document, so both reach this disjunct, and only a **newline** — the spelling
+    /// that leaves the siblings on separate lines to begin with — does not. Testing a literal space
+    /// here instead let the spelling pick the layout, the rule-1 bug
+    /// `elements/inline_separator_tab_prettier_divergence` pins.
+    ///
+    /// The whole-run half mattered only once the whitespace-only arm of
+    /// [`Self::has_source_breaks_in_content`] started deferring here — before, that arm re-supplied
+    /// the break this disjunct had wrongly suppressed, which is the sort of masking that makes a
+    /// predicate look correct until its backstop is removed.
+    ///
+    /// ⚠️ The arm is reachable only for a **prose-free** run, and that is a theorem rather than a
+    /// coincidence: a one-line separator is itself a seam, so `one_line_sibling_run` implies the seam
+    /// conjunct below, and a run with prose therefore reaches `true` through the prose path either
+    /// way. So a change to this arm can only move prose-free runs.
     ///
     /// Both are reached only once the content is ONE run, which is the flow rule's own run
     /// boundary ([`Printer::breaks_inline_run`], reused so the two cannot drift): a **comment**
@@ -242,37 +330,83 @@ impl<'a> Printer<'a> {
     /// writes the very newline the other readers key on. A reader left out therefore reports
     /// [`MultilineCause::SourceBreaks`] on the next pass; multiline mode freezes the authored
     /// newlines as hardlines, and the two arrangements alternate forever (an F1 break on real
-    /// prose tables). There are exactly three readers: the `boundary.both()` arm and the
-    /// content-text arm of [`Self::has_source_breaks_in_content`], and
+    /// prose tables). There are exactly four readers: the `boundary.both()` arm, the content-text
+    /// arm and the whitespace-ONLY-text arm of [`Self::has_source_breaks_in_content`], and
     /// [`Self::text_has_internal_newlines`] at the [`Self::compute_multiline_cause`] call site.
+    /// The whitespace-only arm was the last holdout, and it failed in the shape the other three
+    /// cannot reach: a run whose prose and whose newline live in DIFFERENT nodes
+    /// (`<code>a</code>⏎<code>b</code> text1`), where the separator carrying the break holds
+    /// nothing but whitespace. Its space twin already collapsed, so the two spellings of one
+    /// document reached two layouts — `elements/inline_content_flow_collapse_prettier_divergence`
+    /// carries the case.
     ///
     /// Takes the already-trimmed content run (the [`ContentBreaks`] producer owns that trim), so
     /// the boundary-trim scan is not repeated per reader.
     fn content_is_reflowable_fill(&self, run: &[FragmentNode<'_>]) -> bool {
         let source = self.source;
 
-        // One run, or nothing to reflow as one — see the doc comment.
+        // One run, or nothing to reflow as one — see the doc comment. The blank-line arm is the
+        // CONTENT-text half of that question and says so: on a whitespace-only node
+        // `breaks_inline_run` already answers it (`newline_count >= 2` is the same predicate there,
+        // since every other byte of such a node is horizontal whitespace), so scanning those bytes
+        // again finds nothing new on the commonest node in a fragment.
         if run.iter().any(|n| {
             self.breaks_inline_run(n)
-                || matches!(n, FragmentNode::Text(t) if has_authored_blank_line(t.raw(source)))
+                || matches!(n, FragmentNode::Text(t)
+                    if !t.is_collapsible_ws_only && has_authored_blank_line(t.raw(source)))
         }) {
             return false;
         }
 
-        // `{a} {b}` — a space-only separator between two non-text siblings.
-        let spaced_siblings = run.windows(2).any(|w| {
+        // `{a} {b}` — a one-line whitespace separator between two non-text siblings, in a run the
+        // author did leave on ONE line. Both halves are load-bearing: the `any` alone would let a
+        // single spaced pair speak for a run that is broken across lines everywhere else, and once
+        // the whitespace-only arm of `has_source_breaks_in_content` defers to this answer that
+        // erases every OTHER separator's break — collapsing a whole column of siblings onto one
+        // line while the unmutated authoring stays block-style. The pair test leads so the
+        // whole-run scan is paid only by a run that has such a pair.
+        let one_line_sibling_run = run.windows(2).any(|w| {
             !matches!(w[0], FragmentNode::Text(_))
-                && matches!(&w[1], FragmentNode::Text(t) if { let r = t.raw(source); !r.is_empty() && r.bytes().all(|b| b == b' ') })
-        });
-        if spaced_siblings {
+                && matches!(&w[1], FragmentNode::Text(t) if is_one_line_separator(t, source))
+        }) && self.run_is_one_line(run);
+        if one_line_sibling_run {
             return true;
         }
 
         run.iter().any(|n| self.is_run_prose(n))
             && run.windows(2).any(|w| {
-                matches!(&w[0], FragmentNode::Text(t) if t.raw(source).ends_with(|c: char| c.is_ascii_whitespace()))
-                    || matches!(&w[1], FragmentNode::Text(t) if t.raw(source).starts_with(|c: char| c.is_ascii_whitespace()))
+                matches!(&w[0], FragmentNode::Text(t) if t.raw(source).ends_with(is_collapsible_ws_char))
+                    || matches!(&w[1], FragmentNode::Text(t) if t.raw(source).starts_with(is_collapsible_ws_char))
             })
+    }
+
+    /// Whether the author left this whole run on **one line** — no separator in it broke.
+    ///
+    /// The complement of [`is_one_line_separator`] asked of the run, and the reason
+    /// [`Self::content_is_reflowable_fill`]'s `{a} {b}` disjunct is not just "some pair is
+    /// spaced": "on one line" is a property of the WHOLE run, not of the one pair that matched. A
+    /// run with a spaced pair and newline-separated siblings elsewhere was not left on one line,
+    /// and treating it as a fill erases those other breaks.
+    ///
+    /// ⚠️ The question is asked of every node the run's fill has **no word to pack from** — which
+    /// is a wider set than the whitespace-only nodes. That narrower reading was the bug
+    /// `elements/inline_separator_nbsp_newline` pins: an `&nbsp;`-bearing node carries no word
+    /// ([`Self::is_run_prose`] already excludes it for exactly that reason — "a separator wearing
+    /// content's clothing") yet is not whitespace-only, so its newline was invisible here, and a
+    /// single spaced pair elsewhere in the run spoke for the whole run and flattened it, deleting
+    /// an authored break. A *prose* node's interior newline still does not disqualify — the fill
+    /// owns that one, and a run holding prose reaches the caller's answer through the prose
+    /// disjunct anyway.
+    ///
+    /// ⚠️ So this predicate and [`is_one_line_separator`] are keyed on **different** sets, and
+    /// deliberately: the pair test asks "is this separator interchangeable with a plain space?",
+    /// which an `&nbsp;` node is not (it renders a non-breaking space and never collapses), while
+    /// this asks "did anything structural in the run carry a break?", which an `&nbsp;` node can.
+    /// Do not unify them — a run may legitimately hold a collapsible separator *and* a
+    /// non-collapsible one, and each question has to reach its own set.
+    fn run_is_one_line(&self, run: &[FragmentNode<'_>]) -> bool {
+        !run.iter()
+            .any(|n| matches!(n, FragmentNode::Text(t) if t.has_newline()) && !self.is_run_prose(n))
     }
 
     /// Check if element content has source breaks (newlines) that should trigger multiline.
@@ -345,15 +479,15 @@ impl<'a> Printer<'a> {
         // The one fill answer, computed on the trim this function already owns.
         let is_fill = self.content_is_reflowable_fill(run);
 
-        if boundary.both() {
-            let has_nontext_content = run.iter().any(|n| !matches!(n, FragmentNode::Text(_)));
-
-            if has_nontext_content && !is_fill {
-                return ContentBreaks {
-                    multiline: true,
-                    is_fill,
-                };
-            }
+        // The run is known to hold a non-text child, so the old `has_nontext_content` conjunct
+        // here was dead: `compute_multiline_cause` reaches this function only past its `is_empty`
+        // return and only when `!only_text_content`, i.e. only when some node is not a `Text` —
+        // and the trim above drops whitespace-only *text* alone, so that node is inside `run`.
+        if boundary.both() && !is_fill {
+            return ContentBreaks {
+                multiline: true,
+                is_fill,
+            };
         }
 
         if first >= last {
@@ -373,13 +507,18 @@ impl<'a> Printer<'a> {
             if kind.preserves_boundary_breaks() {
                 // Block/component: any newline triggers source break
                 t.has_newline()
-            } else if t.is_ascii_ws_only {
-                // Inline, whitespace-only: newlines are separators
-                t.has_newline()
+            } else if t.is_collapsible_ws_only {
+                // Inline, whitespace-only: the node IS a separator, so its newline is an
+                // expansion signal only where there is no fill for the run to reflow into.
+                // Inside a fill it is the same newline the fill itself would wrap in, and
+                // reading it back as authored is the two-mechanisms-one-newline bug the
+                // content-text arm below documents — here with the prose and the break simply
+                // living in different nodes. See [`Self::content_is_reflowable_fill`].
+                !is_fill && t.has_newline()
             } else {
-                // Inline, text with content: exclude the boundary (ASCII) whitespace runs on
-                // BOTH edges, whatever the node's position. A non-breaking space is content, so
-                // trim_ascii keeps it attached.
+                // Inline, text with content: exclude the boundary collapsible-whitespace runs
+                // on BOTH edges, whatever the node's position. An NBSP or form feed is content,
+                // so the trim keeps it attached.
                 //
                 // The edge run is a *separator* between this text and its neighbour, and the
                 // fill owns it either way — it reflows to a space when the run fits and to a
@@ -399,7 +538,7 @@ impl<'a> Printer<'a> {
                 // two-mechanisms-one-newline bug, merely relocated from the edge run to the
                 // middle of a sentence. That is the F1 break the suppression exists to stop —
                 // see [`Self::content_is_reflowable_fill`].
-                !is_fill && raw.trim_ascii().contains('\n')
+                !is_fill && raw.trim_matches(is_collapsible_ws_char).contains('\n')
             }
         });
         ContentBreaks {
@@ -522,7 +661,7 @@ impl<'a> Printer<'a> {
         let has_block_children = block_child_count > 0;
         if has_block_children {
             let has_non_block = nodes.iter().any(|n| match n {
-                FragmentNode::Text(t) => !t.is_ascii_ws_only,
+                FragmentNode::Text(t) => !t.is_collapsible_ws_only,
                 FragmentNode::Element(e) => !self.is_block_element(e),
                 FragmentNode::ExpressionTag(_) => true,
                 FragmentNode::HtmlTag(_)
@@ -535,6 +674,15 @@ impl<'a> Printer<'a> {
             if has_non_block {
                 return MultilineCause::Structural;
             }
+        }
+
+        // A declaration that owns its own line is the same kind of child as a block element
+        // here — its line is a break the content must have room for, so the element lays out
+        // block-style rather than collapsing the declaration onto its neighbour. A LONE
+        // declaration counts too (`Printer::has_own_line_declaration`): its boundaries are not
+        // content, so it is not glued and the element still goes block-style.
+        if self.has_own_line_declaration(nodes) {
+            return MultilineCause::Structural;
         }
 
         // Elements with expanding blocks (if/each/key, or those inside await) always expand to
@@ -609,7 +757,7 @@ impl<'a> Printer<'a> {
         let source = self.source;
         let has_ws_around_blocks = has_expanding_blocks
             && nodes.iter().any(|n| {
-                matches!(n, FragmentNode::Text(t) if t.is_ascii_ws_only && !t.raw(source).is_empty())
+                matches!(n, FragmentNode::Text(t) if t.is_collapsible_ws_only && !t.raw(source).is_empty())
             });
 
         has_non_inline_block || has_ws_around_blocks
@@ -623,12 +771,12 @@ impl<'a> Printer<'a> {
     ) -> bool {
         let source = self.source;
         let has_leading_content_break = nodes.first().is_some_and(|n| {
-            matches!(n, FragmentNode::Text(t) if { let r = t.raw(source); r.starts_with('\n') && !t.is_ascii_ws_only })
+            matches!(n, FragmentNode::Text(t) if { let r = t.raw(source); r.starts_with('\n') && !t.is_collapsible_ws_only })
         });
 
         (source_has_leading_break || has_leading_content_break)
             && nodes.iter().any(
-                |n| matches!(n, FragmentNode::Text(t) if t.raw(source).trim_ascii().contains('\n')),
+                |n| matches!(n, FragmentNode::Text(t) if t.raw(source).trim_matches(is_collapsible_ws_char).contains('\n')),
             )
     }
 

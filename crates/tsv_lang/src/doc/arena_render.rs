@@ -287,7 +287,7 @@ pub fn arena_print_doc(arena: &DocArena, doc: DocId, embed: &EmbedContext) -> St
 /// every group flattens. The renderer still uses [`crate::TAB_WIDTH`] / [`crate::INDENT`].
 ///
 /// ⚠️ The result is for measuring, **never** for output — it renders with
-/// [`RenderPurpose::Measure`], so a comment reached in `doc` is deliberately *not* recorded
+/// `RenderPurpose::Measure`, so a comment reached in `doc` is deliberately *not* recorded
 /// as emitted. Writing this string into the document would make every comment it covers read
 /// as DROPPED to the ledger (and, if the real render also runs, DOUBLE-PRINTED). Use a
 /// `arena_print_doc_*` entry to produce output.

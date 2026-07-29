@@ -688,9 +688,13 @@ impl<'a> Printer<'a> {
     /// the leading gap, or any trailing comment, would be silently DROPPED by the
     /// stripped-inner render the caller uses — so the run is declined (empty), and the
     /// caller builds the parenthesized type normally, preserving every comment in
-    /// place. Mirrors [`Self::stripped_redundant_paren_leading_line_comments`] (its
-    /// union analog), minus the union-specific redundancy check the caller's context
-    /// already implies. Empty when `ty` is not a parenthesized type.
+    /// place. Empty when `ty` is not a parenthesized type.
+    ///
+    /// The union counterpart is [`Self::stripped_redundant_paren_member_leading_run`],
+    /// deliberately WIDER on three axes: it hoists the full block+line run (not line-only),
+    /// tolerates a trailing comment (relocated separately onto the member), and adds the
+    /// union-specific redundancy check this caller's context already implies. This narrow
+    /// form serves the conditional-`extends` and intersection-first-member callers.
     pub(in crate::printer) fn stripped_paren_leading_line_comments(
         &self,
         ty: &TSType<'_>,

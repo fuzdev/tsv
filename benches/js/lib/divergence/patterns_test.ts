@@ -501,6 +501,36 @@ Deno.test('inline_content_block_style: positive - block body dropped to its own 
 	assertNotEquals(match, null);
 });
 
+Deno.test('inline_content_block_style: positive - snippet declaration takes its own line', () => {
+	// The declaration own-line rule: prettier welds a one-lined `{#snippet}` to the
+	// content beside it; ours gives the declaration its own line. Whitespace-only.
+	const prettier = '<Card href={x}>docs{#snippet icon()}{glyph}{/snippet}</Card>';
+	const ours = '<Card href={x}>\n\tdocs\n\t{#snippet icon()}{glyph}{/snippet}\n</Card>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('inline_content_block_style: positive - declaration tag takes its own line', () => {
+	// The `{@const}` flavor of the same rule (the compact authoring one-lines it).
+	const prettier = '{#if cond}{@const x = 1}{/if}';
+	const ours = '{#if cond}\n\t{@const x = 1}\n{/if}';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test('inline_content_block_style: negative - a render tag alone is not a declaration', () => {
+	// `{@render}` produces output, so it is NOT in the own-line declaration set —
+	// an isolated render tag carries no signature and must stay unclaimed even
+	// though the diff is whitespace-only.
+	const prettier = '<div>a{@render f()}b</div>';
+	const ours = '<div>\n\ta\n\t{@render f()}\n\tb\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('inline_content_block_style', ctx);
+	assertEquals(match, null);
+});
+
 Deno.test('inline_content_block_style: negative - block head not isolated (hugged in ours)', () => {
 	// A `{#if}` head that stays hugged inside an element on ours side is not a
 	// dropped-body signature (no head-alone line, no tag dangle).

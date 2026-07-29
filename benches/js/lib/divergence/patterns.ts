@@ -2101,6 +2101,9 @@ const inline_content_block_style: DivergencePattern = {
 	languages: ['svelte'],
 	conformance_sections: ['Svelte: Inline content block-style', 'Svelte: Blocks'],
 	fixtures: [
+		'svelte/tags/declaration_own_line_prettier_divergence',
+		'svelte/blocks/snippet/own_line_prettier_divergence',
+		'svelte/blocks/snippet/inline_element_long_prettier_divergence',
 		'svelte/elements/inline_sibling_gt_dangle_prettier_divergence',
 		'svelte/elements/block_body_drop_nested_siblings_prettier_divergence',
 		'svelte/elements/block_multiline_attrs_content_hug_prettier_divergence',
@@ -2174,6 +2177,14 @@ const inline_content_block_style: DivergencePattern = {
 		const block_head_at_eol = /\{#(?:if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
 		const block_branch_alone =
 			/^[ \t]*\{[:/](?:else|then|catch|if|each|await|key|snippet)\b[^}]*\}[ \t]*$/;
+		// A DECLARATION on its own our-line (§"A DECLARATION TAKES ITS OWN LINE"): a
+		// `{@const}` / `{const …}` / `{let …}` tag, or a one-lined `{#snippet …}…{/snippet}`,
+		// alone on an added line — produced only by tsv giving the declaration its own line
+		// where prettier welded it to the content beside it (`docs{#snippet icon()}…`). The
+		// multi-line snippet form is already covered by `block_head_alone` above; this is the
+		// short body that stays on the head's line. Ours-side only.
+		const declaration_alone =
+			/^[ \t]*(?:\{@const\b.*\}|\{(?:const|let)\b.*\}|\{#snippet\b.*\{\/snippet\})[ \t]*$/;
 		// The whitespace-collapsing-container block-style (§"reaches inter-sibling whitespace …
 		// a whitespace-collapsing container"): inside `<table>`/`<tbody>`/`<thead>`/`<tfoot>`/
 		// `<tr>`/`<colgroup>`/`<select>`/`<datalist>` the compiler removes inter-sibling
@@ -2213,7 +2224,8 @@ const inline_content_block_style: DivergencePattern = {
 					block_head_alone.test(l) ||
 					block_head_at_eol.test(l) ||
 					block_branch_alone.test(l) ||
-					container_tag_alone.test(l)
+					container_tag_alone.test(l) ||
+					declaration_alone.test(l)
 			);
 		const signature_hunks = ctx.hunks.filter(has_signature);
 		if (signature_hunks.length === 0) return null;

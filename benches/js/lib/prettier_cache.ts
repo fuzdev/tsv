@@ -12,7 +12,7 @@
  *   `CanonicalImplementation.format_async` derives (`.js`→babel etc.);
  * - the full PRETTIER OPTIONS object (serialized);
  * - the CANONICAL-5 npm pin versions — prettier, prettier-plugin-svelte, AND
- *   svelte (the plugin's peer, proven output-affecting by the 5.56.4 bump's
+ *   svelte (the plugin's peer, proven output-affecting by a past svelte bump's
  *   convergence change), plus acorn/@sveltejs/acorn-typescript for
  *   over-invalidation safety. npm pins are exact and installed==declared is
  *   enforced by the `node_modules` staleness gate, so VERSIONS fully identify

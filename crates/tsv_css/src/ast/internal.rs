@@ -791,10 +791,10 @@ impl CssAtrule<'_> {
 pub struct CssAtruleBlock<'arena> {
     /// Block children - mixture depends on at-rule type
     ///
-    /// @media, @supports, @layer: Vec<CssNode> (rules + nested at-rules)
-    /// @font-face, @page: Vec<CssDeclaration> (declarations only)
+    /// @media, @supports, @layer: `Vec<CssNode>` (rules + nested at-rules)
+    /// @font-face, @page: `Vec<CssDeclaration>` (declarations only)
     ///
-    /// We store as Vec<CssBlockChild> to support both:
+    /// We store as `Vec<CssBlockChild>` to support both:
     pub children: &'arena [CssBlockChild<'arena>],
     pub span: Span,
 }

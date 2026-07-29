@@ -33,7 +33,7 @@ impl<'a> Printer<'a> {
     ///
     /// The gap partitions by line exactly as the `}`→`else` path does — the authored position is
     /// the whole signal, and a blank line above an own-line comment is authoring intent
-    /// ([`ControlFlowGap::BlockToKeyword`]). Prettier is no oracle here: it relocates these
+    /// ([`Self::push_block_to_keyword_gap`]). Prettier is no oracle here: it relocates these
     /// comments into the following block's body, which it does *not* do at `else`. See
     /// `conformance_prettier.md` §Comment relocation.
     ///

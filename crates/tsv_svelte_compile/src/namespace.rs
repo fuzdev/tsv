@@ -1,7 +1,10 @@
-//! Namespace inference for SSR whitespace normalization.
+//! Namespace inference for fragment whitespace normalization.
 //!
 //! Port of Svelte's `infer_namespace` / `check_nodes_for_namespace` /
-//! `determine_namespace_for_children` (`3-transform/utils.js`). A fragment's
+//! `determine_namespace_for_children` (`3-transform/utils.js` — shared oracle
+//! code, imported verbatim by BOTH the client and server transforms, so nothing
+//! here is target-specific; tsv's server transform is simply its only consumer
+//! today). A fragment's
 //! namespace decides whether collapsed inter-node whitespace is *removed*
 //! entirely (`svg`) or kept as a single space (`html`/`mathml`) — the svg case
 //! of the oracle's `clean_nodes` `can_remove_entirely`, alongside the
@@ -22,7 +25,7 @@ use tsv_svelte::ast::internal::{
 use crate::text_class::js_trim;
 use crate::transform_server::EmitEnv;
 
-/// The SSR namespace of a fragment (Svelte's `Namespace`). Only [`Namespace::Svg`]
+/// The namespace of a fragment (Svelte's `Namespace`). Only [`Namespace::Svg`]
 /// changes whitespace handling (collapsed inter-node runs are removed, not
 /// collapsed to a space); [`Namespace::Mathml`] behaves like [`Namespace::Html`]
 /// for whitespace but is tracked for faithfulness with the oracle.

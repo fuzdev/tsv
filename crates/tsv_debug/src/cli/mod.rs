@@ -31,9 +31,9 @@ use commands::{
     fuzz::FuzzCommand, json_profile::JsonProfileCommand, lex_diff::LexDiffCommand,
     line_width::LineWidthCommand, metrics::MetricsCommand,
     neutrality_audit::NeutralityAuditCommand, profile::ProfileCommand,
-    render_audit::RenderAuditCommand, roundtrip_audit::RoundtripAuditCommand,
-    scan_audit::ScanAuditCommand, test262::Test262Command, ts_fixture_audit::TsFixtureAuditCommand,
-    tsc_conformance::TscConformanceCommand,
+    render_audit::RenderAuditCommand, render_compare::RenderCompareCommand,
+    roundtrip_audit::RoundtripAuditCommand, scan_audit::ScanAuditCommand, test262::Test262Command,
+    ts_fixture_audit::TsFixtureAuditCommand, tsc_conformance::TscConformanceCommand,
 };
 
 /// A command failure, carrying the process exit code up to the single exit
@@ -131,6 +131,7 @@ pub enum Subcommand {
     Metrics(MetricsCommand),
     NeutralityAudit(NeutralityAuditCommand),
     RenderAudit(RenderAuditCommand),
+    RenderCompare(RenderCompareCommand),
     RoundtripAudit(RoundtripAuditCommand),
     ScanAudit(ScanAuditCommand),
     // Requires the `swallow_check` feature so default builds keep the
@@ -195,6 +196,7 @@ impl TopLevel {
             Subcommand::Metrics(c) => c.run(),
             Subcommand::NeutralityAudit(c) => c.run(),
             Subcommand::RenderAudit(c) => c.run(),
+            Subcommand::RenderCompare(c) => c.run(),
             Subcommand::RoundtripAudit(c) => c.run(),
             Subcommand::ScanAudit(c) => c.run(),
             #[cfg(feature = "swallow_check")]

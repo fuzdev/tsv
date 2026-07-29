@@ -12,7 +12,7 @@
 //! whitespace-significant (`<pre>`/`<textarea>`, via `tsv_html::preserves_whitespace`),
 //! and neither ever touching a blank-line run (2+ newlines — Tier-1 significant):
 //!
-//! 1. **Between siblings** — an existing ASCII-whitespace run separating two nodes (a
+//! 1. **Between siblings** — an existing collapsible-whitespace run separating two nodes (a
 //!    whitespace-only `Text` node, or the leading/trailing whitespace of a content
 //!    `Text` node adjacent to a sibling). Inter-node whitespace is render-**significant**
 //!    (it collapses to one space, it does not vanish), so the toggle is space ↔ single
@@ -44,6 +44,16 @@
 //! rather than re-deriving significance (audit *policy* lives here in the caller;
 //! the significance *query* is the shared predicate).
 //!
+//! ⚠️ Every whitespace test here is [`is_collapsible_ws_char`], never Rust's
+//! `is_ascii_whitespace`, and that is a **soundness** requirement rather than tidiness.
+//! Every site the audit finds is spliced over wholesale by [`flip_run`], so a character
+//! it wrongly counts as whitespace is a character the mutation DELETES — and the mutant
+//! is then a different document, whose second fixed point is a fact about the instrument
+//! rather than about the formatter. Rust's class includes the form feed, which is rendered
+//! content: with it, every form-feed-bearing document reported spurious
+//! `diverge (dual-stable)` sites (11 where its NBSP twin — the same document, same
+//! classification — reported 2).
+//!
 //! ## Buckets (with `--prettier`)
 //!
 //! Per site, the 2×2 of "does tsv converge?" × "does prettier converge?":
@@ -60,7 +70,7 @@ use std::path::{Path, PathBuf};
 
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
-use tsv_svelte::ast::internal::FragmentNode;
+use tsv_svelte::ast::internal::{FragmentNode, is_collapsible_ws_char};
 
 use crate::cli::CliError;
 use crate::deno::{PrettierParser, run_prettier};
@@ -206,7 +216,7 @@ fn collect_sites(nodes: &[FragmentNode<'_>], src: &str, ws_sig: bool, out: &mut 
             let sp = node.span();
             let (s, e) = (sp.start_usize(), sp.end_usize());
             let raw = &src[s..e];
-            if raw.trim_ascii().is_empty() {
+            if raw.trim_matches(is_collapsible_ws_char).is_empty() {
                 // Whitespace-only node: a site only when it sits *between* two
                 // siblings (an edge run is a parent-boundary, skipped in v1).
                 if i > 0
@@ -224,7 +234,7 @@ fn collect_sites(nodes: &[FragmentNode<'_>], src: &str, ws_sig: bool, out: &mut 
             } else {
                 // Content text: its leading run is a boundary iff a previous
                 // sibling exists; its trailing run iff a next sibling exists.
-                let lead_len = raw.len() - raw.trim_start_matches(is_ascii_ws).len();
+                let lead_len = raw.len() - raw.trim_start_matches(is_collapsible_ws_char).len();
                 if i > 0
                     && lead_len > 0
                     && let Some((had_nl, flip)) = flip_run(&raw[..lead_len])
@@ -237,7 +247,7 @@ fn collect_sites(nodes: &[FragmentNode<'_>], src: &str, ws_sig: bool, out: &mut 
                         flipped: flip,
                     });
                 }
-                let trail_len = raw.len() - raw.trim_end_matches(is_ascii_ws).len();
+                let trail_len = raw.len() - raw.trim_end_matches(is_collapsible_ws_char).len();
                 if i + 1 < len
                     && trail_len > 0
                     && let Some((had_nl, flip)) = flip_run(&raw[raw.len() - trail_len..])
@@ -254,10 +264,6 @@ fn collect_sites(nodes: &[FragmentNode<'_>], src: &str, ws_sig: bool, out: &mut 
         }
         recurse_children(node, src, ws_sig, out);
     }
-}
-
-fn is_ascii_ws(c: char) -> bool {
-    c.is_ascii_whitespace()
 }
 
 /// The three forms an element's content boundary can take. All render identically
@@ -286,9 +292,9 @@ fn collect_boundary_sites(
     // An all-whitespace fragment is an EMPTY element (`<span> </span>` collapses to
     // `<span></span>`), not content with two independent boundaries — its single run
     // would be both the leading and the trailing site at once.
-    let has_content = nodes
-        .iter()
-        .any(|n| !matches!(n, FragmentNode::Text(t) if t.raw(src).trim_ascii().is_empty()));
+    let has_content = nodes.iter().any(
+        |n| !matches!(n, FragmentNode::Text(t) if t.raw(src).trim_matches(is_collapsible_ws_char).is_empty()),
+    );
     if !has_content {
         return;
     }
@@ -302,7 +308,7 @@ fn collect_boundary_sites(
     let lead = match first {
         FragmentNode::Text(t) => {
             let raw = t.raw(src);
-            raw.len() - raw.trim_start_matches(is_ascii_ws).len()
+            raw.len() - raw.trim_start_matches(is_collapsible_ws_char).len()
         }
         _ => 0,
     };
@@ -311,7 +317,7 @@ fn collect_boundary_sites(
     let trail = match last {
         FragmentNode::Text(t) => {
             let raw = t.raw(src);
-            raw.len() - raw.trim_end_matches(is_ascii_ws).len()
+            raw.len() - raw.trim_end_matches(is_collapsible_ws_char).len()
         }
         _ => 0,
     };

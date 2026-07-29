@@ -196,7 +196,7 @@ pub(crate) fn is_empty_text(node: &Value) -> bool {
     is_text(node) && node.get("data").and_then(Value::as_str) == Some("")
 }
 
-/// Collapse ASCII-whitespace runs to a single space in a Text node's `data` and
+/// Collapse collapsible-whitespace runs to a single space in a Text node's `data` and
 /// `raw`. Both are treated identically so they stay consistent and non-whitespace
 /// differences (e.g. entity encoding in `raw`) still surface in the diff.
 fn collapse_text_ws(node: &mut Value) {
@@ -234,13 +234,14 @@ pub(crate) fn trim_text(node: &mut Value, which: TrimEnd) {
     }
 }
 
-/// Collapse every run of ASCII whitespace (space, tab, LF, CR, FF) to a single
-/// space. U+00A0 and other non-ASCII whitespace are left intact (significant).
+/// Collapse every run of [collapsible whitespace](is_collapsible_ws) to a single
+/// space. Every other separator — U+00A0, U+202F, the form feed — is left intact
+/// (significant).
 fn collapse_ws(s: &str) -> String {
     let mut out = String::with_capacity(s.len());
     let mut in_ws = false;
     for ch in s.chars() {
-        if is_ascii_html_ws(ch) {
+        if is_collapsible_ws(ch) {
             in_ws = true;
         } else {
             if in_ws {
@@ -256,8 +257,24 @@ fn collapse_ws(s: &str) -> String {
     out
 }
 
-fn is_ascii_html_ws(ch: char) -> bool {
-    matches!(ch, ' ' | '\t' | '\n' | '\r' | '\u{0C}')
+/// The whitespace the Svelte compiler collapses: `[ \t\n\r]`, its own
+/// `regex_not_whitespace` = `/[^ \t\r\n]/` read positively. Mirrors
+/// `tsv_svelte::ast::internal::is_collapsible_ws_char`.
+///
+/// ⚠️ **Narrower than the HTML tokenizer's class and than Rust's
+/// `is_ascii_whitespace`, both of which include the form feed** — and the difference is
+/// a soundness one, not cosmetic. This function decides what the model declares
+/// INVISIBLE, so every character it accepts is one two documents may differ by and still
+/// compare equal. U+000C is not in CSS Text 3's document white space characters, so the
+/// compiler keeps it verbatim: with it in the set, `<b>a</b>␌<b>b</b>` and
+/// `<b>a</b> <b>b</b>` normalized to the same tree, and this model vouched "render
+/// equivalent" for a formatter respelling a form feed as a space — while the sidecar's
+/// authoritative render key (`svelte-render-key`, whose collapse is the same narrow
+/// class) correctly called them different pages. Both arms of the fixture
+/// render-equivalence gate run through here, so a wide class here reopens the hole the
+/// narrow one closed there.
+fn is_collapsible_ws(ch: char) -> bool {
+    matches!(ch, ' ' | '\t' | '\n' | '\r')
 }
 
 /// Minimal Svelte-AST builders for the whitespace-model tests.
@@ -311,6 +328,23 @@ mod tests {
         let block = render_normalize(root(vec![element("small", vec![text("\n\tword word\n")])]));
         let flowed = render_normalize(root(vec![element("small", vec![text("word word")])]));
         assert_eq!(block, flowed);
+    }
+
+    /// A form feed is rendered CONTENT, not a collapsible separator — so a document
+    /// that spells a separator `␌` is a different document from its space twin, and
+    /// this model must say so. With U+000C in [`is_collapsible_ws`] the two normalized
+    /// equal, and every consumer of this model (`ast_diff --render`, the fixture
+    /// render-equivalence FALLBACK arm) vouched for a formatter that respells one.
+    /// The sidecar's authoritative render key already refuses this pair.
+    #[test]
+    fn form_feed_is_content_not_collapsible_whitespace() {
+        let ff = render_normalize(root(vec![element("span", vec![text("a\u{c}b")])]));
+        let space = render_normalize(root(vec![element("span", vec![text("a b")])]));
+        assert_ne!(ff, space);
+
+        // …and it does not merge with an adjacent collapsible run either.
+        let ff_run = render_normalize(root(vec![element("span", vec![text("a \u{c} b")])]));
+        assert_ne!(ff_run, space);
     }
 
     #[test]

@@ -85,7 +85,7 @@ fn parse_selector_list_with<'arena>(
 /// - Top-level CSS rules: `div, span { }`
 /// - :is(), :where(), :not() pseudo-classes
 ///
-/// See: CSS Selectors Level 4 - <<complex-selector-list>> vs <<relative-selector-list>>
+/// See: CSS Selectors Level 4 - `<complex-selector-list>` vs `<relative-selector-list>`
 pub(crate) fn parse_complex_selector_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<SelectorList<'arena>, ParseError> {
@@ -103,7 +103,7 @@ pub(crate) fn parse_complex_selector_list<'arena>(
 /// must be treated as having zero specificity."
 ///
 /// Algorithm (CSS Selectors Level 4 - "parse as a forgiving selector list"):
-/// 1. Parse a list of <<complex-real-selector>>s from input
+/// 1. Parse a list of `<complex-real-selector>`s from input
 /// 2. For items that fail to parse: wrap as Invalid selector (preserves source)
 /// 3. Keep all selectors (valid and invalid) in AST
 /// 4. Return a selector list representing all items
@@ -116,7 +116,7 @@ pub(crate) fn parse_complex_selector_list<'arena>(
 /// Note: Invalid selectors preserved for formatter output (not deleted).
 /// Public AST conversion filters them out for Svelte compatibility.
 ///
-/// See: CSS Selectors Level 4 - <<forgiving-selector-list>>
+/// See: CSS Selectors Level 4 - `<forgiving-selector-list>`
 pub(crate) fn parse_forgiving_selector_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<SelectorList<'arena>, ParseError> {
@@ -258,7 +258,7 @@ fn extract_selector_until_comma_or_end<'a>(
 /// `<<complex-selector-list>>` distinction (a leading combinator is *grammatically*
 /// valid only in a relative context) is a static-semantic rule deferred to diagnostics.
 ///
-/// See: CSS Selectors Level 4 - <<relative-selector-list>>
+/// See: CSS Selectors Level 4 - `<relative-selector-list>`
 pub(crate) fn parse_relative_selector_list<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<SelectorList<'arena>, ParseError> {
@@ -282,7 +282,7 @@ pub(crate) fn parse_relative_selector_list<'arena>(
 /// - `span` - no leading combinator, combinator field is null (NOT descendant!)
 /// - `div > span` - combinator in the middle
 ///
-/// See: CSS Selectors Level 4 - <<complex-selector>> vs <<relative-selector>>
+/// See: CSS Selectors Level 4 - `<complex-selector>` vs `<relative-selector>`
 pub(crate) fn parse_complex_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<ComplexSelector<'arena>, ParseError> {

@@ -6,7 +6,8 @@
 	must settle in ONE pass: the flow and the layout it feeds are decided together, not on
 	successive passes. Covers an HTML inline element, a table cell (inline-classified), and the
 	rest of the fill class: a component pair and an expression-tag pair whose ONLY separator
-	carries words, plus a lone element with prose leading and trailing. A run is a fill whenever
+	carries words, a lone element with prose leading and trailing, and a pair whose newline sits
+	in a WHITESPACE-ONLY separator node rather than in a content text. A run is a fill whenever
 	it holds prose AND a whitespace seam to reflow at, so neither the separator's shape nor the
 	sibling count decides the layout — only the absence of a seam does (glued `{expr}text` keeps
 	its authored lines, pinned by `inline_multiline_nontext`).
@@ -33,4 +34,8 @@
 
 <div>
 	<span><code>a</code> text1</span>
+</div>
+
+<div>
+	<span><code>a</code> <code>b</code> text1</span>
 </div>

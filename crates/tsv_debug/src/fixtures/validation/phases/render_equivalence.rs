@@ -15,6 +15,16 @@
 //! This phase closes that hole for Svelte templates, asserting the variant and
 //! `input` render the same **independent of the formatter**.
 //!
+//! It also covers the one rewrite the variant↔input rules cannot reach: ours maps
+//! a `divergent_variant_*` to the ephemeral THIRD form, which N11b–d assert to be
+//! stable and distinct but never render-checked. There the baseline is the
+//! **variant itself** — `ours(variant)` must render like `variant` (R3). It is
+//! never `input`: a divergent (or dual-stable) form is free-standing — nothing
+//! forces it to mirror `input`'s case set the way byte-exact normalization forces
+//! the three kinds above — so variant↔input is not a claim those files make.
+//! `variant_*` needs nothing at all: ours keeps it byte-equal (N9), and an
+//! identity transform cannot change a render.
+//!
 //! ## Oracle (hybrid)
 //!
 //! - **Compile arm (authoritative).** Compare the two sources' browser-visible
@@ -47,6 +57,9 @@
 
 use serde_json::Value;
 
+use tsv_cli::cli::format_source::format_source;
+use tsv_cli::cli::input::ParserType;
+
 use crate::deno;
 use crate::diff;
 use crate::fixtures::{Fixture, FixtureFiles, InputType, read_file};
@@ -56,7 +69,9 @@ use super::super::FixtureValidation;
 use super::super::errors::ValidationError;
 
 /// Fallback-arm divergences confirmed BENIGN by hand, keyed by the fixture path
-/// (relative to `tests/fixtures/`) plus its variant file.
+/// (relative to `tests/fixtures/`) plus its variant file. An R3 (ours-transform)
+/// divergence keys with an `::ours` suffix, so the two claims about one file
+/// ratchet independently.
 ///
 /// ⚠️ **Unlike the `gap_audit` / `blank_audit` ratchets, a line here is NOT a known
 /// bug** — it is a known FALSE POSITIVE of the weak fallback oracle (see the module
@@ -126,6 +141,81 @@ enum Oracle {
     Fallback,
 }
 
+/// Which render-equivalence claim a grading is for.
+///
+/// The two claims share the oracle and the verdict handling ([`grade_claim`]); they
+/// differ only in what a failure is CALLED and how its allow-list entry is keyed, so
+/// that difference is this enum rather than a second copy of the loop.
+#[derive(Clone, Copy)]
+enum Claim {
+    /// R1/R2 — a whitespace variant renders like `input`. `ours` maps the variant to
+    /// `input`, so the formatter is the sole witness to the relationship.
+    VariantVsInput,
+    /// R3 — `ours(divergent_variant)` renders like the variant itself. The baseline is
+    /// the VARIANT: a divergent form is free-standing (nothing forces it to mirror
+    /// `input`'s case set), so `input` is not a valid baseline for it.
+    OursVsDivergentVariant,
+}
+
+impl Claim {
+    /// The compile-arm (authoritative) failure — a confirmed render difference.
+    fn compile_error(self, variant_name: &str) -> ValidationError {
+        match self {
+            Self::VariantVsInput => {
+                ValidationError::RenderEquivalenceMismatch(variant_name.to_string())
+            }
+            Self::OursVsDivergentVariant => {
+                ValidationError::RenderEquivalenceTransformMismatch(variant_name.to_string())
+            }
+        }
+    }
+
+    /// The fallback-arm failure, when the divergence is not on the benign allow-list.
+    fn fallback_error(self, variant_name: &str) -> ValidationError {
+        ValidationError::RenderEquivalenceFallbackDivergence(match self {
+            Self::VariantVsInput => variant_name.to_string(),
+            Self::OursVsDivergentVariant => format!("{variant_name} (ours-transform)"),
+        })
+    }
+
+    /// The [`BENIGN_FALLBACK_DIVERGENCES`] key. The R3 claim adds an `::ours` suffix so
+    /// the two claims about one file ratchet independently.
+    fn benign_key(self, fixture: &Fixture, variant_name: &str) -> String {
+        let key = benign_key(fixture, variant_name);
+        match self {
+            Self::VariantVsInput => key,
+            Self::OursVsDivergentVariant => format!("{key}::ours"),
+        }
+    }
+
+    /// What the diff header says was compared.
+    fn diff_label(self, oracle: Oracle) -> &'static str {
+        match (self, oracle) {
+            (Self::VariantVsInput, Oracle::Compile) => "compile",
+            (Self::VariantVsInput, Oracle::Fallback) => "fallback, template-only",
+            (Self::OursVsDivergentVariant, Oracle::Compile) => {
+                "compile, ours(divergent_variant) vs variant"
+            }
+            (Self::OursVsDivergentVariant, Oracle::Fallback) => {
+                "fallback, template-only, ours(divergent_variant) vs variant"
+            }
+        }
+    }
+}
+
+/// The side a claim compares against, plus the per-baseline caches the two oracle arms
+/// keep for it: `key` is its render key (`None` when `svelte compile` could not produce
+/// one, which disables the authoritative arm), `template` its template-only normalized
+/// AST, built lazily on the fallback arm's first need.
+///
+/// One `Baseline` is shared by every variant that grades against it — `input`'s is built
+/// once per fixture, so its key costs one sidecar call however many variants there are.
+struct Baseline<'a> {
+    source: &'a str,
+    key: Option<String>,
+    template: Option<Value>,
+}
+
 /// The verdict for one variant-vs-input comparison.
 enum Verdict {
     /// The variant renders identically to `input` (which arm proved it).
@@ -157,15 +247,19 @@ pub(in crate::fixtures::validation) async fn validate_render_equivalence(
     if files.unformatted.is_empty()
         && files.unformatted_ours.is_empty()
         && files.prettier_variant.is_empty()
+        && files.divergent_variant.is_empty()
     {
         return;
     }
 
-    // Authoritative arm: render-key `input` once and reuse for every variant.
-    let input_key = deno::svelte_render_key(input).await.ok();
-    // Fallback arm: `input`'s template-only normalized AST, built lazily on the
-    // first fallback.
-    let mut input_template: Option<Value> = None;
+    // `input` as a baseline: render-keyed once (authoritative arm) and its
+    // template-only AST built lazily on the first fallback, both reused for every
+    // variant that grades against it.
+    let mut input_baseline = Baseline {
+        source: input,
+        key: deno::svelte_render_key(input).await.ok(),
+        template: None,
+    };
 
     // All three variant kinds share the identical check; the file lists differ
     // only in which N-rule guarantees `ours(variant) == input` upstream. A
@@ -190,69 +284,125 @@ pub(in crate::fixtures::validation) async fn validate_render_equivalence(
             continue;
         };
 
-        match render_equivalent(
+        grade_claim(
+            result,
+            fixture,
+            Claim::VariantVsInput,
+            variant_name,
             &variant_content,
-            input,
-            input_key.as_deref(),
-            &mut input_template,
+            &mut input_baseline,
         )
-        .await
-        {
-            Verdict::Equivalent(Oracle::Compile) => result.render_equiv_verified_compile += 1,
-            Verdict::Equivalent(Oracle::Fallback) => result.render_equiv_verified_fallback += 1,
+        .await;
+    }
 
-            // Compile arm (authoritative): a confirmed render difference — GATE.
-            Verdict::Divergent {
-                oracle: Oracle::Compile,
-                input_side,
-                variant_side,
-            } => {
-                result.add_error(ValidationError::RenderEquivalenceMismatch(
-                    variant_name.clone(),
-                ));
+    // R3: ours' TRANSFORM of a `divergent_variant_*` — the one rewrite the loop
+    // above cannot reach. Ours maps the variant to the ephemeral third form
+    // (N11b–d assert stability and distinctness, never render), so the formatter
+    // is again the sole witness; assert `ours(variant)` renders like the VARIANT.
+    for variant_name in &files.divergent_variant {
+        let variant_path = fixture.path.join(variant_name);
+        // The read and the format are owned + reported by the normalization
+        // phase (N11b–d); skip silently here to avoid double-reporting.
+        let Ok(variant_content) = read_file(&variant_path) else {
+            continue;
+        };
+        let Ok(ours) = format_source(&variant_content, ParserType::Svelte) else {
+            continue;
+        };
+
+        // The variant is the baseline, and it is this variant's alone — unlike
+        // `input`'s, which every variant in the loop above shares.
+        let mut variant_baseline = Baseline {
+            source: &variant_content,
+            key: deno::svelte_render_key(&variant_content).await.ok(),
+            template: None,
+        };
+        grade_claim(
+            result,
+            fixture,
+            Claim::OursVsDivergentVariant,
+            variant_name,
+            &ours,
+            &mut variant_baseline,
+        )
+        .await;
+    }
+}
+
+/// Grade one claim — does `compared` render like `baseline`? — and record the verdict.
+///
+/// The single verdict-handling path for both [`Claim`]s: the oracle, the counters, and
+/// the benign-allow-list gate are identical, and only the failure's name and key differ.
+async fn grade_claim(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    claim: Claim,
+    variant_name: &str,
+    compared: &str,
+    baseline: &mut Baseline<'_>,
+) {
+    match render_equivalent(
+        compared,
+        baseline.source,
+        baseline.key.as_deref(),
+        &mut baseline.template,
+    )
+    .await
+    {
+        Verdict::Equivalent(Oracle::Compile) => result.render_equiv_verified_compile += 1,
+        Verdict::Equivalent(Oracle::Fallback) => result.render_equiv_verified_fallback += 1,
+
+        // Compile arm (authoritative): a confirmed render difference — GATE.
+        Verdict::Divergent {
+            oracle: Oracle::Compile,
+            input_side,
+            variant_side,
+        } => {
+            result.add_error(claim.compile_error(variant_name));
+            result.add_diff(
+                &format!(
+                    "render-equivalence ({}): {}/{}",
+                    claim.diff_label(Oracle::Compile),
+                    fixture.relative_path,
+                    variant_name
+                ),
+                &input_side,
+                &variant_side,
+                &diff::DiffOptions::freshness(),
+            );
+        }
+
+        // Fallback arm: compile unavailable and the template-only model flags a
+        // difference. The model over-flags by construction, so a divergence is
+        // gated against the hand-verified benign allow-list: a listed one is
+        // recorded (the summary ratchets it for staleness), an unlisted one FAILS
+        // and must be triaged — a real render change, or a new oracle artifact to
+        // verify and pin.
+        Verdict::Divergent {
+            oracle: Oracle::Fallback,
+            input_side,
+            variant_side,
+        } => {
+            let key = claim.benign_key(fixture, variant_name);
+            if BENIGN_FALLBACK_DIVERGENCES.contains(&key.as_str()) {
+                result.render_equiv_benign_fired.push(key);
+            } else {
+                result.add_error(claim.fallback_error(variant_name));
                 result.add_diff(
                     &format!(
-                        "render-equivalence (compile): {}/{}",
-                        fixture.relative_path, variant_name
+                        "render-equivalence ({}): {}/{}",
+                        claim.diff_label(Oracle::Fallback),
+                        fixture.relative_path,
+                        variant_name
                     ),
                     &input_side,
                     &variant_side,
                     &diff::DiffOptions::freshness(),
                 );
             }
-
-            // Fallback arm: compile unavailable and the template-only model flags a
-            // difference. The model over-flags by construction, so a divergence is
-            // gated against the hand-verified benign allow-list: a listed one is
-            // recorded (the summary ratchets it for staleness), an unlisted one FAILS
-            // and must be triaged — a real render change, or a new oracle artifact to
-            // verify and pin.
-            Verdict::Divergent {
-                oracle: Oracle::Fallback,
-                input_side,
-                variant_side,
-            } => {
-                let key = benign_key(fixture, variant_name);
-                if BENIGN_FALLBACK_DIVERGENCES.contains(&key.as_str()) {
-                    result.render_equiv_benign_fired.push(key);
-                } else {
-                    result.add_error(ValidationError::RenderEquivalenceFallbackDivergence(
-                        variant_name.clone(),
-                    ));
-                    result.add_diff(
-                        &format!(
-                            "render-equivalence (fallback, template-only): {}/{}",
-                            fixture.relative_path, variant_name
-                        ),
-                        &input_side,
-                        &variant_side,
-                        &diff::DiffOptions::freshness(),
-                    );
-                }
-            }
-
-            Verdict::Indeterminate => {}
         }
+
+        Verdict::Indeterminate => {}
     }
 }
 
@@ -261,6 +411,9 @@ pub(in crate::fixtures::validation) async fn validate_render_equivalence(
 /// `input_key` is `input`'s render key (computed once per fixture); `Some` enables
 /// the authoritative compile arm. `input_template` caches `input`'s template-only
 /// normalized AST for the fallback arm, built lazily on first need.
+///
+/// R3 reuses this with the roles shifted: the divergent variant is the baseline
+/// (`input`) and `ours(variant)` is the compared side (`variant`).
 async fn render_equivalent(
     variant: &str,
     input: &str,

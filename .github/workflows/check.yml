@@ -5,9 +5,12 @@
 #               AST-type drift, clippy with -D warnings. The authoritative list is
 #               the `check` task in deno.json — deliberately NOT re-enumerated here,
 #               because a hand-copied list goes stale every time an audit is added.
-#               pins:audit's checkout-alignment half self-skips here (CI has no
-#               sibling checkouts); the pinned-count guards that run in CI are the
-#               committed-tree ones (fixtures_validate via cargo test, swallow_audit).
+#               pins:audit here is the pin-AGREEMENT half only (a repo fact, so it
+#               holds on this clean checkout); checkout alignment is the separate
+#               pins:audit:checkouts task, gated at conformance cadence where the
+#               sibling checkouts are actually read. The pinned-count guards that run
+#               in CI are the committed-tree ones (fixtures_validate via cargo test,
+#               swallow_audit).
 #   artifacts — publish-parity: builds the WASM/npm packages, checks size
 #               bounds, runs the Node package tests (see the job comment).
 #

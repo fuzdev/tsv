@@ -16,14 +16,14 @@
 //! | `import { 'a-b' as loc }`         | `import { loc }`     |
 //! | `import { thing as loc }`         | `import { thing as loc }` (untouched) |
 //!
-//! `export *` / `export * as 'str'` (an [`ExportAllDeclaration`]) keeps its name
+//! `export *` / `export * as 'str'` (an `ExportAllDeclaration`) keeps its name
 //! verbatim in esrap — the drop rule is specifier-only — so it is deliberately
 //! **not** touched here. `x as x` / `import { x as x }` (both sides identifiers)
 //! is also untouched: this pass fires only when a `Literal` is involved, so the
 //! separate identifier-self-alias gap is naturally left alone.
 //!
 //! **Mechanism, not a printer change.** tsv's specifier printer
-//! ([`build_renamed_specifier_doc`]) emits `as right` iff `left.span() !=
+//! (`build_renamed_specifier_doc`) emits `as right` iff `left.span() !=
 //! right.span()`. This pass makes the two sides share a span by cloning the
 //! surviving binding into the alias slot, so the printer takes its bare-form path
 //! with no printer edit and no separate `esrap`-parity flag.
@@ -53,8 +53,9 @@
 //! [`normalize_module_specifiers`] stays infallible for the comment-free
 //! instance-import path.
 //!
-//! [`build_renamed_specifier_doc`]: the doc builder in
-//! `tsv_ts::printer::statements::modules::specifier_list`
+//! `build_renamed_specifier_doc` is the doc builder in
+//! `tsv_ts::printer::statements::modules::specifier_list` (private to that crate, so
+//! it is named rather than linked).
 
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Comment;

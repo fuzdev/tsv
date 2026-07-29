@@ -45,6 +45,41 @@ pub fn read_file(path: &Path) -> Result<String, String> {
     fs::read_to_string(path).map_err(|e| format!("Failed to read file {path:?}: {e}"))
 }
 
+/// Create a fixture directory, refusing the wrong-cwd footgun first.
+///
+/// A relative fixture path resolved from a repo *subdirectory* silently creates a
+/// NESTED fixture root (`tests/fixtures/svelte/tests/fixtures/…`) — `create_dir_all`
+/// makes the whole chain without complaint and the stray tree only surfaces later as
+/// unmatched fixtures. A resolved target whose absolute path contains more than one
+/// `tests/fixtures` (or `tests/fixtures_compile`) component run is never intended, so
+/// refuse it with the actual fix.
+///
+/// The check and the `create_dir_all` are one function so the two `*fixture_init`
+/// commands cannot acquire the directory by different routes — a caller that reached
+/// for `create_dir_all` alone would be back to creating the nested tree.
+pub fn create_fixture_dir(dir: &Path) -> Result<(), String> {
+    let absolute = match std::env::current_dir() {
+        Ok(cwd) => cwd.join(dir),
+        Err(_) => dir.to_path_buf(),
+    };
+    let components: Vec<&str> = absolute
+        .components()
+        .filter_map(|c| c.as_os_str().to_str())
+        .collect();
+    let fixture_roots = components
+        .windows(2)
+        .filter(|w| w[0] == "tests" && (w[1] == "fixtures" || w[1] == "fixtures_compile"))
+        .count();
+    if fixture_roots > 1 {
+        return Err(format!(
+            "refusing to create a NESTED fixture root: {} resolves under another \
+             tests/fixtures tree — run from the repo root",
+            absolute.display()
+        ));
+    }
+    fs::create_dir_all(dir).map_err(|e| format!("Failed to create directory {dir:?}: {e}"))
+}
+
 /// Write file contents
 pub fn write_file(path: &Path, content: &str) -> Result<(), String> {
     fs::write(path, content).map_err(|e| format!("Failed to write file {path:?}: {e}"))

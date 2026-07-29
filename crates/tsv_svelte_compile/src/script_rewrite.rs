@@ -3,8 +3,8 @@
 //! Oracle phase 3, **server**: `$props()` → `$$props`, `$state`/`$derived`
 //! unwrap, the class-field `$state` unwrap, and the dropped `$effect`/`$inspect`
 //! statements. Every shape here mints server-module syntax, so a client
-//! transform would need its own; the target-independent halves that used to
-//! share this file live beside it:
+//! transform would need its own; the rest of the script pipeline lives beside
+//! it — four target-independent analyses and two server-specific siblings:
 //!
 //! - [`crate::script_ts_gate`] — the document TypeScript flag, gate, self-check
 //! - [`crate::script_decls`] — the shared "what does this script declare" seam
@@ -12,6 +12,7 @@
 //! - [`crate::script_collision`] — the rune/store collision pre-pass
 //! - [`crate::script_comments`] — which host comments carry (server printer policy)
 //! - [`crate::script_props`] — the `$props()` pattern rewrite this dispatches to
+//!   (server phase 3, like this module)
 //!
 //! See [`crate::transform_server`] for the orchestration that calls these in
 //! sequence.

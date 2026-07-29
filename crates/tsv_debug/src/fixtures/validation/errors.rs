@@ -246,6 +246,17 @@ pub enum ValidationError {
     )]
     RenderEquivalenceMismatch(String),
 
+    // Render-equivalence (compile arm, authoritative) for the one rewrite the
+    // variant↔input rules cannot reach: ours maps a `divergent_variant_*` to the
+    // ephemeral THIRD form, and that output renders differently from the variant
+    // itself. The baseline is the VARIANT — a divergent form is free-standing
+    // (nothing forces it to mirror input's case set), so input is not a valid
+    // baseline for it.
+    #[error(
+        "render-equivalence: ours({0}) renders differently from the variant itself (svelte compile render-key) — the formatter changed the rendered output while rewriting this divergent variant to its third form"
+    )]
+    RenderEquivalenceTransformMismatch(String),
+
     // Render-equivalence (fallback arm): the fixture is not analyzable by `svelte
     // compile`, and the weaker template-only model flags a difference that is not on
     // the hand-verified benign allow-list. Either a real render change, or a new
@@ -516,6 +527,9 @@ impl ValidationError {
             Self::RenderEquivalenceMismatch(_) => {
                 "This variant is NOT render-equivalent to input — formatting it changed the rendered output. Fix the formatter (or the fixture, if the variant was mis-authored). Confirm: `svelte compile --generate server` on the variant and on input."
             }
+            Self::RenderEquivalenceTransformMismatch(_) => {
+                "Formatting this divergent variant changed the rendered output — the third form is not render-equivalent to the variant. Fix the formatter. Confirm: `tsv_debug render_compare` on the variant and on ours(variant)."
+            }
             Self::RenderEquivalenceFallbackDivergence(_) => {
                 "Verify authoritatively, then act: compile BOTH sides with the fixture's `bind:` targets declared as `$state` (the same transform on each) and compare the server output. Identical ⇒ an oracle artifact: add it to BENIGN_FALLBACK_DIVERGENCES with a rationale. Different ⇒ a real render change: fix the formatter."
             }
@@ -586,9 +600,9 @@ impl ValidationError {
             | Self::NormalizationPrettierIntermediateToDivergentVariantNoVariantTarget(_)
             | Self::UndocumentedPrettierOutput(_) => "Normalization",
 
-            Self::RenderEquivalenceMismatch(_) | Self::RenderEquivalenceFallbackDivergence(_) => {
-                "Render-equivalence"
-            }
+            Self::RenderEquivalenceMismatch(_)
+            | Self::RenderEquivalenceTransformMismatch(_)
+            | Self::RenderEquivalenceFallbackDivergence(_) => "Render-equivalence",
 
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierVariantWithinFixture(_)
