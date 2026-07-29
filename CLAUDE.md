@@ -151,7 +151,7 @@ cargo run -p tsv_cli format --content '<div>x</div>' --parser svelte     # forma
 
 ```bash
 deno task check          # full committed-tree gate: fmt, audits, typecheck, tests, clippy (benches/js/CLAUDE.md §Gate map)
-deno task doctor         # one-pass setup check: runtimes, canonical pins + checkout alignment, node_modules freshness, oracle checkouts, corpus entries, build artifacts. Exit 1 only on MISLEADING state (pin drift, skew, stale deps); absences are warnings (--strict promotes warnings to failures)
+deno task doctor         # one-pass setup check: runtimes, canonical pins + checkout alignment, node_modules freshness, oracle checkouts, corpus entries, build artifacts. Exit 1 only on MISLEADING state (pin drift, skew, stale deps); absences are warnings (--strict promotes warnings to failures) — except in the explicitly optional experimental-typechecker tier, whose absences are informational at any strictness (a BROKEN checkout there still warns)
 deno task typecheck      # cargo check
 deno task test           # cargo test
 deno task lint           # cargo clippy
@@ -333,11 +333,11 @@ deno task conformance:ts-repo          # tsv's TS parser vs the tsc corpus (../t
 
 # The three gates above accept: -v, --json, <subtree>.
 
-deno task conformance                  # the pre-release aggregate: the three gates above + corpus:compare:parse
-# --all + corpus:compare:format --all, in ONE process (benches/js/conformance.ts; oracle modules load
-# once, fail-fast, corpus FFI built once), then render:audit over the version-pinned checkouts (a
-# subprocess — it drives its own sidecar). The external-oracle correctness gates that can't live in
-# `deno task check`. The format leg's prettier calls ride a content-addressed cache
+deno task conformance                  # the pre-release aggregate: the three gates above +
+# corpus:compare:parse --all + corpus:compare:format --all, in ONE process (benches/js/conformance.ts;
+# oracle modules load once, fail-fast, corpus FFI built once), then render:audit over the version-pinned
+# checkouts (a subprocess — it drives its own sidecar). The external-oracle correctness gates that
+# can't live in `deno task check`. The format leg's prettier calls ride a content-addressed cache
 # (benches/js/lib/prettier_cache.ts; TSV_PRETTIER_CACHE=0 disables).
 
 deno task conformance:test262          # tsv's JS parser vs test262 POSITIVES (pure Rust, `test262 --gate`);
@@ -516,6 +516,7 @@ tsv/
 │   ├── tsv_css/     # CSS: parse(), format(), convert_ast_json_bytes()
 │   ├── tsv_svelte/  # Svelte: parse(), format(), convert_ast_json_bytes()
 │   ├── tsv_svelte_compile/ # Svelte→JS compiler (Svelte's compile() oracle) + JS canonicalizer (intent-erased reprint); consumed by tsv_debug — no shipped artifact links it
+│   ├── tsv_check/   # EXPERIMENTAL TypeScript binder + checker — may never ship (tsgo-conformance target; consumed only by tsv_debug — no shipped artifact links it)
 │   ├── tsv_cli/     # Production CLI (binary: tsv) - pure Rust
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
@@ -879,10 +880,28 @@ cargo run -p tsv_debug test262 language/expressions  # filter by path pattern
 
 See ./docs/conformance_test262.md (command interface; §Differential for the tsv-vs-oxc comparison).
 
+**Typechecker conformance (`tsc_conformance`) — EXPERIMENTAL, may never ship.**
+`tsv_check` is a from-scratch TypeScript binder + checker in development; no shipped
+artifact links it (`cargo tree -i tsv_check` → only `tsv_debug`), and the parser and
+formatter are never modified in service of it. `tsv_debug tsc_conformance` grades it
+against tsgo's committed `.errors.txt` baselines (`../typescript-go`, pin `168e7015`),
+surfaced as **on-demand** tasks:
+
+```bash
+deno task conformance:tsc-roundtrip     # baseline parse → re-render → byte-compare (zero checker code)
+deno task conformance:tsc-check         # the tsv_check conformance sweep + committed report
+deno task conformance:tsc-check:update  # re-pin the run's snapshot counts after deliberate drift
+```
+
+None is in `deno task check`, in `deno task conformance`, or release-gating, and
+`../typescript-go` is not a release-required oracle — until the typechecker ships, no
+ordinary dev or release flow pays for it. Full reference: ./docs/typechecker.md.
+
 **Performance Profiling Commands** (all pure Rust, no Deno — full reference: ./docs/performance.md):
 
 ```bash
 cargo run -p tsv_debug profile ~/dev/zzz/src/lib                    # parse vs format phase timing (--iterations, --json)
+cargo run -p tsv_debug profile --bind ~/dev/zzz/src                 # parse vs lower+bind timing (TS-only) + peak RSS (§1)
 cargo run --release -p tsv_debug -- json_profile ~/dev/zzz/src/lib  # FFI parse path: parse vs the wire-JSON write (§2)
 cargo run -p tsv_debug buffer_sizes ~/dev/zzz/src ~/dev/gro/src     # printer SmallVec sizing histograms (§8)
 cargo run -p tsv_debug arena_stats ~/dev/zzz/src/lib                # DocArena node-population + memory audit (§7; --reuse, --list-errors)
@@ -1071,13 +1090,13 @@ cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — 
 ### Rust Crates (minimal deps)
 
 - `serde_json` — wire-JSON emission: the writer's exact string-escape / `f64` formatting, and reparsing bytes to a `Value` (CLI `--pretty`, tests). The language crates no longer depend on `serde` directly (only transitively, without its `derive`); `serde`'s derive is dev-tooling only (`tsv_debug` / `tsv_cli`)
-- `smallvec` — Stack-allocated vectors
+- `smallvec` — Stack-allocated vectors (printers + `tsv_check`)
 - `thiserror` — Error type derivation
 - `phf` — Compile-time perfect hash maps (keywords, entities)
 - `unicode-ident` — Unicode XID_Start/XID_Continue for identifiers
 - `unicode-segmentation` — Grapheme clustering for visual width measurement
 - `unicode-width` — Character display width (CJK, zero-width)
-- `bumpalo` — Bump arena for the internal AST (and, via the `tsv_arena` crate, the bindings' per-thread `reset()` reuse — `tsv_ffi`/`tsv_napi`/`tsv_wasm`)
+- `bumpalo` — Bump arena for the internal AST (and, via the `tsv_arena` crate, the bindings' per-thread `reset()` reuse — `tsv_ffi`/`tsv_napi`/`tsv_wasm`; `tsv_check`'s caller-owned check arenas follow the same contract)
 - `talc` — WASM global allocator (`tsv_wasm` only, wasm32-only target dep): pure-Rust `no_std` allocator replacing std's default dlmalloc; the `WasmGrowAndExtend` source keeps the warm instance's linear-memory high-water at dlmalloc parity. Pulls `lock_api` + `allocator-api2` (+ `scopeguard`) into the wasm32 graph only; native builds unaffected
 - `napi` / `napi-derive` / `napi-build` — N-API bindings for `tsv_napi` (Node/Bun native addon; tsv-scoped carve-out)
 
@@ -1123,6 +1142,7 @@ formatting behavior. Key files: `src/language-js/print/assignment.js` (assignmen
 - ./docs/comments.md - the detached comment model: ownership, the three axes, hazards, emitters
 - ./docs/compile_tooling.md - the sidecar-dependent compiler harnesses: corpus compare, compile fuzz, erase census
 - ./docs/compile_validation_ratchet.md - the validation-suite ratchet: snapshot, kinds, verdict, triage
+- ./docs/typechecker.md - the experimental `tsv_check` typechecker (may never ship) + its on-demand tsgo-conformance harness
 - ./docs/performance.md - profiling methodology, tooling, and results tracking
 - ./docs/workflow_corpus.md - corpus-driven formatting conformance workflow
 - ./docs/workflow_test262.md - test262 conformance workflow

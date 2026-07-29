@@ -56,8 +56,8 @@ tsv derives its tools from:
 
 tsv's features:
 
+- [x] parsers for TypeScript/JS, CSS, and Svelte, drop-in for Svelte+acorn+acorn-typescript
 - [x] formatter following Prettier + prettier-plugin-svelte (with intentional divergences)
-- [x] parser for TypeScript/JS + CSS + Svelte, drop-in for Svelte+acorn+acorn-typescript
 - [ ] [vscode formatter plugin](https://github.com/fuzdev/vscode_extension_tsv_format) - `fuzdev.tsv-format`
 - [ ] ts-to-js conversion (types-to-whitespace only)
 - [ ] module lexer
@@ -70,12 +70,13 @@ Future features (unknown order):
   but the lift to support it is small)
 - JS parsing diagnostics (test262 negative cases)
 - CSS error recovery (recover past invalid CSS per the spec)
-- Svelte compiler (partially implemented, not ready for usage)
-- later:
+- maybe later:
+  - Svelte compiler (experimental partial implementation)
   - TypeScript 7 integration (the Go impl), unlocking:
     - svelte-check replacement
     - LSP
     - linter - type aware, initially focused on serializable data-only plugins for extensibility
+    - includes an experimental first-party typechecker `tsv_check` (which may never ship)
   - bundling is probably out of scope 
   - [discussion](https://github.com/fuzdev/tsv/discussions) welcome
 
@@ -260,6 +261,7 @@ tsv/
 │   ├── tsv_ts/        # TypeScript parser/formatter (standalone)
 │   ├── tsv_css/       # CSS parser/formatter (standalone)
 │   ├── tsv_svelte/    # Svelte parser/formatter (uses tsv_ts + tsv_css)
+│   ├── tsv_check/     # experimental TypeScript binder/checker (may never ship; not in any shipped artifact)
 │   ├── tsv_cli/       # unified CLI (binary: `tsv`)
 │   ├── tsv_debug/     # dev utilities (binary: `tsv_debug`, uses Deno)
 │   ├── tsv_ffi/       # C FFI bindings
