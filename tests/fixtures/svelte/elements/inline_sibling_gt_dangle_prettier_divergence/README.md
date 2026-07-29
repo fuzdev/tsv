@@ -8,9 +8,11 @@ the `>` hugged in both.
 - **Dangle case** — `<span>text</span>` directly before a block whose body overflows:
   the `</span>` closing `>` drops to the block-head line. The rule is uniform across
   the **four rendering block heads** — `{#if}`, `{#each}`, `{#key}`, and `{#await}`.
-- **`{#snippet}` carve-out** — a snippet never dangles the `>`: it is a declaration and
-  takes its **own line**, so the glued boundary splits instead (the break is render-free —
-  the snippet hoists). See
+- **`{#snippet}` carve-out** — a snippet glued on one side does not dangle the `>`: it
+  is a declaration and takes its **own line**, so the glued boundary splits instead (the
+  break is render-free — the snippet hoists). A snippet glued to content on BOTH sides
+  keeps the author's line and stays in the dangle regime — its multiline form dangles the
+  preceding `>` exactly like `{#if}`. See
   [blocks/snippet/own_line](../../blocks/snippet/own_line_prettier_divergence/).
 - **Control** — the same `<span>` before a short `{#if cond}text{/if}` that stays
   inline: the `>` keeps hugging (no dangle), because the block never goes multiline.

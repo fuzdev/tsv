@@ -36,7 +36,7 @@ impl<'a> Printer<'a> {
     /// fragment edge at compile — `clean_nodes`), so it neither survives inline nor
     /// selects the layout. Interior newlines don't count either — they are fill
     /// separators, not boundary authoring (`{#if c}x\ny{/if}` fills; only the boundary
-    /// run speaks for the boundary). ASCII whitespace only: an NBSP is content.
+    /// run speaks for the boundary). Collapsible whitespace only: an NBSP or form feed is content.
     /// The single boundary-authoring question — the element boundary probes, the block
     /// section paths, and `is_inline_fragment` all route through it.
     /// See conformance_prettier.md §Svelte: Blocks.

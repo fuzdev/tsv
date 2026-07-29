@@ -51,6 +51,11 @@ and the edge trim but not *which nodes the edge is measured against*. The behavi
 - **trailing edge** — `text {@debug cond}`: the text is the last surviving node, so its trailing
   run goes.
 - **leading edge** — `{@debug cond} text`: the mirror.
+- **`<title>`** — `<svelte:head><title>text2</title> text3</svelte:head>`: the other participating
+  hoisted kind (a `TitleElement` — `<title>` *inside* `<svelte:head>`; a bare `<title>` elsewhere
+  is a RegularElement and not hoisted). Its trailing edge run trims the same way. One case only —
+  a component allows a single `<svelte:head>` — and the interior rule is the same mechanism the
+  `{@debug}` control below pins.
 - **interior control** — `a {@debug cond} b`. With content on **both** sides the hoist does not
   make either run an edge: the two runs merge into a single space (`a b`), so one space survives
   and gluing would be a different document (`ab`). This is what bounds the rule — it reaches the

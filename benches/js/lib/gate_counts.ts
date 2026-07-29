@@ -226,7 +226,8 @@ export const TEST262_POSITIVES_PIN = 42_113;
  * bench:harvest:svelte-rejects — exact reject count. Measured 2026-07-06:
  * ../svelte at 8fb7ceeba, oracle svelte@5.56.4 (142 of 5648 conformance-view
  * Svelte files, re-verified after the ryanatkn.com + webdevladder.net + mdz
- * corpus additions — all their Svelte is valid). Fewer = the svelte/compiler oracle stopped rejecting (broken
+ * corpus additions — all their Svelte is valid); re-harvested unchanged at
+ * ../svelte 44a781373, oracle svelte@5.56.8. Fewer = the svelte/compiler oracle stopped rejecting (broken
  * import/config); more = it started rejecting wholesale — either way the cache
  * would corrupt the published coverage number.
  */

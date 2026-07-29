@@ -11,6 +11,9 @@
 
 {#if cond}{@debug cond}text{/if}
 
+<!-- <title> inside <svelte:head> is hoisted the same way: its edge run trims -->
+<svelte:head><title>text2</title>text3</svelte:head>
+
 <!-- Interior: `a {@debug} b` renders `a b`, so one space is kept -->
 {#if cond}a {@debug cond} b{/if}
 

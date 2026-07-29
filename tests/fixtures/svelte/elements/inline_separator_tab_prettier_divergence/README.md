@@ -50,10 +50,11 @@ each in the converged inline form, with two authorings:
   pinned as `divergent_variant_boundary_newline_tab.svelte`.
 
 `divergent_variant_*` rather than `prettier_variant_*` is the load-bearing part of that pin, and it
-is what the divergence actually looks like: prettier's form spells every separator as a **newline**,
-and tsv does not normalize that back to `input` — a pure-sibling run authored across lines keeps its
-lines (the asymmetry above). So tsv rewrites prettier's form to a *third* stable form, collapsing
-only the element pair, whose separator prettier had already joined onto one line. Reading that pin
+is what the divergence actually looks like: prettier's form spells the tag-pair and component-pair
+separators as **newlines** — and tsv does not normalize those back to `input`, since a pure-sibling
+run authored across lines keeps its lines (the asymmetry above) — while the element pair's separator
+prettier had already joined onto one line. So tsv rewrites prettier's form to a *third* stable form,
+collapsing only that element pair. Reading that pin
 next to `input` shows the frontier directly: tsv converges the tab with the space and holds the
 newline apart, on all three sibling kinds.
 

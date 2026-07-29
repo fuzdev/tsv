@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 896,
+	"end": 1032,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -153,32 +153,114 @@
 			{
 				"type": "Comment",
 				"start": 679,
-				"end": 748,
+				"end": 760,
+				"data": " <title> inside <svelte:head> is hoisted the same way: its edge run trims "
+			},
+			{
+				"type": "Text",
+				"start": 760,
+				"end": 761,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteHead",
+				"start": 761,
+				"end": 813,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 15,
+						"column": 1,
+						"character": 762
+					},
+					"end": {
+						"line": 15,
+						"column": 12,
+						"character": 773
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "TitleElement",
+							"start": 774,
+							"end": 794,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 15,
+									"column": 14,
+									"character": 775
+								},
+								"end": {
+									"line": 15,
+									"column": 19,
+									"character": 780
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 781,
+										"end": 786,
+										"raw": "text2",
+										"data": "text2"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 794,
+							"end": 799,
+							"raw": "text3",
+							"data": "text3"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 813,
+				"end": 815,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 815,
+				"end": 884,
 				"data": " Interior: `a {@debug} b` renders `a b`, so one space is kept "
 			},
 			{
 				"type": "Text",
-				"start": 748,
-				"end": 749,
+				"start": 884,
+				"end": 885,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 749,
-				"end": 781,
+				"start": 885,
+				"end": 917,
 				"test": {
 					"type": "Identifier",
-					"start": 754,
-					"end": 758,
+					"start": 890,
+					"end": 894,
 					"loc": {
 						"start": {
-							"line": 15,
+							"line": 18,
 							"column": 5
 						},
 						"end": {
-							"line": 15,
+							"line": 18,
 							"column": 9
 						}
 					},
@@ -189,27 +271,27 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 759,
-							"end": 761,
+							"start": 895,
+							"end": 897,
 							"raw": "a ",
 							"data": "a "
 						},
 						{
 							"type": "DebugTag",
-							"start": 761,
-							"end": 774,
+							"start": 897,
+							"end": 910,
 							"identifiers": [
 								{
 									"type": "Identifier",
-									"start": 769,
-									"end": 773,
+									"start": 905,
+									"end": 909,
 									"loc": {
 										"start": {
-											"line": 15,
+											"line": 18,
 											"column": 20
 										},
 										"end": {
-											"line": 15,
+											"line": 18,
 											"column": 24
 										}
 									},
@@ -219,8 +301,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 774,
-							"end": 776,
+							"start": 910,
+							"end": 912,
 							"raw": " b",
 							"data": " b"
 						}
@@ -230,40 +312,40 @@
 			},
 			{
 				"type": "Text",
-				"start": 781,
-				"end": 783,
+				"start": 917,
+				"end": 919,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 783,
-				"end": 876,
+				"start": 919,
+				"end": 1012,
 				"data": " The ROOT fragment is a fragment too: at its edge, a hoisted `{@debug}` trims the run "
 			},
 			{
 				"type": "Text",
-				"start": 876,
-				"end": 882,
+				"start": 1012,
+				"end": 1018,
 				"raw": "\ntext1",
 				"data": "\ntext1"
 			},
 			{
 				"type": "DebugTag",
-				"start": 882,
-				"end": 895,
+				"start": 1018,
+				"end": 1031,
 				"identifiers": [
 					{
 						"type": "Identifier",
-						"start": 890,
-						"end": 894,
+						"start": 1026,
+						"end": 1030,
 						"loc": {
 							"start": {
-								"line": 18,
+								"line": 21,
 								"column": 13
 							},
 							"end": {
-								"line": 18,
+								"line": 21,
 								"column": 17
 							}
 						},

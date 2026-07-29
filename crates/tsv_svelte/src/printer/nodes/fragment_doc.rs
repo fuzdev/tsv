@@ -713,10 +713,11 @@ impl<'a> Printer<'a> {
         let d = self.d();
         *handle_whitespace_of_prev_text = false;
 
-        // ASCII whitespace class `[\t\n\f\r ]`, matching prettier-plugin-svelte's
-        // text split (`splitTextToDocs`). A leading/trailing non-breaking space (or
-        // any non-ASCII whitespace) is content, so a node made only of those is not
-        // whitespace-only and is preserved verbatim.
+        // Collapsible whitespace class `[ \t\n\r]` (`is_collapsible_ws_char` —
+        // deliberately narrower than prettier-plugin-svelte's `[\t\n\f\r ]`: a form
+        // feed is content). A leading/trailing non-breaking space or form feed is
+        // content, so a node made only of those is not whitespace-only and is
+        // preserved verbatim.
         let has_leading_ws = raw.starts_with(is_collapsible_ws_char);
         let has_trailing_ws = raw.ends_with(is_collapsible_ws_char);
 
@@ -1335,13 +1336,13 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether this text node is a **separator** wearing content's clothing: every non-ASCII-
-    /// whitespace character it holds is itself whitespace (an NBSP / narrow NBSP acting as the
-    /// gap between two siblings). Such a node carries no word for the fill to pack, so treating
-    /// its surrounding run as reflowable would merely re-read a break the fill itself emitted —
+    /// Whether this text node is a **separator** wearing content's clothing: every character it
+    /// holds is whitespace (an NBSP / narrow NBSP acting as the gap between two siblings). Such
+    /// a node carries no word for the fill to pack, so treating its surrounding run as
+    /// reflowable would merely re-read a break the fill itself emitted —
     /// `<span>a</span>⏎<nbsp><span>b</span>` collapses onto one line on the next pass, an F1
-    /// break. Its ASCII whitespace bounds a separator, not content, which is why it is excluded
-    /// for the same reason a whitespace-only node is.
+    /// break. Its collapsible whitespace bounds a separator, not content, which is why it is
+    /// excluded for the same reason a whitespace-only node is.
     ///
     /// Keyed on the **decoded** text, not the raw bytes: `&nbsp;` and a literal U+00A0 are the
     /// same document to the compiler, so spelling the separator as an entity must not buy it a
@@ -2130,10 +2131,10 @@ impl<'a> Printer<'a> {
         trailing_line: bool,
     ) -> Option<DocId> {
         let d = self.d();
-        // ASCII whitespace only (matching the word split below): a boundary space
-        // is emitted only when the split consumed an ASCII-whitespace run. A
-        // boundary non-breaking space (U+00A0 / U+202F) stays attached to its word
-        // and must not get a spurious regular space prepended/appended.
+        // Collapsible whitespace only (matching the word split below): a boundary
+        // space is emitted only when the split consumed a collapsible-whitespace
+        // run. A boundary non-breaking space (U+00A0 / U+202F) stays attached to its
+        // word and must not get a spurious regular space prepended/appended.
         let has_leading_ws = raw.starts_with(is_collapsible_ws_char);
         let has_trailing_ws = raw.ends_with(is_collapsible_ws_char);
 

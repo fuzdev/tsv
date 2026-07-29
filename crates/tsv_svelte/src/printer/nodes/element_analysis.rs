@@ -516,9 +516,9 @@ impl<'a> Printer<'a> {
                 // living in different nodes. See [`Self::content_is_reflowable_fill`].
                 !is_fill && t.has_newline()
             } else {
-                // Inline, text with content: exclude the boundary (ASCII) whitespace runs on
-                // BOTH edges, whatever the node's position. A non-breaking space is content, so
-                // trim_ascii keeps it attached.
+                // Inline, text with content: exclude the boundary collapsible-whitespace runs
+                // on BOTH edges, whatever the node's position. An NBSP or form feed is content,
+                // so the trim keeps it attached.
                 //
                 // The edge run is a *separator* between this text and its neighbour, and the
                 // fill owns it either way — it reflows to a space when the run fits and to a

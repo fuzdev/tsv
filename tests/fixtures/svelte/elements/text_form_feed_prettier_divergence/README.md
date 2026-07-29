@@ -38,8 +38,12 @@ form feed is exempt from that rule rather than from whitespace handling generall
   form feed is not whitespace-only.
 - **inside prose** — a space run inside text collapses to one space; the form feed is a word
   character to that collapse.
-- **boundary run around it** — the ASCII half of a boundary run still trims. The trim stops at the
-  form feed, exactly as it stops at an NBSP, which is what "it is content" means operationally.
+- **boundary run around it** — `<span>␌ <code>a</code> ␌</span>`: with the form feed outermost,
+  the space behind it is no longer a boundary run at all — the form feed is content, so the space
+  beside it is an interior separator and stays. The mirror authoring, a space *outside* the form
+  feed, is `unformatted_ours_boundary_space.svelte`: there the space is still a boundary run and
+  trims, stopping AT the form feed (the file normalizes to the content-boundary case above) —
+  exactly as the trim stops at an NBSP, which is what "it is content" means operationally.
 - **root-level text** — the root fragment's edges trim like any other fragment's, and the interior
   form feed is untouched.
 

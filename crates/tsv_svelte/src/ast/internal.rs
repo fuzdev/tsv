@@ -757,10 +757,10 @@ impl<'arena> FragmentNode<'arena> {
     /// Check if this node is whitespace-only text.
     ///
     /// Returns true only for Text nodes whose content is entirely *collapsible*
-    /// (ASCII) whitespace `[\t\n\f\r ]`. A non-breaking space (U+00A0 / U+202F) or
-    /// other Unicode separator is template *content*, not collapsible whitespace
-    /// (HTML/infra "ASCII whitespace"; matches prettier-plugin-svelte), so a node
-    /// made only of those returns false. All non-Text nodes return false.
+    /// whitespace `[ \t\n\r]` ([`is_collapsible_ws`]). A non-breaking space
+    /// (U+00A0 / U+202F), a form feed, or any other separator CSS does not collapse
+    /// is template *content*, not collapsible whitespace, so a node made only of
+    /// those returns false. All non-Text nodes return false.
     ///
     /// Reads the precomputed `Text::is_collapsible_ws_only` flag — O(1), source-free.
     #[inline]

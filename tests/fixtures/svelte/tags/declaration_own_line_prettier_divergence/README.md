@@ -58,8 +58,12 @@ directory compiles byte-identically.
 `prettier_variant_spaced.svelte` spells the same boundaries with spaces; prettier keeps both stable,
 tsv normalizes both to `input`. The one exception is the lone tag's spaced spelling
 (`{#if cond} {@const x = 1} {/if}`), which prettier itself expands to the own-line form here — so
-the spaced file spells that case as `input` does. The excluded shapes are spelled identically in
-all three files — they have one form, not one per authoring.
+the spaced file spells that case as `input` does. The glued-both-sides exception is spelled
+identically in all three files — it has one form, not one per authoring. The `{@debug}` control is
+the one excluded shape the variant files respell: both spell it `text6 {@debug cond}`, which tsv
+converges to the welded `input` form through the hoist's *trim*
+([blocks/hoisted_boundary_convergence](../../blocks/hoisted_boundary_convergence_prettier_divergence/))
+— so the control pins both halves at once: no own line, and the trim that takes its place.
 
 ## Related
 
