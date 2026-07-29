@@ -23,8 +23,9 @@ use commands::{
     compile_fixture_init::CompileFixtureInitCommand,
     compile_fixtures_validate::CompileFixturesValidateCommand, compile_fuzz::CompileFuzzCommand,
     compile_profile::CompileProfileCommand, conformance_audit::ConformanceAuditCommand,
-    erase_comment_census::EraseCommentCensusCommand, fixture_init::FixtureInitCommand,
-    fixtures_audit::FixturesAuditCommand, fixtures_update::FixturesUpdateCommand,
+    erase_comment_census::EraseCommentCensusCommand, fabrication_audit::FabricationAuditCommand,
+    fixture_init::FixtureInitCommand, fixtures_audit::FixturesAuditCommand,
+    fixtures_update::FixturesUpdateCommand,
     fixtures_update_formatted::FixturesUpdateFormattedCommand,
     fixtures_update_parsed::FixturesUpdateParsedCommand,
     fixtures_validate::FixturesValidateCommand, format_prettier::FormatPrettierCommand,
@@ -102,6 +103,10 @@ pub enum Subcommand {
     // `pristine_format`; the `ignore:audit` deno task passes the feature.
     #[cfg(feature = "comment_check")]
     IgnoreAudit(IgnoreAuditCommand),
+    // The fourth ratchet audit, grouped with the three above — but ungated: it formats each
+    // seed as authored and compares blank runs, so it drives neither the ledger nor any other
+    // instrumentation seam.
+    FabricationAudit(FabricationAuditCommand),
     Compare(CompareCommand),
     ConformanceAudit(ConformanceAuditCommand),
     AstDiff(AstDiffCommand),
@@ -167,6 +172,7 @@ impl TopLevel {
             Subcommand::BlankAudit(c) => c.run(),
             #[cfg(feature = "comment_check")]
             Subcommand::IgnoreAudit(c) => c.run(),
+            Subcommand::FabricationAudit(c) => c.run(),
             Subcommand::Compare(c) => c.run(),
             Subcommand::ConformanceAudit(c) => c.run(),
             Subcommand::AstDiff(c) => c.run(),

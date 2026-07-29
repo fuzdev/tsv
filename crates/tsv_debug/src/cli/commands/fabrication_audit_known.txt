@@ -1,0 +1,13 @@
+# Blank-fabrication ratchet — every line is a BUG, the file shrinking is the goal.
+#
+# One line per SHAPE of invented blank line: the syntactic shape of the output line
+# BEFORE the blank run, a TAB, then the shape of the line AFTER it. Shapes rather than
+# paths, so the snapshot is corpus-portable.
+#
+# A shape found but not pinned FAILS (a new fabrication). A pinned shape that no longer
+# fires FAILS (fix landed — re-pin). The two sanctioned layout rules — the hoisted-section
+# seam and an empty block body — are NOT here: they are carved out structurally in
+# `fabrication_audit.rs`.
+#
+# Regenerate with `deno task fabrication:audit:update`.
+# shapes: 0

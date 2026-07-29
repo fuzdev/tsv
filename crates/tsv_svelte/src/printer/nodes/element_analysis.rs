@@ -8,6 +8,7 @@
 
 use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
+use crate::printer::text::has_authored_blank_line;
 use tsv_lang::doc::arena::DocId;
 use tsv_ts::ast::internal::Expression;
 
@@ -80,52 +81,6 @@ struct ContentBreaks {
     /// neither has a reader for it, since the caller's third reader needs `boundary.leading`,
     /// which for a block is exactly the case that already returned multiline.
     is_fill: bool,
-}
-
-/// Whether `raw` holds an authored blank line — two newlines separated by horizontal whitespace
-/// only.
-///
-/// ⚠️ **Not interchangeable with the two `has_blank_line`s already in the crate**
-/// (`printer::text::TextAnalysis` on `str`, and `internal::Text`), which both answer
-/// `newline_count >= 2` — a *total*, which two SEPARATE single breaks also reach
-/// (`\n\tfoo bar\n\t`). Only the consecutive pair is the Tier-2 authoring signal, so this
-/// predicate scans for the run rather than counting. The distinction is live, not theoretical:
-/// `Printer::range_trailing_separator` reads the total and injects a blank line after a
-/// `format-ignore` range whose trailing text merely spans two lines.
-fn has_authored_blank_line(raw: &str) -> bool {
-    let mut newlines = 0u32;
-    for b in raw.bytes() {
-        match b {
-            b'\n' => {
-                newlines += 1;
-                if newlines >= 2 {
-                    return true;
-                }
-            }
-            b if is_horizontal_ws(b) => {}
-            _ => newlines = 0,
-        }
-    }
-    false
-}
-
-/// Whether `b` is **horizontal** collapsible whitespace — whitespace that does not end a line.
-///
-/// [`internal::is_collapsible_ws`] minus the line feed (`[ \t\r]`). The one caller is
-/// [`has_authored_blank_line`]'s scan: does this byte let the newline run continue rather than
-/// reset it. A form feed is content, so it resets the run — an FF between two newlines is not
-/// a blank line, matching the compiler's own class (`regex_not_whitespace` = `/[^ \t\r\n]/`).
-///
-/// Spelled as the explicit set rather than `internal::is_collapsible_ws(b) && b != b'\n'` — the same set,
-/// in the form the scan's `match` arm wants.
-///
-/// A second spelling of this set lives on `text_starts_with_linebreak` in `fragment_doc.rs`. It is
-/// deliberately left alone: it feeds a `str` pattern, and swapping the `[char; 3]` array for a
-/// predicate fn changes the `Pattern` monomorphization (a measured `.text` growth), so folding it
-/// in is a behaviour-neutral-but-not-code-neutral change rather than part of this cleanup.
-#[inline]
-fn is_horizontal_ws(b: u8) -> bool {
-    matches!(b, b' ' | b'\t' | b'\r')
 }
 
 /// Whether `t` is a non-empty separator node that keeps its two neighbours on **one line** —

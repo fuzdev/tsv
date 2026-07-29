@@ -215,6 +215,8 @@ deno task gaps:audit:update          # regenerate that snapshot after fixing a s
 deno task gaps:audit:rank            # rank the pinned shapes for triage (also --since; see ./docs/gap_audit.md)
 deno task blanks:audit               # blank-line injection audit — RATCHET over `blank_audit_known.txt`, ~24 s (gated in `deno task check`; ./docs/blank_audit.md)
 deno task blanks:audit:update        # regenerate that snapshot after fixing a shape; refuses a narrowed run
+deno task fabrication:audit          # blank-FABRICATION audit — the PRISTINE counterpart to `blanks:audit`: a blank run the formatter INVENTS on an unmutated seed, which F1 is structurally blind to. RATCHET over `fabrication_audit_known.txt` (born EMPTY), ~0.2 s (gated in `deno task check`; ./docs/audits.md)
+deno task fabrication:audit:update   # regenerate that snapshot; refuses a narrowed run
 deno task ignore:audit               # ignore-directive honoring audit (Arm A) — RATCHET over `ignore_audit_known.txt`: per position, four graded checks on an injected `prettier-ignore` (honoring, second-pass stability, freeze scope, trailing inertness) (gated in `deno task check`; ./docs/audits.md)
 deno task ignore:audit:update        # regenerate that snapshot after adding a printer opt-in or fixing a misbinding/over-freeze/transient (the fixed line goes stale); refuses a narrowed run
 deno task render:audit <paths>       # render-equivalence over REAL Svelte code (needs the sidecar — NOT in `deno task check`; release-gated as a leg of `deno task conformance`; ./docs/audits.md)
@@ -918,7 +920,7 @@ deno task metrics                          # shorthand
 ```
 
 **Audits** — the standing correctness gates and discovery harnesses: line-comment swallow,
-the print-once comment ledger, gap/blank injection, build-fanout, raw-find scan,
+the print-once comment ledger, gap/blank injection, blank fabrication, build-fanout, raw-find scan,
 self-format (tsv over its own TS/JS), authoring-independence, format→reparse round-trip,
 comment↔token binding,
 render-equivalence, layout-neutrality, the seeded mutational fuzzer, the F1 idempotency
