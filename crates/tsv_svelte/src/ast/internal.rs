@@ -757,15 +757,15 @@ impl<'arena> FragmentNode<'arena> {
     /// Check if this node is whitespace-only text.
     ///
     /// Returns true only for Text nodes whose content is entirely *collapsible*
-    /// (ASCII) whitespace `[\t\n\f\r ]`. A non-breaking space (U+00A0 / U+202F) or
-    /// other Unicode separator is template *content*, not collapsible whitespace
-    /// (HTML/infra "ASCII whitespace"; matches prettier-plugin-svelte), so a node
-    /// made only of those returns false. All non-Text nodes return false.
+    /// whitespace `[ \t\n\r]` ([`is_collapsible_ws`]). A non-breaking space
+    /// (U+00A0 / U+202F), a form feed, or any other separator CSS does not collapse
+    /// is template *content*, not collapsible whitespace, so a node made only of
+    /// those returns false. All non-Text nodes return false.
     ///
-    /// Reads the precomputed `Text::is_ascii_ws_only` flag — O(1), source-free.
+    /// Reads the precomputed `Text::is_collapsible_ws_only` flag — O(1), source-free.
     #[inline]
     pub fn is_whitespace_only_text(&self) -> bool {
-        matches!(self, FragmentNode::Text(t) if t.is_ascii_ws_only)
+        matches!(self, FragmentNode::Text(t) if t.is_collapsible_ws_only)
     }
 
     /// Check if this node is a whitespace-only text containing at least one newline.
@@ -776,7 +776,108 @@ impl<'arena> FragmentNode<'arena> {
     /// for non-Text nodes or Text without newlines. Reads precomputed flags — source-free.
     #[inline]
     pub fn is_boundary_break(&self) -> bool {
-        matches!(self, FragmentNode::Text(t) if t.is_ascii_ws_only && t.has_newline())
+        matches!(self, FragmentNode::Text(t) if t.is_collapsible_ws_only && t.has_newline())
+    }
+
+    /// Whether this node is a **declaration** — `{@const}`, `{const …}`, `{let …}`, or a
+    /// `{#snippet}` block.
+    ///
+    /// The nodes that declare a binding and render nothing. Because the compiler
+    /// [hoists](FragmentNode::is_hoisted_from_fragment) them out of the fragment before it applies
+    /// the whitespace rules, the break beside one is render-free, and the printer spends that
+    /// licence on giving each its own line — see `Printer::is_own_line_declaration`.
+    ///
+    /// A `{#snippet}` belongs here on both counts: it declares a binding (the snippet name) and
+    /// renders nothing where it is written — `<C>docs{#snippet icon()}…{/snippet}</C>` compiles
+    /// byte-identically with the snippet broken onto its own line
+    /// (`../test-svelte-prettier-whitespace/hoisted-tags.md` carries the full oracle matrix).
+    ///
+    /// ⚠️ `{@debug}` is hoisted alike but is **not** a declaration: it is a transient debugging
+    /// aid, so it keeps the edge *trim* the hoist also licenses rather than a line of its own.
+    #[inline]
+    pub fn is_declaration(&self) -> bool {
+        matches!(
+            self,
+            FragmentNode::ConstTag(_)
+                | FragmentNode::DeclarationTag(_)
+                | FragmentNode::SnippetBlock(_)
+        )
+    }
+
+    /// Whether the compiler **hoists** this node out of its fragment before it applies the
+    /// whitespace rules — `clean_nodes`' `hoisted` list.
+    ///
+    /// Such a node is invisible to those rules, so the text beside it is the fragment's real
+    /// first/last node and the run between them is a render-free *edge* run rather than an
+    /// inter-sibling one: `{#if c}text {@const x = 1}{/if}` compiles to `text`, exactly like the
+    /// glued authoring, where `{#if c}text <b>y</b>{/if}` keeps its space. The printer's boundary
+    /// analysis therefore has to skip these nodes when it asks "am I at the content boundary?"
+    /// ([`FragmentNode::content_bounds`]).
+    ///
+    /// ⚠️ The hoist is **not** one of Svelte 5's three published whitespace rules (collapse
+    /// between nodes / trim at the edges / `<pre>` exempt) — those say nothing about which nodes
+    /// the edge is measured against. It lives only in `clean_nodes`, so it is verified against
+    /// the compiler rather than the summary; see
+    /// [hoisted_boundary_convergence](../../../../tests/fixtures/svelte/blocks/hoisted_boundary_convergence_prettier_divergence/).
+    ///
+    /// ⚠️ Scoped to the **edges**. With content on both sides the hoist makes neither run an
+    /// edge: the two runs merge into a single rendered space (`a {@const} b` → `a b`), so a space
+    /// must survive there and gluing would be a different document.
+    ///
+    /// ⚠️ **Deliberately NARROWER than the oracle's list**, which also holds `SvelteHead` /
+    /// `SvelteWindow` / `SvelteBody` / `SvelteDocument`. Those four are **block-classified**
+    /// here, so `handle_block_child` gives each its own line — and a line break at a fragment
+    /// edge is itself render-free, so trimming it and breaking it are both correct for the
+    /// render but cannot both happen: `<svelte:body … />b` trims to the glued form, whose next
+    /// pass re-breaks it, forever (a real F1 2-cycle the fuzz gate caught). Their own line is
+    /// the better form — a `<svelte:head>` welded to its neighbour would be the alternative —
+    /// so the printer keeps the break and declines the trim. The four are excluded HERE rather
+    /// than at each reader, so the two rules cannot re-collide at a new call site.
+    ///
+    /// ⚠️ **The hoist licenses two different things, and only one of them is this trim.** The break
+    /// beside a hoisted node is render-free for the same reason its edge run is, so trimming the
+    /// run and breaking it are both correct and only one can happen. A **declaration**
+    /// ([`FragmentNode::is_declaration`] — the tags and the `{#snippet}` block) spends the licence
+    /// on the break — it takes its own line (`Printer::is_own_line_declaration`), which is where
+    /// authors already write declarations — and reaches the trim only through that break.
+    /// `DebugTag` and `TitleElement` are what still trim: no layout rule gives either a line of
+    /// its own.
+    ///
+    /// So the five kinds stay in this ONE set even though they split on layout: every reader here
+    /// is asking the compiler's question ("does this node stand between the content and the
+    /// fragment edge?"), and the answer is the same for all five — including for the glue scan
+    /// behind `is_own_line_declaration`, where a hoisted neighbour is not content.
+    ///
+    /// The layout split does make [`FragmentNode::content_bounds`] *redundant* for a declaration —
+    /// the whole fixture suite stays green with those kinds treated as content there, because the
+    /// run beside an own-line declaration is trimmed by `handle_text_child`'s own arms before the
+    /// bounds are consulted. Narrowing it would state something false about the compiler to
+    /// record which reader happens to fire first, so the set answers the compiler's question and
+    /// the readers keep their own.
+    #[inline]
+    pub fn is_hoisted_from_fragment(&self) -> bool {
+        match self {
+            FragmentNode::ConstTag(_)
+            | FragmentNode::DeclarationTag(_)
+            | FragmentNode::DebugTag(_)
+            | FragmentNode::SnippetBlock(_) => true,
+            FragmentNode::SpecialElement(se) => {
+                matches!(se.kind, SpecialElementKind::TitleElement)
+            }
+            _ => false,
+        }
+    }
+
+    /// The index range of `nodes` that the whitespace rules see — the first and last node that
+    /// is **not** [hoisted](FragmentNode::is_hoisted_from_fragment), or `None` when every node is.
+    ///
+    /// Computed once per fragment and compared against, rather than asked per node: a
+    /// `nodes[..i].all(is_hoisted)` test at each child would be O(n²) over a fragment, on a
+    /// question whose answer two bounds settle.
+    pub fn content_bounds(nodes: &[FragmentNode<'_>]) -> Option<(usize, usize)> {
+        let first = nodes.iter().position(|n| !n.is_hoisted_from_fragment())?;
+        let last = nodes.iter().rposition(|n| !n.is_hoisted_from_fragment())?;
+        Some((first, last))
     }
 }
 
@@ -1054,6 +1155,50 @@ pub enum AttributeValue<'arena> {
     ExpressionTag(ExpressionTag<'arena>),
 }
 
+/// Whether `b` is **collapsible whitespace** — the characters CSS white-space processing
+/// actually acts on, and therefore the ones a formatter may add, drop or respell without
+/// changing what renders: `[ \t\n\r]`.
+///
+/// ⚠️ This is **narrower than Rust's `is_ascii_whitespace`**, which includes the form feed
+/// `\x0c`, and the difference is not cosmetic. CSS Text 3 §White Space Processing: "white
+/// space processing in CSS affects only the document white space characters: spaces
+/// (U+0020), tabs (U+0009), and segment breaks" — and in HTML the segment break is U+000A,
+/// since the DOM normalizes CR/CRLF away. U+000C is in none of those, so it is *rendered
+/// content*: Svelte's `clean_nodes` classifies with `regex_not_whitespace` = `/[^ \t\r\n]/`
+/// and keeps a form feed verbatim. Classifying one as whitespace lets the render-free
+/// boundary trim delete it and the inter-sibling collapse respell it as a space — both
+/// content changes, invisible to a corpus diff against prettier, whose own class
+/// (`[\t\n\f\r ]`) has the same defect. See
+/// [text_form_feed_prettier_divergence](../../../../tests/fixtures/svelte/elements/text_form_feed_prettier_divergence/).
+///
+/// ⚠️ It is equally **not** the HTML *tokenizer's* whitespace, which does include the form
+/// feed (a form feed separates attributes). This is a question about what RENDERS, so it is
+/// the printer's and `Text`'s class alone — the parser keeps `is_ascii_whitespace`.
+#[inline]
+pub fn is_collapsible_ws(b: u8) -> bool {
+    matches!(b, b' ' | b'\t' | b'\n' | b'\r')
+}
+
+/// [`is_collapsible_ws`] over a `char`, for the `str` pattern positions
+/// (`trim_matches`, `starts_with`, …).
+#[inline]
+pub fn is_collapsible_ws_char(c: char) -> bool {
+    matches!(c, ' ' | '\t' | '\n' | '\r')
+}
+
+/// The runs of `s` between [`is_collapsible_ws_char`] characters, empties skipped — the
+/// word split of a text node's fill (prettier's `splitTextToDocs`, `/[\t\n\f\r ]+/`).
+///
+/// A word split *is* a whitespace classification — every character it splits at is deleted along
+/// with the run it stood for — so it shares [`is_collapsible_ws_char`] rather than restating the
+/// class. `str::split_ascii_whitespace` is the same function over the **wider** set, and using it
+/// here dropped a form feed out of the middle of a word; `str::split_whitespace` is wider still
+/// and would drop a non-breaking space.
+#[inline]
+pub fn split_collapsible_ws(s: &str) -> impl Iterator<Item = &str> {
+    s.split(is_collapsible_ws_char).filter(|w| !w.is_empty())
+}
+
 /// Svelte Text node - raw text content
 ///
 /// Represents static text in the template or attribute values.
@@ -1067,7 +1212,7 @@ pub enum AttributeValue<'arena> {
 /// allocating when no entity is present.
 ///
 /// The printer's hot template-whitespace predicates (multiline-children analysis,
-/// inline-run detection, boundary trimming) read the precomputed `is_ascii_ws_only`
+/// inline-run detection, boundary trimming) read the precomputed `is_collapsible_ws_only`
 /// and `newline_count` scalars below instead of re-scanning `raw` each time — the
 /// same `multiline`-style trick `comment-as-span` used for `tsv_lang::Comment`. A
 /// content `Text` is otherwise re-scanned ~10× per parent-element format, across the
@@ -1082,11 +1227,19 @@ pub struct Text {
     /// Which entity decode `data()` applies, fixed at parse time by context.
     pub decoding: TextDecoding,
     pub span: Span,
-    /// Precomputed at parse: `raw` is entirely collapsible (ASCII) whitespace
-    /// `[\t\n\f\r ]`, or empty — equivalently `raw(source).trim_ascii().is_empty()`.
-    /// A non-breaking space (U+00A0 / U+202F) or other Unicode separator is template
-    /// *content*, so it makes this `false` (matches prettier-plugin-svelte's split).
-    pub is_ascii_ws_only: bool,
+    /// Precomputed at parse: `raw` is entirely [collapsible whitespace](is_collapsible_ws)
+    /// `[ \t\n\r]`, or empty — equivalently
+    /// `raw(source).trim_matches(is_collapsible_ws_char).is_empty()`.
+    /// A non-breaking space (U+00A0 / U+202F), a form feed, or any other separator CSS does
+    /// not collapse is template *content*, so it makes this `false`.
+    ///
+    /// Keyed on `raw`, not on the decoded `data`: an entity-encoded whitespace character
+    /// (`&#9;`) is content here, where Svelte's `clean_nodes` — which tests `data` — calls it
+    /// whitespace. That is deliberate and matches prettier (`node.raw || node.data`): rewriting
+    /// an entity's bytes is a content edit, so the node is printed verbatim. It is still a
+    /// *separator* rather than prose — it carries no word for a `fill` to pack — which is the
+    /// question `Printer::is_separator_like_text` answers off `data`.
+    pub is_collapsible_ws_only: bool,
     /// Precomputed count of `\n` in `raw`, **saturating at 2** — enough for every test
     /// the printer makes (`has_newline` = `>= 1`, blank line = `>= 2`).
     pub newline_count: u8,
@@ -1113,15 +1266,15 @@ impl Text {
     /// with `raw` whether the node is standalone or embedded.
     pub fn new(raw_span: Span, decoding: TextDecoding, span: Span, source: &str) -> Self {
         let raw = raw_span.extract(source);
-        // `is_ascii_ws_only` == `raw.trim_ascii().is_empty()` (true for empty too);
+        // `is_collapsible_ws_only` is true for an empty node too;
         // `newline_count` saturates at 2 (the printer only tests ==0 / <2 / >=1 / >=2).
-        let is_ascii_ws_only = raw.bytes().all(|b| b.is_ascii_whitespace());
+        let is_collapsible_ws_only = raw.bytes().all(is_collapsible_ws);
         let newline_count = raw.bytes().filter(|&b| b == b'\n').take(2).count() as u8;
         Text {
             raw_span,
             decoding,
             span,
-            is_ascii_ws_only,
+            is_collapsible_ws_only,
             newline_count,
         }
     }
@@ -1176,7 +1329,7 @@ pub struct ExpressionTag<'arena> {
     pub span: Span,
 }
 
-/// Svelte Script block - <script> tag contents
+/// Svelte Script block - `<script>` tag contents
 ///
 /// Contains a TypeScript/JS program and metadata about the script tag.
 /// The `context` field distinguishes between instance and module scripts.
@@ -1207,9 +1360,9 @@ impl ScriptContext {
     }
 }
 
-/// Svelte Style block - <style> tag contents
+/// Svelte Style block - `<style>` tag contents
 ///
-/// Stores the span of the entire <style> tag and the content span.
+/// Stores the span of the entire `<style>` tag and the content span.
 /// Style tag with parsed CSS content
 #[derive(Debug, Clone)]
 pub struct Style<'arena> {
@@ -1294,12 +1447,12 @@ mod tests {
             Text::new(span, TextDecoding::Fragment, span, raw)
         };
 
-        // `is_ascii_ws_only`: collapsible (ASCII) whitespace only; empty counts true.
-        assert!(mk("  \t\n ").is_ascii_ws_only);
-        assert!(mk("").is_ascii_ws_only);
+        // `is_collapsible_ws_only`: collapsible (ASCII) whitespace only; empty counts true.
+        assert!(mk("  \t\n ").is_collapsible_ws_only);
+        assert!(mk("").is_collapsible_ws_only);
         // A non-breaking space (U+00A0) is content, not collapsible whitespace.
-        assert!(!mk("\u{00A0}").is_ascii_ws_only);
-        assert!(!mk("a").is_ascii_ws_only);
+        assert!(!mk("\u{00A0}").is_collapsible_ws_only);
+        assert!(!mk("a").is_collapsible_ws_only);
 
         // `newline_count` saturates at 2 (drives `has_newline` / `has_blank_line`).
         assert_eq!(mk("a b").newline_count, 0);

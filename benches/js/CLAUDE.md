@@ -20,7 +20,7 @@ Uses [@fuzdev/fuz_util](https://github.com/fuzdev/fuz_util) benchmarking library
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
 | **`deno task check`** | `cargo fmt --check` · `pins:audit` · `typecheck` · `conformance:audit` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `binding:audit` · `authoring:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle | every commit; the CI `check` job |
-| **`deno task conformance:all`** | `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all` — plus `render:audit` over the pinned checkouts, the one leg that runs as a subprocess) **+** `conformance:test262` (pure Rust; JS parser vs test262 positives) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
+| **`deno task conformance:all`** | `pins:audit:checkouts` (the checkout-alignment preflight — these are the gates that READ the sibling checkouts, so this is where a skew must block) · `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all` — plus `render:audit` over the pinned checkouts, the one leg that runs as a subprocess) **+** `conformance:test262` (pure Rust; JS parser vs test262 positives) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,200; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`perf`** view (real code; absent checkouts skipped with a warning) | after a printer change; conformance cadence |
 | **`deno task audit:corpus`** | the pure-Rust content-loss / robustness suite over **real code**: `roundtrip_audit --gate` · `comment_audit` · `binding_audit --gate` (real code gating; prettier suites report-only) · `authoring_audit` · `fuzz --iterations 0` (the idempotency:sweep leg) | **`perf`** view + the pinned `../prettier` format suites (absent dev repos skipped with a warning; floor = `../svelte` src) | release; `scripts/publish.ts` **Step 3c**; conformance cadence |
@@ -177,6 +177,19 @@ deno task corpus:compare:format ~/dev/some-project --json           # JSON repor
 # binary (see "Artifact Freshness Guard" below); BENCH_STALE_OK=1 overrides
 deno task corpus:compare:format:run ~/dev/some-project
 ```
+
+**`TSV_FFI_PROFILE=corpus` lives on the `:run` task, not the wrapper.** Every
+corpus/conformance FFI entry (`corpus:compare:{format,parse}:run`,
+`conformance:{svelte-fixtures,ts-fixtures,ts-repo}:run`) selects the profile
+itself, so running one directly loads `target/corpus` — the same binary the
+build-first wrapper produces — instead of falling back to `target/release`.
+The profile is not a detail: `corpus` is `panic = "unwind"`, so a formatter
+panic is caught and reported as a per-file error, where `release`
+(`panic = "abort"`) kills the run. It also aims the freshness guard (which
+derives its path from the same env var) at the binary that will actually be
+loaded, so its staleness verdict and its rebuild hint both name `build:ffi:corpus`.
+The **bench** and **smoke** tasks deliberately stay on `release` — that is the
+artifact they measure.
 
 The `corpus:compare:format:run` task sets `PRETTIER_DEBUG=1` so
 prettier-plugin-svelte's verbatim-on-error fallback (whole `<script>` block
@@ -585,13 +598,13 @@ ledgers, SAFETY — catch tsv-side regressions independently, but the glance is
 cheap). Never re-pin to absorb an unexplained move — that is the regression
 the pin exists to catch.
 
-**Why both the pins AND pins:audit's checkout alignment exist:** they guard
-different granularities. Checkout alignment compares `package.json` versions —
+**Why both the pins AND the checkout alignment exist:** they guard
+different granularities. Checkout alignment (`pins:audit:checkouts`) compares `package.json` versions —
 but an upstream repo's version only bumps at release, so commits landing
 between releases change the SUITE without changing the version (proven on day
-one: a `../svelte` pull added one test fixture at the same `5.56.4` version —
+one: a `../svelte` pull added one test fixture at the same declared version —
 the count pin caught it; the version check couldn't). Conversely the count
-pins can't tell 5.56.1 from 5.56.4 if the counts happen to coincide. Version
+pins can't tell one release from another if the counts happen to coincide. Version
 alignment catches release-level skew; count pins catch commit-level suite
 drift within a version window.
 
@@ -1350,17 +1363,41 @@ stay identical**: the bench has to measure against the same parser/formatter
 that defines fixture correctness. Agreement across all the pin sites (sidecar
 `VERSIONS` + its `npm:` imports, this dir's `package.json`, actor.rs's acorn
 import-map pin) is enforced by `deno task pins:audit`
-(`scripts/check_canonical_pins.ts`, gated in `deno task check`) — which also
-gates **checkout alignment**: a present `../svelte` / `../acorn-typescript`
-checkout whose version differs from its pin FAILS `deno task check` (absent
-checkouts are skipped, so clean machines/CI still pass). Align the checkout to
-the pinned tag, or bump the pins deliberately. `../prettier` is not gated (its
+(`scripts/check_canonical_pins.ts --pins`, gated in `deno task check`).
+
+**Checkout alignment** is the same script's other mode
+(`deno task pins:audit:checkouts`), gated in `deno task conformance` and
+reported by `doctor`: a present `../svelte` / `../acorn-typescript` checkout
+whose version differs from its pin FAILS (absent checkouts are skipped, so a
+machine without the clones still passes). Align the checkout to the pinned tag,
+or bump the pins deliberately. The two modes are split because they assert
+different KINDS of fact: pin agreement is a **repo** fact that invalidates the
+fixture grading `cargo test` does, so it gates the committed tree; alignment is
+an **environment** fact about suites nothing in `deno task check` reads, so a
+skew there is pure collateral damage to that chain — it would halt it without
+invalidating a single committed-tree verdict. `../prettier` is not gated (its
 suites' oracle output is computed live per file and the checkout rides `-dev`
 versions); `deno task doctor` reports it. Bumping any of the five is therefore not a
 benchmark refresh — it re-baselines the entire fixture corpus. Do it
 deliberately: edit `package.json` and `sidecar.ts` in lockstep (the
 `//canonical-sync` note in package.json restates this), run
 `deno task fixtures:update`, and review the resulting fixture churn.
+
+**Then grep the repo for the OLD version string** — `rg '<old>' --glob '!benches/js/results/**'`.
+Nothing gates this, and it is the step that gets skipped. Prose that restates the pin
+("pinned at svelte X", "valid at the X pin", "the pinned oracle (svelte X) throws") is a
+duplicate of a value that just moved, and it goes silently wrong; the 5.56.4 → 5.56.8 bump
+left five such claims behind across `docs/` and two crates. A **past**-version mention is
+different and stays true — "Prettier 3.9.5 tightened it", a fixture README explaining which
+release changed a behavior — so this cannot be a lint, only a read. Prefer pointing at
+`sidecar.ts`'s `VERSIONS` over restating the number.
+
+Two things a bump can invalidate that `deno task check` does **not** cover, because both are
+sidecar-dependent: `deno task compile:validation` (the ratchet's `ORACLE-ERROR` line is a
+claim about oracle behavior, explicitly held "until the pin moves") and
+`deno task bench:harvest` (`SVELTE_REJECTS_PIN` counts what the oracle rejects). Run both.
+Svelte-source line anchors in `docs/checklist_svelte_compiler.md` are the third — nothing
+gates a line number, so spot-check a few.
 
 ### Canonical (JS baseline)
 

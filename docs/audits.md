@@ -283,6 +283,58 @@ own TS never writes stays invisible here. The injection audits (`gaps:audit`,
 **Build world.** Runs `tsv_cli` under `--profile corpus`, the single build world
 every `deno task check` audit shares, so it adds no separate compile.
 
+## Doc-Link Audit (`docs:audit`)
+
+```bash
+# rustdoc over the whole workspace with the doc lints denied. No artifact is
+# consumed — the run itself is the assertion.
+deno task docs:audit
+```
+
+**What it proves.** That every `[`path`]` in a doc comment still names something that
+exists. A doc link is the only claim a doc comment makes that a machine can check, so an
+unresolvable one is not a formatting nit — it is a **stale doc**. Every occurrence found
+when this gate was introduced was a rename that left its back-references behind:
+
+- a struct field doc'd as mirroring `ElementContext::block_flow_multiline`, a field that
+  had never existed on that struct (the value is a local, cached for two readers);
+- `stripped_redundant_paren_leading_line_comments`, renamed to
+  `stripped_redundant_paren_member_leading_run`, still named by two callers — one of
+  which also mis-described how the two forms differ;
+- `ControlFlowGap::BlockToKeyword`, an enum that exists nowhere; the real thing is
+  `push_block_to_keyword_gap`, called twenty lines below the comment naming it.
+
+None of those were reachable by any other gate. They were found only because clearing the
+27 accumulated broken links made them visible — which is the argument for denying rather
+than warning: a pile of known-broken links is precisely what hides the next one.
+
+**Why `--document-private-items`.** All three staleness findings above were on **private**
+items, which a default `cargo doc` never checks. This codebase puts its design rationale
+on private functions, so the private-items build is both the one maintainers read and the
+only one where the gate has teeth.
+
+**Lints, and one deliberate exemption.** `broken_intra_doc_links` (the staleness detector),
+plus three mechanical ones that keep it legible — `invalid_html_tags` (prose like
+`<script>` or `Vec<Doc>` that rustdoc reads as markup), `bare_urls`, and
+`redundant_explicit_links`. `private_intra_doc_links` is **allowed on purpose**: public
+docs here routinely link private items, and under `--document-private-items` those links
+resolve and navigate, so satisfying that lint would replace working navigation with inert
+backticks in exactly the build that matters.
+
+**Where the lints live.** `[workspace.lints.rustdoc]` in the root `Cargo.toml` carries them
+for day-to-day work (IDE, a bare `cargo doc`) along with the rationale. The task re-states
+them as `RUSTDOCFLAGS` because `tsv_ffi` and `tsv_napi` define their own `[lints.clippy]`
+tables, which Cargo cannot merge with `[lints] workspace = true` — so they do not inherit,
+and only the task's flags cover all fourteen crates.
+
+**Blind spots.** It checks that a link *resolves*, never that the surrounding prose is
+true. A doc that describes behavior the code no longer has passes cleanly; so does a
+correct link attached to a wrong claim. Two of the three findings above came with prose
+errors *beside* the dead link, and those needed reading, not the gate.
+
+**Build world.** `cargo doc` builds its own rmeta; it does not share the `--profile corpus`
+world the other `check` audits use, so it adds a short compile of its own.
+
 ## Authoring-Independence Audit (`authoring:audit`)
 
 ```bash
@@ -294,6 +346,12 @@ every `deno task check` audit shares, so it adds no separate compile.
 #   - BETWEEN siblings — space↔single-newline only. Inter-node whitespace is
 #     render-SIGNIFICANT (it collapses to one space, it doesn't vanish), so the run is
 #     reshaped, never created or destroyed. Both forms collapse identically ⇒ safe.
+#   ⚠️ The audit's own whitespace class is `is_collapsible_ws_char` (`[ \t\n\r]`), never Rust's
+#   `is_ascii_whitespace`. Every site it finds is spliced over WHOLESALE, so a character it
+#   wrongly counts as whitespace is one the mutation DELETES — the mutant is then a different
+#   document, and its second fixed point is a fact about the instrument rather than about the
+#   formatter. With the wide class a form-feed-bearing document reported 11 spurious
+#   dual-stable sites where its NBSP twin (the same document, same classification) reported 2.
 #   - At a tag's CONTENT BOUNDARY — hug↔space↔newline, i.e. the run IS created and
 #     destroyed. Svelte 5 removes start/end-of-content whitespace at compile, so all
 #     three authorings render identically. This is the family that catches a formatter

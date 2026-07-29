@@ -45,7 +45,7 @@
 //!   *throw* rather than reject: it carries a `svelte-ignore` for a warning whose
 //!   construction path dereferences an unset source locator, so
 //!   `compile(src, { runes: true })` dies in `state.js`'s `locator` with "An impossible
-//!   situation occurred". Verified against the pin (svelte 5.56.4): the same source
+//!   situation occurred". Verified against the pin: the same source
 //!   compiles fine at the DEFAULT (auto-detected) mode and at `runes: false`, under both
 //!   `generate` targets — Svelte's own harness does not force runes, which is why it is
 //!   green upstream. It is not tsv's bug, but the sidecar forces `runes: true` (the

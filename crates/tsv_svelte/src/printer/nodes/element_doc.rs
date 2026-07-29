@@ -819,7 +819,7 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Build a doc for a nested <style> or <script> element with formatted CSS/JS content
+    /// Build a doc for a nested `<style>` or `<script>` element with formatted CSS/JS content
     ///
     /// This handles nested style/script elements (inside other elements like `<div>`)
     /// that need their content formatted as CSS/JS rather than as regular fragment nodes.

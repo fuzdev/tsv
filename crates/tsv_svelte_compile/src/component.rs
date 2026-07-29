@@ -152,7 +152,7 @@ fn plan_component_children<'arena>(
                 slot_keys.push(slot_key);
             }
             FragmentNode::Comment(_) => {}
-            FragmentNode::Text(text) if text.is_ascii_ws_only => {}
+            FragmentNode::Text(text) if text.is_collapsible_ws_only => {}
             FragmentNode::Element(child) if child_slot_attribute(env, child) => {
                 return Err(unsupported(Refusal::ComponentNamedSlot {
                     name: name.to_string(),

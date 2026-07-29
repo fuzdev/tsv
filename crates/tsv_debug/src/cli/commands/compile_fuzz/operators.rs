@@ -661,7 +661,8 @@ fn exotic_whitespace(source: &str, anchors: &Anchors, rng: &mut Rng) -> Option<S
             *pick(rng, CSS_IDENT_CHARS)?,
         ),
         // Template text at a node boundary — Svelte's own whitespace collapse,
-        // which is ASCII-only (`Text::is_ascii_ws_only`).
+        // whose class is `[ \t\n\r]` (`Text::is_collapsible_ws_only`): a form feed or an
+        // NBSP spliced here is CONTENT, which is exactly what makes it an exotic input.
         _ => (
             *pick(rng, &anchors.template_gaps)?,
             *pick(rng, CONTENT_CHARS)?,

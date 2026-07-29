@@ -881,7 +881,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse attribute value (e.g., `"ts"`, `{expr}`, or unquoted `value`)
-    /// Returns a Vec<AttributeValue> to support mixed text/expressions
+    /// Returns a `Vec<AttributeValue>` to support mixed text/expressions
     pub(crate) fn parse_attribute_value(
         &mut self,
     ) -> Result<BumpVec<'arena, AttributeValue<'arena>>, ParseError> {

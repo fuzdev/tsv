@@ -86,18 +86,24 @@ pub(super) fn is_inline_content(node: &FragmentNode<'_>) -> bool {
 /// Whether a control-flow block is preceded by a **breakable** sibling — one that is
 /// [`is_inline_content`], the same set that sets `has_preceding_breakable`.
 ///
-/// `{#await}` / `{#snippet}` don't force their parent multiline on their own (a lone
+/// `{#await}` doesn't force its parent multiline on its own (a lone
 /// `<div>{#await p}x{/await}</div>` stays inline, matching prettier), unlike if/each/key
-/// (`has_any_expanding_blocks`). They need a force only when a preceding **breakable**
+/// (`has_any_expanding_blocks`). It needs a force only when a preceding **breakable**
 /// sibling *suppresses* the body-drop: there, forcing the parent multiline lets the
 /// body-drop (`can_wrap`), the inline-element closing-`>` dangle
 /// (`try_block_sibling_gt_dangle`), and a block-element sibling's own-line separation all
 /// resolve in one pass. A non-breakable preceding sibling (plain text, a comment) does
-/// **not** suppress the body-drop — await/snippet already drop on their own — so forcing
+/// **not** suppress the body-drop — await already drops on its own — so forcing
 /// there only diverges from prettier (which keeps the short construct inline); such
 /// siblings are skipped. (Block elements are `Element`, hence breakable, so their
 /// separation still fires.) The force is also gated on `kind.is_block()` at the call site,
 /// so it only applies to block-element parents.
+///
+/// A `{#snippet}` mostly precedes this check now: one that owns its line already forced
+/// the parent multiline (`Printer::has_own_line_declaration`, asked first at the call
+/// site), so the snippet half matters only for a snippet glued to content on both sides —
+/// which keeps the author's line and still wants the one-pass resolution after a
+/// breakable sibling.
 pub(super) fn has_control_flow_after_sibling(nodes: &[FragmentNode<'_>]) -> bool {
     let mut seen_breakable = false;
     for node in nodes {

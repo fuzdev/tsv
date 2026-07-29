@@ -54,8 +54,9 @@ impl CompileFixtureInitCommand {
                 }
             };
 
-        if let Err(e) = std::fs::create_dir_all(dir) {
-            eprintln!("Error creating directory {dir:?}: {e}");
+        // Create directory (refusing the wrong-cwd nested-fixture-root footgun)
+        if let Err(e) = fixtures::create_fixture_dir(dir) {
+            eprintln!("Error: {e}");
             return Err(CliError::Failed);
         }
 

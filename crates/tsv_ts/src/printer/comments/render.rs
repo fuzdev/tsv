@@ -78,7 +78,7 @@ impl<'a> Printer<'a> {
     ///
     /// Continuation lines are reindented to a single leading space before the
     /// `*` — the context indent is supplied by the per-line hardline (here baked
-    /// into a [`DocNode::MultilineText`]), and content after the `*` is
+    /// into a [`tsv_lang::doc::arena::DocNode::MultilineText`]), and content after the `*` is
     /// untouched. Mirrors prettier's `printIndentableBlockComment`.
     fn build_indentable_block_comment_doc(
         &self,

@@ -93,7 +93,7 @@ fails until someone decides it belongs upstream.
 
 ## The one `ORACLE-ERROR` line
 
-`validator/samples/silence-warnings-2` makes the pinned oracle (svelte 5.56.4) **throw**:
+`validator/samples/silence-warnings-2` makes the pinned oracle **throw**:
 it carries a `svelte-ignore` for a warning whose construction path dereferences an unset
 source locator, dying in `state.js`'s `locator` with *"An impossible situation occurred"*.
 
@@ -187,8 +187,8 @@ retired `ORACLE-ERROR` is not an over-acceptance win, and is reported on its own
 - The key is the *finding*, not a count — so a green run proves no new finding **shape**,
   never that the compiler's validation is correct on anything outside these suites.
 - The suites are static and version-pinned to the `../svelte` checkout; a pin bump can
-  legitimately move many lines at once. `deno task pins:audit` is what keeps the checkout
-  and the sidecar pin aligned.
+  legitimately move many lines at once. `deno task pins:audit:checkouts` is what keeps the
+  checkout and the sidecar pin aligned.
 
 ## See Also
 

@@ -338,9 +338,9 @@ impl<'a> Printer<'a> {
 
     /// Wrap `doc` in parens when `expr` is an `in` binary built directly inside a
     /// `for` header init. Used at positions that build an expression *without* a
-    /// [`needs_parens`] check — assignment RHS, ternary branches/test, and the
+    /// [`fn@needs_parens`] check — assignment RHS, ternary branches/test, and the
     /// init clause's own expression/declarator — so the for-init `in` rule still
-    /// applies there. Positions that already route through [`needs_parens`] (call
+    /// applies there. Positions that already route through [`fn@needs_parens`] (call
     /// args, object values, binary operands, …) get the same wrap via that path.
     #[inline]
     pub(crate) fn wrap_for_init_in(&self, expr: &internal::Expression<'_>, doc: DocId) -> DocId {
@@ -351,7 +351,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Print-context-aware wrapper over the free [`needs_parens`]: supplies the
+    /// Print-context-aware wrapper over the free [`fn@needs_parens`]: supplies the
     /// ambient for-header-init flag so the for-init `in` rule applies at every
     /// call site without threading the flag by hand. Prefer this inside `Printer`
     /// methods; the free function (which still requires the flag explicitly) is

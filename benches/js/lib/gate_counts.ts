@@ -75,7 +75,7 @@ import type { Language } from './types.ts';
  * upstream `package.json` version bumps only at RELEASE — so commits landing between
  * releases change the graded suite without changing the version. `pins:audit`'s version
  * check is blind to that window, which is exactly how these pins went stale silently: a
- * `../svelte` pull added three test inputs at the same declared `5.56.4`, and `../kit` +
+ * `../svelte` pull added three test inputs at the same declared version, and `../kit` +
  * `../svelte.dev` moved under the corpus pins with no version signal at all.
  *
  * So `pins:audit` also compares each checkout's HEAD against the commit recorded here and
@@ -89,7 +89,7 @@ import type { Language } from './types.ts';
  */
 export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: string }> = {
 	'../svelte': {
-		commit: 'b4d1583ae',
+		commit: '44a781373',
 		pins: 'SVELTE_FIXTURES_PINS, CORPUS_FORMAT_*, CORPUS_PARSE_*'
 	},
 	'../acorn-typescript': { commit: '312d079', pins: 'TS_FIXTURES_PINS' },
@@ -109,7 +109,7 @@ export interface GatePins {
 }
 
 /** conformance:svelte-fixtures — `scanned` suite inputs + `both_accept`; provenance in `GATE_CHECKOUT_COMMITS`. */
-export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3378, both_accept: 3283 };
+export const SVELTE_FIXTURES_PINS: GatePins = { scanned: 3387, both_accept: 3292 };
 
 /** conformance:ts-fixtures — provenance in `GATE_CHECKOUT_COMMITS` (../acorn-typescript, oracle @sveltejs/acorn-typescript). */
 export const TS_FIXTURES_PINS: GatePins = { scanned: 207, both_accept: 186 };
@@ -226,7 +226,8 @@ export const TEST262_POSITIVES_PIN = 42_113;
  * bench:harvest:svelte-rejects — exact reject count. Measured 2026-07-06:
  * ../svelte at 8fb7ceeba, oracle svelte@5.56.4 (142 of 5648 conformance-view
  * Svelte files, re-verified after the ryanatkn.com + webdevladder.net + mdz
- * corpus additions — all their Svelte is valid). Fewer = the svelte/compiler oracle stopped rejecting (broken
+ * corpus additions — all their Svelte is valid); re-harvested unchanged at
+ * ../svelte 44a781373, oracle svelte@5.56.8. Fewer = the svelte/compiler oracle stopped rejecting (broken
  * import/config); more = it started rejecting wholesale — either way the cache
  * would corrupt the published coverage number.
  */

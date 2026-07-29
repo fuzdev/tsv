@@ -4,8 +4,8 @@
 //! and the symbol bind). It ports tsgo's binder flow construction (`bind` /
 //! `bindContainer` / `bindChildren` + the per-statement flow shapers) onto the
 //! tsv AST, resolving each attachment's [`NodeId`] through the F0 address map's
-//! **strict** [`BoundFile::require_node_id`] (a miss aborts — a flow graph must
-//! never silently splice onto the wrong node).
+//! **strict** [`BoundFile::require_node_id`](crate::binder::BoundFile::require_node_id)
+//! (a miss aborts — a flow graph must never silently splice onto the wrong node).
 //!
 //! **F1b scope: the branching control-flow constructs.** On top of F1a's linear
 //! substrate this slice builds faithful topology for **conditions** (the

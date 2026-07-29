@@ -11,7 +11,7 @@
 
 use super::blocks_doc::{EACH_BLOCK_OPEN, ELSE_IF_BLOCK_OPEN, IF_BLOCK_OPEN};
 use super::helpers::each_expr_comment_end;
-use crate::ast::internal::{self, Fragment, FragmentNode};
+use crate::ast::internal::{self, Fragment, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
 use smallvec::smallvec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -106,7 +106,7 @@ impl<'a> Printer<'a> {
                 if let FragmentNode::Text(text) = node {
                     let raw = text.raw(self.source);
                     if is_first_node {
-                        starts_with_ws = raw.starts_with(|c: char| c.is_ascii_whitespace());
+                        starts_with_ws = raw.starts_with(is_collapsible_ws_char);
                     }
                     if raw.contains('\n') {
                         has_newline = true;
@@ -381,7 +381,7 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build if block doc for whitespace-sensitive context (inside <pre>).
+    /// Build if block doc for whitespace-sensitive context (inside `<pre>`).
     ///
     /// Emits block structure inline without added whitespace. Body nodes are
     /// formatted with whitespace-sensitive content formatting to preserve
@@ -440,7 +440,7 @@ impl<'a> Printer<'a> {
         parts.push(body_doc);
     }
 
-    /// Build each block doc for whitespace-sensitive context (inside <pre>).
+    /// Build each block doc for whitespace-sensitive context (inside `<pre>`).
     ///
     /// Emits block structure inline without added whitespace. Body nodes are
     /// formatted with whitespace-sensitive content formatting.

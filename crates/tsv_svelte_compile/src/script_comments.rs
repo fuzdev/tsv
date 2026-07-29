@@ -172,10 +172,10 @@ pub(crate) fn collect_script_comments(
         // is not real markup, so it doesn't force the refusal. Any genuine
         // element / expression / comment / block before the instance script's end
         // still refuses (its emitter's comment window would sweep the carried
-        // script comments). A Unicode-whitespace-only text (`is_ascii_ws_only ==
+        // script comments). A Unicode-whitespace-only text (`is_collapsible_ws_only ==
         // false`) is content and correctly still refuses.
         if let FragmentNode::Text(text) = node
-            && text.is_ascii_ws_only
+            && text.is_collapsible_ws_only
         {
             continue;
         }
@@ -700,7 +700,7 @@ fn template_emits_nested_block(nodes: &[FragmentNode<'_>]) -> bool {
             // `Foo($$renderer, {…})` call.
             ElementKind::Component => {
                 element.fragment.nodes.iter().any(|child| {
-                    !matches!(child, FragmentNode::Text(text) if text.is_ascii_ws_only)
+                    !matches!(child, FragmentNode::Text(text) if text.is_collapsible_ws_only)
                 })
             }
             ElementKind::Html => template_emits_nested_block(element.fragment.nodes),

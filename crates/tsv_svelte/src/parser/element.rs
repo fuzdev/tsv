@@ -114,7 +114,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         })
     }
 
-    /// Parse an element or special element: <tag></tag> or <tag/> or <void>
+    /// Parse an element or special element: `<tag></tag>` or `<tag/>` or `<void>`
     ///
     /// Detects special elements (svelte:*, slot) and parses them appropriately.
     /// Returns a ParsedElement enum to distinguish between regular and special elements.
@@ -615,7 +615,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok(end as u32)
     }
 
-    /// Parse raw text content for nested <style> and <script> elements.
+    /// Parse raw text content for nested `<style>` and `<script>` elements.
     /// These elements should not have their content parsed as Svelte template syntax.
     /// Returns a single Text node with the raw content, or empty vec if no content.
     fn parse_raw_text_content(

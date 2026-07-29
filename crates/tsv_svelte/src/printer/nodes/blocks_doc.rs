@@ -630,7 +630,7 @@ impl<'a> Printer<'a> {
                     }
                     if_block = Some(b);
                 }
-                FragmentNode::Text(t) if t.is_ascii_ws_only => {
+                FragmentNode::Text(t) if t.is_collapsible_ws_only => {
                     // Collapsible (ASCII) whitespace-only text is OK; a non-breaking
                     // space is content and blocks the elseif flatten.
                 }

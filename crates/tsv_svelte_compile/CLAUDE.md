@@ -212,8 +212,10 @@ project-wide conventions.
   (`compare_canonical` → `Parity`). The compiler's parity bar over two canonical JS
   strings: byte-exact, or tolerated when they differ ONLY in comment *position*
   (same code, same comment sequence, no bundler annotation). See §The Parity Bar.
-- `namespace.rs` — **the SSR namespace inference** (Svelte's `infer_namespace` /
-  `check_nodes_for_namespace` / `determine_namespace_for_children`): the `svg`/`mathml`/`html`
+- `namespace.rs` — **the fragment namespace inference** (Svelte's `infer_namespace` /
+  `check_nodes_for_namespace` / `determine_namespace_for_children` — `3-transform/utils.js`,
+  shared oracle code both backends import verbatim; server-only in tsv only because
+  only the server transform exists): the `svg`/`mathml`/`html`
   namespace of each fragment, threaded through emission so the whitespace pass removes
   collapsed inter-node whitespace under `svg` (matching the oracle). Also the
   ancestor-aware `element_is_svg`/`element_is_mathml` classifiers the whitespace,
@@ -702,8 +704,11 @@ project-wide conventions.
   the rune-rewrite loop and `EmitEnv` construction, using the `store_names` /
   `store_shadowed` sets frozen there.
 The **script side** is seven modules, split along the line a second transform
-would need: five are target-independent (the oracle decides them before it
-chooses what to emit), two mint server-module syntax. They are listed here in
+would need: four are target-independent (the oracle decides them before it
+chooses what to emit — `script_ts_gate`, `script_decls`, `script_bindings`,
+`script_collision`), and three are server-specific (`script_rewrite` and
+`script_props` mint server-module syntax; `script_comments` reasons about the
+server printer's comment policy, per its own header). They are listed here in
 pipeline order.
 
 - `script_ts_gate.rs` — the document-wide TypeScript flag and gate

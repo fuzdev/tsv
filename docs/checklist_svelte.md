@@ -192,6 +192,8 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Basic const (`{@const x = value}`)
 - Const with destructuring
 - Const in various contexts (if, each, await)
+- Own line in its fragment, except when glued to content on both sides (shared with the
+  declaration tag — see [conformance_prettier.md §Svelte: Inline content block-style](./conformance_prettier.md#svelte-inline-content-block-style))
 
 ### Declaration Tag
 
@@ -199,6 +201,11 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Binding-less `let` (`{let x}` → `{let x;}`)
 - Declaration with destructuring
 - Declaration in various contexts (root, if, each, snippet, element, component)
+- Own line in its fragment, on the same rule as `{@const}` above (`{#snippet}` follows the
+  same rule — it declares a binding and hoists alike; see its section below)
+- Root siblings around a lifted `<script>` / `<style>` / `<svelte:options>` count as glued —
+  the compiler removes the section before its whitespace rules, so the byte gap is not a
+  separator (`a<script>…</script>{const y = 2}b` stays welded and renders `ab`)
 
 ### Debug Tag
 
@@ -233,6 +240,8 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Parameter comments — interior (`{ a = /* c */ 1 }`), boundary (`a /* c */, b`), dangling (`(/* c */)`)
 - Nested snippets
 - Recursive snippets
+- Own line in its fragment, except when glued to content on both sides — the same rule as the
+  declaration tags (see [conformance_prettier.md §Svelte: Inline content block-style](./conformance_prettier.md#svelte-inline-content-block-style))
 
 ### TypeScript Snippets
 

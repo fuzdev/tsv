@@ -198,7 +198,7 @@ pub fn format_str(source: &str) -> Result<String> {
 
 /// Format into a caller-provided doc arena.
 ///
-/// Identical output to [`format`], but the doc IR is built into `arena` instead
+/// Identical output to [`fn@format`], but the doc IR is built into `arena` instead
 /// of a freshly allocated one, so a driver that formats many files can reuse one
 /// arena across them (`arena.reset()` between files retains the buffers). Nothing
 /// borrowed from `arena` escapes — the result is an owned `String` — so the
@@ -234,7 +234,7 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
 /// Format a program with newline-derived authoring intent **erased** — the
 /// intent-erased *canonical* reprint.
 ///
-/// [`format`] deliberately preserves authoring intent: an object literal, import
+/// [`fn@format`] deliberately preserves authoring intent: an object literal, import
 /// list, or call whose source carried a newline after the opening delimiter stays
 /// expanded even when it would fit inline, and blank lines between statements are
 /// kept. `format_canonical` turns all of that off — constructs collapse when they
@@ -260,7 +260,7 @@ pub fn format_in(program: &Program<'_>, source: &str, arena: &DocArena) -> Strin
 /// canonicalizes hand-written TS must account for it.
 ///
 /// This is a cold path used by tooling that needs a canonical form for comparison
-/// (e.g. diffing two compilers' output); the [`format`] path is untouched and
+/// (e.g. diffing two compilers' output); the [`fn@format`] path is untouched and
 /// byte-identical.
 pub fn format_canonical(program: &Program<'_>, source: &str) -> String {
     let arena = DocArena::for_source(source);

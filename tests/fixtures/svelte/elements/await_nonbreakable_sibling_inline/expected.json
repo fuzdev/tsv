@@ -1,0 +1,195 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 485,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 318,
+				"data": "\n\tA short {#await} after a non-breakable sibling (plain text or a comment) stays\n\tfully inline — the parent element does not break. Await is inline-transparent\n\tafter such a sibling, matching prettier. ({#snippet} is a declaration and takes\n\tits own line instead — blocks/snippet/own_line_prettier_divergence.)\n"
+			},
+			{
+				"type": "Text",
+				"start": 318,
+				"end": 320,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 320,
+				"end": 349,
+				"data": " text sibling + await "
+			},
+			{
+				"type": "Text",
+				"start": 349,
+				"end": 350,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 350,
+				"end": 397,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 351
+					},
+					"end": {
+						"line": 9,
+						"column": 4,
+						"character": 354
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 355,
+							"end": 360,
+							"raw": "text ",
+							"data": "text "
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 360,
+							"end": 391,
+							"expression": {
+								"type": "Identifier",
+								"start": 368,
+								"end": 375,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 18
+									},
+									"end": {
+										"line": 9,
+										"column": 25
+									}
+								},
+								"name": "promise"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 376,
+										"end": 383,
+										"raw": "loading",
+										"data": "loading"
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 397,
+				"end": 399,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 399,
+				"end": 431,
+				"data": " comment sibling + await "
+			},
+			{
+				"type": "Text",
+				"start": 431,
+				"end": 432,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 432,
+				"end": 484,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 433
+					},
+					"end": {
+						"line": 12,
+						"column": 4,
+						"character": 436
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Comment",
+							"start": 437,
+							"end": 447,
+							"data": " c "
+						},
+						{
+							"type": "AwaitBlock",
+							"start": 447,
+							"end": 478,
+							"expression": {
+								"type": "Identifier",
+								"start": 455,
+								"end": 462,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 23
+									},
+									"end": {
+										"line": 12,
+										"column": 30
+									}
+								},
+								"name": "promise"
+							},
+							"value": null,
+							"error": null,
+							"pending": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 463,
+										"end": 470,
+										"raw": "loading",
+										"data": "loading"
+									}
+								]
+							},
+							"then": null,
+							"catch": null
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
