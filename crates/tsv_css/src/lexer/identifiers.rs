@@ -74,7 +74,7 @@ pub(crate) fn is_ascii_identifier_start(b: u8) -> bool {
 /// the common no-escape identifier returns `None` (no allocation — its text is the
 /// verbatim source slice `source[start..end]`). The decoded buffer is materialized
 /// lazily from the verbatim run scanned so far the first time a `\` escape is seen;
-/// the caller ([`Lexer::read_identifier`]) funnels it into the lexer's reused
+/// the caller ([`crate::lexer::Lexer::read_identifier`]) funnels it into the lexer's reused
 /// `decode_scratch`, so this owned `String` is the only allocation on the escape path.
 pub(crate) fn read_identifier(
     source: &str,

@@ -73,7 +73,7 @@ pub enum ChainNode<'a> {
         property_start: u32,
         name_start: u32,
     },
-    /// Computed member access: [expr]
+    /// Computed member access: `[expr]`
     /// `bracket_end` is the position just before the closing `]` (for trailing comment detection)
     ComputedMember {
         expr: &'a internal::Expression<'a>,
@@ -229,7 +229,7 @@ impl<'a> ChainNode<'a> {
         matches!(self, Self::NonNull)
     }
 
-    /// Check if this is a numeric computed accessor like [0], [1]
+    /// Check if this is a numeric computed accessor like `[0]`, `[1]`
     pub fn is_numeric_accessor(&self) -> bool {
         matches!(self, Self::ComputedMember { expr, .. } if is_numeric_index(expr))
     }

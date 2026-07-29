@@ -69,7 +69,7 @@ pub fn format_str(source: &str) -> Result<String> {
 
 /// Format into a caller-provided doc arena.
 ///
-/// Identical output to [`format`], but the doc IR is built into `arena` instead
+/// Identical output to [`fn@format`], but the doc IR is built into `arena` instead
 /// of a freshly allocated one, so a driver that formats many files can reuse one
 /// arena across them (`arena.reset()` between files retains the buffers). Nothing
 /// borrowed from `arena` escapes — the result is an owned `String`. Embedded

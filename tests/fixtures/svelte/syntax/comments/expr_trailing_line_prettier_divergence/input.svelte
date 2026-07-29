@@ -32,7 +32,8 @@ then val}
 {/key}
 {#each list as it}
 	{@const y = it // c
-	}{it}
+	}
+	{it}
 {/each}
 <div
 	{...expr // c

@@ -3,7 +3,7 @@ use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use tsv_lang::{ParseError, Span};
 
-/// Parse attribute selector: [attr], [attr="value"], [attr^="prefix"]
+/// Parse attribute selector: `[attr]`, `[attr="value"]`, `[attr^="prefix"]`
 /// Supports namespace prefixes: [ns|attr], [*|attr], [|attr]
 pub(crate) fn parse_attribute_selector<'arena>(
     parser: &mut CssParser<'_, 'arena>,

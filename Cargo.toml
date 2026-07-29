@@ -95,6 +95,29 @@ unused_lifetimes = "warn"
 elided_lifetimes_in_paths = "warn"
 unused_qualifications = "warn"
 
+[workspace.lints.rustdoc]
+# A doc link is the only machine-checkable claim a doc comment makes, so an unresolvable
+# one is a stale doc, not a formatting nit — every occurrence found so far was a rename
+# that left its back-references behind (a field that had moved to a local, a function
+# renamed under two callers, an enum that no longer existed). Denied so the next one
+# fails instead of joining a pile of known-broken links that hides it.
+#
+# This table is the day-to-day signal (IDE, a bare `cargo doc`). The GATE is `deno task
+# docs:audit`, which re-states these as `RUSTDOCFLAGS` — `tsv_ffi` and `tsv_napi` carry
+# their own `[lints.clippy]` tables, and Cargo cannot merge that with
+# `[lints] workspace = true`, so they do not inherit this. It also runs with
+# `--document-private-items`, because this codebase's design rationale lives on PRIVATE
+# items and every stale link found so far was on one.
+broken_intra_doc_links = "deny"
+invalid_html_tags = "deny"
+bare_urls = "deny"
+redundant_explicit_links = "deny"
+# Deliberately allowed, not swept. Public docs here routinely link private items, and
+# under `--document-private-items` those links RESOLVE and navigate — satisfying this
+# lint would mean replacing working navigation with inert backticks, in exactly the
+# build a maintainer reads.
+private_intra_doc_links = "allow"
+
 [workspace.lints.clippy]
 # Enable lint groups (priority -1 so individual lints can override)
 all = { level = "warn", priority = -1 }

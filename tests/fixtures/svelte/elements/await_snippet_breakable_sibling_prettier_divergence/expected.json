@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 771,
+	"end": 868,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -514,31 +514,31 @@
 			{
 				"type": "Comment",
 				"start": 675,
-				"end": 716,
-				"data": " inline-element sibling + snippet "
+				"end": 811,
+				"data": " inline-element sibling + snippet: the snippet is a declaration, so it also\n     splits from the glued sibling onto its own line "
 			},
 			{
 				"type": "Text",
-				"start": 716,
-				"end": 717,
+				"start": 811,
+				"end": 812,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 717,
-				"end": 770,
+				"start": 812,
+				"end": 867,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 29,
+						"line": 30,
 						"column": 1,
-						"character": 718
+						"character": 813
 					},
 					"end": {
-						"line": 29,
+						"line": 30,
 						"column": 4,
-						"character": 721
+						"character": 816
 					}
 				},
 				"attributes": [],
@@ -547,26 +547,26 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 722,
-							"end": 724,
+							"start": 817,
+							"end": 819,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "RegularElement",
-							"start": 724,
-							"end": 738,
+							"start": 819,
+							"end": 833,
 							"name": "span",
 							"name_loc": {
 								"start": {
-									"line": 30,
+									"line": 31,
 									"column": 2,
-									"character": 725
+									"character": 820
 								},
 								"end": {
-									"line": 30,
+									"line": 31,
 									"column": 6,
-									"character": 729
+									"character": 824
 								}
 							},
 							"attributes": [],
@@ -575,8 +575,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 730,
-										"end": 731,
+										"start": 825,
+										"end": 826,
 										"raw": "s",
 										"data": "s"
 									}
@@ -584,24 +584,31 @@
 							}
 						},
 						{
+							"type": "Text",
+							"start": 833,
+							"end": 835,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
 							"type": "SnippetBlock",
-							"start": 738,
-							"end": 763,
+							"start": 835,
+							"end": 860,
 							"expression": {
 								"type": "Identifier",
 								"name": "f",
-								"start": 748,
-								"end": 749,
+								"start": 845,
+								"end": 846,
 								"loc": {
 									"start": {
-										"line": 30,
-										"column": 25,
-										"character": 748
+										"line": 32,
+										"column": 11,
+										"character": 845
 									},
 									"end": {
-										"line": 30,
-										"column": 26,
-										"character": 749
+										"line": 32,
+										"column": 12,
+										"character": 846
 									}
 								}
 							},
@@ -611,8 +618,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 752,
-										"end": 753,
+										"start": 849,
+										"end": 850,
 										"raw": "x",
 										"data": "x"
 									}
@@ -621,8 +628,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 763,
-							"end": 764,
+							"start": 860,
+							"end": 861,
 							"raw": "\n",
 							"data": "\n"
 						}

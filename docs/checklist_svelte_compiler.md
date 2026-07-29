@@ -4,7 +4,7 @@ Coverage map for tsv's Svelte-to-JS compiler (`crates/tsv_svelte_compile`): whic
 
 ## Coverage
 
-The compiler targets **server (SSR) output for runes-mode components**, measured against Svelte's own `compile()` (pinned at **svelte 5.56.4**, the sidecar pin) as the correctness oracle. Parity is judged on the **canonical reprint** of both sides' JS (`canonicalize_js` — an intent-erased reprint, so a byte difference is a real code difference), plus byte-equal CSS.
+The compiler targets **server (SSR) output for runes-mode components**, measured against Svelte's own `compile()` at the **sidecar pin** (`crates/tsv_debug/src/deno/sidecar.ts`'s `VERSIONS`, the single source of truth — not restated here, where it would silently go stale on the next bump) as the correctness oracle. Parity is judged on the **canonical reprint** of both sides' JS (`canonicalize_js` — an intent-erased reprint, so a byte difference is a real code difference), plus byte-equal CSS.
 
 **The refusal contract**: every component shape is exactly one of
 
@@ -26,7 +26,9 @@ A **Refused** entry below opens with the `Refusal`'s stable **bucket key** in a 
 - Svelte docs: `../../svelte/documentation/docs/`
 - Compile fixtures: `tests/fixtures_compile/` (oracle-generated via `compile_fixture_init`)
 
-Svelte-source line anchors below are valid at the 5.56.4 pin.
+Svelte-source line anchors below are valid at the pinned Svelte version. A pin bump can
+shift them — they are the one thing here a version bump invalidates silently, since nothing
+gates a line number.
 
 ---
 

@@ -657,8 +657,8 @@ impl<'a> PartitionedComments<'a> {
     /// The author's placement is preserved in both cases: a comment hugging the next
     /// arg leads it; a comment left alone on the comma line stays there. Callers then
     /// emit `trailing_block` (before-comma blocks + stranded after-comma) via
-    /// [`emit_trailing_comments_around_comma`], the line break, then `leading` (own-line
-    /// comments + hugged after-comma) via [`emit_leading_comments_inline_aware`] — so the
+    /// [`Self::emit_trailing_comments_around_comma`], the line break, then `leading` (own-line
+    /// comments + hugged after-comma) via [`Self::emit_leading_comments_inline_aware`] — so the
     /// rule lives here once and every argument path inherits it.
     pub fn route_after_comma_hugging_to_leading(&mut self, printer: &Printer<'_>) {
         let Some(comma_pos) = find_comma_pos(printer.source, self.start, self.end) else {
@@ -736,7 +736,7 @@ impl<'a> PartitionedComments<'a> {
     /// after-comma blocks and the same-line line comment follow the comma
     /// (`arg, /* c */ // c2`). The caller adds the line break after.
     ///
-    /// Unlike [`emit_trailing_comments`] (which the caller invokes *after* pushing
+    /// Unlike [`Self::emit_trailing_comments`] (which the caller invokes *after* pushing
     /// the comma, so every block lands after it), this keeps a before-comma block in
     /// its authored position. Shared by the `new`-argument non-last paths
     /// (`build_new_doc_with_wrapping` and `build_args_with_blank_lines`) so they
@@ -786,15 +786,15 @@ impl<'a> PartitionedComments<'a> {
     }
 
     /// Emit a last argument's complete trailing-comment region: same-line comments (via
-    /// [`emit_trailing_comments`]), then own-line dangling comments (via
-    /// [`emit_dangling_comments`]). No trailing comma is emitted (trailingComma: 'none'),
+    /// [`Self::emit_trailing_comments`]), then own-line dangling comments (via
+    /// [`Self::emit_dangling_comments`]). No trailing comma is emitted (trailingComma: 'none'),
     /// so a same-line block trails the arg in source order whether it sat before or after
     /// the source comma — the last arg needs no split around the never-emitted comma.
     ///
     /// The last-argument counterpart to [`Printer::open_inter_arg_gap`] (the non-last
     /// gap): shared by the `new` and member-chain last-arg paths so the ordering lives in
     /// one place. (`call_formatting` keeps its own same-line loop, feeding
-    /// `force_expansion`, and calls only [`emit_dangling_comments`] directly.)
+    /// `force_expansion`, and calls only [`Self::emit_dangling_comments`] directly.)
     pub fn emit_last_arg_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         // `emit_trailing_comments` already no-ops when there are no trailing comments,
         // so no presence guard is needed.

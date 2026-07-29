@@ -14,6 +14,13 @@
  * init/preflights (artifact freshness, node_modules) — those are cheap; the module
  * cache is the win.
  *
+ * The task chains `pins:audit:checkouts` ahead of this driver: every leg below
+ * grades inputs from the sibling checkouts against the PINNED npm oracle, so a
+ * checkout whose version has drifted off its pin grades different inputs than the
+ * oracle defines (and rots the path-keyed ledgers). That preflight is where a skew
+ * blocks — `deno task check` deliberately no longer carries it, since nothing there
+ * reads those checkouts.
+ *
  * Takes NO arguments — per-leg options (subtree roots, --json, -v) live on the
  * standalone tasks (`conformance:svelte-fixtures`, `corpus:compare:*`, …), which
  * remain the scoped/triage entry points. The task sets `TSV_FFI_PROFILE=corpus`

@@ -118,7 +118,7 @@ impl<'a> Printer<'a> {
 
     /// Push each comment on its own line (comment + `hardline`), the layout a
     /// stripped-redundant-paren member's leading line run takes before its `| `
-    /// separator ([`Self::stripped_redundant_paren_leading_line_comments`]).
+    /// separator ([`Self::stripped_redundant_paren_member_leading_run`]).
     fn push_own_line_comment_run(&self, parts: &mut DocBuf, comments: &CommentVec<'_>) {
         let d = self.d();
         for comment in comments {

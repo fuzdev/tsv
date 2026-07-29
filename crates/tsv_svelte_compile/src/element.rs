@@ -238,7 +238,7 @@ pub(crate) fn emit_element<'arena>(
                 .fragment
                 .nodes
                 .iter()
-                .any(|n| !matches!(n, FragmentNode::Text(t) if t.is_ascii_ws_only)) =>
+                .any(|n| !matches!(n, FragmentNode::Text(t) if t.is_collapsible_ws_only)) =>
         {
             return Err(unsupported(Refusal::ElementWithChildren {
                 name: name.clone(),

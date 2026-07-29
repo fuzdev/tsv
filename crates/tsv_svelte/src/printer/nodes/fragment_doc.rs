@@ -14,7 +14,9 @@
 
 use super::element_doc::MultilineCause;
 use super::helpers::{is_control_flow_block, is_inline_content};
-use crate::ast::internal::{self, Fragment, FragmentNode};
+use crate::ast::internal::{
+    self, Fragment, FragmentNode, is_collapsible_ws, is_collapsible_ws_char, split_collapsible_ws,
+};
 use crate::printer::Printer;
 use smallvec::SmallVec;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -87,15 +89,28 @@ struct TextChildContext {
     /// the same separator through its own `next_is_tag` case, and the two emitting a different doc
     /// for one logical separator is exactly the period-2 cycle `cause` exists to close.
     run_has_prose: bool,
+    /// The first and last index in `trimmed_nodes` that the whitespace rules see — the fragment's
+    /// content bounds once every HOISTED node is skipped
+    /// ([`FragmentNode::content_bounds`]). `handle_text_child`'s `is_first` / `is_last` are
+    /// `i <= .0` / `i >= .1` rather than `i == 0` / `i + 1 == len`, so a text with only hoisted
+    /// nodes between it and the edge trims its run — the compiler deletes that run, since it lifts
+    /// those nodes out before it trims.
+    ///
+    /// Carried on the context rather than recomputed per child: the question is per-FRAGMENT, and
+    /// asking it per node would rescan the sibling list at every text (O(n²) on a long fragment).
+    content_bounds: (usize, usize),
 }
 
-/// Whether `raw` begins with a linebreak, ignoring leading horizontal whitespace — matches
-/// prettier-plugin-svelte's `startsWithLinebreak` (`^([\t\f\r ]*\n)`). Used by the block-child
+/// Whether `raw` begins with a linebreak, ignoring leading horizontal whitespace — prettier's
+/// `startsWithLinebreak` (`^([\t\f\r ]*\n)`) with the form feed dropped, since a form feed is
+/// content rather than skippable whitespace ([`is_collapsible_ws`]). Used by the block-child
 /// boundary logic to tell a leading-linebreak text (which supplies its own break) from
 /// content/space text (which needs a `softline`).
+///
+/// The array spelling is deliberate: it feeds a `str` pattern, where an `is_collapsible_ws_char`
+/// predicate fn would change the `Pattern` monomorphization (a measured `.text` growth).
 fn text_starts_with_linebreak(raw: &str) -> bool {
-    raw.trim_start_matches([' ', '\t', '\x0c', '\r'])
-        .starts_with('\n')
+    raw.trim_start_matches([' ', '\t', '\r']).starts_with('\n')
 }
 
 impl<'a> Printer<'a> {
@@ -223,15 +238,12 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
-        // Skip whitespace-only text nodes at the fragment boundaries (ASCII whitespace only —
-        // a non-breaking space (U+00A0) is content, not a collapsible boundary, so an
-        // NBSP-only node is never skipped).
+        // Skip whitespace-only text nodes at the fragment boundaries (collapsible whitespace
+        // only — a non-breaking space (U+00A0) or a form feed is content, not a collapsible
+        // boundary, so a node made only of those is never skipped).
         let source = self.source;
-        let should_skip_at_boundary = |n: &FragmentNode<'_>| -> bool {
-            matches!(n, FragmentNode::Text(text) if text.is_ascii_ws_only)
-        };
-
-        let Some((start_idx, end_idx)) = Self::trimmed_node_bounds(nodes, should_skip_at_boundary)
+        let Some((start_idx, end_idx)) =
+            Self::trimmed_node_bounds(nodes, |n: &FragmentNode<'_>| n.is_whitespace_only_text())
         else {
             return d.empty();
         };
@@ -251,9 +263,18 @@ impl<'a> Printer<'a> {
         // block-child boundaries (hardline) rather than pushing a `break_parent` sibling, which
         // would poison a preceding group's `fits()` lookahead. See `handle_block_child`. Only
         // the `multiline` convergence arm routes blocks here, so the scan is gated on it.
+        // A declaration tag on its own line is the same kind of child as a block element here —
+        // both own a line, so both harden every block boundary in the fragment.
         let force_break = multiline
             && trimmed_len > 1
-            && trimmed_nodes.iter().any(|n| self.is_block_element_node(n));
+            && (0..trimmed_len).any(|j| self.owns_own_line(trimmed_nodes, j));
+
+        // The fragment's content bounds once every HOISTED node is skipped — the positions the
+        // compiler's whitespace rules actually measure the edges from (see
+        // `TextChildContext::content_bounds`). An all-hoisted fragment has no text child to ask,
+        // so the fallback is inert.
+        let content_bounds =
+            FragmentNode::content_bounds(trimmed_nodes).unwrap_or((0, trimmed_len - 1));
 
         let mut format_ignore_next = false;
         // Exclusive upper bound of indices already consumed by a maximal glued-element run built
@@ -313,8 +334,8 @@ impl<'a> Printer<'a> {
             // the inline callers never see adjacent whitespace-only nodes.
             if multiline
                 && i > 0
-                && matches!(node, FragmentNode::Text(t) if t.is_ascii_ws_only)
-                && matches!(&trimmed_nodes[i - 1], FragmentNode::Text(p) if p.is_ascii_ws_only)
+                && matches!(node, FragmentNode::Text(t) if t.is_collapsible_ws_only)
+                && matches!(&trimmed_nodes[i - 1], FragmentNode::Text(p) if p.is_collapsible_ws_only)
             {
                 continue;
             }
@@ -335,6 +356,7 @@ impl<'a> Printer<'a> {
                         breakable_exprs,
                         cause,
                         run_has_prose,
+                        content_bounds,
                     },
                     &mut child_docs,
                     &mut handle_whitespace_of_prev_text,
@@ -353,9 +375,18 @@ impl<'a> Printer<'a> {
                     &mut child_docs,
                     prev_text_ws,
                 );
+            } else if multiline && self.is_own_line_declaration(trimmed_nodes, i) {
+                // Declaration (`{@const}` / `{const}` / `{let}` / `{#snippet}`) on its own
+                // line — the hoist's layout licence, see `is_own_line_declaration`. Checked
+                // BEFORE the control-flow arm: an own-line `{#snippet}` takes its line here
+                // (the handler builds it in multiline context, so its body layout is the
+                // same the control-flow arm would produce); a snippet glued to content on
+                // both sides does not own a line and keeps the control-flow path below.
+                self.handle_own_line_tag(trimmed_nodes, i, &mut child_docs);
             } else if multiline && is_control_flow_block(node) {
-                // Control-flow block (`{#if}`/`{#each}`/`{#await}`/`{#key}`/`{#snippet}`) in the
-                // convergence path. Mirror path 1's block dispatch.
+                // Control-flow block (`{#if}`/`{#each}`/`{#await}`/`{#key}`, and a
+                // `{#snippet}` glued to content on both sides) in the convergence path.
+                // Mirror path 1's block dispatch.
                 //
                 // Axis-3 sibling-`>` dangle first: a block directly following an inline-element
                 // sibling (no whitespace between) sheds that element's closing `>` onto the
@@ -476,6 +507,97 @@ impl<'a> Printer<'a> {
         a.span().end == b.span().start
     }
 
+    /// Whether the node at `i` is a **declaration that owns its own line** — `{@const}` /
+    /// `{const …}` / `{let …}` / `{#snippet}`, unless it is glued to content on both sides.
+    ///
+    /// Such a node renders nothing and `clean_nodes` hoists it out of its fragment *before* the
+    /// whitespace rules run, so the whitespace beside it is never inter-sibling whitespace: at a
+    /// fragment edge the run is deleted, and in the interior the two runs it splits merge back
+    /// into the single whitespace rule 1 would have produced anyway (`{#if c}a {@const} b{/if}`
+    /// compiles to `a b`, exactly like the own-line form). The break is therefore render-free and
+    /// the layout question is free, so tsv answers it with the declaration's own line — where
+    /// authors already write declarations, and what makes a run of them read as what they are.
+    /// The full oracle matrix — every glue position × node kind, graded by `render_compare` —
+    /// is `../test-svelte-prettier-whitespace/hoisted-tags.md`.
+    ///
+    /// ⚠️ **The exception is a declaration glued to content on BOTH sides**, the one shape where
+    /// the break is not render-free: `{#if c}a{@const x = 1}b{/if}` compiles to `ab` while the
+    /// own-line form compiles to `a b` — a different document. That is the standing "a glued
+    /// boundary is never split" rule, and it is what bounds this one.
+    ///
+    /// ⚠️ **`{@debug}` is excluded** ([`internal::FragmentNode::is_declaration`]): it is not a
+    /// declaration but a transient debugging aid, so it keeps the edge *trim* the same hoist
+    /// licenses — see [`internal::FragmentNode::is_hoisted_from_fragment`].
+    ///
+    /// See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+    pub(super) fn is_own_line_declaration(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        nodes[i].is_declaration()
+            && !(self.glued_to_content(nodes, i, true) && self.glued_to_content(nodes, i, false))
+    }
+
+    /// Whether the node at `i` is byte-glued to the nearest **content** before (`prev`) or after
+    /// it — the neighbour the compiler's whitespace rules actually see, which is what decides
+    /// whether breaking there would inject a rendered space.
+    ///
+    /// Three things make a neighbour not-content, and each is the compiler's own answer:
+    /// a **hoisted** sibling vanishes from those rules, so the scan steps over it (only while it
+    /// stays byte-adjacent — a run of `{@const}`s is not glued to itself); a **whitespace-only**
+    /// text is the separator, not the content; and a content **text** counts only when its facing
+    /// edge carries no collapsible whitespace, since that whitespace is the separator instead.
+    /// Anything else counts when the spans touch.
+    ///
+    /// The byte-adjacency test is not redundant with the text checks: sibling spans tile a
+    /// fragment everywhere except the ROOT, where `<script>` / `<style>` are lifted out and leave
+    /// a real gap between the nodes that survive.
+    fn glued_to_content(&self, nodes: &[FragmentNode<'_>], i: usize, before: bool) -> bool {
+        let mut cur = i;
+        loop {
+            let neighbor = if before {
+                cur.checked_sub(1)
+            } else {
+                Some(cur + 1).filter(|j| *j < nodes.len())
+            };
+            let Some(j) = neighbor else { return false };
+            let (left, right) = if before { (j, cur) } else { (cur, j) };
+            if !Self::byte_glued(&nodes[left], &nodes[right]) {
+                return false;
+            }
+            match &nodes[j] {
+                FragmentNode::Text(t) if t.is_collapsible_ws_only => return false,
+                FragmentNode::Text(t) => {
+                    let raw = t.raw(self.source);
+                    return if before {
+                        !raw.ends_with(is_collapsible_ws_char)
+                    } else {
+                        !raw.starts_with(is_collapsible_ws_char)
+                    };
+                }
+                n if n.is_hoisted_from_fragment() => cur = j,
+                _ => return true,
+            }
+        }
+    }
+
+    /// Whether the node at `i` **owns its own line** in a multiline fragment — a block element
+    /// (via `handle_block_child`) or a declaration tag (via [`Self::handle_own_line_tag`]).
+    ///
+    /// The one question both emitters ask of a neighbour: *did that node already supply the break
+    /// between us?* Asking it as two separate predicates is how a node that already owns its line
+    /// picks up a second break — the failure mode this whole path keeps returning to.
+    pub(super) fn owns_own_line(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
+        self.is_block_element_node(&nodes[i]) || self.is_own_line_declaration(nodes, i)
+    }
+
+    /// Whether `nodes` holds a declaration that owns its line — the fragment then cannot
+    /// render on one line.
+    ///
+    /// A *lone* declaration counts too: it touches only the fragment's boundaries, which are
+    /// not content, so it is not glued and takes its line all the same — the host goes
+    /// multiline (`{#if cond}{@const x = 1}{/if}` formats to the own-line form).
+    pub(super) fn has_own_line_declaration(&self, nodes: &[FragmentNode<'_>]) -> bool {
+        (0..nodes.len()).any(|i| self.is_own_line_declaration(nodes, i))
+    }
+
     /// Check if a node is a format-ignore comment — the directive that pins the next node's
     /// raw source instead of formatting it. Single recognition point for the three
     /// `build_nodes_doc_*` accumulation loops.
@@ -492,7 +614,7 @@ impl<'a> Printer<'a> {
     /// caller owns its sink and clears `format_ignore_next` only when this returns `Some`.
     fn format_ignore_raw_doc(&self, node: &FragmentNode<'_>) -> Option<DocId> {
         if let FragmentNode::Text(text) = node
-            && text.is_ascii_ws_only
+            && text.is_collapsible_ws_only
         {
             return None;
         }
@@ -519,6 +641,7 @@ impl<'a> Printer<'a> {
             breakable_exprs,
             cause,
             run_has_prose,
+            content_bounds,
         } = ctx;
         let multiline = cause.is_multiline();
         let FragmentNode::Text(text) = &trimmed_nodes[i] else {
@@ -527,10 +650,28 @@ impl<'a> Printer<'a> {
         let raw: &str = text.raw(self.source);
 
         // Sibling-kind facts, derived from the node's position in `trimmed_nodes`.
-        let is_first = i == 0;
-        let is_last = i + 1 == trimmed_nodes.len();
+        //
+        // "First"/"last" is asked of the nodes the whitespace rules actually see, so a HOISTED
+        // sibling (`{@const}` / `{const}` / `{let}` / `{@debug}` / `{#snippet}` / `<title>`) does not stand
+        // between this text and the fragment edge: `clean_nodes` lifts those out before it trims,
+        // making this text the real last node and its trailing run a render-free edge run
+        // ([`FragmentNode::is_hoisted_from_fragment`]). The bounds are computed once per fragment
+        // by the caller rather than scanned here — see [`TextChildContext::content_bounds`].
+        let is_first = i <= content_bounds.0;
+        let is_last = i >= content_bounds.1;
         let prev_node = i.checked_sub(1).map(|j| &trimmed_nodes[j]);
         let next_node = trimmed_nodes.get(i + 1);
+        // A declaration tag on either side owns its own line ([`Self::is_own_line_declaration`]),
+        // and the run between it and this text is render-free — the tag hoists out of the fragment,
+        // so that run is an edge run whichever side of the tag it sits on. This text therefore
+        // trims it and prints no boundary of its own; the line comes from the tag (for a content
+        // text) or from this node (for a whitespace-only separator, whose arm is the tag's other
+        // side). An authored blank line still survives, as everywhere else.
+        let prev_owns_line = i
+            .checked_sub(1)
+            .is_some_and(|j| self.is_own_line_declaration(trimmed_nodes, j));
+        let next_owns_line =
+            i + 1 < trimmed_nodes.len() && self.is_own_line_declaration(trimmed_nodes, i + 1);
         let prev_is_inline = prev_node.is_some_and(is_inline_content);
         let prev_is_tag = prev_node.is_some_and(Self::is_tag_node);
         // A byte-glued HTML-comment run (`<!--c--><a…>`) between this text and an inline element
@@ -576,10 +717,10 @@ impl<'a> Printer<'a> {
         // text split (`splitTextToDocs`). A leading/trailing non-breaking space (or
         // any non-ASCII whitespace) is content, so a node made only of those is not
         // whitespace-only and is preserved verbatim.
-        let has_leading_ws = raw.starts_with(|c: char| c.is_ascii_whitespace());
-        let has_trailing_ws = raw.ends_with(|c: char| c.is_ascii_whitespace());
+        let has_leading_ws = raw.starts_with(is_collapsible_ws_char);
+        let has_trailing_ws = raw.ends_with(is_collapsible_ws_char);
 
-        if text.is_ascii_ws_only {
+        if text.is_collapsible_ws_only {
             // Whitespace-only text node (never at a fragment boundary — those are skipped
             // by `build_nodes_doc_trimmed`).
             if !multiline {
@@ -606,6 +747,17 @@ impl<'a> Printer<'a> {
                     // Signal the next inline element to lead with a line.
                     *handle_whitespace_of_prev_text = true;
                 }
+                return;
+            }
+            // A separator beside a declaration tag that owns its line: the run is render-free (the
+            // tag hoists out of the fragment), and the break is THIS node's to emit — the tag
+            // breaks only across a directly adjacent sibling, so exactly one line lands here
+            // however either side spelled it. An authored blank line survives as the second.
+            if prev_owns_line || next_owns_line {
+                if text.newline_count >= 2 {
+                    child_docs.push(d.hardline());
+                }
+                child_docs.push(d.hardline());
                 return;
             }
             // Multiline middle whitespace-only text — mirror prettier-plugin-svelte's
@@ -749,14 +901,24 @@ impl<'a> Printer<'a> {
         // node must not flow even when its run holds prose elsewhere, or the fill re-reads a break
         // it emitted itself (the NBSP F1 break).
         let separator_like_text = Self::is_separator_like_text(&text.data(self.source));
-        let leading_run = &raw[..raw.len()
-            - raw
-                .trim_start_matches(|c: char| c.is_ascii_whitespace())
-                .len()];
+        let leading_run = &raw[..raw.len() - raw.trim_start_matches(is_collapsible_ws_char).len()];
         let leading_newline_flows = leading_run.matches('\n').count() == 1
             && !separator_like_text
             && prev_node.is_some_and(|n| self.sibling_newline_flows(n));
-        if multiline && text_starts_with_linebreak(raw) && !is_first && !leading_newline_flows {
+        if multiline && prev_owns_line {
+            // After a declaration tag's own line: trim the render-free run rather than printing a
+            // boundary — the tag's own break_after is the line. Checked ahead of the
+            // `splitTextToDocs` linebreak arm below, which would double it.
+            trim_left = true;
+            add_leading_space = false;
+            if leading_run.matches('\n').count() >= 2 {
+                child_docs.push(d.hardline());
+            }
+        } else if multiline
+            && text_starts_with_linebreak(raw)
+            && !is_first
+            && !leading_newline_flows
+        {
             // splitTextToDocs (prettier-plugin-svelte): a content text whose leading whitespace
             // carries a newline puts a hardline before its first word — the newline is a
             // structural break (path 1's line-buffer flushes on it), NOT a fold into the prev
@@ -771,10 +933,7 @@ impl<'a> Printer<'a> {
             // A blank line (2+ leading newlines) is preserved as `[hardline, hardline]` —
             // prettier's `splitTextToDocs` startsWithLinebreak(_, 2). A single newline → one
             // hardline.
-            let content_start = raw.len()
-                - raw
-                    .trim_start_matches(|c: char| c.is_ascii_whitespace())
-                    .len();
+            let content_start = raw.len() - raw.trim_start_matches(is_collapsible_ws_char).len();
             if raw[..content_start].matches('\n').count() >= 2 {
                 child_docs.push(d.hardline());
             }
@@ -881,9 +1040,7 @@ impl<'a> Printer<'a> {
         let mut trailing_line = false;
         // Count newlines in the trailing whitespace run (multiline structural-break detection).
         let trailing_ws_newlines = if has_trailing_ws {
-            let content_end = raw
-                .trim_end_matches(|c: char| c.is_ascii_whitespace())
-                .len();
+            let content_end = raw.trim_end_matches(is_collapsible_ws_char).len();
             raw[content_end..].matches('\n').count()
         } else {
             0
@@ -897,7 +1054,16 @@ impl<'a> Printer<'a> {
         let trailing_newline_flows = trailing_ws_newlines == 1
             && !separator_like_text
             && next_node.is_some_and(|n| self.sibling_newline_flows(n));
-        if multiline && trailing_ws_newlines >= 1 && !is_last && !trailing_newline_flows {
+        if multiline && next_owns_line {
+            // Mirror of the leading arm: the tag below supplies the line, so this run is trimmed
+            // rather than printed. Reached at a fragment edge too, where `is_last` already trims —
+            // the arm is what carries the *interior* position, and the blank line in both.
+            trim_right = true;
+            add_trailing_space = false;
+            if trailing_ws_newlines >= 2 {
+                trailing_hardlines = 1;
+            }
+        } else if multiline && trailing_ws_newlines >= 1 && !is_last && !trailing_newline_flows {
             // splitTextToDocs (prettier-plugin-svelte): a content text whose trailing whitespace
             // carries a newline ends with a structural `hardline` (a blank line — 2+ newlines —
             // becomes `[hardline, hardline]`). prettier never trims a linebreak boundary, so this
@@ -1070,7 +1236,7 @@ impl<'a> Printer<'a> {
     /// find.
     pub(super) fn breaks_inline_run(&self, node: &FragmentNode<'_>) -> bool {
         match node {
-            FragmentNode::Text(t) if t.is_ascii_ws_only => t.newline_count >= 2,
+            FragmentNode::Text(t) if t.is_collapsible_ws_only => t.newline_count >= 2,
             FragmentNode::Text(_) => false,
             _ => !self.sibling_newline_flows(node),
         }
@@ -1091,7 +1257,7 @@ impl<'a> Printer<'a> {
     /// out what counts as prose.
     pub(super) fn is_run_prose(&self, node: &FragmentNode<'_>) -> bool {
         matches!(node, FragmentNode::Text(t)
-            if !t.is_ascii_ws_only && !Self::is_separator_like_text(&t.data(self.source)))
+            if !t.is_collapsible_ws_only && !Self::is_separator_like_text(&t.data(self.source)))
     }
 
     /// Scan the inline run beginning at `start`: its exclusive end, and whether it holds prose
@@ -1181,9 +1347,35 @@ impl<'a> Printer<'a> {
     /// same document to the compiler, so spelling the separator as an entity must not buy it a
     /// different layout. (Every other read on this path uses `raw` — this is the one question
     /// about what the characters *are* rather than where they sit.)
+    ///
+    /// ⚠️ The test is over the **whole** decoded text, with no trim first. Trimming
+    /// collapsible whitespace off the ends and asking about the remainder answers "not
+    /// separator-like" for the node that decodes to nothing BUT collapsible whitespace —
+    /// an entity-encoded space or tab (`&#9;`, `&#x20;`, `&Tab;`), whose raw bytes make it
+    /// content to [`internal::Text::is_collapsible_ws_only`] while its decoded form carries
+    /// no word at all. Such a node then reported as the run's *prose*, made the content a
+    /// `fill`, and collapsed an authored break its literal-space twin keeps — see
+    /// [inline_separator_entity_newline](../../../../../tests/fixtures/svelte/elements/inline_separator_entity_newline/).
+    /// Both call sites are pre-guarded by `!is_collapsible_ws_only`, so an all-collapsible-
+    /// whitespace node never reaches here and the empty-string arm is unreachable in practice.
+    ///
+    /// ⚠️ **The class is Rust's UNICODE `char::is_whitespace`, deliberately wider than the
+    /// `is_collapsible_ws` class the rest of this path uses — do not "fix" it to match.** The
+    /// printer asks two separator questions of a text node's decoded content, same shape,
+    /// different class, and each needs its own:
+    ///
+    /// - *Does the fill have a word to pack here?* — **this** one, WIDE. An NBSP is not a word,
+    ///   so a node made only of NBSPs is a separator and its run is not reflowable.
+    /// - *Is this separator interchangeable with a plain space?* — `is_one_line_separator`
+    ///   (`element_analysis.rs`), NARROW. An NBSP is **not**: it renders as itself and never
+    ///   collapses, so it may not be respelled and may not pick a layout.
+    ///
+    /// An `&nbsp;` node therefore answers yes here and no there, which is correct on both
+    /// counts — and a single run may legitimately hold one node of each kind, so neither
+    /// predicate can stand in for the other. `Printer::run_is_one_line` documents the same
+    /// split from the third side.
     fn is_separator_like_text(data: &str) -> bool {
-        let content = data.trim_matches(|c: char| c.is_ascii_whitespace());
-        !content.is_empty() && content.chars().all(char::is_whitespace)
+        !data.is_empty() && data.chars().all(char::is_whitespace)
     }
 
     /// Whether a node is a block-level *element* — the `handleBlockChild` set in
@@ -1230,20 +1422,19 @@ impl<'a> Printer<'a> {
                 d.softline()
             }
         };
-        let prev = i.checked_sub(1).map(|j| &trimmed_nodes[j]);
+        let prev = i.checked_sub(1).map(|j| (j, &trimmed_nodes[j]));
         let next = trimmed_nodes.get(i + 1);
 
+        // A previous sibling that owns its own line ([`Self::owns_own_line`] — a block element or
+        // a declaration tag) already emitted the break after itself; asking only about block
+        // elements here is how the tag's line picks up a second one.
         let break_before = match prev {
-            Some(p) if !self.is_block_element_node(p) => match p {
-                FragmentNode::Text(t) => {
-                    prev_text_ws
-                        || !t
-                            .raw(self.source)
-                            .ends_with(|c: char| c.is_ascii_whitespace())
-                }
-                _ => true,
-            },
-            _ => false,
+            Some((j, _)) if self.owns_own_line(trimmed_nodes, j) => false,
+            Some((_, FragmentNode::Text(t))) => {
+                prev_text_ws || !t.raw(self.source).ends_with(is_collapsible_ws_char)
+            }
+            Some(_) => true,
+            None => false,
         };
         if break_before {
             child_docs.push(sep());
@@ -1256,7 +1447,7 @@ impl<'a> Printer<'a> {
         let break_after = match next {
             Some(FragmentNode::Text(t)) => {
                 let raw = t.raw(self.source);
-                let is_empty_ws = t.is_ascii_ws_only;
+                let is_empty_ws = t.is_collapsible_ws_only;
                 // idx+2 is an inline element (prettier's `isInlineElement`, excludes components)
                 let next2_inline = self.next_is_inline_element(trimmed_nodes, i + 1);
                 (!is_empty_ws || next2_inline) && !text_starts_with_linebreak(raw)
@@ -1266,6 +1457,51 @@ impl<'a> Printer<'a> {
         };
         if break_after {
             child_docs.push(sep());
+        }
+    }
+
+    /// Emit a declaration on its own line — the `handle_block_child` of
+    /// [`Self::is_own_line_declaration`].
+    ///
+    /// The break is emitted **only across a directly adjacent sibling**. A whitespace-only
+    /// separator emits its own break instead (`handle_text_child`'s whitespace arm), and a
+    /// neighbour that owns its own line already emitted a break after itself — so exactly one line
+    /// lands at each side however the author spelled it. The adjacent content text contributes
+    /// nothing: its facing run is render-free here, so its own handler trims it rather than
+    /// printing a boundary.
+    ///
+    /// A `{#snippet}` builds in multiline context, exactly as the control-flow arm would build
+    /// it — this handler decides only the node's LINE, never its body layout (a wrapped head
+    /// must still break its params and dangle the `}`).
+    fn handle_own_line_tag(
+        &self,
+        trimmed_nodes: &[FragmentNode<'_>],
+        i: usize,
+        child_docs: &mut DocBuf,
+    ) {
+        let d = self.d();
+        let break_before = i.checked_sub(1).is_some_and(|j| {
+            !trimmed_nodes[j].is_whitespace_only_text() && !self.owns_own_line(trimmed_nodes, j)
+        });
+        if break_before {
+            child_docs.push(d.hardline());
+        }
+
+        let node = &trimmed_nodes[i];
+        let node_doc = if is_control_flow_block(node) {
+            self.build_fragment_node_doc_in_multiline(node)
+        } else {
+            self.build_fragment_node_doc(node)
+        };
+        if let Some(node_doc) = node_doc {
+            child_docs.push(node_doc);
+        }
+
+        if trimmed_nodes
+            .get(i + 1)
+            .is_some_and(|n| !n.is_whitespace_only_text())
+        {
+            child_docs.push(d.hardline());
         }
     }
 
@@ -1315,7 +1551,7 @@ impl<'a> Printer<'a> {
             // Trim inter-sibling whitespace — render-free in this container — but remember an
             // authored blank line so the next child reintroduces it.
             if let FragmentNode::Text(t) = node
-                && t.is_ascii_ws_only
+                && t.is_collapsible_ws_only
             {
                 if t.newline_count >= 2 {
                     pending_blank = true;
@@ -1363,12 +1599,18 @@ impl<'a> Printer<'a> {
     /// Matches prettier's `forceBreakContent`: when there are multiple non-whitespace
     /// children and at least one is a block element, content should break.
     /// This forces the multiline path even for "inline" Svelte block bodies.
+    ///
+    /// A declaration tag that owns its own line ([`Self::has_own_line_declaration`]) forces
+    /// the same break — its line is one the fragment must have room for, so the block's
+    /// inline/expanding fast path (`fragment_inline_authored`) may not take an inline authoring
+    /// at its word.
     pub(super) fn fragment_should_force_break_content(&self, nodes: &[FragmentNode<'_>]) -> bool {
         let non_ws_count = nodes
             .iter()
             .filter(|n| !n.is_whitespace_only_text())
             .count();
-        non_ws_count > 1 && nodes.iter().any(|n| self.is_block_fragment_node(n))
+        (non_ws_count > 1 && nodes.iter().any(|n| self.is_block_fragment_node(n)))
+            || self.has_own_line_declaration(nodes)
     }
 
     /// Whether the node at `trimmed_nodes[i + 1]` is an **inline HTML element** (`<span>`, `<a>`,
@@ -1478,12 +1720,14 @@ impl<'a> Printer<'a> {
     /// built **once**, with the `>` threaded in, so a nested chain of dangles stays linear
     /// (an earlier two-build probe-then-rebuild was O(2^depth) in nesting).
     ///
-    /// Applies to all five block heads (`{#if}` / `{#each}` / `{#key}` / `{#await}` /
-    /// `{#snippet}`). A control-flow block with any preceding sibling routes its block
-    /// parent through the multiline-fragment layout (`has_control_flow_after_sibling` →
-    /// `compute_multiline_cause`), so the block's body-drop keys on `can_wrap` (true here)
-    /// and the dangle is a one-pass fixed point — including for `{#await}` / `{#snippet}`,
-    /// whose body-drop is likewise gated on `can_wrap`.
+    /// Applies to the four rendering block heads (`{#if}` / `{#each}` / `{#key}` /
+    /// `{#await}`) — and to the one `{#snippet}` shape that still reaches the control-flow
+    /// arm, a snippet glued to content on BOTH sides (an own-line snippet takes its line
+    /// via [`Self::is_own_line_declaration`] before this can fire). A control-flow block
+    /// with any preceding sibling routes its block parent through the multiline-fragment
+    /// layout (`has_control_flow_after_sibling` → `compute_multiline_cause`), so the
+    /// block's body-drop keys on `can_wrap` (true here) and the dangle is a one-pass fixed
+    /// point — including for `{#await}`, whose body-drop is likewise gated on `can_wrap`.
     fn try_block_sibling_gt_dangle(
         &self,
         trimmed_nodes: &[FragmentNode<'_>],
@@ -1542,17 +1786,15 @@ impl<'a> Printer<'a> {
         }
         // glued-before: the previous node is content text byte-glued with no trailing whitespace
         // (a trailing space would be a break-before boundary, handled elsewhere). Symmetric with the
-        // glued-after check below — `is_ascii_ws_only` excludes an empty / whitespace-only prev text
+        // glued-after check below — `is_collapsible_ws_only` excludes an empty / whitespace-only prev text
         // (which carries no content the element could be glued *to*).
         let prev = nodes.get(i.checked_sub(1)?)?;
         let FragmentNode::Text(pt) = prev else {
             return None;
         };
-        if pt.is_ascii_ws_only
+        if pt.is_collapsible_ws_only
             || !Self::byte_glued(prev, node)
-            || pt
-                .raw(self.source)
-                .ends_with(|c: char| c.is_ascii_whitespace())
+            || pt.raw(self.source).ends_with(is_collapsible_ws_char)
         {
             return None;
         }
@@ -1562,11 +1804,9 @@ impl<'a> Printer<'a> {
         let FragmentNode::Text(nt) = next else {
             return None;
         };
-        if nt.is_ascii_ws_only
+        if nt.is_collapsible_ws_only
             || !Self::byte_glued(node, next)
-            || nt
-                .raw(self.source)
-                .starts_with(|c: char| c.is_ascii_whitespace())
+            || nt.raw(self.source).starts_with(is_collapsible_ws_char)
         {
             return None;
         }
@@ -1795,14 +2035,15 @@ impl<'a> Printer<'a> {
     //
 
     /// Append `s` as `[word, line, word, …]` fill parts (a `line` between words, none before
-    /// the first / after the last) directly into `parts` — no intermediate buffer. ASCII-whitespace
-    /// separated, matching `build_text_fill_doc_trimmed`'s word split (so non-breaking spaces stay
-    /// attached). Used by the inline-element fold so the words after a folded element pack
-    /// greedily into the surrounding fill rather than moving as one nested unit.
+    /// the first / after the last) directly into `parts` — no intermediate buffer. Split on
+    /// [`split_collapsible_ws`], matching `build_text_fill_doc_trimmed`'s word split (so a
+    /// non-breaking space or form feed stays attached). Used by the inline-element fold so the
+    /// words after a folded element pack greedily into the surrounding fill rather than moving as
+    /// one nested unit.
     fn extend_with_word_fill(&self, parts: &mut DocBuf, s: &str) {
         let d = self.d();
         let mut first = true;
-        for word in s.split_ascii_whitespace() {
+        for word in split_collapsible_ws(s) {
             if !first {
                 parts.push(d.line());
             }
@@ -1859,10 +2100,10 @@ impl<'a> Printer<'a> {
         // ASCII (collapsible) whitespace only: a non-breaking space (U+00A0) is content,
         // so a node made only of NBSP is NOT empty here and flows to the fill path below
         // (preserved verbatim), never dropped or collapsed to a regular space.
-        let trimmed = raw.trim_ascii();
+        let trimmed = raw.trim_matches(is_collapsible_ws_char);
         if trimmed.is_empty() {
             // Pure (ASCII) whitespace: collapse to a single inter-sibling space
-            if raw.bytes().any(|b| b.is_ascii_whitespace()) {
+            if raw.bytes().any(is_collapsible_ws) {
                 Some(self.d().text(" "))
             } else {
                 None
@@ -1893,15 +2134,15 @@ impl<'a> Printer<'a> {
         // is emitted only when the split consumed an ASCII-whitespace run. A
         // boundary non-breaking space (U+00A0 / U+202F) stays attached to its word
         // and must not get a spurious regular space prepended/appended.
-        let has_leading_ws = raw.starts_with(|c: char| c.is_ascii_whitespace());
-        let has_trailing_ws = raw.ends_with(|c: char| c.is_ascii_whitespace());
+        let has_leading_ws = raw.starts_with(is_collapsible_ws_char);
+        let has_trailing_ws = raw.ends_with(is_collapsible_ws_char);
 
-        // Split on ASCII whitespace only and collect non-empty words. Prettier's
-        // splitTextToDocs splits on `/[\t\n\f\r ]+/`, so non-breaking spaces
-        // (U+00A0) and narrow non-breaking spaces (U+202F) stay attached to their
-        // words — they are not break points and are preserved verbatim. Rust's
-        // `split_whitespace` is Unicode-aware and would split (and thus drop) them.
-        let words: SmallVec<[&str; 8]> = raw.split_ascii_whitespace().collect();
+        // Split on collapsible whitespace only and collect non-empty words, so every
+        // non-collapsible separator stays attached to its word and is preserved verbatim:
+        // a non-breaking space (U+00A0) / narrow NBSP (U+202F), which Rust's Unicode-aware
+        // `split_whitespace` would split on and drop, and a form feed, which its
+        // `split_ascii_whitespace` would (prettier's `/[\t\n\f\r ]+/` drops it too).
+        let words: SmallVec<[&str; 8]> = split_collapsible_ws(raw).collect();
         if words.is_empty() {
             return None;
         }

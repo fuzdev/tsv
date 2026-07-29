@@ -21,7 +21,8 @@
 	text
 {/key}
 {#each list as it}
-	{@const y = it)}{it} // c
+	{@const y = it)} // c
+	{it}
 {/each}
 <div {...expr}></div>
 <input bind:value={val} />

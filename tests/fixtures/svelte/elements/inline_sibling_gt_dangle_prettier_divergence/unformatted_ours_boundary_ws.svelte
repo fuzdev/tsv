@@ -31,7 +31,8 @@
 	{/await}
 </div>
 
-<!-- {#snippet} dangles too -->
+<!-- {#snippet} does NOT dangle: a snippet is a declaration and takes its own
+     line, so the glued boundary splits instead -->
 <div>
 	<span>text</span
 	>{#snippet foo()}

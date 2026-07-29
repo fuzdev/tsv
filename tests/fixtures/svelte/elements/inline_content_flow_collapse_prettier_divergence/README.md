@@ -44,7 +44,12 @@ point (F1), and the authorings of one document land on two forms.
 
 An HTML inline element and a table cell (inline-classified, so it takes the same layout), then
 the rest of the fill class: a component pair and an expression-tag pair whose only separator
-carries words, and a lone element with prose leading and trailing. Each is in the converged
+carries words, a lone element with prose leading and trailing, and an element pair followed by
+prose — the case whose newline lands in a **whitespace-only** separator node rather than inside
+a content text. That last one is a distinct arm, not a restatement: where the other cases carry
+their newline in a text that also holds words, this one carries it in a node that holds nothing
+else, which is the one place the run's fill answer had to be consulted separately. Each is in
+the converged
 inline form, with the inter-sibling-newline authoring as
 `unformatted_ours_newline.svelte` (tsv normalizes it to `input`; prettier instead dangles the tag
 delimiters around it, a form it keeps stable — pinned as `prettier_variant_dangle.svelte`) and the

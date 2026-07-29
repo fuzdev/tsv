@@ -1,0 +1,278 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 896,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 610,
+				"data": "\n\t`clean_nodes` HOISTS a `{@debug}` / `<title>` out of its fragment BEFORE it trims, so such a\n\tnode is invisible to the whitespace rules and the text beside it becomes the fragment's\n\tfirst/last node. Its edge run is therefore render-free — `{#if cond}text {@debug cond}{/if}`\n\tcompiles to `text`, exactly like the glued authoring — so the run is trimmed and every\n\tauthoring of the document reaches this one form.\n\tINTERIOR is the opposite case: with content on both sides the two runs MERGE into one space\n\trather than vanishing, so a space survives there and the glued form is a different document.\n"
+			},
+			{
+				"type": "Text",
+				"start": 610,
+				"end": 611,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 611,
+				"end": 643,
+				"test": {
+					"type": "Identifier",
+					"start": 616,
+					"end": 620,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 5
+						},
+						"end": {
+							"line": 10,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 621,
+							"end": 625,
+							"raw": "text",
+							"data": "text"
+						},
+						{
+							"type": "DebugTag",
+							"start": 625,
+							"end": 638,
+							"identifiers": [
+								{
+									"type": "Identifier",
+									"start": 633,
+									"end": 637,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 22
+										},
+										"end": {
+											"line": 10,
+											"column": 26
+										}
+									},
+									"name": "cond"
+								}
+							]
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 643,
+				"end": 645,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 645,
+				"end": 677,
+				"test": {
+					"type": "Identifier",
+					"start": 650,
+					"end": 654,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 5
+						},
+						"end": {
+							"line": 12,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "DebugTag",
+							"start": 655,
+							"end": 668,
+							"identifiers": [
+								{
+									"type": "Identifier",
+									"start": 663,
+									"end": 667,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 18
+										},
+										"end": {
+											"line": 12,
+											"column": 22
+										}
+									},
+									"name": "cond"
+								}
+							]
+						},
+						{
+							"type": "Text",
+							"start": 668,
+							"end": 672,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 677,
+				"end": 679,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 679,
+				"end": 748,
+				"data": " Interior: `a {@debug} b` renders `a b`, so one space is kept "
+			},
+			{
+				"type": "Text",
+				"start": 748,
+				"end": 749,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 749,
+				"end": 781,
+				"test": {
+					"type": "Identifier",
+					"start": 754,
+					"end": 758,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 5
+						},
+						"end": {
+							"line": 15,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 759,
+							"end": 761,
+							"raw": "a ",
+							"data": "a "
+						},
+						{
+							"type": "DebugTag",
+							"start": 761,
+							"end": 774,
+							"identifiers": [
+								{
+									"type": "Identifier",
+									"start": 769,
+									"end": 773,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 20
+										},
+										"end": {
+											"line": 15,
+											"column": 24
+										}
+									},
+									"name": "cond"
+								}
+							]
+						},
+						{
+							"type": "Text",
+							"start": 774,
+							"end": 776,
+							"raw": " b",
+							"data": " b"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 781,
+				"end": 783,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 783,
+				"end": 876,
+				"data": " The ROOT fragment is a fragment too: at its edge, a hoisted `{@debug}` trims the run "
+			},
+			{
+				"type": "Text",
+				"start": 876,
+				"end": 882,
+				"raw": "\ntext1",
+				"data": "\ntext1"
+			},
+			{
+				"type": "DebugTag",
+				"start": 882,
+				"end": 895,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 890,
+						"end": 894,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 13
+							},
+							"end": {
+								"line": 18,
+								"column": 17
+							}
+						},
+						"name": "cond"
+					}
+				]
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

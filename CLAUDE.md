@@ -198,8 +198,10 @@ deno task compile:corpus:compare     # compile-parity wide net over real repos +
 deno task compile:validation         # validation-suite RATCHET over Svelte's own compiler-errors + validator suites (sidecar-dependent, on demand; ./docs/compile_validation_ratchet.md)
 deno task compile:validation:update  # regenerate that snapshot after fixing a finding (or newly refusing a shape); refuses a narrowed run, and never pins a MISMATCH
 deno task compile:fuzz               # differential compile fuzzer over feature cross-products — a discovery tool with an open work list, currently RED by design (sidecar-dependent, on demand; ./docs/compile_tooling.md)
-deno task pins:audit                 # canonical-oracle version sync (gated in `deno task check`): (1) pin agreement — sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical; (2) checkout alignment — a PRESENT ../svelte or ../acorn-typescript checkout must match its pin (absent → skipped, so clean machines pass)
+deno task pins:audit                 # canonical-oracle PIN AGREEMENT, a repo fact (gated in `deno task check`): sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical
+deno task pins:audit:checkouts       # canonical-oracle CHECKOUT ALIGNMENT, an environment fact (gated in `deno task conformance`, reported by `doctor`): a PRESENT ../svelte or ../acorn-typescript checkout must match its pin (absent → skipped, so machines without the clones pass), plus warn-only commit drift vs GATE_CHECKOUT_COMMITS. Deliberately NOT in `deno task check` — nothing there reads those checkouts, so a skew would halt the chain without invalidating a single committed-tree verdict
 deno task format:audit               # tsv formats its own TS/JS — `tsv format --check .` over the repo (gated in `deno task check`). Fails on EITHER a would-change file (exit 1) or a parse error (exit 2); no other gate covers this, since the corpus gates read OTHER repos
+deno task docs:audit                 # every doc-comment `[link]` still names something that exists — rustdoc over the workspace with the doc lints DENIED, `--document-private-items` (gated in `deno task check`; ./docs/audits.md). A dead link is a STALE DOC: each one found so far was a rename that left its back-references behind
 deno task scan:audit                 # no new raw find/rfind/match_indices substring scans over source (gated in `deno task check`; ./docs/audits.md)
 deno task fanout:audit               # no super-linear doc-node fanout — the per-layout-candidate rebuild blowup (gated in `deno task check`; ./docs/audits.md)
 deno task roundtrip:audit            # format(tests/fixtures) must reparse — pure-Rust tripwire, real yield on external corpora (gated in `deno task check`; ./docs/audits.md)
@@ -711,6 +713,16 @@ cargo run -p tsv_debug canonical_compile file.svelte --target client --css  # cl
 cargo run -p tsv_debug canonical_compile file.svelte --json              # { js, css, warnings } as JSON
 # Fixed cssHash ('svelte-tsvhash') + constant filename make output byte-identical across runs.
 # Also: --target server|client (default server), --dev, --content <str>, --stdin. Compile errors exit non-zero.
+
+# render_compare - do TWO Svelte sources render the same page? The pairwise triage arm of the
+# render-equivalence oracles (fixture R rules and render_audit both compare a source against
+# tsv format(source); this compares any two authorings). Tiers: identical (compiled server JS
+# byte-equal — the compiler erases the difference) / cosmetic (bytes differ, render key equal —
+# same page) / visible (render keys differ). Key is static (no SSR execution), so unresolvable
+# imports (component-hosted cases) still grade. Exit codes: 0 same render, 1 visible, 2 error.
+cargo run -p tsv_debug render_compare a.svelte b.svelte
+cargo run -p tsv_debug render_compare --content '{#if c}a{/if}' --content $'{#if c}\n\ta\n{/if}'
+# Also: --json. Two inputs total, via --content (repeatable) and/or file paths.
 
 # compile_compare - diff tsv's Svelte compile against the canonical compiler, comparing
 # the CANONICALIZED JS of both sides (intent-erased reprint via tsv_svelte_compile::canonicalize_js).

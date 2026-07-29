@@ -28,9 +28,11 @@
 	{/await}
 </div>
 
-<!-- {#snippet} dangles too -->
+<!-- {#snippet} does NOT dangle: a snippet is a declaration and takes its own
+     line, so the glued boundary splits instead -->
 <div>
-	<span>text</span>{#snippet foo()}
+	<span>text</span>
+	{#snippet foo()}
 		<Comp prop1={value1} prop2={value2} prop3={value3} prop4={value4} prop5={value5} />
 	{/snippet}
 </div>

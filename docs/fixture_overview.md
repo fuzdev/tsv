@@ -443,9 +443,12 @@ formatter under test) as the sole witness: `unformatted_ours_*` (N6 makes pretti
 elsewhere) and `prettier_variant_*` (N1 makes prettier keep the variant). R closes that
 hole for **Svelte templates** (`.svelte` only — `.svelte.ts`/`.ts`/`.css` have nothing
 Svelte renders), independent of the formatter, over every file `ours` maps to input:
-`unformatted_*`, `unformatted_ours_*`, and `prettier_variant_*` (`variant_*` /
-`divergent_variant_*` stay out — ours does not map them to input, so there is no
-variant↔input claim to prove):
+`unformatted_*`, `unformatted_ours_*`, and `prettier_variant_*` — plus, as R3, the one
+rewrite that has no input baseline: ours mapping a `divergent_variant_*` to its third form.
+(`variant_*` stays out entirely — ours keeps it byte-equal (N9), and an identity transform
+cannot change a render. Neither free-standing kind is compared against `input`: nothing
+forces a dual-stable or divergent form to mirror `input`'s case set the way byte-exact
+normalization forces the three kinds above, so variant↔input is not a claim they make.)
 
 - **R1 (compile arm, authoritative — GATES)**: `render_key(variant) == render_key(input)`,
   where the render key is `svelte compile --generate server` reduced to its browser-visible
@@ -472,6 +475,14 @@ variant↔input claim to prove):
   `BENIGN_FALLBACK_DIVERGENCES` in `phases/render_equivalence.rs`. A divergence **not** on the
   list FAILS (`ValidationError::RenderEquivalenceFallbackDivergence`); a listed entry that stops
   firing FAILS as stale, forcing a re-pin (checked only on an unfiltered run).
+- **R3 (ours-transform, both arms — GATES)**: for every `divergent_variant_*` file `V`,
+  `ours(V)` renders like `V`. The baseline is the variant itself, never `input` (see the
+  scoping note above): ours rewrites `V` to the ephemeral third form, which N11b–d assert to
+  be stable and distinct but nothing else render-checks — the formatter is again the sole
+  witness to its own rewrite. A compile-arm mismatch is
+  `ValidationError::RenderEquivalenceTransformMismatch`; a fallback-arm divergence rides the
+  same benign allow-list with an `::ours` key suffix, so the two claims about one file ratchet
+  independently.
 
   ⚠️ **Unlike the `gap_audit` / `blank_audit` ratchets, a line on that list is NOT a known bug** —
   it is a known false positive of the weak oracle. Shrinking the list means *improving the
