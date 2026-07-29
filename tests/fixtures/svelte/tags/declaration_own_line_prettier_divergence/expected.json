@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1368,
+	"end": 1730,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -457,32 +457,32 @@
 			{
 				"type": "Comment",
 				"start": 741,
-				"end": 807,
-				"data": " A lone tag still takes its line: the block goes multiline "
+				"end": 923,
+				"data": " Glued THROUGH a hoisted run: the glue scan steps over a hoisted neighbour, so both\n     tags are glued to content and the whole run keeps the author's line (`ab`, not `a b`) "
 			},
 			{
 				"type": "Text",
-				"start": 807,
-				"end": 808,
+				"start": 923,
+				"end": 924,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 808,
-				"end": 840,
+				"start": 924,
+				"end": 969,
 				"test": {
 					"type": "Identifier",
-					"start": 813,
-					"end": 817,
+					"start": 929,
+					"end": 933,
 					"loc": {
 						"start": {
-							"line": 29,
+							"line": 30,
 							"column": 5
 						},
 						"end": {
-							"line": 29,
+							"line": 30,
 							"column": 9
 						}
 					},
@@ -493,185 +493,63 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 818,
-							"end": 820,
-							"raw": "\n\t",
-							"data": "\n\t"
+							"start": 934,
+							"end": 935,
+							"raw": "a",
+							"data": "a"
 						},
 						{
 							"type": "ConstTag",
-							"start": 820,
-							"end": 834,
-							"declaration": {
-								"type": "VariableDeclaration",
-								"kind": "const",
-								"declarations": [
-									{
-										"type": "VariableDeclarator",
-										"id": {
-											"type": "Identifier",
-											"name": "x",
-											"start": 828,
-											"end": 829,
-											"loc": {
-												"start": {
-													"line": 30,
-													"column": 9,
-													"character": 828
-												},
-												"end": {
-													"line": 30,
-													"column": 10,
-													"character": 829
-												}
-											}
-										},
-										"init": {
-											"type": "Literal",
-											"start": 832,
-											"end": 833,
-											"loc": {
-												"start": {
-													"line": 30,
-													"column": 13
-												},
-												"end": {
-													"line": 30,
-													"column": 14
-												}
-											},
-											"value": 1,
-											"raw": "1"
-										},
-										"start": 828,
-										"end": 833
-									}
-								],
-								"start": 822,
-								"end": 833
-							}
-						},
-						{
-							"type": "Text",
-							"start": 834,
-							"end": 835,
-							"raw": "\n",
-							"data": "\n"
-						}
-					]
-				},
-				"alternate": null
-			},
-			{
-				"type": "Text",
-				"start": 840,
-				"end": 842,
-				"raw": "\n\n",
-				"data": "\n\n"
-			},
-			{
-				"type": "Comment",
-				"start": 842,
-				"end": 920,
-				"data": " Consecutive tags each take a line: a hoisted neighbour is not content "
-			},
-			{
-				"type": "Text",
-				"start": 920,
-				"end": 921,
-				"raw": "\n",
-				"data": "\n"
-			},
-			{
-				"type": "IfBlock",
-				"elseif": false,
-				"start": 921,
-				"end": 976,
-				"test": {
-					"type": "Identifier",
-					"start": 926,
-					"end": 930,
-					"loc": {
-						"start": {
-							"line": 34,
-							"column": 5
-						},
-						"end": {
-							"line": 34,
-							"column": 9
-						}
-					},
-					"name": "cond"
-				},
-				"consequent": {
-					"type": "Fragment",
-					"nodes": [
-						{
-							"type": "Text",
-							"start": 931,
-							"end": 933,
-							"raw": "\n\t",
-							"data": "\n\t"
-						},
-						{
-							"type": "ConstTag",
-							"start": 933,
-							"end": 947,
-							"declaration": {
-								"type": "VariableDeclaration",
-								"kind": "const",
-								"declarations": [
-									{
-										"type": "VariableDeclarator",
-										"id": {
-											"type": "Identifier",
-											"name": "x",
-											"start": 941,
-											"end": 942,
-											"loc": {
-												"start": {
-													"line": 35,
-													"column": 9,
-													"character": 941
-												},
-												"end": {
-													"line": 35,
-													"column": 10,
-													"character": 942
-												}
-											}
-										},
-										"init": {
-											"type": "Literal",
-											"start": 945,
-											"end": 946,
-											"loc": {
-												"start": {
-													"line": 35,
-													"column": 13
-												},
-												"end": {
-													"line": 35,
-													"column": 14
-												}
-											},
-											"value": 1,
-											"raw": "1"
-										},
-										"start": 941,
-										"end": 946
-									}
-								],
-								"start": 935,
-								"end": 946
-							}
-						},
-						{
-							"type": "Text",
-							"start": 947,
+							"start": 935,
 							"end": 949,
-							"raw": "\n\t",
-							"data": "\n\t"
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "x",
+											"start": 943,
+											"end": 944,
+											"loc": {
+												"start": {
+													"line": 30,
+													"column": 19,
+													"character": 943
+												},
+												"end": {
+													"line": 30,
+													"column": 20,
+													"character": 944
+												}
+											}
+										},
+										"init": {
+											"type": "Literal",
+											"start": 947,
+											"end": 948,
+											"loc": {
+												"start": {
+													"line": 30,
+													"column": 23
+												},
+												"end": {
+													"line": 30,
+													"column": 24
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"start": 943,
+										"end": 948
+									}
+								],
+								"start": 937,
+								"end": 948
+							}
 						},
 						{
 							"type": "ConstTag",
@@ -690,13 +568,13 @@
 											"end": 958,
 											"loc": {
 												"start": {
-													"line": 36,
-													"column": 9,
+													"line": 30,
+													"column": 33,
 													"character": 957
 												},
 												"end": {
-													"line": 36,
-													"column": 10,
+													"line": 30,
+													"column": 34,
 													"character": 958
 												}
 											}
@@ -707,12 +585,12 @@
 											"end": 962,
 											"loc": {
 												"start": {
-													"line": 36,
-													"column": 13
+													"line": 30,
+													"column": 37
 												},
 												"end": {
-													"line": 36,
-													"column": 14
+													"line": 30,
+													"column": 38
 												}
 											},
 											"value": 2,
@@ -729,7 +607,412 @@
 						{
 							"type": "Text",
 							"start": 963,
-							"end": 971,
+							"end": 964,
+							"raw": "b",
+							"data": "b"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 969,
+				"end": 971,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 971,
+				"end": 1063,
+				"data": " A non-collapsible edge is content, so it glues: the NBSP welds the tag on that side "
+			},
+			{
+				"type": "Text",
+				"start": 1063,
+				"end": 1064,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 1064,
+				"end": 1101,
+				"test": {
+					"type": "Identifier",
+					"start": 1069,
+					"end": 1073,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 5
+						},
+						"end": {
+							"line": 33,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1074,
+							"end": 1081,
+							"raw": "a&nbsp;",
+							"data": "a "
+						},
+						{
+							"type": "ConstTag",
+							"start": 1081,
+							"end": 1095,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "x",
+											"start": 1089,
+											"end": 1090,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 25,
+													"character": 1089
+												},
+												"end": {
+													"line": 33,
+													"column": 26,
+													"character": 1090
+												}
+											}
+										},
+										"init": {
+											"type": "Literal",
+											"start": 1093,
+											"end": 1094,
+											"loc": {
+												"start": {
+													"line": 33,
+													"column": 29
+												},
+												"end": {
+													"line": 33,
+													"column": 30
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"start": 1089,
+										"end": 1094
+									}
+								],
+								"start": 1083,
+								"end": 1094
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1095,
+							"end": 1096,
+							"raw": "b",
+							"data": "b"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 1101,
+				"end": 1103,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1103,
+				"end": 1169,
+				"data": " A lone tag still takes its line: the block goes multiline "
+			},
+			{
+				"type": "Text",
+				"start": 1169,
+				"end": 1170,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 1170,
+				"end": 1202,
+				"test": {
+					"type": "Identifier",
+					"start": 1175,
+					"end": 1179,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 5
+						},
+						"end": {
+							"line": 36,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1180,
+							"end": 1182,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 1182,
+							"end": 1196,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "x",
+											"start": 1190,
+											"end": 1191,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 9,
+													"character": 1190
+												},
+												"end": {
+													"line": 37,
+													"column": 10,
+													"character": 1191
+												}
+											}
+										},
+										"init": {
+											"type": "Literal",
+											"start": 1194,
+											"end": 1195,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 13
+												},
+												"end": {
+													"line": 37,
+													"column": 14
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"start": 1190,
+										"end": 1195
+									}
+								],
+								"start": 1184,
+								"end": 1195
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1196,
+							"end": 1197,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 1202,
+				"end": 1204,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1204,
+				"end": 1282,
+				"data": " Consecutive tags each take a line: a hoisted neighbour is not content "
+			},
+			{
+				"type": "Text",
+				"start": 1282,
+				"end": 1283,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 1283,
+				"end": 1338,
+				"test": {
+					"type": "Identifier",
+					"start": 1288,
+					"end": 1292,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 5
+						},
+						"end": {
+							"line": 41,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1293,
+							"end": 1295,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 1295,
+							"end": 1309,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "x",
+											"start": 1303,
+											"end": 1304,
+											"loc": {
+												"start": {
+													"line": 42,
+													"column": 9,
+													"character": 1303
+												},
+												"end": {
+													"line": 42,
+													"column": 10,
+													"character": 1304
+												}
+											}
+										},
+										"init": {
+											"type": "Literal",
+											"start": 1307,
+											"end": 1308,
+											"loc": {
+												"start": {
+													"line": 42,
+													"column": 13
+												},
+												"end": {
+													"line": 42,
+													"column": 14
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"start": 1303,
+										"end": 1308
+									}
+								],
+								"start": 1297,
+								"end": 1308
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1309,
+							"end": 1311,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 1311,
+							"end": 1325,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "y",
+											"start": 1319,
+											"end": 1320,
+											"loc": {
+												"start": {
+													"line": 43,
+													"column": 9,
+													"character": 1319
+												},
+												"end": {
+													"line": 43,
+													"column": 10,
+													"character": 1320
+												}
+											}
+										},
+										"init": {
+											"type": "Literal",
+											"start": 1323,
+											"end": 1324,
+											"loc": {
+												"start": {
+													"line": 43,
+													"column": 13
+												},
+												"end": {
+													"line": 43,
+													"column": 14
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										},
+										"start": 1319,
+										"end": 1324
+									}
+								],
+								"start": 1313,
+								"end": 1324
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1325,
+							"end": 1333,
 							"raw": "\n\ttext3\n",
 							"data": "\n\ttext3\n"
 						}
@@ -739,39 +1022,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 976,
-				"end": 978,
+				"start": 1338,
+				"end": 1340,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 978,
-				"end": 1071,
+				"start": 1340,
+				"end": 1433,
 				"data": " `{const}` / `{let}` are legal in every fragment, so the rule reaches element content "
 			},
 			{
 				"type": "Text",
-				"start": 1071,
-				"end": 1072,
+				"start": 1433,
+				"end": 1434,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1072,
-				"end": 1113,
+				"start": 1434,
+				"end": 1475,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 41,
+						"line": 48,
 						"column": 1,
-						"character": 1073
+						"character": 1435
 					},
 					"end": {
-						"line": 41,
+						"line": 48,
 						"column": 4,
-						"character": 1076
+						"character": 1438
 					}
 				},
 				"attributes": [],
@@ -780,55 +1063,55 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1077,
-							"end": 1086,
+							"start": 1439,
+							"end": 1448,
 							"raw": "\n\ttext4\n\t",
 							"data": "\n\ttext4\n\t"
 						},
 						{
 							"type": "DeclarationTag",
-							"start": 1086,
-							"end": 1099,
+							"start": 1448,
+							"end": 1461,
 							"declaration": {
 								"type": "VariableDeclaration",
-								"start": 1087,
-								"end": 1098,
+								"start": 1449,
+								"end": 1460,
 								"loc": {
 									"start": {
-										"line": 43,
+										"line": 50,
 										"column": 2
 									},
 									"end": {
-										"line": 43,
+										"line": 50,
 										"column": 13
 									}
 								},
 								"declarations": [
 									{
 										"type": "VariableDeclarator",
-										"start": 1093,
-										"end": 1098,
+										"start": 1455,
+										"end": 1460,
 										"loc": {
 											"start": {
-												"line": 43,
+												"line": 50,
 												"column": 8
 											},
 											"end": {
-												"line": 43,
+												"line": 50,
 												"column": 13
 											}
 										},
 										"id": {
 											"type": "Identifier",
-											"start": 1093,
-											"end": 1094,
+											"start": 1455,
+											"end": 1456,
 											"loc": {
 												"start": {
-													"line": 43,
+													"line": 50,
 													"column": 8
 												},
 												"end": {
-													"line": 43,
+													"line": 50,
 													"column": 9
 												}
 											},
@@ -836,15 +1119,15 @@
 										},
 										"init": {
 											"type": "Literal",
-											"start": 1097,
-											"end": 1098,
+											"start": 1459,
+											"end": 1460,
 											"loc": {
 												"start": {
-													"line": 43,
+													"line": 50,
 													"column": 12
 												},
 												"end": {
-													"line": 43,
+													"line": 50,
 													"column": 13
 												}
 											},
@@ -858,8 +1141,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1099,
-							"end": 1107,
+							"start": 1461,
+							"end": 1469,
 							"raw": "\n\ttext5\n",
 							"data": "\n\ttext5\n"
 						}
@@ -868,40 +1151,40 @@
 			},
 			{
 				"type": "Text",
-				"start": 1113,
-				"end": 1115,
+				"start": 1475,
+				"end": 1477,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1115,
-				"end": 1174,
+				"start": 1477,
+				"end": 1536,
 				"data": " `{@debug}` is excluded: its edge run TRIMS instead "
 			},
 			{
 				"type": "Text",
-				"start": 1174,
-				"end": 1175,
+				"start": 1536,
+				"end": 1537,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "IfBlock",
 				"elseif": false,
-				"start": 1175,
-				"end": 1208,
+				"start": 1537,
+				"end": 1570,
 				"test": {
 					"type": "Identifier",
-					"start": 1180,
-					"end": 1184,
+					"start": 1542,
+					"end": 1546,
 					"loc": {
 						"start": {
-							"line": 48,
+							"line": 55,
 							"column": 5
 						},
 						"end": {
-							"line": 48,
+							"line": 55,
 							"column": 9
 						}
 					},
@@ -912,27 +1195,27 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1185,
-							"end": 1190,
+							"start": 1547,
+							"end": 1552,
 							"raw": "text6",
 							"data": "text6"
 						},
 						{
 							"type": "DebugTag",
-							"start": 1190,
-							"end": 1203,
+							"start": 1552,
+							"end": 1565,
 							"identifiers": [
 								{
 									"type": "Identifier",
-									"start": 1198,
-									"end": 1202,
+									"start": 1560,
+									"end": 1564,
 									"loc": {
 										"start": {
-											"line": 48,
+											"line": 55,
 											"column": 23
 										},
 										"end": {
-											"line": 48,
+											"line": 55,
 											"column": 27
 										}
 									},
@@ -946,39 +1229,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 1208,
-				"end": 1210,
+				"start": 1570,
+				"end": 1572,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1210,
-				"end": 1309,
+				"start": 1572,
+				"end": 1671,
 				"data": " A component hosts a fragment too, and a `{#snippet}` sibling hoists for the compiler alike "
 			},
 			{
 				"type": "Text",
-				"start": 1309,
-				"end": 1310,
+				"start": 1671,
+				"end": 1672,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "Component",
-				"start": 1310,
-				"end": 1367,
+				"start": 1672,
+				"end": 1729,
 				"name": "Comp",
 				"name_loc": {
 					"start": {
-						"line": 51,
+						"line": 58,
 						"column": 1,
-						"character": 1311
+						"character": 1673
 					},
 					"end": {
-						"line": 51,
+						"line": 58,
 						"column": 5,
-						"character": 1315
+						"character": 1677
 					}
 				},
 				"attributes": [],
@@ -987,15 +1270,15 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1316,
-							"end": 1318,
+							"start": 1678,
+							"end": 1680,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "ConstTag",
-							"start": 1318,
-							"end": 1332,
+							"start": 1680,
+							"end": 1694,
 							"declaration": {
 								"type": "VariableDeclaration",
 								"kind": "const",
@@ -1005,72 +1288,72 @@
 										"id": {
 											"type": "Identifier",
 											"name": "a",
-											"start": 1326,
-											"end": 1327,
+											"start": 1688,
+											"end": 1689,
 											"loc": {
 												"start": {
-													"line": 52,
+													"line": 59,
 													"column": 9,
-													"character": 1326
+													"character": 1688
 												},
 												"end": {
-													"line": 52,
+													"line": 59,
 													"column": 10,
-													"character": 1327
+													"character": 1689
 												}
 											}
 										},
 										"init": {
 											"type": "Literal",
-											"start": 1330,
-											"end": 1331,
+											"start": 1692,
+											"end": 1693,
 											"loc": {
 												"start": {
-													"line": 52,
+													"line": 59,
 													"column": 13
 												},
 												"end": {
-													"line": 52,
+													"line": 59,
 													"column": 14
 												}
 											},
 											"value": 1,
 											"raw": "1"
 										},
-										"start": 1326,
-										"end": 1331
+										"start": 1688,
+										"end": 1693
 									}
 								],
-								"start": 1320,
-								"end": 1331
+								"start": 1682,
+								"end": 1693
 							}
 						},
 						{
 							"type": "Text",
-							"start": 1332,
-							"end": 1334,
+							"start": 1694,
+							"end": 1696,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "SnippetBlock",
-							"start": 1334,
-							"end": 1359,
+							"start": 1696,
+							"end": 1721,
 							"expression": {
 								"type": "Identifier",
 								"name": "f",
-								"start": 1344,
-								"end": 1345,
+								"start": 1706,
+								"end": 1707,
 								"loc": {
 									"start": {
-										"line": 53,
+										"line": 60,
 										"column": 11,
-										"character": 1344
+										"character": 1706
 									},
 									"end": {
-										"line": 53,
+										"line": 60,
 										"column": 12,
-										"character": 1345
+										"character": 1707
 									}
 								}
 							},
@@ -1080,8 +1363,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 1348,
-										"end": 1349,
+										"start": 1710,
+										"end": 1711,
 										"raw": "x",
 										"data": "x"
 									}
@@ -1090,8 +1373,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1359,
-							"end": 1360,
+							"start": 1721,
+							"end": 1722,
 							"raw": "\n",
 							"data": "\n"
 						}

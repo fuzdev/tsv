@@ -15,6 +15,13 @@
 <!-- GLUED on both sides: `a{@const}b` renders `ab`, so the tag keeps the author's line -->
 {#if cond}a{@const x = 1}b{/if}
 
+<!-- Glued THROUGH a hoisted run: the glue scan steps over a hoisted neighbour, so both
+     tags are glued to content and the whole run keeps the author's line (`ab`, not `a b`) -->
+{#if cond}a{@const x = 1}{@const y = 2}b{/if}
+
+<!-- A non-collapsible edge is content, so it glues: the NBSP welds the tag on that side -->
+{#if cond}a&nbsp;{@const x = 1}b{/if}
+
 <!-- A lone tag still takes its line: the block goes multiline -->
 {#if cond}{@const x = 1}{/if}
 

@@ -499,10 +499,18 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether two fragment nodes are **byte-glued** — no source between them (`a`'s end is `b`'s
-    /// start). The core adjacency test behind every "glued run" in this file: a glued boundary is
-    /// render-significant (breaking it would inject a rendered space), so a glued prefix or element
-    /// run always travels as one unit. Any node — including whitespace-only text — between them
-    /// makes them non-adjacent.
+    /// start). The adjacency test behind the "glued run" *layout* questions in this file (the
+    /// sibling-`>` dangle, the break-before travel unit): a glued boundary is render-significant
+    /// (breaking it would inject a rendered space), so a glued prefix or element run always
+    /// travels as one unit. Any node — including whitespace-only text — between them makes them
+    /// non-adjacent.
+    ///
+    /// ⚠️ The converse does not hold at the ROOT, where a byte gap between consecutive fragment
+    /// nodes is a lifted `<script>` / `<style>` / `<svelte:options>` — content the compiler
+    /// removes, so the survivors are still render-adjacent. The render-glue question
+    /// ([`Self::glued_to_content`]) therefore deliberately does NOT use this test; the layout
+    /// callers here read "not glued" across such a gap and merely decline a dangle, which is
+    /// layout-conservative rather than a render change.
     fn byte_glued(a: &FragmentNode<'_>, b: &FragmentNode<'_>) -> bool {
         a.span().end == b.span().start
     }
@@ -535,20 +543,27 @@ impl<'a> Printer<'a> {
             && !(self.glued_to_content(nodes, i, true) && self.glued_to_content(nodes, i, false))
     }
 
-    /// Whether the node at `i` is byte-glued to the nearest **content** before (`prev`) or after
+    /// Whether the node at `i` is glued to the nearest **content** before (`prev`) or after
     /// it — the neighbour the compiler's whitespace rules actually see, which is what decides
     /// whether breaking there would inject a rendered space.
     ///
     /// Three things make a neighbour not-content, and each is the compiler's own answer:
-    /// a **hoisted** sibling vanishes from those rules, so the scan steps over it (only while it
-    /// stays byte-adjacent — a run of `{@const}`s is not glued to itself); a **whitespace-only**
-    /// text is the separator, not the content; and a content **text** counts only when its facing
-    /// edge carries no collapsible whitespace, since that whitespace is the separator instead.
-    /// Anything else counts when the spans touch.
+    /// a **hoisted** sibling vanishes from those rules, so the scan steps over it (a run of
+    /// `{@const}`s is not glued to itself — stepping over hoisted neighbours can only end at a
+    /// text, whose edges answer, or at the fragment edge, which is not content); a
+    /// **whitespace-only** text is the separator, not the content; and a content **text** counts
+    /// only when its facing edge carries no collapsible whitespace, since that whitespace is the
+    /// separator instead. Anything else is content and glues.
     ///
-    /// The byte-adjacency test is not redundant with the text checks: sibling spans tile a
-    /// fragment everywhere except the ROOT, where `<script>` / `<style>` are lifted out and leave
-    /// a real gap between the nodes that survive.
+    /// ⚠️ There is deliberately **no byte-adjacency test** here, and adding one was a render
+    /// bug. Sibling spans tile every fragment except the ROOT, where `<script>` / `<style>` /
+    /// `<svelte:options>` are lifted out of `Fragment::nodes` and leave a byte gap — but the
+    /// compiler removes exactly those before its whitespace rules run, so the survivors around
+    /// the gap are adjacent to it: `a<script>…</script>{const y = 2}b` renders `ab`, and a
+    /// break injected at the gap is a rendered space. A real separator always materializes as
+    /// its own whitespace text node (or a text's own edge), which the arms above answer — a
+    /// byte gap between consecutive fragment nodes is never render-whitespace. Pinned by
+    /// [root_script_gap](../../../../../tests/fixtures/svelte/tags/root_script_gap/).
     fn glued_to_content(&self, nodes: &[FragmentNode<'_>], i: usize, before: bool) -> bool {
         let mut cur = i;
         loop {
@@ -558,10 +573,6 @@ impl<'a> Printer<'a> {
                 Some(cur + 1).filter(|j| *j < nodes.len())
             };
             let Some(j) = neighbor else { return false };
-            let (left, right) = if before { (j, cur) } else { (cur, j) };
-            if !Self::byte_glued(&nodes[left], &nodes[right]) {
-                return false;
-            }
             match &nodes[j] {
                 FragmentNode::Text(t) if t.is_collapsible_ws_only => return false,
                 FragmentNode::Text(t) => {

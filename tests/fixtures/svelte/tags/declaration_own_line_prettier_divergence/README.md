@@ -46,10 +46,18 @@ directory compiles byte-identically.
 - **interior** — `a {@const} b`. Content on both sides, so the two runs merge to one space rather
   than vanishing; the space survives the break, so the tag takes its line here too.
 - **glued both sides** — `a{@const x = 1}b` keeps the author's line, the exception above.
+- **glued through a hoisted run** — `a{@const x = 1}{@const y = 2}b`: the glue scan steps OVER a
+  hoisted neighbour, so both tags are glued to content and the whole run keeps the author's line
+  (hoisting deletes the tags before the trim, so the split form would render `a b` where this
+  renders `ab`).
+- **non-collapsible edge** — `a&nbsp;{@const x = 1}b`: an NBSP edge is content, not a separator,
+  so it glues — a wider whitespace class here would misread it and split a glued boundary
+  (`a\u{a0}b` → `a\u{a0} b`, a render change). A form feed edge glues the same way.
 - **lone tag** — `{#if cond}⏎\t{@const x = 1}⏎{/if}`: the tag touches only the block's boundaries,
   which are not content, so it is not glued and still takes its line — the block goes multiline.
-- **consecutive tags** — `{@const x = 1}{@const y = 2}text3` breaks into three lines: each tag's
-  neighbour is hoisted, so neither is glued to content.
+- **consecutive tags** — `{@const x = 1}{@const y = 2}text3` breaks into three lines: with the
+  fragment edge on the far side of the run, neither tag reaches content on BOTH sides (contrast
+  the glued-through-run case above, where content closes the run at each end).
 - **element content** — `{const}` / `{let}` carry no placement restriction (unlike `{@const}`, which
   must be a block/component child), so the rule reaches an element's fragment as well.
 - **`{@debug}` control** — `text6{@debug cond}` stays welded, pinning the exclusion.

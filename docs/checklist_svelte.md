@@ -203,6 +203,9 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Declaration in various contexts (root, if, each, snippet, element, component)
 - Own line in its fragment, on the same rule as `{@const}` above (`{#snippet}` follows the
   same rule — it declares a binding and hoists alike; see its section below)
+- Root siblings around a lifted `<script>` / `<style>` / `<svelte:options>` count as glued —
+  the compiler removes the section before its whitespace rules, so the byte gap is not a
+  separator (`a<script>…</script>{const y = 2}b` stays welded and renders `ab`)
 
 ### Debug Tag
 

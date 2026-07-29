@@ -44,9 +44,10 @@ literal, so no line is free to take; pinned by
 - **glued on one side** — `text2{#snippet fn4()}x{/snippet}`: the snippet hoists, so the text's
   run is a fragment-edge run whichever side of the snippet it sits on and the break is render-free.
 - **glued on both sides** — `a{#snippet fn5()}x{/snippet}b` keeps the author's line, the exception
-  above.
+  above — and a **component host** welds the same way (`<Comp5>a{#snippet fn11()}…b</Comp5>`): the
+  snippet still leaves the fragment as a snippet prop, so the glued pair still renders `ab`.
 - **consecutive snippets** — `{#snippet fn6()}…{#snippet fn7()}…text3` breaks into three lines:
-  each snippet's neighbour is hoisted, so neither is glued to content.
+  with the fragment edge on the far side of the run, neither snippet reaches content on BOTH sides.
 - **comment sibling** — `<!-- c -->{#snippet fn8()}…`: a comment IS content for the glue scan
   (its position is authorship, and it must stay render-safe under `preserveComments` too), but
   it glues only one side here, so the snippet still takes its line.

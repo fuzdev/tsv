@@ -18,6 +18,9 @@
 <!-- GLUED on both sides: `a{#snippet}…{/snippet}b` renders `ab`, so it keeps the author's line -->
 <div>a{#snippet fn5()}x{/snippet}b</div>
 
+<!-- A component-hosted glued pair welds the same way (the snippet still becomes a prop) -->
+<Comp5>a{#snippet fn11()}x{/snippet}b</Comp5>
+
 <!-- Consecutive snippets each take a line: a hoisted neighbour is not content -->
 <Comp3>{#snippet fn6()}x{/snippet}{#snippet fn7()}y{/snippet}text3</Comp3>
 

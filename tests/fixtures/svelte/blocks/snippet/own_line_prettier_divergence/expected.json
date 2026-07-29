@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1466,
+	"end": 1606,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -484,31 +484,31 @@
 			{
 				"type": "Comment",
 				"start": 896,
-				"end": 978,
-				"data": " Consecutive snippets each take a line: a hoisted neighbour is not content "
+				"end": 988,
+				"data": " A component-hosted glued pair welds the same way (the snippet still becomes a prop) "
 			},
 			{
 				"type": "Text",
-				"start": 978,
-				"end": 979,
+				"start": 988,
+				"end": 989,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "Component",
-				"start": 979,
-				"end": 1060,
-				"name": "Comp3",
+				"start": 989,
+				"end": 1034,
+				"name": "Comp5",
 				"name_loc": {
 					"start": {
 						"line": 32,
 						"column": 1,
-						"character": 980
+						"character": 990
 					},
 					"end": {
 						"line": 32,
 						"column": 6,
-						"character": 985
+						"character": 995
 					}
 				},
 				"attributes": [],
@@ -517,30 +517,30 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 986,
-							"end": 988,
-							"raw": "\n\t",
-							"data": "\n\t"
+							"start": 996,
+							"end": 997,
+							"raw": "a",
+							"data": "a"
 						},
 						{
 							"type": "SnippetBlock",
-							"start": 988,
-							"end": 1015,
+							"start": 997,
+							"end": 1025,
 							"expression": {
 								"type": "Identifier",
-								"name": "fn6",
-								"start": 998,
-								"end": 1001,
+								"name": "fn11",
+								"start": 1007,
+								"end": 1011,
 								"loc": {
 									"start": {
-										"line": 33,
-										"column": 11,
-										"character": 998
+										"line": 32,
+										"column": 18,
+										"character": 1007
 									},
 									"end": {
-										"line": 33,
-										"column": 14,
-										"character": 1001
+										"line": 32,
+										"column": 22,
+										"character": 1011
 									}
 								}
 							},
@@ -550,8 +550,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 1004,
-										"end": 1005,
+										"start": 1014,
+										"end": 1015,
 										"raw": "x",
 										"data": "x"
 									}
@@ -560,30 +560,81 @@
 						},
 						{
 							"type": "Text",
-							"start": 1015,
-							"end": 1017,
+							"start": 1025,
+							"end": 1026,
+							"raw": "b",
+							"data": "b"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1034,
+				"end": 1036,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1036,
+				"end": 1118,
+				"data": " Consecutive snippets each take a line: a hoisted neighbour is not content "
+			},
+			{
+				"type": "Text",
+				"start": 1118,
+				"end": 1119,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 1119,
+				"end": 1200,
+				"name": "Comp3",
+				"name_loc": {
+					"start": {
+						"line": 35,
+						"column": 1,
+						"character": 1120
+					},
+					"end": {
+						"line": 35,
+						"column": 6,
+						"character": 1125
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1126,
+							"end": 1128,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "SnippetBlock",
-							"start": 1017,
-							"end": 1044,
+							"start": 1128,
+							"end": 1155,
 							"expression": {
 								"type": "Identifier",
-								"name": "fn7",
-								"start": 1027,
-								"end": 1030,
+								"name": "fn6",
+								"start": 1138,
+								"end": 1141,
 								"loc": {
 									"start": {
-										"line": 34,
+										"line": 36,
 										"column": 11,
-										"character": 1027
+										"character": 1138
 									},
 									"end": {
-										"line": 34,
+										"line": 36,
 										"column": 14,
-										"character": 1030
+										"character": 1141
 									}
 								}
 							},
@@ -593,8 +644,51 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 1033,
-										"end": 1034,
+										"start": 1144,
+										"end": 1145,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1155,
+							"end": 1157,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 1157,
+							"end": 1184,
+							"expression": {
+								"type": "Identifier",
+								"name": "fn7",
+								"start": 1167,
+								"end": 1170,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 11,
+										"character": 1167
+									},
+									"end": {
+										"line": 37,
+										"column": 14,
+										"character": 1170
+									}
+								}
+							},
+							"parameters": [],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1173,
+										"end": 1174,
 										"raw": "y",
 										"data": "y"
 									}
@@ -603,8 +697,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1044,
-							"end": 1052,
+							"start": 1184,
+							"end": 1192,
 							"raw": "\n\ttext3\n",
 							"data": "\n\ttext3\n"
 						}
@@ -613,39 +707,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 1060,
-				"end": 1062,
+				"start": 1200,
+				"end": 1202,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 1062,
-				"end": 1152,
+				"start": 1202,
+				"end": 1292,
 				"data": " A comment is content: glued on one side only, so the snippet still takes its line "
 			},
 			{
 				"type": "Text",
-				"start": 1152,
-				"end": 1153,
+				"start": 1292,
+				"end": 1293,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1153,
-				"end": 1206,
+				"start": 1293,
+				"end": 1346,
 				"name": "div",
 				"name_loc": {
 					"start": {
-						"line": 39,
+						"line": 42,
 						"column": 1,
-						"character": 1154
+						"character": 1294
 					},
 					"end": {
-						"line": 39,
+						"line": 42,
 						"column": 4,
-						"character": 1157
+						"character": 1297
 					}
 				},
 				"attributes": [],
@@ -654,43 +748,43 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1158,
-							"end": 1160,
+							"start": 1298,
+							"end": 1300,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 1160,
-							"end": 1170,
+							"start": 1300,
+							"end": 1310,
 							"data": " c "
 						},
 						{
 							"type": "Text",
-							"start": 1170,
-							"end": 1172,
+							"start": 1310,
+							"end": 1312,
 							"raw": "\n\t",
 							"data": "\n\t"
 						},
 						{
 							"type": "SnippetBlock",
-							"start": 1172,
-							"end": 1199,
+							"start": 1312,
+							"end": 1339,
 							"expression": {
 								"type": "Identifier",
 								"name": "fn8",
-								"start": 1182,
-								"end": 1185,
+								"start": 1322,
+								"end": 1325,
 								"loc": {
 									"start": {
-										"line": 41,
+										"line": 44,
 										"column": 11,
-										"character": 1182
+										"character": 1322
 									},
 									"end": {
-										"line": 41,
+										"line": 44,
 										"column": 14,
-										"character": 1185
+										"character": 1325
 									}
 								}
 							},
@@ -700,8 +794,8 @@
 								"nodes": [
 									{
 										"type": "Text",
-										"start": 1188,
-										"end": 1189,
+										"start": 1328,
+										"end": 1329,
 										"raw": "x",
 										"data": "x"
 									}
@@ -710,132 +804,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 1199,
-							"end": 1200,
-							"raw": "\n",
-							"data": "\n"
-						}
-					]
-				}
-			},
-			{
-				"type": "Text",
-				"start": 1206,
-				"end": 1208,
-				"raw": "\n\n",
-				"data": "\n\n"
-			},
-			{
-				"type": "Comment",
-				"start": 1208,
-				"end": 1285,
-				"data": " A hoisted non-declaration neighbour ({@debug}) is not content either "
-			},
-			{
-				"type": "Text",
-				"start": 1285,
-				"end": 1286,
-				"raw": "\n",
-				"data": "\n"
-			},
-			{
-				"type": "Component",
-				"start": 1286,
-				"end": 1346,
-				"name": "Comp4",
-				"name_loc": {
-					"start": {
-						"line": 45,
-						"column": 1,
-						"character": 1287
-					},
-					"end": {
-						"line": 45,
-						"column": 6,
-						"character": 1292
-					}
-				},
-				"attributes": [],
-				"fragment": {
-					"type": "Fragment",
-					"nodes": [
-						{
-							"type": "Text",
-							"start": 1293,
-							"end": 1295,
-							"raw": "\n\t",
-							"data": "\n\t"
-						},
-						{
-							"type": "DebugTag",
-							"start": 1295,
-							"end": 1308,
-							"identifiers": [
-								{
-									"type": "Identifier",
-									"start": 1303,
-									"end": 1307,
-									"loc": {
-										"start": {
-											"line": 46,
-											"column": 9
-										},
-										"end": {
-											"line": 46,
-											"column": 13
-										}
-									},
-									"name": "cond"
-								}
-							]
-						},
-						{
-							"type": "Text",
-							"start": 1308,
-							"end": 1310,
-							"raw": "\n\t",
-							"data": "\n\t"
-						},
-						{
-							"type": "SnippetBlock",
-							"start": 1310,
-							"end": 1337,
-							"expression": {
-								"type": "Identifier",
-								"name": "fn9",
-								"start": 1320,
-								"end": 1323,
-								"loc": {
-									"start": {
-										"line": 47,
-										"column": 11,
-										"character": 1320
-									},
-									"end": {
-										"line": 47,
-										"column": 14,
-										"character": 1323
-									}
-								}
-							},
-							"parameters": [],
-							"body": {
-								"type": "Fragment",
-								"nodes": [
-									{
-										"type": "Text",
-										"start": 1326,
-										"end": 1327,
-										"raw": "x",
-										"data": "x"
-									}
-								]
-							}
-						},
-						{
-							"type": "Text",
-							"start": 1337,
-							"end": 1338,
+							"start": 1339,
+							"end": 1340,
 							"raw": "\n",
 							"data": "\n"
 						}
@@ -852,35 +822,159 @@
 			{
 				"type": "Comment",
 				"start": 1348,
-				"end": 1430,
+				"end": 1425,
+				"data": " A hoisted non-declaration neighbour ({@debug}) is not content either "
+			},
+			{
+				"type": "Text",
+				"start": 1425,
+				"end": 1426,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 1426,
+				"end": 1486,
+				"name": "Comp4",
+				"name_loc": {
+					"start": {
+						"line": 48,
+						"column": 1,
+						"character": 1427
+					},
+					"end": {
+						"line": 48,
+						"column": 6,
+						"character": 1432
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1433,
+							"end": 1435,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "DebugTag",
+							"start": 1435,
+							"end": 1448,
+							"identifiers": [
+								{
+									"type": "Identifier",
+									"start": 1443,
+									"end": 1447,
+									"loc": {
+										"start": {
+											"line": 49,
+											"column": 9
+										},
+										"end": {
+											"line": 49,
+											"column": 13
+										}
+									},
+									"name": "cond"
+								}
+							]
+						},
+						{
+							"type": "Text",
+							"start": 1448,
+							"end": 1450,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "SnippetBlock",
+							"start": 1450,
+							"end": 1477,
+							"expression": {
+								"type": "Identifier",
+								"name": "fn9",
+								"start": 1460,
+								"end": 1463,
+								"loc": {
+									"start": {
+										"line": 50,
+										"column": 11,
+										"character": 1460
+									},
+									"end": {
+										"line": 50,
+										"column": 14,
+										"character": 1463
+									}
+								}
+							},
+							"parameters": [],
+							"body": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1466,
+										"end": 1467,
+										"raw": "x",
+										"data": "x"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1477,
+							"end": 1478,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1486,
+				"end": 1488,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1488,
+				"end": 1570,
 				"data": " The ROOT fragment is a fragment too: the trailing glue splits there alike "
 			},
 			{
 				"type": "Text",
-				"start": 1430,
-				"end": 1431,
+				"start": 1570,
+				"end": 1571,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "SnippetBlock",
-				"start": 1431,
-				"end": 1459,
+				"start": 1571,
+				"end": 1599,
 				"expression": {
 					"type": "Identifier",
 					"name": "fn10",
-					"start": 1441,
-					"end": 1445,
+					"start": 1581,
+					"end": 1585,
 					"loc": {
 						"start": {
-							"line": 51,
+							"line": 54,
 							"column": 10,
-							"character": 1441
+							"character": 1581
 						},
 						"end": {
-							"line": 51,
+							"line": 54,
 							"column": 14,
-							"character": 1445
+							"character": 1585
 						}
 					}
 				},
@@ -890,8 +984,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1448,
-							"end": 1449,
+							"start": 1588,
+							"end": 1589,
 							"raw": "x",
 							"data": "x"
 						}
@@ -900,8 +994,8 @@
 			},
 			{
 				"type": "Text",
-				"start": 1459,
-				"end": 1465,
+				"start": 1599,
+				"end": 1605,
 				"raw": "\ntext4",
 				"data": "\ntext4"
 			}
