@@ -31,7 +31,7 @@
 //! (the corpus has pathological-nesting tests and tsv's parser has no depth
 //! guard), and each test's check is wrapped in `catch_unwind` so a panic lands
 //! in its own bucket instead of killing the run. A stack-overflow *abort* can't
-//! be caught; the [`CRASH_EXCLUSIONS`] list carves out crashers by kind — the
+//! be caught; the `grade::CRASH_EXCLUSIONS` list carves out crashers by kind — the
 //! genuine-abort class is empty on the pinned corpus (every current entry is a
 //! catchable panic tracking a tsv parser bug, liveness-probed each run).
 //
@@ -139,19 +139,19 @@ const _: () = {
 /// [`MissingCause::Other`] cause is exact-pinned in the CLI command's cause-pin
 /// table; `Other` is the HARD-zero invariant (enforced even on filtered runs).
 /// **Adding a deferred cause** (a new family's type-engine residual) = a variant
-/// here + a ledger const + an arm in [`classify_missing`] + a pin-table row.
+/// here + a ledger const + an arm in `grade::classify_missing` + a pin-table row.
 #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug, serde::Serialize)]
 #[serde(rename_all = "snake_case")]
 pub enum MissingCause {
-    /// The merge phase owns the code ([`MERGE_CODES`]).
+    /// The merge phase owns the code (`grade::MERGE_CODES`).
     Merge,
-    /// A [`LIB_CONFLICT_BASELINES`] test missing a dup-family code (absent lib
+    /// A `grade::LIB_CONFLICT_BASELINES` test missing a dup-family code (absent lib
     /// binding — a lib-detection regression guard, pinned 0).
     Lib,
-    /// A [`LATE_BOUND_BASELINES`] test missing a dup-family code — the
+    /// A `grade::LATE_BOUND_BASELINES` test missing a dup-family code — the
     /// type-engine `lateBindMember` residual (exact-pinned).
     DeferredLateBound,
-    /// A [`DEFERRED_CFA_BASELINES`] test missing a flow-family code — the
+    /// A `grade::DEFERRED_CFA_BASELINES` test missing a flow-family code — the
     /// `isReachableFlowNode` residual (exact-pinned).
     DeferredCfa,
     /// Unclassified — a same-table cascade / flow-construction bug. **HARD
@@ -197,7 +197,7 @@ pub struct ManifestEntry {
     pub baselined: bool,
     /// Whether tsv parsed the unit (`false` = parse-rejected).
     pub parsed: bool,
-    /// The per-variant verdict (see [`grade_test`] / [`grade_family`]).
+    /// The per-variant verdict (see `grade::grade_test` / `grade::grade_family`).
     pub verdict: &'static str,
 }
 
