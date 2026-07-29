@@ -23,6 +23,7 @@ pub mod compile_fuzz;
 pub mod compile_profile;
 pub mod conformance_audit;
 pub mod erase_comment_census;
+pub mod fabrication_audit;
 pub mod fixture_init;
 pub mod fixtures_audit;
 pub mod fixtures_update;

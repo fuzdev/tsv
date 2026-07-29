@@ -1285,12 +1285,6 @@ impl Text {
         self.newline_count >= 1
     }
 
-    /// Whether `raw` contains a blank line (2+ `\n`) (precomputed, source-free).
-    #[inline]
-    pub fn has_blank_line(&self) -> bool {
-        self.newline_count >= 2
-    }
-
     /// Raw text (entities preserved) — a sub-slice of `source`, no allocation.
     /// `source` must be the host document the spans were recorded against.
     pub fn raw<'s>(&self, source: &'s str) -> &'s str {
@@ -1454,14 +1448,13 @@ mod tests {
         assert!(!mk("\u{00A0}").is_collapsible_ws_only);
         assert!(!mk("a").is_collapsible_ws_only);
 
-        // `newline_count` saturates at 2 (drives `has_newline` / `has_blank_line`).
+        // `newline_count` saturates at 2 (drives `has_newline`, and the printer's own
+        // `newline_count >= 2` reads).
         assert_eq!(mk("a b").newline_count, 0);
         assert!(!mk("a b").has_newline());
         assert_eq!(mk("a\nb").newline_count, 1);
         assert!(mk("a\nb").has_newline());
-        assert!(!mk("a\nb").has_blank_line());
         assert_eq!(mk("a\n\nb").newline_count, 2);
-        assert!(mk("a\n\nb").has_blank_line());
         // 3+ newlines still report the saturated 2.
         assert_eq!(mk("\n\n\n\n").newline_count, 2);
     }

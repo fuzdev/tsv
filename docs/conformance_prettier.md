@@ -1374,8 +1374,12 @@ For a whole-construct freeze the `prettier-ignore` family matches prettier (both
 - `format-ignore-start` / `-end` range — ◆design_choice — [range](../tests/fixtures/svelte/syntax/format_ignore/range_prettier_divergence/)
 - `format-ignore` standalone `.ts` — ◆design_choice — [ts_standalone](../tests/fixtures/typescript/syntax/comments/format_ignore_prettier_divergence/)
 - `format-ignore` standalone `.css` — ◆design_choice — [css_standalone](../tests/fixtures/css/syntax/comments/format_ignore_prettier_divergence/)
+- comment beside a hoisted section **inside** a range — ◆design_choice — [range_interior_comment](../tests/fixtures/svelte/syntax/prettier_ignore/range_interior_comment_prettier_divergence/)
+- glued nodes **inside** a range (byte-verbatim vs prettier's inter-node re-layout) — ◆design_choice — [range_glued](../tests/fixtures/svelte/syntax/prettier_ignore/range_glued_prettier_divergence/)
 
-The first five are Svelte-embedded; the last two pin the **standalone**
+**A range does not pin a section's position.** A `<script>` / `<style>` / `<svelte:options>` written *inside* a range is still lifted to the component root and printed at its canonical position, and its bytes are cut out of the frozen slice — leaving them there emits the section twice, which the parser rejects (`Duplicate instance script found`). Prettier does the same, so the plain case needs no divergence ([range_section_hoist](../tests/fixtures/svelte/syntax/prettier_ignore/range_section_hoist/)); a comment sitting beside such a section diverges ([range_interior_comment](../tests/fixtures/svelte/syntax/prettier_ignore/range_interior_comment_prettier_divergence/)), and the seam the cut leaves behind follows the byte-verbatim rule ([range_glued](../tests/fixtures/svelte/syntax/prettier_ignore/range_glued_prettier_divergence/)): tsv freezes the whole slice including inter-node whitespace, where prettier freezes node *content* but re-lays out the whitespace between nodes.
+
+The first five are Svelte-embedded; the two standalone entries pin the **standalone**
 `.ts` / `.css` paths (acorn-typescript / `parseCss` + `tsv_ts` / `tsv_css`
 directly), so the directive is covered in every language outside a Svelte host
 too.

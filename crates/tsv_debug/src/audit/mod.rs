@@ -20,8 +20,10 @@
 //! - [`report`] — the shared reporting envelope (`{severity, confidence, site,
 //!   example, detail}`) and the human / JSON printers.
 //!
-//! `gap_audit`, `blank_audit`, and `ignore_audit` are the consumers; the modules
-//! are written generic where a second consumer would actually reuse them, and no
+//! `gap_audit`, `blank_audit`, and `ignore_audit` are the consumers of the whole
+//! substrate; [`ratchet`] additionally serves `fabrication_audit` and
+//! `compile_corpus_compare --ratchet`, which drive no ledger. The modules are
+//! written generic where a second consumer would actually reuse them, and no
 //! further.
 
 // Always compiled: `properties` hosts the reparse primitives the `roundtrip_audit`

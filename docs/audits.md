@@ -14,6 +14,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Comment ledger](#comment-ledger-audit-commentsaudit) | `comments:audit` | a parsed comment DROPPED or DOUBLE-PRINTED (print-once) | `deno task check` |
 | [Gap injection](#gap-injection-audit-gapsaudit) | `gaps:audit` | comment drops in gaps no fixture covers | `deno task check` (ratchet) |
 | [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse / ledger / blank-run | `deno task check` (ratchet) |
+| [Blank fabrication](#blank-fabrication-audit-fabricationaudit) | `fabrication:audit` | a blank line the formatter INVENTS on a pristine seed (the author never wrote it) | `deno task check` (ratchet) |
 | [Ignore honoring](#ignore-directive-honoring-audit-ignoreaudit) | `ignore:audit` | `prettier-ignore` positions that silently reformat an ignored node, misbind a trailing directive, over-freeze, or lose the freeze on pass 2 | `deno task check` (ratchet) |
 | [Build fanout](#build-fanout-audit-fanoutaudit) | `fanout:audit` | exponential doc-node rebuild in nested layout candidates | `deno task check` |
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
@@ -146,6 +147,45 @@ cargo run --profile corpus -p tsv_debug --features audits blank_audit ~/dev/zzz/
 ```
 
 `deno task blanks:audit:update` regenerates the snapshot after fixing a shape; it refuses a narrowed run.
+
+## Blank-Fabrication Audit (`fabrication:audit`)
+
+The **pristine** counterpart to `blanks:audit`. That audit MUTATES a seed — injects a blank into a code gap and grades the response — so its subject is how the formatter reacts to a blank the author *did* write. This one never mutates: it formats the seed as authored and asks whether the output holds a blank run the input did not.
+
+Why it needs its own gate. A fabricated blank is indistinguishable from an authored one once written, so it is silent content the author never approved — and **every other gate is structurally blind to it**:
+
+- **F1 / idempotency** — the fabricated blank is authored as far as pass 2 is concerned, so pass 2 preserves it and the file is a fixed point. The property never trips.
+- **`blanks:audit` / `gaps:audit` / `ignore:audit`** — all grade a MUTATED seed, and the first two exempt whole-file format-ignore regions outright.
+- **Corpus format compare** — a fabrication prettier also makes is a match, not a divergence.
+
+```bash
+# fabrication_audit - format each pristine seed and report every blank RUN the output
+# holds that the input did not, minus two structurally sanctioned layout rules.
+# Pure Rust, no Deno. Defaults to tests/fixtures; pass dirs/files to audit real code.
+cargo run --profile corpus -p tsv_debug --features audits fabrication_audit
+cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ~/dev/zzz/src
+# Also: --json, --update. ~0.2 s over tests/fixtures.
+#
+# GATED as a RATCHET over `fabrication_audit_known.txt`, keyed by the SHAPE of the two
+# lines bracketing the invented blank (`{:catch` ⇢ blank ⇢ `{/await`), not by path — so
+# the snapshot is corpus-portable and states the bug rather than a location. Every line
+# is a bug; the file shrinking is the goal. Currently EMPTY (born green).
+```
+
+**The metric.** Blank *runs*, not blank lines: collapsing `a⏎⏎⏎⏎b` to `a⏎⏎b` removes newlines but not the author's "there is a break here" signal. A finding is `unsanctioned_runs(output) > runs(input)`.
+
+**The two sanctioned fabrications** are structural carve-outs in the audit, deliberately not snapshot lines — mixing sanctioned rules into a known-bug list would make "every line is a bug" false:
+
+1. **Hoisted-section seam** — tsv moves `<script>` / `<style>` / `<svelte:options>` to canonical positions and separates each from its neighbours with a blank. The carve-out is **two-sided**: a glued `</script><div>` puts the closing tag before the run, a glued `</div><style>` puts the opening tag after it.
+2. **Empty block body** — a kept-but-empty block section prints in block form, and the empty body between opener and terminator is a blank line (`{:catch error}{/await}` → `{:catch error}⏎⏎{/await}`). Sanctioned by [`empty_branch_collapse`](../tests/fixtures/svelte/blocks/empty_branch_collapse_prettier_divergence/) and [`empty_catch_multiline`](../tests/fixtures/svelte/blocks/await/empty_catch_multiline_prettier_divergence/), whose READMEs state it.
+
+**Known over-report: a section's leading comment run.** Rule 1 recognizes the seam by the section *tag*, but comments travel with the section, so a glued `<div>block1</div>⏎<!-- comment -->⏎<style>` puts the section's **leading comment** where the tag would be — the run reads `</div` ⇢ `<!--` and no carve-out fires, though prettier emits the identical blank. Left un-widened deliberately: the shape the audit can see is "a blank before some comment", and excusing that would blind it to a whole class of real fabrications. The narrow statement needs the AST, not the line shapes. Currently latent — an already-formatted corpus carries the blank in its input, so counts match and nothing trips; it fires only on pristine glued input.
+
+**Blind spots.**
+
+- **Net-zero.** The metric compares counts, so a run fabricated in one place while another is dropped elsewhere in the same file nets out and is missed. Closing it needs a position-preserving alignment between input and output, which reflow (and section hoisting, which relocates blanks wholesale) makes unavailable.
+- **Vacuous on fixed points.** Where `format(S) == S` the property holds by construction, so over a corpus of already-tsv-formatted files the audit adds nothing over F1. Its yield is on **pristine, not-yet-formatted** code — exactly where a first-format fabrication would otherwise go unnoticed, because every later format is a fixed point.
+- **Shape attribution.** A file trips on a count, and every unsanctioned run in *that file* then contributes its shape. So a tripped file can pin an innocent shape alongside the guilty one. Harmless while the snapshot is empty; if it fills, read a line as "a shape present in a file that fabricated", not "this shape fabricated".
 
 ## Ignore-Directive Honoring Audit (`ignore:audit`)
 
