@@ -25,8 +25,8 @@ mod nodes;
 mod script_style;
 mod text;
 
-use self::text::TextAnalysis;
 use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
+use smallvec::SmallVec;
 use std::cell::{Cell, RefCell};
 use tsv_lang::FxHashSet;
 use tsv_lang::doc::DocBuf;
@@ -41,7 +41,7 @@ use tsv_ts::Expression;
 /// A buffered run of comments from one gap — collected rather than iterated because the
 /// callers ask two questions of it (how does each one lay out? and how did the run end?).
 /// Mirrors `tsv_ts`'s `CommentVec`, which this crate can't see (`pub(crate)` there).
-pub(in crate::printer) type CommentRun<'a> = smallvec::SmallVec<[&'a Comment; 8]>;
+pub(in crate::printer) type CommentRun<'a> = SmallVec<[&'a Comment; 8]>;
 
 /// Which section a fragment comment should travel with during canonical reordering.
 /// Comments attach to the nearest section that follows them in source order.
@@ -52,6 +52,55 @@ enum CommentSection {
     InstanceScript,
     Template,
     Style,
+}
+
+/// The four root sections in canonical print order, each with the [`CommentSection`] it
+/// anchors. **The single enumeration of what hoists**: the comment-classification table
+/// ([`Printer::classify_fragment_comment`]) and the range-slice cuts
+/// ([`Printer::build_ignore_range_doc`], via `print_component`'s `hoisted`) both read it, so a
+/// section kind cannot join one and silently miss the other — a kind the cut missed would
+/// re-open the duplicate-section emit for exactly that kind.
+fn root_sections(root: &internal::Root<'_>) -> [(Option<Span>, CommentSection); 4] {
+    [
+        (
+            root.options.as_ref().map(|s| s.span),
+            CommentSection::Options,
+        ),
+        (
+            root.module.as_ref().map(|s| s.span),
+            CommentSection::ModuleScript,
+        ),
+        (
+            root.instance.as_ref().map(|s| s.span),
+            CommentSection::InstanceScript,
+        ),
+        (root.css.as_ref().map(|s| s.span), CommentSection::Style),
+    ]
+}
+
+/// A format-ignore **range marker**'s kind — the `…-start` / `…-end` pair that brackets a
+/// frozen template region.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum RangeMarker {
+    Start,
+    End,
+}
+
+/// Classify `comment` as a format-ignore range marker; `None` for every ordinary comment.
+///
+/// The one spelling of the marker test — the freeze scan, the comment-classification barrier,
+/// and [`Printer::is_inside_ignore_range`] all ask it here, so they cannot drift on which
+/// comments count as markers. A free function (not a method) because
+/// [`Printer::print_root_fragment`]'s closures capture `source` alone to stay borrow-clean.
+fn range_marker(comment: &internal::HtmlComment, source: &str) -> Option<RangeMarker> {
+    let content = comment.content(source);
+    if is_format_ignore_range_start(content) {
+        Some(RangeMarker::Start)
+    } else if is_format_ignore_range_end(content) {
+        Some(RangeMarker::End)
+    } else {
+        None
+    }
 }
 
 /// A head's content doc plus whether that head **froze** it — the pair every head builder
@@ -623,9 +672,33 @@ impl<'a> Printer<'a> {
         last_comment.is_some_and(|c| is_format_ignore_directive(c.content(self.source)))
     }
 
+    /// Whether the fragment node at `idx` sits **inside a frozen range** — the nearest range
+    /// marker before it opens one, and a closing marker follows.
+    ///
+    /// Mirrors the freeze condition in [`Self::print_root_fragment`] (a `…-start` counts only
+    /// once a matching `…-end` is found), so an *unclosed* `…-start` — which tsv prints as an
+    /// ordinary comment, freezing nothing — does not pin everything after it.
+    fn is_inside_ignore_range(&self, idx: usize, fragment: &internal::Fragment<'_>) -> bool {
+        let opened = fragment.nodes[..idx].iter().rev().find_map(|n| match n {
+            FragmentNode::Comment(c) => {
+                range_marker(c, self.source).map(|m| m == RangeMarker::Start)
+            }
+            _ => None,
+        });
+        opened == Some(true)
+            && fragment.nodes[idx..].iter().any(|n| {
+                matches!(n, FragmentNode::Comment(c)
+                    if range_marker(c, self.source) == Some(RangeMarker::End))
+            })
+    }
+
     /// Classify which section a fragment comment should travel with during
     /// canonical reordering. Each comment attaches to the nearest section
     /// that follows it in source order.
+    ///
+    /// Two things pin a comment to the template: a real node between it and every section (it
+    /// leads that node, not a section), and a **format-ignore range marker** — see
+    /// [`range_marker`]'s role in the scan below.
     fn classify_fragment_comment(
         &self,
         comment: &internal::HtmlComment,
@@ -634,59 +707,52 @@ impl<'a> Printer<'a> {
     ) -> CommentSection {
         // format-ignore-start/end mark ranges within the template —
         // they must stay in the fragment so the range preservation logic sees them
-        if is_format_ignore_range_start(comment.content(self.source))
-            || is_format_ignore_range_end(comment.content(self.source))
-        {
+        if range_marker(comment, self.source).is_some() {
+            return CommentSection::Template;
+        }
+
+        // A comment INSIDE a frozen range is already emitted by the range's verbatim slice, so
+        // hoisting it prints it twice. The forward scan below cannot see this on its own: when
+        // the *section* is inside the range too, its start precedes the closing marker and wins
+        // the nearest-start contest.
+        if self.is_inside_ignore_range(comment_idx, &root.fragment) {
             return CommentSection::Template;
         }
 
         let comment_end = comment.span.end;
         let mut nearest: Option<(u32, CommentSection)> = None;
 
-        // Check next non-comment, non-whitespace fragment node
+        // The first thing after the comment that pins it to the template: a real node (the
+        // comment leads *it*), or a range marker.
+        //
+        // A marker is a BARRIER, not a skippable comment. Hoisting across one moves the comment
+        // into or out of a frozen region — a reorder prettier does not make — and when the
+        // comment sits INSIDE the range it is printed twice, since the fragment emits the whole
+        // range verbatim while the section emits the comment again. Ordinary comments are still
+        // skipped: a run of them all lead the same section.
         for node in root.fragment.nodes.iter().skip(comment_idx + 1) {
-            match node {
+            let barrier = match node {
                 FragmentNode::Text(t) if t.is_collapsible_ws_only => continue,
+                FragmentNode::Comment(c) if range_marker(c, self.source).is_some() => c.span.start,
                 FragmentNode::Comment(_) => continue,
-                other => {
-                    let pos = other.span().start;
-                    if pos >= comment_end {
-                        nearest = Some((pos, CommentSection::Template));
-                    }
-                    break;
-                }
+                other => other.span().start,
+            };
+            if barrier >= comment_end {
+                nearest = Some((barrier, CommentSection::Template));
             }
+            break;
         }
 
-        // Check options
-        if let Some(options) = &root.options {
-            let start = options.span.start;
+        // Every root section competes on the same rule — the nearest start after the comment
+        // wins. One loop over the shared [`root_sections`] table rather than four copies of
+        // the comparison: the copies differ only in which field and which variant, which is
+        // exactly the pair a copy-paste edit gets wrong silently.
+        for (span, section) in root_sections(root) {
+            let Some(start) = span.map(|s| s.start) else {
+                continue;
+            };
             if start >= comment_end && nearest.as_ref().is_none_or(|(p, _)| start < *p) {
-                nearest = Some((start, CommentSection::Options));
-            }
-        }
-
-        // Check module script
-        if let Some(module) = &root.module {
-            let start = module.span.start;
-            if start >= comment_end && nearest.as_ref().is_none_or(|(p, _)| start < *p) {
-                nearest = Some((start, CommentSection::ModuleScript));
-            }
-        }
-
-        // Check instance script
-        if let Some(instance) = &root.instance {
-            let start = instance.span.start;
-            if start >= comment_end && nearest.as_ref().is_none_or(|(p, _)| start < *p) {
-                nearest = Some((start, CommentSection::InstanceScript));
-            }
-        }
-
-        // Check style
-        if let Some(css) = &root.css {
-            let start = css.span.start;
-            if start >= comment_end && nearest.as_ref().is_none_or(|(p, _)| start < *p) {
-                nearest = Some((start, CommentSection::Style));
+                nearest = Some((start, section));
             }
         }
 
@@ -695,6 +761,20 @@ impl<'a> Printer<'a> {
 
     /// Print section-attached comments and preserve authorial blank lines.
     /// Returns true if any comments were printed.
+    ///
+    /// Both blank questions ask [`text::has_authored_blank_line`], the RUN scan, because neither
+    /// gap is guaranteed whitespace-only: a `format-ignore` range marker classifies
+    /// [`CommentSection::Template`] while [`Self::classify_fragment_comment`] skips *every*
+    /// comment when it looks for the nearest real node, so a marker can sit between two section
+    /// comments — or between the last one and its section. A newline *total* would read that
+    /// marker's two bracketing newlines as an authored blank and invent one.
+    ///
+    /// TODO: the marker only lands in those gaps because a section comment is hoisted **past**
+    /// the range boundary in the first place — a reorder prettier does not make, and one that
+    /// double-prints a comment written INSIDE the range (the fragment emits the range verbatim
+    /// while the section emits the comment again). Classifying a comment separated from its
+    /// section by a range marker as `Template` would fix the reorder, the double-print, and
+    /// make these gaps whitespace-only again; it needs its own fixture cycle.
     fn print_section_comments(
         &mut self,
         comment_indices: &[usize],
@@ -710,7 +790,7 @@ impl<'a> Printer<'a> {
                 // Preserve authorial blank line between consecutive comments
                 if let Some(end) = prev_end {
                     let between = &self.source[end as usize..comment.span.start as usize];
-                    if between.has_blank_line() {
+                    if text::has_authored_blank_line(between) {
                         self.write("\n");
                     }
                 }
@@ -723,7 +803,7 @@ impl<'a> Printer<'a> {
         if let Some(&last_idx) = comment_indices.last() {
             let last_end = fragment.nodes[last_idx].span().end;
             let between = &self.source[last_end as usize..section_start as usize];
-            if between.has_blank_line() {
+            if text::has_authored_blank_line(between) {
                 self.write("\n");
             }
         }
@@ -758,6 +838,14 @@ impl<'a> Printer<'a> {
                 }
             }
         }
+
+        // Sections are lifted off the fragment and printed at canonical positions, but a
+        // `format-ignore` range's verbatim slice is raw source and would re-emit any that sits
+        // inside it — see `build_ignore_range_doc`.
+        let hoisted: SmallVec<[Span; 4]> = root_sections(root)
+            .into_iter()
+            .filter_map(|(span, _)| span)
+            .collect();
 
         // Non-template comments are skipped during fragment printing
         let mut printed_comment_indices: Vec<usize> = Vec::new();
@@ -807,7 +895,7 @@ impl<'a> Printer<'a> {
             if has_previous_section {
                 self.write("\n"); // Blank line between sections
             }
-            self.print_root_fragment(&root.fragment, &printed_comment_indices);
+            self.print_root_fragment(&root.fragment, &printed_comment_indices, &hoisted);
             self.write("\n"); // Template needs explicit newline
             has_previous_section = true;
         }
@@ -878,7 +966,12 @@ impl<'a> Printer<'a> {
     ///   split at top-level ranges: each range emits its source verbatim, the surrounding
     ///   segments go through the shared builder. (Single-node `format-ignore` is handled by
     ///   the shared builder itself.)
-    fn print_root_fragment(&mut self, fragment: &internal::Fragment<'_>, skip_indices: &[usize]) {
+    fn print_root_fragment(
+        &mut self,
+        fragment: &internal::Fragment<'_>,
+        skip_indices: &[usize],
+        hoisted: &[Span],
+    ) {
         // Effective template range: drop section comments (`skip_indices`) and collapsible-ws-only
         // boundary text. Both kinds only occur at the boundaries, so the kept content is a
         // contiguous slice.
@@ -944,12 +1037,12 @@ impl<'a> Printer<'a> {
             }
             let is_range_start = matches!(
                 &nodes[i],
-                FragmentNode::Comment(c) if is_format_ignore_range_start(c.content(source))
+                FragmentNode::Comment(c) if range_marker(c, source) == Some(RangeMarker::Start)
             );
             if is_range_start
                 && let Some(range_end) = (i + 1..nodes.len()).find(|&j| {
                     matches!(&nodes[j],
-                        FragmentNode::Comment(c) if is_format_ignore_range_end(c.content(source)))
+                        FragmentNode::Comment(c) if range_marker(c, source) == Some(RangeMarker::End))
                 })
             {
                 // Segment up to and including the start comment (it prints normally).
@@ -958,7 +1051,7 @@ impl<'a> Printer<'a> {
                 // comment — emit the slice as a span, no allocation.
                 let raw_start = nodes[i].span().end;
                 let raw_end = nodes[range_end].span().end;
-                out.push(self.verbatim_source_doc(Span::new(raw_start, raw_end)));
+                out.push(self.build_ignore_range_doc(Span::new(raw_start, raw_end), hoisted));
                 // The whitespace after the end comment is trimmed by the next segment's
                 // boundary, so re-emit it as the separator before that segment.
                 if let Some(sep) = self.range_trailing_separator(nodes, range_end) {
@@ -978,6 +1071,65 @@ impl<'a> Printer<'a> {
             let doc = self.d().concat(&out);
             self.render_doc_immediate(doc);
         }
+    }
+
+    /// The verbatim doc for a `format-ignore` range slice, with every **hoisted section** cut out.
+    ///
+    /// A `<script>` / `<style>` / `<svelte:options>` written inside the range is not a fragment
+    /// node — it is lifted onto [`internal::Root`] and printed at its canonical position — but
+    /// this slice is *raw source* between the two markers, which still holds its bytes. Emitting
+    /// them verbatim prints the section **twice**, and the result is not a valid component:
+    /// tsv's own parser rejects it (`Duplicate instance script found` / `Duplicate style tag
+    /// found` / `Duplicate <svelte:options> found`). So the slice is emitted as the pieces
+    /// *between* the hoisted spans. Prettier drops the section from its own ignored range the
+    /// same way; the range freezes template formatting, it does not pin a section's position.
+    ///
+    /// Each cut takes the section's span **plus the whitespace run immediately before it**, which
+    /// is what closes the line rather than leaving a blank one behind: source
+    /// `</div>⏎⏎<script>…</script>⏎⏎<p>` has two runs around the section and must end at
+    /// `</div>⏎⏎<p>`, so exactly one of them goes with it. Bounded by the slice start, so a
+    /// section glued to the start marker cuts nothing extra.
+    fn build_ignore_range_doc(&self, span: Span, hoisted: &[Span]) -> DocId {
+        let mut cuts: SmallVec<[Span; 4]> = hoisted
+            .iter()
+            .copied()
+            .filter(|h| h.start >= span.start && h.end <= span.end)
+            .collect();
+        if cuts.is_empty() {
+            return self.verbatim_source_doc(span);
+        }
+        // `hoisted` is in canonical print order (options, module, instance, style), which is not
+        // source order — the pieces must be emitted in source order.
+        cuts.sort_unstable_by_key(|s| s.start);
+
+        let mut parts: DocBuf = DocBuf::new();
+        let mut cursor = span.start;
+        for cut in cuts {
+            let piece_end = self.trim_trailing_ws_back_to(cursor, cut.start);
+            if piece_end > cursor {
+                parts.push(self.verbatim_source_doc(Span::new(cursor, piece_end)));
+            }
+            cursor = cut.end;
+        }
+        if cursor < span.end {
+            parts.push(self.verbatim_source_doc(Span::new(cursor, span.end)));
+        }
+        self.d().concat(&parts)
+    }
+
+    /// Walk `to` back over collapsible whitespace, stopping at `floor`.
+    ///
+    /// The class is [`internal::is_collapsible_ws`] — the byte spelling of
+    /// [`is_collapsible_ws_char`], the same set every other boundary in this printer trims;
+    /// a form feed is content, so it stops the walk. A byte walk is exact here because the
+    /// whole class is ASCII, and an ASCII byte value in UTF-8 is always a standalone char.
+    fn trim_trailing_ws_back_to(&self, floor: u32, to: u32) -> u32 {
+        let bytes = self.source.as_bytes();
+        let mut end = to;
+        while end > floor && internal::is_collapsible_ws(bytes[end as usize - 1]) {
+            end -= 1;
+        }
+        end
     }
 
     /// Mark control-flow blocks in **single-line** root inline runs (`{x}{#if c}…{/if}` with no
@@ -1013,6 +1165,14 @@ impl<'a> Printer<'a> {
     /// whitespace immediately following the end comment (which the next segment's boundary
     /// trim would otherwise drop). A blank line → `literalline` (the un-indented blank) +
     /// `hardline`; a single newline / adjacency → `hardline`. `None` when nothing follows.
+    ///
+    /// "Immediately following" is the whole rule, so the blank is read off the next node's
+    /// **leading** whitespace run ([`text::has_leading_blank_line`]) rather than its text as a
+    /// whole. A total newline count answers a different question and fabricates: trailing text
+    /// that merely spans two lines (`…-end -->⏎text1⏎text2`) reaches 2 newlines without the
+    /// author writing a blank, and a blank *inside* that text (`…-end -->⏎text1⏎⏎text2`) belongs
+    /// to the text — relaying it here would relocate the author's blank onto the seam. The
+    /// behavior matches an ordinary preceding comment, which is the parity target.
     fn range_trailing_separator(
         &self,
         nodes: &[FragmentNode<'_>],
@@ -1024,7 +1184,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let blank = matches!(
             &nodes[range_end + 1],
-            FragmentNode::Text(t) if t.has_blank_line()
+            FragmentNode::Text(t) if text::has_leading_blank_line(t.raw(self.source))
         );
         Some(if blank {
             d.concat(&[d.literalline(), d.hardline()])

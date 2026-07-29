@@ -14,7 +14,8 @@
 //!   absolute it is never allowed into the list whose shrinking is the goal.
 //!
 //! `gap_audit` (`gap_audit_known.txt`), `blank_audit` (`blank_audit_known.txt`),
-//! and `ignore_audit` (`ignore_audit_known.txt`) are the consumers. It is written
+//! `ignore_audit` (`ignore_audit_known.txt`), and `fabrication_audit`
+//! (`fabrication_audit_known.txt`) are the consumers. It is written
 //! generic — parameterized on the snapshot **path**, the **key type**
 //! ([`SnapshotKey`], which owns its own line render/parse and its pinnability
 //! rule), and (via that trait) the **pinnable predicate** — so each later
@@ -169,7 +170,6 @@ impl Ratchet {
     /// # Errors
     ///
     /// Returns [`CliError::Failed`] when the snapshot file cannot be written ([`Self::write`]).
-    #[cfg(feature = "comment_check")]
     pub(crate) fn write_pinned<K: SnapshotKey>(
         &self,
         found: &BTreeSet<K>,
@@ -241,9 +241,11 @@ impl<K> GateDiff<K> {
 
 // ---------------------------------------------------------------------------
 // Consumer orchestration — the prose every ratchet-consuming audit was copying
-// into its `run()`. Behind `comment_check` because the three consumers are;
-// `compile_corpus_compare --ratchet` (the always-compiled consumer) has its own
-// path-keyed flow with different semantics and keeps its own messages.
+// into its `run()`. The two an always-compiled consumer reaches
+// (`fabrication_audit`) are unconditional; the rest stay behind `comment_check`
+// with the injection audits that are their only callers. `compile_corpus_compare
+// --ratchet` has its own path-keyed flow with different semantics and keeps its
+// own messages.
 // ---------------------------------------------------------------------------
 
 /// Refuse `--update` on a narrowed run. The snapshot describes the FULL default run —
@@ -257,7 +259,6 @@ impl<K> GateDiff<K> {
 ///
 /// Returns [`CliError::Failed`] (after the user-facing refusal) when `update` is set on a
 /// narrowed run.
-#[cfg(feature = "comment_check")]
 pub(crate) fn refuse_narrowed_update(
     update: bool,
     narrowed: &[&'static str],
