@@ -29,6 +29,48 @@ struct MultilinePlan<'v> {
     first_members: Option<&'v [CssValue<'v>]>,
 }
 
+/// Is this comma-list element the **empty** one — the nothing between two top-level
+/// commas (`transition: a,,b`, `,a`)?
+///
+/// The value parser emits it as the zero-width empty-identifier sentinel (see
+/// `CssValue::Identifier`), which prints as the nothing it is. It is a real list entry —
+/// CSS Syntax 3's comma-list algorithm produces a group for it — so it is never dropped;
+/// what it *does* need is a layout rule of its own, since every other break trigger is
+/// phrased in terms of an element holding more than one node and this one holds none.
+pub(super) fn is_empty_element(value: &CssValue<'_>) -> bool {
+    matches!(value, CssValue::Identifier { span } if span.start >= span.end)
+}
+
+/// Must this comma list print a **closing** comma after its last element?
+///
+/// Joining N elements with `,` writes N-1 commas, and re-splitting that gets the same N
+/// elements back — unless the last one is empty, because CSS Syntax 3's list algorithm
+/// stops once the input is empty and so produces no group for the stretch after a final
+/// comma. `["a", ""]` joined is `a,`, which re-splits to `["a"]`: an element silently
+/// gone. Its spelling is `a,,`. So a list ending in an empty element writes one more
+/// comma than it has separators, and only then is the printed form a faithful spelling of
+/// the parsed list.
+///
+/// Prettier gets this wrong in declaration position — `transition: a,,` prints as `a,` and
+/// then degrades to `a` on the next pass, deleting the element (and turning a dead
+/// declaration live) — so tsv diverges here; it keeps the round-trip instead. Prettier
+/// does keep the comma inside a function (`var(--a, ,)`), where tsv matches it.
+///
+/// TODO: the rule is one-sided. A *trailing* comma with no empty element behind it is
+/// still deleted (`transition: a,` → `a`, `--x: a,` → `a`, `rgb(1, 2, 3,)` → `rgb(1, 2,
+/// 3)`), because the comma-split parse is unchanged — but that is not the question the
+/// declaration grammar asks. css-values-4 §"Component value combinators" requires a comma
+/// to be omitted when "all items following the comma have been omitted", so `transition:
+/// a,` is invalid and `transition: a` is not: the deletion turns a dead declaration live,
+/// the same class of change this function exists to prevent. A **custom property** has no
+/// grammar to invalidate and so no excuse at all — its value is a verbatim token sequence
+/// (css-variables-1), so `--x: a,` and `--x: a` substitute different tokens. Prettier
+/// agrees with today's behavior, so closing this mints a new `_prettier_divergence`
+/// (fixture first, per the TDD gate) rather than fixing a mismatch.
+pub(super) fn list_needs_closing_comma(values: &[CssValue<'_>]) -> bool {
+    values.last().is_some_and(is_empty_element)
+}
+
 impl<'a> Printer<'a> {
     /// Write the declaration ending: optional `!important` tail and the semicolon with newline.
     ///
@@ -101,9 +143,15 @@ impl<'a> Printer<'a> {
     /// `node.groups.some((node) => node.type === "value-comma_group")`
     ///
     /// Returns true if any value is a space-separated list (box-shadow, text-shadow, etc.)
+    /// or an **empty** element (`transition: a,,b`) — postcss-value-parser materializes the
+    /// nothing between two commas as a group too, so prettier's predicate sees it and
+    /// breaks; putting each element on its own line is also the layout that makes an empty
+    /// one visible rather than hiding it in a run of commas.
     /// Functions are NOT checked here - they use doc-based wrapping with group/softline.
     fn any_value_needs_own_line(&self, values: &[CssValue<'_>]) -> bool {
-        values.iter().any(|v| matches!(v, CssValue::List { .. }))
+        values
+            .iter()
+            .any(|v| matches!(v, CssValue::List { .. }) || is_empty_element(v))
     }
 
     /// This declaration's broken-comma-list layout, or `None` when the list does not break
@@ -169,7 +217,9 @@ impl<'a> Printer<'a> {
         }
         values.iter().enumerate().any(|(i, value)| {
             let from = if i == 0 { content_start } else { None };
-            self.value_node_count(value.span(), from) > 1
+            // An empty element holds *zero* nodes, so the count alone would miss it —
+            // it is the one element kind whose break reason is its emptiness.
+            is_empty_element(value) || self.value_node_count(value.span(), from) > 1
         })
     }
 
@@ -621,6 +671,9 @@ impl<'a> Printer<'a> {
                 self.write(",\n");
             }
         }
+        if list_needs_closing_comma(values) {
+            self.write(",");
+        }
     }
 
     /// Build a fill doc for comma-separated values
@@ -657,6 +710,9 @@ impl<'a> Printer<'a> {
                 let line = d.line();
                 parts.push(d.concat(&[comma, line]));
             }
+        }
+        if list_needs_closing_comma(values) {
+            parts.push(d.text(","));
         }
 
         // Reserve 1 char for trailing semicolon to prevent fill from packing

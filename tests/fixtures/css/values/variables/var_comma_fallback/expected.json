@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 128,
+		"end": 108,
 		"attributes": [],
 		"children": [
 			{
@@ -38,31 +38,31 @@
 				"block": {
 					"type": "Block",
 					"start": 12,
-					"end": 119,
+					"end": 99,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 99,
-							"end": 115,
+							"start": 77,
+							"end": 95,
 							"property": "color",
-							"value": "var(--a,)"
+							"value": "var(--a, ,)"
 						}
 					]
 				},
 				"start": 9,
-				"end": 119
+				"end": 99
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 120,
-			"styles": "\n\t.c {\n\t\t/* A value-less var() fallback collapses to the canonical empty-fallback form */\n\t\tcolor: var(--a,);\n\t}\n",
+			"end": 100,
+			"styles": "\n\t.c {\n\t\t/* the fallback is a comma token, not an empty fallback */\n\t\tcolor: var(--a, ,);\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 129,
+	"end": 109,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

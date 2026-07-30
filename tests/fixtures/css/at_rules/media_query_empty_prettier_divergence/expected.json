@@ -1,0 +1,60 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 235,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 95,
+				"end": 119,
+				"name": "import",
+				"prelude": "url('./a.css'),",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 177,
+				"end": 197,
+				"name": "media",
+				"prelude": ", screen",
+				"block": {
+					"type": "Block",
+					"start": 193,
+					"end": 197,
+					"children": []
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 199,
+				"end": 226,
+				"name": "media",
+				"prelude": "screen, , print",
+				"block": {
+					"type": "Block",
+					"start": 222,
+					"end": 226,
+					"children": []
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 227,
+			"styles": "\n\t/* an all-empty list keeps its comma: without it the list is empty, which is true */\n\t@import url('./a.css'),;\n\n\t/* an empty query in leading and interior position */\n\t@media , screen {\n\t}\n\t@media screen, , print {\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 236,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

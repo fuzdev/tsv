@@ -1,0 +1,52 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 156,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 85,
+				"end": 103,
+				"name": "media",
+				"prelude": "screen",
+				"block": {
+					"type": "Block",
+					"start": 99,
+					"end": 103,
+					"children": []
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 106,
+				"end": 147,
+				"name": "media",
+				"prelude": "screen and (min-width: 100px)",
+				"block": {
+					"type": "Block",
+					"start": 143,
+					"end": 147,
+					"children": []
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 148,
+			"styles": "\n\t/* a comma closing the query list is a separator with no entry after it */\n\t@media screen {\n\t}\n\n\t@media screen and (min-width: 100px) {\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 157,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

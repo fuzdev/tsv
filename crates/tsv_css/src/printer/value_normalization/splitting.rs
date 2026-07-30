@@ -492,7 +492,12 @@ fn split_top_level(content: &str, is_sep: impl Fn(u8) -> bool, trim: bool) -> Ve
         i += 1;
     }
 
-    // Don't forget the last part
+    // Don't forget the last part. A separator in *final* position produces no further
+    // segment, matching CSS Syntax 3 §"parse a comma-separated list of component
+    // values": the loop consumes up to the separator, discards it, and stops once the
+    // input is empty — so `a,b,` is the two-entry list `[a, b]`, not a three-entry one.
+    // A caller that must still *print* that final separator asks for it separately (see
+    // `media_query_list`); it is a delimiter, not an entry.
     if start < content.len() {
         push_segment(&mut parts, &content[start..], trim);
     }
@@ -644,9 +649,13 @@ mod tests {
         assert_eq!(split_args_by_comma("a,,b"), vec!["a", "", "b"]);
         assert_eq!(split_args_by_comma(",a"), vec!["", "a"]);
         assert_eq!(split_args_by_comma(","), vec![""]);
-        // A trailing separator does NOT produce a trailing empty (the
-        // `start < content.len()` final-segment guard).
+        // A trailing separator does NOT produce a trailing empty: CSS Syntax 3
+        // §"parse a comma-separated list of component values" discards each separator
+        // and stops when the input runs out, so `a,b,` is the two-entry list `[a, b]`
+        // (the `start < content.len()` final-segment guard). Printing that final comma
+        // is a separate question — see `media_query_list`.
         assert_eq!(split_args_by_comma("a,b,"), vec!["a", "b"]);
+        assert_eq!(split_args_by_comma(",,"), vec!["", ""]);
         // Commas inside comments are NOT separators
         assert_eq!(
             split_args_by_comma("--a, /* with, comma */ red"),
