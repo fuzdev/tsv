@@ -6,6 +6,8 @@
 // - split_values_at_delimiter() → replaced by ValueCursor usage in ValueParser
 // See: crates/tsv_css/src/parser/value/parser.rs for the new implementation
 
+use crate::parser::value::scan::{comment_end, is_comment_start};
+
 /// Top-level separator found in a CSS value string.
 ///
 /// "Top level" means not inside parentheses, quotes, or block comments. Commas
@@ -38,16 +40,15 @@ pub enum ValueSeparator {
 /// [`crate::parser::value::cursor::ValueCursor`] (which tests `is_css_whitespace`),
 /// without decoding.
 ///
-/// That `ValueCursor` is intentionally comment-*blind* (it tracks paren/quote
-/// nesting through comment bodies) while this classifier is comment-*aware*, so
-/// the two can still disagree on a value with an unbalanced paren/quote inside a
-/// comment. `ValueParser::split_top_level`'s progress guard makes that
-/// disagreement safe — it parses such a range as a single leaf instead of
-/// re-splitting it forever.
+/// [`ValueCursor`](crate::parser::value::cursor::ValueCursor) steps over a comment
+/// whole for the same reason, so the classification and the split it feeds agree on
+/// where a comment's interior ends — including when that interior holds an
+/// unbalanced paren or quote. `ValueParser::split_top_level`'s progress guard remains
+/// for the comment-free disagreement it was always about (a value opening with a
+/// delimiter, e.g. `,a b`).
 pub fn classify_separators(s: &str) -> ValueSeparator {
     let mut in_parens: u32 = 0;
     let mut in_quote = false;
-    let mut in_comment = false;
     let mut quote_char = 0u8;
     let mut whitespace_seen = false;
     let bytes = s.as_bytes();
@@ -56,23 +57,20 @@ pub fn classify_separators(s: &str) -> ValueSeparator {
     while i < bytes.len() {
         let b = bytes[i];
 
-        // Comment start (outside quotes)
-        if !in_quote && !in_comment && b == b'/' && bytes.get(i + 1) == Some(&b'*') {
-            in_comment = true;
-            i += 2;
-            continue;
-        }
-
-        // Comment end
-        if in_comment && b == b'*' && bytes.get(i + 1) == Some(&b'/') {
-            in_comment = false;
-            i += 2;
-            continue;
-        }
-
-        // Skip content inside comments
-        if in_comment {
-            i += 1;
+        // A block comment is OPAQUE — step over it whole, so a `,` or space inside
+        // `/* … */` is comment text rather than a separator — and at the top level it is
+        // also a BOUNDARY. A comment is its own node, so `a/* c */b` holds three of them
+        // exactly as `a /* c */ b` does, and reporting that here is what routes such a
+        // value to the space-separated arm, where `split_top_level`'s `comment_is_element`
+        // performs the split. Keying the boundary on the comment rather than on the
+        // whitespace that usually accompanies it is what makes every glued position —
+        // leading, interior, trailing — reach the split; a value whose *only* separator is
+        // a glued comment (`0.3s/* c */5px`) has no whitespace to report.
+        if !in_quote && is_comment_start(bytes, i) {
+            if in_parens == 0 {
+                whitespace_seen = true;
+            }
+            i = comment_end(bytes, i);
             continue;
         }
 
@@ -168,10 +166,38 @@ mod tests {
 
     #[test]
     fn separators_inside_comments_are_ignored() {
-        // a comma inside a comment must not be classified as a comma separator
-        assert_eq!(classify_separators("red/*,*/blue"), ValueSeparator::None);
-        // whitespace inside a comment must not classify as whitespace either
-        assert_eq!(classify_separators("red/* x */blue"), ValueSeparator::None);
+        // A comma inside a comment must not classify as a COMMA separator — that is the
+        // opacity rule, and it is what keeps the value off the comma-split path where the
+        // element would be torn in half mid-comment.
+        assert_eq!(
+            classify_separators("red/*,*/blue"),
+            ValueSeparator::Whitespace
+        );
+        // The comment's own boundary, though, IS a separator: `red/*,*/blue` holds three
+        // nodes exactly as `red /* x */ blue` does, so both classify as whitespace-
+        // separated and reach `split_top_level`'s comment-aware split.
+        assert_eq!(
+            classify_separators("red/* x */blue"),
+            ValueSeparator::Whitespace
+        );
+    }
+
+    #[test]
+    fn a_top_level_comment_is_a_separator_in_every_position() {
+        // Leading, interior and trailing all reach the split. The interior case is the one
+        // with no whitespace to fall back on, so keying the boundary on the comment rather
+        // than on accompanying whitespace is what makes it work.
+        for s in ["/* c */a", "a/* c */b", "a/* c */", "0.3s/* c */5px"] {
+            assert_eq!(
+                classify_separators(s),
+                ValueSeparator::Whitespace,
+                "top-level comment boundary in {s:?}"
+            );
+        }
+        // Inside parens it is interior text, not a top-level boundary.
+        assert_eq!(classify_separators("f(a/* c */b)"), ValueSeparator::None);
+        // A comma still outranks it.
+        assert_eq!(classify_separators("a/* c */b, c"), ValueSeparator::Comma);
     }
 
     #[test]

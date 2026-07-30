@@ -91,11 +91,12 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
             continue;
         }
 
-        // Copy block comments verbatim (shares `skip_block_comment` with the
-        // media-feature scanner below — one definition of a comment's extent).
-        if b == b'/' && bytes.get(i + 1) == Some(&b'*') {
+        // Copy block comments verbatim, taking the extent from `crate::comments` — the
+        // one definition, shared with the media-feature scanner below and the value
+        // scanners.
+        if crate::comments::is_comment_start(bytes, i) {
             let start = i;
-            i = skip_block_comment(input, i);
+            i = crate::comments::comment_end(input.as_bytes(), i);
             out.push_str(&input[start..i]);
             continue;
         }
@@ -327,19 +328,11 @@ pub(crate) fn lowercase_media_feature_names(query: &str) -> Cow<'_, str> {
     Cow::Owned(out)
 }
 
-/// Index just past a `/* … */` block comment starting at `start` (or end of input
-/// for an unterminated one).
-fn skip_block_comment(s: &str, start: usize) -> usize {
-    let bytes = s.as_bytes();
-    let mut i = start + 2;
-    while i < s.len() && !(bytes[i] == b'*' && bytes.get(i + 1) == Some(&b'/')) {
-        i += 1;
-    }
-    (i + 2).min(s.len())
-}
-
 /// Index just past a `'…'`/`"…"` string starting at `start` (backslash-aware; or end
 /// of input for an unterminated one).
+///
+/// The string twin of [`crate::comments::comment_end`]; the two are what
+/// [`trivia_span_at`] is built from.
 fn skip_string(s: &str, start: usize) -> usize {
     let bytes = s.as_bytes();
     let quote = bytes[start];
@@ -365,7 +358,9 @@ fn skip_string(s: &str, start: usize) -> usize {
 fn trivia_span_at(s: &str, i: usize) -> Option<usize> {
     let bytes = s.as_bytes();
     match bytes[i] {
-        b'/' if bytes.get(i + 1) == Some(&b'*') => Some(skip_block_comment(s, i)),
+        b'/' if crate::comments::is_comment_start(bytes, i) => {
+            Some(crate::comments::comment_end(bytes, i))
+        }
         b'"' | b'\'' => Some(skip_string(s, i)),
         _ => None,
     }
@@ -576,11 +571,12 @@ pub(crate) fn extract_property_name(
         let mut rest = &property_part[comment_start..];
         loop {
             // `rest` starts at a `/*`.
-            let Some(comment_end_rel) = rest.find("*/") else {
+            // `comment_end_checked`, not `comment_end`: a malformed comment abandons the
+            // whole reconstruction rather than being taken as reaching end-of-input.
+            let Some(comment_end) = crate::comments::comment_end_checked(rest.as_bytes(), 0) else {
                 // Malformed comment (no closing `*/`) - just trim the whole part.
                 return Cow::Borrowed(property_part.trim());
             };
-            let comment_end = comment_end_rel + 2; // Include */
             comments.push(&rest[..comment_end]);
             rest = &rest[comment_end..];
             match rest.find("/*") {

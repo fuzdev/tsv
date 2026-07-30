@@ -5,6 +5,7 @@
 
 pub mod ast;
 mod color;
+mod comments;
 mod escapes;
 mod keyword_set;
 mod lexer;

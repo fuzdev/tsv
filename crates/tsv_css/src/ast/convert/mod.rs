@@ -97,14 +97,15 @@ pub(super) fn strip_css_comments(input: &str) -> Cow<'_, str> {
     let mut rest = input;
     while let Some(ch) = rest.chars().next() {
         // Block comment — strip
-        if ch == '/' && rest.as_bytes().get(1) == Some(&b'*') {
-            if let Some(end_rel) = rest[2..].find("*/") {
-                rest = &rest[2 + end_rel + 2..];
-                continue;
-            }
-            // Unterminated — keep verbatim
-            out.push_str(rest);
-            break;
+        if crate::comments::is_comment_start(rest.as_bytes(), 0) {
+            // `comment_end_checked`, not `comment_end`: an unterminated comment is kept
+            // verbatim here rather than swallowed to end-of-input.
+            let Some(end) = crate::comments::comment_end_checked(rest.as_bytes(), 0) else {
+                out.push_str(rest);
+                break;
+            };
+            rest = &rest[end..];
+            continue;
         }
         // String literal — copy through unchanged (escape-aware)
         if ch == '"' || ch == '\'' {
@@ -190,10 +191,8 @@ pub(super) fn scan_to_terminator(source: &str, from: usize) -> usize {
     while i < bytes.len() {
         match bytes[i] {
             b';' | b'}' => break,
-            b'/' if bytes.get(i + 1) == Some(&b'*') => {
-                i = source[i + 2..]
-                    .find("*/")
-                    .map_or(bytes.len(), |rel| i + 2 + rel + 2);
+            b'/' if crate::comments::is_comment_start(bytes, i) => {
+                i = crate::comments::comment_end(bytes, i);
             }
             _ => i += 1,
         }

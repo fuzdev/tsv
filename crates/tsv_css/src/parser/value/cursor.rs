@@ -4,13 +4,17 @@
 // args) while respecting parenthesis and quote nesting, tracking byte position
 // during parsing.
 
-use crate::parser::value::scan::is_value_structural;
+use crate::parser::value::scan::{comment_end, is_comment_start, is_value_structural};
 use crate::whitespace::is_css_whitespace;
 
 /// Position-tracking cursor for parsing CSS values
 ///
 /// Splits a CSS value string into delimiter-separated ranges (lists, function
-/// args) while respecting parenthesis and quote nesting.
+/// args) while respecting parenthesis and quote nesting, and stepping over
+/// escapes and block comments whole (both are opaque — see
+/// [`scan::comment_end`](super::scan::comment_end)). A caller splitting a
+/// space-separated list additionally ends a range at a top-level comment start
+/// (`consume_until`'s `stop_at_comment`), since there a comment is its own element.
 ///
 /// # Example
 /// ```ignore
@@ -22,7 +26,7 @@ use crate::whitespace::is_css_whitespace;
 ///
 /// // Parse first value
 /// let start = cursor.skip_whitespace();
-/// let (_, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
+/// let (_, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
 /// assert_eq!(&source[start..end], "red 01%");
 /// ```
 #[derive(Debug)]
@@ -101,7 +105,8 @@ impl<'a> ValueCursor<'a> {
     /// Consume characters until delimiter or EOF, tracking paren/quote nesting
     ///
     /// Returns the start and end positions of the consumed text.
-    /// Respects nesting - delimiters inside parentheses or quotes are ignored.
+    /// Respects nesting — a delimiter inside parentheses, quotes, an escape, or a
+    /// block comment is ignored.
     ///
     /// # Arguments
     /// * `is_delimiter` - Predicate to check if character is a delimiter
@@ -111,16 +116,28 @@ impl<'a> ValueCursor<'a> {
     ///   the call site, and the `debug_assert` below re-derives every skip from the
     ///   predicate itself. A table that disagrees fails the test suite (which runs in
     ///   debug) rather than silently changing a split.
+    /// * `stop_at_comment` - End the range at a **top-level** comment start as well as at
+    ///   `is_delimiter`. Set for the space-separated split, where a comment is its own
+    ///   element (see `split_top_level`'s `comment_is_element`), and clear for the comma
+    ///   split, where a comment belongs to the element around it. This is a *delimiter*
+    ///   rule, not a nesting one: the comment stays opaque either way — nothing inside it
+    ///   changes paren or quote state — and inside parens it is interior text, so the stop
+    ///   applies at depth 0 only.
     ///
     /// # Returns
     /// `(start, end)` - Byte positions of consumed text (not including delimiter)
     ///
     /// # Example
     /// ```ignore
-    /// let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
+    /// let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
     /// // Parses "rgba(1, 2, 3)" correctly - commas inside parens don't stop parsing
     /// ```
-    pub fn consume_until<F>(&mut self, is_delimiter: F, skip: &[bool; 256]) -> (usize, usize)
+    pub fn consume_until<F>(
+        &mut self,
+        is_delimiter: F,
+        skip: &[bool; 256],
+        stop_at_comment: bool,
+    ) -> (usize, usize)
     where
         F: Fn(char) -> bool,
     {
@@ -172,6 +189,23 @@ impl<'a> ValueCursor<'a> {
                 && let Some(len) = crate::escapes::escape_len(self.source, i)
             {
                 i += len;
+                continue;
+            }
+
+            // A block comment is OPAQUE for the same reason (`scan::comment_end`): a `,`,
+            // space, paren, or quote inside `/* … */` is comment text, not structure.
+            // Splitting an element mid-comment rewrites the comment's interior, since the
+            // halves come back as ordinary re-tokenized leaves — see `comment_end`.
+            if !self.in_quote && is_comment_start(bytes, i) {
+                // The comment's own START can still end the element before it, when the
+                // caller splits a space-separated list (`stop_at_comment`). `i > start`
+                // keeps the range non-empty, so this can never fail to make progress — a
+                // comment that *opens* an element is claimed by `split_top_level` before
+                // the range is ever consumed.
+                if stop_at_comment && self.paren_depth == 0 && i > start {
+                    return (start, i);
+                }
+                i = comment_end(bytes, i);
                 continue;
             }
 
@@ -304,7 +338,7 @@ mod tests {
         let source = "red, blue";
         let mut cursor = ValueCursor::new(source);
 
-        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
         assert_eq!(start, 0);
         assert_eq!(end, 3);
         assert_eq!(&source[start..end], "red");
@@ -315,7 +349,7 @@ mod tests {
         let source = "rgba(1, 2, 3), blue";
         let mut cursor = ValueCursor::new(source);
 
-        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
         assert_eq!(start, 0);
         assert_eq!(end, 13);
         assert_eq!(&source[start..end], "rgba(1, 2, 3)");
@@ -326,10 +360,56 @@ mod tests {
         let source = r#""foo, bar", baz"#;
         let mut cursor = ValueCursor::new(source);
 
-        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
         assert_eq!(start, 0);
         assert_eq!(end, 10);
         assert_eq!(&source[start..end], r#""foo, bar""#);
+    }
+
+    #[test]
+    fn test_consume_until_steps_over_comments() {
+        // A delimiter inside `/* … */` is comment text, not a separator.
+        let source = "a /* , */ b, c";
+        let mut cursor = ValueCursor::new(source);
+
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
+        assert_eq!(&source[start..end], "a /* , */ b");
+    }
+
+    #[test]
+    fn test_consume_until_comment_nesting_is_inert() {
+        // A paren or quote inside a comment must not open nesting either, or the real
+        // delimiter after it becomes unreachable.
+        let source = "/* ( ' */ a, b";
+        let mut cursor = ValueCursor::new(source);
+
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
+        assert_eq!(&source[start..end], "/* ( ' */ a");
+        assert_eq!(cursor.paren_depth, 0);
+        assert!(!cursor.in_quote);
+    }
+
+    #[test]
+    fn test_consume_until_unterminated_comment_runs_to_eof() {
+        // An unterminated comment swallows the rest of the value; the lexer reports the
+        // error elsewhere, and a scanner's only job is to not read the interior as
+        // structure.
+        let source = "a /* , b";
+        let mut cursor = ValueCursor::new(source);
+
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
+        assert_eq!(&source[start..end], "a /* , b");
+    }
+
+    #[test]
+    fn test_consume_until_comment_in_quotes_is_literal() {
+        // Inside a string, `/*` is content — it must not start a comment and swallow the
+        // closing quote.
+        let source = r#""/*", a"#;
+        let mut cursor = ValueCursor::new(source);
+
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
+        assert_eq!(&source[start..end], r#""/*""#);
     }
 
     #[test]
@@ -337,7 +417,7 @@ mod tests {
         let source = "red blue";
         let mut cursor = ValueCursor::new(source);
 
-        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
         assert_eq!(start, 0);
         assert_eq!(end, 8);
         assert_eq!(&source[start..end], "red blue");
@@ -370,7 +450,7 @@ mod tests {
         let source = "calc(10px + calc(5px + 2px)), blue";
         let mut cursor = ValueCursor::new(source);
 
-        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
         assert_eq!(start, 0);
         assert_eq!(end, 28);
         assert_eq!(&source[start..end], "calc(10px + calc(5px + 2px))");
@@ -381,7 +461,7 @@ mod tests {
         let source = r#"'foo "bar" baz', "qux 'quux'""#;
         let mut cursor = ValueCursor::new(source);
 
-        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
+        let (start, end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
         assert_eq!(start, 0);
         assert_eq!(end, 15);
         assert_eq!(&source[start..end], r#"'foo "bar" baz'"#);
@@ -442,7 +522,7 @@ mod tests {
         let mut cursor = ValueCursor::new(source);
 
         // consume_until whitespace should split at the space between "(" and b
-        let (start, end) = cursor.consume_until(char::is_whitespace, &UNICODE_WS_SKIP);
+        let (start, end) = cursor.consume_until(char::is_whitespace, &UNICODE_WS_SKIP, false);
         assert_eq!(&source[start..end], r#""(""#);
         assert_eq!(cursor.paren_depth, 0);
     }

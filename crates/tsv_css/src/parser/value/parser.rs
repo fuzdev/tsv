@@ -6,23 +6,22 @@
 use crate::ast::internal::CssValue;
 use crate::parser::value::cursor::ValueCursor;
 use crate::parser::value::lists::{ValueSeparator, classify_separators};
-use crate::parser::value::scan::value_skip_table;
+use crate::parser::value::scan::{comment_run_end, is_comment_start, value_skip_table};
 use crate::whitespace::is_css_whitespace;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 
-/// [`ValueParser::fast_scan`]'s skip table. Beyond the structural set it must see the
-/// comment introducer (`/`), and both separators it classifies on — the comma and
-/// ASCII whitespace.
+/// [`ValueParser::fast_scan`]'s skip table. Beyond the structural set — which already
+/// carries the comment introducer (`/`) — it must see both separators it classifies on,
+/// the comma and ASCII whitespace.
 ///
 /// The exhaustiveness argument, which is what makes the skip byte-identical: a skipped
 /// byte reaches no arm of the loop. It is not `/` (comment probe), not `\` (escape
 /// probe), not a paren or quote (nesting), not `,` and not whitespace (the separators)
 /// — and the one remaining arm, the in-quote close (`b == quote_char`), can't match it
 /// either, because `quote_char` only ever holds `'` or `"`, both structural.
-const FAST_SCAN_SKIP: [bool; 256] =
-    value_skip_table!(|b| b == b'/' || b == b',' || b.is_ascii_whitespace());
+const FAST_SCAN_SKIP: [bool; 256] = value_skip_table!(|b| b == b',' || b.is_ascii_whitespace());
 
 /// Skip table for the comma-list split's delimiter, `|c| c == ','`.
 const COMMA_SKIP: [bool; 256] = value_skip_table!(|b| b == b',');
@@ -178,12 +177,12 @@ impl<'a> ValueParser<'a> {
     /// a comma list is split and its elements built inline (no second `ValueCursor`
     /// walk), a whitespace list or single leaf dispatches to the same builders as
     /// before, and — because `text` is already trimmed — the leaf is built without
-    /// re-trimming. A value with a `/* */` comment falls back to the original
-    /// two-pass path — `classify_separators` is comment-*aware* while the
-    /// `ValueCursor` split is comment-*blind*, and the two deliberately disagree on
-    /// a comment between value tokens, so the single-string fast pass hands such a
-    /// value off unchanged. A whitespace or non-ASCII boundary byte (rare, since the
-    /// range is trimmed) also takes the two-pass path, which trims first —
+    /// re-trimming. A value with a `/* */` comment falls back to the two-pass path:
+    /// the fused pass has no comment state of its own, while `classify_separators`
+    /// and the `ValueCursor` split both step over a comment whole, so the fallback is
+    /// the only path that reads a comment's interior as interior. A whitespace or
+    /// non-ASCII boundary byte (rare, since the range is trimmed) also takes the
+    /// two-pass path, which trims first —
     /// CSS-whitespace-only (`trim_start_css` / `trim_end_preserving_escape`), so an
     /// ASCII-whitespace boundary comes off (identical to what the fast path would
     /// produce) while a non-ASCII space (NBSP, em space) is kept as leaf content,
@@ -220,8 +219,7 @@ impl<'a> ValueParser<'a> {
         }
 
         // Fallback (comment present, a non-ASCII/whitespace boundary, or a
-        // non-trimmed range): trim, then classify comment-aware and split with the
-        // comment-blind `ValueCursor` — the original behaviour.
+        // non-trimmed range): trim, then classify and split, both comment-aware.
         let trimmed =
             crate::escapes::trim_end_preserving_escape(crate::escapes::trim_start_css(text));
         if trimmed.is_empty() {
@@ -275,10 +273,12 @@ impl<'a> ValueParser<'a> {
                 continue;
             }
 
-            // A block comment outside quotes: the comment-blind split below would
-            // treat the `,`/space inside it as separators, so hand the whole value
-            // to the comment-aware fallback instead.
-            if !in_quote && b == b'/' && bytes.get(i + 1) == Some(&b'*') {
+            // A block comment outside quotes: *this loop's* inline split is comment-blind
+            // (it has no comment state), so hand the whole value to the two-pass fallback,
+            // whose `classify_separators` + `ValueCursor` both step over a comment whole.
+            // Comment-bearing values are rare enough that teaching the fused pass to skip
+            // them would buy nothing the fallback doesn't already get right.
+            if !in_quote && is_comment_start(bytes, i) {
                 return FastScan::Comment;
             }
 
@@ -377,7 +377,8 @@ impl<'a> ValueParser<'a> {
         let sub = self.sub_parser(value_start, value_end);
         // Same guard as `split_top_level`: a first non-empty element whose raw end
         // reaches EOF is parsed as a single leaf (the classify/cursor disagreement
-        // safety, reachable comment-free only via leading delimiters).
+        // safety, reachable only via leading delimiters — `fast_scan` never runs on a
+        // comment-bearing value).
         let node = if !*pushed && seg_end == text.len() {
             sub.parse_single(arena)
         } else {
@@ -390,7 +391,7 @@ impl<'a> ValueParser<'a> {
     /// Parse comma-separated values: "a, b, c"
     fn parse_comma_separated<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         CssValue::CommaSeparated {
-            values: self.split_top_level(arena, |c| c == ',', &COMMA_SKIP),
+            values: self.split_top_level(arena, |c| c == ',', &COMMA_SKIP, false),
             span: self.absolute_span(),
         }
     }
@@ -398,7 +399,7 @@ impl<'a> ValueParser<'a> {
     /// Parse space-separated values: "a b c"
     fn parse_space_separated<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         CssValue::List {
-            values: self.split_top_level(arena, is_css_whitespace, &CSS_WS_SKIP),
+            values: self.split_top_level(arena, is_css_whitespace, &CSS_WS_SKIP, true),
             span: self.absolute_span(),
         }
     }
@@ -413,26 +414,60 @@ impl<'a> ValueParser<'a> {
     /// collapse) fall out of the same loop. The delimiter is consumed after each
     /// element; for whitespace the next iteration's `skip_whitespace` absorbs the
     /// rest of the run.
+    ///
+    /// `comment_is_element` — set for the whitespace split only — makes **a top-level
+    /// comment boundary an element boundary on both sides**, so a comment run is always
+    /// its own element even when nothing separates it from the tokens around it
+    /// (`0.3s/* c */z` is three elements). A comment is its own node — the unit prettier's
+    /// comma-list layout counts, see the printer's `value_node_count` — so this is the AST
+    /// agreeing with the model the printer already reads.
+    ///
+    /// Two things depend on it. The declaration printer's `raws.between` hoist cuts
+    /// element 0 at exactly that member boundary, and a leading run left fused to the next
+    /// token gives it nothing to cut: dropping the fused member drops its content, keeping
+    /// it prints the comment twice. And each side of a glued comment is re-classified on
+    /// its own, so it reaches the leaf printer that normalizes it — a fused
+    /// `0.3s/* c */` parsed as one `Dimension` kept the glue (every other leaf kind fell
+    /// through to `Identifier`, whose whitespace normalizer inserts the space), and a fused
+    /// `"s"/* c */` lost its quote normalization.
+    ///
+    /// The comma split does **not** take this rule — `/* c */ a, b` is two comma elements,
+    /// and the run belongs to the first.
     fn split_top_level<'arena, F>(
         &self,
         arena: &'arena Bump,
         is_delimiter: F,
         skip: &[bool; 256],
+        comment_is_element: bool,
     ) -> &'arena [CssValue<'arena>]
     where
         F: Fn(char) -> bool,
     {
         let text = self.text();
+        let bytes = text.as_bytes();
         let mut cursor = ValueCursor::new(text);
         let mut values = BumpVec::new_in(arena);
 
         loop {
-            cursor.skip_whitespace();
+            let pos = cursor.skip_whitespace();
             if cursor.is_eof() {
                 break;
             }
 
-            let (value_start, value_end_raw) = cursor.consume_until(&is_delimiter, skip);
+            // A comment run opening this element is emitted as its own element (see
+            // `comment_is_element` above). `Identifier` is the representation a
+            // whitespace-separated comment already had — the printer emits it verbatim
+            // from its span, so the interior is never re-tokenized.
+            if comment_is_element && let Some(run_end) = comment_run_end(bytes, pos) {
+                values.push(CssValue::Identifier {
+                    span: self.sub_parser(pos, run_end).absolute_span(),
+                });
+                cursor.set_position(run_end);
+                continue;
+            }
+
+            let (value_start, value_end_raw) =
+                cursor.consume_until(&is_delimiter, skip, comment_is_element);
             let value_end = self.trimmed_end(text, value_start, value_end_raw);
 
             if value_end > value_start {
@@ -440,11 +475,10 @@ impl<'a> ValueParser<'a> {
                 let sub_parser = self.sub_parser(value_start, value_end);
                 // Progress guard: the cursor reached EOF without finding a
                 // delimiter (`value_end_raw == text.len()`) and this is the only
-                // element, so the whole range is a single value —
-                // `classify_separators` and the comment-blind cursor disagreed
-                // (an unbalanced paren/quote inside a comment). Re-`parse()`ing
-                // the identical range would re-classify it the same way and
-                // recurse forever, so parse it as a leaf instead.
+                // element, so the whole range is a single value — `classify_separators`
+                // and the cursor disagreed (a value opening with a delimiter, e.g.
+                // `,a b`). Re-`parse()`ing the identical range would re-classify it the
+                // same way and recurse forever, so parse it as a leaf instead.
                 if values.is_empty() && value_end_raw == text.len() {
                     values.push(sub_parser.parse_single(arena));
                 } else {
@@ -538,6 +572,9 @@ mod tests {
             // Quotes, comments and parens still shield their interiors.
             ("'a, b'", false, false),
             ("url(a b)", false, false),
+            // Inside a string `/*` is content, not a comment start — it must not swallow
+            // the closing quote and hide the comma after it.
+            (r#""/*", a"#, true, true),
             // An escape at end-of-input has no payload to consume — it must not run past
             // the end or swallow a separator that is not there.
             (r"a\", false, false),
@@ -584,14 +621,14 @@ mod tests {
             // 3. `ValueCursor::consume_until` — the splitter's scanner. Stopping before
             // EOF means it found a top-level delimiter.
             let mut cursor = ValueCursor::new(text);
-            let (_, comma_end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP);
+            let (_, comma_end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
             assert_eq!(
                 comma_end < text.len(),
                 want_comma,
                 "ValueCursor disagrees on a top-level comma in {text:?}"
             );
             let mut cursor = ValueCursor::new(text);
-            let (_, ws_end) = cursor.consume_until(is_css_whitespace, &CSS_WS_SKIP);
+            let (_, ws_end) = cursor.consume_until(is_css_whitespace, &CSS_WS_SKIP, false);
             assert_eq!(
                 ws_end < text.len(),
                 want_ws,
@@ -599,12 +636,65 @@ mod tests {
             );
         }
 
-        // A comment is the ONE place the three deliberately diverge: `ValueCursor` is
-        // comment-BLIND while `classify_separators` is comment-aware, so a `,` inside a
-        // comment would split the cursor's scan. `fast_scan` is what makes that safe — it
-        // detects the comment and bails to the comment-aware two-pass path, so the blind
-        // cursor is never asked about such a value. Pin the bail, not a false agreement.
-        for text in ["a/* , */b", "a /* , */ b", "red /* x */, blue"] {
+        // A comment-bearing value is parsed by `classify_separators` and `ValueCursor`
+        // together, so they must agree — this is the pairing that had drifted. Each is
+        // graded in the mode its production caller uses: the comma split takes
+        // `stop_at_comment: false` (a comment belongs to the element around it), the
+        // whitespace split takes `true` (there a comment is its own element).
+        //
+        // `want_sep` is therefore "does a top-level SEPARATOR exist", and a top-level
+        // comment is one — its boundary separates elements exactly as whitespace does, so
+        // `a/* c */b` and `a /* c */ b` are the same three nodes. That is what routes a
+        // value whose ONLY separator is a glued comment (`0.3s/* c */5px`) to the split
+        // instead of fusing it into one leaf.
+        let comment_cases = [
+            // (input, has_top_level_comma, has_top_level_separator)
+            // A separator inside `/* … */` is comment text — but the comment itself is a
+            // boundary, so these are separated values, just not COMMA-separated ones.
+            ("a/* , */b", false, true),
+            ("a/* */b", false, true),
+            ("a /* , */ b", false, true),
+            ("red /* x */, blue", true, true),
+            // A paren or quote inside a comment opens no nesting, so the real delimiter
+            // after it stays reachable.
+            ("/* ( ' */ a, b", true, true),
+            ("/* ) */ a b", false, true),
+            // An unterminated comment reaches end-of-input (§4.3.2) and swallows the rest,
+            // so nothing after it is structure — but its own opening is still a boundary.
+            ("a /* , b", false, true),
+            ("a/* , b", false, true),
+        ];
+        for (text, want_comma, want_sep) in comment_cases {
+            let classified = classify_separators(text);
+            assert_eq!(
+                classified == ValueSeparator::Comma,
+                want_comma,
+                "classify_separators comma verdict for {text:?}"
+            );
+            assert_eq!(
+                classified == ValueSeparator::Whitespace,
+                want_sep && !want_comma,
+                "classify_separators separator verdict for {text:?}"
+            );
+
+            let mut cursor = ValueCursor::new(text);
+            let (_, comma_end) = cursor.consume_until(|c| c == ',', &COMMA_SKIP, false);
+            assert_eq!(
+                comma_end < text.len(),
+                want_comma,
+                "ValueCursor disagrees on a top-level comma in {text:?}"
+            );
+            let mut cursor = ValueCursor::new(text);
+            let (_, ws_end) = cursor.consume_until(is_css_whitespace, &CSS_WS_SKIP, true);
+            assert_eq!(
+                ws_end < text.len(),
+                want_sep,
+                "ValueCursor disagrees on a top-level separator in {text:?}"
+            );
+
+            // `fast_scan` has no comment state of its own — it recognizes the comment and
+            // hands the value to the two-pass path graded above. Pin the bail, since the
+            // fused pass's own verdict is never consulted for such a value.
             let arena = Bump::new();
             let span = Span {
                 start: 0,
@@ -613,9 +703,66 @@ mod tests {
             let parser = ValueParser::new(text, span);
             assert!(
                 matches!(parser.fast_scan(text, &arena), FastScan::Comment),
-                "fast_scan must bail to the comment-aware path for {text:?} — the blind \
-                 `ValueCursor` may not be used on a comment-bearing value"
+                "fast_scan must bail to the two-pass path for {text:?}"
             );
+        }
+    }
+
+    #[test]
+    fn comment_is_its_own_list_member() {
+        // A top-level comment boundary is an element boundary on BOTH sides, so gluing
+        // never fuses a comment to a neighbour. Two things rest on it: the declaration
+        // printer's `raws.between` hoist cuts element 0 at that boundary (fused, it would
+        // either drop the token's content or print the comment twice), and each side is
+        // re-classified on its own so it reaches the leaf printer that normalizes it.
+        for (source, want) in [
+            ("/* c */color 0.3s", vec!["/* c */", "color", "0.3s"]),
+            ("/* c */ color 0.3s", vec!["/* c */", "color", "0.3s"]),
+            // Consecutive comments are one run (§4.3.2 loops), so they split as one member
+            // and the printer's whitespace normalizer spaces them on emit.
+            ("/* c *//* d */color", vec!["/* c *//* d */", "color"]),
+            ("/* c */ /* d */ color", vec!["/* c */", "/* d */", "color"]),
+            // A run mid-list splits the same way, at every element start.
+            ("a /* c */b", vec!["a", "/* c */", "b"]),
+            // Glued to the token BEFORE it, a comment still ends that element. Fused, the
+            // `0.3s/* c */` case below parsed as one `Dimension` and kept the glue —
+            // `build_dimension_doc` emits from its span and never runs the whitespace
+            // normalizer, unlike the `Identifier` every other leaf kind falls through to.
+            ("a/* c */ b", vec!["a", "/* c */", "b"]),
+            ("a 0.3s/* c */", vec!["a", "0.3s", "/* c */"]),
+            ("a 0.3s/* c */z", vec!["a", "0.3s", "/* c */", "z"]),
+            // Inside parens the comment is interior text: the function is one element and
+            // its argument list is never split here.
+            ("a f(x/* c */y)", vec!["a", "f(x/* c */y)"]),
+        ] {
+            let arena = Bump::new();
+            let span = Span {
+                start: 0,
+                end: source.len() as u32,
+            };
+            let value = ValueParser::new(source, span).parse(&arena);
+            let CssValue::List { values, .. } = value else {
+                panic!("expected a space-separated list for {source:?}, got {value:?}");
+            };
+            let got: Vec<&str> = values.iter().map(|v| v.span().extract(source)).collect();
+            assert_eq!(got, want, "member split for {source:?}");
+        }
+
+        // A value of nothing but comments is a one-member list holding the whole run —
+        // consecutive comments fold (§4.3.2 loops), and the member's own leaf printer
+        // spaces their interior, so folding costs nothing at emit.
+        for source in ["/* c */", "/* c *//* d */"] {
+            let arena = Bump::new();
+            let span = Span {
+                start: 0,
+                end: source.len() as u32,
+            };
+            let value = ValueParser::new(source, span).parse(&arena);
+            let CssValue::List { values, .. } = value else {
+                panic!("expected a list for the comment-only {source:?}, got {value:?}");
+            };
+            assert_eq!(values.len(), 1);
+            assert_eq!(values[0].span().extract(source), source);
         }
     }
 
@@ -968,11 +1115,14 @@ mod tests {
     }
 
     #[test]
-    fn test_comment_unbalanced_paren_terminates() {
-        // `classify_separators` is comment-aware and sees the top-level comma;
-        // the comment-blind cursor sees the `(` inside the comment, opens a paren
-        // it never closes, and can't reach the comma. The progress guard parses
-        // the range as a single value instead of recursing forever.
+    fn test_comment_unbalanced_paren_does_not_open_nesting() {
+        // A `(` inside a comment is comment text. Stepping over the comment whole
+        // (`scan::comment_end`) leaves the paren depth at 0, so the real top-level comma
+        // still splits and `classify_separators` and the cursor agree.
+        //
+        // While the cursor was comment-blind this `(` opened a paren it never closed, the
+        // comma became unreachable, and the progress guard collapsed the whole range to a
+        // single leaf.
         let source = "/* ( */ a, b";
         let span = Span {
             start: 0,
@@ -981,13 +1131,51 @@ mod tests {
         let parser = ValueParser::new(source, span);
 
         let arena = Bump::new();
-        let value = parser.parse(&arena); // must terminate (no stack overflow)
-        assert!(matches!(value, CssValue::CommaSeparated { .. }));
-        if let CssValue::CommaSeparated { values, .. } = value {
-            // The guard collapsed the unsplittable range to one leaf.
-            assert_eq!(values.len(), 1);
-            assert!(matches!(values[0], CssValue::Identifier { .. }));
-        }
+        let value = parser.parse(&arena);
+        let CssValue::CommaSeparated { values, .. } = value else {
+            panic!("expected a comma list, got {value:?}");
+        };
+        assert_eq!(values.len(), 2);
+        // Element 0 is `/* ( */ a` — the comment is ONE member, so its interior is
+        // never re-tokenized.
+        let CssValue::List {
+            values: members, ..
+        } = values[0]
+        else {
+            panic!(
+                "expected a space-separated first element, got {:?}",
+                values[0]
+            );
+        };
+        assert_eq!(members.len(), 2);
+        assert_eq!(members[0].span().extract(source), "/* ( */");
+        assert!(matches!(values[1], CssValue::Identifier { .. }));
+    }
+
+    #[test]
+    fn test_comment_interior_comma_is_not_a_separator() {
+        // The corruption this opacity exists to prevent: the comma inside the comment
+        // used to split the element in two, and the halves came back re-tokenized —
+        // interior whitespace collapsed, the body broken at its own comma, `#FFF` and
+        // `.5px` normalized *inside* the comment.
+        let source = "color 0.3s /* keep   this,  #FFF  .5px */, background 0.3s";
+        let span = Span {
+            start: 0,
+            end: source.len() as u32,
+        };
+        let parser = ValueParser::new(source, span);
+
+        let arena = Bump::new();
+        let value = parser.parse(&arena);
+        let CssValue::CommaSeparated { values, .. } = value else {
+            panic!("expected a comma list, got {value:?}");
+        };
+        assert_eq!(values.len(), 2);
+        assert_eq!(
+            values[0].span().extract(source),
+            "color 0.3s /* keep   this,  #FFF  .5px */"
+        );
+        assert_eq!(values[1].span().extract(source), "background 0.3s");
     }
 
     #[test]

@@ -1,19 +1,26 @@
 // Shared byte-scan machinery for the value scanners.
 //
-// Three scanners walk a CSS value's bytes with the same paren/quote/escape state
-// machine: `ValueParser::fast_scan` (the fused fast path), `ValueCursor::consume_until`
-// (the split), and `classify_separators` (the comment-aware fallback classifier). Their
-// nesting rules are deliberately identical — the fused-pass invariant — so the byte set
-// that invariant rests on lives here once, rather than being re-spelled per scanner.
+// Three scanners walk a CSS value's bytes with the same paren/quote/escape/comment
+// state machine: `ValueParser::fast_scan` (the fused fast path), `ValueCursor::consume_until`
+// (the split), and `classify_separators` (the fallback classifier). Their nesting rules
+// are deliberately identical — the fused-pass invariant — so the byte set that invariant
+// rests on lives here once, rather than being re-spelled per scanner.
 
-/// Bytes that drive a value scanner's state machine: the escape introducer and the
-/// nesting/quote triggers. All ASCII, so none can occur as a UTF-8 continuation byte.
+/// Bytes that drive a value scanner's state machine: the escape introducer, the
+/// nesting/quote triggers, and the comment introducer. All ASCII, so none can occur
+/// as a UTF-8 continuation byte.
 ///
 /// This is the set every scanner must inspect no matter what it is looking *for*;
-/// each adds its own bytes on top (a separator, or `/` for a comment probe).
+/// each adds its own bytes on top (its separator).
 pub(crate) const fn is_value_structural(b: u8) -> bool {
-    matches!(b, b'\\' | b'(' | b')' | b'\'' | b'"')
+    matches!(b, b'\\' | b'(' | b')' | b'\'' | b'"' | b'/')
 }
+
+// The comment-extent primitives live at the crate root ([`crate::comments`]), beside
+// [`crate::escapes::escape_len`] — the two answer the same "how far does this reach"
+// question for the two constructs a value scanner must step over whole. Re-exported here
+// so a scanner imports its whole byte-scan vocabulary from one place.
+pub(crate) use crate::comments::{comment_end, comment_run_end, is_comment_start};
 
 /// Build a scanner's 256-entry "this byte cannot possibly matter" table: `true` for a
 /// byte that is neither [`is_value_structural`] nor one the scanner is looking for, so
