@@ -1,0 +1,66 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 428,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 68,
+				"end": 107,
+				"name": "import",
+				"prelude": "url('./a.css') screen, , print",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 109,
+				"end": 150,
+				"name": "import",
+				"prelude": "url('./b.css') screen, , , print",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 206,
+				"end": 239,
+				"name": "import",
+				"prelude": "url('./c.css'), , screen",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 241,
+				"end": 298,
+				"name": "import",
+				"prelude": "url('./d.css') supports(display: grid), , screen",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 389,
+				"end": 419,
+				"name": "import",
+				"prelude": "url('./e.css') screen",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 420,
+			"styles": "\n\t/* an empty query between two others keeps both commas */\n\t@import url('./a.css') screen, , print;\n\t@import url('./b.css') screen, , , print;\n\n\t/* empty first query, then an empty interior one */\n\t@import url('./c.css'), , screen;\n\t@import url('./d.css') supports(display: grid), , screen;\n\n\t/* a comma closing the list is a separator with no entry after it, so it is dropped */\n\t@import url('./e.css') screen;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 429,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

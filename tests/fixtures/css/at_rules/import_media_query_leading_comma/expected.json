@@ -1,0 +1,74 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 473,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 69,
+				"end": 100,
+				"name": "import",
+				"prelude": "url('./a.css'), screen",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 102,
+				"end": 128,
+				"name": "import",
+				"prelude": "'./b.css', screen",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 197,
+				"end": 234,
+				"name": "import",
+				"prelude": "url('./c.css') layer, screen",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 236,
+				"end": 279,
+				"name": "import",
+				"prelude": "url('./d.css') layer(base), screen",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 281,
+				"end": 336,
+				"name": "import",
+				"prelude": "url('./e.css') supports(display: grid), screen",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 401,
+				"end": 464,
+				"name": "import",
+				"prelude": "url('./f.css') supports(display: grid) , screen",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 465,
+			"styles": "\n\t/* leading comma: the query list's first query is empty */\n\t@import url('./a.css'), screen;\n\t@import './b.css', screen;\n\n\t/* the comma glues to whichever prelude component precedes it */\n\t@import url('./c.css') layer, screen;\n\t@import url('./d.css') layer(base), screen;\n\t@import url('./e.css') supports(display: grid), screen;\n\n\t/* a comment before the comma keeps the comma glued to it */\n\t@import url('./f.css') supports(display: grid) /* c */, screen;\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 474,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

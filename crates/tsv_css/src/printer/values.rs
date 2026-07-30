@@ -60,7 +60,15 @@ impl<'a> Printer<'a> {
             } => self.build_supports_condition_doc(name, condition),
             CssValue::List { values, .. } => self.build_separated_values_doc(values, " "),
             CssValue::CommaSeparated { values, .. } => {
-                self.build_separated_values_doc(values, ", ")
+                let joined = self.build_separated_values_doc(values, ", ");
+                // A list ending in an empty element needs one more comma than it has
+                // separators to spell itself (see `list_needs_closing_comma`).
+                if super::declarations::list_needs_closing_comma(values) {
+                    let d = self.d();
+                    d.concat(&[joined, d.text(",")])
+                } else {
+                    joined
+                }
             }
         }
     }
@@ -313,6 +321,14 @@ impl<'a> Printer<'a> {
                 inner_parts.push(d.text(","));
                 inner_parts.push(d.line()); // space when flat, newline when broken
             }
+        }
+        // An argument list ending in an empty argument needs one more comma than it has
+        // separators to spell itself back (see `list_needs_closing_comma`): `red, ` is a
+        // ONE-argument list, so `linear-gradient(red,,)` would lose its empty argument —
+        // and with it the reason the UA drops the declaration. `var()`'s empty fallback
+        // takes its own tighter form above (`var(--a,)`, no space) and never reaches here.
+        if super::declarations::list_needs_closing_comma(args) {
+            inner_parts.push(d.text(","));
         }
 
         let name_doc = d.text_pooled(name);

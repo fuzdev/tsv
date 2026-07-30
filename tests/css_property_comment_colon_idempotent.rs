@@ -23,7 +23,12 @@
 //! comma list on pass 1 (routed to the `: ` path, the comma then dropped), and
 //! its formatted output `color /* c */: ed;` reparses as a single identifier
 //! on pass 2 (routed to the ` : ` path) — so the separator oscillated and the
-//! format was not a fixed point. Hoisting the "property carries a comment ⇒
+//! format was not a fixed point. (The drop that produced the flip is itself
+//! fixed — an empty comma-list element is a list entry and is preserved — so
+//! these mutants now stay comma lists across passes; they are kept because the
+//! separator still has to agree across every value-kind dispatch path, and the
+//! broken one-per-line layout an empty element forces is one more of them.)
+//! Hoisting the "property carries a comment ⇒
 //! space before the colon" decision to one predicate, emitted once before the
 //! value-kind dispatch, makes every kind agree in a single pass. See CLAUDE.md
 //! §Comment Handling and the `css-normalize-value-text-context-blind` bug class.
@@ -37,27 +42,28 @@
 //! every value kind and to the malformed value-kind-flip mutant.
 
 /// `(label, input, expected)`. Each `input` formats to `expected` in one pass,
-/// and `expected` is a fixed point (formats to itself). The two malformed
-/// leading-comma mutants (the fuzz findings) have no prettier oracle — prettier
-/// keeps the leading comma as an empty broken element and tsv drops it — so they
-/// guard idempotency only. The valid cases diverge from prettier solely by the
-/// documented property↔comment glue (see `PRETTIER_DIVERGENCE` below).
+/// and `expected` is a fixed point (formats to itself). Every case — the two
+/// malformed leading-comma mutants (the fuzz findings) included — diverges from
+/// prettier solely by the documented property↔comment glue (see
+/// `PRETTIER_DIVERGENCE` below).
 const CASES: &[(&str, &str, &str)] = &[
     // ── the fuzz non-idempotency mutants (malformed; idempotency-only) ──
-    // A leading-comma value parses as a comma list, whose formatted output drops
-    // the comma and reparses as a single identifier — the value-kind flip that
-    // oscillated the separator.
+    // A leading comma opens the value with an EMPTY element, which keeps the value
+    // a comma list on every pass (it used to be dropped, and the output then
+    // reparsed as a single identifier — the value-kind flip that oscillated the
+    // separator). The empty element also breaks the list one-per-line, so the
+    // separator now has to hold across a broken layout too.
     (
         "malformed leading-comma value (seed-123 fuzz non-idempotency)",
         "a{color/* comment */ : ,ed}",
-        "a {\n\tcolor /* comment */ : ed;\n}\n",
+        "a {\n\tcolor /* comment */ :\n\t\t,\n\t\ted;\n}\n",
     ),
-    // The same flip with a colon *inside* the comment (scan robustness — the real
+    // The same shape with a colon *inside* the comment (scan robustness — the real
     // `property : value` colon is the one outside the comment).
     (
         "malformed leading-comma value, colon inside the comment",
         "a{color/* x:y */ :, red}",
-        "a {\n\tcolor /* x:y */ : red;\n}\n",
+        "a {\n\tcolor /* x:y */ :\n\t\t,\n\t\tred;\n}\n",
     ),
     // ── valid values: the separator is ` : ` for every kind ──
     // A genuine comma list — the inconsistency case (was `: `, no space before
