@@ -66,21 +66,22 @@ struct MediaQueryList<'a> {
 /// and in a JS list. It is **kept** in the one case where the deletion would change the
 /// list: when the last entry is empty. `@import url('a.css'),;` is the one-entry list
 /// `not all`, and without its comma it is the **empty** list, which mediaqueries-4
-/// evaluates to true — the import would flip from never applying to always. Same
-/// predicate as the declaration path's `list_needs_closing_comma`: a list ending in an
-/// empty entry takes one more comma than it has separators, every other list takes N-1.
+/// evaluates to true — the import would flip from never applying to always.
 ///
-/// Whether a closing comma is there at all is derived from the split rather than from a
-/// second scan of the text: the parts are subslices of `content` separated by exactly one
-/// comma byte each, so N parts account for `sum(len) + N - 1` bytes — one short of
-/// `content.len()` exactly when a closing comma was consumed without producing a part.
-/// That also puts the comma at the final byte, which is what makes slicing it off safe.
+/// A **declaration value** answers this differently: there the comma is authored content
+/// and is always kept, since the value is matched against a grammar rather than split (see
+/// `declarations::list_has_closing_comma`). The `<media-query-list>` is the one construct
+/// where mediaqueries-4 §Syntax delegates to the split itself, which is what makes the
+/// deletion parse-preserving.
+///
+/// Whether a closing comma is there at all comes from `has_closing_comma`, derived from
+/// the split rather than from a second scan of the text — which also puts the comma at the
+/// final byte, and that is what makes slicing it off safe.
 ///
 /// Shared by both preludes so one list formats one way in both positions.
 fn media_query_list(content: &str) -> MediaQueryList<'_> {
     let parts = value_normalization::split_args_by_comma(content);
-    let consumed: usize = parts.iter().map(|part| part.len()).sum();
-    let ends_with_comma = !parts.is_empty() && content.len() == consumed + parts.len();
+    let ends_with_comma = value_normalization::has_closing_comma(content, &parts);
     let entries: Vec<&str> = parts.into_iter().map(str::trim).collect();
     let closing_comma = ends_with_comma && entries.last().is_some_and(|entry| entry.is_empty());
     let text = if ends_with_comma && !closing_comma {

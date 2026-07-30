@@ -59,11 +59,15 @@ impl<'a> Printer<'a> {
                 name, condition, ..
             } => self.build_supports_condition_doc(name, condition),
             CssValue::List { values, .. } => self.build_separated_values_doc(values, " "),
-            CssValue::CommaSeparated { values, .. } => {
+            CssValue::CommaSeparated { values, span } => {
                 let joined = self.build_separated_values_doc(values, ", ");
-                // A list ending in an empty element needs one more comma than it has
-                // separators to spell itself (see `list_needs_closing_comma`).
-                if super::declarations::list_needs_closing_comma(values) {
+                // Joining N elements writes N-1 commas, so an authored closing comma —
+                // one that terminated no element — is spelled back here.
+                if super::declarations::list_has_closing_comma(
+                    self.source,
+                    values,
+                    span.end_usize(),
+                ) {
                     let d = self.d();
                     d.concat(&[joined, d.text(",")])
                 } else {
@@ -242,30 +246,13 @@ impl<'a> Printer<'a> {
         span: Span,
     ) -> DocId {
         let d = self.d();
-        // Functions with no parsed args extract from source.
-        if args.is_empty() && span.end_usize() <= self.source.len() {
-            let raw = span.extract(self.source);
-            // An unparsed `url(...)` reaches here when the prelude path leaves its opaque
-            // content unparsed (e.g. `@import url(a.css)`). Trim only the whitespace inside
-            // the parens to match prettier, exactly like the parsed-args url path below.
-            // Any other empty-args function is one whose grammar tsv doesn't read
-            // (`scope((.a) to (.b))`), so it stays verbatim.
-            if name.eq_ignore_ascii_case("url")
-                && let Some(trimmed) = crate::url::trim_url_raw(raw)
-            {
-                return d.text_pooled(&trimmed);
-            }
-            // Deliberately pooled, not `source_span`: this arm is hot on CSS
-            // corpora (every unparsed `url(...)`/empty-args function) and the
-            // span form's render-time resolution hop measured +0.07% instructions
-            // there for no allocation win (the pool is amortized).
-            return d.text_pooled(raw);
-        }
-
-        // `url` is matched ASCII-case-insensitively (css-syntax): `URL(…)` is a url too, so
-        // it takes the same opaque/verbatim path (casing preserved via `span`) rather than
-        // generic-function normalization — which would space an interior `/*` in the now-
-        // lexed `URL(x/*y)` url-token. Matches the empty-args url check above.
+        // `url` is opaque whether or not its content was parsed, so it answers first and
+        // in one place — the prelude path leaves `@import url(a.css)` unparsed (empty
+        // args) while a declaration value parses them, and both want the same verbatim
+        // form. Matched ASCII-case-insensitively (css-syntax): `URL(…)` is a url too, so
+        // it takes the same path (casing preserved via `span`) rather than generic-function
+        // normalization — which would space an interior `/*` in the now-lexed `URL(x/*y)`
+        // url-token.
         if name.eq_ignore_ascii_case("url") {
             // Quoted url() — a single string arg. Print it through the normal string
             // path so the quote is normalized (`"x"` → `'x'`), matching prettier.
@@ -276,26 +263,47 @@ impl<'a> Printer<'a> {
             // stripping only the whitespace right after `url(` and right before `)`
             // (prettier's `printer-postcss.js` url handling). Rejoining parsed args
             // would drop empty/trailing comma segments (`url(a,b,)` → `url(a,b)`),
-            // silently changing the URL — the comma is part of the resource ref.
-            if span.end_usize() <= self.source.len()
-                && let Some(raw) = crate::url::trim_url_raw(span.extract(self.source))
-            {
-                return d.text_pooled(&raw);
+            // silently changing the URL — the comma is part of the resource ref — so
+            // raw text wins over the args even when it isn't parenthesized at all (which
+            // a parsed function's span cannot be; the arm is defensive).
+            //
+            // Deliberately pooled, not `source_span`: this arm is hot on CSS corpora
+            // (every `url(...)`) and the span form's render-time resolution hop measured
+            // +0.07% instructions there for no allocation win (the pool is amortized).
+            if span.end_usize() <= self.source.len() {
+                let raw = span.extract(self.source);
+                return match crate::url::trim_url_raw(raw) {
+                    Some(trimmed) => d.text_pooled(&trimmed),
+                    None => d.text_pooled(raw),
+                };
             }
             // Fallback (span unavailable): rejoin args with no space after commas.
             let args_doc = d.join(args.iter().map(|arg| self.build_css_value_doc(arg)), ",");
             return self.flat_function_doc(name, args_doc);
         }
 
-        // var() empty fallback: `var(--a,)` — the trailing comma is kept with no space
-        // after it. The empty fallback is the final empty-identifier arg (see the parser's
-        // var-specific handling). `var(--a, red)` keeps the normal `, ` separator.
-        if name.eq_ignore_ascii_case("var")
-            && args.len() >= 2
-            && matches!(args.last(), Some(CssValue::Identifier { span }) if span.extract(self.source).trim().is_empty())
-        {
-            let real = &args[..args.len() - 1];
-            let args_doc = d.join(real.iter().map(|arg| self.build_css_value_doc(arg)), ", ");
+        // A function whose grammar tsv doesn't read parsed no args (`scope((.a) to (.b))`);
+        // it stays verbatim.
+        if args.is_empty() && span.end_usize() <= self.source.len() {
+            return d.text_pooled(span.extract(self.source));
+        }
+
+        // A comma **closing** the argument list (`rgb(1, 2, 3,)`, `var(--a,)`,
+        // `linear-gradient(red, ,)`) terminated no argument, so joining the args would
+        // drop it. `extract_function_parts` requires the closing paren to be the value's
+        // last byte, which is what bounds the list at `span.end - 1`.
+        let closing_comma = super::declarations::list_has_closing_comma(
+            self.source,
+            args,
+            span.end_usize().saturating_sub(1),
+        );
+
+        // var()'s empty fallback (`var(--a,)`, `var(--a, ,)`) is kept flat: the generic
+        // path below spells the same closing comma, but wraps the argument list in a
+        // breakable group, and prettier never breaks a `var()`. `var(--a, red)` has no
+        // closing comma and takes the generic path with the normal `, ` separator.
+        if name.eq_ignore_ascii_case("var") && closing_comma {
+            let args_doc = d.join(args.iter().map(|arg| self.build_css_value_doc(arg)), ", ");
             let comma = d.text(",");
             return self.flat_function_doc(name, d.concat(&[args_doc, comma]));
         }
@@ -322,13 +330,14 @@ impl<'a> Printer<'a> {
                 inner_parts.push(d.line()); // space when flat, newline when broken
             }
         }
-        // An argument list ending in an empty argument needs one more comma than it has
-        // separators to spell itself back (see `list_needs_closing_comma`): `red, ` is a
-        // ONE-argument list, so `linear-gradient(red,,)` would lose its empty argument —
-        // and with it the reason the UA drops the declaration. `var()`'s empty fallback
-        // takes its own tighter form above (`var(--a,)`, no space) and never reaches here.
-        if super::declarations::list_needs_closing_comma(args) {
-            inner_parts.push(d.text(","));
+        // The closing comma the args' own separators can't spell: `red, ` is a ONE-argument
+        // list, so `linear-gradient(red,,)` would lose its empty argument — and with it the
+        // reason the UA drops the declaration — while `rgb(1, 2, 3,)` would lose the comma
+        // that makes it invalid in the first place. `var()` takes its own flat form above.
+        // The comma joins the last argument rather than standing as its own part, so the
+        // group's break can never strand it on a line of its own.
+        if closing_comma && let Some(last) = inner_parts.pop() {
+            inner_parts.push(d.concat(&[last, d.text(",")]));
         }
 
         let name_doc = d.text_pooled(name);

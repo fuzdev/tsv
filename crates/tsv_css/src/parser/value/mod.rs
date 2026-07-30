@@ -15,7 +15,6 @@ pub mod strings;
 use crate::ast::internal::CssValue;
 use crate::escapes::{trim_end_preserving_escape, trim_start_css};
 use bumpalo::Bump;
-use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::Span;
 
 // Re-export public functions
@@ -142,7 +141,7 @@ pub(crate) fn parse_single_value<'arena>(
     // hot per-value-token path where `str::find(char)`'s CharSearcher state machine
     // outweighs a direct byte loop (equivalent: `(` is ASCII, self-synchronising).
     if let Some(paren_pos) = s.as_bytes().iter().position(|&b| b == b'(')
-        && let Some((name, args, true)) = extract_function_parts(s, paren_pos)
+        && let Some((name, args)) = extract_function_parts(s, paren_pos)
     {
         // Try color function first
         if let Some(color) = parse_color_function(name, args) {
@@ -157,28 +156,16 @@ pub(crate) fn parse_single_value<'arena>(
             start: span.start + args_start as u32,
             end: span.start + args_start as u32 + args.len() as u32,
         };
-        let parsed_args = parse_function_arguments(args, args_span, arena);
-        // var()'s empty fallback (`var(--a,)`) is significant: per css-variables-1 the
-        // trailing comma with an empty `<declaration-value>` substitutes nothing when the
-        // variable is unset, distinct from `var(--a)`. The generic comma parser drops empty
-        // elements, so restore the empty trailing fallback for var() specifically — other
-        // functions (`rgb(0,0,0,)`, `min(1px,)`) correctly drop it, matching prettier.
-        let final_args = if name.eq_ignore_ascii_case("var") && args.trim_end().ends_with(',') {
-            let mut v = BumpVec::new_in(arena);
-            v.extend(parsed_args.iter().cloned());
-            v.push(CssValue::Identifier {
-                span: Span {
-                    start: args_span.end,
-                    end: args_span.end,
-                },
-            });
-            v.into_bump_slice()
-        } else {
-            parsed_args
-        };
+        // A comma **closing** the argument list (`var(--a,)`, `rgb(1, 2, 3,)`) terminated
+        // no argument, so it is not one — CSS Syntax 3's comma-split stops once the input
+        // is empty. It is still authored content the printer must spell back, and it reads
+        // that off the source between the last argument and the `)`
+        // (`printer::declarations::list_has_closing_comma`) rather than from a synthesized
+        // empty argument here: an *escaped* comma (`var(--b, x\,)`) is content inside the
+        // last argument, and a synthesized one would double it.
         return Some(CssValue::Function {
             name: arena.alloc_str(name),
-            args: final_args,
+            args: parse_function_arguments(args, args_span, arena),
             span,
         });
     }
@@ -200,7 +187,11 @@ pub(crate) fn parse_single_value<'arena>(
 /// Extract function name and arguments, validating balanced parentheses.
 /// Both returned strings borrow from `s` (the caller copies `name` into the
 /// arena when storing; `args` is re-parsed, not stored).
-fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str, bool)> {
+///
+/// `Some` means the whole of `s` is the function — the matching close paren is its last
+/// byte — which is what lets the printer bound the argument list at `span.end - 1`
+/// (`build_value_function_doc`'s closing-comma read).
+fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str)> {
     let name_part = s[..paren_pos].trim();
 
     // Validate function name: alphanumeric, hyphens, underscores only
@@ -239,7 +230,7 @@ fn extract_function_parts(s: &str, paren_pos: usize) -> Option<(&str, &str, bool
     }
 
     let args = &s[paren_pos + 1..close_pos];
-    Some((name_part, args, true))
+    Some((name_part, args))
 }
 
 #[cfg(test)]
