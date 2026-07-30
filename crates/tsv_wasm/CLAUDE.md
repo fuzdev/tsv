@@ -21,6 +21,17 @@ extern types plus a `typescript_custom_section` `export type * from "./tsv_ast"`
 header. wasm-pack emits typed `parse_typescript(...): import('./tsv_ast').Program`
 etc. with no post-build patcher.
 
+## Panic Reporting
+
+A `#[wasm_bindgen(start)]` hook forwards panic messages to `console.error`
+(**measured 468 B**), because under the shipped `panic = "abort"` + `strip` a
+panic reaches the host as a bare `RuntimeError: unreachable`. The why — and why
+the `console.error` binding is hand-rolled rather than a dep — is in the comment
+above the hook in `src/lib.rs`.
+
+Diagnostic only: the call still traps. What makes the **instance survive** it is
+[`tsv_arena`](../tsv_arena/CLAUDE.md#abort-safety-take-and-park)'s take/park.
+
 ## JSON-String Transport
 
 The AST crosses the JS↔WASM boundary as **one compact JSON string**:
@@ -196,7 +207,7 @@ require dual updates.
 
 ## Files
 
-- `src/lib.rs` — WASM bindings (`lang_bindings!` macro + typed extern types) + the wasm32-gated talc `#[global_allocator]`
+- `src/lib.rs` — WASM bindings (`lang_bindings!` macro + typed extern types) + the wasm32-gated talc `#[global_allocator]` and panic hook
 - `types/tsv_ast.d.ts` — Hand-maintained TS types, bundled into the parse-capable packages
 - `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv_wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); `node:util` `parseArgs`, zero deps
 - `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only `no-locations` wire; ships in the parse-capable packages, re-exported from index.js/browser.js by `patch_npm_package.ts` (see [No-Locations Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))

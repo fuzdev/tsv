@@ -15,7 +15,16 @@ It's a crate, not duplicated inline, because the bindings would otherwise hand-s
 - `with_ast_arena(f)` — runs `f` with a per-thread `bumpalo::Bump`. **Always available** (parse and format both need it).
 - `with_doc_arena(f)` — runs `f` with a per-thread `DocArena` (the format-time doc IR). Behind the **`format`** feature, which pulls `tsv_lang` for the type.
 
-Both `reset()` at the *start* of each call; `f` must return an owned value (a formatted `String`, a JSON `String`, or `()`) so nothing borrowed escapes. `reset()` also recovers cleanly after a `catch_unwind`-caught panic (the FFI path). Full rationale + soundness in the `src/lib.rs` module docs.
+Both `reset()` at the *start* of each call; `f` must return an owned value (a formatted `String`, a JSON `String`, or `()`) so nothing borrowed escapes. Full rationale + soundness in the `src/lib.rs` module docs.
+
+## Abort safety: take and park
+
+Each helper **takes** its arena out of the thread-local for the call and **parks** it back after — it never holds a `RefCell` borrow guard across `f`. This is the load-bearing decision in the crate; the argument (a WASM trap runs no `Drop` but leaves the instance callable, so a held guard bricks every later call) is in the `src/lib.rs` module docs, along with the two consequences — a panicking call loses its warm arena, and re-entrancy became a fresh-fallback rather than a panic.
+
+What the module docs don't carry, because it is evidence rather than rationale:
+
+- **Measured end-to-end on the built `format` bundle** with a temporary panicking export: with a held guard, a trap made every subsequent `format_typescript` throw; with take/park, calls after the trap return correct output.
+- The change was **byte-identical over 211 corpus files and ~4% faster** on the WASM format path (`wasm_format_probe` net 0.95/0.96 across two runs, floor ~1.01). Two effects are inseparable by construction: dropping the borrow guard, and the `const { Cell::new(None) }` thread-local init that only becomes possible once the parked state is `None` (`Bump::new()` is not `const`, so the old form necessarily used std's lazy thread-local storage — a state check per access; the new one is eager, on wasm a plain static).
 
 ## Features
 

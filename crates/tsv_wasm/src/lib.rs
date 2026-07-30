@@ -22,7 +22,9 @@ use wasm_bindgen::prelude::*;
 // `reset()` rewinds it, removing the per-call `Bump` / `DocArena` allocation (the
 // documented WASM-format allocation-count lever). Soundness matches the native
 // bindings — the AST/doc are fully consumed into an owned return value before the
-// next call's `reset()`.
+// next call's `reset()`, and both helpers park their arena outside the
+// thread-local while it is in use, so a trap here leaves a callable instance
+// (see `tsv_arena`'s §Abort safety — this is the target that made it necessary).
 use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
@@ -41,6 +43,35 @@ use tsv_arena::with_doc_arena;
 #[global_allocator]
 static ALLOCATOR: talc::cell::TalcSyncCell<talc::wasm::WasmGrowAndExtend, talc::wasm::WasmBinning> =
     talc::cell::TalcSyncCell::new_wasm(talc::wasm::WasmGrowAndExtend::new());
+
+// Panic reporting. The shipped profile is `panic = "abort"`, so a panic
+// compiles to a WASM trap: the host sees a bare `RuntimeError: unreachable`
+// with no message, no location, and nothing to report upstream — and with
+// `strip = true` there is no symbol to recover it from either. `std` still runs
+// the panic hook before aborting, which is the one place the message is still
+// in hand, so the hook forwards it to `console.error`. Purely diagnostic: the
+// call still traps, and the instance stays callable afterwards because the
+// arena helpers park (see the `tsv_arena` note above).
+//
+// `console.error` is declared directly rather than pulled from `web_sys` /
+// `console_error_panic_hook`: the binding is three lines, and `js-sys` itself
+// rides only the `parse` feature — a dependency here would newly weigh down the
+// format-only package.
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen]
+extern "C" {
+    #[wasm_bindgen(js_namespace = console, js_name = error)]
+    fn console_error(message: &str);
+}
+
+/// Forward panic messages to `console.error` before the trap swallows them.
+///
+/// wasm-bindgen runs this once at module init.
+#[cfg(target_arch = "wasm32")]
+#[wasm_bindgen(start)]
+fn install_panic_hook() {
+    std::panic::set_hook(Box::new(|info| console_error(&info.to_string())));
+}
 
 fn err(e: impl ToString) -> JsError {
     JsError::new(&e.to_string())
