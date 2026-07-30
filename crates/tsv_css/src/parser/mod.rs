@@ -348,6 +348,30 @@ impl<'a, 'arena> CssParser<'a, 'arena> {
         Ok(())
     }
 
+    /// Abandon a speculative parse: reposition at `pos` (a `source`-relative byte
+    /// offset) and re-lex from there, discarding every comment registered since
+    /// `comments_len`.
+    ///
+    /// Both halves are the operation — a rewind that keeps the registrations would
+    /// leave phantom entries in `self.comments` for a region the caller is about to
+    /// re-read, and the printer's `comments_to_emit_in_range` lookups are keyed on
+    /// source position, not on which attempt produced them, so a comment inside the
+    /// abandoned region would print twice. Take the snapshot with
+    /// `self.comments.len()` **before** the trial call.
+    ///
+    /// Clearing `peek` is likewise not optional: a lookahead lexed from the
+    /// abandoned position would otherwise be consumed by the next `advance`.
+    pub(in crate::parser) fn rewind_to(
+        &mut self,
+        pos: usize,
+        comments_len: usize,
+    ) -> Result<(), ParseError> {
+        self.comments.truncate(comments_len);
+        self.peek = None;
+        self.lexer.seek(pos);
+        self.advance()
+    }
+
     /// Skip a run of legacy HTML-comment markers `<!-- ... -->` (CDO/CDC) at a
     /// stylesheet statement or selector-list boundary, mirroring Svelte `parseCss`'s
     /// `allow_comment_or_whitespace`. The whole span — **including any CSS between the

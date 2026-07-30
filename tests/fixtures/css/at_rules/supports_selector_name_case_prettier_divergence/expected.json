@@ -1,0 +1,87 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 132,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 62,
+				"end": 123,
+				"name": "supports",
+				"prelude": "SELECTOR(div:hover)",
+				"block": {
+					"type": "Block",
+					"start": 92,
+					"end": 123,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 96,
+								"end": 99,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 96,
+										"end": 99,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 96,
+														"end": 99
+													}
+												],
+												"start": 96,
+												"end": 99
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 100,
+								"end": 120,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 105,
+										"end": 115,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 96,
+							"end": 120
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 124,
+			"styles": "\n\t/* A CSS function name is ASCII case-insensitive */\n\t@supports SELECTOR(div:hover) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 133,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -460,16 +460,35 @@ impl<'a> Printer<'a> {
         // colors lowercased (`#FFF` → `#fff`); `@container` is emitted verbatim, both
         // matching prettier.
         let content_doc = |part: &internal::ConditionPart<'_>| {
-            if kind.normalizes() {
-                // Only `@supports` reaches here (the sole `normalizes()` kind), so hex
-                // lowercasing is on.
-                d.text_pooled(&value_normalization::normalize_value_text(
-                    part.content,
-                    true,
-                ))
-            } else {
-                d.text_pooled(part.content)
+            let mut segments = DocBuf::new();
+            for segment in part.segments {
+                match segment {
+                    internal::ConditionSegment::Text(text) => segments.push(if kind.normalizes() {
+                        // Only `@supports` reaches here (the sole `normalizes()` kind),
+                        // so hex lowercasing is on.
+                        d.text_pooled(&value_normalization::normalize_value_text(text, true))
+                    } else {
+                        d.text_pooled(text)
+                    }),
+                    // A `selector()` argument prints through the selector printer — the
+                    // one a rule's own selector uses, so the same selector formats the
+                    // same way in both positions. `remove_lines` keeps it on the
+                    // prelude's line: a selector's combinator and pseudo-arg break
+                    // points belong to a rule's selector list, not to a condition,
+                    // whose own wrapping is the `and`/`or` fill below.
+                    internal::ConditionSegment::Selectors(selectors) => {
+                        let mut list = DocBuf::new();
+                        for (i, selector) in selectors.iter().enumerate() {
+                            if i > 0 {
+                                list.push(d.text(", "));
+                            }
+                            list.push(self.build_complex_selector_doc(selector));
+                        }
+                        segments.push(d.remove_lines(d.concat(&list)));
+                    }
+                }
             }
+            d.concat(&segments)
         };
 
         // The leading comments before the first part (after the optional name).

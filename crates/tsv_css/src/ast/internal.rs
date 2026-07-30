@@ -697,6 +697,28 @@ pub struct ConditionQuery<'arena> {
     pub parts: &'arena [ConditionPart<'arena>],
 }
 
+/// One piece of a `ConditionPart`'s content.
+///
+/// A condition is normalized text — the parser re-emits its tokens with the
+/// spacing the grammar calls for — with one exception: the argument of
+/// `selector( <complex-selector> )` (css-conditional-4) is a **selector**, so it
+/// is parsed as one and printed by the selector printer, exactly as a rule's own
+/// selector is. An argument that doesn't parse as a selector never becomes a
+/// `Selectors` segment: it is a `<general-enclosed>`, whose contents the grammar
+/// leaves undefined, and it stays `Text`.
+///
+/// The grammar's argument is a single complex selector, but a comma-separated
+/// list is read (and printed) as the list it lexically is — the singular
+/// production decides whether the *condition* is true, which is not a formatting
+/// question.
+#[derive(Debug, Clone, Copy)]
+pub enum ConditionSegment<'arena> {
+    /// Normalized condition text (`(display: `, `selector(`, `)`, …).
+    Text(&'arena str),
+    /// A `selector()` argument, parsed as the selectors it is.
+    Selectors(&'arena [ComplexSelector<'arena>]),
+}
+
 /// A single part of a `ConditionQuery` (one `(prop: val)` term, optionally
 /// `not`-prefixed or function-style like `selector(...)`).
 #[derive(Debug, Clone)]
@@ -709,9 +731,11 @@ pub struct ConditionPart<'arena> {
     /// printer so the author's case is preserved (matching prettier). `Some` iff
     /// `connector` is `Some`.
     pub connector_raw: Option<&'arena str>,
-    /// The condition content (e.g., "(display: grid)" or "not (color: red)"). A
-    /// leading `not` keeps its source case (preserved like the connectors).
-    pub content: &'arena str,
+    /// The condition content (e.g., `(display: grid)` or `not (color: red)`) as a
+    /// run of segments — one `Text` segment unless the part holds a `selector()`
+    /// argument. A leading `not` keeps its source case (preserved like the
+    /// connectors).
+    pub segments: &'arena [ConditionSegment<'arena>],
     pub span: Span,
 }
 

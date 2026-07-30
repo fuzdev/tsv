@@ -208,7 +208,10 @@ impl<'a> Printer<'a> {
     /// combinators and indent continuation lines (and any pseudo args on them) one
     /// level. A single compound needs no group/indent — its only break point is a
     /// pseudo's own arg group, which is self-contained.
-    fn build_complex_selector_doc(&self, complex: &internal::ComplexSelector<'_>) -> DocId {
+    pub(super) fn build_complex_selector_doc(
+        &self,
+        complex: &internal::ComplexSelector<'_>,
+    ) -> DocId {
         // A comment at a combinator boundary (between compounds, or glued between two
         // simple selectors of one compound) takes the interleaving path: the comment is
         // re-emitted at its authored position with the surrounding gap whitespace
