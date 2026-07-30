@@ -73,6 +73,19 @@ pub(super) fn push_empty_args(
         parts.push(d.text(empty_pair));
         return;
     };
+    let parens =
+        printer.build_empty_parens_inline_with_comments_doc(paren_pos, paren_close, prefix);
+    // A **line** comment in this gap runs to end of line, so the argument list cannot
+    // stay on it — left inline the `//` swallows the `()` and everything after it
+    // (`call // c⏎()` → `call // c();`, losing the call itself). The comment keeps the
+    // position the author gave it and the list drops to a continuation line indented one
+    // level: the uniform forced-continuation indent every line-comment-split construct
+    // shares (`build_continuation_indent`), so the list reads as part of its call rather
+    // than as a sibling statement. A block comment forces nothing and stays inline below.
+    if printer.has_line_comments_between(search_from, paren_pos) {
+        parts.push(printer.build_continuation_indent(search_from, paren_pos, parens));
+        return;
+    }
     if let Some(pre) = printer.build_comments_between_filtered_opt(
         search_from,
         paren_pos,
@@ -81,7 +94,7 @@ pub(super) fn push_empty_args(
     ) {
         parts.push(pre);
     }
-    parts.push(printer.build_empty_parens_inline_with_comments_doc(paren_pos, paren_close, prefix));
+    parts.push(parens);
 }
 
 //

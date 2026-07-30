@@ -211,9 +211,11 @@ impl<'a> Printer<'a> {
 }
 
 impl<'a> Printer<'a> {
-    /// Format a slice of block comments with the given spacing style.
-    ///
-    /// Shared formatting for block comments with the given spacing style.
+    /// Format an already-filtered slice of **block** comments, each with `spacing`
+    /// applied to its outer edges (` /* c */` after a chain element, `/* c */ ` before
+    /// one). Every comment gets the space — a chain gap's block run is never at line
+    /// start — so this is the plain-`true` consumer of
+    /// [`Printer::push_block_comment_spaced`], which owns what the spacing means.
     pub(crate) fn format_block_comments(
         &self,
         block_comments: &[&Comment],
@@ -226,21 +228,7 @@ impl<'a> Printer<'a> {
 
         let mut parts = DocBuf::new();
         for comment in block_comments {
-            match spacing {
-                CommentSpacing::Leading => {
-                    // Space before comment: `method() /* c */`
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
-                CommentSpacing::Trailing => {
-                    // Space after comment: `/* c */ key`
-                    parts.push(self.build_comment_doc(comment));
-                    parts.push(d.text(" "));
-                }
-                CommentSpacing::None => {
-                    parts.push(self.build_comment_doc(comment));
-                }
-            }
+            self.push_block_comment_spaced(&mut parts, comment, spacing, true);
         }
         d.concat(&parts)
     }

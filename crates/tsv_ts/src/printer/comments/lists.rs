@@ -726,16 +726,14 @@ impl<'a> Printer<'a> {
     /// one delimiter pair where inlining is a correctness bug rather than a layout
     /// choice.
     ///
+    /// The sibling swallow in CALLEE position — a line comment between the callee and
+    /// its `(` (`call // c⏎()`, and the optional-call `call?. // c⏎()`) — is a different
+    /// mechanism (callee-position trivia, not a dangling comment inside a delimiter
+    /// pair) and is handled by this emitter's caller, `push_empty_args`, which drops the
+    /// whole list to an indented continuation line.
+    ///
     /// `paren_open` is the `(` position and `paren_close_after` the position past
     /// the `)` (as returned by `find_closing_paren`).
-    // TODO: the sibling swallow in CALLEE position is NOT covered here. A line comment
-    // between a callee and its `(` — `call // c⏎()`, and the optional-call `call?. // c⏎()`
-    // — is emitted by the callee/member-chain path, not by this emitter, and still prints
-    // inline (`call // c();`), swallowing the `()`. Same bug class, different mechanism
-    // (callee-position trivia, not a dangling comment inside a delimiter pair), so it wants
-    // its own fixtures-first fix. `swallow_audit` cannot see it — that gate runs over
-    // `tests/fixtures` only, and no fixture carries the shape; prettier's own
-    // `js/call/no-argument/no-arguments.js` does.
     pub(crate) fn build_empty_parens_inline_with_comments_doc(
         &self,
         paren_open: u32,

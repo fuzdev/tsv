@@ -245,10 +245,18 @@ impl<'a> Printer<'a> {
     /// reads as part of the construct, not a sibling.
     ///
     /// `start`/`end` bound the comment gap; `tail` is the continued content (a type,
-    /// a `: type` annotation, …) the caller has already built. Used by the `:`→type
-    /// annotation (`build_type_annotation_doc`), the marker→`:` before-colon gap
-    /// (`build_marker_colon_line_continuation`), and the index-signature `]`→value-`:`
-    /// gap (`build_index_signature_member_doc`). See conformance_prettier.md
+    /// a `: type` annotation, an argument list, …) the caller has already built.
+    ///
+    /// **Every** site where a line comment splits a construct's head from its tail
+    /// routes here, so the enumeration is the rule's coverage, not a sample: the
+    /// `:`→type annotation and its union arm (`build_type_annotation_doc`), the
+    /// marker→`:` before-colon gap (`build_marker_colon_line_continuation`), the
+    /// name→`=` initializer gap (`build_initializer_line_continuation`), the
+    /// name→marker gap and the dotted-name gap (`build_dot_gap_doc`), the
+    /// object-property and import-attribute key→`:` gaps, the index-signature
+    /// `]`→value-`:` gap (`build_index_signature_member_doc`), and the callee→empty
+    /// argument list gap (`push_empty_args`). Adding a site means calling this, never
+    /// re-deriving `indent(" " + hang_next + tail)`. See conformance_prettier.md
     /// §Uniform Forced-Continuation Indent.
     pub(crate) fn build_continuation_indent(&self, start: u32, end: u32, tail: DocId) -> DocId {
         let d = self.d();
@@ -832,21 +840,7 @@ impl<'a> Printer<'a> {
             }
             if comment.is_block {
                 // Block comment: use caller-specified spacing
-                match block_spacing {
-                    CommentSpacing::Leading => {
-                        if space_before {
-                            parts.push(d.text(" "));
-                        }
-                        parts.push(self.build_comment_doc(comment));
-                    }
-                    CommentSpacing::Trailing => {
-                        parts.push(self.build_comment_doc(comment));
-                        parts.push(d.text(" "));
-                    }
-                    CommentSpacing::None => {
-                        parts.push(self.build_comment_doc(comment));
-                    }
-                }
+                self.push_block_comment_spaced(&mut parts, comment, block_spacing, space_before);
                 at_line_start = false;
             } else {
                 // Line comment: leading space (unless already at line start) +

@@ -1247,7 +1247,23 @@ impl<'a> Printer<'a> {
     /// Recursively check for line comments in a chain (calls, members, non-null).
     fn has_line_comments_in_chain(&self, expr: &Expression<'_>) -> bool {
         match expr {
-            Expression::CallExpression(call) => self.has_line_comments_in_chain(call.callee),
+            Expression::CallExpression(call) => {
+                // A line comment between the callee (or its type arguments) and the
+                // arguments forces the break too: the `//` must end its line before the
+                // `(`, so the argument list drops to an indented continuation
+                // (`push_empty_args`). That break is the comment's, not a chain break
+                // point the static analysis missed.
+                let args_gap_start = call
+                    .type_arguments
+                    .as_ref()
+                    .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
+                let args_gap_end = call
+                    .arguments
+                    .first()
+                    .map_or(call.span.end, |arg| arg.span().start);
+                self.has_line_comments_between(args_gap_start, args_gap_end)
+                    || self.has_line_comments_in_chain(call.callee)
+            }
             Expression::MemberExpression(member) => {
                 // Check for line comments between object and property
                 let obj_end = member.object.span().end;
