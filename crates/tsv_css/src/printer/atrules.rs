@@ -129,8 +129,15 @@ impl<'a> Printer<'a> {
                             continue;
                         }
                     }
-                    // Use doc-based formatting to normalize quotes and spacing
-                    self.print_nested_value(value);
+                    // Doc-based formatting normalizes quotes and spacing. The last
+                    // value is followed by the rule's `;`, so reserve it — a value
+                    // group that can break (`supports(…)`, `layer(…)`) must break one
+                    // column sooner, the same boundary the media-query fill above
+                    // already measures for itself. Without it a 101-char
+                    // `@import … supports(…);` sat one char over print width.
+                    let suffix_width = usize::from(i == values.len() - 1 && atrule.block.is_none());
+                    let doc = self.build_css_value_doc(value);
+                    self.write_arena_doc_with_suffix(doc, suffix_width);
                     prev_end = value.span().end;
                 }
                 // Trailing comments between the last value and the `;` (e.g.
@@ -437,6 +444,96 @@ impl<'a> Printer<'a> {
         self.write_arena_doc_with_suffix(doc, suffix_width);
     }
 
+    /// Build the doc for an `@import` prelude's `supports()` call.
+    ///
+    /// The argument is the same `<supports-condition>` `@supports` takes, so its
+    /// segments print through the same emitter — the `@supports` value normalization
+    /// (numbers, hex, string quotes) and the `selector()` routing, both of which
+    /// prettier applies here too.
+    ///
+    /// The function's parens are peeled back off the part. The parser folded them *in*
+    /// (they are the condition part's own, which is what let the bare `<declaration>`
+    /// alternative reuse the parenthesized-part grammar), but as part text they'd be
+    /// unbreakable, and an over-width `supports()` has to break somewhere. Peeling
+    /// restores the `group("(" indent(softline …) softline ")")` shape every other
+    /// function value takes, so this position's break point is the ordinary one.
+    pub(super) fn build_supports_condition_doc(
+        &self,
+        name: &str,
+        condition: &internal::ConditionQuery<'_>,
+    ) -> DocId {
+        let d = self.d();
+        // A `supports()` argument is exactly one part; an empty query means the parse
+        // found nothing to record.
+        let Some(part) = condition.parts.first() else {
+            return d.text_pooled(name);
+        };
+        let last = part.segments.len().saturating_sub(1);
+        let mut inner = DocBuf::with_capacity(part.segments.len());
+        for (i, segment) in part.segments.iter().enumerate() {
+            // The first and last segments are `Text` by construction — the part opens
+            // on the `(` and closes on the `)` — so the strip guards never fire.
+            let peeled = match segment {
+                internal::ConditionSegment::Text(text) => {
+                    let mut text: &str = text;
+                    if i == 0 {
+                        text = text.strip_prefix('(').unwrap_or(text);
+                    }
+                    if i == last {
+                        text = text.strip_suffix(')').unwrap_or(text);
+                    }
+                    internal::ConditionSegment::Text(text)
+                }
+                selectors => *selectors,
+            };
+            inner.push(self.build_condition_segment_doc(ConditionKind::Supports, &peeled));
+        }
+        let inner = d.concat(&inner);
+        d.group(d.concat(&[
+            d.text_pooled(name),
+            d.text("("),
+            d.indent(d.concat(&[d.softline(), inner])),
+            d.softline(),
+            d.text(")"),
+        ]))
+    }
+
+    /// Build the doc for one condition part segment.
+    ///
+    /// `@supports` values are number-normalized (`.5px` → `0.5px`) and their hex colors
+    /// lowercased (`#FFF` → `#fff`); `@container` is emitted verbatim, both matching
+    /// prettier. A `selector()` argument prints through the selector printer — the one
+    /// a rule's own selector uses, so the same selector formats the same way in both
+    /// positions. `remove_lines` keeps it on the prelude's line: a selector's combinator
+    /// and pseudo-arg break points belong to a rule's selector list, not to a condition,
+    /// whose own wrapping is the `and`/`or` fill.
+    fn build_condition_segment_doc(
+        &self,
+        kind: ConditionKind<'_>,
+        segment: &internal::ConditionSegment<'_>,
+    ) -> DocId {
+        let d = self.d();
+        match segment {
+            internal::ConditionSegment::Text(text) => {
+                if kind.normalizes() {
+                    d.text_pooled(&value_normalization::normalize_value_text(text, true))
+                } else {
+                    d.text_pooled(text)
+                }
+            }
+            internal::ConditionSegment::Selectors(selectors) => {
+                let mut list = DocBuf::with_capacity(selectors.len() * 2);
+                for (i, selector) in selectors.iter().enumerate() {
+                    if i > 0 {
+                        list.push(d.text(", "));
+                    }
+                    list.push(self.build_complex_selector_doc(selector));
+                }
+                d.remove_lines(d.concat(&list))
+            }
+        }
+    }
+
     /// Build the doc tree for an `@supports`/`@container` condition prelude.
     ///
     /// A single condition has no break point — it's a plain concat (leading comment,
@@ -456,37 +553,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let parts = condition.parts;
 
-        // `@supports` values are number-normalized (`.5px` → `0.5px`) and their hex
-        // colors lowercased (`#FFF` → `#fff`); `@container` is emitted verbatim, both
-        // matching prettier.
         let content_doc = |part: &internal::ConditionPart<'_>| {
-            let mut segments = DocBuf::new();
+            let mut segments = DocBuf::with_capacity(part.segments.len());
             for segment in part.segments {
-                match segment {
-                    internal::ConditionSegment::Text(text) => segments.push(if kind.normalizes() {
-                        // Only `@supports` reaches here (the sole `normalizes()` kind),
-                        // so hex lowercasing is on.
-                        d.text_pooled(&value_normalization::normalize_value_text(text, true))
-                    } else {
-                        d.text_pooled(text)
-                    }),
-                    // A `selector()` argument prints through the selector printer — the
-                    // one a rule's own selector uses, so the same selector formats the
-                    // same way in both positions. `remove_lines` keeps it on the
-                    // prelude's line: a selector's combinator and pseudo-arg break
-                    // points belong to a rule's selector list, not to a condition,
-                    // whose own wrapping is the `and`/`or` fill below.
-                    internal::ConditionSegment::Selectors(selectors) => {
-                        let mut list = DocBuf::new();
-                        for (i, selector) in selectors.iter().enumerate() {
-                            if i > 0 {
-                                list.push(d.text(", "));
-                            }
-                            list.push(self.build_complex_selector_doc(selector));
-                        }
-                        segments.push(d.remove_lines(d.concat(&list)));
-                    }
-                }
+                segments.push(self.build_condition_segment_doc(kind, segment));
             }
             d.concat(&segments)
         };

@@ -1,0 +1,66 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 222,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 30,
+				"name": "import",
+				"prelude": "URL('a.css')",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 32,
+				"end": 66,
+				"name": "import",
+				"prelude": "url('b.css') LAYER(name1)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 68,
+				"end": 113,
+				"name": "import",
+				"prelude": "url('c.css') SUPPORTS(display: grid)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 115,
+				"end": 164,
+				"name": "import",
+				"prelude": "url('d.css') SuPpOrTs((a: b) and (c: d))",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 166,
+				"end": 213,
+				"name": "import",
+				"prelude": "url('e.css') SUPPORTS(selector(a > b))",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 214,
+			"styles": "\n\t@import URL('a.css');\n\t@import url('b.css') LAYER(name1);\n\t@import url('c.css') SUPPORTS(display: grid);\n\t@import url('d.css') SuPpOrTs((a: b) and (c: d));\n\t@import url('e.css') SUPPORTS(selector(a > b));\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 223,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

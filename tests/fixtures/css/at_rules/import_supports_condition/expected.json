@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 218,
+		"end": 313,
 		"attributes": [],
 		"children": [
 			{
@@ -36,18 +36,34 @@
 				"name": "import",
 				"prelude": "url('d.css') supports((a: b) and (c: d))",
 				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 211,
+				"end": 257,
+				"name": "import",
+				"prelude": "url('e.css') supports((width: 0.5px))",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 259,
+				"end": 304,
+				"name": "import",
+				"prelude": "url('f.css') supports((color: #fff))",
+				"block": null
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 210,
-			"styles": "\n\t@import url('a.css') supports((display: grid));\n\t@import url('b.css') supports(not (display: flex));\n\t@import url('c.css') supports(selector(a > b));\n\t@import url('d.css') supports((a: b) and (c: d));\n",
+			"end": 305,
+			"styles": "\n\t@import url('a.css') supports((display: grid));\n\t@import url('b.css') supports(not (display: flex));\n\t@import url('c.css') supports(selector(a > b));\n\t@import url('d.css') supports((a: b) and (c: d));\n\t@import url('e.css') supports((width: 0.5px));\n\t@import url('f.css') supports((color: #fff));\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 219,
+	"end": 314,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
