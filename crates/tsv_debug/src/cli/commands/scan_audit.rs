@@ -104,16 +104,6 @@ const ALLOW: &[Allow] = &[
     ),
     (
         "tsv_css/src/ast/convert/mod.rs",
-        "if let Some(end_rel) = rest[2..].find(\"*/\") {",
-        "comment-marker",
-    ),
-    (
-        "tsv_css/src/ast/convert/mod.rs",
-        ".find(\"*/\")",
-        "comment-marker",
-    ),
-    (
-        "tsv_css/src/ast/convert/mod.rs",
         "raw.find('(').map_or(span.end, |i| span.start + i as u32)",
         "css-value",
     ),
@@ -125,11 +115,6 @@ const ALLOW: &[Allow] = &[
         "css-value",
     ),
     (
-        "tsv_css/src/printer/declarations.rs",
-        ".find(\"*/\")",
-        "comment-marker",
-    ),
-    (
         "tsv_css/src/printer/value_normalization/colors.rs",
         "if let Some(open_paren) = raw.find('(') {",
         "css-value",
@@ -137,14 +122,6 @@ const ALLOW: &[Allow] = &[
     (
         "tsv_css/src/printer/value_normalization/mod.rs",
         "if has_block_comment && let Some(comment_start) = property_part.find(\"/*\") {",
-        "comment-marker",
-    ),
-    (
-        // Collecting every property→colon-gap comment: `rest` starts at a `/*`, so
-        // scanning it for the next `*/` / `/*` only ever matches comment markers
-        // (the property-name text before the parser-recorded colon holds no strings).
-        "tsv_css/src/printer/value_normalization/mod.rs",
-        "let Some(comment_end_rel) = rest.find(\"*/\") else {",
         "comment-marker",
     ),
     (

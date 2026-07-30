@@ -1,0 +1,115 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 898,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 889,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 104,
+							"end": 180,
+							"property": "transition",
+							"value": "color 0.3s ,\n\t\t\tbackground 0.3s"
+						},
+						{
+							"type": "Declaration",
+							"start": 225,
+							"end": 282,
+							"property": "transition",
+							"value": "color 0.3s ,\n\t\t\tbackground 0.3s"
+						},
+						{
+							"type": "Declaration",
+							"start": 414,
+							"end": 439,
+							"property": "font-family",
+							"value": "a, b"
+						},
+						{
+							"type": "Declaration",
+							"start": 530,
+							"end": 561,
+							"property": "font-family",
+							"value": "a,\n\t\t\t b"
+						},
+						{
+							"type": "Declaration",
+							"start": 644,
+							"end": 684,
+							"property": "font-family",
+							"value": "color 0.3s,\n\t\t\tb"
+						},
+						{
+							"type": "Declaration",
+							"start": 772,
+							"end": 820,
+							"property": "font-family",
+							"value": "color 0.3s,\n\t\t\tb"
+						},
+						{
+							"type": "Declaration",
+							"start": 824,
+							"end": 885,
+							"property": "transition",
+							"value": "color 0.3s ,\n\t\t\tbackground 0.3s"
+						}
+					]
+				},
+				"start": 9,
+				"end": 889
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 890,
+			"styles": "\n\ta {\n\t\t/* Interior whitespace, an interior comma, and normalizable tokens survive verbatim */\n\t\ttransition:\n\t\t\tcolor 0.3s /* keep   this,  #FFF  .5px */,\n\t\t\tbackground 0.3s;\n\t\t/* An interior whitespace run alone */\n\t\ttransition:\n\t\t\tcolor 0.3s /* a   b */,\n\t\t\tbackground 0.3s;\n\t\t/* A comment before the first element content is between the colon and the value, so\n\t\t   single-node elements stay inline */\n\t\tfont-family: /* c */ a, b;\n\t\t/* A comment on a later element makes that element multi-node, so the list breaks */\n\t\tfont-family:\n\t\t\ta,\n\t\t\t/* c */ b;\n\t\t/* When the list does break, that between comment stays on the colon line */\n\t\tfont-family: /* c */\n\t\t\tcolor 0.3s,\n\t\t\tb;\n\t\t/* A run of them, and one that belongs to an element, keep their own positions */\n\t\tfont-family: /* c */ /* d */\n\t\t\tcolor 0.3s,\n\t\t\tb;\n\t\ttransition: /* c */\n\t\t\tcolor 0.3s /* d */,\n\t\t\tbackground 0.3s;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 899,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

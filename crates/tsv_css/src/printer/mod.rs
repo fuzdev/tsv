@@ -156,47 +156,111 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether the value spanning `value_span` carries a comment at the comma
-    /// list's **top level** (paren-depth 0).
+    /// How many **nodes** the value spanning `span` holds at the comma list's top level
+    /// (paren-depth 0), counting from `from` on — or from the span's own start when `from`
+    /// is `None`.
     ///
-    /// Such a list breaks one-per-line: prettier force-breaks a comma list with a
-    /// top-level comment, and keying the break here — rather than on the
-    /// space-separated `List` the value parser builds *only* when a space happens to
-    /// follow the comment — makes every render-equivalent authoring reach the one
-    /// broken form in a single pass. The value normalizer inserts a space after a
-    /// comment's `*/`, so a glued `x,/* c */y` and a spaced `x, /* c */ y` would
-    /// otherwise flip the parse (and the break) between passes — the F1 violation the
-    /// `css-normalize-value-text-context-blind` class produces. A comment nested
-    /// inside a function argument (`var(--a, /* c */ red)`) sits at depth ≥ 1 and
-    /// does not count — prettier keeps that inline.
+    /// This is prettier's unit of value structure, and the one thing its comma-list
+    /// layout turns on: `shouldBreakList` breaks a list when some element is still a
+    /// `value-comma_group` after `flattenGroups` collapses the single-node ones — i.e.
+    /// when some element holds more than one node. A node is a comment, or a run of
+    /// non-comment tokens with no whitespace inside it — where a **function's closing `)`
+    /// ends the run**: prettier splits `f(x)g` into two nodes and prints `f(x) g`, so the
+    /// count must too. That falls out of `prev_end` tracking only depth-0 tokens: the
+    /// argument list is skipped wholesale, leaving `prev_end` at the `(`, so the token
+    /// after the `)` reads as gapped and opens a node. Do not "fix" that by updating
+    /// `prev_end` on every token — it would fuse `f(x)g` into one node and stop matching
+    /// prettier.
+    ///
+    /// Counting comments as nodes is what makes the glued and spaced authorings agree:
+    /// `x,/* c */y` and `x, /* c */ y` both give element 1 two nodes, so both break in
+    /// one pass. Keying the break on the space-separated `List` the value parser builds
+    /// *only* when a space follows the comment would flip the break between passes —
+    /// the value normalizer inserts a space after a comment's `*/`, which is the F1
+    /// 2-cycle the `css-normalize-value-text-context-blind` class produces.
     ///
     /// Lexing (not a raw `/*` substring scan) is what keeps it honest: the lexer
     /// consumes strings and unquoted `url(...)` whole, so a `/*` inside them is not a
     /// comment token, and a `(` inside a comment is part of the one Comment token —
-    /// neither can miscount the depth. Callers gate on
-    /// `CssDeclaration::has_block_comment` first, so this lexes only when a comment is
-    /// actually present in the declaration.
-    pub(crate) fn comma_value_has_top_level_comment(&self, value_span: Span) -> bool {
-        let text = value_span.extract(self.source);
+    /// neither can miscount the depth.
+    pub(crate) fn value_node_count(&self, span: Span, from: Option<u32>) -> usize {
+        let start = from.map_or(span.start, |from| span.start.max(from));
+        if start >= span.end {
+            return 0;
+        }
+        let text = Span::new(start, span.end).extract(self.source);
         let mut lexer = Lexer::new(text);
         let mut paren_depth: u32 = 0;
+        let mut count = 0usize;
+        // End of the previous depth-0 token, and whether it was a comment — a token
+        // opens a new node when whitespace precedes it, or when either side of the
+        // boundary is a comment (a comment is always its own node, glued or not).
+        let mut prev_end: Option<u32> = None;
+        let mut prev_was_comment = false;
         loop {
-            match lexer.next_token() {
-                Ok(t) if t.kind == TokenKind::Eof => return false,
-                Ok(t) if t.kind == TokenKind::Comment => {
-                    if paren_depth == 0 {
-                        return true;
-                    }
+            // A lex error (e.g. an unterminated `/* …`): report what was counted so far
+            // rather than guess. This governs only layout, never content.
+            let Ok(token) = lexer.next_token() else {
+                return count;
+            };
+            match token.kind {
+                TokenKind::Eof => return count,
+                // Whitespace is a node *boundary*, not a node; the gap it leaves is
+                // what `prev_end` detects.
+                TokenKind::Whitespace => continue,
+                _ => {}
+            }
+            if paren_depth == 0 {
+                let is_comment = token.kind == TokenKind::Comment;
+                if prev_end.is_none_or(|end| end < token.start) || is_comment || prev_was_comment {
+                    count += 1;
                 }
-                Ok(t) if t.kind == TokenKind::LeftParen => paren_depth += 1,
-                Ok(t) if t.kind == TokenKind::RightParen => {
-                    paren_depth = paren_depth.saturating_sub(1);
+                prev_was_comment = is_comment;
+                prev_end = Some(token.end);
+            }
+            match token.kind {
+                TokenKind::LeftParen => paren_depth += 1,
+                TokenKind::RightParen => paren_depth = paren_depth.saturating_sub(1),
+                _ => {}
+            }
+        }
+    }
+
+    /// The block-comment run a value opens with: the text to emit after the
+    /// declaration's `:`, and the absolute offset where the value's own content starts.
+    /// `None` when the value does not open with a comment, or holds nothing but
+    /// comments.
+    ///
+    /// postcss keeps everything between a declaration's property and its value in
+    /// `raws.between`, so a comment right after the colon is not part of the value at
+    /// all — which is why prettier neither counts it toward the list's node counts nor
+    /// indents it with the first element, but leaves it on the colon's line
+    /// (`font-family: /* c */⏎\tcolor 0.3s,⏎\tb;`). tsv keeps such a comment inside the
+    /// value span (the wire `value` is source-sliced, so the span is a printer-internal
+    /// boundary), and recovers the same split here.
+    ///
+    /// Returns the run's own span and the absolute offset where content begins. The
+    /// caller emits the run through `normalize_css_whitespace`, so multiple comments are
+    /// joined single-spaced — the same normalizer every other comment-bearing value path
+    /// uses, and the same rule the property→colon gap takes
+    /// (`multi_comment_before_colon`). Spans rather than built text keeps this allocation-
+    /// free, so the predicate path can ask the question as cheaply as the emit path.
+    pub(crate) fn leading_value_comment_run(&self, value_span: Span) -> Option<(Span, u32)> {
+        let text = value_span.extract(self.source);
+        let mut lexer = Lexer::new(text);
+        let mut run_end = None;
+        loop {
+            let token = lexer.next_token().ok()?;
+            match token.kind {
+                TokenKind::Comment => run_end = Some(token.end),
+                TokenKind::Whitespace => {}
+                // A value of nothing but comments has no content to separate them from.
+                TokenKind::Eof => return None,
+                _ => {
+                    let run_end = run_end?;
+                    let run = Span::new(value_span.start, value_span.start + run_end);
+                    return Some((run, value_span.start + token.start));
                 }
-                Ok(_) => {}
-                // A lex error (e.g. an unterminated `/* …`): don't force the break
-                // rather than guess — the value still prints, and this governs only
-                // layout, never content.
-                Err(_) => return false,
             }
         }
     }
