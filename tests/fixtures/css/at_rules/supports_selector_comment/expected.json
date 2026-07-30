@@ -1,0 +1,209 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 383,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 51,
+				"end": 121,
+				"name": "supports",
+				"prelude": "selector(div  > span)",
+				"block": {
+					"type": "Block",
+					"start": 90,
+					"end": 121,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 94,
+								"end": 97,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 94,
+										"end": 97,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 94,
+														"end": 97
+													}
+												],
+												"start": 94,
+												"end": 97
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 98,
+								"end": 118,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 103,
+										"end": 113,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 94,
+							"end": 118
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 183,
+				"end": 255,
+				"name": "supports",
+				"prelude": "selector(:has( .class))",
+				"block": {
+					"type": "Block",
+					"start": 224,
+					"end": 255,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 228,
+								"end": 231,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 228,
+										"end": 231,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 228,
+														"end": 231
+													}
+												],
+												"start": 228,
+												"end": 231
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 232,
+								"end": 252,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 237,
+										"end": 247,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 228,
+							"end": 252
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 313,
+				"end": 374,
+				"name": "supports",
+				"prelude": "selector(. )",
+				"block": {
+					"type": "Block",
+					"start": 343,
+					"end": 374,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 347,
+								"end": 350,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 347,
+										"end": 350,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 347,
+														"end": 350
+													}
+												],
+												"start": 347,
+												"end": 350
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 351,
+								"end": 371,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 356,
+										"end": 366,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 347,
+							"end": 371
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 375,
+			"styles": "\n\t/* A comment at a combinator boundary */\n\t@supports selector(div /* c */ > span) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* A comment inside a functional pseudo-class argument */\n\t@supports selector(:has(/* c */ .class)) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* A comment in an argument that is not a selector */\n\t@supports selector(. /* c */) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 384,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

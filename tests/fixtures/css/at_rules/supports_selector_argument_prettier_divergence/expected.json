@@ -1,0 +1,148 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 292,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 60,
+				"end": 128,
+				"name": "supports",
+				"prelude": "selector(.class1, .class2)",
+				"block": {
+					"type": "Block",
+					"start": 97,
+					"end": 128,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 101,
+								"end": 104,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 101,
+										"end": 104,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 101,
+														"end": 104
+													}
+												],
+												"start": 101,
+												"end": 104
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 105,
+								"end": 125,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 110,
+										"end": 120,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 101,
+							"end": 125
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 215,
+				"end": 283,
+				"name": "supports",
+				"prelude": "selector([data-attr=1.50])",
+				"block": {
+					"type": "Block",
+					"start": 252,
+					"end": 283,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 256,
+								"end": 259,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 256,
+										"end": 259,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 256,
+														"end": 259
+													}
+												],
+												"start": 256,
+												"end": 259
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 260,
+								"end": 280,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 265,
+										"end": 275,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 256,
+							"end": 280
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 284,
+			"styles": "\n\t/* A selector list stays on the prelude's line */\n\t@supports selector(.class1, .class2) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* An attribute value must be an identifier or a string, so this is no selector */\n\t@supports selector([data-attr=1.50]) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 293,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
