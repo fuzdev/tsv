@@ -68,6 +68,10 @@ Foundation for all CSS parsing. Spec: `css-syntax-3`
   An+B term (`:nth-child(2n /* c */ + 1)`) is not supported — see [Future Work](#not-parsed)
 - Comments in `::slotted()` / `::part()` / unknown-pseudo args (leading/trailing gaps preserved; the interior positions — between `::part()` names, or `::slotted()` compound-internal — are rejected by parseCss but preserved + normalized by tsv, a `_svelte_prettier_divergence`)
 - Comments in `:dir()` / `:lang()` / `::highlight()` identifier args (leading/trailing gaps preserved + normalized; parseCss accepts → a `_prettier_divergence`)
+- Comments in a `@supports`/`@import` `selector()` argument — an argument that parses as a
+  selector carries them through the selector printer; one that doesn't is a
+  `<general-enclosed>`, where no whitespace is inserted at all, so a glued comment stays
+  glued on each side (a space would turn a compound into a descendant)
 - Comments in declarations
 - Comments in at-rules
 - Consecutive comments
