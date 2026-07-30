@@ -37,6 +37,66 @@ fn is_media_connector(atom: &str) -> bool {
     atom.eq_ignore_ascii_case("and") || atom.eq_ignore_ascii_case("or")
 }
 
+/// The `<media-query-list>` a normalized `@media`/`@import` prelude holds.
+struct MediaQueryList<'a> {
+    /// The prelude text to print — `content` with a *deletable* closing comma removed.
+    text: &'a str,
+    /// The list's entries, in order. An empty one is a real entry.
+    entries: Vec<&'a str>,
+    /// Whether the entries can't be spelled without a comma after the last one.
+    closing_comma: bool,
+}
+
+/// Read a normalized `@media`/`@import` prelude as the `<media-query-list>` it is.
+///
+/// mediaqueries-4 §Syntax parses the production by parsing "a comma-separated list of
+/// component values, then parsing each entry as a `<media-query>`" — so **every stretch
+/// between two top-level commas is an entry**, including an empty one. An entry that
+/// matches no `<media-query>` is not dropped from the list; §"Error Handling" replaces
+/// it with `not all`, which is why a grammar mismatch "does not wipe out an entire media
+/// query list, just the problematic media query". Discarding an empty entry here would
+/// shorten the authored list — a rewrite, not a normalization — so the entries come back
+/// as authored and the callers render an empty one as the nothing it is, between its two
+/// commas.
+///
+/// A **closing** comma is different: the same algorithm discards each separator and stops
+/// once the input is empty, so it contributes no entry at all (and `split_args_by_comma`
+/// produces none) — `screen,` and `screen` are the same list, and tsv deletes the comma,
+/// exactly as it deletes a trailing comma in a declaration value (`transition: a,` → `a`)
+/// and in a JS list. It is **kept** in the one case where the deletion would change the
+/// list: when the last entry is empty. `@import url('a.css'),;` is the one-entry list
+/// `not all`, and without its comma it is the **empty** list, which mediaqueries-4
+/// evaluates to true — the import would flip from never applying to always. Same
+/// predicate as the declaration path's `list_needs_closing_comma`: a list ending in an
+/// empty entry takes one more comma than it has separators, every other list takes N-1.
+///
+/// Whether a closing comma is there at all is derived from the split rather than from a
+/// second scan of the text: the parts are subslices of `content` separated by exactly one
+/// comma byte each, so N parts account for `sum(len) + N - 1` bytes — one short of
+/// `content.len()` exactly when a closing comma was consumed without producing a part.
+/// That also puts the comma at the final byte, which is what makes slicing it off safe.
+///
+/// Shared by both preludes so one list formats one way in both positions.
+fn media_query_list(content: &str) -> MediaQueryList<'_> {
+    let parts = value_normalization::split_args_by_comma(content);
+    let consumed: usize = parts.iter().map(|part| part.len()).sum();
+    let ends_with_comma = !parts.is_empty() && content.len() == consumed + parts.len();
+    let entries: Vec<&str> = parts.into_iter().map(str::trim).collect();
+    let closing_comma = ends_with_comma && entries.last().is_some_and(|entry| entry.is_empty());
+    let text = if ends_with_comma && !closing_comma {
+        // Deleting it leaves the same entries, so it is padding. The trim is
+        // escape-aware: an escaped space before the comma is content, not padding.
+        crate::escapes::trim_end_preserving_escape(&content[..content.len() - 1])
+    } else {
+        content
+    };
+    MediaQueryList {
+        text,
+        entries,
+        closing_comma,
+    }
+}
+
 /// A `@supports`/`@container` condition prelude. The two differ only in that
 /// `@supports` is value-parsed by prettier (so its numbers/strings normalize)
 /// while `@container` is kept raw, and that `@container` carries a name. Pairing
@@ -90,7 +150,11 @@ impl<'a> Printer<'a> {
                 // with single-space padding, so we interleave them here.
                 let mut prev_end = span.start;
                 for (i, value) in values.iter().enumerate() {
-                    self.write_import_gap_comments(prev_end, value.span().start, i > 0);
+                    // A value that opens with a comma is a `<media-query-list>` whose
+                    // first query is empty; the comma glues to the component before it.
+                    let glue_next =
+                        self.source.as_bytes().get(value.span().start as usize) == Some(&b',');
+                    self.write_import_gap_comments(prev_end, value.span().start, i > 0, glue_next);
                     // Check if this is the media query part of @import that needs wrapping
                     if is_import
                         && i == values.len() - 1
@@ -320,11 +384,11 @@ impl<'a> Printer<'a> {
             Cow::Owned(s) => s,
         };
 
-        let queries: Vec<&str> = value_normalization::split_args_by_comma(&content)
-            .into_iter()
-            .map(str::trim)
-            .filter(|q| !q.is_empty())
-            .collect();
+        let MediaQueryList {
+            text,
+            entries: queries,
+            closing_comma,
+        } = media_query_list(&content);
 
         if queries.len() > 1 {
             // Comma-separated query list: a group that breaks at every comma (one
@@ -340,11 +404,17 @@ impl<'a> Printer<'a> {
                 // emitted verbatim — no atom rewriting in the comma-list branch.
                 parts.push(d.text_pooled(query));
             }
+            // A list-closing comma takes no separator after it — one would strand a
+            // space before the ` {`.
+            if closing_comma {
+                parts.push(d.text(","));
+            }
             return d.group(d.indent(d.concat(&parts)));
         }
 
-        // Single query: wrap greedily at its `and`/`or` boundaries.
-        self.build_and_or_wrap_doc(&content, suffix_width)
+        // Single query: wrap greedily at its `and`/`or` boundaries. `text` already has a
+        // deletable closing comma removed, and keeps one the entries need (`@media ,`).
+        self.build_and_or_wrap_doc(text, suffix_width)
     }
 
     /// Build an `and`/`or`-wrapping fill for a single media query (raw string).
@@ -692,10 +762,26 @@ impl<'a> Printer<'a> {
     /// holds no comment, only the inter-value separator space is emitted (when
     /// `needs_separator`, i.e. this isn't the first value — the leading `@import `
     /// space is already written).
-    fn write_import_gap_comments(&mut self, start: u32, end: u32, needs_separator: bool) {
+    ///
+    /// `glue_next` drops the space on the value's side of the gap: the value that
+    /// follows opens with a comma (a `<media-query-list>` whose first query is empty),
+    /// and a comma that *follows* something takes no space before it — the same rule
+    /// `normalize_css_whitespace` applies to every comma inside a value, applied here at
+    /// the seam between two prelude values. So `supports(a), screen` glues, and a comment
+    /// in that gap keeps its leading space but not its trailing one
+    /// (`supports(a) /* c */, screen`). A comma with no prelude value before it is a
+    /// different position and keeps the at-keyword's separator (`@media , screen`);
+    /// gluing there would read as an at-rule named `@media,`.
+    fn write_import_gap_comments(
+        &mut self,
+        start: u32,
+        end: u32,
+        needs_separator: bool,
+        glue_next: bool,
+    ) {
         let comments: Vec<_> = comments_to_emit_in_range(self.comments, start, end).collect();
         if comments.is_empty() {
-            if needs_separator {
+            if needs_separator && !glue_next {
                 self.write(" ");
             }
             return;
@@ -709,7 +795,9 @@ impl<'a> Printer<'a> {
             }
             self.print_css_comment(comment);
         }
-        self.write(" ");
+        if !glue_next {
+            self.write(" ");
+        }
     }
 
     /// Emit any block comments in `[start, end]` as ` /* … */` — a single leading
@@ -754,16 +842,18 @@ impl<'a> Printer<'a> {
         // `@import`'s prelude is a media query (feature values), so hex case is
         // preserved like `@media` — only `@supports` conditions lowercase hex.
         let normalized = value_normalization::normalize_value_text(content, false);
-        let queries: Vec<&str> = value_normalization::split_args_by_comma(&normalized)
-            .into_iter()
-            .map(str::trim)
-            .filter(|q| !q.is_empty())
-            .collect();
-        if normalized.contains("/*") || queries.len() <= 1 {
-            let doc = self.build_and_or_wrap_doc(&normalized, 1);
+        let MediaQueryList {
+            text,
+            entries: queries,
+            closing_comma,
+        } = media_query_list(&normalized);
+        if text.contains("/*") || queries.len() <= 1 {
+            // `text` already has a deletable closing comma removed, and keeps one the
+            // entries need (`@import url('a.css'),;`).
+            let doc = self.build_and_or_wrap_doc(text, 1);
             self.write_arena_doc_with_suffix(doc, 1);
         } else {
-            self.print_import_media_query_fill(&queries);
+            self.print_import_media_query_fill(&queries, closing_comma);
         }
     }
 
@@ -783,7 +873,7 @@ impl<'a> Printer<'a> {
     /// (`split_by_space_preserving_parens` keeps the tokens atomic — no token has an
     /// internal break — so naive greedy line-packing is equivalent to prettier's
     /// pairwise `fill`.) The trailing `;`/`,` (1 wide) rides each query's last line.
-    fn print_import_media_query_fill(&mut self, queries: &[&str]) {
+    fn print_import_media_query_fill(&mut self, queries: &[&str], closing_comma: bool) {
         let base = self.effective_indent();
         let indent1 = (base + 1) * TAB_WIDTH; // comma-break column
         let indent2 = (base + 2) * TAB_WIDTH; // within-query break column
@@ -795,6 +885,11 @@ impl<'a> Printer<'a> {
             let query_start = col;
             col = self.emit_import_query(query, query_start, indent2, PRINT_WIDTH);
             if is_last {
+                // A list-closing comma takes no separator after it — one would strand
+                // a space before the rule's `;`.
+                if closing_comma {
+                    self.write(",");
+                }
                 continue;
             }
             self.write(",");

@@ -402,6 +402,7 @@ Specs: `css-color-3`, `css-color-4`, `css-color-5` (Level 5 is widely shipped)
 - `@charset`
 - `@import` (basic)
 - `@import` with media-query condition (media-type-led `screen and (…)` or a bare `<media-condition>` `(max-width: 40px)`)
+- `@import` with a comma-separated `<media-query-list>`, including an empty entry (`, screen`, `screen, , print`)
 - `@namespace`
 - `@media`
 - `@page`

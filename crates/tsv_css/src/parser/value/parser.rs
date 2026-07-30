@@ -32,6 +32,22 @@ const COMMA_SKIP: [bool; 256] = value_skip_table!(|b| b == b',');
 /// (vertical tab).
 const CSS_WS_SKIP: [bool; 256] = value_skip_table!(|b| b.is_ascii_whitespace());
 
+/// Which separator a `split_top_level` walk splits on.
+///
+/// The two arms differ in more than the delimiter byte, and the differences are
+/// *correlated* — a pair of bools could be set to a combination neither grammar has —
+/// so they ride one tag that each is derived from.
+#[derive(Clone, Copy, PartialEq, Eq)]
+enum SplitKind {
+    /// Top-level commas. A comma is a **list separator**, so the (possibly empty)
+    /// stretch between two of them is an element; a comment is ordinary element
+    /// content.
+    Comma,
+    /// Top-level whitespace runs. Whitespace is a **gap**, so an empty stretch is
+    /// nothing at all; a comment run instead opens its own element (`comment_is_element`).
+    Whitespace,
+}
+
 /// Position-tracking parser for CSS values
 ///
 /// Maintains ONE source string throughout entire parse tree.
@@ -347,9 +363,10 @@ impl<'a> ValueParser<'a> {
 
     /// Emit one comma-list element for the raw segment `text[seg_start..seg_end]`,
     /// reproducing `split_top_level`'s per-element handling: skip leading and trim
-    /// trailing whitespace, drop an empty element, and parse the first non-empty
-    /// element that runs to EOF as a single leaf (the progress guard). `seg_end` is
-    /// the `ve_raw` position — a comma index, or `text.len()` for the final segment.
+    /// trailing whitespace, emit an empty element as the empty-identifier sentinel,
+    /// and parse the first element that runs to EOF as a single leaf (the progress
+    /// guard). `seg_end` is the `ve_raw` position — a comma index, or `text.len()` for
+    /// the final segment.
     fn push_comma_segment<'arena>(
         &self,
         values: &mut BumpVec<'arena, CssValue<'arena>>,
@@ -369,10 +386,25 @@ impl<'a> ValueParser<'a> {
         // delete the whole element).
         let after_lead = seg.trim_start_matches(|c: char| c.is_ascii_whitespace());
         let core = crate::escapes::trim_end_preserving_escape(after_lead);
+        let value_start = seg_start + (seg.len() - after_lead.len());
         if core.is_empty() {
+            // An empty element is still an element — but only when a comma terminated
+            // it. CSS Syntax 3 §"parse a comma-separated list of component values"
+            // consumes up to the separator, discards it, and stops once the input is
+            // empty, so the stretch after a *final* comma produces no group at all
+            // (`a,` is the one-element list `[a]`). Everything else — a leading comma,
+            // two adjacent ones — is a real element that a `<media-query>` reads as
+            // `not all` and a declaration value reads as invalid; dropping it shortens
+            // the authored list, and in a declaration that turns a dead declaration
+            // (`linear-gradient(red,,blue)`, which the UA drops) into a live one.
+            if seg_end < text.len() {
+                values.push(CssValue::Identifier {
+                    span: self.sub_parser(value_start, value_start).absolute_span(),
+                });
+                *pushed = true;
+            }
             return;
         }
-        let value_start = seg_start + (seg.len() - after_lead.len());
         let value_end = value_start + core.len();
         let sub = self.sub_parser(value_start, value_end);
         // Same guard as `split_top_level`: a first non-empty element whose raw end
@@ -391,7 +423,7 @@ impl<'a> ValueParser<'a> {
     /// Parse comma-separated values: "a, b, c"
     fn parse_comma_separated<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         CssValue::CommaSeparated {
-            values: self.split_top_level(arena, |c| c == ',', &COMMA_SKIP, false),
+            values: self.split_top_level(arena, |c| c == ',', &COMMA_SKIP, SplitKind::Comma),
             span: self.absolute_span(),
         }
     }
@@ -399,7 +431,12 @@ impl<'a> ValueParser<'a> {
     /// Parse space-separated values: "a b c"
     fn parse_space_separated<'arena>(&self, arena: &'arena Bump) -> CssValue<'arena> {
         CssValue::List {
-            values: self.split_top_level(arena, is_css_whitespace, &CSS_WS_SKIP, true),
+            values: self.split_top_level(
+                arena,
+                is_css_whitespace,
+                &CSS_WS_SKIP,
+                SplitKind::Whitespace,
+            ),
             span: self.absolute_span(),
         }
     }
@@ -438,11 +475,12 @@ impl<'a> ValueParser<'a> {
         arena: &'arena Bump,
         is_delimiter: F,
         skip: &[bool; 256],
-        comment_is_element: bool,
+        kind: SplitKind,
     ) -> &'arena [CssValue<'arena>]
     where
         F: Fn(char) -> bool,
     {
+        let comment_is_element = kind == SplitKind::Whitespace;
         let text = self.text();
         let bytes = text.as_bytes();
         let mut cursor = ValueCursor::new(text);
@@ -470,7 +508,15 @@ impl<'a> ValueParser<'a> {
                 cursor.consume_until(&is_delimiter, skip, comment_is_element);
             let value_end = self.trimmed_end(text, value_start, value_end_raw);
 
-            if value_end > value_start {
+            if value_end == value_start && kind == SplitKind::Comma {
+                // An empty element is still an element (the twin of
+                // `push_comma_segment`'s arm — see it for the spec basis). Only a
+                // comma-terminated stretch reaches here: the loop breaks on EOF above,
+                // so the nothing after a *final* comma never becomes one.
+                values.push(CssValue::Identifier {
+                    span: self.sub_parser(value_start, value_start).absolute_span(),
+                });
+            } else if value_end > value_start {
                 // Non-empty value
                 let sub_parser = self.sub_parser(value_start, value_end);
                 // Progress guard: the cursor reached EOF without finding a
@@ -1013,7 +1059,12 @@ mod tests {
 
     #[test]
     fn test_parse_handles_empty_values() {
-        // Edge case: double comma (empty value between)
+        // Edge case: double comma (empty value between). CSS Syntax 3 §"parse a
+        // comma-separated list of component values" produces a group for the stretch
+        // between the two commas, so the list has THREE elements, the middle one the
+        // zero-width empty-identifier sentinel. Dropping it would shorten the authored
+        // list — and in a declaration that turns an invalid (dropped) declaration into a
+        // valid one, a render change.
         let source = "a,,c";
         let span = Span { start: 0, end: 4 };
         let parser = ValueParser::new(source, span);
@@ -1022,9 +1073,20 @@ mod tests {
         let value = parser.parse(&arena);
         assert!(matches!(value, CssValue::CommaSeparated { .. }));
         if let CssValue::CommaSeparated { values, .. } = value {
-            // Empty values should be skipped
-            assert_eq!(values.len(), 2);
+            assert_eq!(values.len(), 3);
+            assert!(
+                matches!(values[1], CssValue::Identifier { span } if span.start == span.end),
+                "the middle element is the empty sentinel"
+            );
         }
+
+        // A *closing* comma produces no further group (the algorithm stops once the
+        // input is empty), so `a,` is the one-element list `[a]`.
+        let trailing = ValueParser::new("a,", Span { start: 0, end: 2 }).parse(&arena);
+        let CssValue::CommaSeparated { values, .. } = trailing else {
+            panic!("expected a comma list");
+        };
+        assert_eq!(values.len(), 1);
     }
 
     #[test]

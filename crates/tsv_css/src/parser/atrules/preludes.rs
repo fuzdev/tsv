@@ -803,15 +803,25 @@ pub(super) fn parse_import_prelude<'arena>(
             });
             parser.advance()?;
             parser.skip_whitespace_registering_comments()?;
-        } else if parser.check(TokenKind::Identifier) || parser.check(TokenKind::LeftParen) {
+        } else if parser.check(TokenKind::Identifier)
+            || parser.check(TokenKind::LeftParen)
+            || parser.check(TokenKind::Comma)
+        {
             // Media-query-list — the last prelude component (css-cascade-5
             // §import-conditions). Consume the rest verbatim to `;`/EOF, preserving
             // original whitespace; the text is recovered from `span` at print time.
             // A query may lead with a media type (`screen and (…)`, an identifier) OR a
             // bare `<media-condition>` (`(max-width: 40px)`, `(width < 100px)`, a `(`) —
             // Media Queries 4 §media-query makes a lone `<media-condition>` a valid query,
-            // so both starts are accepted. Any other leading token (e.g. a stray `)`) is
-            // not a media-query start and falls through to the reject below.
+            // so both starts are accepted. A leading `,` starts the list too: mediaqueries-4
+            // §Syntax parses a `<media-query-list>` by parsing "a comma-separated list of
+            // component values, then parsing each entry as a `<media-query>`", so an entry
+            // that matches no `<media-query>` — an empty one included — is a grammar
+            // mismatch that §"Error Handling" replaces with `not all`, never a parse error.
+            // Rejecting it here made the structured `@import` reader stricter than the raw
+            // `@media` one on the identical list (and stricter than `parseCss`, which keeps
+            // the whole prelude raw). Any other leading token (e.g. a stray `)`) is not a
+            // media-query start and falls through to the reject below.
             let media_local_start = parser.current_start;
             let media_start = parser.span_pos(media_local_start);
             let mut media_local_end = parser.current_end;
