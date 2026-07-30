@@ -55,6 +55,9 @@ impl<'a> Printer<'a> {
             CssValue::Function { name, args, span } => {
                 self.build_value_function_doc(name, args, *span)
             }
+            CssValue::SupportsCondition {
+                name, condition, ..
+            } => self.build_supports_condition_doc(name, condition),
             CssValue::List { values, .. } => self.build_separated_values_doc(values, " "),
             CssValue::CommaSeparated { values, .. } => {
                 self.build_separated_values_doc(values, ", ")
@@ -231,13 +234,14 @@ impl<'a> Printer<'a> {
         span: Span,
     ) -> DocId {
         let d = self.d();
-        // For functions with no parsed args (like supports()), extract from source
+        // Functions with no parsed args extract from source.
         if args.is_empty() && span.end_usize() <= self.source.len() {
             let raw = span.extract(self.source);
             // An unparsed `url(...)` reaches here when the prelude path leaves its opaque
             // content unparsed (e.g. `@import url(a.css)`). Trim only the whitespace inside
             // the parens to match prettier, exactly like the parsed-args url path below.
-            // Other empty-args functions (`supports(...)`) stay verbatim.
+            // Any other empty-args function is one whose grammar tsv doesn't read
+            // (`scope((.a) to (.b))`), so it stays verbatim.
             if name.eq_ignore_ascii_case("url")
                 && let Some(trimmed) = crate::url::trim_url_raw(raw)
             {

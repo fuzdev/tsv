@@ -46,6 +46,21 @@ fn parse_selector_argument<'arena>(
     Ok(None)
 }
 
+/// Must a spacing rule emit its own separator before the current token, or does the
+/// part buffer already end in one?
+///
+/// The two rules that pad a token — the boolean operator's space and the comment's —
+/// both ask this, so they can never stack into a double space with each other or with
+/// the rules that ran before them (a source whitespace run, the space after a value
+/// `:`, the space after a comment). `trailing_spaces` is the buffer's count of
+/// *programmatic* trailing spaces, so it answers that directly; the one separated
+/// position it can't see is an opening paren, which wants no separator at all
+/// (`(not (…))` and `(/* c */ a: b)` keep the paren tight, matching prettier). `None`
+/// is the part's first token, which is always that `(`.
+fn needs_separator_before(prev: Option<TokenKind>, trailing_spaces: usize) -> bool {
+    trailing_spaces == 0 && !matches!(prev, None | Some(TokenKind::LeftParen))
+}
+
 /// Can a boolean operator (`and`/`or`/`not`) begin at this point in a condition?
 ///
 /// Only where the grammar can start one: at the beginning of a condition, or
@@ -134,295 +149,21 @@ pub(super) fn parse_condition_query<'arena>(
             }
         }
 
-        // Parse a condition part (may start with `not`, then parenthesized content)
-        let part_start = parser.span_pos(parser.current_start);
-        // One growable buffer instead of a `Vec<String>` of per-token / per-space pieces
-        // joined at the end (mirrors `parse_raw_prelude_content` and
-        // `parse_declaration`): tokens `push_str` straight in, separators are a single
-        // `push(' ')`. `trailing_spaces` counts the trailing programmatic spaces (the
-        // collapse unit) so `truncate` strips exactly those, never a token's own
-        // escape-terminator space — the old `Vec` "last part is `\" \"`" test, exactly.
-        let mut part_buf = String::new();
-        // The part's content. Everything lands in `part_buf` and flushes to one `Text`
-        // segment, except a `selector()` argument, which is parsed as a selector and
-        // rides its own segment for the printer to hand to the selector printer.
-        let mut segments = parser.bvec();
-        let mut trailing_spaces: usize = 0;
-        let mut paren_depth: usize = 0;
-        // `Some(depth)` while inside a `selector()` argument the selector parse
-        // declined — a `<general-enclosed>`, where the declaration rules below (the
-        // value colon's spacing, boolean operators) must not fire.
-        let mut general_enclosed_selector: Option<usize> = None;
-
-        // Check for leading `not` (ASCII case-insensitive). Its source case is kept
-        // (pushed verbatim), preserved by the printer like the `and`/`or` connectors.
-        if parser.check(TokenKind::Identifier) {
-            let ident = parser.current_identifier();
-            if ident.eq_ignore_ascii_case("not") {
-                part_buf.push_str(parser.current_value());
-                trailing_spaces = 0;
-                parser.advance()?;
-                parser.skip_whitespace()?;
-                // Include comments after `not` in content (e.g., `not /* comment */ (...)`)
-                // These go in the part buffer rather than being registered, since they're
-                // inside the condition part's span
-                while parser.check(TokenKind::Comment) {
-                    part_buf.push(' ');
-                    part_buf.push_str(parser.current_value());
-                    trailing_spaces = 0;
-                    end_pos = parser.base_offset() + parser.current_end;
-                    parser.advance()?;
-                    parser.skip_whitespace()?;
-                }
-                part_buf.push(' ');
-                trailing_spaces += 1;
-            }
-        }
-
-        // Check for function-style condition like `selector(:has(...))`: an
-        // identifier directly followed by `(`. The name is serialized verbatim from
-        // source (escapes preserved) — only `and`/`or`/`not` keyword matches decode.
-        let mut at_selector_args = false;
-        if parser.check(TokenKind::Identifier)
-            && parser.source.get(parser.current_end..=parser.current_end) == Some("(")
-        {
-            at_selector_args = at_selector_function(parser);
-            part_buf.push_str(parser.current_value());
-            trailing_spaces = 0;
-            parser.advance()?;
-            // Continue to parse the parenthesized part below
-        }
-
-        // Now parse the parenthesized condition
-        if !parser.check(TokenKind::LeftParen) {
-            // Not a valid @supports part - break out
-            break;
-        }
-
-        // Parse until we close all parens and hit whitespace/and/or/brace
-        // Track state for whitespace normalization
-        let mut prev_token_kind: Option<TokenKind> = None;
-        // The previous token that can decide a spacing rule — whitespace and comments
-        // are transparent to both readers (the value colon's space, and whether an
-        // `and`/`or`/`not` sits where the grammar can start a boolean operator).
-        let mut last_significant_kind: Option<TokenKind> = None;
-
-        while !parser.check(TokenKind::Eof) {
-            let opening_selector_args = at_selector_args;
-            at_selector_args = false;
-
-            // A `selector()` argument is a selector, not a declaration: parse it as
-            // one so the printer can hand it to the selector printer, and the
-            // declaration rules below never see its tokens. An argument that declines
-            // to parse is a `<general-enclosed>` and falls through to the loop, which
-            // consumes it as opaque text.
-            if opening_selector_args && parser.check(TokenKind::LeftParen) {
-                part_buf.push('(');
-                trailing_spaces = 0;
-                parser.advance()?; // consume '('
-                let arg_start = parser.current_start;
-                let comments_len = parser.comments.len();
-                if let Some(selectors) = parse_selector_argument(parser, arg_start, comments_len)? {
-                    if !part_buf.is_empty() {
-                        segments.push(ConditionSegment::Text(parser.alloc_str_in(&part_buf)));
-                        part_buf.clear();
-                    }
-                    segments.push(ConditionSegment::Selectors(selectors));
-                    // Seated on the closing `)`; the `(` it matches was consumed above,
-                    // so the two cancel and `paren_depth` never saw either.
-                    part_buf.push(')');
-                    end_pos = parser.base_offset() + parser.current_end;
-                    parser.advance()?;
-                    prev_token_kind = Some(TokenKind::RightParen);
-                    last_significant_kind = Some(TokenKind::RightParen);
-                    if paren_depth == 0 {
-                        break;
-                    }
-                    continue;
-                }
-                // Rewound to the argument's first token: the `(` stays consumed, so
-                // account for it and mark the region the declaration rules skip.
-                paren_depth += 1;
-                general_enclosed_selector.get_or_insert(paren_depth);
-                prev_token_kind = Some(TokenKind::LeftParen);
-                last_significant_kind = Some(TokenKind::LeftParen);
-                continue;
-            }
-
-            // Track paren depth
-            if parser.check(TokenKind::LeftParen) {
-                paren_depth += 1;
-            } else if parser.check(TokenKind::RightParen) {
-                if paren_depth == 0 {
-                    break;
-                }
-                paren_depth -= 1;
-                if general_enclosed_selector == Some(paren_depth + 1) {
-                    general_enclosed_selector = None;
+        match parse_condition_part(
+            parser,
+            current_connector.take(),
+            current_connector_raw.take(),
+            end_pos,
+        )? {
+            ConditionPartOutcome::Parsed { part, end, .. } => {
+                end_pos = end;
+                if let Some(part) = part {
+                    parts.push(part);
                 }
             }
-
-            // Check for end of part (at top level)
-            if paren_depth == 0 && parser.check(TokenKind::RightParen) {
-                // Include the closing paren (loop ends here, so no counter reset needed)
-                part_buf.push(')');
-                end_pos = parser.base_offset() + parser.current_end;
-                parser.advance()?;
-                break;
-            }
-
-            // Handle whitespace normalization
-            if parser.check(TokenKind::Whitespace) {
-                // A whitespace run right after a value colon (`(a: )`, empty value) is
-                // the prettier-mandated single space after `:` — keep it before `)`
-                // rather than dropping it, or `(a: )` would collapse to `(a:)` while
-                // `(a:)` gains the space (the colon-space rule below), an F1 oscillation.
-                // In `@supports`/`@container` a `:` is always a value colon.
-                let after_value_colon = matches!(prev_token_kind, Some(TokenKind::Colon));
-                let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
-                    || (matches!(parser.peek_kind(), Ok(TokenKind::RightParen))
-                        && !after_value_colon);
-
-                parser.advance()?;
-
-                if skip_whitespace {
-                    continue;
-                }
-                part_buf.push(' ');
-                trailing_spaces += 1;
-                prev_token_kind = Some(TokenKind::Whitespace);
-                continue;
-            }
-
-            // Add space after comment if followed by non-whitespace
-            // (Comments need space before the next token)
-            let is_comment = matches!(parser.current_kind, TokenKind::Comment);
-
-            // Check if this is a boolean operator (and/or/not) inside nested parens.
-            // Match on the decoded value, not the verbatim source slice, so an escaped
-            // operator still spaces correctly — and only where the grammar can start
-            // one, so an identifier that merely spells `and` keeps its own spacing.
-            let is_bool_op = matches!(&parser.current_kind, TokenKind::Identifier)
-                && is_boolean_operator_keyword(parser.current_identifier())
-                && boolean_operator_position(
-                    last_significant_kind,
-                    general_enclosed_selector.is_some(),
-                );
-
-            // The next token opens a `selector()` argument, handled at the top of the
-            // loop once its `(` is current.
-            at_selector_args = at_selector_function(parser);
-
-            // Add space before boolean operators if not preceded by whitespace — but
-            // not right after an opening paren (`(not (…))` keeps the paren tight,
-            // matching prettier; the space would otherwise stack to `( not …`).
-            if is_bool_op
-                && !matches!(
-                    prev_token_kind,
-                    Some(TokenKind::Whitespace | TokenKind::LeftParen)
-                )
-            {
-                part_buf.push(' ');
-                trailing_spaces += 1;
-            }
-
-            // Remove trailing whitespace before a value ':' — only the counted
-            // programmatic spaces, never a token's own escape-terminator space. (The
-            // counter is reset by the token emission just below, which always runs
-            // next.) Inside a `<general-enclosed>` `selector()` argument the colon
-            // opens a pseudo-class instead, where a preceding space is a descendant
-            // combinator: `selector(div :hover)` is not `selector(div:hover)`.
-            if matches!(parser.current_kind, TokenKind::Colon)
-                && general_enclosed_selector.is_none()
-            {
-                part_buf.truncate(part_buf.len() - trailing_spaces);
-            }
-
-            // Emit the token verbatim from source: identifiers serialize their raw slice so
-            // escapes survive (`\@foo` stays `\@foo`), a string keeps its surrounding quotes,
-            // and a comment is included verbatim.
-            match &parser.current_kind {
-                TokenKind::String { quote } => {
-                    let content =
-                        &parser.source()[parser.current_start + 1..parser.current_end - 1];
-                    part_buf.push(*quote);
-                    part_buf.push_str(content);
-                    part_buf.push(*quote);
-                }
-                _ => part_buf.push_str(parser.current_value()),
-            }
-            trailing_spaces = 0;
-            let current_kind = parser.current_kind;
-            end_pos = parser.base_offset() + parser.current_end;
-            parser.advance()?;
-
-            // Add space after boolean operators
-            if is_bool_op && !parser.check(TokenKind::Whitespace) {
-                part_buf.push(' ');
-                trailing_spaces += 1;
-            }
-
-            // Add space after comment if followed by non-whitespace
-            // (e.g., `/* comment */ grid` needs space before `grid`)
-            if is_comment
-                && !parser.check(TokenKind::Whitespace)
-                && !parser.check(TokenKind::RightParen)
-            {
-                part_buf.push(' ');
-                trailing_spaces += 1;
-            }
-
-            // Add space after ':' for property:value pairs — a value colon only. The
-            // colon of a pseudo-class inside a `<general-enclosed>` argument binds the
-            // name to it (`selector(div:hover)`), and spacing it makes a selector that
-            // no longer parses.
-            if !parser.check(TokenKind::Whitespace)
-                && matches!(current_kind, TokenKind::Colon)
-                && general_enclosed_selector.is_none()
-                && matches!(
-                    last_significant_kind,
-                    Some(TokenKind::Identifier)
-                        | Some(TokenKind::Number)
-                        | Some(TokenKind::Dimension { .. })
-                        | Some(TokenKind::Percentage)
-                )
-            {
-                part_buf.push(' ');
-                trailing_spaces += 1;
-            }
-
-            prev_token_kind = Some(current_kind);
-            if !matches!(current_kind, TokenKind::Whitespace | TokenKind::Comment) {
-                last_significant_kind = Some(current_kind);
-            }
-        }
-
-        // Build the part. The buffer's outer whitespace is trimmed the way the whole
-        // content used to be: only the first and last segments can carry any, and both
-        // are `Text` whenever a selector segment is present — the function name opens
-        // the part and its `)` closes it.
-        if !part_buf.is_empty() {
-            segments.push(ConditionSegment::Text(parser.alloc_str_in(&part_buf)));
-        }
-        if let Some(ConditionSegment::Text(first)) = segments.first_mut() {
-            *first = first.trim_start();
-        }
-        if let Some(ConditionSegment::Text(last)) = segments.last_mut() {
-            *last = last.trim_end();
-        }
-        let is_empty = segments
-            .iter()
-            .all(|segment| matches!(segment, ConditionSegment::Text(text) if text.is_empty()));
-        if !is_empty {
-            parts.push(ConditionPart {
-                connector: current_connector.take(),
-                connector_raw: current_connector_raw.take(),
-                segments: segments.into_bump_slice(),
-                span: Span {
-                    start: part_start,
-                    end: end_pos as u32,
-                },
-            });
+            // Not a valid condition part, so the query ends here; the caller reports
+            // whatever follows.
+            ConditionPartOutcome::NotAPart => break,
         }
     }
 
@@ -437,6 +178,380 @@ pub(super) fn parse_condition_query<'arena>(
         },
         span,
     ))
+}
+
+/// What one `parse_condition_part` call produced.
+enum ConditionPartOutcome<'arena> {
+    /// A parsed part — `None` when its content came out empty, which records nothing
+    /// but has still consumed tokens. `end` is the widened end position; `closed` is
+    /// false only when the content ran to end-of-input without the part's own `)`.
+    Parsed {
+        part: Option<ConditionPart<'arena>>,
+        end: usize,
+        closed: bool,
+    },
+    /// The current token can't start a condition part, and nothing was consumed.
+    NotAPart,
+}
+
+/// Parse one condition part — an optional leading `not`, an optional function name,
+/// then the parenthesized content, whose tokens are re-emitted with the spacing the
+/// grammar calls for (the space after a value `:`, the spacing around a boolean
+/// operator), except where the grammar says they are a selector.
+///
+/// `end_pos` is the query's end position so far, widened by the part and handed back
+/// in the outcome.
+fn parse_condition_part<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+    connector: Option<ConditionConnector>,
+    connector_raw: Option<&'arena str>,
+    mut end_pos: usize,
+) -> Result<ConditionPartOutcome<'arena>, ParseError> {
+    let part_start = parser.span_pos(parser.current_start);
+    // One growable buffer instead of a `Vec<String>` of per-token / per-space pieces
+    // joined at the end (mirrors `parse_raw_prelude_content` and
+    // `parse_declaration`): tokens `push_str` straight in, separators are a single
+    // `push(' ')`. `trailing_spaces` counts the trailing programmatic spaces (the
+    // collapse unit) so `truncate` strips exactly those, never a token's own
+    // escape-terminator space — the old `Vec` "last part is `\" \"`" test, exactly.
+    let mut part_buf = String::new();
+    // The part's content. Everything lands in `part_buf` and flushes to one `Text`
+    // segment, except a `selector()` argument, which is parsed as a selector and
+    // rides its own segment for the printer to hand to the selector printer.
+    let mut segments = parser.bvec();
+    let mut trailing_spaces: usize = 0;
+    let mut paren_depth: usize = 0;
+    // `Some(depth)` while inside a `selector()` argument the selector parse
+    // declined — a `<general-enclosed>`, where the declaration rules below (the
+    // value colon's spacing, boolean operators) must not fire.
+    let mut general_enclosed_selector: Option<usize> = None;
+
+    // Check for leading `not` (ASCII case-insensitive). Its source case is kept
+    // (pushed verbatim), preserved by the printer like the `and`/`or` connectors.
+    if parser.check(TokenKind::Identifier) {
+        let ident = parser.current_identifier();
+        if ident.eq_ignore_ascii_case("not") {
+            part_buf.push_str(parser.current_value());
+            trailing_spaces = 0;
+            parser.advance()?;
+            parser.skip_whitespace()?;
+            // Include comments after `not` in content (e.g., `not /* comment */ (...)`)
+            // These go in the part buffer rather than being registered, since they're
+            // inside the condition part's span
+            while parser.check(TokenKind::Comment) {
+                part_buf.push(' ');
+                part_buf.push_str(parser.current_value());
+                trailing_spaces = 0;
+                end_pos = parser.base_offset() + parser.current_end;
+                parser.advance()?;
+                parser.skip_whitespace()?;
+            }
+            part_buf.push(' ');
+            trailing_spaces += 1;
+        }
+    }
+
+    // Check for function-style condition like `selector(:has(...))`: an
+    // identifier directly followed by `(`. The name is serialized verbatim from
+    // source (escapes preserved) — only `and`/`or`/`not` keyword matches decode.
+    let mut at_selector_args = false;
+    if parser.check(TokenKind::Identifier)
+        && parser.source.get(parser.current_end..=parser.current_end) == Some("(")
+    {
+        at_selector_args = at_selector_function(parser);
+        part_buf.push_str(parser.current_value());
+        trailing_spaces = 0;
+        parser.advance()?;
+        // Continue to parse the parenthesized part below
+    }
+
+    // Now parse the parenthesized condition
+    if !parser.check(TokenKind::LeftParen) {
+        // Not a valid @supports part — nothing consumed, so the query ends here.
+        return Ok(ConditionPartOutcome::NotAPart);
+    }
+
+    // Whether the part's own closing `)` was reached. False means the content ran
+    // to end-of-input unterminated, which only the `supports()` caller cares about
+    // (a condition prelude is bounded by the `{`/`;` its at-rule needs anyway).
+    let mut closed = false;
+
+    // Parse until we close all parens and hit whitespace/and/or/brace
+    // Track state for whitespace normalization
+    let mut prev_token_kind: Option<TokenKind> = None;
+    // The previous token that can decide a spacing rule — whitespace and comments
+    // are transparent to both readers (the value colon's space, and whether an
+    // `and`/`or`/`not` sits where the grammar can start a boolean operator).
+    let mut last_significant_kind: Option<TokenKind> = None;
+
+    while !parser.check(TokenKind::Eof) {
+        let opening_selector_args = at_selector_args;
+        at_selector_args = false;
+
+        // A `selector()` argument is a selector, not a declaration: parse it as
+        // one so the printer can hand it to the selector printer, and the
+        // declaration rules below never see its tokens. An argument that declines
+        // to parse is a `<general-enclosed>` and falls through to the loop, which
+        // consumes it as opaque text.
+        if opening_selector_args && parser.check(TokenKind::LeftParen) {
+            part_buf.push('(');
+            trailing_spaces = 0;
+            parser.advance()?; // consume '('
+            let arg_start = parser.current_start;
+            let comments_len = parser.comments.len();
+            if let Some(selectors) = parse_selector_argument(parser, arg_start, comments_len)? {
+                if !part_buf.is_empty() {
+                    segments.push(ConditionSegment::Text(parser.alloc_str_in(&part_buf)));
+                    part_buf.clear();
+                }
+                segments.push(ConditionSegment::Selectors(selectors));
+                // Seated on the closing `)`; the `(` it matches was consumed above,
+                // so the two cancel and `paren_depth` never saw either.
+                part_buf.push(')');
+                end_pos = parser.base_offset() + parser.current_end;
+                parser.advance()?;
+                prev_token_kind = Some(TokenKind::RightParen);
+                last_significant_kind = Some(TokenKind::RightParen);
+                if paren_depth == 0 {
+                    // The part *was* the `selector()` call, and its `)` just closed
+                    // it (`@supports selector(a)`, no wrapping paren).
+                    closed = true;
+                    break;
+                }
+                continue;
+            }
+            // Rewound to the argument's first token: the `(` stays consumed, so
+            // account for it and mark the region the declaration rules skip.
+            paren_depth += 1;
+            general_enclosed_selector.get_or_insert(paren_depth);
+            prev_token_kind = Some(TokenKind::LeftParen);
+            last_significant_kind = Some(TokenKind::LeftParen);
+            continue;
+        }
+
+        // Track paren depth
+        if parser.check(TokenKind::LeftParen) {
+            paren_depth += 1;
+        } else if parser.check(TokenKind::RightParen) {
+            if paren_depth == 0 {
+                break;
+            }
+            paren_depth -= 1;
+            if general_enclosed_selector == Some(paren_depth + 1) {
+                general_enclosed_selector = None;
+            }
+        }
+
+        // Check for end of part (at top level)
+        if paren_depth == 0 && parser.check(TokenKind::RightParen) {
+            // Include the closing paren (loop ends here, so no counter reset needed)
+            part_buf.push(')');
+            end_pos = parser.base_offset() + parser.current_end;
+            parser.advance()?;
+            closed = true;
+            break;
+        }
+
+        // Handle whitespace normalization
+        if parser.check(TokenKind::Whitespace) {
+            // A whitespace run right after a value colon (`(a: )`, empty value) is
+            // the prettier-mandated single space after `:` — keep it before `)`
+            // rather than dropping it, or `(a: )` would collapse to `(a:)` while
+            // `(a:)` gains the space (the colon-space rule below), an F1 oscillation.
+            // In `@supports`/`@container` a `:` is always a value colon.
+            let after_value_colon = matches!(prev_token_kind, Some(TokenKind::Colon));
+            let skip_whitespace = matches!(prev_token_kind, Some(TokenKind::LeftParen))
+                || (matches!(parser.peek_kind(), Ok(TokenKind::RightParen)) && !after_value_colon);
+
+            parser.advance()?;
+
+            if skip_whitespace {
+                continue;
+            }
+            part_buf.push(' ');
+            trailing_spaces += 1;
+            prev_token_kind = Some(TokenKind::Whitespace);
+            continue;
+        }
+
+        let is_comment = matches!(parser.current_kind, TokenKind::Comment);
+
+        // Check if this is a boolean operator (and/or/not) inside nested parens.
+        // Match on the decoded value, not the verbatim source slice, so an escaped
+        // operator still spaces correctly — and only where the grammar can start
+        // one, so an identifier that merely spells `and` keeps its own spacing.
+        let is_bool_op = matches!(&parser.current_kind, TokenKind::Identifier)
+            && is_boolean_operator_keyword(parser.current_identifier())
+            && boolean_operator_position(
+                last_significant_kind,
+                general_enclosed_selector.is_some(),
+            );
+
+        // The next token opens a `selector()` argument, handled at the top of the
+        // loop once its `(` is current.
+        at_selector_args = at_selector_function(parser);
+
+        // Two token kinds carry their own leading separator: a boolean operator, and a
+        // comment (padded on **both** sides — the after side is handled once the token
+        // is emitted, below; emitting only one leaves `(display: grid/* c */)`
+        // half-spaced). They ask for it in ONE place, because two emission sites each
+        // seeing only its own reason to pad is exactly how the doubled `/* c */  and`
+        // arose. The comment's bound: inside a `<general-enclosed>` `selector()`
+        // argument the tokens are opaque by grammar, so it is bounded like the value
+        // colon's rule below — a space inserted inside a compound would turn
+        // `selector([a=1.5]/* c */.b)` into a descendant `[a=1.5] .b`. The operator's
+        // matching bound rides inside `is_bool_op`, which its after-space reads too.
+        let pads_before = is_bool_op || (is_comment && general_enclosed_selector.is_none());
+        if pads_before && needs_separator_before(prev_token_kind, trailing_spaces) {
+            part_buf.push(' ');
+            trailing_spaces += 1;
+        }
+
+        // Remove trailing whitespace before a value ':' — only the counted
+        // programmatic spaces, never a token's own escape-terminator space. (The
+        // counter is reset by the token emission just below, which always runs
+        // next.) Inside a `<general-enclosed>` `selector()` argument the colon
+        // opens a pseudo-class instead, where a preceding space is a descendant
+        // combinator: `selector(div :hover)` is not `selector(div:hover)`.
+        if matches!(parser.current_kind, TokenKind::Colon) && general_enclosed_selector.is_none() {
+            part_buf.truncate(part_buf.len() - trailing_spaces);
+        }
+
+        // Emit the token verbatim from source: identifiers serialize their raw slice so
+        // escapes survive (`\@foo` stays `\@foo`), a string keeps its surrounding quotes,
+        // and a comment is included verbatim.
+        match &parser.current_kind {
+            TokenKind::String { quote } => {
+                let content = &parser.source()[parser.current_start + 1..parser.current_end - 1];
+                part_buf.push(*quote);
+                part_buf.push_str(content);
+                part_buf.push(*quote);
+            }
+            _ => part_buf.push_str(parser.current_value()),
+        }
+        trailing_spaces = 0;
+        let current_kind = parser.current_kind;
+        end_pos = parser.base_offset() + parser.current_end;
+        parser.advance()?;
+
+        // Add space after boolean operators
+        if is_bool_op && !parser.check(TokenKind::Whitespace) {
+            part_buf.push(' ');
+            trailing_spaces += 1;
+        }
+
+        // Add space after comment if followed by non-whitespace
+        // (e.g., `/* comment */ grid` needs space before `grid`)
+        if is_comment
+            && !parser.check(TokenKind::Whitespace)
+            && !parser.check(TokenKind::RightParen)
+        {
+            part_buf.push(' ');
+            trailing_spaces += 1;
+        }
+
+        // Add space after ':' for property:value pairs — a value colon only. The
+        // colon of a pseudo-class inside a `<general-enclosed>` argument binds the
+        // name to it (`selector(div:hover)`), and spacing it makes a selector that
+        // no longer parses.
+        if !parser.check(TokenKind::Whitespace)
+            && matches!(current_kind, TokenKind::Colon)
+            && general_enclosed_selector.is_none()
+            && matches!(
+                last_significant_kind,
+                Some(TokenKind::Identifier)
+                    | Some(TokenKind::Number)
+                    | Some(TokenKind::Dimension { .. })
+                    | Some(TokenKind::Percentage)
+            )
+        {
+            part_buf.push(' ');
+            trailing_spaces += 1;
+        }
+
+        prev_token_kind = Some(current_kind);
+        if !matches!(current_kind, TokenKind::Whitespace | TokenKind::Comment) {
+            last_significant_kind = Some(current_kind);
+        }
+    }
+
+    // Build the part. The buffer's outer whitespace is trimmed the way the whole
+    // content used to be: only the first and last segments can carry any, and both
+    // are `Text` whenever a selector segment is present — the function name opens
+    // the part and its `)` closes it.
+    if !part_buf.is_empty() {
+        segments.push(ConditionSegment::Text(parser.alloc_str_in(&part_buf)));
+    }
+    if let Some(ConditionSegment::Text(first)) = segments.first_mut() {
+        *first = first.trim_start();
+    }
+    if let Some(ConditionSegment::Text(last)) = segments.last_mut() {
+        *last = last.trim_end();
+    }
+    let is_empty = segments
+        .iter()
+        .all(|segment| matches!(segment, ConditionSegment::Text(text) if text.is_empty()));
+    let part = (!is_empty).then(|| ConditionPart {
+        connector,
+        connector_raw,
+        segments: segments.into_bump_slice(),
+        span: Span {
+            start: part_start,
+            end: end_pos as u32,
+        },
+    });
+
+    Ok(ConditionPartOutcome::Parsed {
+        part,
+        end: end_pos,
+        closed,
+    })
+}
+
+/// Parse the argument of an `@import` prelude's `supports()` as the condition it is,
+/// with the parser seated on the function's `(`.
+///
+/// `supports( <supports-condition> | <declaration> )` (css-cascade-5 §"Conditional
+/// import rules") is the same grammar `@supports` takes, so the argument is read by
+/// the same reader and printed by the same printer — one condition, one form,
+/// wherever it appears. Seating on the `(` rather than past it is what makes that
+/// work: **the function's own parentheses are the condition part's**, so the bare
+/// `<declaration>` alternative (`supports(display: grid)`) reuses the
+/// parenthesized-part grammar unchanged instead of needing a second reader.
+///
+/// Exactly one part can come of that (the parens wrap the whole argument), so this
+/// never runs the query loop — which is also what bounds it to the function:
+/// whatever follows the `)` is the caller's (`supports(a) screen`).
+///
+/// Returns with the parser just past the matching `)`, or `None` when the argument is
+/// not a parenthesized part or never closed — the caller reports the unterminated
+/// function.
+pub(super) fn parse_supports_function_condition<'arena>(
+    parser: &mut CssParser<'_, 'arena>,
+) -> Result<Option<(ConditionQuery<'arena>, Span)>, ParseError> {
+    let start = parser.base_offset() + parser.current_start;
+    let ConditionPartOutcome::Parsed {
+        part,
+        end,
+        closed: true,
+    } = parse_condition_part(parser, None, None, start)?
+    else {
+        return Ok(None);
+    };
+
+    let mut parts = parser.bvec();
+    if let Some(part) = part {
+        parts.push(part);
+    }
+    Ok(Some((
+        ConditionQuery {
+            parts: parts.into_bump_slice(),
+        },
+        Span {
+            start: start as u32,
+            end: end as u32,
+        },
+    )))
 }
 
 /// Parse @container prelude into structured condition parts with optional name
@@ -774,7 +889,12 @@ fn parse_function_value<'arena>(
 ) -> Result<CssValue<'arena>, ParseError> {
     let value_start = parser.span_pos(parser.current_start);
 
-    // Get function name (current token should be identifier)
+    // Get function name (current token should be identifier). Kept verbatim from
+    // source so the author's case survives to output; every *recognition* test below
+    // is ASCII case-insensitive instead ("like keywords, function names are ASCII
+    // case-insensitive" — css-values-4 §"Functional Notations"), so `SUPPORTS(a:b)`
+    // and `LAYER( a )` normalize like their lowercase spellings rather than falling
+    // through to the opaque unknown-function path.
     let name = if parser.check(TokenKind::Identifier) {
         parser.current_identifier_in_arena()
     } else {
@@ -788,12 +908,29 @@ fn parse_function_value<'arena>(
         return Err(parser.error_expected_after("'('", "function name"));
     }
 
+    // `supports()` is read *before* the `(` is consumed: that paren is the condition
+    // part's own opening paren (see `parse_supports_function_condition`), which is what
+    // lets the bare `<declaration>` alternative reuse the parenthesized-part grammar.
+    if name.eq_ignore_ascii_case("supports") {
+        let Some((condition, condition_span)) = parse_supports_function_condition(parser)? else {
+            return Err(parser.error_expected("')' to close function"));
+        };
+        return Ok(CssValue::SupportsCondition {
+            name,
+            condition,
+            span: Span {
+                start: value_start,
+                end: condition_span.end,
+            },
+        });
+    }
+
     parser.advance()?; // consume '('
 
     // For @import functions (url, layer, supports), parse arguments based on function type
     let mut args = parser.bvec();
 
-    if name == "url" {
+    if name.eq_ignore_ascii_case("url") {
         // url() - parse the URL argument (string or bare URL)
         parser.skip_whitespace()?;
         if let TokenKind::String { .. } = &parser.current_kind {
@@ -818,7 +955,7 @@ fn parse_function_value<'arena>(
                 parser.advance()?;
             }
         }
-    } else if name == "layer" {
+    } else if name.eq_ignore_ascii_case("layer") {
         // layer(name) - parse the layer name as identifier
         parser.skip_whitespace()?;
         if parser.check(TokenKind::Identifier) {
@@ -834,56 +971,13 @@ fn parse_function_value<'arena>(
             parser.advance()?;
         }
         parser.skip_whitespace()?;
-    } else if name == "supports" {
-        // supports(condition) - normalize whitespace like @supports at-rule prelude
-        // This ensures `supports(  display:  grid  )` → `supports(display: grid)`
-        parser.skip_whitespace()?;
-
-        // The condition text is recovered verbatim from `span` at print time (see the
-        // printer), so only its span and whether it holds any content matter here — there
-        // is no normalized string to build. `condition_end` tracks the last non-whitespace
-        // token, so leading/trailing whitespace is trimmed from the span. Track paren depth
-        // so a nested `(…)`/`fn(…)` inside the condition doesn't end the arg at its first
-        // inner `)` — the grammar is `supports( <supports-condition> | <declaration> )`
-        // (css-cascade-4/5 §import-conditions), so `supports((display: grid))`,
-        // `supports(not (a: b))`, and `supports(selector(a > b))` are all valid; only the
-        // matching depth-0 `)` (the `supports(` close) ends the arg.
-        let condition_start = parser.span_pos(parser.current_start);
-        let mut condition_end = condition_start;
-        let mut has_content = false;
-        let mut depth: u32 = 0;
-
-        while !parser.check(TokenKind::Eof) {
-            match parser.current_kind {
-                TokenKind::RightParen if depth == 0 => break,
-                TokenKind::LeftParen => depth += 1,
-                TokenKind::RightParen => depth -= 1,
-                _ => {}
-            }
-            if !parser.check(TokenKind::Whitespace) {
-                has_content = true;
-                condition_end = parser.span_pos(parser.current_end);
-            }
-            parser.advance()?;
-        }
-
-        if has_content {
-            args.push(CssValue::Identifier {
-                span: Span {
-                    start: condition_start,
-                    end: condition_end,
-                },
-            });
-        }
-
-        parser.skip_whitespace()?;
     } else {
         // Other unknown functions (e.g. `scope((.a) to (.b))`, css-cascade-6 scoped
         // `@import`) — consume the args opaquely to the MATCHING `)`. Per CSS Syntax 3
         // §consume-a-function the contents are a component-value list, so a nested
-        // `(…)`/`fn(…)` must not end the arg at its first inner `)`; track paren depth
-        // like the `supports` branch above. Args stay empty — the printer and public-AST
-        // conversion reconstruct the function verbatim from its span.
+        // `(…)`/`fn(…)` must not end the arg at its first inner `)`; track paren depth.
+        // Args stay empty — the printer and public-AST conversion reconstruct the
+        // function verbatim from its span.
         let mut depth: u32 = 0;
         while !parser.check(TokenKind::Eof) {
             match parser.current_kind {

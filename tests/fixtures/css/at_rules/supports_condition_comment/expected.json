@@ -1,0 +1,392 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 796,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 70,
+				"end": 135,
+				"name": "supports",
+				"prelude": "(display: grid )",
+				"block": {
+					"type": "Block",
+					"start": 104,
+					"end": 135,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 108,
+								"end": 111,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 108,
+										"end": 111,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 108,
+														"end": 111
+													}
+												],
+												"start": 108,
+												"end": 111
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 112,
+								"end": 132,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 117,
+										"end": 127,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 108,
+							"end": 132
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 215,
+				"end": 275,
+				"name": "supports",
+				"prelude": "(gap : 1px)",
+				"block": {
+					"type": "Block",
+					"start": 244,
+					"end": 275,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 248,
+								"end": 251,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 248,
+										"end": 251,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 248,
+														"end": 251
+													}
+												],
+												"start": 248,
+												"end": 251
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 252,
+								"end": 272,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 257,
+										"end": 267,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 248,
+							"end": 272
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 323,
+				"end": 394,
+				"name": "supports",
+				"prelude": "(not (display: grid) )",
+				"block": {
+					"type": "Block",
+					"start": 363,
+					"end": 394,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 367,
+								"end": 370,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 367,
+										"end": 370,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 367,
+														"end": 370
+													}
+												],
+												"start": 367,
+												"end": 370
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 371,
+								"end": 391,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 376,
+										"end": 386,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 367,
+							"end": 391
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 449,
+				"end": 531,
+				"name": "supports",
+				"prelude": "((display: grid)  and (gap: 1px))",
+				"block": {
+					"type": "Block",
+					"start": 500,
+					"end": 531,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 504,
+								"end": 507,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 504,
+										"end": 507,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 504,
+														"end": 507
+													}
+												],
+												"start": 504,
+												"end": 507
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 508,
+								"end": 528,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 513,
+										"end": 523,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 504,
+							"end": 528
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 586,
+				"end": 676,
+				"name": "supports",
+				"prelude": "((display: grid)   and (gap: 1px))",
+				"block": {
+					"type": "Block",
+					"start": 645,
+					"end": 676,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 649,
+								"end": 652,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 649,
+										"end": 652,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 649,
+														"end": 652
+													}
+												],
+												"start": 649,
+												"end": 652
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 653,
+								"end": 673,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 658,
+										"end": 668,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 649,
+							"end": 673
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 727,
+				"end": 787,
+				"name": "supports",
+				"prelude": "(foo(a  b))",
+				"block": {
+					"type": "Block",
+					"start": 756,
+					"end": 787,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 760,
+								"end": 763,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 760,
+										"end": 763,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 760,
+														"end": 763
+													}
+												],
+												"start": 760,
+												"end": 763
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 764,
+								"end": 784,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 769,
+										"end": 779,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 760,
+							"end": 784
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 788,
+			"styles": "\n\t/* A comment glued to a value takes a space on each side */\n\t@supports (display: grid /* c */) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* The space after `:` is decided by the property name, past the comment */\n\t@supports (gap /* c */: 1px) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* A comment trailing a nested condition */\n\t@supports (not (display: grid) /* c */) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* One space before a nested connector, not two */\n\t@supports ((display: grid) /* c */ and (gap: 1px)) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* Two comments in the run stay one space apart */\n\t@supports ((display: grid) /* c */ /* d */ and (gap: 1px)) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* The same rule inside a function argument */\n\t@supports (foo(a /* c */ b)) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 797,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -386,8 +386,10 @@ Specs: `css-color-3`, `css-color-4`, `css-color-5` (Level 5 is widely shipped)
 > **Note**: At-rule preludes are parsed at three levels. **Structured**: `@supports` and
 > `@container` (conditions, for line-width wrapping — with a raw fallback when the prelude
 > isn't a valid condition; a `selector()` argument parses one level deeper, as the selector
-> the grammar says it is, and prints through the selector printer), `@import` (url/string + `layer()`/`supports()`/media, falling back
-> to raw when it doesn't lead with a url/string), and `@scope` (forgiving selector lists).
+> the grammar says it is, and prints through the selector printer), `@import` (url/string +
+> `layer()`/`supports()`/media, falling back to raw when it doesn't lead with a url/string —
+> its `supports()` argument is a `<supports-condition>`, read and printed by the `@supports`
+> machinery above), and `@scope` (forgiving selector lists).
 > **Raw text**: `@media` — kept verbatim to preserve comments, with the printer locating
 > `and`/`or` boundaries at print time for wrapping. **Raw text** likewise for everything else
 > (`@keyframes`, `@layer`, `@page`, …), since they have no `property: value` / media-query

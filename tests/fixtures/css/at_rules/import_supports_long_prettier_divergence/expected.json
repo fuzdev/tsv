@@ -1,0 +1,50 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 492,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 54,
+				"end": 152,
+				"name": "import",
+				"prelude": "url('a.css') supports((display: grid) and (gap: 1px) and (x: yyyyyyyyyyyyyyyyyyyyyyyyyy))",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 220,
+				"end": 324,
+				"name": "import",
+				"prelude": "url('a.css') supports(\n\t\t(display: grid) and (gap: 1px) and (x: yyyyyyyyyyyyyyyyyyyyyyyyyyy)\n\t)",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 378,
+				"end": 483,
+				"name": "import",
+				"prelude": "url('a.css') supports(\n\t\t(display: grid) and (gap: 1px) and (x: yyyyyyyyyyyyyyyyyyyyyyyyyyyy)\n\t)",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 484,
+			"styles": "\n\t/* 100 chars - stays inline (both agree) */\n\t@import url('a.css') supports((display: grid) and (gap: 1px) and (x: yyyyyyyyyyyyyyyyyyyyyyyyyy));\n\n\t/* 101 chars - we break the condition, Prettier stays inline */\n\t@import url('a.css') supports(\n\t\t(display: grid) and (gap: 1px) and (x: yyyyyyyyyyyyyyyyyyyyyyyyyyy)\n\t);\n\n\t/* 102 chars - both break, at different points */\n\t@import url('a.css') supports(\n\t\t(display: grid) and (gap: 1px) and (x: yyyyyyyyyyyyyyyyyyyyyyyyyyyy)\n\t);\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 493,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

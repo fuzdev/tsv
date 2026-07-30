@@ -1,0 +1,50 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 196,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 9,
+				"end": 71,
+				"name": "import",
+				"prelude": "url('a.css') supports((display: grid) and (gap: 1px))",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 73,
+				"end": 134,
+				"name": "import",
+				"prelude": "url('b.css') supports((display: grid) or (gap: 1px))",
+				"block": null
+			},
+			{
+				"type": "Atrule",
+				"start": 136,
+				"end": 187,
+				"name": "import",
+				"prelude": "url('c.css') supports(not (display: grid))",
+				"block": null
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 188,
+			"styles": "\n\t@import url('a.css') supports((display: grid) and (gap: 1px));\n\t@import url('b.css') supports((display: grid) or (gap: 1px));\n\t@import url('c.css') supports(not (display: grid));\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 197,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
