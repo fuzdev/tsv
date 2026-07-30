@@ -130,16 +130,6 @@ const ALLOW: &[Allow] = &[
         "comment-marker",
     ),
     (
-        "tsv_css/src/printer/value_normalization/splitting.rs",
-        "let func_start = source.find(func_name)?;",
-        "css-value",
-    ),
-    (
-        "tsv_css/src/printer/value_normalization/splitting.rs",
-        "let open_paren = after_name.find('(')?;",
-        "css-value",
-    ),
-    (
         "tsv_css/src/url.rs",
         "let open = raw.find('(')?;",
         "css-value",

@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 108,
+		"end": 216,
 		"attributes": [],
 		"children": [
 			{
@@ -38,7 +38,7 @@
 				"block": {
 					"type": "Block",
 					"start": 12,
-					"end": 99,
+					"end": 207,
 					"children": [
 						{
 							"type": "Declaration",
@@ -46,23 +46,30 @@
 							"end": 95,
 							"property": "color",
 							"value": "var(--a, ,)"
+						},
+						{
+							"type": "Declaration",
+							"start": 178,
+							"end": 203,
+							"property": "background",
+							"value": "var(--b, x\\,)"
 						}
 					]
 				},
 				"start": 9,
-				"end": 99
+				"end": 207
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 100,
-			"styles": "\n\t.c {\n\t\t/* the fallback is a comma token, not an empty fallback */\n\t\tcolor: var(--a, ,);\n\t}\n",
+			"end": 208,
+			"styles": "\n\t.c {\n\t\t/* the fallback is a comma token, not an empty fallback */\n\t\tcolor: var(--a, ,);\n\t\t/* an escaped comma is content, so this fallback is the single ident `x,` */\n\t\tbackground: var(--b, x\\,);\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 109,
+	"end": 217,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

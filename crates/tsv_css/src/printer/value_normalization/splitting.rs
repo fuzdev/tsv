@@ -369,36 +369,6 @@ fn is_normalize_noop_byte(b: u8) -> bool {
         )
 }
 
-/// Extract the content between a function's parentheses from source
-///
-/// Given source like `property: func_name(arg1, arg2)` and func_name `func_name`,
-/// returns `Some("arg1, arg2")`. Returns `None` if the function can't be found.
-pub(crate) fn extract_function_args<'a>(source: &'a str, func_name: &str) -> Option<&'a str> {
-    let func_start = source.find(func_name)?;
-    let after_name = &source[func_start + func_name.len()..];
-    let open_paren = after_name.find('(')?;
-
-    let inner_start = func_start + func_name.len() + open_paren + 1;
-    let inner_content = &source[inner_start..];
-
-    // Find closing paren (handle nested parens)
-    let mut depth = 1;
-    for (i, c) in inner_content.char_indices() {
-        match c {
-            '(' => depth += 1,
-            ')' => {
-                depth -= 1;
-                if depth == 0 {
-                    return Some(&inner_content[..i]);
-                }
-            }
-            _ => {}
-        }
-    }
-
-    None
-}
-
 /// Split by top-level spaces, preserving content inside parentheses, quotes, and comments
 ///
 /// Used for space-separated values like `var(--b) color-mix(...)`.
@@ -415,6 +385,24 @@ pub(crate) fn split_by_space_preserving_parens(content: &str) -> Vec<&str> {
 /// Skips over quoted strings so commas inside `"a, b"` aren't treated as separators.
 pub(crate) fn split_args_by_comma(content: &str) -> Vec<&str> {
     split_top_level(content, |b| b == b',', false)
+}
+
+/// Did `split_args_by_comma(content)` consume a **closing** comma — one in final position,
+/// which produces no part (see `split_top_level`'s tail)?
+///
+/// Derived from the split rather than from a second scan of the text: the parts are
+/// subslices of `content` separated by exactly one comma byte each, so N parts account for
+/// `sum(len) + N - 1` bytes — one short of `content.len()` exactly when a comma was
+/// consumed without producing a part. Reading it off the split is what makes it agree with
+/// the split by construction, including on the shapes a byte test gets wrong: an *escaped*
+/// comma (`x\,`) never separated anything, so it is inside a part and the count is
+/// unmoved.
+///
+/// `content` must have no trailing whitespace, or the space after the comma becomes a
+/// (whitespace-only) final part and hides it.
+pub(crate) fn has_closing_comma(content: &str, parts: &[&str]) -> bool {
+    let consumed: usize = parts.iter().map(|part| part.len()).sum();
+    !parts.is_empty() && content.len() == consumed + parts.len()
 }
 
 /// Split `content` at top-level bytes matching `is_sep`, preserving content inside
@@ -609,25 +597,6 @@ mod tests {
         // Idempotent: the collapsed form is a fixed point.
         let once = collapse_whitespace_runs(".a  >\n>  .b").into_owned();
         assert_eq!(collapse_whitespace_runs(&once), once);
-    }
-
-    #[test]
-    fn test_extract_function_args() {
-        assert_eq!(
-            extract_function_args("prop: var(--a, red)", "var"),
-            Some("--a, red")
-        );
-        assert_eq!(
-            extract_function_args("prop: var(--a, /* comment */ red)", "var"),
-            Some("--a, /* comment */ red")
-        );
-        // Nested parens
-        assert_eq!(
-            extract_function_args("prop: var(--a, calc(1 + 2))", "var"),
-            Some("--a, calc(1 + 2)")
-        );
-        // Function not found
-        assert_eq!(extract_function_args("prop: red", "var"), None);
     }
 
     #[test]

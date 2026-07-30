@@ -41,34 +41,46 @@ pub(super) fn is_empty_element(value: &CssValue<'_>) -> bool {
     matches!(value, CssValue::Identifier { span } if span.start >= span.end)
 }
 
-/// Must this comma list print a **closing** comma after its last element?
+/// Did the author write a **closing** comma — a separator with nothing after it — at the
+/// end of this comma list?
 ///
-/// Joining N elements with `,` writes N-1 commas, and re-splitting that gets the same N
-/// elements back — unless the last one is empty, because CSS Syntax 3's list algorithm
-/// stops once the input is empty and so produces no group for the stretch after a final
-/// comma. `["a", ""]` joined is `a,`, which re-splits to `["a"]`: an element silently
-/// gone. Its spelling is `a,,`. So a list ending in an empty element writes one more
-/// comma than it has separators, and only then is the printed form a faithful spelling of
-/// the parsed list.
+/// `values` are the list's elements and `list_end` the byte offset the list runs to (a
+/// declaration value's span end, a function's `)`), so the answer is whatever text sits
+/// between the last element and that bound: a comma there terminated no element, and one
+/// must be written back. Every case falls out of the one question:
 ///
-/// Prettier gets this wrong in declaration position — `transition: a,,` prints as `a,` and
-/// then degrades to `a` on the next pass, deleting the element (and turning a dead
-/// declaration live) — so tsv diverges here; it keeps the round-trip instead. Prettier
-/// does keep the comma inside a function (`var(--a, ,)`), where tsv matches it.
+/// - `a,` → elements `[a]`, tail `,` — the source's last comma produced no element (CSS
+///   Syntax 3 §"parse a comma-separated list of component values" stops once the input is
+///   empty), so joining the elements would drop it.
+/// - `a,,` → elements `[a, ""]`, tail `,` — the trailing **empty** element is real, and
+///   joining N elements writes only N-1 commas, so its spelling still needs one more.
+/// - `a, b` → tail empty. `a, b\,` → tail empty too: an escaped comma is content, so it
+///   lives *inside* the last element's span and closes nothing.
 ///
-/// TODO: the rule is one-sided. A *trailing* comma with no empty element behind it is
-/// still deleted (`transition: a,` → `a`, `--x: a,` → `a`, `rgb(1, 2, 3,)` → `rgb(1, 2,
-/// 3)`), because the comma-split parse is unchanged — but that is not the question the
-/// declaration grammar asks. css-values-4 §"Component value combinators" requires a comma
-/// to be omitted when "all items following the comma have been omitted", so `transition:
-/// a,` is invalid and `transition: a` is not: the deletion turns a dead declaration live,
-/// the same class of change this function exists to prevent. A **custom property** has no
-/// grammar to invalidate and so no excuse at all — its value is a verbatim token sequence
-/// (css-variables-1), so `--x: a,` and `--x: a` substitute different tokens. Prettier
-/// agrees with today's behavior, so closing this mints a new `_prettier_divergence`
-/// (fixture first, per the TDD gate) rather than fixing a mismatch.
-pub(super) fn list_needs_closing_comma(values: &[CssValue<'_>]) -> bool {
-    values.last().is_some_and(is_empty_element)
+/// Asking the source rather than the elements is what makes those one rule instead of
+/// two. Reading it off the elements can only see the empty-element case (`values.last()`
+/// empty), which left the plain trailing comma deleted — the parse is unchanged, but that
+/// is not the question a declaration asks. css-values-4 §"Component value combinators"
+/// requires a comma to be omitted when "all items following the comma have been omitted",
+/// so `transition: a,` is invalid where `transition: a` is valid and the deletion turns a
+/// dead declaration live; a **custom property** has no grammar to invalidate at all, and
+/// its verbatim token sequence (css-variables-1) simply loses a token. Prettier deletes it
+/// in every position — see `css/values/lists/comma_closing_prettier_divergence`.
+///
+/// The `<media-query-list>` is the one construct where the deletion *is* correct, because
+/// mediaqueries-4 §Syntax delegates to the split itself; that path has its own reader
+/// (`atrules::media_query_list`) and never comes here.
+pub(super) fn list_has_closing_comma(
+    source: &str,
+    values: &[CssValue<'_>],
+    list_end: usize,
+) -> bool {
+    let Some(last) = values.last() else {
+        return false;
+    };
+    source
+        .get(last.span().end_usize()..list_end)
+        .is_some_and(|tail| crate::escapes::trim_end_preserving_escape(tail).ends_with(','))
 }
 
 impl<'a> Printer<'a> {
@@ -302,14 +314,14 @@ impl<'a> Printer<'a> {
     /// here (the dispatch guard); it stays on the source-extracting comment path.
     fn print_decl_value_list(&mut self, decl: &internal::CssDeclaration<'_>) {
         let doc = match &decl.value {
-            CssValue::CommaSeparated { values, .. } => {
-                let fill = self.build_comma_fill_doc(values);
+            CssValue::CommaSeparated { values, span } => {
+                let fill = self.build_comma_fill_doc(values, span.end_usize());
                 let d = self.d();
                 let body = d.group(d.indent(d.concat(&[d.line(), fill])));
                 d.concat(&[d.text(":"), body])
             }
             CssValue::List { values, .. } => {
-                let fill = self.build_space_fill_doc(values, 1);
+                let fill = self.build_space_fill_doc(values);
                 let d = self.d();
                 d.concat(&[d.text(": "), d.indent(fill)])
             }
@@ -497,7 +509,7 @@ impl<'a> Printer<'a> {
             self.write(name);
             self.write("(\n");
             self.indent_level += 1;
-            self.print_function_args_from_source(decl, name, args);
+            self.print_function_args_from_source(span, args);
             self.indent_level -= 1;
             self.write("\n");
             self.write_indent();
@@ -635,21 +647,29 @@ impl<'a> Printer<'a> {
         value: &'v CssValue<'v>,
         first_members: Option<&'v [CssValue<'v>]>,
     ) {
-        let CssValue::CommaSeparated { values, .. } = value else {
+        let CssValue::CommaSeparated { values, span } = value else {
             // Unreachable via `multiline_plan` (which matches on `CommaSeparated`); fall
             // back rather than panicking, like the crate's other defensive value guards.
             self.print_nested_value(value);
             return;
         };
 
+        let closing_comma = list_has_closing_comma(self.source, values, span.end_usize());
         for (i, val) in values.iter().enumerate() {
             self.write_indent();
-            // Every item reserves the trailing `,`/`;` (width 1) for its own fit
-            // decision, so a wrappable item breaks one column early rather than
-            // letting the terminator push the line to 101 (matching prettier and
-            // tsv's hard-print-width stance). A space-separated List value self-wraps
-            // via `build_space_fill_value_doc`'s `group(indent(fill))`; a non-List
-            // value (e.g. a gradient function) wraps via its own value group.
+            // Every item reserves what its own line ends with, so a wrappable item breaks
+            // that many columns early rather than letting the terminator push the line to
+            // 101 (matching prettier and tsv's hard-print-width stance). That is the `,` a
+            // non-final item takes, or the `;` a final one does — except when a closing
+            // comma is coming, and the last line ends `,;`, two columns. A space-separated
+            // List value self-wraps via `build_space_fill_value_doc`'s
+            // `group(indent(fill))`; a non-List value (e.g. a gradient function) wraps via
+            // its own value group.
+            let reserve = if closing_comma && i == values.len() - 1 {
+                2
+            } else {
+                1
+            };
             let doc = if let CssValue::List {
                 values: list_values,
                 ..
@@ -666,12 +686,12 @@ impl<'a> Printer<'a> {
             } else {
                 self.build_css_value_doc(val)
             };
-            self.write_arena_doc_reserving(doc, 1);
+            self.write_arena_doc_reserving(doc, reserve);
             if i < values.len() - 1 {
                 self.write(",\n");
             }
         }
-        if list_needs_closing_comma(values) {
+        if closing_comma {
             self.write(",");
         }
     }
@@ -686,7 +706,13 @@ impl<'a> Printer<'a> {
     /// `group(indent(fill([sub1, line, sub2, ...])))` so fill can break within
     /// items with continuation indent. This matches prettier's
     /// `printCommaSeparatedValueGroup` which returns `group(indent(fill(parts)))`.
-    fn build_comma_fill_doc(&self, values: &[CssValue<'_>]) -> DocId {
+    ///
+    /// `list_end` bounds the list in the source so an authored **closing** comma is spelled
+    /// back (`list_has_closing_comma`). It rides on the last element's part rather than
+    /// becoming a part of its own: `fill` reads the parts as alternating content and
+    /// separators, so a bare `,` appended after the final content lands in separator
+    /// position and could be left stranded on its own line when the fill breaks.
+    fn build_comma_fill_doc(&self, values: &[CssValue<'_>], list_end: usize) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
         for (i, val) in values.iter().enumerate() {
@@ -711,8 +737,10 @@ impl<'a> Printer<'a> {
                 parts.push(d.concat(&[comma, line]));
             }
         }
-        if list_needs_closing_comma(values) {
-            parts.push(d.text(","));
+        if list_has_closing_comma(self.source, values, list_end)
+            && let Some(last) = parts.pop()
+        {
+            parts.push(d.concat(&[last, d.text(",")]));
         }
 
         // Reserve 1 char for trailing semicolon to prevent fill from packing
@@ -747,12 +775,14 @@ impl<'a> Printer<'a> {
     /// - In flat mode: `item1 item2 item3`
     /// - When broken: `item1 item2\n  item3 item4\n  item5`
     ///
-    /// `trailing_reserve` accounts for characters after the list (comma, semicolon).
-    fn build_space_fill_doc(&self, values: &[CssValue<'_>], trailing_reserve: usize) -> DocId {
+    /// The whole list is the declaration's value, so what follows it is the `;` — one
+    /// column, reserved so the fill breaks rather than letting the terminator push the
+    /// line to 101.
+    fn build_space_fill_doc(&self, values: &[CssValue<'_>]) -> DocId {
         let d = self.d();
         let parts = self.build_space_fill_parts(values);
         let context = DocContext {
-            trailing_reserve,
+            trailing_reserve: 1,
             ..Default::default()
         };
         let fill = d.fill(&parts);
@@ -763,22 +793,20 @@ impl<'a> Printer<'a> {
     ///
     /// Used when a function has comments in its arguments and needs wrapping.
     /// Extracts each argument from the source string to preserve comments.
-    fn print_function_args_from_source(
-        &mut self,
-        decl: &internal::CssDeclaration<'_>,
-        func_name: &str,
-        args: &[CssValue<'_>],
-    ) {
-        let decl_source = decl.span.extract(self.source);
-
-        // Extract function args content from source, or fall back to semantic printing
-        let Some(args_content) = value_normalization::extract_function_args(decl_source, func_name)
-        else {
+    fn print_function_args_from_source(&mut self, span: Span, args: &[CssValue<'_>]) {
+        // Extract function args content from the function's OWN span, or fall back to
+        // semantic printing.
+        let Some(args_content) = self.function_args_source(span) else {
             self.print_function_args_semantic(args);
             return;
         };
 
-        // Split by top-level commas and print each normalized arg
+        // Split by top-level commas and print each normalized arg. The trailing trim is
+        // what lets `has_closing_comma` see a closing comma the author padded (`…, )`) —
+        // untrimmed, that space becomes a whitespace-only final part, which both hides the
+        // comma and prints as a blank argument line. It is the escape-aware trim, so an
+        // argument legitimately ending in an escaped space (`calc(1px\ )`) keeps it.
+        let args_content = crate::escapes::trim_end_preserving_escape(args_content);
         let arg_strs = value_normalization::split_args_by_comma(args_content);
         for (i, arg_str) in arg_strs.iter().enumerate() {
             self.write_indent();
@@ -798,6 +826,38 @@ impl<'a> Printer<'a> {
                 self.write(",\n");
             }
         }
+        // A comma in final position produced no part, so it can only be written back here
+        // — the same closing comma the doc paths spell via `list_has_closing_comma`. It
+        // joins the last argument's line rather than taking one of its own.
+        if value_normalization::has_closing_comma(args_content, &arg_strs) {
+            self.write(",");
+        }
+    }
+
+    /// The text between a function value's parentheses, sliced from the function's own
+    /// span.
+    ///
+    /// The span is the exact bound: `extract_function_parts` accepts a value as a function
+    /// only when the matching close paren is its **last byte**, and a function name cannot
+    /// contain a `(`, so the first one in the span opens the arguments. Locating the
+    /// function by *name* instead — searching the whole declaration text for `name(` — is
+    /// what this replaces: the name is routinely also part of the property
+    /// (`--linear-gradient: linear-gradient(…)`), and the search then measures from the
+    /// wrong occurrence, which lands on the right paren only because nothing between them
+    /// can be a `(` — until a comment in the property→colon gap is (`--linear-gradient
+    /// /* ( */: linear-gradient(…)`), and the whole extraction fails to the semantic
+    /// fallback, dropping every argument comment and the closing comma.
+    ///
+    /// `None` only if the span is out of bounds or holds no `(` — neither reachable for a
+    /// parsed function, so the caller's fallback is defensive, like the crate's other
+    /// value guards.
+    fn function_args_source(&self, span: Span) -> Option<&'a str> {
+        if span.end_usize() > self.source.len() {
+            return None;
+        }
+        let raw = span.extract(self.source);
+        let open = raw.as_bytes().iter().position(|&b| b == b'(')?;
+        raw.get(open + 1..raw.len().checked_sub(1)?)
     }
 
     /// Check if an arg string would exceed width when printed at current position
@@ -873,7 +933,16 @@ impl<'a> Printer<'a> {
         d.fill(&doc_parts)
     }
 
-    /// Print function arguments semantically (fallback when source extraction fails)
+    /// Print function arguments semantically — the defensive arm for when
+    /// `function_args_source` can't slice the arguments out of the function's span.
+    ///
+    /// ⚠️ Lossy by construction, unlike the crate's other defensive guards: it prints from
+    /// the AST, which holds neither the closing comma nor any argument comment that isn't
+    /// glued into an argument's own span. That is tolerable only because it is
+    /// **unreachable** for a parsed function — the span is in bounds and a function value
+    /// always holds its `(`. It exists so an impossible state degrades instead of
+    /// panicking; if a shape ever *does* reach it, the fix is to make the slice total, not
+    /// to improve this.
     fn print_function_args_semantic(&mut self, args: &[CssValue<'_>]) {
         for (i, arg) in args.iter().enumerate() {
             self.write_indent();

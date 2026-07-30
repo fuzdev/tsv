@@ -1,0 +1,94 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 871,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 12,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 12,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 9,
+											"end": 12
+										}
+									],
+									"start": 9,
+									"end": 12
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 13,
+					"end": 862,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 114,
+							"end": 209,
+							"property": "background",
+							"value": "linear-gradient( #000 0%, #111 2%, #222 30%, #333 50%, #444 90%, #555 100%,)"
+						},
+						{
+							"type": "Declaration",
+							"start": 306,
+							"end": 424,
+							"property": "background",
+							"value": "linear-gradient(\n\t\t\t #000 0%,\n\t\t\t#111 2%,\n\t\t\t#222 30%,\n\t\t\t#333 50%,\n\t\t\t#444 90%,\n\t\t\t#5555 100%,\n\t\t)"
+						},
+						{
+							"type": "Declaration",
+							"start": 525,
+							"end": 642,
+							"property": "transition",
+							"value": "a 1s,\n\t\t\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 1s ccccccccccccccccccccccccccccccccccccccccccccc,"
+						},
+						{
+							"type": "Declaration",
+							"start": 736,
+							"end": 858,
+							"property": "transition",
+							"value": "a 1s,\n\t\t\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 1s\n\t\t\t\tcccccccccccccccccccccccccccccccccccccccccccccc,"
+						}
+					]
+				},
+				"start": 9,
+				"end": 862
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 863,
+			"styles": "\n\tdiv {\n\t\t/* a comment routes the value to the source-extracting path; at 100 columns it stays inline */\n\t\tbackground: linear-gradient(/* k */ #000 0%, #111 2%, #222 30%, #333 50%, #444 90%, #555 100%,);\n\t\t/* one column more (101) breaks those arguments one per line, closing comma on the last */\n\t\tbackground: linear-gradient(\n\t\t\t/* k */ #000 0%,\n\t\t\t#111 2%,\n\t\t\t#222 30%,\n\t\t\t#333 50%,\n\t\t\t#444 90%,\n\t\t\t#5555 100%,\n\t\t);\n\t\t/* a broken list reserves the `,;` its last element takes, so at 100 the element stays flat */\n\t\ttransition:\n\t\t\ta 1s,\n\t\t\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 1s ccccccccccccccccccccccccccccccccccccccccccccc,;\n\t\t/* one column more (101) and that element wraps at its space rather than overrunning */\n\t\ttransition:\n\t\t\ta 1s,\n\t\t\tbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb 1s\n\t\t\t\tcccccccccccccccccccccccccccccccccccccccccccccc,;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 872,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

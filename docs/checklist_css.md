@@ -330,8 +330,11 @@ Spec: `css-variables-1`
 - `var()` basic usage
 - `var()` with fallback
 - `var()` empty fallback (`var(--a,)`) — the trailing comma is significant
-  (substitutes nothing when unset, unlike `var(--a)`) and is preserved; other
-  functions (`rgb(0,0,0,)`) drop a trailing empty arg, matching prettier
+  (substitutes nothing when unset, unlike `var(--a)`) and is preserved; so is the
+  same **closing** comma anywhere else in a declaration value (`transition: a,`,
+  `rgb(1, 2, 3,)`, `--x: a,`), one rule rather than a `var()` carve-out, a
+  prettier divergence (see `conformance_prettier.md` → CSS: Values, "Closing comma
+  in a value"). An *escaped* comma (`var(--b, x\,)`) is content and closes nothing
 - Nested fallbacks (`var(--a, var(--b, red))`)
 - Composition with `calc()`
 
