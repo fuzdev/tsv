@@ -144,6 +144,43 @@ impl LeadingGlue {
 }
 
 impl<'a> Printer<'a> {
+    /// Push one **block** comment with `spacing` applied to its outer edges — the single
+    /// definition of what [`CommentSpacing`] means for a comment that does not end its
+    /// line: ` /* c */` (`Leading`), `/* c */ ` (`Trailing`), or bare (`None`).
+    ///
+    /// `space_before` lets a `Leading` caller suppress the space when the run already
+    /// sits at the start of a fresh (indented) line, where a space would render as a
+    /// stray `\t /* c */`; a caller with nothing to suppress passes `true`.
+    ///
+    /// Shared by [`Self::format_block_comments`] (the chain gaps' block-only runs) and
+    /// the block arm of [`Self::build_header_comment_run`]. A **line** comment has no
+    /// spacing choice to make — it must end its line — so it never reaches here; that
+    /// asymmetry is the whole content-loss hazard, and the one emitter that hand-rolls
+    /// both halves ([`Self::build_comments_between_filtered_opt`]) documents it in place.
+    pub(crate) fn push_block_comment_spaced(
+        &self,
+        parts: &mut DocBuf,
+        comment: &Comment,
+        spacing: CommentSpacing,
+        space_before: bool,
+    ) {
+        debug_assert!(comment.is_block, "line comments have no spacing choice");
+        let d = self.d();
+        match spacing {
+            CommentSpacing::Leading => {
+                if space_before {
+                    parts.push(d.text(" "));
+                }
+                parts.push(self.build_comment_doc(comment));
+            }
+            CommentSpacing::Trailing => {
+                parts.push(self.build_comment_doc(comment));
+                parts.push(d.text(" "));
+            }
+            CommentSpacing::None => parts.push(self.build_comment_doc(comment)),
+        }
+    }
+
     /// Whether a comment between two neighbors can't share a line with either — any
     /// line comment (it runs to EOL), or a block comment isolated from *both* `prev`
     /// (at the comment's start) and `next` (at its end). The shared "isolated from
@@ -499,6 +536,23 @@ impl<'a> Printer<'a> {
     ///
     /// This is more efficient than `has_comments_to_emit_between` + `build_comments_between`
     /// because it uses a single binary search instead of two.
+    ///
+    /// ⚠️ **`Leading` emits no separator AFTER the run — the caller owns what follows.**
+    /// The separators here sit *between* comments, so a run whose last comment is a `//`
+    /// ends mid-line and the caller's next token is **swallowed** by it. `Trailing` has no
+    /// such hole (its separator is emitted after each comment, `hardline` for a line one),
+    /// which is why an identical gap can be correct under one spacing and lossy under the
+    /// other — `call // c⏎<T>()` versus the callee→`(` gap that produced `call // c();`,
+    /// eating the parens and the `;` (fixture
+    /// `calls/callee_line_comment_empty_args_prettier_divergence`).
+    ///
+    /// A `Leading` caller must therefore answer "what follows this run?" itself: gate on
+    /// [`Self::has_line_comments_between`] and route to
+    /// [`Self::build_continuation_indent`] (or push its own break) before falling through
+    /// to this builder. `push_empty_args` and `build_dot_gap_doc` are the worked examples.
+    /// The swallowed form parses and is a fixed point, so idempotency, round-trip, and the
+    /// print-once ledger are all blind to it; `swallow_audit` sees only shapes some fixture
+    /// already carries.
     pub(crate) fn build_comments_between_filtered_opt(
         &self,
         start: u32,
@@ -518,11 +572,12 @@ impl<'a> Printer<'a> {
 
         // Build docs for matching comments.
         //
-        // A line comment ends its line, so whatever follows it (another comment, or
-        // the caller's next token) must start a new line — else two line comments
-        // merge onto one (`// c1 // c2` reparses as a single comment: boundary loss)
-        // and a trailing line comment swallows the following token. So a `hardline`,
-        // not the spacing separator, sits across any line-comment boundary. A block
+        // A line comment ends its line, so the next comment in the run must start a new
+        // one — else two line comments merge onto one (`// c1 // c2` reparses as a single
+        // comment: boundary loss). So a `hardline`, not the spacing separator, sits across
+        // any line-comment boundary *within* the run. The run's far edge is the caller's
+        // (see the ⚠️ on this function): `Leading` adds nothing after the last comment,
+        // `Trailing` hardlines. A block
         // comment keeps the inline spacing.
         let mut parts = DocBuf::new();
         let mut prev_was_line = false;
