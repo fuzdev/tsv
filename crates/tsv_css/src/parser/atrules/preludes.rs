@@ -4,18 +4,33 @@ use crate::lexer::TokenKind;
 use crate::parser::selectors::{parse_complex_selector_list, parse_forgiving_selector_list};
 use tsv_lang::{ParseError, Span};
 
+/// Whether the current token is a CSS `<function-token>` — an identifier
+/// immediately followed by `(` with no intervening whitespace (`url(`, `layer(`,
+/// `supports(`, `selector(`). The lexer emits the name and `(` as separate tokens
+/// (only an unquoted `url(...)` is one opaque `Url` token), so the
+/// function-vs-plain-ident distinction is recovered here by peeking the source byte
+/// after the identifier.
+///
+/// This is the whole of css-values-4 §"Functional Notations" on the point — any
+/// character between the name and the `(`, whitespace included, leaves an ordinary
+/// identifier followed by a parenthesis — and every reader of that rule in this file
+/// asks it here, so a condition part, a container name and a value function cannot
+/// disagree about what a function is.
+fn is_function_token(parser: &CssParser<'_, '_>) -> bool {
+    parser.check(TokenKind::Identifier) && {
+        let end_pos = parser.current_end;
+        parser.source.get(end_pos..=end_pos) == Some("(")
+    }
+}
+
 /// Is the current token the `selector` of a `selector(` function token — the
 /// condition grammar's one function whose argument is a selector rather than a
 /// declaration?
 ///
-/// Both halves of the test come from css-values-4 §"Functional Notations": the `(`
-/// must abut the name (that is what makes it a `<function-token>` — any character
-/// between, whitespace included, leaves an ordinary identifier followed by a
-/// parenthesis), and "like keywords, function names are ASCII case-insensitive".
+/// The name is matched ASCII case-insensitively, css-values-4's other half of the
+/// same section: "like keywords, function names are ASCII case-insensitive".
 fn at_selector_function(parser: &CssParser<'_, '_>) -> bool {
-    parser.check(TokenKind::Identifier)
-        && parser.current_identifier().eq_ignore_ascii_case("selector")
-        && parser.source.get(parser.current_end..=parser.current_end) == Some("(")
+    is_function_token(parser) && parser.current_identifier().eq_ignore_ascii_case("selector")
 }
 
 /// Read a `selector()` argument as the selector it is, with the parser positioned
@@ -59,6 +74,30 @@ fn parse_selector_argument<'arena>(
 /// is the part's first token, which is always that `(`.
 fn needs_separator_before(prev: Option<TokenKind>, trailing_spaces: usize) -> bool {
     trailing_spaces == 0 && !matches!(prev, None | Some(TokenKind::LeftParen))
+}
+
+/// Skip a gap between condition parts, registering its comments and widening `end`
+/// past the last of them.
+///
+/// The query's own gaps — before a part, and after a connector (`(a) /* c */ and
+/// /* d */ (b)`) — are printer-reconstructed, so their comments must be *registered*
+/// rather than emitted (a dropping skip loses them silently). That is
+/// `skip_whitespace_registering_comments`'s job everywhere else in this file; the one
+/// thing it can't do is report where the last comment ended, and the query's span has
+/// to cover it — a trailing `(a) /* c */` gap is inside the prelude the printer
+/// re-emits from. Hence the loop, in one place rather than at each gap.
+fn skip_gap_registering_comments(
+    parser: &mut CssParser<'_, '_>,
+    end: &mut usize,
+) -> Result<(), ParseError> {
+    parser.skip_whitespace()?;
+    while parser.check(TokenKind::Comment) {
+        parser.register_current_comment();
+        *end = parser.base_offset() + parser.current_end;
+        parser.advance()?;
+        parser.skip_whitespace()?;
+    }
+    Ok(())
 }
 
 /// Can a boolean operator (`and`/`or`/`not`) begin at this point in a condition?
@@ -107,15 +146,8 @@ pub(super) fn parse_condition_query<'arena>(
     let mut end_pos = start;
 
     while !parser.at_prelude_end() {
-        parser.skip_whitespace()?;
-
-        // Register comments between condition parts (e.g., `(a) /* comment */ and (b)`)
-        while parser.check(TokenKind::Comment) {
-            parser.register_current_comment();
-            end_pos = parser.base_offset() + parser.current_end;
-            parser.advance()?;
-            parser.skip_whitespace()?;
-        }
+        // The gap before a part (`(a) /* comment */ and (b)`)
+        skip_gap_registering_comments(parser, &mut end_pos)?;
 
         // Check for `and`/`or` connector. CSS grammar keywords are ASCII
         // case-insensitive (CSS Syntax 3), so `AND`/`Or` connect like `and`; the
@@ -137,14 +169,8 @@ pub(super) fn parse_condition_query<'arena>(
                 current_connector = Some(conn);
                 current_connector_raw = Some(parser.alloc_str_in(parser.current_value()));
                 parser.advance()?;
-                // Register comments after connector (e.g., `and /* comment */ (b)`)
-                parser.skip_whitespace()?;
-                while parser.check(TokenKind::Comment) {
-                    parser.register_current_comment();
-                    end_pos = parser.base_offset() + parser.current_end;
-                    parser.advance()?;
-                    parser.skip_whitespace()?;
-                }
+                // The gap after a connector (`and /* comment */ (b)`)
+                skip_gap_registering_comments(parser, &mut end_pos)?;
                 continue;
             }
         }
@@ -255,9 +281,7 @@ fn parse_condition_part<'arena>(
     // identifier directly followed by `(`. The name is serialized verbatim from
     // source (escapes preserved) — only `and`/`or`/`not` keyword matches decode.
     let mut at_selector_args = false;
-    if parser.check(TokenKind::Identifier)
-        && parser.source.get(parser.current_end..=parser.current_end) == Some("(")
-    {
+    if is_function_token(parser) {
         at_selector_args = at_selector_function(parser);
         part_buf.push_str(parser.current_value());
         trailing_spaces = 0;
@@ -396,12 +420,15 @@ fn parse_condition_part<'arena>(
         // is emitted, below; emitting only one leaves `(display: grid/* c */)`
         // half-spaced). They ask for it in ONE place, because two emission sites each
         // seeing only its own reason to pad is exactly how the doubled `/* c */  and`
-        // arose. The comment's bound: inside a `<general-enclosed>` `selector()`
-        // argument the tokens are opaque by grammar, so it is bounded like the value
-        // colon's rule below — a space inserted inside a compound would turn
-        // `selector([a=1.5]/* c */.b)` into a descendant `[a=1.5] .b`. The operator's
-        // matching bound rides inside `is_bool_op`, which its after-space reads too.
-        let pads_before = is_bool_op || (is_comment && general_enclosed_selector.is_none());
+        // arose. The comment's bound is `pads_comment`, which **both** of its sides
+        // read for the same reason: inside a `<general-enclosed>` `selector()` argument
+        // the tokens are opaque by grammar, so it is bounded like the value colon's rule
+        // below — a space inserted inside a compound would turn
+        // `selector([a=1.5]/* c */.b)` into a descendant `[a=1.5] .b`, and a bound only
+        // one side honors inserts that space from the other. The operator's matching
+        // bound rides inside `is_bool_op`, which its after-space reads too.
+        let pads_comment = is_comment && general_enclosed_selector.is_none();
+        let pads_before = is_bool_op || pads_comment;
         if pads_before && needs_separator_before(prev_token_kind, trailing_spaces) {
             part_buf.push(' ');
             trailing_spaces += 1;
@@ -442,7 +469,7 @@ fn parse_condition_part<'arena>(
 
         // Add space after comment if followed by non-whitespace
         // (e.g., `/* comment */ grid` needs space before `grid`)
-        if is_comment
+        if pads_comment
             && !parser.check(TokenKind::Whitespace)
             && !parser.check(TokenKind::RightParen)
         {
@@ -575,7 +602,7 @@ pub(super) fn parse_container_prelude<'arena>(
     // lookahead; the stored name is serialized verbatim from source so escapes
     // survive (`\@named` stays `\@named`).
     let container_name = if parser.check(TokenKind::Identifier)
-        && parser.source.get(parser.current_end..=parser.current_end) != Some("(")
+        && !is_function_token(parser)
         && !is_boolean_operator_keyword(parser.current_identifier())
     {
         // Copy into the arena only on the path that stores the name as a node.
@@ -882,18 +909,6 @@ fn url_token_has_unclosed_paren(text: &str) -> bool {
 }
 
 /// Parse a function value (e.g., url(), layer(), supports())
-/// Whether the current token is a CSS `<function-token>` — an identifier
-/// immediately followed by `(` with no intervening whitespace (`url(`, `layer(`,
-/// `supports(`). The lexer emits the name and `(` as separate tokens (only an
-/// unquoted `url(...)` is one opaque `Url` token), so the function-vs-plain-ident
-/// distinction is recovered here by peeking the source byte after the identifier.
-fn is_function_token(parser: &CssParser<'_, '_>) -> bool {
-    parser.check(TokenKind::Identifier) && {
-        let end_pos = parser.current_end;
-        parser.source.get(end_pos..=end_pos) == Some("(")
-    }
-}
-
 fn parse_function_value<'arena>(
     parser: &mut CssParser<'_, 'arena>,
 ) -> Result<CssValue<'arena>, ParseError> {
