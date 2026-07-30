@@ -1,0 +1,514 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 976,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 86,
+				"end": 147,
+				"name": "supports",
+				"prelude": "selector(div:hover)",
+				"block": {
+					"type": "Block",
+					"start": 116,
+					"end": 147,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 120,
+								"end": 123,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 120,
+										"end": 123,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 120,
+														"end": 123
+													}
+												],
+												"start": 120,
+												"end": 123
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 124,
+								"end": 144,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 129,
+										"end": 139,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 120,
+							"end": 144
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 216,
+				"end": 278,
+				"name": "supports",
+				"prelude": "selector(div :hover)",
+				"block": {
+					"type": "Block",
+					"start": 247,
+					"end": 278,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 251,
+								"end": 254,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 251,
+										"end": 254,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 251,
+														"end": 254
+													}
+												],
+												"start": 251,
+												"end": 254
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 255,
+								"end": 275,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 260,
+										"end": 270,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 251,
+							"end": 275
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 348,
+				"end": 415,
+				"name": "supports",
+				"prelude": "selector(div:not(.class))",
+				"block": {
+					"type": "Block",
+					"start": 384,
+					"end": 415,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 388,
+								"end": 391,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 388,
+										"end": 391,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 388,
+														"end": 391
+													}
+												],
+												"start": 388,
+												"end": 391
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 392,
+								"end": 412,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 397,
+										"end": 407,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 388,
+							"end": 412
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 498,
+				"end": 554,
+				"name": "supports",
+				"prelude": "selector(.and)",
+				"block": {
+					"type": "Block",
+					"start": 523,
+					"end": 554,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 527,
+								"end": 530,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 527,
+										"end": 530,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 527,
+														"end": 530
+													}
+												],
+												"start": 527,
+												"end": 530
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 531,
+								"end": 551,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 536,
+										"end": 546,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 527,
+							"end": 551
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 626,
+				"end": 688,
+				"name": "supports",
+				"prelude": "selector(div > span)",
+				"block": {
+					"type": "Block",
+					"start": 657,
+					"end": 688,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 661,
+								"end": 664,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 661,
+										"end": 664,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 661,
+														"end": 664
+													}
+												],
+												"start": 661,
+												"end": 664
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 665,
+								"end": 685,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 670,
+										"end": 680,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 661,
+							"end": 685
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 691,
+				"end": 767,
+				"name": "supports",
+				"prelude": "selector(div:is(.class1, .class2))",
+				"block": {
+					"type": "Block",
+					"start": 736,
+					"end": 767,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 740,
+								"end": 743,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 740,
+										"end": 743,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 740,
+														"end": 743
+													}
+												],
+												"start": 740,
+												"end": 743
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 744,
+								"end": 764,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 749,
+										"end": 759,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 740,
+							"end": 764
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 770,
+				"end": 844,
+				"name": "supports",
+				"prelude": "selector(div[data-attr='value'])",
+				"block": {
+					"type": "Block",
+					"start": 813,
+					"end": 844,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 817,
+								"end": 820,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 817,
+										"end": 820,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 817,
+														"end": 820
+													}
+												],
+												"start": 817,
+												"end": 820
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 821,
+								"end": 841,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 826,
+										"end": 836,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 817,
+							"end": 841
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 914,
+				"end": 967,
+				"name": "supports",
+				"prelude": "selector(.)",
+				"block": {
+					"type": "Block",
+					"start": 936,
+					"end": 967,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 940,
+								"end": 943,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 940,
+										"end": 943,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 940,
+														"end": 943
+													}
+												],
+												"start": 940,
+												"end": 943
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 944,
+								"end": 964,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 949,
+										"end": 959,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 940,
+							"end": 964
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 968,
+			"styles": "\n\t/* A `:` inside selector() opens a pseudo-class, not a declaration value */\n\t@supports selector(div:hover) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* A space before the pseudo-class is a descendant combinator */\n\t@supports selector(div :hover) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* A functional pseudo-class keeps its name glued to the colon */\n\t@supports selector(div:not(.class)) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* `and` names a class here, so it is an identifier, not a boolean operator */\n\t@supports selector(.and) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* The argument is a selector, normalized like one anywhere else */\n\t@supports selector(div > span) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t@supports selector(div:is(.class1, .class2)) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t@supports selector(div[data-attr='value']) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* An argument that is not a selector at all stays as authored */\n\t@supports selector(.) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 977,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

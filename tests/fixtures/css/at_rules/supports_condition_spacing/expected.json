@@ -1,0 +1,331 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 634,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 81,
+				"end": 141,
+				"name": "supports",
+				"prelude": "(font-family: and)",
+				"block": {
+					"type": "Block",
+					"start": 110,
+					"end": 141,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 114,
+								"end": 117,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 114,
+										"end": 117,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 114,
+														"end": 117
+													}
+												],
+												"start": 114,
+												"end": 117
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 118,
+								"end": 138,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 123,
+										"end": 133,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 114,
+							"end": 138
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 211,
+				"end": 287,
+				"name": "supports",
+				"prelude": "((display: grid) and (color: red))",
+				"block": {
+					"type": "Block",
+					"start": 256,
+					"end": 287,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 260,
+								"end": 263,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 260,
+										"end": 263,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 260,
+														"end": 263
+													}
+												],
+												"start": 260,
+												"end": 263
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 264,
+								"end": 284,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 269,
+										"end": 279,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 260,
+							"end": 284
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 290,
+				"end": 353,
+				"name": "supports",
+				"prelude": "(not (display: grid))",
+				"block": {
+					"type": "Block",
+					"start": 322,
+					"end": 353,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 326,
+								"end": 329,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 326,
+										"end": 329,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 326,
+														"end": 329
+													}
+												],
+												"start": 326,
+												"end": 329
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 330,
+								"end": 350,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 335,
+										"end": 345,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 326,
+							"end": 350
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 433,
+				"end": 498,
+				"name": "supports",
+				"prelude": "(display : grid)",
+				"block": {
+					"type": "Block",
+					"start": 467,
+					"end": 498,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 471,
+								"end": 474,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 471,
+										"end": 474,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 471,
+														"end": 474
+													}
+												],
+												"start": 471,
+												"end": 474
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 475,
+								"end": 495,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 480,
+										"end": 490,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 471,
+							"end": 495
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 544,
+				"end": 625,
+				"name": "supports",
+				"prelude": "selector(div:hover) and (display: grid)",
+				"block": {
+					"type": "Block",
+					"start": 594,
+					"end": 625,
+					"children": [
+						{
+							"type": "Rule",
+							"prelude": {
+								"type": "SelectorList",
+								"start": 598,
+								"end": 601,
+								"children": [
+									{
+										"type": "ComplexSelector",
+										"start": 598,
+										"end": 601,
+										"children": [
+											{
+												"type": "RelativeSelector",
+												"combinator": null,
+												"selectors": [
+													{
+														"type": "TypeSelector",
+														"name": "div",
+														"start": 598,
+														"end": 601
+													}
+												],
+												"start": 598,
+												"end": 601
+											}
+										]
+									}
+								]
+							},
+							"block": {
+								"type": "Block",
+								"start": 602,
+								"end": 622,
+								"children": [
+									{
+										"type": "Declaration",
+										"start": 607,
+										"end": 617,
+										"property": "color",
+										"value": "red"
+									}
+								]
+							},
+							"start": 598,
+							"end": 622
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 626,
+			"styles": "\n\t/* A value spelled `and` is a value keyword, not a boolean operator */\n\t@supports (font-family: and) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* A boolean operator between two nested conditions does space */\n\t@supports ((display: grid) and (color: red)) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t@supports (not (display: grid)) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* The space after `:` is decided by the property name, past the comment */\n\t@supports (display /* c */: grid) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n\n\t/* A connector after a selector() part */\n\t@supports selector(div:hover) and (display: grid) {\n\t\tdiv {\n\t\t\tcolor: red;\n\t\t}\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 635,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}

@@ -181,7 +181,12 @@ pub(crate) fn normalize_value_text(input: &str, lowercase_hex: bool) -> String {
                 i += 1;
             }
             let unit = &input[unit_start..i];
-            if unit.is_empty() || unit.eq_ignore_ascii_case("n") || is_known_css_unit(unit) {
+            // Inside a `selector(...)` group the digits are selector syntax — an
+            // `<an+b>` term, an attribute value — not a `<number>` with a canonical
+            // serialization, so they are copied like the `#`-token above.
+            if preserve_from.is_none()
+                && (unit.is_empty() || unit.eq_ignore_ascii_case("n") || is_known_css_unit(unit))
+            {
                 out.push_str(&normalize_css_number(num));
                 // `canonical_unit` lowercases a known unit (`PX`→`px`) and leaves the
                 // `n`/empty cases untouched (neither is a known unit).
