@@ -22,7 +22,12 @@ follows:
 | `margin: calc(1px\ );` | `margin: calc(1px\);` | same |
 | `color: a\ b;` | `color: a\b;` | not a delimiter, but the value silently changes from `a b` to `ab` |
 | `padding: var(--b, x\,y);` | `padding: var(--b, x\, y);` | the **escaped comma** is read as an argument separator, so one ident is split and rejoined with `", "` — a space is inserted *inside* the value `x,y` |
+| `gap: a, b\,;` | `gap: a, b\;` | the same escaped comma at the value's *end*: its payload is dropped and `\;` escapes the terminator |
 | `inset: a\+b;` | `inset: a\+ b;` | the **escaped `+`** is read as an operator and gets operator spacing — one ident `a+b` becomes two values |
+
+The `gap` row is also the boundary of a separate tsv rule: a comma **closing** a
+value is authored content tsv keeps ([comma_closing](../lists/comma_closing_prettier_divergence/)),
+and an escaped comma closes nothing — so nothing is appended after it.
 
 The first three make prettier's own output **fail to re-parse**: tsv's CSS parser
 rejects `output_prettier.svelte` with `Expected '}'`, because with `;` and `)`

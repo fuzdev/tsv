@@ -2,7 +2,7 @@
 	"css": {
 		"type": "StyleSheet",
 		"start": 0,
-		"end": 166,
+		"end": 465,
 		"attributes": [],
 		"children": [
 			{
@@ -38,73 +38,59 @@
 				"block": {
 					"type": "Block",
 					"start": 13,
-					"end": 157,
+					"end": 456,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 17,
-							"end": 30,
-							"property": "width",
-							"value": "50px\\"
+							"start": 91,
+							"end": 105,
+							"property": "transition",
+							"value": "a,"
 						},
 						{
 							"type": "Declaration",
-							"start": 34,
-							"end": 58,
-							"property": "height",
-							"value": "var(--a, 50px\\ )"
+							"start": 170,
+							"end": 209,
+							"property": "transition",
+							"value": "a 1s ease,\n\t\t\tb 2s ease,"
 						},
 						{
 							"type": "Declaration",
-							"start": 62,
-							"end": 81,
-							"property": "margin",
-							"value": "calc(1px\\ )"
+							"start": 268,
+							"end": 307,
+							"property": "background",
+							"value": "linear-gradient(red, blue,)"
 						},
 						{
 							"type": "Declaration",
-							"start": 85,
-							"end": 96,
-							"property": "color",
-							"value": "a\\ b"
+							"start": 369,
+							"end": 376,
+							"property": "--x",
+							"value": "a,"
 						},
 						{
 							"type": "Declaration",
-							"start": 100,
-							"end": 123,
-							"property": "padding",
-							"value": "var(--b, x\\,y)"
-						},
-						{
-							"type": "Declaration",
-							"start": 127,
-							"end": 138,
-							"property": "gap",
-							"value": "a, b\\,"
-						},
-						{
-							"type": "Declaration",
-							"start": 142,
-							"end": 153,
-							"property": "inset",
-							"value": "a\\+b"
+							"start": 434,
+							"end": 452,
+							"property": "--y",
+							"value": "rgb(1, 2, 3,)"
 						}
 					]
 				},
 				"start": 9,
-				"end": 157
+				"end": 456
 			}
 		],
 		"content": {
 			"start": 7,
-			"end": 158,
-			"styles": "\n\tdiv {\n\t\twidth: 50px\\ ;\n\t\theight: var(--a, 50px\\ );\n\t\tmargin: calc(1px\\ );\n\t\tcolor: a\\ b;\n\t\tpadding: var(--b, x\\,y);\n\t\tgap: a, b\\,;\n\t\tinset: a\\+b;\n\t}\n",
+			"end": 457,
+			"styles": "\n\tdiv {\n\t\t/* a comma closing the value list is authored content, so it is kept */\n\t\ttransition: a,;\n\t\t/* the same, in a list that breaks one element per line */\n\t\ttransition:\n\t\t\ta 1s ease,\n\t\t\tb 2s ease,;\n\t\t/* a function's argument list takes the same rule */\n\t\tbackground: linear-gradient(red, blue,);\n\t\t/* a custom property substitutes its tokens verbatim */\n\t\t--x: a,;\n\t\t/* and the rule reaches a function nested in one */\n\t\t--y: rgb(1, 2, 3,);\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 167,
+	"end": 466,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",

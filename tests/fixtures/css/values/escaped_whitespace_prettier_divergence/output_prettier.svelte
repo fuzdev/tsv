@@ -5,6 +5,7 @@
 		margin: calc(1px\);
 		color: a\b;
 		padding: var(--b, x\, y);
+		gap: a, b\;
 		inset: a\+ b;
 	}
 </style>
