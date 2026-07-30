@@ -13,6 +13,22 @@ use tsv_lang::doc::{DocBuf, DocContext, arena::DocId};
 use tsv_lang::printing::visual_width;
 use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
+/// How a declaration's broken comma list lays out, decided once.
+///
+/// Its existence *is* the break decision: `multiline_plan` returns `Some` exactly when
+/// `comma_list_should_break` does. The routing question and the answers the printing needs
+/// are one computation, so they cannot disagree — a split between them would reintroduce
+/// the glued-vs-spaced 2-cycle — and a comment-bearing declaration lexes its value once
+/// rather than at both sites.
+struct MultilinePlan<'v> {
+    /// The leading comment run to emit on the colon's line — postcss `raws.between`
+    /// material (`leading_value_comment_run`).
+    hoisted: Option<Span>,
+    /// Element 0's own content members once the hoisted run is cut away. `None` when
+    /// nothing was hoisted, and then element 0 prints whole.
+    first_members: Option<&'v [CssValue<'v>]>,
+}
+
 impl<'a> Printer<'a> {
     /// Write the declaration ending: optional `!important` tail and the semicolon with newline.
     ///
@@ -40,10 +56,8 @@ impl<'a> Printer<'a> {
         while i < bytes.len() {
             match bytes[i] {
                 b';' | b'}' => break,
-                b'/' if bytes.get(i + 1) == Some(&b'*') => {
-                    let end = self.source[i + 2..]
-                        .find("*/")
-                        .map_or(bytes.len(), |rel| i + 2 + rel + 2);
+                b'/' if crate::comments::is_comment_start(bytes, i) => {
+                    let end = crate::comments::comment_end(bytes, i);
                     out.push(' ');
                     out.push_str(&self.source[i..end]);
                     i = end;
@@ -92,48 +106,126 @@ impl<'a> Printer<'a> {
         values.iter().any(|v| matches!(v, CssValue::List { .. }))
     }
 
-    fn should_use_multiline(&self, decl: &internal::CssDeclaration<'_>) -> bool {
-        // Only apply to comma-separated values with multiple items
+    /// This declaration's broken-comma-list layout, or `None` when the list does not break
+    /// and takes one of the inline paths instead.
+    ///
+    /// The break is purely structural — prettier's `shouldBreakList`. tsv formerly also
+    /// broke a list whose *source* put a newline after the colon, which made the output
+    /// authoring-dependent on a shape nothing else in CSS honors (`margin:⏎1px 2px`,
+    /// `color:⏎red` and `translate(⏎1px,⏎2px)` all collapse), and which no fixture relied
+    /// on. Pinned by `comma_separated`'s `unformatted_authored_break` variant.
+    fn multiline_plan<'v>(
+        &self,
+        decl: &'v internal::CssDeclaration<'v>,
+    ) -> Option<MultilinePlan<'v>> {
+        // Only comma-separated values with multiple items.
         let values = match &decl.value {
-            CssValue::CommaSeparated { values, .. } if values.len() > 1 => values,
-            _ => return false,
+            CssValue::CommaSeparated { values, .. } if values.len() > 1 => *values,
+            _ => return None,
         };
 
         // Custom properties skip structure-based multiline (one-per-line for List values).
         // They take the self-deciding width path via `print_decl_value_list` instead.
         // See fixture: declaration_long_multiline (continuation indent for space-separated items)
         if decl.property.starts_with("--") {
-            return false;
+            return None;
         }
 
-        // Check source: is there a newline between `:` and the first value?
-        let decl_source = decl.span.extract(self.source);
-        let after_colon = &decl_source[decl.colon_pos() + 1..];
-        for ch in after_colon.chars() {
-            if ch == '\n' {
-                return true;
-            }
-            if !ch.is_whitespace() {
-                break;
-            }
+        let hoist = self.hoistable_leading_run(decl, values);
+        // Element 0's node count starts where its own content does, past any hoisted run.
+        let content_start = hoist.map(|(_, members)| members[0].span().start);
+        if !self.comma_list_should_break(decl, values, content_start) {
+            return None;
         }
 
-        // Structure-based check using shared helper.
-        self.any_value_needs_own_line(values) || self.comma_list_comment_forces_own_line(decl)
+        Some(MultilinePlan {
+            hoisted: hoist.map(|(run, _)| run),
+            first_members: hoist.map(|(_, members)| members),
+        })
     }
 
-    /// Whether a comment forces this declaration's comma list to break one-per-line.
+    /// Whether this declaration's comma list breaks one element per line — prettier's
+    /// `shouldBreakList`: some element holds more than one node.
     ///
-    /// True for a comment at the list's **top level** (prettier force-breaks such a
-    /// list). Keyed on the comment — not the space-separated `List` the value parser
-    /// builds only when a space follows the comment — so a glued (`x,/* c */y`) and a
-    /// spaced (`x, /* c */ y`) authoring reach the same fixed point in one pass; see
-    /// `comma_value_has_top_level_comment`. The single predicate `should_use_multiline`
-    /// (break after the colon) and `print_decl_multiline` (one element per line) both
-    /// consult, so the two decisions cannot disagree — a split would reintroduce the
-    /// glued-vs-spaced 2-cycle. Gated on the O(1) `has_block_comment`.
-    fn comma_list_comment_forces_own_line(&self, decl: &internal::CssDeclaration<'_>) -> bool {
-        decl.has_block_comment && self.comma_value_has_top_level_comment(decl.value.span())
+    /// The single predicate `multiline_plan` derives the whole layout from — the break, the
+    /// hoist, and the members element 0 emits — so they cannot disagree.
+    ///
+    /// A comment-free value answers from the AST alone: an element holds more than one
+    /// node exactly when the value parser built it as a space-separated `List`, so the
+    /// common path keeps its O(1) shape and pays nothing for the comment rules. Only a
+    /// declaration that actually carries a `/* … */` (the O(1) `has_block_comment` gate)
+    /// pays the per-element lex, and there a comment counts as a node — see
+    /// `value_node_count` for why that is what makes the glued and spaced authorings
+    /// converge. Element 0's own leading comment run is excluded via `content_start`: it
+    /// is postcss `raws.between` material, not value content.
+    fn comma_list_should_break(
+        &self,
+        decl: &internal::CssDeclaration<'_>,
+        values: &[CssValue<'_>],
+        content_start: Option<u32>,
+    ) -> bool {
+        if !decl.has_block_comment {
+            return self.any_value_needs_own_line(values);
+        }
+        values.iter().enumerate().any(|(i, value)| {
+            let from = if i == 0 { content_start } else { None };
+            self.value_node_count(value.span(), from) > 1
+        })
+    }
+
+    /// The leading comment run `print_decl_multiline` hoists onto the colon's line, paired
+    /// with element 0's own content members — the ones that print beneath it. `None` when
+    /// there is nothing to hoist.
+    ///
+    /// Two things must hold, and both are about **element 0**. It has to be a
+    /// space-separated `List` whose members the run can be cut from at a boundary
+    /// (`content_members`), and content has to remain on the other side of that cut. A
+    /// comment-only element 0 (`font-family: /* c */, b`) fails the second: hoisting would
+    /// strand a bare `,` on its own line, which is what prettier does there and tsv
+    /// declines — see the `comma_comment_only_element_prettier_divergence` fixture.
+    ///
+    /// Gated on the O(1) `has_block_comment`, so a comment-free comma list — the common
+    /// case — never pays the lex.
+    fn hoistable_leading_run<'v>(
+        &self,
+        decl: &internal::CssDeclaration<'_>,
+        values: &'v [CssValue<'v>],
+    ) -> Option<(Span, &'v [CssValue<'v>])> {
+        if !decl.has_block_comment {
+            return None;
+        }
+        let (run, content_start) = self.leading_value_comment_run(decl.value.span())?;
+        let CssValue::List {
+            values: members, ..
+        } = values.first()?
+        else {
+            return None;
+        };
+        Some((run, Self::content_members(members, content_start)?))
+    }
+
+    /// Element 0's content members — those at or after `content_start` — or `None` when
+    /// `content_start` does not land on a member boundary.
+    ///
+    /// That boundary is the hoist's precondition, and checking it here is what keeps the
+    /// hoist lossless. A member that *contains* `content_start` holds the comment and the
+    /// token after it fused into one: there is nothing to cut there, dropping the member
+    /// whole would drop its content, and keeping it would print the comment twice. The
+    /// value parser splits a leading comment run into its own member precisely so the
+    /// boundary exists (`split_top_level`'s `comment_is_element`); this returns `None` for
+    /// anything that still arrives fused, and the caller then declines to hoist rather
+    /// than losing either the content or the print-once property.
+    ///
+    /// `None` also covers an all-comment element (no member is at or after
+    /// `content_start`), which is the comment-only element 0 case above.
+    fn content_members<'v>(
+        members: &'v [CssValue<'v>],
+        content_start: u32,
+    ) -> Option<&'v [CssValue<'v>]> {
+        let kept = members
+            .iter()
+            .position(|member| member.span().start >= content_start)?;
+        (members[kept].span().start == content_start).then_some(&members[kept..])
     }
 
     /// Print a declaration whose comment-free value is a comma- or space-separated
@@ -173,7 +265,7 @@ impl<'a> Printer<'a> {
             }
             // The dispatch in `print_css_declaration` only routes comma/space lists here;
             // fall back to the plain `: value` form rather than panicking, matching the
-            // crate's other defensive value guards (e.g. `print_comma_list_wrapped`).
+            // crate's other defensive value guards.
             _ => {
                 let value_doc = self.build_css_value_doc(&decl.value);
                 let d = self.d();
@@ -219,8 +311,8 @@ impl<'a> Printer<'a> {
         // Dispatch to appropriate handler based on value type and formatting needs
         if self.is_grid_multirow_value(decl) {
             self.print_decl_grid_multirow(decl);
-        } else if self.should_use_multiline(decl) {
-            self.print_decl_multiline(decl);
+        } else if let Some(plan) = self.multiline_plan(decl) {
+            self.print_decl_multiline(decl, plan);
         } else if matches!(
             &decl.value,
             CssValue::CommaSeparated { .. } | CssValue::List { .. }
@@ -238,15 +330,26 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Print declaration with multiline formatting (structure-based)
-    fn print_decl_multiline(&mut self, decl: &internal::CssDeclaration<'_>) {
-        // A top-level comment forces one-per-line even when no space-separated `List`
-        // element is present (the glued-comment authoring) — the same predicate
-        // `should_use_multiline` used to route here, so the two agree.
-        let force_own_line = self.comma_list_comment_forces_own_line(decl);
-        self.write(":\n");
+    /// Print declaration with multiline formatting, per the layout `multiline_plan`
+    /// already decided.
+    fn print_decl_multiline<'v>(
+        &mut self,
+        decl: &'v internal::CssDeclaration<'v>,
+        plan: MultilinePlan<'v>,
+    ) {
+        self.write(":");
+        // A leading comment run is `raws.between` material, so it stays on the colon's
+        // line and the value breaks beneath it. Emitted through the same whitespace
+        // normalizer every other comment-bearing value path uses, so a run of them is
+        // joined single-spaced.
+        if let Some(run) = plan.hoisted {
+            self.write(" ");
+            let text = value_normalization::normalize_css_whitespace(run.extract(self.source));
+            self.write(&text);
+        }
+        self.write("\n");
         self.indent_level += 1;
-        self.print_css_value_multiline(&decl.value, force_own_line);
+        self.print_css_value_multiline(&decl.value, plan.first_members);
         self.indent_level -= 1;
         self.write_declaration_end(decl);
     }
@@ -470,67 +573,54 @@ impl<'a> Printer<'a> {
         self.write_declaration_end(decl);
     }
 
-    /// Format a CSS value on multiple lines with greedy packing
+    /// Emit a broken comma list, one element per line.
     ///
-    /// This is called when value needs wrapping (detected via newline in source or width).
-    /// Uses greedy packing (like prettier's fill algorithm) to pack multiple items per line.
-    ///
-    /// Exception: Properties with space-separated items (like box-shadow, text-shadow)
-    /// or wrappable functions (like gradients) use true one-per-line formatting.
-    fn print_css_value_multiline(&mut self, value: &CssValue<'_>, force_own_line: bool) {
+    /// Reached only through `multiline_plan`, which returns `Some` exactly when
+    /// `comma_list_should_break` does — so there is one arm, not a choice between
+    /// one-per-line and greedy packing. A list that does *not* break is not routed here at
+    /// all: it takes `print_decl_value_list`'s self-deciding doc (or, with comments,
+    /// `print_decl_with_comments`), which does its own width-based wrapping.
+    fn print_css_value_multiline<'v>(
+        &mut self,
+        value: &'v CssValue<'v>,
+        first_members: Option<&'v [CssValue<'v>]>,
+    ) {
         let CssValue::CommaSeparated { values, .. } = value else {
-            // Fallback to regular formatting
+            // Unreachable via `multiline_plan` (which matches on `CommaSeparated`); fall
+            // back rather than panicking, like the crate's other defensive value guards.
             self.print_nested_value(value);
             return;
         };
 
-        if force_own_line || self.any_value_needs_own_line(values) {
-            // True one-per-line for shadow-like properties and wrappable functions
-            for (i, val) in values.iter().enumerate() {
-                self.write_indent();
-                // Every item reserves the trailing `,`/`;` (width 1) for its own fit
-                // decision, so a wrappable item breaks one column early rather than
-                // letting the terminator push the line to 101 (matching prettier and
-                // tsv's hard-print-width stance). A space-separated List value self-wraps
-                // via `build_space_fill_value_doc`'s `group(indent(fill))`; a non-List
-                // value (e.g. a gradient function) wraps via its own value group.
-                let doc = if let CssValue::List {
-                    values: list_values,
-                    ..
-                } = val
-                {
-                    self.build_space_fill_value_doc(list_values)
-                } else {
-                    self.build_css_value_doc(val)
+        for (i, val) in values.iter().enumerate() {
+            self.write_indent();
+            // Every item reserves the trailing `,`/`;` (width 1) for its own fit
+            // decision, so a wrappable item breaks one column early rather than
+            // letting the terminator push the line to 101 (matching prettier and
+            // tsv's hard-print-width stance). A space-separated List value self-wraps
+            // via `build_space_fill_value_doc`'s `group(indent(fill))`; a non-List
+            // value (e.g. a gradient function) wraps via its own value group.
+            let doc = if let CssValue::List {
+                values: list_values,
+                ..
+            } = val
+            {
+                // Element 0 prints only its own content: the leading comment run
+                // `print_decl_multiline` hoisted onto the colon's line is already
+                // gone from `first_members`, so the run prints exactly once.
+                let members = match first_members {
+                    Some(members) if i == 0 => members,
+                    _ => list_values,
                 };
-                self.write_arena_doc_reserving(doc, 1);
-                if i < values.len() - 1 {
-                    self.write(",\n");
-                }
+                self.build_space_fill_value_doc(members)
+            } else {
+                self.build_css_value_doc(val)
+            };
+            self.write_arena_doc_reserving(doc, 1);
+            if i < values.len() - 1 {
+                self.write(",\n");
             }
-        } else {
-            // Greedy packing for simple lists (font-family, animation-name, etc.)
-            self.print_comma_list_wrapped(value);
         }
-    }
-
-    /// Format a comma-separated list with width-based wrapping using doc::fill
-    ///
-    /// Breaks long comma-separated lists intelligently to fit within print width.
-    /// Uses doc::fill() for greedy packing (pack as many items per line as fit).
-    /// Pattern: property:\n\titem1, item2,\n\titem3;
-    fn print_comma_list_wrapped(&mut self, value: &CssValue<'_>) {
-        let CssValue::CommaSeparated { values, .. } = value else {
-            self.print_nested_value(value);
-            return;
-        };
-
-        // Build fill doc with comma+line separators
-        let fill_doc = self.build_comma_fill_doc(values);
-
-        // Write first line indentation, then let fill handle the rest
-        self.write_indent();
-        self.write_arena_doc(fill_doc);
     }
 
     /// Build a fill doc for comma-separated values

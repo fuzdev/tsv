@@ -5,6 +5,28 @@ use std::borrow::Cow;
 
 use crate::whitespace::is_css_whitespace;
 
+/// Emit `consumed` — an opaque construct starting at the char the loop already took from
+/// `chars` — and step the iterator and `byte_pos` past it.
+///
+/// These loops walk **chars** but ask **byte**-indexed helpers how far a construct reaches
+/// (`escapes::escape_len` for an escape, `comments::comment_end` for a comment — each the
+/// single definition of its own rule), so after emitting one the iterator has to be moved
+/// to match. Doing that in one place keeps the two off-by-one hazards — the leading char is
+/// already consumed, and `chars` counts code points while the span counts bytes — from
+/// being re-derived per arm.
+fn emit_opaque(
+    result: &mut String,
+    chars: &mut std::iter::Peekable<impl Iterator<Item = char>>,
+    byte_pos: &mut usize,
+    consumed: &str,
+) {
+    result.push_str(consumed);
+    for _ in 0..consumed.chars().count() - 1 {
+        chars.next();
+    }
+    *byte_pos += consumed.len() - consumed.chars().next().map_or(0, char::len_utf8);
+}
+
 /// Normalize CSS whitespace in extracted source text
 ///
 /// Single-pass normalization that:
@@ -55,42 +77,23 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
     let mut byte_pos = 0usize;
     let mut in_string = false;
     let mut string_delim = '\0';
-    let mut in_comment = false;
     let mut pending_space = false;
 
     while let Some(ch) = chars.next() {
         let ch_start = byte_pos;
         byte_pos += ch.len_utf8();
-        // Check for comment start (outside strings)
-        if !in_string && !in_comment && ch == '/' && chars.peek() == Some(&'*') {
-            // Add space before comment if preceded by non-whitespace (except `(`)
-            // This normalizes `foo,/*` → `foo, /*`
+        // A comment is opaque: emit it whole (`crate::comments::comment_end`) rather than
+        // tracking an `in_comment` flag through three per-char branches. A space is added
+        // on each side when one isn't already there — `foo,/*` → `foo, /*`, and
+        // `*/bar` → `*/ bar` via `pending_space` — which is what makes a glued comment
+        // normalize the same way in every value position.
+        if !in_string && crate::comments::is_comment_start(s.as_bytes(), ch_start) {
             if !result.is_empty() && !result.ends_with(' ') && !result.ends_with('(') {
                 result.push(' ');
             }
-            pending_space = false;
-            result.push('/');
-            chars.next(); // consume '*'
-            byte_pos += 1;
-            result.push('*');
-            in_comment = true;
-            continue;
-        }
-
-        // Check for comment end
-        if in_comment && ch == '*' && chars.peek() == Some(&'/') {
-            result.push('*');
-            chars.next(); // consume '/'
-            byte_pos += 1;
-            result.push('/');
-            in_comment = false;
-            pending_space = true; // Space needed before next token
-            continue;
-        }
-
-        // Inside comment - preserve everything
-        if in_comment {
-            result.push(ch);
+            let end = crate::comments::comment_end(s.as_bytes(), ch_start);
+            emit_opaque(&mut result, &mut chars, &mut byte_pos, &s[ch_start..end]);
+            pending_space = true;
             continue;
         }
 
@@ -152,13 +155,12 @@ pub(crate) fn normalize_css_whitespace(s: &str) -> Cow<'_, str> {
                 result.push(' ');
             }
             pending_space = false;
-            let escape = &s[ch_start..ch_start + len];
-            result.push_str(escape);
-            // The `\` is already consumed; step the iterator over the escape's tail.
-            for _ in 0..escape.chars().count() - 1 {
-                chars.next();
-            }
-            byte_pos = ch_start + len;
+            emit_opaque(
+                &mut result,
+                &mut chars,
+                &mut byte_pos,
+                &s[ch_start..ch_start + len],
+            );
             continue;
         }
 
@@ -265,22 +267,10 @@ pub(crate) fn collapse_whitespace_runs(s: &str) -> Cow<'_, str> {
     let mut byte_pos = 0usize;
     let mut in_string = false;
     let mut string_delim = '\0';
-    let mut in_comment = false;
 
     while let Some(ch) = chars.next() {
         let ch_start = byte_pos;
         byte_pos += ch.len_utf8();
-        // Comment interior: copy verbatim (its whitespace is content).
-        if in_comment {
-            result.push(ch);
-            if ch == '*' && chars.peek() == Some(&'/') {
-                result.push('/');
-                chars.next();
-                byte_pos += 1;
-                in_comment = false;
-            }
-            continue;
-        }
         // String interior: copy verbatim, honoring `\` escapes so an escaped quote
         // (or a `\`-continuation newline) doesn't end the string early.
         if in_string {
@@ -295,15 +285,16 @@ pub(crate) fn collapse_whitespace_runs(s: &str) -> Cow<'_, str> {
             }
             continue;
         }
-        // Comment / string starts.
-        if ch == '/' && chars.peek() == Some(&'*') {
-            result.push('/');
-            result.push('*');
-            chars.next();
-            byte_pos += 1;
-            in_comment = true;
+        // A comment is copied verbatim — its whitespace is content, not a run to collapse.
+        // Taken whole via `crate::comments::comment_end` (the single definition of a
+        // comment's extent) rather than tracked with an `in_comment` flag, so the interior
+        // needs no per-char branch at all.
+        if crate::comments::is_comment_start(s.as_bytes(), ch_start) {
+            let end = crate::comments::comment_end(s.as_bytes(), ch_start);
+            emit_opaque(&mut result, &mut chars, &mut byte_pos, &s[ch_start..end]);
             continue;
         }
+        // String starts.
         if ch == '\'' || ch == '"' {
             in_string = true;
             string_delim = ch;
@@ -319,13 +310,12 @@ pub(crate) fn collapse_whitespace_runs(s: &str) -> Cow<'_, str> {
         if ch == '\\'
             && let Some(len) = crate::escapes::escape_len(s, ch_start)
         {
-            let escape = &s[ch_start..ch_start + len];
-            result.push_str(escape);
-            // The `\` is already consumed; step the iterator over the escape's tail.
-            for _ in 0..escape.chars().count() - 1 {
-                chars.next();
-            }
-            byte_pos = ch_start + len;
+            emit_opaque(
+                &mut result,
+                &mut chars,
+                &mut byte_pos,
+                &s[ch_start..ch_start + len],
+            );
             continue;
         }
         // A whitespace run outside strings/comments: consume it whole and emit one
@@ -449,32 +439,17 @@ fn split_top_level(content: &str, is_sep: impl Fn(u8) -> bool, trim: bool) -> Ve
     let mut parts = Vec::new();
     let mut depth: u32 = 0;
     let mut start = 0;
-    let mut in_comment = false;
     let mut in_quote = false;
     let mut quote_char = b'\0';
     let bytes = content.as_bytes();
 
     let mut i = 0;
     while i < content.len() {
-        // Check for comment start (outside quotes)
-        if !in_quote
-            && !in_comment
-            && i + 1 < content.len()
-            && bytes[i] == b'/'
-            && bytes[i + 1] == b'*'
-        {
-            in_comment = true;
-            i += 2;
-            continue;
-        }
-        // Check for comment end
-        if in_comment && i + 1 < content.len() && bytes[i] == b'*' && bytes[i + 1] == b'/' {
-            in_comment = false;
-            i += 2;
-            continue;
-        }
-        if in_comment {
-            i += 1;
+        // A comment is opaque: step over it whole, so a separator inside `/* … */` is
+        // comment text. `crate::comments::comment_end` is the single definition of how far
+        // it reaches (CSS Syntax 3 §4.3.2), shared with the value scanners.
+        if !in_quote && crate::comments::is_comment_start(bytes, i) {
+            i = crate::comments::comment_end(bytes, i);
             continue;
         }
 

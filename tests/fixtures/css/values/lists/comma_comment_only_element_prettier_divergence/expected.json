@@ -1,0 +1,80 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 257,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 9,
+					"end": 10,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 9,
+							"end": 10,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "a",
+											"start": 9,
+											"end": 10
+										}
+									],
+									"start": 9,
+									"end": 10
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 11,
+					"end": 248,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 95,
+							"end": 118,
+							"property": "font-family",
+							"value": ", b"
+						},
+						{
+							"type": "Declaration",
+							"start": 205,
+							"end": 244,
+							"property": "font-family",
+							"value": ",\n\t\t\tb b"
+						}
+					]
+				},
+				"start": 9,
+				"end": 248
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 249,
+			"styles": "\n\ta {\n\t\t/* A first element that is nothing but comments: tsv keeps the list inline */\n\t\tfont-family: /* c */, b;\n\t\t/* Same for a run of them, and with a later element that would break the list */\n\t\tfont-family:\n\t\t\t/* c */ /* d */,\n\t\t\tb b;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 258,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
