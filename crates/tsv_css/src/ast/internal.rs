@@ -470,6 +470,22 @@ pub enum CssValue<'arena> {
         span: Span,
     },
 
+    /// An `@import` prelude's `supports()` call, whose argument is parsed as the
+    /// condition it is rather than kept as opaque text.
+    ///
+    /// `supports( <supports-condition> | <declaration> )` (css-cascade-5
+    /// §"Conditional import rules") is the grammar `@supports` takes, so the argument
+    /// carries the same `ConditionQuery` and prints through the same printer — one
+    /// condition, one form, in both positions. The function's own parentheses **are**
+    /// the condition part's, so the query holds exactly one part and `span` (the whole
+    /// call, `supports` through its `)`) needs no separate paren bookkeeping. `name` is
+    /// a verbatim source slice like `Function`'s, so the author's case survives.
+    SupportsCondition {
+        name: &'arena str,
+        condition: ConditionQuery<'arena>,
+        span: Span,
+    },
+
     /// Space-separated list of values
     List {
         values: &'arena [CssValue<'arena>],
@@ -492,6 +508,7 @@ impl CssValue<'_> {
             CssValue::Dimension { span, .. } => *span,
             CssValue::Color { span, .. } => *span,
             CssValue::Function { span, .. } => *span,
+            CssValue::SupportsCondition { span, .. } => *span,
             CssValue::List { span, .. } => *span,
             CssValue::CommaSeparated { span, .. } => *span,
         }
