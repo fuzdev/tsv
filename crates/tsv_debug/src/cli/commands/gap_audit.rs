@@ -60,6 +60,14 @@
 //! the program via ASI (`return// c⏎ x`), cannot produce a false positive. That is why the
 //! oracle here is the ledger and not an output diff.
 //!
+//! **Two detectors ride the one format.** The ledger is the first; the render-time
+//! [swallow check](tsv_lang::doc::swallow) is the second, and it answers a question the
+//! ledger is **structurally blind** to — "did a `//` eat the content after it on its output
+//! line?" A swallowing comment is printed exactly once, so the print-once account balances
+//! while a token is silently lost. Arming both on the *same* format call is what makes the
+//! second one affordable (no extra format, no extra parse), and both kinds are ratcheted
+//! alike; see [`Kind::Swallow`].
+//!
 //! ## Scope — what a green run does NOT prove
 //!
 //! Two limits compose, and neither is visible in a `✓`.
@@ -110,7 +118,7 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use by_node::{by_node_json_sections, compute_by_node, report_by_node, report_rank, report_since};
 use snapshot::{
-    KnownKey, count_panics, count_soft, is_pinnable, known_shapes_path, ratchet, snapshot_keys,
+    KnownKey, count_panics, count_swallows, is_pinnable, known_shapes_path, ratchet, snapshot_keys,
 };
 use verify::{verify_example, victim_seed_offset};
 
@@ -149,15 +157,15 @@ pub struct GapAuditCommand {
     json: bool,
 
     /// print the full per-shape report even when the ratchet holds. A passing gate is
-    /// summary-only by default — ~700 shapes it already knows about is noise in
+    /// summary-only by default — the several hundred shapes it already knows about are noise in
     /// `deno task check`. Any run with something to act on reports regardless
     #[argh(switch)]
     report: bool,
 
     /// after the run, also print a COARSE by-(node, edge) rollup of the finding shapes: a
     /// ranked emitter work-list keyed on the enclosing AST node + child-role edge, folding
-    /// the ~700 fine token shapes into the few dozen printer clusters. A report-only view —
-    /// it never changes the ratchet grade or the exit code
+    /// the several hundred fine token shapes into the few dozen printer clusters. A report-only
+    /// view — it never changes the ratchet grade or the exit code
     #[argh(switch)]
     by_node: bool,
 
@@ -291,9 +299,16 @@ enum Kind {
     /// existing format is what closes it — a second *detector* on one format, not a second
     /// format (the reason this is affordable where a full `f1_check` was not).
     ///
-    /// Held **report-only** ([`is_graded`](snapshot::is_graded)): the class is newly visible
-    /// here and its shapes have not been triaged, so it reports without grading rather than
-    /// pinning ~330 unreviewed claims into the ratchet.
+    /// **Graded like the ledger kinds** ([`snapshot_keys`](snapshot::snapshot_keys)) — it was
+    /// staged report-only only while the swallow check was armed on `tsv_ts`'s emitters alone,
+    /// since a shape set half the printers could not produce is an artifact of the instrument,
+    /// not of the formatter. Every `tsv_svelte` comment emitter now tags its whole span too, so
+    /// the arm is whole and the class pins like any other known bug.
+    ///
+    /// It differs from the ledger kinds on one axis: there is **no verify pass**. A swallow is
+    /// read straight off the rendered output (like `blank_audit`'s F1/reparse kinds), and the
+    /// verify oracle — the multiset of comment *contents* — answers the ledger's question, not
+    /// this one, so every swallow shape would file a bogus `UNCONFIRMED`.
     Swallow,
     Panic,
 }
@@ -936,8 +951,19 @@ impl GapAuditCommand {
             let added = pinned.difference(&previous).count();
             let net = added as isize - retired as isize;
             println!("  yield: gaps −{retired} +{added} (net {net:+})");
-            // Spend the verify pass rather than discarding it. Pinning is the moment ~700
-            // claims get frozen, so it is exactly when it's worth saying which ones the
+            // Break the total out by what it costs: SWALLOW is lost CODE where the two ledger
+            // kinds are lost COMMENTS, and the write line above says only "shape(s)". Printed
+            // at the pin because that is when the split is decided, not merely reported.
+            let swallows = count_swallows(&total.shapes);
+            if swallows > 0 {
+                println!(
+                    "  of {} pinned, {swallows} are SWALLOW — a `//` eating the content after \
+                     it, i.e. lost CODE",
+                    pinned.len()
+                );
+            }
+            // Spend the verify pass rather than discarding it. Pinning is the moment several
+            // hundred claims get frozen, so it is exactly when it's worth saying which ones the
             // audit could not reproduce. A WARNING, not a refusal: an unconfirmed shape is
             // still a real finding, and the verdict describes the shape's one sampled
             // example rather than the shape, so refusing on it would both block `--update`
@@ -998,26 +1024,25 @@ impl GapAuditCommand {
             }
         }
 
-        // The report-only class is never part of a grade — surface it on its own so a reader
-        // can't mistake a quiet ✓ for "no swallows".
-        let soft = count_soft(&total.shapes);
-        if soft > 0 {
+        // The swallow class gates like the rest, but it is the only CODE-loss kind here and the
+        // summary line speaks of dropped comments — so name its share, or a `✓` over a snapshot
+        // holding hundreds of them reads as "no swallows".
+        let swallows = count_swallows(&total.shapes);
+        if swallows > 0 {
             eprintln!(
-                "\n○ {soft} SWALLOW shape(s) — a `//` comment swallowing following content on \
-                 its output line — reported, NOT gated. The print-once ledger is blind to this \
-                 class (the comment IS printed once), so these are invisible to \
+                "\n○ of those, {swallows} SWALLOW shape(s) — a `//` comment swallowing following \
+                 content on its output line, i.e. lost CODE. The print-once ledger is blind to \
+                 this class (the comment IS printed once), so these are invisible to \
                  `comments:audit`. See docs/gap_audit.md."
             );
         }
 
-        // Off the default corpus the snapshot doesn't apply — every GRADED finding is news.
-        // The report-only class is excluded here for the same reason it is excluded from the
-        // ratchet: it reports, it never decides an exit status.
+        // Off the default corpus the snapshot doesn't apply — every finding is news.
         if !default_paths {
-            return if total.shapes.keys().any(|(k, _)| snapshot::is_graded(*k)) {
-                Err(CliError::Failed)
-            } else {
+            return if total.shapes.is_empty() {
                 Ok(())
+            } else {
+                Err(CliError::Failed)
             };
         }
         // A narrowed default run reaches only part of the snapshot's shape set (or, under
@@ -1072,8 +1097,9 @@ impl GapAuditCommand {
 
         if !new.is_empty() {
             eprintln!(
-                "\n✗ {} NEW finding shape(s) — a comment in one of these gaps is dropped or \
-                 double-printed, and the snapshot has never seen it:",
+                "\n✗ {} NEW finding shape(s) — a comment in one of these gaps is dropped, \
+                 double-printed, or swallows the content after it, and the snapshot has never \
+                 seen it:",
                 new.len()
             );
             for k in new.iter().take(40) {
@@ -1116,7 +1142,7 @@ impl GapAuditCommand {
             // makes it unparseable. Logs go to stderr (the `corpus:compare --json` contract).
             let msg = format!(
                 "\n✓ ratchet holds — every finding shape is a known bug ({} pinned); no new \
-                 gap drops a comment",
+                 gap drops a comment or swallows the content after one",
                 diff.known
             );
             if self.json {
@@ -1189,7 +1215,6 @@ fn build_report(total: &Tally, payloads: &[Payload]) -> (RunSummary, Vec<Finding
                     bystander_hits: agg.bystander_hits,
                     verify_confirmed: agg.verify.map(|v| v.confirmed),
                     verify_total: agg.verify.map(|v| v.total),
-                    gated: snapshot::is_graded(*kind),
                 }),
             }
         })
@@ -1197,9 +1222,9 @@ fn build_report(total: &Tally, payloads: &[Payload]) -> (RunSummary, Vec<Finding
     (summary, findings)
 }
 
-/// A finding's [`Severity`]: a `PANIC` is an absolute break (gate-failing on its own); a
-/// drop / double-print is informational, its fatality decided by the ratchet; a `SWALLOW` is
-/// informational and never fatal at all (report-only, see [`snapshot::is_graded`]).
+/// A finding's [`Severity`]: a `PANIC` is an absolute break (gate-failing on its own); every
+/// other kind — drop, double-print, swallow — is informational, its fatality decided by the
+/// ratchet.
 fn severity_of(kind: Kind) -> Severity {
     match kind {
         Kind::Panic => Severity::GateFailing,

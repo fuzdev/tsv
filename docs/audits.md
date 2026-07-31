@@ -10,9 +10,9 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 
 | audit | task | catches | gating |
 | --- | --- | --- | --- |
-| [Swallow](#line-comment-swallow-audit-swallowaudit) | `swallow:audit` | `//` line comment followed by content on one output line (silent content loss) | `deno task check` |
+| [Swallow](#line-comment-swallow-audit-swallowaudit) | `swallow:audit` | `//` line comment followed by content on one output line (silent content loss) | `deno task check`; `audit:corpus` (real code) |
 | [Comment ledger](#comment-ledger-audit-commentsaudit) | `comments:audit` | a parsed comment DROPPED or DOUBLE-PRINTED (print-once) | `deno task check` |
-| [Gap injection](#gap-injection-audit-gapsaudit) | `gaps:audit` | comment drops in gaps no fixture covers | `deno task check` (ratchet) |
+| [Gap injection](#gap-injection-audit-gapsaudit) | `gaps:audit` | comment drops — and `//` swallows — in gaps no fixture covers | `deno task check` (ratchet) |
 | [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse / ledger / blank-run | `deno task check` (ratchet) |
 | [Blank fabrication](#blank-fabrication-audit-fabricationaudit) | `fabrication:audit` | a blank line the formatter INVENTS on a pristine seed (the author never wrote it) | `deno task check` (ratchet) |
 | [Comment census](#comment-census-audit-censusaudit) | `census:audit` | a comment interior lost, gained, or rewritten between raw input and raw output — parse-time drops included, which the ledger can't see | `deno task check` (ratchet) |
@@ -48,7 +48,9 @@ cargo run --profile corpus -p tsv_debug --features audits swallow_audit ~/dev/zz
 # code). The `swallow:audit` deno task builds it via the `audits` umbrella feature
 # (swallow_check + comment_check) under `--profile corpus`, the single build world
 # EVERY `deno task check` audit shares; `--features swallow_check` alone still works
-# for a targeted run. Gated in `deno task check` (via `swallow:audit`) over tests/fixtures.
+# for a targeted run. Gated in `deno task check` (via `swallow:audit`) over tests/fixtures,
+# and as a leg of `deno task audit:corpus` over the real-code corpus + the prettier suites —
+# where the class actually lives (the callee-position swallow sits in ONE file anywhere).
 #
 # Coverage is every render that appends to the output buffer — the main loop AND
 # its sub-renders (fill segments, the line-suffix flush), all driving one
@@ -72,7 +74,7 @@ cargo run --profile corpus -p tsv_debug --features audits swallow_audit ~/dev/zz
 ⚠️ **A green `swallow:audit` does not mean "no swallows"** — it formats each file **as
 authored**, so a swallow only reachable once a comment sits in some other gap is a swallow it
 never provokes. The [gap-injection audit](gap_audit.md) arms this same check on its injected
-formats and reports what that reaches, as its report-only
+formats and ratchets what that reaches, as its
 [SWALLOW class](gap_audit.md#the-swallow-class). The
 [comment census](#comment-census-audit-censusaudit) sees an as-authored swallow from the other
 side — the comment's interior GAINS the swallowed code, a multiset imbalance — with no
@@ -121,10 +123,15 @@ cargo run --profile corpus -p tsv_debug --features audits gap_audit ~/dev/zzz/sr
 # panic=abort, so a formatter panic kills the process instead of being caught + reported.
 #
 # GATED as a RATCHET, not a green gate: `gap_audit_known.txt` is a machine-generated
-# snapshot of the ~717 shapes tests/fixtures produces, every line a KNOWN BUG, the file
+# snapshot of every shape tests/fixtures produces, every line a KNOWN BUG, the file
 # shrinking is the goal. A shape not on the list, one on it that no longer fires, or any
 # PANIC, FAILS. `--limit`/`--payload`/`--all-bytes`/a path narrow a run, so they skip the
 # ratchet and refuse `--update`. ~17 s.
+#
+# Two detectors ride the one format, and BOTH are ratcheted: the ledger's DROPPED /
+# DOUBLE-PRINTED, and the render-time swallow check's SWALLOW — a `//` eating the content
+# after it, i.e. lost CODE, which the print-once ledger is structurally blind to (the
+# comment IS printed once). A holding run names the swallow share on its own line.
 ```
 
 `deno task gaps:audit:update` regenerates the snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); it refuses a narrowed run.
@@ -671,7 +678,7 @@ deno task idempotency:sweep
 
 ## The Corpus Bundle (`audit:corpus`)
 
-The standing content-loss / robustness gate over REAL code — the extension-robustness bar that `deno task check`'s fixture-only scope is structurally blind to: `roundtrip_audit --gate` + `comment_audit` + `binding_audit --gate` (real gating; prettier suites report-only) + `authoring_audit` + `fuzz --iterations 0`, over the `perf` corpus view + the pinned prettier suites. Pure Rust; absent dev repos warn-skip (floor = `../svelte` src). NOT in `deno task check` (machine-dependent corpus, minutes); wired into publish Step 3c alongside conformance:all's SAFETY. Run at conformance/release cadence or after a printer change. See ../benches/js/CLAUDE.md §Gate map.
+The standing content-loss / robustness gate over REAL code — the extension-robustness bar that `deno task check`'s fixture-only scope is structurally blind to: `roundtrip_audit --gate` + `comment_audit` + `swallow_audit` + `binding_audit --gate` (real gating; prettier suites report-only) + `authoring_audit` + `fuzz --iterations 0`, over the `perf` corpus view + the pinned prettier suites. Pure Rust; absent dev repos warn-skip (floor = `../svelte` src). NOT in `deno task check` (machine-dependent corpus, minutes); wired into publish Step 3c alongside conformance:all's SAFETY. Run at conformance/release cadence or after a printer change. See ../benches/js/CLAUDE.md §Gate map.
 
 ```bash
 deno task audit:corpus

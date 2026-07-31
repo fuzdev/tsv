@@ -1192,7 +1192,6 @@ fn build_report(total: &Tally) -> (RunSummary, Vec<Finding>) {
                     count: agg.count,
                     files: agg.files.len(),
                     node_type: ex.node_type.clone(),
-                    gated: true,
                 }),
             }
         })
