@@ -30,31 +30,48 @@ use tsv_arena::with_ast_arena;
 #[cfg(feature = "format")]
 use tsv_arena::with_doc_arena;
 
-/// Extract a &str from source pointer, or return an error result.
+/// Decode the caller's source buffer and render a payload from it: either `f`'s,
+/// or an error payload when the buffer can't be decoded.
+///
+/// The `&str` is handed *into* `f` rather than returned, which is what bounds
+/// its lifetime to this call. Returning it would need a lifetime appearing only
+/// in the return type — caller-chosen, `'static` included, with nothing tying it
+/// to the host's buffer (the `CStr::from_ptr` shape). Passing it down makes that
+/// unrepresentable, and matches the `with_*` idiom the rest of the crate and
+/// `tsv_arena` already use.
+///
+/// Exactly one payload is rendered per call — `f` runs only on the paths that
+/// don't render an error — so `out_len` is written exactly once either way.
 ///
 /// # Safety
-/// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes
-/// (a null `source_ptr` is tolerated when `source_len` is 0, and reported as an
-/// error otherwise).
-unsafe fn extract_source<'a>(
+/// - `source_ptr` must point to valid UTF-8 of `source_len` bytes (a null
+///   `source_ptr` is tolerated when `source_len` is 0, and reported as an error
+///   otherwise)
+/// - `out_len` must be valid for writes of a `usize`
+unsafe fn with_extracted_source(
     source_ptr: *const u8,
     source_len: usize,
     out_len: *mut usize,
-) -> Result<&'a str, *mut u8> {
+    f: impl FnOnce(&str) -> *mut u8,
+) -> *mut u8 {
     // An empty source needs no read at all — and short-circuiting matters for
     // soundness: `slice::from_raw_parts` requires a non-null pointer even for
     // length 0, while FFI hosts commonly hand (null, 0) for an empty buffer
     // (e.g. Deno's `UnsafePointer.of` on an empty typed array is null).
     if source_len == 0 {
-        return Ok("");
+        return f("");
     }
     if source_ptr.is_null() {
-        return Err(error_result("Null source pointer", out_len));
+        // SAFETY: `out_len` validity is the caller's contract, forwarded.
+        return unsafe { error_result("Null source pointer", out_len) };
     }
+    // SAFETY: caller guarantees `source_ptr` is valid for `source_len` bytes,
+    // and the null/empty cases are handled above.
     let bytes = unsafe { slice::from_raw_parts(source_ptr, source_len) };
     match std::str::from_utf8(bytes) {
-        Ok(s) => Ok(s),
-        Err(e) => Err(error_result(&format!("Invalid UTF-8: {e}"), out_len)),
+        Ok(s) => f(s),
+        // SAFETY: `out_len` validity is the caller's contract, forwarded.
+        Err(e) => unsafe { error_result(&format!("Invalid UTF-8: {e}"), out_len) },
     }
 }
 
@@ -87,68 +104,72 @@ where
     F: FnOnce(&str) -> Result<B, String> + panic::UnwindSafe,
     B: Into<Vec<u8>>,
 {
-    let source = match unsafe { extract_source(source_ptr, source_len, out_len) } {
-        Ok(s) => s,
-        Err(ptr) => return ptr,
+    let render = |source: &str| match panic::catch_unwind(|| f(source)) {
+        // SAFETY: `out_len` validity is the caller's contract.
+        Ok(Ok(result)) => unsafe { bytes_to_ptr(result, out_len) },
+        Ok(Err(e)) => unsafe { error_result(&e, out_len) },
+        Err(payload) => unsafe { error_result(&format_panic(&*payload), out_len) },
     };
-
-    match panic::catch_unwind(|| f(source)) {
-        Ok(Ok(result)) => bytes_to_ptr(result, out_len),
-        Ok(Err(e)) => error_result(&e, out_len),
-        Err(payload) => error_result(&format_panic(&*payload), out_len),
-    }
+    // SAFETY: the pointer contract is this function's own, forwarded verbatim.
+    unsafe { with_extracted_source(source_ptr, source_len, out_len, render) }
 }
 
 /// Helper for internal parse (no conversion, no JSON serialization).
 /// Returns empty string on success, error JSON on failure.
 /// Catches panics (when built with `panic = "unwind"`) and returns them as error JSON.
 ///
-/// Uses `std::hint::black_box` to prevent the compiler from optimizing away
-/// the parse when the AST result is unused.
+/// `f` yields nothing on success by design: this is the benchmark-only path, and
+/// the AST it parses never leaves the arena scope. **Keeping that parse from
+/// being optimized away is `f`'s own job** — `parse_internal!` holds the AST live
+/// with `std::hint::black_box(&ast)` *inside* the arena closure, which is the
+/// only place it still exists. Nothing out here can stand in for that.
 ///
 /// # Safety
 /// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes.
 #[cfg(feature = "parse")]
-unsafe fn with_source_parse_internal<F, T>(
+unsafe fn with_source_parse_internal<F>(
     source_ptr: *const u8,
     source_len: usize,
     out_len: *mut usize,
     f: F,
 ) -> *mut u8
 where
-    F: FnOnce(&str) -> Result<T, String> + panic::UnwindSafe,
+    F: FnOnce(&str) -> Result<(), String> + panic::UnwindSafe,
 {
-    let source = match unsafe { extract_source(source_ptr, source_len, out_len) } {
-        Ok(s) => s,
-        Err(ptr) => return ptr,
+    let render = |source: &str| match panic::catch_unwind(|| f(source)) {
+        // SAFETY: `out_len` validity is the caller's contract.
+        Ok(Ok(())) => unsafe { bytes_to_ptr(Vec::new(), out_len) }, // Success: empty output
+        Ok(Err(e)) => unsafe { error_result(&e, out_len) },
+        Err(payload) => unsafe { error_result(&format_panic(&*payload), out_len) },
     };
-
-    match panic::catch_unwind(|| f(source)) {
-        Ok(Ok(ast)) => {
-            // Prevent compiler from optimizing away the parse
-            std::hint::black_box(ast);
-            bytes_to_ptr(Vec::new(), out_len) // Success: empty output
-        }
-        Ok(Err(e)) => error_result(&e, out_len),
-        Err(payload) => error_result(&format_panic(&*payload), out_len),
-    }
+    // SAFETY: the pointer contract is this function's own, forwarded verbatim.
+    unsafe { with_extracted_source(source_ptr, source_len, out_len, render) }
 }
 
 /// Convert an output payload (JSON bytes or a formatted `String` — anything
 /// byte-convertible) to a raw pointer, writing the length to `out_len`.
-fn bytes_to_ptr(payload: impl Into<Vec<u8>>, out_len: *mut usize) -> *mut u8 {
+///
+/// # Safety
+/// - `out_len` must be valid for writes of a `usize`
+/// - the returned pointer owns a boxed slice of the written length, and is
+///   released only by `tsv_free(ptr, len)` with that same length
+unsafe fn bytes_to_ptr(payload: impl Into<Vec<u8>>, out_len: *mut usize) -> *mut u8 {
     let bytes = payload.into().into_boxed_slice();
-    // Safety: out_len is guaranteed valid by caller contract
+    // SAFETY: `out_len` validity is the caller's contract.
     unsafe { *out_len = bytes.len() };
     Box::into_raw(bytes).cast::<u8>()
 }
 
 /// Return an error as a JSON object.
-fn error_result(message: &str, out_len: *mut usize) -> *mut u8 {
+///
+/// # Safety
+/// Same contract as [`bytes_to_ptr`], which renders the payload.
+unsafe fn error_result(message: &str, out_len: *mut usize) -> *mut u8 {
     let error = serde_json::json!({ "error": message });
     #[allow(clippy::unwrap_used)] // JSON serialization of simple object won't fail
     let json = serde_json::to_string(&error).unwrap();
-    bytes_to_ptr(json, out_len)
+    // SAFETY: `out_len` validity is the caller's contract, forwarded.
+    unsafe { bytes_to_ptr(json, out_len) }
 }
 
 /// Generate `tsv_parse_<lang>` / `tsv_parse_internal_<lang>` / `tsv_format_<lang>`
@@ -680,7 +701,7 @@ mod tests {
         // (null, 0) — the empty source, as FFI hosts commonly pass it (e.g.
         // Deno's `UnsafePointer.of` on an empty typed array is null). Formats
         // to empty output, no error.
-        // Safety: extract_source short-circuits before any read.
+        // SAFETY: `with_extracted_source` short-circuits before any read.
         let ptr = unsafe { tsv_format_typescript(std::ptr::null(), 0, &raw mut out_len) };
         assert!(!ptr.is_null(), "FFI returned a null pointer");
         let out = unsafe { slice::from_raw_parts(ptr, out_len) };

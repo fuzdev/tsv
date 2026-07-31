@@ -39,13 +39,22 @@ default = ["format", "parse"]
 format = ["tsv_arena/format"]
 parse = ["tsv_ts/convert", "tsv_css/convert", "tsv_svelte/convert"]
 
-# N-API generates unsafe code, exactly like the FFI crate. Cargo replaces the
-# whole [lints] table on override (no partial inherit), so the workspace lints
-# are re-declared verbatim below — only `unsafe_code` differs. Keep in sync with
-# the root [workspace.lints] block; the restriction lints (panic/unwrap_used/etc.)
-# must stay so this crate keeps the same floor as the rest of the workspace.
+# `napi-derive` generates unsafe code. Cargo replaces the whole [lints] table on
+# override (no partial inherit), so the workspace lints are re-declared verbatim
+# below — only `unsafe_code` differs. Keep in sync with the root
+# [workspace.lints] block; the restriction lints (panic/unwrap_used/etc.) must
+# stay so this crate keeps the same floor as the rest of the workspace.
+#
+# `deny`, not `allow`: `#[napi]` expands to items carrying their own
+# `#[allow(unsafe_code)]`, and an inner `allow` overrides `deny` — it cannot
+# override `forbid`, which is why inheriting the workspace table fails to
+# compile and this override exists at all. So `deny` lets the macro's generated
+# items through while every OTHER site in the crate still has to justify itself,
+# and this crate hand-writes no unsafe at all — so today nothing does. The
+# exemption stays scoped to the generated N-API surface instead of the whole
+# crate: a hand-written `unsafe` block added here is a compile error.
 [lints.rust]
-unsafe_code = "allow"
+unsafe_code = "deny"
 missing_debug_implementations = "allow"
 trivial_casts = "warn"
 trivial_numeric_casts = "warn"
