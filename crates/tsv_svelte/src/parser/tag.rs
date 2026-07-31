@@ -4,6 +4,7 @@
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
+use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::TriviaProfile;
 use tsv_lang::{ParseError, Span};
 use tsv_ts::Expression;
@@ -185,7 +186,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             "declaration end must not pass the closing brace"
         );
         if !self.source[decl_end..close_brace]
-            .trim_matches(|c: char| c.is_whitespace() || c == ';')
+            .trim_matches(|c: char| is_svelte_ws(c) || c == ';')
             .is_empty()
         {
             return Err(self.error_msg_at("unexpected content after declaration", decl_end));

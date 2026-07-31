@@ -3,6 +3,7 @@
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
+use crate::whitespace::svelte_ws_width_at;
 use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 use tsv_lang::{ParseError, Span};
 
@@ -267,14 +268,14 @@ pub(crate) fn subslice_offset(outer: &str, inner: &str) -> usize {
 ///   `<style>` in markup, which Svelte reads through its generic element parser: it
 ///   rejects `</script  >` there, and tsv matches that (verified parity). Migrating it
 ///   to the whitespace-tolerant scan would introduce a divergence.
-pub(crate) fn find_raw_text_close(bytes: &[u8], from: usize, tag: &[u8]) -> Option<usize> {
-    find_tag_close(bytes, from, tag, true)
+pub(crate) fn find_raw_text_close(source: &str, from: usize, tag: &[u8]) -> Option<usize> {
+    find_tag_close(source, from, tag, true)
 }
 
 /// Exact-`</tag>` sibling of `find_raw_text_close` (no whitespace before `>`); see there
 /// for the whitespace-tolerant-vs-exact split and why both exist.
-pub(crate) fn find_exact_tag_close(bytes: &[u8], from: usize, tag: &[u8]) -> Option<usize> {
-    find_tag_close(bytes, from, tag, false)
+pub(crate) fn find_exact_tag_close(source: &str, from: usize, tag: &[u8]) -> Option<usize> {
+    find_tag_close(source, from, tag, false)
 }
 
 /// If a whitespace/attribute-tolerant closing tag `</tag…>` starts **exactly** at byte
@@ -291,7 +292,8 @@ pub(crate) fn find_exact_tag_close(bytes: &[u8], from: usize, tag: &[u8]) -> Opt
 /// tolerates attributes on the close (`</textarea data-x >`, not just `\s*>`), it matches
 /// the tag name case-insensitively (`</TEXTAREA>`), and it reports the `>` offset (the
 /// reader needs it for the element end).
-pub(crate) fn rcdata_close_at(bytes: &[u8], i: usize, tag: &[u8]) -> Option<(usize, usize)> {
+pub(crate) fn rcdata_close_at(source: &str, i: usize, tag: &[u8]) -> Option<(usize, usize)> {
+    let bytes = source.as_bytes();
     if bytes.get(i) != Some(&b'<') || bytes.get(i + 1) != Some(&b'/') {
         return None;
     }
@@ -300,13 +302,17 @@ pub(crate) fn rcdata_close_at(bytes: &[u8], i: usize, tag: &[u8]) -> Option<(usi
     if rest.len() < tag.len() || !rest[..tag.len()].eq_ignore_ascii_case(tag) {
         return None;
     }
+    // `</` + an ASCII tag name, so this is a char boundary — safe to decode from.
     let after_name = name_start + tag.len();
     match bytes.get(after_name) {
         // `</textarea>` — closes directly.
         Some(b'>') => Some((i, after_name)),
-        // `</textarea\s[^>]*>` — the required whitespace, then non-`>`* to the first `>`.
-        Some(b) if b.is_ascii_whitespace() => {
-            let mut j = after_name + 1;
+        // `</textarea\s[^>]*>` — the required whitespace (the full `\s`, so
+        // `</textarea\u{3000}>` closes), then non-`>`* to the first `>`. Any other
+        // trailing character (`</textareax`, `</textarea/`) is not a close, and falls
+        // out as the `?` on the width lookup.
+        Some(_) => {
+            let mut j = after_name + svelte_ws_width_at(source, after_name)?;
             while let Some(&c) = bytes.get(j) {
                 if c == b'>' {
                     return Some((i, j));
@@ -315,8 +321,8 @@ pub(crate) fn rcdata_close_at(bytes: &[u8], i: usize, tag: &[u8]) -> Option<(usi
             }
             None
         }
-        // Any other trailing byte (`</textareax`, `</textarea/`) is not a close.
-        _ => None,
+        // Trailing EOF (`</textarea`) is not a close.
+        None => None,
     }
 }
 
@@ -324,21 +330,24 @@ pub(crate) fn rcdata_close_at(bytes: &[u8], i: usize, tag: &[u8]) -> Option<(usi
 /// selects the whitespace-tolerant (`\s*>`) vs exact (`>`) close. Callers pick a named
 /// wrapper so the boolean never reaches a call site.
 fn find_tag_close(
-    bytes: &[u8],
+    source: &str,
     from: usize,
     tag: &[u8],
     allow_ws_before_gt: bool,
 ) -> Option<usize> {
+    let bytes = source.as_bytes();
     let mut i = from;
     while i < bytes.len() {
         if bytes[i] == b'<'
             && bytes.get(i + 1) == Some(&b'/')
             && bytes.get(i + 2..).is_some_and(|rest| rest.starts_with(tag))
         {
+            // `</` + an ASCII tag name, so this is a char boundary — safe to decode from.
             let mut j = i + 2 + tag.len();
             if allow_ws_before_gt {
-                while bytes.get(j).is_some_and(u8::is_ascii_whitespace) {
-                    j += 1;
+                // The full `\s` of `/<\/tag\s*>/`, so `</style\u{a0}>` closes.
+                while let Some(width) = svelte_ws_width_at(source, j) {
+                    j += width;
                 }
             }
             if bytes.get(j) == Some(&b'>') {

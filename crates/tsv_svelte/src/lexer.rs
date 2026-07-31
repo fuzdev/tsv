@@ -3,6 +3,8 @@ use std::str::Chars;
 // Shared lexer-error constructor: used by the unterminated/unexpected sites in `next_token`.
 use tsv_lang::{ParseError, lex_err, source_scan};
 
+use crate::whitespace::is_svelte_ws;
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum TokenKind {
     LeftAngle,     // <
@@ -126,7 +128,7 @@ impl<'a> Lexer<'a> {
 
     fn skip_whitespace(&mut self) {
         while let Some(ch) = self.current {
-            if ch.is_whitespace() {
+            if is_svelte_ws(ch) {
                 self.advance();
             } else {
                 break;
@@ -147,13 +149,13 @@ impl<'a> Lexer<'a> {
     }
 
     /// Byte offset of the first non-whitespace char at or after the cursor, without
-    /// consuming input. Whitespace matches `skip_whitespace` (`char::is_whitespace`),
-    /// so a follow-up `skip_whitespace()` lands exactly here.
+    /// consuming input. Whitespace matches `skip_whitespace` ([`is_svelte_ws`]), so a
+    /// follow-up `skip_whitespace()` lands exactly here.
     #[inline]
     fn peek_past_whitespace(&self) -> usize {
         let mut pos = self.position;
         for ch in self.source[self.position..].chars() {
-            if ch.is_whitespace() {
+            if is_svelte_ws(ch) {
                 pos += ch.len_utf8();
             } else {
                 break;
@@ -344,11 +346,28 @@ impl<'a> Lexer<'a> {
                 // Advance past first char — ! is a valid start but not a continuation char
                 self.advance();
                 while let Some(ch) = self.current {
-                    // `is_alphanumeric` already covers Unicode *letters* (so `<my-café>`
-                    // works); `is_pcen_char` adds the non-alphanumeric members of the HTML
-                    // custom-element name grammar (`·`, ZWNJ/ZWJ, astral emoji) so a whole
-                    // custom-element name stays in one token. It sits last: ASCII
-                    // short-circuits on `is_alphanumeric` before reaching it. Over-admitting
+                    // The overwhelmingly common name char, and disjoint from every
+                    // terminator below — so taking it first keeps the whitespace guard
+                    // off the hot path without changing what the loop accepts.
+                    if ch.is_ascii_alphanumeric() {
+                        self.advance();
+                        continue;
+                    }
+                    // Whitespace ends a name run before any name-char test, mirroring
+                    // `read_until(regex)`, where the terminator wins over what the name
+                    // grammar would otherwise admit. Not redundant with the classes below:
+                    // PCENChar spans `[#xFDF0-#xFFFD]`, which contains U+FEFF — the one
+                    // character that is both Svelte whitespace and a custom-element name
+                    // char. Without this guard `</div\u{feff}>` lexes as the name
+                    // `div\u{feff}` and fails to close its `div`.
+                    if is_svelte_ws(ch) {
+                        break;
+                    }
+                    // `is_alphanumeric` covers the non-ASCII Unicode *letters* the fast
+                    // path above leaves (so `<my-café>` works); `is_pcen_char` adds the
+                    // non-alphanumeric members of the HTML custom-element name grammar
+                    // (`·`, ZWNJ/ZWJ, astral emoji) so a whole custom-element name stays in
+                    // one token. It sits last, and ASCII never reaches it. Over-admitting
                     // (e.g. a PCENChar with no preceding hyphen) is harmless — the parser's
                     // `is_valid_tag_name` gate rejects any name that isn't valid.
                     if ch.is_alphanumeric()
