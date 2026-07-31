@@ -1,0 +1,476 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1085,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 822,
+				"data": "\n\tA whitespace-collapsing container lays out block-style, but the break may only land where\n\tthe compiler removes the whitespace ENTIRELY — between two non-text children. A boundary\n\twith a TEXT child lands INSIDE that text node, where the whitespace collapses to a rendered\n\tspace instead of vanishing, so the authored boundary is reproduced exactly: glued stays\n\tglued, and an authored space is carried by the line break rather than written twice. The\n\tcontainer's own edges are always trimmed (the compiler strips them). Cases below, in order:\n\ta lone text child; text glued after an element; text glued before an element; an authored\n\tspace before the text; the same glued case in a <datalist>; two glued elements (control —\n\ttheir boundary is whitespace-only, so it is removed entirely and the break is free).\n"
+			},
+			{
+				"type": "Text",
+				"start": 822,
+				"end": 823,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 823,
+				"end": 847,
+				"name": "select",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 824
+					},
+					"end": {
+						"line": 12,
+						"column": 7,
+						"character": 830
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 831,
+							"end": 838,
+							"raw": "\n\ttext\n",
+							"data": "\n\ttext\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 847,
+				"end": 848,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 848,
+				"end": 890,
+				"name": "select",
+				"name_loc": {
+					"start": {
+						"line": 15,
+						"column": 1,
+						"character": 849
+					},
+					"end": {
+						"line": 15,
+						"column": 7,
+						"character": 855
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 856,
+							"end": 858,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 858,
+							"end": 876,
+							"name": "option",
+							"name_loc": {
+								"start": {
+									"line": 16,
+									"column": 2,
+									"character": 859
+								},
+								"end": {
+									"line": 16,
+									"column": 8,
+									"character": 865
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 866,
+										"end": 867,
+										"raw": "a",
+										"data": "a"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 876,
+							"end": 881,
+							"raw": "text\n",
+							"data": "text\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 890,
+				"end": 891,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 891,
+				"end": 933,
+				"name": "select",
+				"name_loc": {
+					"start": {
+						"line": 18,
+						"column": 1,
+						"character": 892
+					},
+					"end": {
+						"line": 18,
+						"column": 7,
+						"character": 898
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 899,
+							"end": 905,
+							"raw": "\n\ttext",
+							"data": "\n\ttext"
+						},
+						{
+							"type": "RegularElement",
+							"start": 905,
+							"end": 923,
+							"name": "option",
+							"name_loc": {
+								"start": {
+									"line": 19,
+									"column": 6,
+									"character": 906
+								},
+								"end": {
+									"line": 19,
+									"column": 12,
+									"character": 912
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 913,
+										"end": 914,
+										"raw": "a",
+										"data": "a"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 923,
+							"end": 924,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 933,
+				"end": 934,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 934,
+				"end": 978,
+				"name": "select",
+				"name_loc": {
+					"start": {
+						"line": 21,
+						"column": 1,
+						"character": 935
+					},
+					"end": {
+						"line": 21,
+						"column": 7,
+						"character": 941
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 942,
+							"end": 944,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 944,
+							"end": 962,
+							"name": "option",
+							"name_loc": {
+								"start": {
+									"line": 22,
+									"column": 2,
+									"character": 945
+								},
+								"end": {
+									"line": 22,
+									"column": 8,
+									"character": 951
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 952,
+										"end": 953,
+										"raw": "a",
+										"data": "a"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 962,
+							"end": 969,
+							"raw": "\n\ttext\n",
+							"data": "\n\ttext\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 978,
+				"end": 979,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 979,
+				"end": 1025,
+				"name": "datalist",
+				"name_loc": {
+					"start": {
+						"line": 25,
+						"column": 1,
+						"character": 980
+					},
+					"end": {
+						"line": 25,
+						"column": 9,
+						"character": 988
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 989,
+							"end": 991,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 991,
+							"end": 1009,
+							"name": "option",
+							"name_loc": {
+								"start": {
+									"line": 26,
+									"column": 2,
+									"character": 992
+								},
+								"end": {
+									"line": 26,
+									"column": 8,
+									"character": 998
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 999,
+										"end": 1000,
+										"raw": "b",
+										"data": "b"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1009,
+							"end": 1014,
+							"raw": "text\n",
+							"data": "text\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1025,
+				"end": 1026,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1026,
+				"end": 1084,
+				"name": "select",
+				"name_loc": {
+					"start": {
+						"line": 28,
+						"column": 1,
+						"character": 1027
+					},
+					"end": {
+						"line": 28,
+						"column": 7,
+						"character": 1033
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1034,
+							"end": 1036,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1036,
+							"end": 1054,
+							"name": "option",
+							"name_loc": {
+								"start": {
+									"line": 29,
+									"column": 2,
+									"character": 1037
+								},
+								"end": {
+									"line": 29,
+									"column": 8,
+									"character": 1043
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1044,
+										"end": 1045,
+										"raw": "a",
+										"data": "a"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1054,
+							"end": 1056,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1056,
+							"end": 1074,
+							"name": "option",
+							"name_loc": {
+								"start": {
+									"line": 30,
+									"column": 2,
+									"character": 1057
+								},
+								"end": {
+									"line": 30,
+									"column": 8,
+									"character": 1063
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1064,
+										"end": 1065,
+										"raw": "b",
+										"data": "b"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1074,
+							"end": 1075,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

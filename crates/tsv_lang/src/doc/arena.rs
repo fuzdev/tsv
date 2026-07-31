@@ -207,10 +207,15 @@ const _: () = assert!(!std::mem::needs_drop::<DocNode>());
 // A variant that bloats it would silently regress that locality with no other signal, so pin the
 // size — a change here is a deliberate decision, not an accident. The size is pointer-width
 // dependent (the `AlignRoot { n: usize }` and `DocText::Static(&str)` fat-pointer payloads), so it is
-// pinned per target: 32 B on 64-bit (the native flagship) and 16 B on wasm32 (the shipped WASM
+// pinned per target: 24 B on 64-bit (the native flagship) and 16 B on wasm32 (the shipped WASM
 // bundles, where the locality/allocator budget matters most).
+//
+// ⚠️ **`WithContext` is the 64-bit size driver** — it carries a `DocContext` by value, so a field
+// added there lands on *every* node in the store. That is why `DocContext::trailing_reserve` is a
+// `u16` (it is a column count; as a `usize` it alone held the whole node store at 32 B) and why
+// `DocContext` carries its own size assert. Check that one first when this pin moves.
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(size_of::<DocNode>() == 32);
+const _: () = assert!(size_of::<DocNode>() == 24);
 #[cfg(target_pointer_width = "32")]
 const _: () = assert!(size_of::<DocNode>() == 16);
 

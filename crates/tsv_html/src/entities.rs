@@ -190,8 +190,11 @@ fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(&str, us
             }
             break;
         }
-        // Stop at non-alphanumeric
-        if !ch.is_alphanumeric() {
+        // Stop at anything that cannot appear in a name. Every named character reference is
+        // ASCII, so a non-ASCII character can only ever *end* the run — scanning past it could
+        // never reach a match, and `char::is_alphanumeric` (which admits `中`, `٣`, …) would
+        // carry a multibyte character into the name slices below.
+        if !ch.is_ascii_alphanumeric() {
             break;
         }
     }
@@ -202,7 +205,12 @@ fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(&str, us
     let mut longest_len = 0;
 
     for (i, ch) in rest.char_indices() {
-        if !ch.is_alphanumeric() {
+        // ASCII-only, as above — and load-bearing here rather than merely tidy: `&rest[..=i]` is a
+        // BYTE range, so a multibyte character reaching this line slices mid-character and panics
+        // (`&a中pos;` in an attribute value did, all the way out through `tsv parse`). Keeping the
+        // run ASCII also keeps `longest_len` a byte length that equals the char count, which the
+        // `rest.chars().nth(longest_len)` look-ahead below relies on.
+        if !ch.is_ascii_alphanumeric() {
             break;
         }
         let entity_name = &rest[..=i];

@@ -1,0 +1,194 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 523,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 417,
+				"data": "\n\tA malformed named reference whose name run carries a NON-ASCII character. Named\n\tcharacter references are ASCII-only, so no such run can ever name an entity: the\n\tscan stops at the first non-ASCII character and the source is preserved verbatim.\n\tCases: a multibyte character inside a semicolon-terminated run; the same with no\n\tsemicolon; and a well-formed entity beside it (the control that still decodes).\n"
+			},
+			{
+				"type": "Text",
+				"start": 417,
+				"end": 418,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 418,
+				"end": 451,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 419
+					},
+					"end": {
+						"line": 8,
+						"column": 4,
+						"character": 422
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 423,
+						"end": 444,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 8,
+								"column": 5,
+								"character": 423
+							},
+							"end": {
+								"line": 8,
+								"column": 14,
+								"character": 432
+							}
+						},
+						"value": [
+							{
+								"start": 434,
+								"end": 443,
+								"type": "Text",
+								"raw": "a&b中pos;s",
+								"data": "a&b中pos;s"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 451,
+				"end": 452,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 452,
+				"end": 483,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 453
+					},
+					"end": {
+						"line": 9,
+						"column": 4,
+						"character": 456
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 457,
+						"end": 476,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 9,
+								"column": 5,
+								"character": 457
+							},
+							"end": {
+								"line": 9,
+								"column": 14,
+								"character": 466
+							}
+						},
+						"value": [
+							{
+								"start": 468,
+								"end": 475,
+								"type": "Text",
+								"raw": "a&b中pos",
+								"data": "a&b中pos"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 483,
+				"end": 484,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 484,
+				"end": 522,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 485
+					},
+					"end": {
+						"line": 10,
+						"column": 4,
+						"character": 488
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 489,
+						"end": 515,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 10,
+								"column": 5,
+								"character": 489
+							},
+							"end": {
+								"line": 10,
+								"column": 14,
+								"character": 498
+							}
+						},
+						"value": [
+							{
+								"start": 500,
+								"end": 514,
+								"type": "Text",
+								"raw": "&amp; a&b中pos;",
+								"data": "& a&b中pos;"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
