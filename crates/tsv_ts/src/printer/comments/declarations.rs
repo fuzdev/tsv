@@ -252,6 +252,8 @@ impl<'a> Printer<'a> {
     /// `:`→type annotation and its union arm (`build_type_annotation_doc`), the
     /// marker→`:` before-colon gap (`build_marker_colon_line_continuation`), the
     /// name→`=` initializer gap (`build_initializer_line_continuation`), the
+    /// type-parameter pre-keyword gaps — name→`extends` and pre-`=`
+    /// (`push_keyword_value_or_continuation`, `types/type_params.rs`) — the
     /// name→marker gap and the dotted-name gap (`build_dot_gap_doc`), the
     /// object-property and import-attribute key→`:` gaps, the index-signature
     /// `]`→value-`:` gap (`build_index_signature_member_doc`), and the callee→empty
