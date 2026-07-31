@@ -1038,6 +1038,20 @@ impl<'a> Printer<'a> {
                     child_docs.push(d.group(inner));
                 }
             }
+        } else if multiline && has_leading_ws && !is_first {
+            // Same-line space boundary after a sibling none of the arms above claims — a comment or
+            // a control-flow block (an inline element, tag, block element and own-line declaration
+            // each have their own arm; the linebreak-authored boundary is arm 2). The boundary is
+            // inter-node whitespace, so it collapses to one rendered space and a break there is
+            // render-equivalent — but it must be the fill's OWN `line`, not a space baked into its
+            // first word. Baked in, the fresh-line drop carries the space to the head of the
+            // continuation line (`-->⏎\t text1`), which the next pass reads as indentation and drops:
+            // the format has no fixed point. `leading_line` is the same parity-shifted mechanism the
+            // after-a-tag boundary uses, and the fill renders it Flat (the space) or Break (the
+            // newline) by width.
+            trim_left = true;
+            add_leading_space = false;
+            leading_line = true;
         }
 
         // If text ends with whitespace and next is inline element:
@@ -1120,6 +1134,18 @@ impl<'a> Printer<'a> {
             }
         }
 
+        // The run's LEADING boundary is byte-glued to the previous sibling — no whitespace there,
+        // so there is no break point: dropping the run's first word to a fresh line would inject a
+        // rendered space (and the mangled form is a fixed point, so F1 is blind to it). The fill
+        // renders that first item in place instead and breaks inside the run — see
+        // [`DocContext::glued_lead`], the mirror of `break_before_wide_flow`'s glued half. A first
+        // node's boundary is the parent's (trimmed), and a previous sibling that owns its own line
+        // supplies the break itself, so neither is glued.
+        let glued_lead = !has_leading_ws
+            && !is_first
+            && !prev_owns_line
+            && prev_node.is_some_and(|p| Self::byte_glued(p, &trimmed_nodes[i]));
+
         // Build fill for this text node's words.
         // leading_line: fill starts with line() (text after expression tag)
         // trailing_line: fill ends with line() (text before expression tag or first-child)
@@ -1147,44 +1173,47 @@ impl<'a> Printer<'a> {
             // prettier keeps the opening tag on the text line — see conformance_prettier.md §Svelte:
             // Inline content block-style. A first-child element with NO preceding text is unaffected
             // (it never reaches this text handler; `hug_wide_first` still guards its idempotency).
-            let fill_doc = if next_is_flow && (trailing_line || !has_trailing_ws) {
-                // One `break_before_wide_flow` boundary rule, both authored shapes (the render side
-                // routes each to the right fill case by parity — see the flag's doc):
-                // - **space-separated** (`… word <a…>`, `trailing_line`): the trailing `line` is the
-                //   Case-2 separator; measuring the following element/run flat breaks it so a wide
-                //   element drops to its own line whole rather than packing onto the text line.
-                // - **glued** (`… glued<a…>`, `!has_trailing_ws`, no separator): the glued word is
-                //   the Case-1 last item; the same flat measurement breaks at the whitespace boundary
-                //   BEFORE the glued word so the whole glued run moves to a fresh line together,
-                //   never splitting the glued boundary (which would inject a rendered space).
-                //
-                // Either way an inline element preceded by same-line content that must wrap starts on
-                // a fresh line rather than dangling its opening tag at the text line's end (the
-                // `inline_break_before_*` divergences) — tsv converges every authoring to that form
-                // where prettier keeps the opening tag on the text line (conformance_prettier.md
-                // §Svelte: Inline content block-style). Coupled whether the preceding text is a first
-                // or middle child; a first-child element with NO preceding text is unaffected (it
-                // never reaches this handler; `hug_wide_first` still guards its idempotency). Not
-                // `multiline`-gated: a single-line-authored run that must wrap by width still
-                // converges to the fresh-line form (a short run that fits is a no-op).
+            //
+            // The run's two ends are INDEPENDENT questions, so they are answered independently and
+            // carried on one context rather than by an if/else chain that made them look exclusive:
+            // a run can be glued at both ends at once, and the three flags reach disjoint fill cases
+            // (the head's drop at `offset == 0`, the trailing measurement at `is_final_segment`).
+            //
+            // `break_before_wide_flow` — one boundary rule, both authored shapes (the render side
+            // routes each to the right fill case by parity — see the flag's doc):
+            // - **space-separated** (`… word <a…>`, `trailing_line`): the trailing `line` is the
+            //   Case-2 separator; measuring the following element/run flat breaks it so a wide
+            //   element drops to its own line whole rather than packing onto the text line.
+            // - **glued** (`… glued<a…>`, `!has_trailing_ws`, no separator): the glued word is the
+            //   Case-1 last item; the same flat measurement breaks at the whitespace boundary BEFORE
+            //   the glued word so the whole glued run moves to a fresh line together, never splitting
+            //   the glued boundary (which would inject a rendered space).
+            //
+            // Either way an inline element preceded by same-line content that must wrap starts on a
+            // fresh line rather than dangling its opening tag at the text line's end (the
+            // `inline_break_before_*` divergences) — tsv converges every authoring to that form where
+            // prettier keeps the opening tag on the text line (conformance_prettier.md §Svelte:
+            // Inline content block-style). Not `multiline`-gated: a single-line-authored run that
+            // must wrap by width still converges to the fresh-line form (a short run that fits is a
+            // no-op).
+            //
+            // `trailing_glued_tag` — the text's last word is welded to a following tag with no
+            // whitespace (`… tsv is ~{ratio}`). prettier keeps the tag outside the fill, so the fill
+            // never breaks before that word and the tag rides past printWidth after it. Measure the
+            // last word alone so tsv matches — otherwise the glued tag folds into the word's fit
+            // check and strands it on its own line.
+            let break_before_wide_flow = next_is_flow && (trailing_line || !has_trailing_ws);
+            let trailing_glued_tag = next_is_tag && !has_trailing_ws;
+            // A tag is never `next_is_flow` (disjoint node kinds), so the two trailing rules cannot
+            // both claim the boundary — asserted rather than left to the old chain's ordering.
+            debug_assert!(!(break_before_wide_flow && trailing_glued_tag));
+            let fill_doc = if break_before_wide_flow || trailing_glued_tag || glued_lead {
                 d.with_context(
                     fill_doc,
                     tsv_lang::doc::DocContext {
-                        break_before_wide_flow: true,
-                        ..Default::default()
-                    },
-                )
-            } else if next_is_tag && !has_trailing_ws {
-                // The text's last word is welded to a following tag with no whitespace
-                // (`… tsv is ~{ratio}`). prettier keeps the tag outside the fill, so the fill never
-                // breaks before that word and the tag rides past printWidth after it. Measure the
-                // last word alone so tsv matches — otherwise the glued tag folds into the word's fit
-                // check and strands it on its own line. (A tag is never `next_is_flow`, so this is
-                // disjoint from the flow branch above.)
-                d.with_context(
-                    fill_doc,
-                    tsv_lang::doc::DocContext {
-                        trailing_glued_tag: true,
+                        break_before_wide_flow,
+                        trailing_glued_tag,
+                        glued_lead,
                         ..Default::default()
                     },
                 )
@@ -1541,6 +1570,19 @@ impl<'a> Printer<'a> {
     /// the inline form and reproduces the block-authored form both formatters already keep — see
     /// [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
     ///
+    /// ⚠️ **That licence stops at a TEXT child, and the boundary is where it stops.**
+    /// `can_remove_entirely` removes a node only when its data is exactly `' '` — a whitespace-only
+    /// run between two *non-text* children. A boundary with a **content text** child lands *inside*
+    /// that text node, where the run collapses to a rendered space instead of vanishing. So such a
+    /// boundary is reproduced as authored rather than block-styled: a **glued** boundary gets no
+    /// separator at all (a break there would inject a rendered space — and the mangled form is a
+    /// fixed point, so F1 cannot see it), and an authored **space** is spent on the `hardline`, the
+    /// text itself being built trimmed so the space is not written twice (which would strand a
+    /// leading space the next pass reads as indentation and drops). The container's own **edges**
+    /// stay free either way — `clean_nodes` strips the first and last text node's outer whitespace
+    /// whatever the parent — so a lone text child still takes its own line. Pinned by
+    /// [`ws_collapsing_container_text_child`](../../../../../tests/fixtures/svelte/elements/ws_collapsing_container_text_child_prettier_divergence/).
+    ///
     /// Whitespace-only text nodes are dropped — with one carry-over: an **authored blank line**
     /// (2+ newlines) is a Tier-2 authoring signal preserved block-style everywhere else, so it
     /// survives (collapsed to a single blank) between the two children it separates, exactly as
@@ -1559,6 +1601,9 @@ impl<'a> Printer<'a> {
         // A skipped inter-sibling whitespace run carrying a blank line: the run itself is trimmed
         // (render-free), but the blank line is carried to the next child as a doubled separator.
         let mut pending_blank = false;
+        // The previous child was a content TEXT node with no trailing whitespace, so the boundary
+        // to whatever follows is glued: no separator may be emitted there.
+        let mut prev_text_glued_after = false;
         for node in nodes {
             // Trim inter-sibling whitespace — render-free in this container — but remember an
             // authored blank line so the next child reintroduces it.
@@ -1570,23 +1615,40 @@ impl<'a> Printer<'a> {
                 }
                 continue;
             }
-            let node_doc = if format_ignore_next {
+            // One dispatch, three outcomes: the node's doc plus whether each of its boundaries is
+            // GLUED (no separator may be emitted there). Only a content text child can be glued —
+            // every other kind sits behind a whitespace-only run the container removes entirely, so
+            // its boundaries are always free. A content text is built TRIMMED (see the doc comment)
+            // and its authored whitespace, not a re-emitted space, decides each separator.
+            let (node_doc, glued_before, glued_after) = if format_ignore_next {
                 format_ignore_next = false;
-                self.format_ignore_raw_doc(node)
+                (self.format_ignore_raw_doc(node), false, false)
+            } else if let FragmentNode::Text(t) = node {
+                let raw = t.raw(self.source);
+                (
+                    self.build_text_fill_doc_trimmed(raw, true, true, false, false),
+                    !raw.starts_with(is_collapsible_ws_char),
+                    !raw.ends_with(is_collapsible_ws_char),
+                )
             } else {
                 if Self::is_format_ignore_comment(node, self.source) {
                     format_ignore_next = true;
                 }
-                self.build_fragment_node_doc_in_multiline(node)
+                (
+                    self.build_fragment_node_doc_in_multiline(node),
+                    false,
+                    false,
+                )
             };
             if let Some(node_doc) = node_doc {
-                if !parts.is_empty() {
+                if !parts.is_empty() && !prev_text_glued_after && !glued_before {
                     parts.push(d.hardline());
                     if pending_blank {
                         parts.push(d.hardline());
                     }
                 }
                 pending_blank = false;
+                prev_text_glued_after = glued_after;
                 parts.push(node_doc);
             }
         }

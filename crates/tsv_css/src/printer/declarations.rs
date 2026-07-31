@@ -463,13 +463,7 @@ impl<'a> Printer<'a> {
     fn write_arena_doc_reserving(&mut self, doc: DocId, reserve: usize) {
         let reserved = {
             let d = self.d();
-            let marker = d.with_context(
-                d.empty(),
-                DocContext {
-                    trailing_reserve: reserve,
-                    ..Default::default()
-                },
-            );
+            let marker = d.with_context(d.empty(), DocContext::reserving(reserve));
             d.concat(&[doc, marker])
         };
         self.write_arena_doc(reserved);
@@ -745,10 +739,7 @@ impl<'a> Printer<'a> {
 
         // Reserve 1 char for trailing semicolon to prevent fill from packing
         // to exactly printWidth and then exceeding when ';' is added
-        let context = DocContext {
-            trailing_reserve: 1,
-            ..Default::default()
-        };
+        let context = DocContext::reserving(1);
         let fill = d.fill(&parts);
         d.with_context(fill, context)
     }
@@ -781,10 +772,7 @@ impl<'a> Printer<'a> {
     fn build_space_fill_doc(&self, values: &[CssValue<'_>]) -> DocId {
         let d = self.d();
         let parts = self.build_space_fill_parts(values);
-        let context = DocContext {
-            trailing_reserve: 1,
-            ..Default::default()
-        };
+        let context = DocContext::reserving(1);
         let fill = d.fill(&parts);
         d.with_context(fill, context)
     }

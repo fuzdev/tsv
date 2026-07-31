@@ -61,7 +61,11 @@ pub struct DocContext {
     /// which would be exceeded when the parent adds trailing punctuation.
     ///
     /// Example: CSS declarations add ";" after the value, so reserve 1 char.
-    pub trailing_reserve: usize,
+    ///
+    /// `u16`, not `usize`: this is a **column count**, bounded in practice by print width, and
+    /// `DocContext` is stored *inline* in `DocNode::WithContext`, whose size is `const`-asserted
+    /// per target (see below). Widening it here spends the budget that the layout flags need.
+    pub trailing_reserve: u16,
 
     /// When set, the fill's trailing separator (its terminal `line`, the only one reaching the
     /// "content + separator" render case) measures the *immediately following* node — the next
@@ -139,6 +143,53 @@ pub struct DocContext {
     /// Off for every other fill, so the general last-item look-ahead (a hard-limit guard that keeps
     /// the following node from overshooting printWidth) is unaffected.
     pub trailing_glued_tag: bool,
+
+    /// When set, the fill's FIRST item is **byte-glued** to whatever precedes it on the render
+    /// stack, so the boundary before it carries no whitespace. The fill therefore never moves that
+    /// item to a fresh line when it doesn't fit mid-line: it renders in place (prettier's shape) and
+    /// breaks at the first whitespace boundary *inside* the run instead, even when the glued head
+    /// overruns printWidth. Only the fill's head is affected — every later item is separated by real
+    /// whitespace and breaks normally.
+    ///
+    /// This is the mirror of [`Self::break_before_wide_flow`]'s glued half, on the other side of the
+    /// run: there a text run is glued to a *following* element and the break travels to the
+    /// whitespace before the run; here the run is glued to a *preceding* node (a Svelte
+    /// `<!--c-->text` boundary) and there is no whitespace before it to travel to. Breaking anyway
+    /// would inject a rendered space — and the mangled form is a fixed point, so F1 cannot see it.
+    ///
+    /// Scoped to a Svelte text-run fill whose leading boundary is glued. Off for every other fill,
+    /// so the ordinary fresh-line drop (text word-wrap, CSS value lists) is unaffected.
+    pub glued_lead: bool,
+}
+
+// `DocContext` is stored **inline** in `DocNode::WithContext`, whose size is `const`-asserted per
+// target — 16 B on wasm32, the tightest budget and the one the shipped npm packages build under.
+// Nothing in `deno task check` builds wasm32, so without this assert a context that outgrows the
+// budget passes every gate and fails only at `deno task build:packages` (it already did once:
+// adding `glued_lead` blew the `DocNode` assert, invisibly to the whole gate chain).
+//
+// This pins the cost **here**, natively, where the field is added. A new flag is free while the
+// bools fit the padding; the moment one doesn't, pack them into a bitfield rather than raising
+// these numbers — `DocNode`'s own budget has no room to give.
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<DocContext>() == 8);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(size_of::<DocContext>() == 8);
+
+impl DocContext {
+    /// A context that only reserves `columns` trailing columns — the CSS trailing-punctuation
+    /// case, and the sole reason [`Self::trailing_reserve`] exists.
+    ///
+    /// Callers hold their widths as `usize`, so the clamp lives here rather than at each of them.
+    /// It is unobservable: a reserve at all near `u16::MAX` already means "nothing fits", which is
+    /// what saturating produces.
+    #[must_use]
+    pub fn reserving(columns: usize) -> Self {
+        Self {
+            trailing_reserve: u16::try_from(columns).unwrap_or(u16::MAX),
+            ..Self::default()
+        }
+    }
 }
 
 /// Sentinel value for cached_width: text contains a newline.
