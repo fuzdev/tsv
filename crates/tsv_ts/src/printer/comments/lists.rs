@@ -276,6 +276,37 @@ impl<'a> Printer<'a> {
             })
     }
 
+    /// Whether the construct spanning `[span_start, span_end)` ends its doc with a **line
+    /// comment** rather than with its `;` — the case where its terminator gap held one and
+    /// [`Self::split_separator_gap_comments`] deferred it past the `;`, onto a line of its
+    /// own.
+    ///
+    /// A caller that trails a same-line comment on this construct has to ask, because the
+    /// anchor for "same line" is the `;`'s position in **source** while what the comment
+    /// would actually land next to is the doc's **last line**. When the two differ, an
+    /// appended block is welded onto the line comment (`// c /* b */`) — the block becomes
+    /// text of the comment and is lost.
+    ///
+    /// Keyed on the `;`: only a terminator defers. A `}` / `,` / member end prints nothing
+    /// after itself, so its same-line run still trails. Keyed on a **line** comment because
+    /// only a `//` runs to end of line; a deferred block leaves the line open.
+    pub(crate) fn terminator_defers_line_comment(&self, span_start: u32, span_end: u32) -> bool {
+        let bytes = self.source.as_bytes();
+        if span_end == 0 || bytes.get(span_end as usize - 1) != Some(&b';') {
+            return false;
+        }
+        let semi = span_end - 1;
+        let Some(last) = comments_to_emit_in_range(self.comments, span_start, semi).last() else {
+            return false;
+        };
+        // Only whitespace may sit between the deferred comment and the `;` — anything else
+        // means the comment is interior to the construct, not in its terminator gap.
+        !last.is_block
+            && bytes[last.span.end as usize..semi as usize]
+                .iter()
+                .all(u8::is_ascii_whitespace)
+    }
+
     /// Build docs for trailing same-line comments after a node
     ///
     /// Line comments are wrapped in `line_suffix` so they don't affect width

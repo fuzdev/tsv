@@ -189,14 +189,29 @@ fn build_chain_doc_impl<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) ->
             .flat_map(|g| g.nodes.iter())
             .any(|n| has_inside_bracket_comments(n, printer));
 
+    // Member-only chain with interior line comments: break the chain and emit each
+    // comment in place (shared comment-aware path), instead of the fill path's
+    // line_suffix — which defers mid-chain line comments to end of line, merging/
+    // reversing multiple. Prettier hoists these; tsv preserves position.
+    //
+    // Routed ahead of `first_has_parens` because that gate is about LAYOUT — letting a
+    // parenthesized base break at group boundaries rather than inside itself — and this
+    // chain breaks at every member regardless, so there is no width decision left for it
+    // to make. Behind it, a parenthesized head (a cast, an `await`, an arrow) fell
+    // through to the call-chain path, whose boundary-less `line_suffix` defers the
+    // comment to end of line; it then merged with whatever else flushed there
+    // (`.g; // c1 // c2`), the second `//` becoming text of the first. `has_bracket_comments`
+    // still routes first: fill can't break inside a computed member's brackets, which is
+    // a shape question this builder doesn't answer.
+    if !has_calls
+        && !has_bracket_comments
+        && chain_has_comments
+        && member_only_has_interior_line_comments(groups, printer)
+    {
+        return build_member_only_chain_with_comments_doc(groups, printer);
+    }
+
     if !has_calls && !first_has_parens && !has_bracket_comments {
-        // Member-only chain with interior line comments: break the chain and emit
-        // each comment in place (shared comment-aware path), instead of the fill
-        // path's line_suffix — which defers mid-chain line comments to end of line,
-        // merging/reversing multiple. Prettier hoists these; tsv preserves position.
-        if chain_has_comments && member_only_has_interior_line_comments(groups, printer) {
-            return build_member_only_chain_with_comments_doc(groups, printer);
-        }
         // Member-only chain: use fill for greedy packing
         return build_member_only_chain_doc(groups, printer);
     }

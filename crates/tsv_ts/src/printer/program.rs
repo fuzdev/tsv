@@ -40,6 +40,9 @@ impl<'a> Printer<'a> {
         let mut parts = d.pooled_docbuf();
         let mut prev_end = 0u32;
         let mut has_output = false;
+        // Set when the statement just emitted deferred a line comment past its own `;`, so
+        // its doc ends on a later line than the `;` and cannot carry that line's comments.
+        let mut prev_deferred_line_comment = false;
 
         for (stmt_idx, statement) in program.body.iter().enumerate() {
             // Skip standalone EmptyStatements but preserve blank lines and comments around them
@@ -104,7 +107,7 @@ impl<'a> Printer<'a> {
             if let Some(leading_doc) = self.build_leading_comments_doc(
                 prev_end,
                 statement.span().start,
-                !has_output,
+                !has_output || prev_deferred_line_comment,
                 false,
             ) {
                 parts.push(leading_doc);
@@ -122,20 +125,29 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_statement_doc(statement, true));
             }
 
-            // Trailing same-line comments. Bound the scan by the next *printed*
-            // statement's start so a comment only attaches to the statement it
-            // immediately follows — multiple statements on one source line
-            // (`a(); b(); // c`) must not each grab the trailing comment — while
-            // still claiming a comment trailing a dropped `;` on this line
-            // (`a();; // c`), which the erased `;` emits nothing to carry.
-            let next_start = next_printed_stmt_start(program.body, stmt_idx, program.span.end);
-            let trailing_docs =
-                self.build_trailing_same_line_comment_docs(statement.span().end, next_start);
-            parts.extend(trailing_docs);
-
-            // Update prev_end to be after any trailing same-line comments
-            // This ensures blank line detection works correctly
-            prev_end = self.find_end_with_trailing_comments(statement.span().end);
+            // Trailing same-line comments — unless this statement deferred a line comment
+            // past its own `;`, in which case its doc ends with that comment and nothing
+            // may share the line (`terminator_defers_line_comment`). Those comments lead
+            // the NEXT statement instead, which is what leaving `prev_end` at the `;`
+            // hands over — advancing it (what the trailing case does, to keep blank-line
+            // detection honest) would DROP them, since this emitter skipped them and the
+            // leading run would start past them.
+            let span = statement.span();
+            prev_deferred_line_comment = self.terminator_defers_line_comment(span.start, span.end);
+            if prev_deferred_line_comment {
+                prev_end = span.end;
+            } else {
+                // Bound the scan by the next *printed* statement's start so a comment only
+                // attaches to the statement it immediately follows — multiple statements
+                // on one source line (`a(); b(); // c`) must not each grab the trailing
+                // comment — while still claiming a comment trailing a dropped `;` on this
+                // line (`a();; // c`), which the erased `;` emits nothing to carry.
+                let next_start = next_printed_stmt_start(program.body, stmt_idx, program.span.end);
+                parts.extend(self.build_trailing_same_line_comment_docs(span.end, next_start));
+                // Update prev_end to be after any trailing same-line comments
+                // This ensures blank line detection works correctly
+                prev_end = self.find_end_with_trailing_comments(span.end);
+            }
             has_output = true;
         }
 
@@ -166,11 +178,17 @@ impl<'a> Printer<'a> {
     /// When `force_non_inline` is true, all comments are treated as non-inline (own line).
     /// This is used for empty statements that will be skipped - their inline comments
     /// have nothing to be inline with.
+    /// `claims_trailing` says this run owns the comments sharing `prev_end`'s source line.
+    /// Normally the previous statement's trailing emitter takes them, so they are skipped
+    /// here; two callers claim them instead — the file-start run (there is no previous
+    /// statement) and a run whose previous statement deferred a line comment past its own
+    /// `;` (`terminator_defers_line_comment`), whose doc therefore ends on a later line and
+    /// cannot carry them. Skipping them in BOTH places is a dropped comment.
     fn build_leading_comments_doc(
         &self,
         prev_end: u32,
         curr_start: u32,
-        is_first: bool,
+        claims_trailing: bool,
         force_non_inline: bool,
     ) -> Option<DocId> {
         let d = self.d();
@@ -183,8 +201,8 @@ impl<'a> Printer<'a> {
             let position =
                 classify_comment_fast(comment, prev_end, curr_start, self.comment_line_breaks);
 
-            // Skip trailing comments EXCEPT for first statement (file start)
-            if !is_first && matches!(position, CommentPosition::Trailing) {
+            // Skip trailing comments unless this run claims them (see `claims_trailing`).
+            if !claims_trailing && matches!(position, CommentPosition::Trailing) {
                 last_comment_end = comment.span.end;
                 continue;
             }
@@ -199,7 +217,7 @@ impl<'a> Printer<'a> {
             // returns Trailing (same line as prev_end=0) but these should stay inline with
             // the expression since they're also on the same line as curr_start.
             let is_inline = matches!(position, CommentPosition::LeadingInline)
-                || (is_first
+                || (claims_trailing
                     && comment.is_block
                     && matches!(position, CommentPosition::Trailing)
                     && self.is_same_line(comment.span.end, curr_start));
