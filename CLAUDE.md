@@ -1091,6 +1091,17 @@ collapses is decided by per-element grouping — the array family groups each el
 collapses), the params family doesn't (run breaks) — mirrored from prettier; the full rule
 is in ./docs/comments.md.
 
+⚠️ **A run at the END of a container takes its separator BEFORE each comment**, never after
+— `Printer::build_trailing_body_comments_doc` where a last item precedes it (`prev_end == 0`
+being the program's `}`-less form) and `Printer::push_dangling_comment_run` where the run is
+the container's only content. The "separator after each non-last comment" formulation has to
+ask the comment's **kind**, and its answer — "a block needs no break, the closer follows
+immediately" — is false as soon as another comment follows, welding that comment onto the
+block's line (`/* c1 *//* c2 */`). It is **lossless** (the weld reparses as the same two
+comments) and idempotent, so the ledger, the census, F1, the fuzzer and the round-trip are
+all blind to it and only a prettier `compare` finds it — which is why the rule lives in one
+emitter per question rather than at each container.
+
 Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/linter use
 cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — see
 [conformance_prettier.md §Comment relocation](docs/conformance_prettier.md#comment-relocation).

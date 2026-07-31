@@ -447,20 +447,14 @@ impl<'a> Printer<'a> {
                     }
                 }
 
-                // Print leading comments before this statement
-                for comment in &leading_comments {
-                    stmt_parts.push(self.build_comment_doc(comment));
-                    if !comment.is_block {
-                        // Line comment: add hardline after
-                        stmt_parts.push(d.hardline());
-                    } else if !self.is_same_line(comment.span.end, stmt_start) {
-                        // Block comment not on same line as statement - add hardline
-                        stmt_parts.push(d.hardline());
-                    } else {
-                        // Block comment on same line as statement - add space
-                        stmt_parts.push(d.text(" "));
-                    }
-                }
+                // Print leading comments before this statement, on the shared rule
+                // (prettier's `printLeadingComment`) the block / class / interface / member
+                // lists all use — the separator after each comment is keyed on the source
+                // around *that comment*, never on where the statement starts. Keying it on
+                // the statement instead splits a run the author glued
+                // (`/* c1 */ /* c2 */⏎stmt`), which is the bug family docs/comments.md
+                // §"Leading comments" names; the case-LABEL run above already routes here.
+                self.push_leading_comments_before(&mut stmt_parts, &leading_comments, stmt_start);
 
                 stmt_parts.push(match frozen {
                     // The freeze emitter claims the glued block comment the statement

@@ -347,8 +347,12 @@ impl<'a> Printer<'a> {
     ) -> DocBuf {
         let d = self.d();
         let mut docs = DocBuf::new();
-        // Track line reference — follows multi-line block comments to their
-        // closing */ line (same logic as build_trailing_same_line_comments_doc in mod.rs)
+        // Track line reference — follows multi-line block comments to their closing */
+        // line, the same walk [`Self::find_end_with_trailing_comments`] makes. The two are
+        // deliberately on different axes and must stay that way: this one is **to emit**
+        // (an owned comment is printed by its own node), while the cursor is **in source**
+        // (it steps over comment bytes so a blank-line scan can't read a comment's own
+        // newlines as an author's blank).
         let mut line_ref = after_pos;
         for comment in comments_to_emit_in_range(self.comments, after_pos, upper_bound) {
             if self.is_same_line(line_ref, comment.span.start) {
@@ -452,7 +456,20 @@ impl<'a> Printer<'a> {
     /// Handles comments that appear after the last member/statement in a body,
     /// with blank line preservation between them. Returns a Vec of docs to append.
     ///
-    /// Used by: class body, interface body, enum body, type literal, namespace body.
+    /// The separator is emitted **before** every comment (`hardline`, preceded by a
+    /// `literalline` when the author left a blank line) rather than after it. Keying it on
+    /// the *following* comment's existence is what makes the rule uniform: a run is a list
+    /// of own-line comments, and the closing `}` supplies its own break. The
+    /// mirror-image formulation — emit the separator *after* each non-last comment — has
+    /// to ask what KIND the comment was, and answering "a block needs no break, the `}`
+    /// follows immediately" welds whatever comes next onto its line (`/* c1 *//* c2 */`,
+    /// `/* c1 *///  c2` — the second comment becomes text of the first).
+    ///
+    /// Used by every end-of-body run: class body, interface body, enum body, type literal,
+    /// namespace body, block-statement bodies (function and bare blocks, via
+    /// [`Self::build_block_body_doc`]), and the `}`-less one — the end of the **program**,
+    /// where `body_end` is the source length.
+    ///
     /// `claims_trailing` says this run owns the comments sharing `prev_end`'s source line.
     /// Normally the last item's trailing emitter took them, so they are skipped here; a
     /// caller whose last item deferred a line comment past its own `;`
@@ -465,56 +482,65 @@ impl<'a> Printer<'a> {
         body_end: u32,
         claims_trailing: bool,
     ) -> DocBuf {
-        let trailing_comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, prev_end, body_end)
-                .filter(|c| !self.comment_already_trailed(Some(prev_end), c, claims_trailing))
-                .collect();
-
-        if trailing_comments.is_empty() {
-            return DocBuf::new();
-        }
-
         let d = self.d();
         let mut docs = DocBuf::new();
-
-        // Check for blank line before the first trailing comment
-        let first_comment = trailing_comments[0];
-        if self.has_blank_line_between(prev_end, first_comment.span.start) {
-            docs.push(d.literalline());
-        }
-        docs.push(d.hardline());
-
-        // Process each trailing comment
         let mut last_pos = prev_end;
-        for (j, comment) in trailing_comments.iter().enumerate() {
-            let is_last = j == trailing_comments.len() - 1;
+        // `prev_end == 0` is the one caller with no previous item at all: a comments-only
+        // file, where the run IS the output. Nothing trailed, so nothing is claimed
+        // ([`Self::comment_already_trailed`]'s `None` anchor), and the first comment opens
+        // the document rather than breaking away from content above it. A real `{}` body's
+        // cursor is at least its `{` plus one, so the two cases can't collide.
+        let anchor = (prev_end > 0).then_some(prev_end);
+        let mut needs_separator = anchor.is_some();
 
-            // Check for blank lines between comments
-            if j > 0 && self.has_blank_line_between(last_pos, comment.span.start) {
-                docs.push(d.literalline());
+        for comment in comments_to_emit_in_range(self.comments, prev_end, body_end) {
+            if self.comment_already_trailed(anchor, comment, claims_trailing) {
+                // Already emitted as the last item's trailing run — but the cursor still
+                // steps over its BYTES, since the blank-line scan below reads raw source
+                // and would otherwise count a multi-line block's own newlines as a blank.
+                last_pos = comment.span.end;
+                continue;
+            }
+            if needs_separator {
+                if self.has_blank_line_between(last_pos, comment.span.start) {
+                    docs.push(d.literalline());
+                }
                 docs.push(d.hardline());
             }
-
-            // Check if there's a blank line after this comment (to next comment)
-            let has_blank_after = !is_last
-                && self
-                    .has_blank_line_between(comment.span.end, trailing_comments[j + 1].span.start);
-
             docs.push(self.build_comment_doc(comment));
-
-            // Line comment - add hardline after unless:
-            // - It's the last comment (closing brace follows)
-            // - There's a blank line after (the blank line separator handles it)
-            if !comment.is_block && !is_last && !has_blank_after {
-                docs.push(d.hardline());
-            }
-            // Block comments don't need hardline after in this context
-            // (the closing brace follows immediately)
-
             last_pos = comment.span.end;
+            needs_separator = true;
         }
 
         docs
+    }
+
+    /// Append a **dangling** comment run — the comments alone inside an otherwise empty
+    /// delimiter pair, with no node to lead or trail — joined by a `hardline` (prettier's
+    /// `printDanglingComments`).
+    ///
+    /// The separator sits strictly BETWEEN comments: the delimiter pair supplies the break
+    /// before the first and after the last. It is emitted before each comment but the
+    /// first, never after each comment but the last, for the same reason
+    /// [`Self::build_trailing_body_comments_doc`] is — the "after" formulation has to ask
+    /// what KIND the comment was, and "a block needs no break, the closer follows
+    /// immediately" is false the moment another comment follows, welding the two together
+    /// (`/* c1 *//* c2 */`).
+    ///
+    /// The caller owns whether the run can stay inline: it picks the open/close separator
+    /// (a collapsible `line`/`softline`, or a `hardline` for the always-exploded bodies).
+    pub(crate) fn push_dangling_comment_run<'c>(
+        &self,
+        parts: &mut DocBuf,
+        comments: impl IntoIterator<Item = &'c internal::Comment>,
+    ) {
+        let d = self.d();
+        for (i, comment) in comments.into_iter().enumerate() {
+            if i > 0 {
+                parts.push(d.hardline());
+            }
+            parts.push(self.build_comment_doc(comment));
+        }
     }
 
     /// Compute the "delimiter-line prefix" for the open-delimiter trailing-comment
@@ -695,52 +721,19 @@ impl<'a> Printer<'a> {
     /// Always breaks when a comment is present — used by the containers prettier
     /// keeps exploded (class body, interface body, namespace body). The
     /// containers that keep a fitting block comment inline (object literals and
-    /// patterns, enum bodies, type literals) use the
-    /// `build_empty_*_inline_with_comments_doc` helpers instead.
+    /// patterns, enum bodies, type literals) pass a collapsible `sep` to
+    /// [`Self::build_empty_bracketed_with_comments_doc`] instead; "always breaks" is
+    /// nothing more than that same emitter with a `hardline` separator, so both live on
+    /// one dangling-comment rule.
     pub(crate) fn build_empty_body_with_comments_doc(&self, body_span: Span) -> DocId {
-        self.build_empty_delimited_with_comments_doc(body_span.start, body_span.end, "{}")
-    }
-
-    /// Build a Doc for an empty delimited container that may contain comments.
-    ///
-    /// Generic helper for both `{}` and `[]` containers. `pair` is the closed
-    /// form (`"{}"` / `"[]"` — two single-byte delimiters), emitted whole on the
-    /// comment-free path and sliced into its halves around the comment body.
-    fn build_empty_delimited_with_comments_doc(
-        &self,
-        span_start: u32,
-        span_end: u32,
-        pair: &'static str,
-    ) -> DocId {
         let d = self.d();
-        let body_start = span_start + 1; // After opening delimiter
-        let body_end = span_end.saturating_sub(1); // Before closing delimiter
-
-        // Single binary search to find comments (no collect: peek covers both the
-        // empty check and the is-last check).
-        let mut comments =
-            comments_to_emit_in_range(self.comments, body_start, body_end).peekable();
-
-        if comments.peek().is_none() {
-            return d.text(pair);
-        }
-        let mut comment_parts = DocBuf::new();
-
-        while let Some(comment) = comments.next() {
-            comment_parts.push(self.build_comment_doc(comment));
-            // Add hardline after line comments, except for the last one
-            // (the hardline before closing delimiter handles that)
-            if !comment.is_block && comments.peek().is_some() {
-                comment_parts.push(d.hardline());
-            }
-        }
-
-        d.concat(&[
-            d.text(&pair[..1]),
-            d.indent(d.concat(&[d.hardline(), d.concat(&comment_parts)])),
+        self.build_empty_bracketed_with_comments_doc(
+            body_span.start,
+            body_span.end,
+            d.text("{"),
+            "}",
             d.hardline(),
-            d.text(&pair[1..]),
-        ])
+        )
     }
 
     /// Build a Doc for an empty `{}` body whose only content is a dangling
@@ -852,8 +845,8 @@ impl<'a> Printer<'a> {
     /// (bracket spacing) for type literals.
     ///
     /// Containers that always break with a dangling comment (class, interface,
-    /// and namespace bodies) keep using
-    /// [`Self::build_empty_delimited_with_comments_doc`] instead.
+    /// and namespace bodies) reach the same emitter through
+    /// [`Self::build_empty_body_with_comments_doc`], with `sep` a `hardline`.
     fn build_empty_inline_with_comments_doc(
         &self,
         span_start: u32,
@@ -890,14 +883,8 @@ impl<'a> Printer<'a> {
             return d.concat(&[opening, d.text(closing)]);
         }
 
-        // Dangling comments join with hardline (prettier `printDanglingComments`).
         let mut comment_parts = DocBuf::new();
-        for (i, comment) in comments.iter().enumerate() {
-            if i > 0 {
-                comment_parts.push(d.hardline());
-            }
-            comment_parts.push(self.build_comment_doc(comment));
-        }
+        self.push_dangling_comment_run(&mut comment_parts, comments.iter().copied());
 
         // A line comment can't be inlined, so it forces the break; a fitting
         // block comment stays inline (the group breaks on overflow / a multi-line
