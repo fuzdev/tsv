@@ -109,14 +109,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         }
                         return self.parse_expression_statement();
                     }
-                    // Check for `await using` declaration (Explicit Resource Management);
-                    // both gaps carry [no LineTerminator here] — a break before `using` or
-                    // before the binding makes this an `await using` expression statement,
-                    // as does a word-shaped binary operator (`await using in b`)
-                    if self.peek_is_same_line_identifier()
-                        && self.peek_value() == "using"
-                        && self.peek_followed_by_same_line_binding_word()
-                    {
+                    // Check for `await using` declaration (Explicit Resource
+                    // Management); a break at either gap, or a word-shaped binary
+                    // operator (`await using in b`), leaves an expression statement
+                    if self.at_await_using_declaration() {
                         return self.parse_await_using_declaration();
                     }
                     // Regular await expression (rejected by the expression parser
@@ -178,11 +174,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             },
             TokenKind::Identifier => {
                 // Check for contextual keyword 'using' followed by a binding word
-                // (Explicit Resource Management); `using [no LineTerminator
-                // here] BindingIdentifier` — a break makes `using` an identifier
+                // (Explicit Resource Management); a break makes `using` an identifier
                 // statement, and an expression-continuation word (`in`/`instanceof`/
                 // `as`/`satisfies`) keeps the expression reading
-                if self.current_value() == "using" && self.peek_is_same_line_binding_word() {
+                if self.at_using_declaration() {
                     return self.parse_using_declaration();
                 }
                 // Contextual keyword `type` starts a type alias only when the name is
