@@ -57,7 +57,6 @@ impl<'a> Printer<'a> {
         // consequents is independent of comments and is NOT gated.
         let switch_body_end = stmt.span.end - 1; // before '}'
         let body_has_comments = self.has_comments_on_page_between(brace_start + 1, switch_body_end);
-        let mut is_first_item = true;
         for (i, case) in stmt.cases.iter().enumerate() {
             // Own-line comments between the previous case and this one. Same-line
             // trailing comments on the previous case's last statement — and a
@@ -75,11 +74,10 @@ impl<'a> Printer<'a> {
             // (`body_doc` owns that break). Everything after it is an ordinary leading
             // run: a block the author glued to the case leads it (`/* c */ case 2:`), an
             // own-line comment keeps its line, and author blank lines are preserved.
-            if !is_first_item {
+            if i > 0 {
                 let run_start = comments.first().map_or(case.span.start, |c| c.span.start);
                 self.push_blank_preserving_hardline(&mut case_parts, prev_end, run_start);
             }
-            is_first_item = false;
             self.push_leading_comment_run(
                 &mut case_parts,
                 comments.iter().copied(),
@@ -124,20 +122,27 @@ impl<'a> Printer<'a> {
             prev_end = self.find_end_with_trailing_comments(case.span.end);
         }
 
-        // Handle trailing comments after the last case (before closing `}`)
-        // Also handles comments in empty switch bodies
+        // Comments after the last case, before the body's `}` — or, in a body with no
+        // cases at all, the body's whole content. Two different questions, so two
+        // emitters, each the shared statement of its rule (docs/comments.md): with a case
+        // above it the run BREAKS AWAY from that case, so every comment takes its
+        // separator before it; with nothing above it the run is DANGLING and the
+        // separator sits strictly *between* comments, `body_doc` supplying the break on
+        // either side. Neither is spelled "separator after each comment" — that has to ask
+        // a comment's kind, and its answer welds a block onto the next one
+        // (`/* c1 *//* c2 */`), losslessly enough that only a prettier `compare` sees it.
         if body_has_comments {
-            let mut last_trailing_end = prev_end;
-            for comment in comments_to_emit_in_range(self.comments, prev_end, switch_body_end) {
-                if !is_first_item {
-                    if self.has_blank_line_between(last_trailing_end, comment.span.start) {
-                        case_parts.push(d.literalline());
-                    }
-                    case_parts.push(d.hardline());
-                }
-                is_first_item = false;
-                case_parts.push(self.build_comment_doc(comment));
-                last_trailing_end = comment.span.end;
+            if stmt.cases.is_empty() {
+                self.push_dangling_comment_run(
+                    &mut case_parts,
+                    comments_to_emit_in_range(self.comments, prev_end, switch_body_end),
+                );
+            } else {
+                case_parts.extend(self.build_trailing_body_comments_doc(
+                    prev_end,
+                    switch_body_end,
+                    false,
+                ));
             }
         }
 
@@ -172,36 +177,39 @@ impl<'a> Printer<'a> {
         d.group(d.concat(&switch_parts))
     }
 
-    /// Get the end position of a case label (position after the colon)
-    fn get_case_label_end(&self, case: &internal::SwitchCase<'_>) -> u32 {
-        let bytes = self.source.as_bytes();
-        if let Some(test) = &case.test {
-            // Find the label ':' after the test expression, skipping any ':' inside
-            // a comment (`case 1 /* : */:`).
-            let test_end = test.span().end;
-            find_char(
-                bytes,
-                test_end as usize,
-                bytes.len(),
-                b':',
-                TriviaProfile::JS,
-            )
-            .map_or(test_end + 1, |c| c as u32 + 1)
-        } else {
-            // "default:" - find the actual ':' position (comment-skipping).
-            let start = case.span.start;
-            find_char(bytes, start as usize, bytes.len(), b':', TriviaProfile::JS)
-                .map_or(start + "default:".len() as u32, |c| c as u32 + 1)
-        }
+    /// Where the case's head ends — past the test expression, or past the `default`
+    /// keyword — which is where the head→`:` gap opens. The one anchor both the label
+    /// scan and the label emitter measure that gap from.
+    fn case_head_end(case: &internal::SwitchCase<'_>) -> u32 {
+        case.test.as_ref().map_or_else(
+            || case.span.start + "default".len() as u32,
+            |test| test.span().end,
+        )
     }
 
-    /// Collect leading comments for a case-consequent statement (or a dropped
-    /// `EmptyStatement` standing in for one), filtering out whatever's already
-    /// Build a doc for a switch case (without outer indent - that's handled by switch)
+    /// Get the end position of a case label (position after the colon)
+    fn get_case_label_end(&self, case: &internal::SwitchCase<'_>) -> u32 {
+        // Find the label ':' after the head, skipping any ':' inside a comment in the gap
+        // (`case 1 /* : */:`, `default /* : */:`). With no comment the colon follows the
+        // head immediately, which is also the fallback if the scan finds nothing.
+        let head_end = Self::case_head_end(case);
+        find_char(
+            self.source.as_bytes(),
+            head_end as usize,
+            self.source.len(),
+            b':',
+            TriviaProfile::JS,
+        )
+        .map_or(head_end + 1, |c| c as u32 + 1)
+    }
+
+    /// Build a doc for a switch case — the label, its trailing comments, and the
+    /// consequent statement list (without the outer indent, which the switch owns).
     ///
-    /// `inline_comment_boundary` is the position up to which we should look for inline comments
-    /// on this case label (typically the next case start or switch body end).
-    ///
+    /// `inline_comment_boundary` bounds every scan that runs off the end of this case's
+    /// own span: the next case's start, or the switch body's `}` for the last one. A
+    /// fallthrough case has no consequent to bound them, and a trailing comment on the
+    /// last statement falls outside the `SwitchCase` span either way.
     fn build_switch_case_doc_inner(
         &self,
         case: &internal::SwitchCase<'_>,
@@ -217,65 +225,60 @@ impl<'a> Printer<'a> {
         if let Some(test) = &case.test {
             parts.push(d.text("case "));
             parts.push(self.build_expression_doc(test));
-            // Comments between expression and colon: `case 1 /* c */:`. The colon sits
-            // exactly one byte before the label end, which `get_case_label_end` already
-            // located as colon+1, so no second scan is needed.
-            let test_end = test.span().end;
-            let colon_pos = case_label_end - 1;
-            if let Some(comments) = self.build_inline_comments_between_doc_opt(test_end, colon_pos)
-            {
-                parts.push(comments);
-            }
-            parts.push(d.text(":"));
         } else {
-            // Comments between `default` keyword and colon: `default /* c */:`. The colon
-            // sits one byte before the label end located by `get_case_label_end`.
-            let default_keyword_end = case.span.start + "default".len() as u32;
-            let colon_pos = case_label_end - 1;
             parts.push(d.text("default"));
-            if let Some(comments) =
-                self.build_inline_comments_between_doc_opt(default_keyword_end, colon_pos)
-            {
-                parts.push(comments);
-            }
-            parts.push(d.text(":"));
         }
+        // The head→`:` gap is the same gap either way (`case 1 /* c */:`,
+        // `default /* c */:`), so its comments are emitted once rather than per arm. The
+        // colon sits exactly one byte before the label end, which `get_case_label_end`
+        // already located as colon+1, so no second scan is needed.
+        let colon_pos = case_label_end - 1;
+        if let Some(comments) =
+            self.build_inline_comments_between_doc_opt(Self::case_head_end(case), colon_pos)
+        {
+            parts.push(comments);
+        }
+        parts.push(d.text(":"));
 
-        // Handle inline comments after case label (e.g., `case 1: // comment`)
-        // For fallthrough cases (no consequent), use the boundary passed by the switch printer
+        // Comments trailing the case label (`case 1: // comment`), on the shared same-line
+        // trailing rule every statement list uses — which also walks a multiline block to
+        // its CLOSING line, so a comment the author glued after the `*/`
+        // (`case 1: /* a⏎b */ /* c */`) is claimed here instead of being split off onto its
+        // own line by the consequent's leading run below. A line comment goes through
+        // `line_suffix` (zero width) so it never forces the case test (e.g. a binary
+        // expression) to break; it flushes at the consequent's hardline (prettier's
+        // `lineSuffix`). A block stays inline, width counted.
+        // For fallthrough cases (no consequent), use the boundary passed by the switch printer.
         let first_stmt_start = case.consequent.first().map(|s| s.span().start);
         let inline_comment_end = first_stmt_start.unwrap_or(inline_comment_boundary);
-        let mut has_inline_line_comment = false;
-        if body_has_comments {
-            for comment in
-                comments_to_emit_in_range(self.comments, case_label_end, inline_comment_end)
-            {
-                if self.is_same_line(case_label_end, comment.span.start) {
-                    // A line comment goes through `line_suffix` (zero width) so it never
-                    // forces the case test (e.g. a binary expression) to break; it flushes
-                    // at the consequent's hardline (prettier's `lineSuffix`). A block stays
-                    // inline, width counted.
-                    parts.push(self.build_trailing_comment_doc(comment));
-                    if !comment.is_block {
-                        has_inline_line_comment = true;
-                    }
-                }
-            }
-        }
+        let label_trailing_end = if body_has_comments {
+            parts.extend(
+                self.build_trailing_same_line_comment_docs(case_label_end, inline_comment_end),
+            );
+            // The in-source twin of that emitter's walk — the cursor the consequent starts
+            // from, so a claimed comment is neither re-emitted by the leading run
+            // (docs/comments.md hazard 3) nor read as an author blank line. The same
+            // emitter/cursor pairing the block and class statement lists use.
+            self.find_end_with_trailing_comments(case_label_end)
+                .min(inline_comment_end)
+        } else {
+            case_label_end
+        };
+        // A `//` anywhere in that run ends the label's rendered line, so a block that would
+        // otherwise hug the label has to drop below it. Asked of the whole claimed run
+        // rather than of the label's own line: the walk above can carry the run onto a
+        // multiline block's closing line, and it is the RENDERED line the block competes for.
+        let label_trailing_line_comment = body_has_comments
+            && comments_to_emit_in_range(self.comments, case_label_end, label_trailing_end)
+                .any(|c| !c.is_block);
 
         // Consequent statements (indented from case line)
         // Handle comments between statements like block statements do
-        let mut prev_end = case_label_end;
+        let mut prev_end = label_trailing_end;
         let mut prev_stmt_end: Option<u32> = None;
         // Set when the statement just emitted deferred a line comment past its own `;`, so
         // its doc ends on a later line than the `;` and cannot carry that line's comments.
         let mut prev_deferred_line_comment = false;
-
-        // Check if first statement is a block - it hugs the case label: `case 'a': { ... }`
-        let first_is_block = case
-            .consequent
-            .first()
-            .is_some_and(|s| matches!(s, Statement::BlockStatement(_)));
 
         for (i, stmt) in case.consequent.iter().enumerate() {
             let stmt_start = stmt.span().start;
@@ -300,7 +303,7 @@ impl<'a> Printer<'a> {
                     self.collect_leading_comments(
                         prev_end,
                         search_end,
-                        Some(prev_stmt_end.unwrap_or(case_label_end)),
+                        prev_stmt_end,
                         prev_deferred_line_comment,
                     )
                 } else {
@@ -324,19 +327,17 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
-            // Comments between the previous position and this statement, minus
-            // whatever's already claimed (a trailing same-line comment of the
-            // previous statement, or — for the first statement — an inline
-            // comment on the case label's own line, handled above).
-            // The shared statement-list collector, with the consequent's own anchor: the
-            // FIRST statement has no previous statement, so what its leading run must skip
-            // is an inline comment on the CASE LABEL's line (the caller already emitted
-            // that one). Every later statement anchors on the previous statement as usual.
+            // Comments between the previous position and this statement, minus the ones
+            // the previous statement's trailing emitter already took — the shared
+            // statement-list collector, anchored exactly as the block and class lists
+            // anchor it. The FIRST statement needs no anchor of its own: the label's
+            // trailing run was claimed above and `prev_end` starts past it, so nothing on
+            // the label's line is in range to re-emit (docs/comments.md hazard 3).
             let leading_comments = if body_has_comments {
                 self.collect_leading_comments(
                     prev_end,
                     stmt_start,
-                    Some(prev_stmt_end.unwrap_or(case_label_end)),
+                    prev_stmt_end,
                     prev_deferred_line_comment,
                 )
             } else {
@@ -390,41 +391,34 @@ impl<'a> Printer<'a> {
             // the label's line — an inert placement, so the freeze would die on pass 2.
             let frozen = self.gap_frozen_span(prev_end, stmt.span());
 
-            // First block statement hugs the case label: `case 'a': { ... }`
-            // Unless there are line comments (inline after label or between label and
-            // block), or a directive whose own line the hug would take away.
-            if i == 0 && first_is_block && frozen.is_none() {
-                let has_leading_line_comment = leading_comments.iter().any(|c| !c.is_block);
-                if !has_inline_line_comment && !has_leading_line_comment {
-                    // Hug: `case 'a': { ... }`
-                    for comment in &leading_comments {
-                        parts.push(d.text(" "));
-                        parts.push(self.build_comment_doc(comment));
-                    }
-                    parts.push(d.text(" "));
-                    // A SwitchCase consequent isn't a Program/BlockStatement, so a
-                    // bare string statement here is never directive-prologue
-                    // eligible — see `Printer::needs_avoid_directive_parens`.
-                    parts.push(self.build_statement_doc(stmt, false));
-                    parts.extend(trailing);
-                } else if has_inline_line_comment && leading_comments.is_empty() {
-                    // Inline line comment, no leading: `case 'a': // comment\n{`
-                    // Block at case level (no indent)
-                    parts.push(d.hardline());
-                    parts.push(self.build_statement_doc(stmt, false));
-                    parts.extend(trailing);
+            // First block statement hugs the case label: `case 'a': { ... }` — the two
+            // layouts that keep something on the label's own line. Both need that line
+            // free of leading comments: a comment written ON the label's line trails the
+            // label (the emitter above claimed it), so anything reaching the leading run
+            // sits below and claims a line of its own, which the general path prints on
+            // the shared rule with the block following it at consequent indent. Pulling
+            // such a run up to keep the hug would relocate it — merging own-line comments
+            // onto one line — for exactly the authorings a `//` in the same gap already
+            // keeps in place (`case 'b':⏎// c⏎{`, docs/conformance_prettier.md §Comment
+            // relocation), so comment kind stops deciding the layout. A frozen statement
+            // keeps its own line too: the hug would take away the directive's.
+            if i == 0
+                && matches!(stmt, Statement::BlockStatement(_))
+                && frozen.is_none()
+                && leading_comments.is_empty()
+            {
+                // A line comment on the label already ends that line, so the block drops
+                // below it — at CASE indent, since nothing else was written there.
+                parts.push(if label_trailing_line_comment {
+                    d.hardline()
                 } else {
-                    // Leading comments exist - indent both comments and block
-                    // e.g., `case 'b':\n  // comment\n  {`
-                    let mut stmt_parts: DocBuf = smallvec![d.hardline()];
-                    for comment in &leading_comments {
-                        stmt_parts.push(self.build_comment_doc(comment));
-                        stmt_parts.push(d.hardline());
-                    }
-                    stmt_parts.push(self.build_statement_doc(stmt, false));
-                    stmt_parts.extend(trailing);
-                    parts.push(d.indent(d.concat(&stmt_parts)));
-                }
+                    d.text(" ")
+                });
+                // A SwitchCase consequent isn't a Program/BlockStatement, so a
+                // bare string statement here is never directive-prologue
+                // eligible — see `Printer::needs_avoid_directive_parens`.
+                parts.push(self.build_statement_doc(stmt, false));
+                parts.extend(trailing);
             } else {
                 // Build the indented content for this statement
                 let mut stmt_parts: DocBuf = smallvec![d.hardline()];
