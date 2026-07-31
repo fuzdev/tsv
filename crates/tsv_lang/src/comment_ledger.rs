@@ -106,6 +106,17 @@ struct DocLedger {
     entries: Vec<Entry>,
     /// Raw source ranges — every comment a range covers counts as emitted once.
     verbatim: Vec<(u32, u32)>,
+    /// Line comments a `BlockOnly`-filtered builder passed over, with the call site that
+    /// held the licence — see [`record_filtered_skip`]. Joined against the DROPPED
+    /// findings at drain; never a finding by itself.
+    filtered_skips: Vec<FilteredSkip>,
+}
+
+/// One recorded `BlockOnly` skip: the line comment's span and the builder call site that
+/// skipped it (captured via `#[track_caller]` at the printers' filtered comment builder).
+struct FilteredSkip {
+    span: Span,
+    site: &'static std::panic::Location<'static>,
 }
 
 struct Entry {
@@ -134,6 +145,13 @@ pub struct CommentFinding {
     /// How many times it was emitted — `0` for [`CommentFindingKind::Dropped`], `≥2` for
     /// [`CommentFindingKind::DoublePrinted`].
     pub emitted: usize,
+    /// The `BlockOnly`-filtered builder call sites that skipped this comment during the
+    /// format (`file:line:column`, sorted + deduped), populated only for
+    /// [`CommentFindingKind::Dropped`] — the skip-∧-dropped join that names the builder
+    /// whose gate broke the line-comment routing promise. Empty when no filtered builder
+    /// saw the comment (the drop happened elsewhere), and always empty for
+    /// [`CommentFindingKind::DoublePrinted`] (a skip cannot cause a double print).
+    pub skip_sites: Vec<String>,
 }
 
 /// The drained result of one format.
@@ -226,6 +244,37 @@ pub fn record_emitted_keyed(key: DocumentKey, span: Span) {
             Ok(idx) => doc.entries[idx].emitted += 1,
             Err(_) => UNREGISTERED.with(|u| *u.borrow_mut() += 1),
         }
+    });
+}
+
+/// Record a line comment a `CommentFilter::BlockOnly` builder **skipped**, with the call
+/// site that held the licence (the filtered builder's own caller, captured via
+/// `#[track_caller]`).
+///
+/// The `BlockOnly` licence is a promise: the caller's gate routed line comments to an
+/// expansion builder first, so the filtered builder never meets one. Nothing enforces
+/// that the gate is the exact complement of what the filtered builder can express — this
+/// records the evidence when the promise breaks. A skip is an **annotation, never a
+/// finding**: it is legitimate wherever the routing worked but the doc was built anyway
+/// (a losing `conditional_group` candidate) or another emitter prints the comment (the
+/// `line_suffix` family), and in both cases the comment ends the format emitted and the
+/// annotation stays invisible. Only when the skipped comment ends the format **DROPPED**
+/// does [`take_comment_ledger`] surface the recorded site(s) on the finding
+/// ([`CommentFinding::skip_sites`]) — naming the responsible builder at the site, instead
+/// of leaving the drop to be found by injection wherever a fixture happens to reach it.
+pub fn record_filtered_skip(
+    source: &str,
+    span: Span,
+    site: &'static std::panic::Location<'static>,
+) {
+    if !comment_check_enabled() {
+        return;
+    }
+    DOCS.with(|docs| {
+        let mut docs = docs.borrow_mut();
+        doc_for(&mut docs, source)
+            .filtered_skips
+            .push(FilteredSkip { span, site });
     });
 }
 
@@ -324,11 +373,29 @@ pub fn take_comment_ledger() -> CommentLedger {
                 1 => continue,
                 _ => CommentFindingKind::DoublePrinted,
             };
+            // The skip-∧-dropped join: a DROPPED comment some `BlockOnly` builder passed
+            // over names that builder's call site on the finding. Dropped-only — an
+            // emitted comment clears its annotations (the skip was legitimate), and a
+            // skip cannot cause a double print.
+            let skip_sites = if kind == CommentFindingKind::Dropped {
+                let mut sites: Vec<String> = doc
+                    .filtered_skips
+                    .iter()
+                    .filter(|s| s.span == entry.span)
+                    .map(|s| s.site.to_string())
+                    .collect();
+                sites.sort();
+                sites.dedup();
+                sites
+            } else {
+                Vec::new()
+            };
             ledger.findings.push(CommentFinding {
                 kind,
                 text: entry.text.clone(),
                 span: entry.span,
                 emitted,
+                skip_sites,
             });
         }
     }
@@ -349,6 +416,7 @@ fn doc_for_key(docs: &mut Vec<DocLedger>, key: DocumentKey) -> &mut DocLedger {
             key,
             entries: Vec::new(),
             verbatim: Vec::new(),
+            filtered_skips: Vec::new(),
         });
         docs.len() - 1
     };
@@ -502,6 +570,72 @@ mod tests {
         assert_eq!(ledger.findings.len(), 1);
         assert_eq!(ledger.findings[0].kind, CommentFindingKind::Dropped);
         assert_eq!(ledger.findings[0].text, "<!-- a -->");
+    }
+
+    /// A skip whose comment ends the format DROPPED surfaces the recorded call site on the
+    /// finding — the skip-∧-dropped join. Two distinct sites both skipping it are both
+    /// named (sorted), and the same site skipping twice (a rebuilt candidate) dedupes.
+    #[test]
+    fn a_skipped_and_dropped_comment_names_the_skip_sites() {
+        let source = "// a\nx;\n";
+        let comments = [line_comment(0, 4)];
+        let site_a = std::panic::Location::caller();
+        let ((), ledger) = with_check(|| {
+            register_parsed(source, &comments);
+            record_filtered_skip(source, comments[0].span, site_a);
+            record_filtered_skip(source, comments[0].span, site_a); // rebuilt candidate: dedupes
+        });
+        assert_eq!(ledger.findings.len(), 1);
+        assert_eq!(ledger.findings[0].kind, CommentFindingKind::Dropped);
+        assert_eq!(
+            ledger.findings[0].skip_sites,
+            vec![site_a.to_string()],
+            "the responsible site is named once, deduped"
+        );
+        assert!(ledger.findings[0].skip_sites[0].contains("comment_ledger.rs"));
+    }
+
+    /// A skip whose comment IS emitted (the routed expansion path printed it, or the
+    /// skipping doc was a losing `conditional_group` candidate) is invisible — a bare skip
+    /// is an annotation, never a finding.
+    #[test]
+    fn a_skipped_but_emitted_comment_is_clean() {
+        let source = "// a\nx;\n";
+        let comments = [line_comment(0, 4)];
+        let ((), ledger) = with_check(|| {
+            register_parsed(source, &comments);
+            record_filtered_skip(source, comments[0].span, std::panic::Location::caller());
+            record_emitted(source, comments[0].span);
+        });
+        assert!(ledger.findings.is_empty(), "{:?}", ledger.findings);
+    }
+
+    /// A dropped comment nothing skipped carries no sites — the drop happened elsewhere,
+    /// and the finding must not point at an innocent builder.
+    #[test]
+    fn a_dropped_comment_without_skips_names_no_site() {
+        let source = "// a\nx;\n";
+        let comments = [line_comment(0, 4)];
+        let ((), ledger) = with_check(|| register_parsed(source, &comments));
+        assert_eq!(ledger.findings.len(), 1);
+        assert!(ledger.findings[0].skip_sites.is_empty());
+    }
+
+    /// A double-printed comment never carries skip sites — a skip cannot cause a double
+    /// print, so annotating one would misdirect the triage.
+    #[test]
+    fn a_double_printed_comment_carries_no_skip_sites() {
+        let source = "// a\nx;\n";
+        let comments = [line_comment(0, 4)];
+        let ((), ledger) = with_check(|| {
+            register_parsed(source, &comments);
+            record_filtered_skip(source, comments[0].span, std::panic::Location::caller());
+            record_emitted(source, comments[0].span);
+            record_emitted(source, comments[0].span);
+        });
+        assert_eq!(ledger.findings.len(), 1);
+        assert_eq!(ledger.findings[0].kind, CommentFindingKind::DoublePrinted);
+        assert!(ledger.findings[0].skip_sites.is_empty());
     }
 
     #[test]

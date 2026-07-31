@@ -521,6 +521,9 @@ impl<'a> Printer<'a> {
     }
 
     /// Build a Doc for inline comments with filtering
+    // `track_caller` (ledger builds only): the `BlockOnly` skip annotation below records
+    // the caller that held the filter licence, and this wrapper must be transparent to it.
+    #[cfg_attr(feature = "comment_check", track_caller)]
     pub(crate) fn build_comments_between_filtered(
         &self,
         start: u32,
@@ -553,6 +556,7 @@ impl<'a> Printer<'a> {
     /// The swallowed form parses and is a fixed point, so idempotency, round-trip, and the
     /// print-once ledger are all blind to it; `swallow_audit` sees only shapes some fixture
     /// already carries.
+    #[cfg_attr(feature = "comment_check", track_caller)]
     pub(crate) fn build_comments_between_filtered_opt(
         &self,
         start: u32,
@@ -560,6 +564,27 @@ impl<'a> Printer<'a> {
         spacing: CommentSpacing,
         filter: CommentFilter,
     ) -> Option<DocId> {
+        // The `BlockOnly` licence, checked (ledger builds only): record every line comment
+        // this filter passes over, with the caller that held the licence (`track_caller`).
+        // The licence is a promise that a gate routed line comments to the expansion
+        // builder first; nothing else enforces that the gate is the exact complement of
+        // what this filtered builder can express. Annotation only — the ledger's drain
+        // surfaces the site solely on a comment that ends the format DROPPED; a skip whose
+        // comment another emitter prints (the routed expansion path, a winning
+        // `conditional_group` sibling) stays invisible. See
+        // `comment_ledger::record_filtered_skip`.
+        #[cfg(feature = "comment_check")]
+        if matches!(filter, CommentFilter::BlockOnly)
+            && tsv_lang::comment_ledger::comment_check_enabled()
+        {
+            let site = std::panic::Location::caller();
+            for c in comments_to_emit_in_range(self.comments, start, end) {
+                if !c.is_block {
+                    tsv_lang::comment_ledger::record_filtered_skip(self.source, c.span, site);
+                }
+            }
+        }
+
         let d = self.d();
 
         // Check if any comments exist in range (considering filter)

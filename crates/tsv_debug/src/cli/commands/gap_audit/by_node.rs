@@ -12,6 +12,11 @@ use super::Tally;
 struct ClusterRow {
     key: NodeEdgeKey,
     hits: usize,
+    /// How many **distinct gaps** landed in this cluster — `(file, whitespace-run)` deduped
+    /// (see `NodeClusterAccum::gaps`). The RANKING metric: raw hits over-weight
+    /// whitespace-adjacent gaps ~3.7× (an N-wide run yields ~N injectable offsets, a glued
+    /// gap one), so sorting on hits systematically deprioritizes the glued-gap families.
+    gaps: usize,
     /// How many distinct site shapes landed in this cluster.
     shapes: usize,
     /// The lexicographically smallest shape in the cluster, shown as its example.
@@ -25,9 +30,13 @@ struct ClusterRow {
 /// carry. The one residual caveat is the [`Self::unresolved_count`] tail (offsets that key to no
 /// node), zero over `tests/fixtures`.
 pub(super) struct ByNodeRollup {
-    /// Clusters ranked worst-first (hits desc, then key).
+    /// Clusters ranked worst-first (distinct gaps desc, then hits desc, then key).
     clusters: Vec<ClusterRow>,
     grand_total: usize,
+    /// Σ per-cluster distinct-gap counts — the gap-share denominator. Strictly speaking
+    /// "gap-slots": the rare gap whose hits key to two clusters (an injected vs a
+    /// mapped-back bystander attribution) counts once per cluster.
+    grand_total_gaps: usize,
     unresolved_count: usize,
     total_shapes: usize,
 }
@@ -67,19 +76,27 @@ pub(super) fn compute_by_node(total: &Tally) -> ByNodeRollup {
         .map(|(key, accum)| ClusterRow {
             key: key.clone(),
             hits: accum.hits,
+            gaps: accum.gaps.len(),
             shapes: accum.shapes.len(),
             // BTreeSet is sorted, so `.next()` is the lexicographically smallest shape. An accum
             // always carries ≥1 shape (it's created when a hit is folded), so the default is dead.
             example_shape: accum.shapes.iter().next().cloned().unwrap_or_default(),
         })
         .collect();
-    // Worst-first: the fattest emitter cluster is the highest-leverage fix. Ties break on the
-    // key, so the ranking is deterministic.
-    clusters.sort_by(|a, b| b.hits.cmp(&a.hits).then_with(|| a.key.cmp(&b.key)));
+    let grand_total_gaps: usize = clusters.iter().map(|c| c.gaps).sum();
+    // Worst-first by DISTINCT GAPS (the de-biased metric — see `ClusterRow::gaps`), hits as
+    // the first tie-break, then the key, so the ranking is deterministic.
+    clusters.sort_by(|a, b| {
+        b.gaps
+            .cmp(&a.gaps)
+            .then_with(|| b.hits.cmp(&a.hits))
+            .then_with(|| a.key.cmp(&b.key))
+    });
 
     ByNodeRollup {
         clusters,
         grand_total,
+        grand_total_gaps,
         unresolved_count,
         total_shapes: total.shapes.len(),
     }
@@ -120,8 +137,10 @@ pub(super) fn by_node_json_sections(
                 "node": c.key.node_type,
                 "edge": c.key.edge,
                 "hits": c.hits,
+                "gaps": c.gaps,
                 "shapes": c.shapes,
                 "share": share_of(c.hits, rollup.grand_total),
+                "gaps_share": share_of(c.gaps, rollup.grand_total_gaps),
                 "example_shape": c.example_shape,
             })
         })
@@ -133,6 +152,11 @@ pub(super) fn by_node_json_sections(
         "by_node_unresolved".to_string(),
         serde_json::json!(rollup.unresolved_count),
     );
+    // The ranking-metric version stamp. 1 = hits-sorted (pre-gap-dedup); 2 = distinct-gap
+    // sorted with `gaps`/`gaps_share` per cluster. `--since` deliberately keeps diffing
+    // HITS (exact and comparable across both metrics, so old baselines stay usable); a
+    // consumer that wants gap-based diffs keys on this stamp.
+    m.insert("by_node_metric".to_string(), serde_json::json!(2));
     m
 }
 
@@ -159,8 +183,8 @@ pub(super) fn report_by_node(rollup: &ByNodeRollup, json: bool) {
     for c in &rollup.clusters {
         let key = c.key.to_string();
         lines.push(format!(
-            "  {:>7}×  {:>4} shape(s)  {key:<42}  e.g. {}",
-            c.hits, c.shapes, c.example_shape
+            "  {:>6} gap(s)  {:>7}×  {:>4} shape(s)  {key:<42}  e.g. {}",
+            c.gaps, c.hits, c.shapes, c.example_shape
         ));
     }
     let top10: usize = rollup.clusters.iter().take(10).map(|c| c.hits).sum();
@@ -171,7 +195,8 @@ pub(super) fn report_by_node(rollup: &ByNodeRollup, json: bool) {
     ));
     lines.push(
         "note: each finding is keyed to its own site's (node, edge) at record time, so these \
-         totals are EXACT per-site tallies."
+         totals are EXACT per-site tallies. Ranked by DISTINCT GAPS (whitespace-run deduped) — \
+         raw hits over-weight whitespace-adjacent gaps ~3.7× vs glued ones."
             .to_string(),
     );
 
@@ -211,23 +236,27 @@ pub(super) fn report_rank(rollup: &ByNodeRollup, top: usize, json: bool) {
         rollup.total_shapes,
         rollup.clusters.len()
     ));
-    lines.push("| # | cluster | hits | shapes | share |".to_string());
-    lines.push("| ---: | --- | ---: | ---: | ---: |".to_string());
+    lines.push("| # | cluster | gaps | hits | shapes | gap share |".to_string());
+    lines.push("| ---: | --- | ---: | ---: | ---: | ---: |".to_string());
     for (i, c) in rollup.clusters.iter().take(n).enumerate() {
         lines.push(format!(
-            "| {} | `{}` | {} | {} | {}% |",
+            "| {} | `{}` | {} | {} | {} | {}% |",
             i + 1,
             c.key,
+            c.gaps,
             c.hits,
             c.shapes,
-            tenths_pct(c.hits, rollup.grand_total)
+            tenths_pct(c.gaps, rollup.grand_total_gaps)
         ));
     }
+    let top_gaps: usize = rollup.clusters.iter().take(n).map(|c| c.gaps).sum();
     let top_hits: usize = rollup.clusters.iter().take(n).map(|c| c.hits).sum();
     lines.push(format!(
-        "\ntop-{n} clusters cover {top_hits}/{} findings ({}%) · regenerate via `deno task gaps:audit:rank`",
-        rollup.grand_total,
-        pct_of(top_hits, rollup.grand_total)
+        "\ntop-{n} clusters cover {top_gaps}/{} distinct gaps ({}%) · {top_hits}/{} findings · \
+         ranked by distinct gaps (whitespace-run deduped) · regenerate via `deno task gaps:audit:rank`",
+        rollup.grand_total_gaps,
+        pct_of(top_gaps, rollup.grand_total_gaps),
+        rollup.grand_total
     ));
 
     let out = lines.join("\n");
@@ -411,6 +440,7 @@ mod tests {
                     injection_offset: 2,
                     attribution_offset: 2,
                     text: "/* c */".to_string(),
+                    skip_sites: Vec::new(),
                     injected: true,
                     node_edge: Some(edge.clone()),
                 },
@@ -436,6 +466,80 @@ mod tests {
         assert_eq!(rollup.clusters[0].hits, 2);
         assert_eq!(rollup.clusters[1].key, prop);
         assert_eq!(rollup.clusters[1].hits, 1);
+    }
+
+    /// One keyed hit at `offset` in `source`, for the gap-dedup tests below.
+    fn keyed_hit<'a>(source: &'a str, path: &'a str, offset: usize, edge: &NodeEdgeKey) -> Hit<'a> {
+        Hit {
+            kind: Kind::Dropped,
+            payload: Payload::Block,
+            path,
+            source,
+            injection_offset: offset,
+            attribution_offset: offset,
+            text: "/* c */".to_string(),
+            skip_sites: Vec::new(),
+            injected: true,
+            node_edge: Some(edge.clone()),
+        }
+    }
+
+    /// The ranking metric is DISTINCT GAPS, not hits: three hits spread across one 3-wide
+    /// whitespace run dedup to ONE gap, while two glued hits in two different gaps stay TWO —
+    /// so the glued cluster outranks the whitespace one despite fewer hits. Exactly the
+    /// ~3.7× whitespace bias the dedup exists to remove (an N-wide run yields ~N injectable
+    /// offsets; ranking on hits deprioritizes the glued-gap families).
+    #[test]
+    fn ranking_dedups_whitespace_runs_and_sorts_by_distinct_gaps() {
+        let ws_edge = node_edge("CallExpression", "arguments→$");
+        let glued_edge = node_edge("TSArrayType", "elementType→$");
+        let mut tally = Tally::default();
+        // `"a   b"`: offsets 1, 2, 3 are all inside the one 3-wide whitespace run — one gap.
+        for offset in [1, 2, 3] {
+            tally.record(keyed_hit("a   b", "ws.ts", offset, &ws_edge), true);
+        }
+        // `"x.y"` offsets 1 and 2 are glued (no preceding whitespace) — two distinct gaps.
+        for offset in [1, 2] {
+            tally.record(keyed_hit("x.y", "glued.ts", offset, &glued_edge), true);
+        }
+
+        let rollup = compute_by_node(&tally);
+        assert_eq!(rollup.grand_total, 5, "hits stay exact");
+        assert_eq!(
+            rollup.grand_total_gaps, 3,
+            "1 whitespace run + 2 glued gaps"
+        );
+        // The glued cluster (2 gaps, 2 hits) outranks the whitespace one (1 gap, 3 hits).
+        assert_eq!(rollup.clusters[0].key, glued_edge);
+        assert_eq!(rollup.clusters[0].gaps, 2);
+        assert_eq!(rollup.clusters[0].hits, 2);
+        assert_eq!(rollup.clusters[1].key, ws_edge);
+        assert_eq!(rollup.clusters[1].gaps, 1);
+        assert_eq!(rollup.clusters[1].hits, 3);
+    }
+
+    /// `gap_run_start` normalizes every offset in one ASCII-whitespace run to its first byte,
+    /// leaves a glued offset alone, and guards the 0/OOB edges.
+    #[test]
+    fn gap_run_start_normalizes_within_a_run() {
+        use super::super::gap_run_start;
+        //         0123456
+        let src = "a \t\n b";
+        for offset in [2, 3, 4, 5] {
+            assert_eq!(
+                gap_run_start(src, offset),
+                1,
+                "offset {offset} is in the run"
+            );
+        }
+        assert_eq!(gap_run_start(src, 1), 1, "run start maps to itself");
+        assert_eq!(gap_run_start("x.y", 2), 2, "glued offset is its own gap");
+        assert_eq!(gap_run_start("x.y", 0), 0);
+        assert_eq!(
+            gap_run_start("  ", 9),
+            0,
+            "offset clamped, then scans the run"
+        );
     }
 
     /// A four-decimal share compares within one ULP-ish epsilon — `assert_eq!` on `f64` trips
