@@ -4,11 +4,33 @@ use bumpalo::collections::Vec as BumpVec;
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use crate::whitespace::{char_at, is_svelte_ws};
+use crate::whitespace::{char_at, is_svelte_ws, name_run_end};
 use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
 use super::{find_exact_tag_close, rcdata_close_at};
+
+/// Svelte's `regex_whitespace_or_slash_or_closing_tag = /(\s|\/|>)/` — the characters that
+/// end a *tag* name run (`read_tag` in `1-parse/state/element.js`). Everything else is part
+/// of the name, including the `=`, `"` and `'` that end an *attribute* name
+/// ([`is_attr_name_terminator`](super::attribute)) — a tag name is read against the narrower
+/// class, so the two are deliberately separate predicates.
+///
+/// A `char` question, not a byte one: the `\s` arm is Unicode ([`is_svelte_ws`]).
+const fn is_tag_name_terminator(c: char) -> bool {
+    is_svelte_ws(c) || matches!(c, '/' | '>')
+}
+
+/// Byte offset of the first tag-name terminator at/after `start`. The name is
+/// `source[start..end]`.
+///
+/// The lexer's identifier scan is narrower than this run, so a glued symbol (`<div%x>`), a
+/// `{` (`<div{x}>`) or a Unicode space outside JS `\s` (U+0085 NEL) sits *past* the token
+/// end and still belongs to the name. In the common case the token already ends at a
+/// terminator, so the scan stops on its first check.
+pub(super) fn tag_name_end(source: &str, start: usize) -> usize {
+    name_run_end(source, start, is_tag_name_terminator)
+}
 
 /// Whether `name` is an acceptable Svelte element or component tag name, mirroring Svelte's
 /// accept gate (`1-parse/state/element.js`): `is_valid_element_name(name) ||
@@ -156,22 +178,30 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             return Err(self.error_expected_found("tag name"));
         }
 
-        // `&'a str` borrows the source, so it survives the `&mut self` calls below.
-        let tag_name = self.current_value();
+        // Read the whole tag name as Svelte's `read_tag` does — a raw run up to `\s`, `/` or
+        // `>`. The lexer only scanned the leading identifier, and grading that prefix alone
+        // admits names Svelte rejects: a glued symbol (`<div%x>`), a `{` (`<div{x}>`) or a
+        // U+0085 NEL all end the token but stay *inside* the name. The printer then re-emits
+        // the tail as an attribute, spacing it away from the name — turning source Svelte
+        // rejects into source it accepts. `&'a str` borrows the source, so the name survives
+        // the `&mut self` calls below.
+        let name_start = self.current_start;
+        let name_end = tag_name_end(self.source, self.current_end);
+        let tag_name = &self.source[name_start..name_end];
         let name_span = Span {
-            start: self.current_start as u32,
-            end: self.current_end as u32,
+            start: name_start as u32,
+            end: name_end as u32,
         };
 
         // The tag name must immediately follow `<` and be a valid element/component name;
         // `svelte.parse` rejects `< div>` (whitespace after `<`, which tsv's tag lexer skips),
         // `<1>` / `<_x>` / `<$x>` (invalid start char), and `<élan>` / `<divä>` (non-ASCII
         // outside a valid custom-element/component name) at parse.
-        if name_span.start as usize != start + 1 || !is_valid_tag_name(tag_name) {
+        if name_start != start + 1 || !is_valid_tag_name(tag_name) {
             return Err(self.error_msg_at("Expected a valid element or component name", start + 1));
         }
 
-        self.advance()?;
+        self.advance_past_name(name_end)?;
 
         // Check if this is a special element. `title`/`slot` classification depends on the
         // ancestor context tracked on the parser (see `SpecialElementTag::from_tag_name`).
@@ -591,9 +621,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// followed by a tag-name terminator (whitespace, `/`, `>`, or EOF), so `</li>`
     /// matches `li` but `</link>` does not.
     ///
-    /// The terminators are Svelte's `regex_whitespace_or_slash_or_closing_tag = /(\s|\/|>)/`,
-    /// so the whitespace arm is the full [`crate::whitespace::is_svelte_ws`] set, not just
-    /// ASCII — `</div\u{a0}>` closes a `div`.
+    /// The terminators are [`is_tag_name_terminator`] — Svelte's
+    /// `regex_whitespace_or_slash_or_closing_tag = /(\s|\/|>)/`, the same class the opening
+    /// tag's name run ends at — so the whitespace arm is the full
+    /// [`crate::whitespace::is_svelte_ws`] set, not just ASCII: `</div\u{a0}>` closes a `div`.
     fn is_closing_tag_for(&self, tag_name: &str) -> bool {
         let name_start = self.current_start + 2; // past `</`
         if !self
@@ -603,10 +634,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         {
             return false;
         }
-        // `(\s|\/|>)`, or EOF.
+        // a terminator, or EOF
         match char_at(self.source, name_start + tag_name.len()) {
             None => true,
-            Some((c, _)) => is_svelte_ws(c) || c == '/' || c == '>',
+            Some((c, _)) => is_tag_name_terminator(c),
         }
     }
 
@@ -616,13 +647,22 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `<>`), in which case there is no name to test against the auto-close table.
     /// The returned `&'a str` borrows the immutable source, so it survives the
     /// `&mut self` borrow (same pattern as `current_value`).
+    ///
+    /// Reads the whole name **run** ([`tag_name_end`]) rather than the peeked identifier
+    /// token, so the name handed to the auto-close table is the one the element parser will
+    /// grade. A token-only read is verdict-neutral here — a run that outran its token can
+    /// only be an invalid name, which `parse_element_or_special` rejects on either branch —
+    /// but the same shortcut *was* a live bug in `is_next_tag`, so this asks the same
+    /// question the same way rather than resting on the downstream reject.
     fn peek_open_tag_name(&mut self) -> Result<Option<&'a str>, ParseError> {
         if self.peek.is_none() {
             self.peek = Some(self.lexer.next_token()?);
         }
         Ok(self.peek.as_ref().and_then(|p| {
             (p.kind == TokenKind::Identifier).then(|| {
-                &self.source[self.base_offset + p.start as usize..self.base_offset + p.end as usize]
+                let name_start = self.base_offset + p.start as usize;
+                let name_end = tag_name_end(self.source, self.base_offset + p.end as usize);
+                &self.source[name_start..name_end]
             })
         }))
     }
@@ -631,6 +671,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// offset past `>`. Shared by the generic element path and the raw-text
     /// `<script>` / `<style>` parsers, so all three agree on tag-close tokenization
     /// (whitespace before `>` skipped by the lexer, mismatch → one error).
+    ///
+    /// Compares the identifier **token**, not the name run — sound here, unlike in
+    /// `is_next_tag`, because the very next check is `expect(RightAngle)`: every character
+    /// that would extend the run past its token is by definition not `\s`, `/` or `>`, so a
+    /// longer run cannot reach the `>` and `</div%x>` is rejected either way.
     pub(super) fn parse_closing_tag(&mut self, expected_name: &str) -> Result<u32, ParseError> {
         self.expect(TokenKind::LeftAngle)?;
         self.expect(TokenKind::Slash)?;
@@ -783,8 +828,47 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_namespaced_name, is_valid_element_name, is_valid_tag_name};
+    use super::{is_namespaced_name, is_valid_element_name, is_valid_tag_name, tag_name_end};
     use crate::ast::internal::is_component_name;
+
+    /// The run ends at `(\s|\/|>)` or EOF and at **nothing else**, so whatever the lexer's
+    /// narrower identifier scan stopped at is still part of the name — that is the whole
+    /// point of reading the run rather than grading the token.
+    ///
+    /// Each case is `(name, tail)`: the expected end is `name.len()`, so a position is
+    /// built from a prefix length rather than searched for.
+    #[test]
+    fn tag_name_run_ends_only_at_whitespace_slash_or_gt() {
+        for (name, tail) in [
+            // the three terminators, and EOF
+            ("div", ">"),
+            ("div", "/>"),
+            ("div", " x"),
+            ("div", ""),
+            // the whitespace arm is JS `\s`, so it is Unicode-wide
+            ("div", "\u{a0}>"),   // NO-BREAK SPACE
+            ("div", "\u{feff}>"), // ZWNBSP — in JS `\s`, not in Rust's `White_Space`
+            // U+0085 NEL is `White_Space` but NOT JS `\s`, so it stays in the name
+            ("div\u{85}x", ">"),
+            // a glued symbol or `{` is likewise ordinary name content
+            ("div%x", ">"),
+            ("div{x}", ">"),
+            // `=`, `"` and `'` end an ATTRIBUTE name but not a tag name — the two
+            // terminator classes are deliberately different predicates
+            ("div=x", ">"),
+            ("div\"x", ">"),
+            ("div'x", ">"),
+            // valid names the run must carry whole
+            ("my-elem", ">"),
+            ("my-caf\u{e9}", ">"),
+            ("svelte:head", ">"),
+            ("Foo.Bar", ">"),
+            ("!DOCTYPE", " html>"),
+        ] {
+            let source = format!("{name}{tail}");
+            assert_eq!(tag_name_end(&source, 0), name.len(), "{source:?}");
+        }
+    }
 
     #[test]
     fn component_classification() {

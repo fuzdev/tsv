@@ -2,6 +2,7 @@
 
 use crate::ast::internal::FragmentNode;
 use crate::lexer::{Lexer, Token, TokenKind};
+use crate::parser::element::tag_name_end;
 use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{Comment, ParseError, Span};
@@ -154,6 +155,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Check if the next tag matches the given name (e.g., "script", "style")
     /// Returns true if we're at `<tagname`, false otherwise
     /// Does not allocate - compares directly against source
+    ///
+    /// ⚠️ Compares the whole tag-name **run** ([`tag_name_end`]), not the peeked identifier
+    /// token: the lexer's identifier scan is narrower than the run, so a token-only compare
+    /// answers yes for `<script%x>` / `<style%x>` / `<svelte:options%x>` and routes a name
+    /// Svelte rejects into the raw-text or options parser, which never grades it again.
     pub(crate) fn is_next_tag(&mut self, tag_name: &str) -> Result<bool, ParseError> {
         if !self.check(TokenKind::LeftAngle) {
             return Ok(false);
@@ -169,9 +175,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         {
             // Compare directly without allocating (peek positions are
             // slice-relative, so shift by base_offset to index the full source).
-            let value = &self.source
-                [self.base_offset + peek.start as usize..self.base_offset + peek.end as usize];
-            return Ok(value == tag_name);
+            let name_start = self.base_offset + peek.start as usize;
+            let name_end = tag_name_end(self.source, self.base_offset + peek.end as usize);
+            return Ok(&self.source[name_start..name_end] == tag_name);
         }
 
         Ok(false)
@@ -233,6 +239,21 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.current_end = self.base_offset + token.end as usize;
 
         Ok(())
+    }
+
+    /// Resync the lexer past a name run ending at `name_end`. Fast path (`name_end` == the
+    /// current Identifier token's end) is a plain `advance()`; when the name was extended
+    /// past the token, re-lex at `name_end`.
+    ///
+    /// Both name readers that mirror Svelte's `read_tag` need this — the tag name
+    /// (`parser/element.rs`) and the attribute/directive name (`parser/attribute.rs`) — since
+    /// each reads a raw run the lexer's narrower identifier scan can stop short of.
+    pub(crate) fn advance_past_name(&mut self, name_end: usize) -> Result<(), ParseError> {
+        if name_end == self.current_end {
+            self.advance()
+        } else {
+            self.advance_to_position(name_end)
+        }
     }
 
     /// Try to read a JS-style comment (`//` or `/* */`) at the current position.

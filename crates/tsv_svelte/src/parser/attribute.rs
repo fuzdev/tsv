@@ -4,7 +4,7 @@ use bumpalo::collections::Vec as BumpVec;
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use crate::whitespace::{char_at, is_svelte_ws};
+use crate::whitespace::{char_at, is_svelte_ws, name_run_end};
 use tsv_lang::{ParseError, Span};
 use tsv_ts::ast::internal::{Expression, IdentName, Identifier};
 
@@ -36,11 +36,20 @@ const fn is_attr_name_terminator(c: char) -> bool {
     is_svelte_ws(c) || matches!(c, '=' | '/' | '>' | '"' | '\'')
 }
 
-/// The UTF-8 width of the attribute-name character at byte offset `i` in `source`, or `None`
-/// when the run ends there — a `regex_token_ending_character` match, or EOF.
-fn attr_name_char_width_at(source: &str, i: usize) -> Option<usize> {
-    let (c, width) = char_at(source, i)?;
-    (!is_attr_name_terminator(c)).then_some(width)
+/// Whether byte offset `i` in `source` holds an attribute-name character — i.e. the run does
+/// not end there (`regex_token_ending_character` match, or EOF).
+fn is_attr_name_char_at(source: &str, i: usize) -> bool {
+    char_at(source, i).is_some_and(|(c, _)| !is_attr_name_terminator(c))
+}
+
+/// Byte offset of the first attribute-name terminator at/after `start`, mirroring Svelte's
+/// `read_tag(regex_token_ending_character)`. The name is `source[start..end]`.
+///
+/// The attribute-name twin of [`tag_name_end`](super::element::tag_name_end): same scan
+/// ([`name_run_end`]), different terminator class, and free rather than a method for the
+/// same reason — so it can be graded directly by a unit test.
+fn attr_name_end(source: &str, start: usize) -> usize {
+    name_run_end(source, start, is_attr_name_terminator)
 }
 
 /// Directive prefix types
@@ -200,18 +209,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `{`/`<` (spread/shorthand/attach) and `>`/`/` (tag close) first, so a non-terminator here
     /// is a leading-symbol name like `<p }>` (Svelte's `read_static_attribute` raw run).
     fn current_token_starts_attribute_name(&self) -> bool {
-        attr_name_char_width_at(self.source, self.current_start).is_some()
-    }
-
-    /// Byte offset of the first attribute-name terminator at/after `start`, mirroring
-    /// Svelte's `read_tag(regex_token_ending_character)`. The name is `source[start..end]`.
-    /// Shared by the plain/directive name reader and `parse_static_brace_attribute`.
-    fn attribute_name_end(&self, start: usize) -> usize {
-        let mut end = start;
-        while let Some(width) = attr_name_char_width_at(self.source, end) {
-            end += width;
-        }
-        end
+        is_attr_name_char_at(self.source, self.current_start)
     }
 
     /// End of the current attribute/directive name run. The lexer already scanned the
@@ -227,19 +225,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     // *tag* name (`<%foo>`) directly, so a lexer change can't turn that into an
     // over-acceptance. Off-frontier (no corpus/real occurrence), deferred deliberately.
     fn attribute_name_run_end(&self) -> usize {
-        self.attribute_name_end(self.current_end)
-    }
-
-    /// Resync the lexer past an attribute/directive name ending at `name_end`. Fast path
-    /// (`name_end` == the current Identifier token's end) is a plain `advance()`; when the
-    /// name was extended past the token (special chars, à la Svelte's `read_tag`), re-lex
-    /// at `name_end`.
-    fn advance_past_name(&mut self, name_end: usize) -> Result<(), ParseError> {
-        if name_end == self.current_end {
-            self.advance()
-        } else {
-            self.advance_to_position(name_end)
-        }
+        attr_name_end(self.source, self.current_end)
     }
 
     /// Parse an attribute or directive
@@ -804,7 +790,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let start = self.current_start;
         // Svelte's `read_static_attribute` reads the raw run up to a token-ending char
         // (`regex_token_ending_character = /[\s=/>"']/`) as the attribute name.
-        let end = self.attribute_name_end(start);
+        let end = attr_name_end(self.source, start);
         let span = Span {
             start: start as u32,
             end: end as u32,
@@ -1073,5 +1059,42 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.advance_to_position(pos)?;
 
         Ok(parts)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::attr_name_end;
+
+    /// The attribute-name run ends at `[\s=/>"']` and at nothing else. Wider than the
+    /// tag-name class ([`is_tag_name_terminator`](super::super::element)), which keeps `=`,
+    /// `"` and `'` *inside* the name — two questions, two predicates, and collapsing them
+    /// would break one of the two.
+    ///
+    /// Each case is `(name, tail)`: the expected end is `name.len()`, so a position is built
+    /// from a prefix length rather than searched for.
+    #[test]
+    fn attr_name_run_ends_at_the_token_ending_characters() {
+        for (name, tail) in [
+            // every terminator, and EOF
+            ("data-attr", "=\"value\""),
+            ("data-attr", " x"),
+            ("data-attr", "/>"),
+            ("data-attr", ">"),
+            ("data-attr", "\"value\""),
+            ("data-attr", "'value'"),
+            ("data-attr", ""),
+            // the whitespace arm is JS `\s`, so it is Unicode-wide
+            ("data-attr", "\u{a0}x"),
+            ("data-attr", "\u{feff}x"),
+            // U+0085 NEL is not JS `\s`, so it stays inside the name
+            ("data-attr\u{85}x", "="),
+            // symbols Svelte folds into the name, and a directive's whole head token
+            ("ysc%%gibberish", "="),
+            ("on:click|preventDefault", "={fn}"),
+        ] {
+            let source = format!("{name}{tail}");
+            assert_eq!(attr_name_end(&source, 0), name.len(), "{source:?}");
+        }
     }
 }
