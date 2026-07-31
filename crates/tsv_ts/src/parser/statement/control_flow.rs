@@ -700,7 +700,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Script `[~Await]` (a valid `LabelIdentifier`), which the statement
         // dispatcher routes here as a keyword token.
         let name = self
-            .try_ident_or_keyword_name()
+            .try_ident_or_contextual_name()
             .ok_or_else(|| self.error_expected("label"))?;
         self.advance()?;
 

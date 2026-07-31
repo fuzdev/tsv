@@ -977,18 +977,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let end = private_id.span.end_usize();
             Ok((Expression::PrivateIdentifier(private_id), end))
         } else if self.current_is_identifier_or_keyword() {
-            let (prop_start, prop_end) = self.current_pos();
-            // Property names are span-identity but decode `\u` escapes (`x.a` →
-            // name `a`; ecma262 IdentifierName StringValue) — acorn parity.
-            let name = self.current_ident_name();
-            self.advance()?;
-            Ok((
-                Expression::Identifier(Identifier::simple(
-                    name,
-                    Span::new(prop_start as u32, prop_end as u32),
-                )),
-                prop_end,
-            ))
+            let property = self.parse_identifier_name_node()?;
+            let prop_end = property.span.end_usize();
+            Ok((Expression::Identifier(property), prop_end))
         } else {
             Err(self.error_expected_after("property name", "."))
         }
@@ -2252,10 +2243,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     if !self.current_is_identifier_or_keyword() {
                         return Err(self.error_expected_after("property name", "."));
                     }
-                    let (prop_start, prop_end) = self.current_pos();
-                    // Property names decode `\u` escapes (span-identity otherwise) — acorn parity.
-                    let name = self.current_ident_name();
-                    self.advance()?;
+                    let property = self.parse_identifier_name_node()?;
+                    let prop_end = property.span.end_usize();
 
                     // actual_start covers a parenthesized callee's `(` (`new (a()).b`)
                     let span = Span::new(callee.actual_start, prop_end as u32);
@@ -2263,10 +2252,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         self.arena,
                         Expression::MemberExpression(MemberExpression {
                             object: callee.expr,
-                            property: arena.alloc(Expression::Identifier(Identifier::simple(
-                                name,
-                                Span::new(prop_start as u32, prop_end as u32),
-                            ))),
+                            property: arena.alloc(Expression::Identifier(property)),
                             computed: false,
                             optional: false,
                             span,

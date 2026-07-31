@@ -479,7 +479,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let name = if is_import && self.peek_kind() == TokenKind::Keyword(KeywordKind::As) {
             self.try_identifier_name()
         } else {
-            self.try_ident_or_keyword_name()
+            self.try_ident_or_contextual_name()
         };
         let Some(name) = name else {
             return Err(self.error_expected("identifier in specifier"));
@@ -739,7 +739,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             ) {
                 self.current_raw_ident_name()
             } else {
-                match self.try_ident_or_keyword_name() {
+                match self.try_ident_or_contextual_name() {
                     Some(name) => name,
                     None => {
                         return Err(self.error_expected("identifier in export specifier"));
@@ -792,7 +792,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let imported_name = if self.peek_kind() == TokenKind::Keyword(KeywordKind::As) {
                 self.try_identifier_name()
             } else {
-                self.try_ident_or_keyword_name()
+                self.try_ident_or_contextual_name()
             };
             let Some(imported_name) = imported_name else {
                 return Err(self.error_expected("identifier in import specifier"));

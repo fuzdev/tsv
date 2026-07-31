@@ -197,16 +197,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let (computed, key) = if self.eat(TokenKind::BracketOpen) {
             (true, self.parse_computed_member_key()?)
         } else if self.current_is_identifier_or_keyword() {
-            let (key_start, key_end) = self.current_pos();
-            // Member keys decode `\u` escapes (span-identity otherwise) — acorn parity.
-            let key_name = self.current_ident_name();
-            self.advance()?;
             (
                 false,
-                Expression::Identifier(Identifier::simple(
-                    key_name,
-                    Span::new(key_start as u32, key_end as u32),
-                )),
+                Expression::Identifier(self.parse_identifier_name_node()?),
             )
         } else if self.check(&TokenKind::String) {
             // String literal key: {'multi-word': number}

@@ -395,7 +395,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // The predicate subject is an identifier/keyword name or `this`
         // (`x is T`, `this is T`, `asserts x`, `asserts this`).
         let param_name = self
-            .try_ident_or_keyword_name()
+            .try_ident_or_contextual_name()
             .or_else(|| self.this_as_name());
         if let Some(param_name) = param_name {
             // Type predicate: `identifier is Type` or `asserts identifier is Type`.
