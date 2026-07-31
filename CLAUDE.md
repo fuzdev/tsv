@@ -208,9 +208,9 @@ deno task roundtrip:audit            # format(tests/fixtures) must reparse — p
 deno task binding:audit              # comment↔token re-binding audit — HARD fails the gate, SOFT informational (gated in `deno task check`; ./docs/audits.md)
 deno task authoring:audit            # authoring-independence over Svelte boundary whitespace — one fixed point per document, exit 1 on any non-idempotency (gated in `deno task check`; ./docs/audits.md)
 deno task fuzz:audit                 # seeded mutational fuzzer (fixed --seed 0 --iterations 5000): no-panic + idempotency + structural-reparse (gated in `deno task check`; ./docs/audits.md)
-deno task swallow:audit              # `//` line-comment swallow check — a line comment swallowing following output-line content (gated in `deno task check`; ./docs/audits.md)
+deno task swallow:audit              # `//` line-comment swallow check — a line comment swallowing following output-line content (gated in `deno task check` over fixtures + `deno task audit:corpus` over real code; ./docs/audits.md)
 deno task comments:audit             # print-once comment ledger: DROPPED / DOUBLE-PRINTED comments (gated in `deno task check`; ./docs/audits.md)
-deno task gaps:audit                 # gap-injection audit — RATCHET over `gap_audit_known.txt` (every line a known bug), ~17 s (gated in `deno task check`; ./docs/gap_audit.md)
+deno task gaps:audit                 # gap-injection audit — RATCHET over `gap_audit_known.txt` (every line a known bug: a comment DROPPED / DOUBLE-PRINTED, or code SWALLOWed by a `//`), ~17 s (gated in `deno task check`; ./docs/gap_audit.md)
 deno task gaps:audit:update          # regenerate that snapshot after fixing a shape (or when a new fixture merely REACHES a pre-existing one); refuses a narrowed run
 deno task gaps:audit:rank            # rank the pinned shapes for triage (also --since; see ./docs/gap_audit.md)
 deno task blanks:audit               # blank-line injection audit — RATCHET over `blank_audit_known.txt`, ~24 s (gated in `deno task check`; ./docs/blank_audit.md)

@@ -15,6 +15,12 @@
  *   corruption the char-frequency SAFETY check is blind to). All dirs.
  * - `comment_audit` — every parsed comment emitted exactly once (dropped / double-printed). All
  *   dirs. Needs the `comment_check` feature (folded into the `audits` umbrella).
+ * - `swallow_audit` — no `//` may eat the content after it on its output line (lost CODE, and a
+ *   class the print-once ledger is structurally blind to since the comment IS printed once). All
+ *   dirs; needs the `swallow_check` feature (same umbrella). Real code is where this one earns
+ *   its keep: the callee-position swallow (`call // c⏎()` → `call // c();`) lives in exactly one
+ *   file anywhere, prettier's `js/call/no-argument/no-arguments.js`, and survived because no
+ *   standing gate ran the check outside `tests/fixtures`.
  * - `binding_audit --gate` — a glued comment must bind the same subtree after formatting
  *   (cast/annotation re-binding invisible to every other gate). Real code only: the Prettier
  *   suites carry a handful of known adversarial philosophy HARDs (plain comments tsv preserves
@@ -104,6 +110,7 @@ const legs: Leg[] = [
 		gating: true
 	},
 	{ name: 'comment_audit', args: ['comment_audit'], dirs: all_dirs, gating: true },
+	{ name: 'swallow_audit', args: ['swallow_audit'], dirs: all_dirs, gating: true },
 	{
 		name: 'binding_audit --gate (real code)',
 		args: ['binding_audit', '--gate'],
