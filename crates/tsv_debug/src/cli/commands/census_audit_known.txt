@@ -1,0 +1,15 @@
+# Comment-census ratchet — every line is a KNOWN BUG, the file shrinking is the goal.
+#
+# One line per (file, language bucket, direction): a comment interior present in the raw
+# INPUT lex but not the raw OUTPUT lex (MISSING — a dropped comment, whichever internal
+# layer lost it), or present in the output but not the input (EXTRA — a duplicated or
+# fabricated one). Interiors compare as per-line-trimmed multisets, so a re-indented
+# multi-line block matches; everything else is byte-exact. The one sanctioned drop (the
+# CSS CDO/CDC `<!-- ... -->` span, discarded wholesale to match parseCss) is carved out
+# in the scanner and can never appear here.
+#
+# A key found but not pinned FAILS (a new loss site). A pinned key that no longer fires
+# FAILS (fix landed — re-pin).
+#
+# Regenerate with `deno task census:audit:update`.
+# shapes: 0

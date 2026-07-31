@@ -217,6 +217,8 @@ deno task blanks:audit               # blank-line injection audit — RATCHET ov
 deno task blanks:audit:update        # regenerate that snapshot after fixing a shape; refuses a narrowed run
 deno task fabrication:audit          # blank-FABRICATION audit — the PRISTINE counterpart to `blanks:audit`: a blank run the formatter INVENTS on an unmutated seed, which F1 is structurally blind to. RATCHET over `fabrication_audit_known.txt` (born EMPTY), ~0.2 s (gated in `deno task check`; ./docs/audits.md)
 deno task fabrication:audit:update   # regenerate that snapshot; refuses a narrowed run
+deno task census:audit               # comment CENSUS — lex comment trivia off the raw INPUT and raw OUTPUT (its own scanners, never `parse().comments`) and compare per-line-trimmed interior multisets per language bucket (incl. per `<script>`/`<style>` island): catches parse-time drops, merges, and interior rewrites every registration-based gate is blind to. RATCHET over `census_audit_known.txt` (born EMPTY), ~0.35 s (gated in `deno task check`; ./docs/audits.md)
+deno task census:audit:update        # regenerate that snapshot; refuses a narrowed run
 deno task ignore:audit               # ignore-directive honoring audit (Arm A) — RATCHET over `ignore_audit_known.txt`: per position, four graded checks on an injected `prettier-ignore` (honoring, second-pass stability, freeze scope, trailing inertness) (gated in `deno task check`; ./docs/audits.md)
 deno task ignore:audit:update        # regenerate that snapshot after adding a printer opt-in or fixing a misbinding/over-freeze/transient (the fixed line goes stale); refuses a narrowed run
 deno task render:audit <paths>       # render-equivalence over REAL Svelte code (needs the sidecar — NOT in `deno task check`; release-gated as a leg of `deno task conformance`; ./docs/audits.md)
@@ -920,7 +922,9 @@ deno task metrics                          # shorthand
 ```
 
 **Audits** — the standing correctness gates and discovery harnesses: line-comment swallow,
-the print-once comment ledger, gap/blank injection, blank fabrication, build-fanout, raw-find scan,
+the print-once comment ledger, the comment census (raw-text trivia lex of input AND output,
+per-language interior multisets — the guard on parse-time comment drops), gap/blank
+injection, blank fabrication, build-fanout, raw-find scan,
 self-format (tsv over its own TS/JS), authoring-independence, format→reparse round-trip,
 comment↔token binding,
 render-equivalence, layout-neutrality, the seeded mutational fuzzer, the F1 idempotency
@@ -1071,7 +1075,11 @@ survives, so a leading-comment repro reports the builder healthy. The **print-on
 ledger** (`deno task comments:audit`, gated in `deno task check`; see ./docs/audits.md) is
 the structural guard on all four — but it only sees a document AS AUTHORED, so a wholly
 comment-blind builder stays green until some file puts a comment there; the **injection**
-audits (`gaps:audit`) are the discovery arm for hazard 4.
+audits (`gaps:audit`) are the discovery arm for hazard 4. One layer below the ledger's
+model, the **comment census** (`deno task census:audit`) lexes comment trivia off the raw
+input AND raw output and compares interior multisets — so a comment a parse path consumed
+without ever registering (invisible to the ledger by construction), a merge, or an
+interior rewrite still counts.
 
 ⚠️ **Leading comments have one rule and one emitter** — `Printer::push_leading_comment_run`
 (prettier's `printLeadingComment`), with `Printer::comment_hugs_next` as the single glue
