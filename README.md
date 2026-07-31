@@ -32,10 +32,11 @@ See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for stats.
 Compared to Oxc and Biome, tsv (v0.2, not yet published) is faster,
 smaller, and uses less memory to parse and format its supported languages.
 One reason for tsv to exist is to help find the performance bonuses
-being left on the table in the Web ecosystem's increasingly-native implementations.
+left on the table in the Web ecosystem's increasingly-native implementations.
 
-This is an early release, and reports and feedback are appreciated -
-see the [issues](https://github.com/fuzdev/tsv/issues)
+This is an early release with many bugs (and fixes to bugs in Prettier and
+prettier-plugin-svelte), and reports and feedback are appreciated.
+See the [issues](https://github.com/fuzdev/tsv/issues)
 and [discussions](https://github.com/fuzdev/tsv/discussions).
 
 AI disclosure: this codebase is mostly LLM-generated, and the usual caveats apply.
