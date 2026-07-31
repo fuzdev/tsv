@@ -48,6 +48,14 @@ fn type_has_internal_breaking(ts_type: &TSType<'_>) -> bool {
         }
         // TypeReference with type arguments has internal breaking via `<>`
         TSType::TypeReference(r) => r.type_arguments.is_some(),
+        // A **parenthesized** array element brings its own delimiter, so `(…)[]` breaks
+        // inside its parens exactly as `{…}` breaks inside its braces. Without this the
+        // gate answered on width alone: the same `(| 'a' | 'b')[]` hugged `=` when the
+        // break was width-driven and hung after `=` when a member comment forced it, which
+        // is the disagreement `build_conditional_check_doc` names for its own union gate.
+        // A narrow arm, not the recursion the wider enumeration wants (`Ref<…>[]`,
+        // `keyof Ref<…>`, `Ref<…>['k']` are still missing) — that one needs a corpus A/B.
+        TSType::Array(a) => matches!(a.element_type, TSType::Parenthesized(_)),
         _ => false,
     }
 }

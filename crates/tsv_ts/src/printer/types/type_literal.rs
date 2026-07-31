@@ -280,22 +280,37 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// A comment-free parenthesized union in element/object position that would
-    /// break EXPANDS its parens (`(⏎\t| A⏎\t| B⏎)`, prettier's `printUnionType`
-    /// needs-parens branch) instead of gluing the leading `|` to the `(`. Returns
-    /// `None` for any other type — the caller keeps its existing layout — and for a
-    /// *commented* union, so comment placement stays untouched. `ty` is the element /
-    /// object as authored (parens included): it is unwrapped to reach the union, and
-    /// its own span (parens and all) is the comment window. Shared by the
-    /// array-element (`build_array_type_doc`) and indexed-access-object arms; the
+    /// A parenthesized union in element/object position that would break EXPANDS its
+    /// parens (`(⏎\t| A⏎\t| B⏎)`, prettier's `printUnionType` needs-parens branch)
+    /// instead of gluing the leading `|` to the `(`. Returns `None` for any other type
+    /// — the caller keeps its existing layout. A *commented* union takes this layout
+    /// too, with the shell's own two gaps emitted by the paren builder (see the body).
+    /// `ty` is the element / object as authored (parens included): it is unwrapped to
+    /// reach the union, and its own span (parens and all) is the comment window. Shared
+    /// by the array-element (`build_array_type_doc`) and indexed-access-object arms; the
     /// indexed-access *index* uses bracket delimiters, not parens, so it expands
     /// inline rather than through here. See `type_param_fits_rhs_long`.
     pub(super) fn build_expanded_parenthesized_union_opt(&self, ty: &TSType<'_>) -> Option<DocId> {
         if let TSType::Union(u) = unwrap_parenthesized(ty)
             && !self.union_prints_hugged(u)
-            && !self.has_comments_to_emit_between(ty.span().start, ty.span().end)
         {
-            Some(self.build_parenthesized_union_doc(u, None, false))
+            // The real paren node, not `None`: with it the builder emits the shell's own
+            // two gaps, so a commented shell takes this expanded layout too. Declining on
+            // any comment (what this replaced) sent it to the glued-paren fall-through,
+            // which welds the leading `|` to the `(` **and** leaves the shell's trailing
+            // gap to an outer emitter — a member's trailing `// c` escaped past the `)`
+            // and merged with whatever else flushed on that line. A comment-free shell is
+            // unaffected: both gap scans find nothing.
+            //
+            // The **outermost** paren, not `immediate_paren`'s innermost: the builder
+            // bounds its gap scans by this node's span, and only one pair is emitted for
+            // the whole shell, so the innermost `)` would stop the trailing scan short and
+            // drop everything between the two closers (`((A | B) /* c */)[]`).
+            let shell = match ty {
+                TSType::Parenthesized(p) => Some(p),
+                _ => None,
+            };
+            Some(self.build_parenthesized_union_doc(u, shell, true))
         } else {
             None
         }

@@ -74,6 +74,32 @@ impl<'a> Printer<'a> {
         update: &internal::UpdateExpression<'_>,
     ) -> DocId {
         let d = self.d();
+        let operator_doc = d.text(update.operator.as_str());
+        let operator_len = update.operator.as_str().len() as u32;
+
+        // Postfix `x++` / `x--`: the operand→operator gap is ASI-sensitive — `a // c⏎++`
+        // parses as `a;` then `++;`, so the operator may not start a line.
+        //
+        // That does not make the gap block-only, though. A grouping paren shell holds the
+        // line terminator off the gap, so `(a // c⏎)++` really is a postfix update
+        // carrying a `//` — and inlining it swallowed the `++;` into the comment. Such a
+        // comment keeps the shell (`asi_gap_needs_parens`), which also supplies the
+        // `(a as T)++` parens, so nothing below adds a second pair.
+        //
+        // Asked BEFORE the operand's doc is built: the shell builds its own operand doc,
+        // so building one here first would be discarded — and `build_expression_doc` is
+        // not side-effect-free (it consumes the expression-statement paren target), which
+        // makes a discarded build more than wasted work.
+        if !update.prefix
+            && let Some(shell) = self.build_asi_operand_shell_doc(
+                update.span.start,
+                update.argument,
+                update.span.end - operator_len,
+            )
+        {
+            return d.concat(&[shell, operator_doc]);
+        }
+
         let argument_doc = self.build_expression_doc(update.argument);
         // A type-assertion operand keeps its parens: `(a as T)++` (bare
         // `a as T++` binds `++` to `T`).
@@ -82,8 +108,6 @@ impl<'a> Printer<'a> {
         } else {
             argument_doc
         };
-        let operator_doc = d.text(update.operator.as_str());
-        let operator_len = update.operator.as_str().len() as u32;
 
         if update.prefix {
             // Prefix: ++x, --x. The operator→operand gap has no other emitter, so a
@@ -102,12 +126,10 @@ impl<'a> Printer<'a> {
                 None => d.concat(&[operator_doc, argument_doc]),
             }
         } else {
-            // Postfix: x++, x--. Same unclaimed gap on the other side, and it can only
-            // ever hold a SINGLE-LINE block comment: a line comment or a multiline block
-            // is a line terminator for ASI, so `a // c⏎++` parses as `a;` then `++;` —
-            // never a postfix update, so the AST this prints can't contain one. That is
-            // why the comments emit inline here rather than hanging the operator: a break
-            // would rewrite the program.
+            // Postfix, no shell needed (see above): the same unclaimed gap on the other
+            // side, emitted **inline** rather than hanging the operator — a break would
+            // rewrite the program. Only a single-line block reaches here (`x /* c */++`);
+            // anything spanning lines took the shell.
             let operator_start = update.span.end - operator_len;
             let comments =
                 self.build_inline_comments_between_doc(update.argument.span().end, operator_start);

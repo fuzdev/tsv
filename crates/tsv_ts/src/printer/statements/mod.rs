@@ -710,15 +710,8 @@ impl<'a> Printer<'a> {
             b'(',
         )
         .map(|p| p as u32);
-        let first_comment = comments_to_emit_in_range(self.comments, keyword_end, arg_start).next();
-        let (paren_trailing, leading_start) = match (open_paren, first_comment) {
-            (Some(op), Some(c))
-                if !c.is_block && !self.has_newline_between(op + 1, c.span.start) =>
-            {
-                (Some(self.build_comment_doc(c)), c.span.end)
-            }
-            _ => (None, keyword_end),
-        };
+        let (paren_trailing, leading_start) =
+            self.split_paren_line_trailing_comment(keyword_end, open_paren, arg_start);
         let inline_comments = self.build_rhs_comments_opt(leading_start, arg_start);
 
         // Rule: an own-line directive in the grouping `(`→operand gap freezes the operand

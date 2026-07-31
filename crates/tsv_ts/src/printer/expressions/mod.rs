@@ -198,13 +198,17 @@ impl<'a> Printer<'a> {
             Expression::TSTypeAssertion(type_assert) => {
                 self.build_ts_type_assertion_doc(type_assert)
             }
-            Expression::TSAsExpression(as_expr) => {
-                self.build_binary_cast_doc(as_expr.expression, as_expr.type_annotation, "as")
-            }
+            Expression::TSAsExpression(as_expr) => self.build_binary_cast_doc(
+                as_expr.expression,
+                as_expr.type_annotation,
+                "as",
+                as_expr.span.start,
+            ),
             Expression::TSSatisfiesExpression(sat_expr) => self.build_binary_cast_doc(
                 sat_expr.expression,
                 sat_expr.type_annotation,
                 "satisfies",
+                sat_expr.span.start,
             ),
             Expression::TSInstantiationExpression(inst_expr) => {
                 self.build_ts_instantiation_doc(inst_expr)
@@ -635,29 +639,53 @@ impl<'a> Printer<'a> {
         expression: &Expression<'_>,
         type_annotation: &TSType<'_>,
         keyword: &'static str,
+        cast_start: u32,
     ) -> DocId {
         let d = self.d();
-        let needs_parens = self.needs_parens(expression, ParenContext::TypeAssertion);
         let mut parts = d.pooled_docbuf();
-        if needs_parens {
-            parts.push(d.text("("));
-        }
-        parts.push(self.build_expression_doc(expression));
-        if needs_parens {
-            parts.push(d.text(")"));
-        }
 
         // Find the keyword position
         let expr_end = expression.span().end;
         let type_start = type_annotation.span().start;
         let keyword_pos = self.find_keyword_in_range(expr_end, type_start, keyword);
 
-        // Comments between expression and keyword → place before the keyword. Skip the
-        // `empty()` child on the comment-free `expr as` gap (ubiquitous). Byte-identical.
-        if let Some(kw_pos) = keyword_pos
-            && self.has_comments_to_emit_between(expr_end, kw_pos)
-        {
-            parts.push(self.build_inline_comments_between_doc(expr_end, kw_pos));
+        // The operand→keyword gap is ASI-sensitive — `as`/`satisfies` may not start a
+        // line — so a comment that spans lines keeps the operand's grouping parens
+        // rather than being inlined (`asi_gap_needs_parens`), and the shell's own
+        // `(`→operand gap is emitted with it (nothing else does, so it was dropped).
+        // The paren frame supplies whatever parens the cast itself needs, so this arm
+        // emits no second pair.
+        //
+        // One gap scan serves both arms. A cast is ubiquitous, and both the shell
+        // question and the inline emission below used to open with the same binary
+        // search over `[expr_end, kw)`. The shell's two triggers are each implied by a
+        // term of the guard: its trailing trigger needs a comment IN that gap, and its
+        // leading trigger needs a `(` BEFORE the operand, which needs room for one.
+        let gap_has_comments =
+            keyword_pos.is_some_and(|kw| self.has_comments_to_emit_between(expr_end, kw));
+        let shell = if gap_has_comments || cast_start < expression.span().start {
+            keyword_pos.and_then(|kw| self.build_asi_operand_shell_doc(cast_start, expression, kw))
+        } else {
+            None
+        };
+
+        if let Some(shell) = shell {
+            parts.push(shell);
+        } else {
+            let needs_parens = self.needs_parens(expression, ParenContext::TypeAssertion);
+            if needs_parens {
+                parts.push(d.text("("));
+            }
+            parts.push(self.build_expression_doc(expression));
+            if needs_parens {
+                parts.push(d.text(")"));
+            }
+
+            // Comments between expression and keyword → place before the keyword. Skip the
+            // `empty()` child on the comment-free `expr as` gap (ubiquitous). Byte-identical.
+            if gap_has_comments && let Some(kw_pos) = keyword_pos {
+                parts.push(self.build_inline_comments_between_doc(expr_end, kw_pos));
+            }
         }
 
         // A comment between the keyword and the type that can't be inlined forces the
