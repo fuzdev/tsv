@@ -501,6 +501,26 @@ every-file-errored / every-file-parse-fail-skipped run is a systemic failure —
 sidecar/FFI down or a wrong corpus — never a pass. Only the CSS-WPT harvest stays
 manual, outside the automated step.
 
+**A caught panic hard-fails both corpus tools, on every run** (not just `--all`,
+and never inside a bucket). These tools build tsv with `--profile corpus`
+(`panic = "unwind"`) precisely so a crash is caught and reported per file rather
+than killing the run — but the SHIPPED artifacts are `panic = "abort"` and take
+the host process down on that same input, so the caught panic lands in the run's
+mildest bucket while describing the release's harshest failure (robustness bar
+tier 2). Without the gate it graded as one more `errors` WARN at exit 0 in
+`corpus:compare:format`, and as a dimmed `parse-fail skipped` line in
+`corpus:compare:parse` — where only `--all`'s exact `CORPUS_PARSE_TSV_ERRORS_PIN`
+would have noticed, and then as "a new over-rejection". The gate is
+`gate_on_panics` in `lib/compare_cli.ts` (each tool passes the failures that
+could be tsv's; the classification is shared, so the two can't answer this
+question differently) over `is_native_panic_error` in
+`lib/divergence/panic_errors.ts`, matched against the message's FIRST LINE so a
+rejection's source code frame can never fabricate the verdict; only tsv can
+produce those shapes, since the oracle on the other side is JS. Classification
+runs BEFORE `check_expected_error` — those patterns key on file *content*, so a
+panic on a file that also happens to hold SCSS used to file as an expected error
+and vanish from the report entirely.
+
 ## Pinned gate counts
 
 The gates and harvests enforce **committed expected counts** so any change in

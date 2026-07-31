@@ -23,6 +23,7 @@ export {
 	type ExpectedErrorPattern,
 	type ExpectedErrorResult
 } from './expected_errors.ts';
+export { is_native_panic_error } from './panic_errors.ts';
 export { type DiffHunk, extract_hunks } from '../diff.ts';
 export {
 	type AuditReport,
