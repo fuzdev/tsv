@@ -18,7 +18,10 @@ import { z } from 'zod';
 import {
 	COMPARE_BASE_ARG_FIELDS,
 	create_compare_loader,
+	dispose_compare,
 	emit_json_stdout,
+	exit_compare_failure,
+	gate_on_panics,
 	init_compare_implementations,
 	parse_language_filter,
 	redirect_logs_to_stderr,
@@ -44,6 +47,7 @@ import {
 	check_safety_vs_prettier,
 	detect_divergences,
 	type HunkCoverageResult,
+	is_native_panic_error,
 	type SafetyViolation
 } from './lib/divergence/mod.ts';
 
@@ -361,7 +365,8 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	console.log();
 
 	const loader = create_compare_loader(use_all_repos, base_path);
-	const { canonical, native } = await init_compare_implementations();
+	const impls = await init_compare_implementations();
+	const { canonical, native } = impls;
 	// Content-addressed prettier-output cache (lib/prettier_cache.ts) — the
 	// dominant cost here is prettier over ~6k mostly-unchanged files. Keyed on
 	// content + routing + options + the canonical-5 pins + PRETTIER_DEBUG;
@@ -630,8 +635,14 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 			}
 		} catch (e) {
 			const error_msg = e instanceof Error ? e.message : String(e);
-			const expected_check = check_expected_error(file.content, lang);
-			if (expected_check.expected) {
+			// Classify the failure MODE before its CONTENT: the expected-error
+			// patterns key on the file's source, so a panic on a file that also
+			// happens to hold SCSS would file as "expected" and be dimmed out of
+			// the report entirely. A crash is never expected, whatever it crashed on.
+			const expected_check = is_native_panic_error(error_msg)
+				? null
+				: check_expected_error(file.content, lang);
+			if (expected_check?.expected) {
 				lang_stats.expected_errors++;
 				lang_results.push({
 					path: file.path,
@@ -657,9 +668,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		}
 
 		if (should_exit) {
-			canonical.dispose();
-			native.dispose();
-			Deno.exit(1);
+			exit_compare_failure(impls);
 		}
 	}
 
@@ -669,9 +678,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		// source-empty path (typo, moved src/) must not read as green.
 		console.log('No files found — nothing was compared.');
 		if (json_mode) emit_json_stdout(build_json_report(results, stats, base_path));
-		canonical.dispose();
-		native.dispose();
-		Deno.exit(1);
+		exit_compare_failure(impls);
 	}
 
 	const counts = LANGUAGES.map((lang) => `${lang_counts[lang]} ${lang}`).join(', ');
@@ -934,6 +941,12 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	// side is always live).
 	if (prettier_cache) console.log(`\n${prettier_cache.stats()}`);
 
+	// A caught panic hard-fails before the count pins — it is a robustness-bar
+	// violation, and it also explains any bucket the crashed file moved. `errors`
+	// is the only bucket a panic can reach (the expected-error branch is mode-gated
+	// above), and prettier can't panic, so this is the whole candidate set.
+	gate_on_panics(all_errors, impls, base_path);
+
 	// Pinned counts (--all only — see lib/gate_counts.ts). The count pins gate on
 	// the REPRODUCIBLE subset (`repro_stats` — version-pinned framework + prettier
 	// suites, tracked by GATE_CHECKOUT_COMMITS + pins:audit), so live dev-repo churn
@@ -983,9 +996,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 				`\n\x1b[31mFAIL: pinned counts (reproducible subset) — ${pin_failures.join('; ')}. ` +
 					`If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`
 			);
-			canonical.dispose();
-			native.dispose();
-			Deno.exit(1);
+			exit_compare_failure(impls);
 		}
 	}
 
@@ -995,15 +1006,11 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		console.log(
 			`\x1b[31mFAIL: ${total_safety_violation} safety violations (data loss detected)\x1b[0m`
 		);
-		canonical.dispose();
-		native.dispose();
-		Deno.exit(1);
+		exit_compare_failure(impls);
 	} else if ((total_unknown_diff > 0 || total_partial_divergence > 0) && strict) {
 		const issues = total_unknown_diff + total_partial_divergence;
 		console.log(`\x1b[31mFAIL: ${issues} unexplained differences (strict mode)\x1b[0m`);
-		canonical.dispose();
-		native.dispose();
-		Deno.exit(1);
+		exit_compare_failure(impls);
 	} else if (total_unknown_diff > 0 || total_partial_divergence > 0) {
 		const parts: string[] = [];
 		if (total_unknown_diff > 0) parts.push(`${total_unknown_diff} unknown`);
@@ -1019,9 +1026,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 		console.log(
 			`\x1b[31mFAIL: all ${total_errors} files errored — nothing was compared (systemic sidecar/FFI failure?)\x1b[0m`
 		);
-		canonical.dispose();
-		native.dispose();
-		Deno.exit(1);
+		exit_compare_failure(impls);
 	} else if (total_errors > 0) {
 		console.log(`\x1b[33mWARN: ${total_errors} errors occurred\x1b[0m`);
 	} else {
@@ -1029,8 +1034,7 @@ export async function run_corpus_compare_format(argv: string[] = Deno.args): Pro
 	}
 
 	// Cleanup
-	canonical.dispose();
-	native.dispose();
+	dispose_compare(impls);
 }
 
 /**

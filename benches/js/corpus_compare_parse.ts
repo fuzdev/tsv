@@ -39,7 +39,10 @@ import { z } from 'zod';
 import {
 	COMPARE_BASE_ARG_FIELDS,
 	create_compare_loader,
+	dispose_compare,
 	emit_json_stdout,
+	exit_compare_failure,
+	gate_on_panics,
 	init_compare_implementations,
 	parse_language_filter,
 	redirect_logs_to_stderr,
@@ -827,7 +830,8 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 	console.log();
 
 	const loader = create_compare_loader(use_all_repos, base_path);
-	const { canonical, native } = await init_compare_implementations();
+	const impls = await init_compare_implementations();
+	const { canonical, native } = impls;
 
 	const results: Map<Language, FileResult[]> = new Map();
 	const stats: Map<Language, LanguageStats> = new Map();
@@ -930,9 +934,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		// source-empty path (typo, moved src/) must not read as green.
 		console.log('No files found — nothing was compared.');
 		if (json_mode) emit_json_stdout(build_json_report(results, stats, [], base_path));
-		canonical.dispose();
-		native.dispose();
-		Deno.exit(1);
+		exit_compare_failure(impls);
 	}
 
 	const counts = LANGUAGES.map((lang) => `${lang_counts[lang]} ${lang}`).join(', ');
@@ -992,6 +994,17 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 
 	if (json_mode) emit_json_stdout(build_json_report(results, stats, groups, base_path));
 
+	// A caught panic hard-fails ahead of the "compared nothing" floor and the
+	// count pins — a tsv-side parse failure is otherwise dimmed as "skipped", and
+	// only `--all`'s exact `CORPUS_PARSE_TSV_ERRORS_PIN` would notice, reporting a
+	// crash as one more over-rejection. `canonical_error` files are excluded: their
+	// recorded message is the JS oracle's, which can't be a panic.
+	gate_on_panics(
+		LANGUAGES.flatMap((lang) => results.get(lang)!.filter((r) => r.status !== 'canonical_error')),
+		impls,
+		base_path
+	);
+
 	// Floor: a run where NOTHING was compared (every file parse-fail-skipped on
 	// one side) is a systemic failure, not a pass — without this, an FFI or
 	// sidecar breakage would zero out `compared` and sail through green.
@@ -999,9 +1012,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		console.log(
 			`\x1b[31mFAIL: 0 of ${total_processed} files compared (all parse-fail-skipped) — systemic failure or wrong corpus?\x1b[0m`
 		);
-		canonical.dispose();
-		native.dispose();
-		Deno.exit(1);
+		exit_compare_failure(impls);
 	}
 
 	// Pinned counts (--all only — see lib/gate_counts.ts): per-language MINIMUM
@@ -1029,9 +1040,7 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 			console.log(
 				`\x1b[31mFAIL: pinned counts — ${pin_failures.join('; ')}. If deliberate, re-pin in lib/gate_counts.ts.\x1b[0m`
 			);
-			canonical.dispose();
-			native.dispose();
-			Deno.exit(1);
+			exit_compare_failure(impls);
 		}
 	}
 
@@ -1083,15 +1092,12 @@ export async function run_corpus_compare_parse(argv: string[] = Deno.args): Prom
 		console.log(
 			`\x1b[31mFAIL: ${total_undocumented} file(s) with undocumented AST diffs vs canonical\x1b[0m`
 		);
-		canonical.dispose();
-		native.dispose();
-		Deno.exit(1);
+		exit_compare_failure(impls);
 	} else {
 		console.log('\x1b[32mPASS: no undocumented AST diffs vs canonical\x1b[0m');
 	}
 
-	canonical.dispose();
-	native.dispose();
+	dispose_compare(impls);
 }
 
 /**

@@ -2,11 +2,14 @@
  * Shared CLI scaffolding for the corpus_compare_* entry points
  * (corpus_compare_format.ts, corpus_compare_parse.ts): common argument
  * fields, path/filter resolution, loader selection, implementation init with
- * the artifact-freshness guard, and the --json stdout/stderr discipline.
+ * the artifact-freshness guard, the teardown/failure contract, the shared panic
+ * gate, and the --json stdout/stderr discipline.
  *
  * Keeping this in one place means hardening (the FFI heisenbug mitigations,
  * freshness-guard behavior, sidecar init errors) applies to every comparison
- * tool instead of drifting per-script.
+ * tool instead of drifting per-script — and a GATE that lives here cannot be
+ * answered two ways by two tools, which is how the panic hole opened in the
+ * first place.
  */
 
 import process from 'node:process';
@@ -16,6 +19,7 @@ import { z } from 'zod';
 
 import { DevReposLoader, DirectoryLoader } from './corpus.ts';
 import { CanonicalImplementation } from './canonical.ts';
+import { is_native_panic_error } from './divergence/panic_errors.ts';
 import { get_library_path, NativeImplementation } from './ffi.ts';
 import { check_artifact_freshness } from './check_artifact_freshness.ts';
 import { check_node_modules } from './check_node_modules.ts';
@@ -98,15 +102,19 @@ export function create_compare_loader(
 	return use_all ? new DevReposLoader('gates') : new DirectoryLoader(base_path);
 }
 
+/** The pair of implementations a comparison run holds open for its lifetime. */
+export interface CompareImplementations {
+	canonical: CanonicalImplementation;
+	native: NativeImplementation;
+}
+
 /**
  * Initialize the canonical (prettier + svelte/compiler + acorn) and native
  * (FFI) implementations behind the artifact-freshness guard, exiting with a
- * profile-aware rebuild hint on failure. Callers own `dispose()` on both.
+ * profile-aware rebuild hint on failure. Callers own the teardown —
+ * `dispose_compare` on the clean path, `exit_compare_failure` on every gate.
  */
-export async function init_compare_implementations(): Promise<{
-	canonical: CanonicalImplementation;
-	native: NativeImplementation;
-}> {
+export async function init_compare_implementations(): Promise<CompareImplementations> {
 	// The canonical impls resolve from benches/js/node_modules — check it exists
 	// (and isn't stale) up front so the failure is the installer hint, not an
 	// opaque module-resolution error mid-init.
@@ -145,6 +153,67 @@ export async function init_compare_implementations(): Promise<{
 	}
 
 	return { canonical, native };
+}
+
+/** Release both implementations at the end of a run. */
+export function dispose_compare(impls: CompareImplementations): void {
+	impls.canonical.dispose();
+	impls.native.dispose();
+}
+
+/**
+ * Tear down and exit 1 — the shared failure contract of every gate in a
+ * comparison tool. Exists so a gate added later can't half-remember it: the
+ * only way to fail a run is the way that also releases the sidecar and the FFI
+ * handle.
+ */
+export function exit_compare_failure(impls: CompareImplementations): never {
+	dispose_compare(impls);
+	Deno.exit(1);
+}
+
+/** A per-file failure a panic gate can grade: where it happened, and what threw. */
+export interface CompareFailure {
+	path: string;
+	error?: string;
+}
+
+/**
+ * HARD-FAIL the run on any caught panic, on every run — not just `--all`, and
+ * never folded into a per-file bucket.
+ *
+ * The comparison tools build tsv with `--profile corpus` (`panic = "unwind"`)
+ * precisely so a crash is caught and reported per file rather than killing the
+ * run; the SHIPPED artifacts are `panic = "abort"` and take the host process
+ * down on that same input. So a caught panic arrives in the run's mildest
+ * bucket while describing the release's harshest failure (robustness bar tier
+ * 2) — `errors` → a WARN at exit 0 in the format tool, a dimmed `parse-fail
+ * skipped` line in the parse tool.
+ *
+ * Callers pass the failures that could be tsv's (the parse tool's canonical-side
+ * errors are excluded there, being JS); the CLASSIFICATION lives here, in one
+ * place, so the two tools cannot answer this question differently.
+ *
+ * Call it AFTER the report body is printed — a panic is the headline, not a
+ * reason to withhold the run's findings.
+ */
+export function gate_on_panics(
+	failures: readonly CompareFailure[],
+	impls: CompareImplementations,
+	base_path: string
+): void {
+	const panics = failures.filter((f) => is_native_panic_error(f.error));
+	if (panics.length === 0) return;
+
+	console.log(
+		`\n\x1b[31mFAIL: ${panics.length} panic(s) — tsv crashed on real code ` +
+			`(caught here by the corpus profile; a shipped artifact would abort the host):\x1b[0m`
+	);
+	for (const f of panics.slice(0, 10)) {
+		console.log(`  ${rel_path(f.path, base_path)}: ${f.error}`);
+	}
+	if (panics.length > 10) console.log(`  ... and ${panics.length - 10} more`);
+	exit_compare_failure(impls);
 }
 
 /**
