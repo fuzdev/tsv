@@ -459,13 +459,7 @@ impl<'a> Printer<'a> {
         }
 
         let fill = d.fill(&fill_parts);
-        let fill = d.with_context(
-            fill,
-            DocContext {
-                trailing_reserve: suffix_width,
-                ..Default::default()
-            },
-        );
+        let fill = d.with_context(fill, DocContext::reserving(suffix_width));
         d.indent(fill)
     }
 
@@ -710,13 +704,7 @@ impl<'a> Printer<'a> {
         }
 
         let fill = d.fill(&fill_parts);
-        let fill = d.with_context(
-            fill,
-            DocContext {
-                trailing_reserve: suffix_width,
-                ..Default::default()
-            },
-        );
+        let fill = d.with_context(fill, DocContext::reserving(suffix_width));
         d.indent(fill)
     }
 

@@ -42,7 +42,7 @@ pub(super) fn render_fill_iterative(
         let is_final_segment = offset + 2 >= parts.len();
 
         let available = if is_final_segment {
-            remaining.saturating_sub(context.trailing_reserve)
+            remaining.saturating_sub(context.trailing_reserve as usize)
         } else {
             remaining
         };
@@ -456,6 +456,36 @@ pub(super) fn render_fill_iterative(
                         pos,
                         indent,
                         Mode::Flat,
+                        should_remeasure,
+                    );
+                    offset += 2;
+                    continue;
+                }
+
+                // `glued_lead`: the fill's FIRST item is byte-glued to what precedes it, so the
+                // boundary before it carries no whitespace and the fresh-line drop below would
+                // INJECT a rendered space (and, since the mangled form is itself a fixed point, F1
+                // could never see it). Render it in place — prettier's shape — and break the
+                // separator, so the run splits at the first whitespace boundary INSIDE it instead,
+                // even when the glued head overruns printWidth. Head only: every later item is
+                // separated by real whitespace and keeps the ordinary drop.
+                if context.glued_lead && offset == 0 {
+                    render_single_doc(
+                        ctx,
+                        content,
+                        output,
+                        pos,
+                        indent,
+                        Mode::Break,
+                        should_remeasure,
+                    );
+                    render_single_doc(
+                        ctx,
+                        separator,
+                        output,
+                        pos,
+                        indent,
+                        Mode::Break,
                         should_remeasure,
                     );
                     offset += 2;

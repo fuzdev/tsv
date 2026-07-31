@@ -1,0 +1,230 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 944,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 494,
+				"data": "\n\tA text run byte-glued to a preceding HTML comment is one indivisible run: breaking at\n\tthat boundary would inject a rendered space, so the break can only land at a\n\twhitespace boundary INSIDE the text run — even when the glued head overflows\n\tprintWidth. Cases below, in order: fits at exactly 100 (stays inline, control); 101\n\t(breaks at the space inside the run, glue intact); the glued head alone over width\n\t(101, stands); a run of two glued comments (the whole run stays welded).\n"
+			},
+			{
+				"type": "Text",
+				"start": 494,
+				"end": 495,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 495,
+				"end": 603,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 496
+					},
+					"end": {
+						"line": 9,
+						"column": 2,
+						"character": 497
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 498,
+							"end": 500,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 500,
+							"end": 587,
+							"data": "pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14 pad15"
+						},
+						{
+							"type": "Text",
+							"start": 587,
+							"end": 599,
+							"raw": "text1 text2\n",
+							"data": "text1 text2\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 603,
+				"end": 604,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 604,
+				"end": 714,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 605
+					},
+					"end": {
+						"line": 12,
+						"column": 2,
+						"character": 606
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 607,
+							"end": 609,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 609,
+							"end": 697,
+							"data": "pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14 pad15x"
+						},
+						{
+							"type": "Text",
+							"start": 697,
+							"end": 710,
+							"raw": "text1\n\ttext2\n",
+							"data": "text1\n\ttext2\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 714,
+				"end": 715,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 715,
+				"end": 831,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 716
+					},
+					"end": {
+						"line": 16,
+						"column": 2,
+						"character": 717
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 718,
+							"end": 720,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 720,
+							"end": 814,
+							"data": "pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14 pad15 pad16x"
+						},
+						{
+							"type": "Text",
+							"start": 814,
+							"end": 827,
+							"raw": "text1\n\ttext2\n",
+							"data": "text1\n\ttext2\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 831,
+				"end": 832,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 832,
+				"end": 943,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 20,
+						"column": 1,
+						"character": 833
+					},
+					"end": {
+						"line": 20,
+						"column": 2,
+						"character": 834
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 835,
+							"end": 837,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 837,
+							"end": 845,
+							"data": "a"
+						},
+						{
+							"type": "Comment",
+							"start": 845,
+							"end": 926,
+							"data": "pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14"
+						},
+						{
+							"type": "Text",
+							"start": 926,
+							"end": 939,
+							"raw": "text1\n\ttext2\n",
+							"data": "text1\n\ttext2\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
