@@ -1,0 +1,163 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 245,
+		"end": 285,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 254,
+					"end": 257,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 254,
+							"end": 257,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "TypeSelector",
+											"name": "div",
+											"start": 254,
+											"end": 257
+										}
+									],
+									"start": 254,
+									"end": 257
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 258,
+					"end": 276,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 262,
+							"end": 272,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				},
+				"start": 254,
+				"end": 276
+			}
+		],
+		"content": {
+			"start": 252,
+			"end": 277,
+			"styles": "\n\tdiv {\n\t\tcolor: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 286,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 201,
+				"data": "\n\tA closing tag name ends at any JS `\\s` character, so a Unicode space may sit\n\tbetween the name and `>` (see the unformatted_* variants). The raw-text and\n\tRCDATA closes tolerate the same run.\n"
+			},
+			{
+				"type": "Text",
+				"start": 201,
+				"end": 202,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 202,
+				"end": 217,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 203
+					},
+					"end": {
+						"line": 6,
+						"column": 4,
+						"character": 206
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 207,
+							"end": 211,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 217,
+				"end": 218,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 218,
+				"end": 243,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 219
+					},
+					"end": {
+						"line": 7,
+						"column": 9,
+						"character": 227
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"start": 228,
+							"end": 232,
+							"type": "Text",
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 243,
+				"end": 245,
+				"raw": "\n\n",
+				"data": "\n\n"
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

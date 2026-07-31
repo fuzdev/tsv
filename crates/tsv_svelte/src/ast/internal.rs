@@ -1181,9 +1181,11 @@ pub enum AttributeValue<'arena> {
 /// (`[\t\n\f\r ]`) has the same defect. See
 /// [text_form_feed_prettier_divergence](../../../../tests/fixtures/svelte/elements/text_form_feed_prettier_divergence/).
 ///
-/// ⚠️ It is equally **not** the HTML *tokenizer's* whitespace, which does include the form
-/// feed (a form feed separates attributes). This is a question about what RENDERS, so it is
-/// the printer's and `Text`'s class alone — the parser keeps `is_ascii_whitespace`.
+/// ⚠️ It is equally **not** the *tokenizer's* whitespace, which does include the form feed (a
+/// form feed separates attributes) and every Unicode space besides. This is a question about
+/// what RENDERS, so it is the printer's and `Text`'s class alone — the parser and lexer ask
+/// the token-separator question instead, and answer it with
+/// [`is_svelte_ws`](crate::whitespace::is_svelte_ws).
 #[inline]
 pub fn is_collapsible_ws(b: u8) -> bool {
     matches!(b, b' ' | b'\t' | b'\n' | b'\r')
