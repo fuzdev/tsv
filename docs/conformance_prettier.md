@@ -161,6 +161,13 @@ its tail:
   properties relocates the comment to end-of-line.
 - **Index-signature bracket gaps** — the `]`→value-`:` continuation
   (`[k: T] // c⏎\t: V`). See [Index signature `]`→value-`:`](#comment-relocation).
+- **Type-parameter pre-keyword gaps** — the name→`extends` and before-`=` default
+  continuations (`<T // c⏎\t\textends A>`, `<T extends A // c⏎\t\t= B>`), in every
+  context including Svelte `{#snippet}` generics
+  ([type_param_before_extends_line_comment](../tests/fixtures/typescript/types/comments/type_param_before_extends_line_comment_prettier_divergence/),
+  [type_param_before_eq_line_comment](../tests/fixtures/typescript/types/comments/type_param_before_eq_line_comment_prettier_divergence/)).
+  Prettier relocates the comment past the keyword. Inlining is content loss, not a
+  layout choice — the `//` swallows the `extends`/`=` tail into the comment.
 - **Callee→empty argument list** — the call/`new` head→`()` continuation
   (`call // c⏎\t()`), uniformly for a plain callee, `new`, explicit type arguments,
   an optional call, and a member-chain callee. Inlining here is content loss, not a
@@ -976,6 +983,8 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Enum member name to `=` line comment → After the value (`A = 1 // c`); tsv keeps it after the name + continuation indent. With a second trailing comment prettier merges both onto one line (info loss); tsv keeps them distinct — [member_before_eq_line_comment](../tests/fixtures/typescript/declarations/enum/member_before_eq_line_comment_prettier_divergence/)
 - Class property name to `=` line comment → Trailing the member `;` after the value (`a = 1; // c`); tsv keeps it in place + continuation indent. Two comments → prettier merges (info loss), tsv keeps distinct — [property_before_eq_line_comment](../tests/fixtures/typescript/declarations/class/property_before_eq_line_comment_prettier_divergence/)
 - Variable binding to `=` line comment → Trailing the statement `;` after the value (`const a = 1; // c`); tsv keeps it in place + continuation indent. Two comments → prettier merges (info loss), tsv keeps distinct — [declarator_before_eq_line_comment](../tests/fixtures/typescript/declarations/variable/declarator_before_eq_line_comment_prettier_divergence/)
+- Type parameter name to `extends` line comment → After `extends`, leading the constraint (`T extends // c⏎A`), re-binding the comment from the name to the constraint; tsv keeps it trailing the name and drops the `extends A` tail to a continuation line at one indent level (inlining would swallow the tail — the constraint becomes comment text). Identical in Svelte `{#snippet}` generics (shared type-parameter printer) — [type_param_before_extends_line_comment](../tests/fixtures/typescript/types/comments/type_param_before_extends_line_comment_prettier_divergence/), [snippet/ts_generic_constraint_gap_line_comment](../tests/fixtures/svelte/blocks/snippet/ts_generic_constraint_gap_line_comment_prettier_divergence/)
+- Type parameter before-`=` default line comment → After `=`, leading the default (`T extends A = // c⏎B`); tsv keeps it in place + continuation indent — the type-parameter face of the before-`=` initializer family above (declarators, enum members, class properties) — [type_param_before_eq_line_comment](../tests/fixtures/typescript/types/comments/type_param_before_eq_line_comment_prettier_divergence/)
 - Object property key to `:` line comment → Hoisted to its own line before the key (`// c⏎a: 1`); tsv keeps it after the key and drops `: value` to a continuation line — [property_key_colon_line_comment](../tests/fixtures/typescript/expressions/objects/property_key_colon_line_comment_prettier_divergence/)
 - Variable definite `!` → After `!` modifier — [definite_comment](../tests/fixtures/typescript/declarations/variable/definite_comment_prettier_divergence/)
 - Function param optional `?` → After `?` modifier — [param_optional_comment](../tests/fixtures/typescript/declarations/function/param_optional_comment_prettier_divergence/)
