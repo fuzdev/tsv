@@ -150,57 +150,17 @@ impl<'a> Printer<'a> {
                     }
                 }
 
-                // Process comments before this property
-                let mut last_pos = search_start;
-                for (j, comment) in comments.iter().enumerate() {
-                    let is_last_comment = j == comments.len() - 1;
-
-                    // Check if there's a blank line after this comment (for must_break mode)
-                    let has_blank_after = must_break
-                        && if is_last_comment {
-                            self.has_blank_line_between(comment.span.end, prop_start)
-                        } else {
-                            self.has_blank_line_between(
-                                comment.span.end,
-                                comments[j + 1].span.start,
-                            )
-                        };
-
-                    // For subsequent comments, check for blank lines between them
-                    if must_break
-                        && j > 0
-                        && self.has_blank_line_between(last_pos, comment.span.start)
-                    {
-                        parts.push(d.literalline());
-                        parts.push(d.hardline());
-                    }
-
-                    parts.push(self.build_comment_doc(comment));
-                    if !comment.is_block {
-                        // Line comments need a hardline after (unless blank line follows in must_break)
-                        if !has_blank_after {
-                            parts.push(d.hardline());
-                        }
-                    } else if must_break && !self.is_same_line(comment.span.end, prop_start) {
-                        // Block comment on its own line - hardline after (unless blank line follows)
-                        if !has_blank_after {
-                            parts.push(d.hardline());
-                        }
-                    } else {
-                        // Block comment on same line as property - space after
-                        parts.push(d.text(" "));
-                    }
-                    last_pos = comment.span.end;
-                }
-
-                // Check for blank line after last comment (before property)
-                if must_break
-                    && !comments.is_empty()
-                    && self.has_blank_line_between(last_pos, prop_start)
-                {
-                    parts.push(d.literalline());
-                    parts.push(d.hardline());
-                }
+                // Print the leading-comment run on the shared rule (prettier's
+                // `printLeadingComment`), the one the block / class / interface / member
+                // lists use: the separator after each comment is keyed on the source around
+                // *that comment*, never on where the property starts. Keying it on the
+                // property split a run the author glued (`/* c1 */ /* c2 */⏎x: 1`) — the bug
+                // family docs/comments.md §"Leading comments" names. The emitter owns the
+                // blank-line preservation this loop used to hand-roll on both sides
+                // (between two comments, and between the last one and the property), and
+                // emits a soft `line` where the run may still collapse, so an object that
+                // stays inline is decided by its group rather than by a hardcoded space.
+                self.push_leading_comments_before(&mut parts, &comments, prop_start);
 
                 // Build property doc — a preceding format-ignore directive keeps the
                 // property's source verbatim (trailing comment/comma handled normally)
