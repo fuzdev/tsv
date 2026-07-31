@@ -349,6 +349,12 @@ struct Example {
     /// Whether the offending comment is the injected one rather than a bystander the
     /// injection knocked out.
     injected: bool,
+    /// The `BlockOnly`-filtered builder call sites that skipped this comment during the
+    /// format (`file:line:column`) — the ledger's skip-∧-dropped join
+    /// ([`tsv_lang::comment_ledger::CommentFinding::skip_sites`]), naming the builder
+    /// whose gate broke the line-comment routing promise. Empty for panics, swallows,
+    /// and drops no filtered builder saw.
+    skip_sites: Vec<String>,
 }
 
 impl ExampleOrd for Example {
@@ -439,6 +445,8 @@ struct Hit<'a> {
     /// The offending comment's text, which is the *injected* payload only when
     /// [`Self::injected`] holds.
     text: String,
+    /// The ledger's skip-∧-dropped join for this comment — see [`Example::skip_sites`].
+    skip_sites: Vec<String>,
     /// Whether the offending comment is the injected one rather than a bystander.
     injected: bool,
     /// The `(node, edge)` this hit's [`Self::attribution_offset`] keys to — computed at record
@@ -460,6 +468,28 @@ struct NodeClusterAccum {
     hits: usize,
     /// The distinct site shapes that landed here — sorted, so `.iter().next()` is the smallest.
     shapes: BTreeSet<String>,
+    /// The distinct **gaps** that landed here — `(path, gap_run_start)`, deduping the
+    /// per-offset hits within one whitespace run. Raw hit counts are whitespace-biased:
+    /// an N-wide run yields ~N injectable offsets while a glued gap yields exactly one
+    /// (measured ~3.7×, 98.3 vs 26.3 hits/shape), so ranking on hits systematically
+    /// deprioritizes glued gaps — where the owned-claim and fused-`text()` families live.
+    /// The ranking sorts on this; hits stay reported beside it.
+    gaps: BTreeSet<(String, usize)>,
+}
+
+/// The start of the ASCII-whitespace run containing `offset` — the `(path, gap)` dedup key
+/// behind [`NodeClusterAccum::gaps`]. Every injectable offset within one inter-token
+/// whitespace run normalizes to the run's first byte; a glued offset (no preceding
+/// whitespace) is its own key. A comment inside a gap splits the run — two keys for one
+/// inter-token gap — a small residual accepted for the scan's simplicity (the alternative
+/// re-derives token boundaries the site enumeration already paid for).
+fn gap_run_start(source: &str, offset: usize) -> usize {
+    let bytes = source.as_bytes();
+    let mut i = offset.min(bytes.len());
+    while i > 0 && matches!(bytes[i - 1], b' ' | b'\t' | b'\r' | b'\n') {
+        i -= 1;
+    }
+    i
 }
 
 impl Tally {
@@ -481,6 +511,10 @@ impl Tally {
                 let c = self.node_edge_hits.entry(key.clone()).or_default();
                 c.hits += 1;
                 c.shapes.insert(shape.clone());
+                c.gaps.insert((
+                    hit.path.to_string(),
+                    gap_run_start(hit.source, hit.attribution_offset),
+                ));
             }
             // Keyed, but the offset resolved to no node — the UNRESOLVED tail. Counted only when
             // keying ran, so a gate run (keying off, every `node_edge` `None`) stays at zero.
@@ -495,6 +529,7 @@ impl Tally {
             snippet: snippet(hit.source, hit.attribution_offset),
             text: hit.text,
             injected: hit.injected,
+            skip_sites: hit.skip_sites,
         };
         let e = self
             .shapes
@@ -528,6 +563,7 @@ impl Tally {
             let c = self.node_edge_hits.entry(k).or_default();
             c.hits += v.hits;
             c.shapes.extend(v.shapes);
+            c.gaps.extend(v.gaps);
         }
         self.dirty_files.extend(other.dirty_files);
         for (k, v) in other.shapes {
@@ -634,6 +670,7 @@ fn audit_file(
                             injection_offset: offset,
                             attribution_offset: offset,
                             text: text.to_string(),
+                            skip_sites: Vec::new(),
                             injected: true,
                             node_edge: key_node_edge(node_map.as_ref(), offset),
                         },
@@ -660,6 +697,7 @@ fn audit_file(
                                 injection_offset: offset,
                                 attribution_offset: offset,
                                 text: report.comment,
+                                skip_sites: Vec::new(),
                                 injected: true,
                                 node_edge: key_node_edge(node_map.as_ref(), offset),
                             },
@@ -713,6 +751,7 @@ fn audit_file(
                         injection_offset: offset,
                         attribution_offset,
                         text: f.text,
+                        skip_sites: f.skip_sites,
                         injected,
                         // Key on the ATTRIBUTION offset — the victim's own site for a bystander,
                         // the injection site otherwise — so the cluster is the emitter that
@@ -1140,6 +1179,7 @@ fn build_report(total: &Tally, payloads: &[Payload]) -> (RunSummary, Vec<Finding
                     snippet: ex.snippet.clone(),
                     text: ex.text.clone(),
                     injected: ex.injected,
+                    skip_sites: ex.skip_sites.clone(),
                 },
                 detail: Detail::Gap(GapDetail {
                     kind_label: kind.label(),
@@ -1274,6 +1314,7 @@ mod tests {
             snippet: String::new(),
             text: "/* c */".to_string(),
             injected: true,
+            skip_sites: Vec::new(),
         }
     }
 
@@ -1361,6 +1402,7 @@ mod tests {
                 injection_offset: import_dot,
                 attribution_offset: import_dot,
                 text: "/* c */".to_string(),
+                skip_sites: Vec::new(),
                 injected: true,
                 node_edge: None,
             },
@@ -1376,6 +1418,7 @@ mod tests {
                 injection_offset: import_dot,
                 attribution_offset: member_dot,
                 text: "/* pre-existing */".to_string(),
+                skip_sites: Vec::new(),
                 injected: false,
                 node_edge: None,
             },
