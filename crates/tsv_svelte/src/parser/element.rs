@@ -44,6 +44,23 @@ fn is_valid_tag_name(name: &str) -> bool {
     is_valid_element_name(name) || is_component_name(name)
 }
 
+/// Whether `name` claims the reserved `svelte:` namespace without naming a meta tag —
+/// Svelte's `tag.name.startsWith('svelte:') && !meta_tags.has(tag.name)`
+/// (`1-parse/state/element.js`), which errors as `svelte_meta_invalid_tag`.
+///
+/// Rejecting is the only representable answer, which is what makes this a *parser* concern
+/// rather than one a later validate pass could own: `meta_tags.has(name)` **is** the node-type
+/// decision, so accepting `<svelte:foo>` forces a fabricated `RegularElement { name:
+/// "svelte:foo" }` — a shape Svelte's AST never contains, and no post-parse pass can repair a
+/// wire that is already wrong. Svelte's editor-tolerant `loose` mode grants this check no
+/// escape either (unlike `tag_invalid_name`, which forgives a mid-typed `<div.`).
+///
+/// Only that exact prefix is reserved: `<sveltex:foo>` and `<foo:bar>` stay ordinary
+/// namespaced elements.
+fn is_reserved_namespace_miss(name: &str) -> bool {
+    name.starts_with("svelte:") && !SpecialElementTag::is_meta_tag_name(name)
+}
+
 /// Port of Svelte's `is_valid_element_name` (`1-parse/state/element.js`): a doctype
 /// (`<!DOCTYPE>`), a namespaced meta/element name (`<svelte:head>`, `<foo:bar>`), or a valid
 /// HTML/SVG/MathML/custom element name (`REGEX_VALID_TAG_NAME`).
@@ -193,11 +210,23 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             end: name_end as u32,
         };
 
-        // The tag name must immediately follow `<` and be a valid element/component name;
-        // `svelte.parse` rejects `< div>` (whitespace after `<`, which tsv's tag lexer skips),
-        // `<1>` / `<_x>` / `<$x>` (invalid start char), and `<élan>` / `<divä>` (non-ASCII
-        // outside a valid custom-element/component name) at parse.
-        if name_start != start + 1 || !is_valid_tag_name(tag_name) {
+        // The tag name must immediately follow `<`: `svelte.parse` rejects `< div>`
+        // (whitespace after `<`, which tsv's tag lexer skips) — its `read_tag` reads an empty
+        // name there, which no gate below accepts.
+        if name_start != start + 1 {
+            return Err(self.error_msg_at("Expected a valid element or component name", start + 1));
+        }
+
+        // The `svelte:` namespace is reserved, so a name in it that isn't a known meta tag is
+        // a parse error — and, as in Svelte, this gate comes *before* the general name check.
+        if is_reserved_namespace_miss(tag_name) {
+            return Err(self.error_msg_at("Invalid `<svelte:...>` tag name", start + 1));
+        }
+
+        // A valid element or component name: `svelte.parse` rejects `<1>` / `<_x>` / `<$x>`
+        // (invalid start char) and `<élan>` / `<divä>` (non-ASCII outside a valid
+        // custom-element/component name) at parse.
+        if !is_valid_tag_name(tag_name) {
             return Err(self.error_msg_at("Expected a valid element or component name", start + 1));
         }
 
@@ -828,7 +857,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
 #[cfg(test)]
 mod tests {
-    use super::{is_namespaced_name, is_valid_element_name, is_valid_tag_name, tag_name_end};
+    use super::{
+        is_namespaced_name, is_reserved_namespace_miss, is_valid_element_name, is_valid_tag_name,
+        tag_name_end,
+    };
     use crate::ast::internal::is_component_name;
 
     /// The run ends at `(\s|\/|>)` or EOF and at **nothing else**, so whatever the lexer's
@@ -950,5 +982,64 @@ mod tests {
         // Doctype must be `!` + ASCII letters only.
         assert!(!is_valid_element_name("!-"));
         assert!(!is_valid_element_name("!doc7"));
+    }
+
+    /// The reserved namespace is exactly `svelte:`, matched case-sensitively, and holds
+    /// exactly the ten meta tags — so this predicate splits names `is_valid_tag_name`
+    /// accepts wholesale into the ones Svelte builds a node type for and the ones it
+    /// rejects.
+    #[test]
+    fn reserved_namespace_admits_only_the_meta_tags() {
+        // Every meta tag passes, `svelte:options` included — it has no
+        // `SpecialElementTag` (it fills `Root`'s `Option` slot), so it is the arm most
+        // likely to be dropped by a future edit.
+        for name in [
+            "svelte:head",
+            "svelte:options",
+            "svelte:window",
+            "svelte:document",
+            "svelte:body",
+            "svelte:element",
+            "svelte:component",
+            "svelte:self",
+            "svelte:fragment",
+            "svelte:boundary",
+        ] {
+            assert!(is_valid_tag_name(name), "should accept <{name}>");
+            assert!(
+                !is_reserved_namespace_miss(name),
+                "meta tag <{name}> should not be a miss"
+            );
+        }
+        // A name in the namespace that is not one of them — including a near-miss on a
+        // real tag, and a case difference (the namespace and the local part are both
+        // matched exactly).
+        for name in [
+            "svelte:foo",
+            "svelte:headx",
+            "svelte:optionsx",
+            "svelte:Head",
+            "svelte:HEAD",
+        ] {
+            assert!(
+                is_reserved_namespace_miss(name),
+                "<{name}> should be a miss"
+            );
+        }
+        // Only that exact prefix is reserved: a different namespace, an uppercase
+        // spelling of it, and a plain name are all untouched by the rule.
+        for name in [
+            "sveltex:foo",
+            "foo:bar",
+            "SVELTE:head",
+            "Svelte:head",
+            "div",
+            "svelte",
+        ] {
+            assert!(
+                !is_reserved_namespace_miss(name),
+                "<{name}> is outside the reserved namespace"
+            );
+        }
     }
 }

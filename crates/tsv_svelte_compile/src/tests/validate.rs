@@ -66,21 +66,21 @@ fn compile_root_only_meta_tag_placement_refuses() {
 }
 
 #[test]
-fn compile_unknown_svelte_meta_tag_refuses() {
-    // The oracle's parse-time `svelte_meta_invalid_tag` (`element.js:142`): a
-    // `svelte:`-prefixed element whose name is not a known meta tag. tsv's parser
-    // routes every known `svelte:` name to a `SpecialElementKind` (and
-    // `svelte:options` to `Root.options`), so an unknown one reaches a regular
-    // element and the compiler refuses it.
-    assert_unsupported("<svelte:selfdestructive x=\"a\" />", "meta tag");
-    assert_unsupported("<svelte:nope />", "meta tag");
-    // Fires wherever the tag sits — inside a block, and inside a region SSR DROPS
-    // (a `{:catch}` branch), the whole reason this rule lives in `validate.rs`
-    // rather than at an emitter.
-    assert_unsupported("{#if x}<svelte:selfdestructive />{/if}", "meta tag");
-    assert_unsupported(
+fn compile_unknown_svelte_meta_tag_is_parse_rejected() {
+    // The oracle's `svelte_meta_invalid_tag` (`element.js:142`): a `svelte:`-prefixed
+    // element whose name is not a known meta tag. It is raised at PARSE on both sides —
+    // `meta_tags.has(name)` *is* the node-type decision, so accepting the tag would force
+    // a fabricated `RegularElement` — which is why this crate carries no refusal for it:
+    // no such element can reach the compiler.
+    const INVALID_META_TAG: &str = "Invalid `<svelte:...>` tag name";
+    assert_parse_rejected("<svelte:selfdestructive x=\"a\" />", INVALID_META_TAG);
+    assert_parse_rejected("<svelte:nope />", INVALID_META_TAG);
+    // Rejected wherever the tag sits, including a region SSR DROPS (a `{:catch}`
+    // branch) — parse precedes every emission decision.
+    assert_parse_rejected("{#if x}<svelte:selfdestructive />{/if}", INVALID_META_TAG);
+    assert_parse_rejected(
         "{#await p}a{:then v}b{:catch e}<svelte:nope />{/await}",
-        "meta tag",
+        INVALID_META_TAG,
     );
 
     // Controls — the rule is `svelte:`-specific and never touches a KNOWN meta tag.
