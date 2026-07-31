@@ -1196,6 +1196,37 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
     }
 
+    /// Whether the cursor sits at a `using` declaration head — the contextual
+    /// keyword followed on the same line by a binding word (`using [no
+    /// LineTerminator here] BindingIdentifier`; a break, or an
+    /// expression-continuation word, demotes `using` to a plain identifier —
+    /// `peek_is_same_line_binding_word` spells both).
+    ///
+    /// One question, one predicate: every dispatch site asks exactly this, and a
+    /// for head then adds only its own `[lookahead ≠ of]`.
+    pub(super) fn at_using_declaration(&mut self) -> bool {
+        *self.current_kind() == TokenKind::Identifier
+            && self.current_value() == "using"
+            && self.peek_is_same_line_binding_word()
+    }
+
+    /// Whether the cursor sits at an `await using` declaration head. **Both** gaps
+    /// carry `[no LineTerminator here]` — `await [no LT] using [no LT]
+    /// BindingIdentifier` — so a break at either leaves an `await using`
+    /// *expression* behind; a statement then splits under ASI, while a for head,
+    /// having no ASI, is a syntax error. Splitting this question across the two
+    /// dispatch sites is what let the for head lose both restrictions.
+    ///
+    /// Whether `await` may be an ordinary identifier here (`Goal::Script`) is the
+    /// caller's question, not this one's — statement dispatch settles it first
+    /// via `await_is_identifier`.
+    pub(super) fn at_await_using_declaration(&mut self) -> bool {
+        *self.current_kind() == TokenKind::Keyword(KeywordKind::Await)
+            && self.peek_is_same_line_identifier()
+            && self.peek_value() == "using"
+            && self.peek_followed_by_same_line_binding_word()
+    }
+
     /// Check if peek token could be a property name (identifier, keyword, string, or computed key)
     ///
     /// Used to detect getter/setter syntax where `get` and `set` are contextual keywords:

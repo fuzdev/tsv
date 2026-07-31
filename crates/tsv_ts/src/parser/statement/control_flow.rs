@@ -86,27 +86,24 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(KeywordKind::Const | KeywordKind::Let | KeywordKind::Var)
         );
 
-        // Check for `using` contextual keyword (Explicit Resource Management)
-        // `for (using resource of resources) { ... }`. The binding must be a
-        // same-line binding word that is not `of`: `for (using of items)` is a
-        // for-of whose LHS is the plain identifier `using` (a using ForBinding
-        // cannot be named `of`), and a line break demotes `using` the same way.
-        let is_using = *self.current_kind() == TokenKind::Identifier
-            && self.current_value() == "using"
-            && self.peek_is_same_line_binding_word()
-            && self.peek_value() != "of";
+        // Check for a `using` / `await using` head (Explicit Resource Management),
+        // `for (using resource of resources)` / `for await (await using resource of
+        // resources)`. The shared dispatch predicates own the `[no LineTerminator
+        // here]` restrictions; a head adds one rule of its own — `[lookahead ≠ of]`,
+        // since a using ForBinding cannot be named `of`, so `for (using of items)`
+        // is a for-of whose LHS is the plain identifier `using`.
+        let is_using = self.at_using_declaration() && self.peek_value() != "of";
+        let is_await_using = self.at_await_using_declaration();
 
-        // Check for `await using` in for-of
-        // `for await (await using resource of resources) { ... }`
-        let is_await_using = *self.current_kind() == TokenKind::Keyword(KeywordKind::Await)
-            && self.peek_is_identifier()
-            && self.peek_value() == "using";
+        // Neither form has a for-in or C-style spelling, so both parse the same way
+        // and differ only in which keyword the rejection names.
+        if is_using || is_await_using {
+            let var_decl = if is_await_using {
+                self.parse_for_await_using_declaration()?
+            } else {
+                self.parse_for_using_declaration()?
+            };
 
-        if is_await_using {
-            // Parse `await using` declaration for for-of
-            let var_decl = self.parse_for_await_using_declaration()?;
-
-            // `await using` only valid with `of`, not `in` or standard for
             if self.current_value() == "of" {
                 self.advance()?;
                 return self.parse_for_of(
@@ -116,24 +113,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 );
             }
 
-            return Err(self.error_msg("'await using' can only be used in for-of loops"));
-        }
-
-        if is_using {
-            // Parse `using` declaration for for-of
-            let var_decl = self.parse_for_using_declaration()?;
-
-            // `using` only valid with `of`, not `in` or standard for
-            if self.current_value() == "of" {
-                self.advance()?;
-                return self.parse_for_of(
-                    start,
-                    ForInOfLeft::VariableDeclaration(var_decl),
-                    is_await,
-                );
-            }
-
-            return Err(self.error_msg("'using' can only be used in for-of loops"));
+            return Err(self.error_msg(if is_await_using {
+                "'await using' can only be used in for-of loops"
+            } else {
+                "'using' can only be used in for-of loops"
+            }));
         }
 
         if is_var_decl {
