@@ -12,6 +12,7 @@ use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::source_scan::find_char_skipping_comments;
 
 impl<'a> Printer<'a> {
     /// Build the leading-comment doc for comments between an opening `(` and the
@@ -175,13 +176,8 @@ impl<'a> Printer<'a> {
     /// grouping paren follows a trailing comment before the terminator, marking the
     /// comment as operand-enclosed rather than statement-trailing.
     pub(crate) fn gap_has_close_paren(&self, start: u32, end: u32) -> bool {
-        tsv_lang::source_scan::find_char_skipping_comments(
-            self.source.as_bytes(),
-            start as usize,
-            end as usize,
-            b')',
-        )
-        .is_some()
+        find_char_skipping_comments(self.source.as_bytes(), start as usize, end as usize, b')')
+            .is_some()
     }
 
     /// Collect comments between a module statement's last content token and its
@@ -289,6 +285,152 @@ impl<'a> Printer<'a> {
             .any(|b| b == b')')
     }
 
+    /// Whether a comment in `[expr_end, boundary_end)` forces the operand's grouping
+    /// parens to **survive**, at a gap the grammar marks `[no LineTerminator here]`.
+    ///
+    /// Two gaps qualify, and both are ASI-sensitive: an `as`/`satisfies` cast's
+    /// operand→keyword gap and a postfix `++`/`--`'s operand→operator gap (tsc breaks
+    /// out of each construct on `scanner.hasPrecedingLineBreak()`). A comment that
+    /// occupies more than one line — a `//`, which runs to end of line, or a multi-line
+    /// block — therefore cannot be inlined here, because inlining **rewrites the
+    /// program**: the `//` swallows the tail (`(1 // c⏎) as const;` → `1 // c as const;`,
+    /// which parses as a bare `1`), and the multi-line block puts a real line break
+    /// before the keyword (output that does not reparse at all).
+    ///
+    /// Such a comment can only ever have been authored *inside* a grouping paren shell,
+    /// since the bare form is unparseable — so the shell is what holds it in place, and
+    /// stripping it is not available the way it is at the sibling keyword→value gaps
+    /// ([`Self::build_expression_doc_with_paren_comments`]). A shell is redundant only
+    /// when the stripped form can still express the comment's position.
+    ///
+    /// A single-line block comment inlines as before (`x /* c */ as A`, `x /* c */++`),
+    /// matching prettier. The `)` check inside
+    /// [`Self::has_trailing_paren_comments`] is what keeps this keyed on a real shell.
+    ///
+    /// The multi-line predicate is asked FIRST: it is one binary search that also
+    /// subsumes the existence check, and it is false on nearly every cast in a real
+    /// file — so [`Self::has_trailing_paren_comments`]'s second comment walk and its
+    /// `)` byte scan only run once a comment has already qualified.
+    pub(crate) fn asi_gap_needs_parens(&self, expr_end: u32, boundary_end: u32) -> bool {
+        comments_to_emit_in_range(self.comments, expr_end, boundary_end)
+            .any(|c| !c.is_block || c.multiline)
+            && self.has_trailing_paren_comments(expr_end, boundary_end)
+    }
+
+    /// Split a `//` line comment the author put on the grouping `(`'s **own line** off the
+    /// front of the leading run, so it can trail the `(` (`( // c⏎\tvalue`) rather than
+    /// dropping to its own line below it. Returns that comment's doc plus the position the
+    /// rest of the leading run starts at.
+    ///
+    /// A `//` runs to end of line, so this is the only placement that keeps it where the
+    /// author wrote it; every other leading comment takes the ordinary run
+    /// ([`Self::build_rhs_comments_opt`]). Shared by the two shells that emit this gap —
+    /// the restricted-production hang ([`Printer::build_restricted_production_paren_doc`])
+    /// and the ASI-gap operand shell ([`Self::build_asi_operand_shell_doc`]) — so the two
+    /// cannot answer differently about the same authoring.
+    pub(crate) fn split_paren_line_trailing_comment(
+        &self,
+        gap_start: u32,
+        open_paren: Option<u32>,
+        value_start: u32,
+    ) -> (Option<DocId>, u32) {
+        let first = comments_to_emit_in_range(self.comments, gap_start, value_start).next();
+        match (open_paren, first) {
+            (Some(op), Some(c))
+                if !c.is_block && !self.has_newline_between(op + 1, c.span.start) =>
+            {
+                (Some(self.build_comment_doc(c)), c.span.end)
+            }
+            _ => (None, gap_start),
+        }
+    }
+
+    /// The operand of an ASI-sensitive gap (an `as`/`satisfies` keyword, a postfix
+    /// `++`/`--`) rendered inside the grouping-paren shell that holds its comments,
+    /// emitting **both** of the shell's gaps — `(`→operand and operand→`)`.
+    ///
+    /// `None` when no shell needs keeping, so the caller falls through to its ordinary
+    /// inline path.
+    ///
+    /// The trailing gap is what makes the shell load-bearing ([`Self::asi_gap_needs_parens`]):
+    /// the keyword may not start a line, so a comment spanning lines has nowhere else to go.
+    /// The **leading** gap keeps the shell for a different reason — nothing else emits it.
+    /// A comment there that is neither glued to the operand (which would make it
+    /// `owned_by_node`, printed from the operand's own doc) nor inside the operand's span
+    /// belongs to no node at all, so stripping the shell **drops** it outright
+    /// (`( // c⏎x) as A` → `x as A`, the comment gone). Retaining on either gap is one
+    /// rule for one shell rather than two half-rules that disagree about `( // b⏎x // c⏎)`.
+    ///
+    /// A **sequence** operand delegates: its own required parens are the grouping, so
+    /// re-wrapping would double them ([`Self::build_expression_doc_keep_paren_comments`]).
+    pub(crate) fn build_asi_operand_shell_doc(
+        &self,
+        node_start: u32,
+        expr: &internal::Expression<'_>,
+        boundary_end: u32,
+    ) -> Option<DocId> {
+        let expr_start = expr.span().start;
+        let expr_end = expr.span().end;
+        let open = find_char_skipping_comments(
+            self.source.as_bytes(),
+            node_start as usize,
+            expr_start as usize,
+            b'(',
+        )
+        .map(|p| p as u32);
+
+        let leading_start = open.map_or(node_start, |p| p + 1);
+        let has_leading =
+            open.is_some() && self.has_comments_to_emit_between(leading_start, expr_start);
+        if !has_leading && !self.asi_gap_needs_parens(expr_end, boundary_end) {
+            return None;
+        }
+        if matches!(expr, internal::Expression::SequenceExpression(_)) {
+            return Some(self.build_expression_doc_keep_paren_comments(expr, boundary_end));
+        }
+
+        let d = self.d();
+
+        // The shell's `(` is the statement's first token whenever the statement's leftmost
+        // node is inside the operand, so it already discharges what the expression-statement
+        // wrap exists for — keeping the statement from starting with `{` / `function` /
+        // `class`. Clearing the target stops the operand adding a second pair inside this
+        // one (`(⏎\t({ a: 1 }) // c⏎) as const`). Not restored afterwards: a rebuild under a
+        // conditional group must reach the same answer, and the target is cleared per
+        // statement by `build_expression_statement_doc` regardless. A nested cast never
+        // owns the target (it is set for the statement's leftmost node only), so this is a
+        // no-op there.
+        self.expr_stmt_paren_target.set(None);
+
+        let (paren_trailing, run_start) =
+            self.split_paren_line_trailing_comment(leading_start, open, expr_start);
+        let leading_run = self.build_rhs_comments_opt(run_start, expr_start);
+
+        let mut body = DocBuf::new();
+        if let Some(run) = leading_run {
+            body.push(run);
+        }
+        body.push(self.build_expression_doc(expr));
+        if let Some((trailing, _needs_break)) =
+            self.trailing_paren_comment_parts(expr_end, boundary_end)
+        {
+            body.extend(trailing);
+        }
+
+        let open_doc = match paren_trailing {
+            // `( // c` — the comment runs to end of line and the indent's hardline supplies
+            // the break, so nothing following it is swallowed.
+            Some(comment) => d.concat(&[d.text("( "), comment]),
+            None => d.text("("),
+        };
+        Some(d.concat(&[
+            open_doc,
+            d.indent(d.concat(&[d.hardline(), d.concat(&body)])),
+            d.hardline(),
+            d.text(")"),
+        ]))
+    }
+
     /// Build expression doc, stripping a redundant grouping paren around a trailing
     /// comment and keeping the comment inline after the expression.
     ///
@@ -318,7 +460,7 @@ impl<'a> Printer<'a> {
         // the parens in value positions (#19263). The grouping `)` sits outside
         // `seq.span` (the parens aren't part of the node), so scan to it.
         if let internal::Expression::SequenceExpression(seq) = expr {
-            let grouping_close = tsv_lang::source_scan::find_char_skipping_comments(
+            let grouping_close = find_char_skipping_comments(
                 self.source.as_bytes(),
                 expr_end as usize,
                 boundary_end as usize,
@@ -369,10 +511,18 @@ impl<'a> Printer<'a> {
         }
         let d = self.d();
 
-        // A line comment runs to end-of-line, and an own-line block comment was authored
-        // on its own line — either way the closing `)` can no longer share the line.
-        let needs_break = comments_to_emit_in_range(self.comments, expr_end, boundary_end)
-            .any(|c| !c.is_block || self.has_newline_between(expr_end, c.span.start));
+        // A line comment runs to end-of-line, an own-line block comment was authored on
+        // its own line, and a multi-line block spans lines of its own — in every case the
+        // shell already occupies more than one line, and a shell that breaks expands
+        // rather than gluing its content to the `(` (the same rule
+        // `build_expanded_parenthesized_union_opt` states for a breaking paren). Without
+        // the `multiline` term the two authorings of one comment disagreed: `(⏎\tx // c⏎)`
+        // expanded while `(x /* m1⏎m2 */)` stayed glued, at the same gap and for the same
+        // reason.
+        let needs_break =
+            comments_to_emit_in_range(self.comments, expr_end, boundary_end).any(|c| {
+                !c.is_block || c.multiline || self.has_newline_between(expr_end, c.span.start)
+            });
 
         let mut parts = DocBuf::new();
         let mut prev_end = expr_end;
@@ -412,7 +562,7 @@ impl<'a> Printer<'a> {
         // self-parenthesize the sequence and then this method would re-wrap it. The
         // grouping `)` sits outside `seq.span`, so scan to it.
         if let internal::Expression::SequenceExpression(seq) = expr {
-            let grouping_close = tsv_lang::source_scan::find_char_skipping_comments(
+            let grouping_close = find_char_skipping_comments(
                 self.source.as_bytes(),
                 expr_end as usize,
                 boundary_end as usize,

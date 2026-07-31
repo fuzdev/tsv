@@ -673,16 +673,26 @@ impl<'a> Printer<'a> {
                 None => (true_type_start, extends_type_end),
             };
 
-            // Comments BEFORE the `?` token — emit as trailing on extends_type
-            // (before the hardline that ends extends_type's line). Also includes
+            // Comments BEFORE the `?` token, split by where the author put them: one on
+            // the extends-type's line trails it, one on its own line keeps that line,
+            // above the `?`. `build_own_line_preserving_run` is the seam for exactly this
+            // question — what follows the run in the OUTPUT is the `?` operator, not the
+            // node the comments lead — and it is what the value-level conditional already
+            // does for the identical authoring.
+            //
+            // Emitting the whole gap as trailing (what this replaced) pulled an own-line
+            // run up onto the extends-type's line, where the second `//` became text of
+            // the first (`B extends C // c1 // c2`) and a comment was lost. Also includes
             // relocated leading line comments from inside true_type's parens.
-            for comment in comments_to_emit_in_range(self.comments, extends_type_end, before_q_end)
-            {
-                trailing_on_extends_parts.push(self.build_trailing_comment_doc(comment));
-            }
+            let (extends_trailing, own_line_before_q) =
+                self.build_own_line_preserving_run(extends_type_end, before_q_end);
+            trailing_on_extends_parts.push(extends_trailing);
             for comment in &true_paren_leading_line_comments {
                 trailing_on_extends_parts.push(self.build_trailing_line_comment_doc(comment));
             }
+
+            // Own-line comments sit above the `?`, at the branch indent.
+            q_parts.extend(own_line_before_q);
 
             // ? on new line
             q_parts.push(d.hardline());
@@ -723,15 +733,21 @@ impl<'a> Printer<'a> {
         } else {
             // Comments trailing on true_type (between true_type and :) — preserve position.
             // Also includes relocated leading line comments from inside false_type's parens.
+            // Split the same way as the `?` gap above — a comment on the true-branch's
+            // line trails it, an own-line one keeps its line above the `:`. The two arms
+            // ask one question through one seam, so they cannot drift.
             let colon = self.find_char_outside_comments(true_type_end, false_type_start, b':');
+            let mut own_line_before_colon = DocBuf::new();
             if let Some(c_pos) = colon {
-                for comment in comments_to_emit_in_range(self.comments, true_type_end, c_pos) {
-                    q_parts.push(self.build_trailing_comment_doc(comment));
-                }
+                let (true_trailing, own_line) =
+                    self.build_own_line_preserving_run(true_type_end, c_pos);
+                q_parts.push(true_trailing);
+                own_line_before_colon = own_line;
             }
             for comment in &false_paren_leading_line_comments {
                 q_parts.push(self.build_trailing_line_comment_doc(comment));
             }
+            q_parts.extend(own_line_before_colon);
 
             // : on new line
             q_parts.push(d.hardline());
