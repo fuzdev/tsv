@@ -16,8 +16,8 @@ use commands::{
     authoring_audit::AuthoringAuditCommand, binding_audit::BindingAuditCommand,
     buffer_sizes::BufferSizesCommand, build_fanout_audit::BuildFanoutAuditCommand,
     canonical_compile::CanonicalCompileCommand, canonical_parse::CanonicalParseCommand,
-    canonicalize_audit::CanonicalizeAuditCommand, check::CheckCommand, compare::CompareCommand,
-    compile_compare::CompileCompareCommand,
+    canonicalize_audit::CanonicalizeAuditCommand, census_audit::CensusAuditCommand,
+    check::CheckCommand, compare::CompareCommand, compile_compare::CompileCompareCommand,
     compile_conformance_audit::CompileConformanceAuditCommand,
     compile_corpus_compare::CompileCorpusCompareCommand,
     compile_fixture_init::CompileFixtureInitCommand,
@@ -107,6 +107,10 @@ pub enum Subcommand {
     // seed as authored and compares blank runs, so it drives neither the ledger nor any other
     // instrumentation seam.
     FabricationAudit(FabricationAuditCommand),
+    // The comment census — also a pristine-format ratchet and also ungated: its whole design
+    // is lexing comment trivia off raw text, independent of the ledger and the parser's
+    // comment carrying.
+    CensusAudit(CensusAuditCommand),
     Compare(CompareCommand),
     ConformanceAudit(ConformanceAuditCommand),
     AstDiff(AstDiffCommand),
@@ -173,6 +177,7 @@ impl TopLevel {
             #[cfg(feature = "comment_check")]
             Subcommand::IgnoreAudit(c) => c.run(),
             Subcommand::FabricationAudit(c) => c.run(),
+            Subcommand::CensusAudit(c) => c.run(),
             Subcommand::Compare(c) => c.run(),
             Subcommand::ConformanceAudit(c) => c.run(),
             Subcommand::AstDiff(c) => c.run(),
