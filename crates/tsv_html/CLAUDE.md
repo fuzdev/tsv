@@ -42,11 +42,13 @@ not here. This crate stays AST-agnostic.
 ## Distinctives
 
 - **Compile-time entity table**: `build.rs` reads `src/entities.json`
-  (a simplified first-codepoint-only view of the WHATWG HTML
+  (the WHATWG HTML
   [named character references list](https://html.spec.whatwg.org/entities.json),
-  matching Svelte's runtime decoder) and emits a `phf::Map` at
+  name → the characters it stands for) and emits a `phf::Map` at
   `$OUT_DIR/entities_map.rs`, `include!`d by `entities.rs`. ~2,231
-  entries, zero runtime init cost.
+  entries, zero runtime init cost. The value is a `&'static str` because
+  93 names stand for two code points — Svelte's own table keeps only the
+  first, which is one of the decoder's cataloged corrections.
 - **Pure `&str` API**: classification predicates take tag names, not
   AST nodes or a parser's name representation. Keeps this crate
   independent of any particular parser's representation.

@@ -7,13 +7,13 @@
 //! - Numeric hex entities (&#x41; or &#X41;)
 //! - Different parsing rules for attribute values vs text content
 //!
-//! ## Entity Map Simplification
+//! ## The entity map
 //!
-//! The entity map uses a simplified format matching Svelte's implementation:
-//! - Multi-codepoint entities use only the first codepoint (base character)
-//! - ~200 entities with combining marks are simplified (e.g., NotEqualTilde)
-//! - Source: <https://html.spec.whatwg.org/entities.json> (first codepoint only)
+//! - Source: <https://html.spec.whatwg.org/entities.json>, one entry per name holding
+//!   the characters it stands for
 //! - Generated at compile time from `src/entities.json` by `build.rs`
+//! - 93 of the 2,231 names stand for **two** code points — a combining mark, a variation
+//!   selector, or a second character — which is why a lookup answers a `&str`
 //!
 //! ## Svelte's decoder: which quirks are matched, which are corrected
 //!
@@ -22,9 +22,8 @@
 //! - **NUL, not U+FFFD, for a code that cannot be represented** — a surrogate half or a
 //!   code past the last code point Unicode defines.
 //! - **A line feed becomes a space** (`&#10;` → U+0020).
-//! - **Multi-codepoint references keep their first codepoint only** (the map above).
 //!
-//! Four others are *slips* in Svelte's implementation rather than choices, so the decoder
+//! Five others are *slips* in Svelte's implementation rather than choices, so the decoder
 //! follows the spec instead — cataloged in `docs/conformance_svelte.md` §Entity Decoding
 //! Corrections, and each one an upstream candidate:
 //! - **Uppercase hex** — `&#X41;` decodes. The spec's numeric-character-reference state
@@ -39,6 +38,10 @@
 //! - **The admitted planes** — every code point but a surrogate half is emitted as itself.
 //!   Svelte enumerates the planes it will emit and drops the rest to NUL, destroying
 //!   assigned characters (`&#x30000;` is CJK Extension G) — see `validate_code`.
+//! - **A two-code-point reference** — both are emitted. Svelte's entity table is generated
+//!   with one code point per name, so the second is dropped and a negated relation decodes
+//!   to the relation itself: `&NotEqualTilde;` loses the combining solidus that makes it a
+//!   negation, leaving the U+2242 of `&esim;`.
 //!
 //! References:
 //! - <https://html.spec.whatwg.org/multipage/parsing.html#named-character-reference-state>
@@ -56,13 +59,8 @@ const WINDOWS_1252: [u32; 32] = [
 ];
 
 // Entity data sourced from: https://html.spec.whatwg.org/entities.json
-// Simplified to match Svelte's implementation (first codepoint only)
 // Stored in: crates/tsv_html/src/entities.json
 // Generated at compile time by build.rs
-//
-// Note: Multi-codepoint entities with combining marks are simplified to just
-// the base character. This matches Svelte's behavior for drop-in compatibility.
-// See: scripts/generate_simplified_entities.ts for details
 include!(concat!(env!("OUT_DIR"), "/entities_map.rs"));
 
 /// Decode HTML character references in a string.
@@ -105,16 +103,16 @@ pub fn decode_character_references(html: &str, is_attribute_value: bool) -> Stri
         let rest = &html[i + 1..];
 
         // Numeric character reference: &#... or &#x...
-        if let Some((decoded, consumed)) = decode_numeric_entity(rest) {
+        if let Some((consumed, decoded)) = decode_numeric_entity(rest) {
             result.push(decoded);
             i += 1 + consumed; // +1 for '&'
             continue;
         }
 
         // Named character reference
-        if let Some((entity_len, decoded_char)) = decode_named_entity(rest, is_attribute_value) {
-            result.push(decoded_char);
-            i += 1 + entity_len; // +1 for '&'
+        if let Some((consumed, decoded)) = decode_named_entity(rest, is_attribute_value) {
+            result.push_str(decoded);
+            i += 1 + consumed; // +1 for '&'
             continue;
         }
 
@@ -128,9 +126,10 @@ pub fn decode_character_references(html: &str, is_attribute_value: bool) -> Stri
 
 /// Decode a numeric character reference (decimal or hex)
 ///
-/// Returns (decoded_char, bytes_consumed) if successful
+/// Returns (bytes_consumed, the character it stands for) if successful — the same
+/// (span, value) order as [`decode_named_entity`], so the caller's two arms read alike.
 /// Examples: &#65; &#x41; &#X41; &#0041;
-fn decode_numeric_entity(rest: &str) -> Option<(char, usize)> {
+fn decode_numeric_entity(rest: &str) -> Option<(usize, char)> {
     if !rest.starts_with('#') {
         return None;
     }
@@ -184,13 +183,14 @@ fn decode_numeric_entity(rest: &str) -> Option<(char, usize)> {
     let validated = validate_code(code);
     let decoded = char::from_u32(validated)?;
 
-    Some((decoded, total_consumed))
+    Some((total_consumed, decoded))
 }
 
 /// Decode a named character reference
 ///
-/// Returns (consumed_length, decoded_char) if successful
-fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, char)> {
+/// Returns (consumed_length, the characters it stands for) if successful — one character
+/// for all but the 93 references the table gives two.
+fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, &'static str)> {
     // Every named character reference is ASCII, so the name run ends at the first byte that
     // could not appear in one — which for a multibyte character is its first byte, so every
     // slice below stays on a character boundary. That is load-bearing rather than tidy:
@@ -210,17 +210,19 @@ fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, c
     if rest[run_len..].starts_with(';') {
         let consumed = run_len + 1;
         for name in [&rest[..consumed], run] {
-            if let Some(&codepoint) = ENTITIES.get(name) {
-                return Some((consumed, char::from_u32(codepoint)?));
+            if let Some(&characters) = ENTITIES.get(name) {
+                return Some((consumed, characters));
             }
         }
     }
 
     // Otherwise (and for a semicolon that closed no reference — `&notit;` is `&not` + `it;`)
     // the longest prefix of the run that names one wins.
-    let (longest_len, codepoint) = (1..=run_len)
-        .rev()
-        .find_map(|len| ENTITIES.get(&run[..len]).map(|&codepoint| (len, codepoint)))?;
+    let (longest_len, characters) = (1..=run_len).rev().find_map(|len| {
+        ENTITIES
+            .get(&run[..len])
+            .map(|&characters| (len, characters))
+    })?;
 
     // Check if we should decode in attribute context: don't decode if followed by '=' or an
     // ASCII alphanumeric — the spec's named-character-reference state, verbatim. The class is
@@ -234,7 +236,7 @@ fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, c
         return None;
     }
 
-    Some((longest_len, char::from_u32(codepoint)?))
+    Some((longest_len, characters))
 }
 
 /// Validate and normalize a Unicode code point per HTML5 spec
@@ -291,6 +293,31 @@ fn validate_code(code: u32) -> u32 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    /// The generated table's shape, which the decoder reads as a given: a name is an
+    /// ASCII run with at most a trailing semicolon (the byte scan in
+    /// `decode_named_entity` ends every name run on `is_ascii_alphanumeric`, and slices
+    /// by byte), and a value is the one or two characters the reference stands for.
+    /// A regeneration that dropped the second character would leave this the only guard
+    /// — no corpus file in any gate uses one of the 93 two-character references.
+    #[test]
+    fn test_entity_table_shape() {
+        let mut two_character = 0;
+        for (name, characters) in &ENTITIES {
+            let bare = name.strip_suffix(';').unwrap_or(name);
+            assert!(
+                !bare.is_empty() && bare.bytes().all(|b| b.is_ascii_alphanumeric()),
+                "{name:?} is not an ASCII name run plus an optional semicolon"
+            );
+            match characters.chars().count() {
+                1 => {}
+                2 => two_character += 1,
+                n => panic!("{name:?} stands for {n} characters"),
+            }
+        }
+        assert_eq!(ENTITIES.len(), 2231);
+        assert_eq!(two_character, 93);
+    }
 
     #[test]
     fn test_basic_named_entities() {
@@ -502,8 +529,10 @@ mod tests {
 
                 for is_attribute_value in [false, true] {
                     let decoded = decode_character_references(&input, is_attribute_value);
-                    // Decoding replaces a whole reference with one character and copies
-                    // every other character through, so it can only ever shorten the run.
+                    // Decoding replaces a whole reference with the one or two characters
+                    // it stands for and copies every other character through. The
+                    // shortest reference is four characters (`&lt;`), so the run can
+                    // only ever shorten.
                     assert!(
                         decoded.chars().count() <= input.chars().count(),
                         "{input:?} grew to {decoded:?} (attribute value: {is_attribute_value})"
@@ -552,6 +581,45 @@ mod tests {
         assert_eq!(
             decode_character_references("&#x\u{663}1;", false),
             "&#x\u{663}1;"
+        );
+    }
+
+    /// 93 references stand for two code points. Svelte's generated table carries the
+    /// first alone, so the second — a combining mark, a variation selector, or a second
+    /// character — is dropped; tsv emits both (see the module docs).
+    #[test]
+    fn test_multi_codepoint_entities() {
+        // A combining mark, which is what makes the reference mean what it names.
+        assert_eq!(
+            decode_character_references("&NotEqualTilde;", false),
+            "\u{2242}\u{338}"
+        );
+        assert_eq!(
+            decode_character_references("&nLt;", false),
+            "\u{226a}\u{20d2}"
+        );
+        // A variation selector.
+        assert_eq!(
+            decode_character_references("&caps;", false),
+            "\u{2229}\u{fe00}"
+        );
+        // Two characters outright — a ligature spelled as its letters, and two spaces.
+        assert_eq!(decode_character_references("&fjlig;", false), "fj");
+        assert_eq!(
+            decode_character_references("&ThickSpace;", false),
+            "\u{205f}\u{200a}"
+        );
+        // The attribute-value path decodes the same table.
+        assert_eq!(decode_character_references("&bne;", true), "=\u{20e5}");
+        // The base character each pairs with has its own single-code-point reference.
+        assert_eq!(decode_character_references("&esim;", false), "\u{2242}");
+        assert_eq!(decode_character_references("&cap;", false), "\u{2229}");
+        // Every one of the 93 is a semicolon-terminated name: no legacy spelling of one
+        // exists, so a semicolon-less prefix decodes to whatever shorter name it holds
+        // (here none, leaving the source verbatim).
+        assert_eq!(
+            decode_character_references("&NotEqualTilde", false),
+            "&NotEqualTilde"
         );
     }
 
