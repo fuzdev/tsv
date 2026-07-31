@@ -944,6 +944,7 @@ fn build_report(total: &Tally) -> (RunSummary, Vec<Finding>) {
                     snippet: ex.snippet.clone(),
                     text: "\\n\\n".to_string(),
                     injected: true,
+                    skip_sites: Vec::new(),
                 },
                 detail: Detail::Blank(BlankDetail {
                     kind_label: kind.label(),

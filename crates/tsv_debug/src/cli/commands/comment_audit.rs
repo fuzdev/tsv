@@ -201,6 +201,11 @@ fn print_report(violations: &[Violation], stats: &Stats) {
         if v.finding.kind == CommentFindingKind::DoublePrinted {
             println!("    emitted:       {}", v.finding.emitted);
         }
+        // The skip-∧-dropped join: the `BlockOnly`-filtered builder call site(s) that
+        // passed over this comment — the responsible licence holder, named at the site.
+        for site in &v.finding.skip_sites {
+            println!("    skipped by:    {site}");
+        }
         println!();
     }
 
@@ -228,6 +233,7 @@ fn print_json(violations: &[Violation], stats: &Stats) {
                 "start": v.finding.span.start,
                 "end": v.finding.span.end,
                 "emitted": v.finding.emitted,
+                "skip_sites": v.finding.skip_sites,
             })
         })
         .collect();

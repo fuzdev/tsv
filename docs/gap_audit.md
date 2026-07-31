@@ -162,6 +162,13 @@ next fixture edit.
   `e.g. inject <payload> at <path>:<injection> → drops the comment at :<attribution>`: the
   injection offset reproduces the drop, and `<attribution>` (with the snippet) is where the
   victim comment lived, which is what the shape keys on.
+- **`skipped by: <file:line:column>`** (when present) — the ledger's **skip-∧-dropped join**:
+  a `CommentFilter::BlockOnly` builder passed over this line comment during the format, and the
+  comment ended DROPPED. The `BlockOnly` licence is a promise that a gate routed line comments
+  to an expansion builder first; this line names the caller whose gate broke that promise, so
+  triage starts at the responsible call site instead of from the shape. A skip whose comment
+  another emitter prints (the routed expansion path, a winning `conditional_group` sibling)
+  never surfaces — a bare skip is an annotation, not a finding.
 - **`⚠ UNCONFIRMED (0/5 confirmed)` / `⚠ PARTIAL (2/5 confirmed)`** — see below.
 
 ### The by-node rollup (`--by-node`)
@@ -189,10 +196,22 @@ that tail is empty.
 
 It is **report-only** — it never changes the ratchet grade or the exit code.
 
+**Clusters rank by DISTINCT GAPS, not raw hits.** A hit is one `(offset, payload)` finding, and
+an N-wide whitespace run offers ~N injectable offsets while a glued (zero-width) gap offers
+exactly one — measured ~3.7× (98.3 vs 26.3 hits/shape) — so a raw-hit ranking systematically
+deprioritizes glued gaps, where the owned-claim and fused-`text()` families live. Each cluster
+therefore also counts its **distinct gaps** — `(file, whitespace-run-start)` deduped, every
+offset in one ASCII-whitespace run normalizing to the run's first byte — and the ranking sorts
+on that (hits as tie-break, both still reported). A comment inside a gap splits the run into two
+keys — a small accepted residual.
+
 `--json` carries the ranked work-list as one additive top-level section, `by_node` — one
-`{node, edge, hits, shapes, share, example_shape}` per cluster, hits-descending, what per-slice
-tooling reads to ask "did my fix move the cluster?" — plus a top-level `by_node_unresolved`, the
-count in the `UNRESOLVED` tail.
+`{node, edge, hits, gaps, shapes, share, gaps_share, example_shape}` per cluster,
+distinct-gaps-descending — plus a top-level `by_node_unresolved` (the `UNRESOLVED` tail count)
+and **`by_node_metric`**, the ranking-metric version stamp (`1` = the retired hits-sorted
+ranking; `2` = distinct-gap sorted). `--since` deliberately keeps diffing **hits** — exact and
+comparable across both metrics, so baselines from before the change stay usable; a consumer
+wanting gap-based diffs keys on the stamp.
 
 ### The ranking, productized (`--rank` / `--since`)
 
@@ -201,9 +220,10 @@ consumes directly instead of parsing `--json` and hand-transcribing (all report-
 byte-identical to the gate):
 
 - **`deno task gaps:audit:rank`** (`--rank`, `--top N`) prints the top-N clusters as a
-  **paste-ready markdown table** for `TODO_GAPS` §Status — rank, `` `(node, edge)` ``, hits,
-  shapes, share — so the fattest-first work-list stays current by paste, not by
-  re-transcription (which rots as slices land).
+  **paste-ready markdown table** for `TODO_GAPS` §Status — rank, `` `(node, edge)` ``, distinct
+  gaps, hits, shapes, gap share (sorted by distinct gaps; see the by-node section above) — so
+  the fattest-first work-list stays current by paste, not by re-transcription (which rots as
+  slices land).
 - **`--since <baseline.json>`** diffs this run's ranking against a prior `--json` output and
   prints only the clusters whose hit count **changed** — `(CallExpression, arguments→$) 2861 →
   2790 (−71)`, biggest reduction first — the direct answer to "did my slice move its target

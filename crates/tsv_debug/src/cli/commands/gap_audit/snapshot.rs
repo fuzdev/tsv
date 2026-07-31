@@ -168,6 +168,7 @@ mod tests {
             snippet: String::new(),
             text: "/* c */".to_string(),
             injected: true,
+            skip_sites: Vec::new(),
         });
         ShapeAgg {
             count: 1,

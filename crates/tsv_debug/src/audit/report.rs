@@ -119,6 +119,11 @@ pub(crate) struct ReportExample {
     pub(crate) snippet: String,
     pub(crate) text: String,
     pub(crate) injected: bool,
+    /// Gap-only: the `BlockOnly`-filtered builder call sites that skipped this comment
+    /// during the format (`file:line:column`) — the comment ledger's skip-∧-dropped join,
+    /// naming the builder whose gate broke the line-comment routing promise. Always empty
+    /// for the blank / ignore audits (their payloads aren't comments a filter can skip).
+    pub(crate) skip_sites: Vec<String>,
 }
 
 /// `gap_audit`'s audit-specific detail — the per-shape aggregate the envelope
@@ -373,6 +378,12 @@ pub(crate) fn print_report(s: &RunSummary, findings: &[Finding]) {
                     );
                 }
                 println!("            comment: {:?}", ex.text);
+                // The ledger's skip-∧-dropped join — the `BlockOnly` builder site(s) that
+                // passed over this comment. When present, the responsible predicate is
+                // already named; triage starts at that call site, not from the shape.
+                for site in &ex.skip_sites {
+                    println!("            skipped by: {site}");
+                }
                 println!();
             }
             Detail::Blank(d) => {
@@ -459,6 +470,9 @@ pub(crate) fn print_json(
                     "example_snippet": ex.snippet,
                     "example_text": ex.text,
                     "example_injected": ex.injected,
+                    // The skip-∧-dropped join (empty when no filtered builder saw the
+                    // comment) — see `ReportExample::skip_sites`.
+                    "example_skip_sites": ex.skip_sites,
                 }),
                 Detail::Blank(d) => serde_json::json!({
                     "audit": f.audit,

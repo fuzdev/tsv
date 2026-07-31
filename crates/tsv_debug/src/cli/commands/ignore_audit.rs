@@ -1184,6 +1184,7 @@ fn build_report(total: &Tally) -> (RunSummary, Vec<Finding>) {
                     snippet: ex.snippet.clone(),
                     text: "// prettier-ignore".to_string(),
                     injected: true,
+                    skip_sites: Vec::new(),
                 },
                 verdict_string: String::new(),
                 detail: Detail::Ignore(IgnoreDetail {
