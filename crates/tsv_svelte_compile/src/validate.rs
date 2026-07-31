@@ -210,18 +210,10 @@ impl<'s> Validator<'s> {
         match node {
             FragmentNode::Element(element) => {
                 let name = element.name_span.extract(self.source);
-                // The oracle's parse-time `svelte_meta_invalid_tag`
-                // (`phases/1-parse/state/element.js:142`, before `attribute_duplicate`
-                // at `:250` and `tag_invalid_name` at `:151`). Every KNOWN `svelte:`
-                // name parses to a `SpecialElementKind` — and `svelte:options` to
-                // `Root.options` — so a `svelte:`-prefixed *regular* element is by
-                // construction an unknown meta tag. A component name cannot carry the
-                // prefix (it is lowercase), so `ElementKind::Html` is the only host.
-                if element.kind == ElementKind::Html && name.starts_with("svelte:") {
-                    return Err(unsupported(Refusal::SvelteMetaInvalidTag {
-                        name: name.to_string(),
-                    }));
-                }
+                // No `svelte_meta_invalid_tag` check here: the oracle raises it at PARSE
+                // (`phases/1-parse/state/element.js:142`) and so does tsv's parser, which
+                // rejects a `svelte:`-prefixed name that is not a known meta tag. A regular
+                // element can no longer carry the prefix, so there is nothing left to refuse.
                 refuse_duplicate_attributes(element.attributes, self.source)?;
                 match element.kind {
                     ElementKind::Html => {

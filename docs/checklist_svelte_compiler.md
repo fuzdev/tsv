@@ -506,11 +506,18 @@ below); the caveat retains no live consequence.
 
 #### The parse-time rules — closed
 
-**Closed.** Three oracle rules, all raised in `phases/1-parse/state/element.js`, all
+**Closed.** Two oracle rules, both raised in `phases/1-parse/state/element.js`, both
 enforced by one upfront whole-document walk (`validate.rs`) run at the top of
 `analyze()`. They share a home not because they share inputs but because they share a
 *scope*: each fires wherever its construct sits, including a region SSR **drops**, so
 neither the emitters nor `guard_dropped_presence` alone can host them.
+
+A third — `svelte_meta_invalid_tag` (`element.js:142`) — is enforced one layer down, in
+tsv's **parser**, which rejects a `svelte:`-prefixed name that is not a known meta tag
+exactly as the oracle does. That is not a siting preference: `meta_tags.has(name)` *is*
+the node-type decision, so accepting the tag would force a fabricated `RegularElement`
+carrying the name, and no later pass can repair a wire that is already wrong. The
+compiler therefore carries no refusal for it — no such element can reach it.
 
 - **Refused**: ``duplicate `{name}` attribute on one element (the oracle rejects it)`` —
   the oracle's `attribute_duplicate` (`element.js:250`). Only `Attribute` /
@@ -519,14 +526,6 @@ neither the emitters nor `guard_dropped_presence` alone can host them.
   (so `bind:value` collides with `value`, while `class:x` and `x` legally co-exist);
   and the name `this` is never recorded, which is what keeps
   `<svelte:element bind:this this={…}>` legal.
-- **Refused**: `<{name}> is not a valid <svelte:...> meta tag (the oracle rejects it)` —
-  the oracle's parse-time `svelte_meta_invalid_tag`
-  (`element.js:142`, `tag.name.startsWith('svelte:') && !meta_tags.has(tag.name)`). tsv's
-  parser routes every KNOWN `svelte:` name to a `SpecialElementKind` — and `svelte:options`
-  to `Root.options` — so a `svelte:`-prefixed name that reaches a *regular* element is by
-  construction an unknown meta tag. The oracle raises this BEFORE `tag_invalid_name`
-  (`:151`), so `<svelte:foo>` is this refusal, never that one; a non-`svelte:` namespaced
-  tag (`<foo:bar>`) is an ordinary regular element and compiles.
 - **Refused**: `<{name}> must be a top-level element (the oracle rejects it)` and
   `duplicate <{name}> element (the oracle rejects it)` — the oracle's
   `svelte_meta_invalid_placement` / `svelte_meta_duplicate` over its

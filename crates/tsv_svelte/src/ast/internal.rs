@@ -516,6 +516,19 @@ impl SpecialElementTag {
         }
     }
 
+    /// Whether `name` is one of the `svelte:*` meta tags — Svelte's `meta_tags.has(name)`
+    /// (`1-parse/state/element.js`), the gate that makes the `svelte:` namespace reserved.
+    ///
+    /// Derived from [`Self::from_tag_name`] rather than a second hand-written list, so the two
+    /// cannot drift. The caller gates on the `svelte:` prefix first, which makes the two
+    /// context flags irrelevant here: neither `slot` nor `title` is namespaced. The one meta
+    /// tag with no `SpecialElementTag` is `svelte:options` — it fills `Root`'s single `Option`
+    /// slot instead of becoming a fragment node, so the root dispatch takes it before element
+    /// parsing ever sees it.
+    pub fn is_meta_tag_name(name: &str) -> bool {
+        name == "svelte:options" || Self::from_tag_name(name, false, false).is_some()
+    }
+
     /// Returns the tag name as it appears in source code
     #[inline]
     pub const fn tag_name(self) -> &'static str {
