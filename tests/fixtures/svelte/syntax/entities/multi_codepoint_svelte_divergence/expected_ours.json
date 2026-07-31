@@ -1,0 +1,301 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 485,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 170,
+				"data": "\n\tA character reference naming an entity of two code points: the HTML5 table gives\n\tboth, Svelte's generated table carries one per name, so the second is dropped.\n"
+			},
+			{
+				"type": "Text",
+				"start": 170,
+				"end": 171,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 171,
+				"end": 221,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 5,
+						"column": 1,
+						"character": 172
+					},
+					"end": {
+						"line": 5,
+						"column": 2,
+						"character": 173
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 174,
+							"end": 217,
+							"raw": "combining mark: &NotEqualTilde; &nLt; &acE;",
+							"data": "combining mark: ≂̸ ≪⃒ ∾̳"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 221,
+				"end": 222,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 222,
+				"end": 255,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 223
+					},
+					"end": {
+						"line": 6,
+						"column": 2,
+						"character": 224
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 225,
+							"end": 251,
+							"raw": "variation selector: &caps;",
+							"data": "variation selector: ∩︀"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 255,
+				"end": 256,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 256,
+				"end": 299,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 257
+					},
+					"end": {
+						"line": 7,
+						"column": 2,
+						"character": 258
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 259,
+							"end": 295,
+							"raw": "two characters: &fjlig; &ThickSpace;",
+							"data": "two characters: fj   "
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 299,
+				"end": 300,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 300,
+				"end": 329,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 301
+					},
+					"end": {
+						"line": 8,
+						"column": 4,
+						"character": 304
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 305,
+						"end": 322,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 8,
+								"column": 5,
+								"character": 305
+							},
+							"end": {
+								"line": 8,
+								"column": 14,
+								"character": 314
+							}
+						},
+						"value": [
+							{
+								"start": 316,
+								"end": 321,
+								"type": "Text",
+								"raw": "&bne;",
+								"data": "=⃥"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 329,
+				"end": 331,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 331,
+				"end": 405,
+				"data": " The base characters each pairs with, where the two decoders agree "
+			},
+			{
+				"type": "Text",
+				"start": 405,
+				"end": 406,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 406,
+				"end": 451,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 407
+					},
+					"end": {
+						"line": 11,
+						"column": 2,
+						"character": 408
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 409,
+							"end": 447,
+							"raw": "base character: &esim; &ll; &ac; &cap;",
+							"data": "base character: ≂ ≪ ∾ ∩"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 451,
+				"end": 452,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 452,
+				"end": 484,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 453
+					},
+					"end": {
+						"line": 12,
+						"column": 4,
+						"character": 456
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 457,
+						"end": 477,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 12,
+								"column": 5,
+								"character": 457
+							},
+							"end": {
+								"line": 12,
+								"column": 14,
+								"character": 466
+							}
+						},
+						"value": [
+							{
+								"start": 468,
+								"end": 476,
+								"type": "Text",
+								"raw": "&equals;",
+								"data": "="
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

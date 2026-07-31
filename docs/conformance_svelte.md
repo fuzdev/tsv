@@ -203,12 +203,12 @@ Svelte decodes character references with a generated regex over its entity table
 (`1-parse/utils/html.js`), and its `validate_code` deliberately answers some codes
 differently from [HTML5](https://html.spec.whatwg.org/multipage/parsing.html#character-reference-state).
 Those deliberate answers are **matched**, quirks and all — NUL rather than U+FFFD for a
-code with no character to emit (a surrogate half, or one past U+10FFFF), `&#10;` becoming
-a space, and the entity table keeping only the first codepoint of a multi-codepoint
-reference. Four others are slips in the implementation rather than choices, so tsv
-follows the spec — all four pinned by
+code with no character to emit (a surrogate half, or one past U+10FFFF), and `&#10;`
+becoming a space. Five others are slips in the implementation rather than choices, so tsv
+follows the spec — the first four pinned by
 [spec_decoding](../tests/fixtures/svelte/syntax/entities/spec_decoding_svelte_divergence/),
-whose README carries the per-case argument, and all three upstream candidates:
+whose README carries the per-case argument, the fifth by its own fixture, and every one of
+them an upstream candidate:
 
 - **Uppercase hex marker** — the numeric-character-reference state opens a hex reference
   on `U+0078 x` or `U+0058 X`; Svelte's pattern (`#(?:x[a-fA-F\d]+|\d+)(?:;)?`) spells only
@@ -231,6 +231,15 @@ whose README carries the per-case argument, and all three upstream candidates:
   that class is not a divergence — both decoders leave `&AMP中` decoding, since `\b` is
   ASCII-only, and tsv's test is `is_ascii_alphanumeric`, never `char::is_alphanumeric`
   ([attributes/entity_no_semicolon_boundary](../tests/fixtures/svelte/attributes/entity_no_semicolon_boundary/)).
+- **A two-code-point reference** — 93 of the 2,231 names in the
+  [named character references table](https://html.spec.whatwg.org/entities.json) stand for
+  two code points, and Svelte's table (`1-parse/utils/entities.js`) is generated with one
+  per name, so the second — a combining mark, a variation selector, or a second character —
+  is dropped. A negated relation then decodes to the relation itself: `&NotEqualTilde;`
+  loses the combining solidus that negates it, leaving the U+2242 of `&esim;`.
+  This is a slip in the generated data rather than a rule, so tsv emits both; the base
+  characters, which have their own single-code-point references, are unaffected. Pinned by
+  [multi_codepoint](../tests/fixtures/svelte/syntax/entities/multi_codepoint_svelte_divergence/).
 
 ### TypeScript Corrections
 
