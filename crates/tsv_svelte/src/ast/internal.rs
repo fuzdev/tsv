@@ -533,6 +533,16 @@ impl SpecialElementTag {
             Self::TitleElement => "title",
         }
     }
+
+    /// Whether a `this` attribute on this tag binds the element rather than staying an
+    /// ordinary attribute.
+    ///
+    /// Only these two consume one, and only the first — on every other special element (and
+    /// on any later `this` here) the name has no meaning beyond being an attribute.
+    #[inline]
+    pub const fn takes_this(self) -> bool {
+        matches!(self, Self::SvelteElement | Self::SvelteComponent)
+    }
 }
 
 /// The `this=` binding of `<svelte:element>`, in the two forms Svelte lets it be spelled.

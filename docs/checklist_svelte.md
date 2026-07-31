@@ -451,12 +451,14 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - With children
 - Void element handling (`this="hr"`)
 - Namespace attribute (`xmlns`)
+- Repeated `this` — the first binds the tag, later ones stay ordinary attributes
 
 ### svelte:component
 
 - Dynamic component (`<svelte:component this={Comp} />`)
 - With props
 - With children
+- Repeated `this` — as above; only the first must be an `{expression}`
 
 ### svelte:self
 
