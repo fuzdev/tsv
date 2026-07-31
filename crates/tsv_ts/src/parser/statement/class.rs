@@ -662,16 +662,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     .current_decoded()
                     .unwrap_or_else(|| self.current_property_name())
                     == "constructor";
-                let (key_start, key_end) = self.current_pos();
-                // Member keys decode `\u` escapes (span-identity otherwise) — acorn parity.
-                let key_name = self.current_ident_name();
-                self.advance()?;
                 (
                     false,
-                    Expression::Identifier(Identifier::simple(
-                        key_name,
-                        Span::new(key_start as u32, key_end as u32),
-                    )),
+                    Expression::Identifier(self.parse_identifier_name_node()?),
                     name_is_constructor,
                 )
             } else if matches!(self.current_kind(), TokenKind::String) {

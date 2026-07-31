@@ -648,13 +648,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         )
     }
 
-    /// Name channel for the current token as an identifier, accepting contextual
-    /// keywords.
+    /// Name channel for the current token as an identifier, accepting only the
+    /// **contextual** keywords — the ones `KeywordKind::can_be_identifier` admits
+    /// (`from`, `as`, `satisfies`, the type keywords, …). A reserved word is
+    /// rejected: these are positions where it would be read as a keyword instead
+    /// (a specifier local name, a label, a qualified type name's right side).
     ///
-    /// Handles `TokenKind::Identifier` (with unicode escape decoding) and
-    /// contextual keywords like `from`, `as`, `satisfies`. Returns `None`
+    /// Handles `TokenKind::Identifier` with unicode escape decoding. Returns `None`
     /// if the current token is not identifier-like.
-    pub(super) fn try_ident_or_keyword_name(&self) -> Option<IdentName<'arena>> {
+    ///
+    /// ⚠️ For a position the grammar spells `IdentifierName` — where every reserved
+    /// word is valid — use [`Parser::try_identifier_name`] instead.
+    pub(super) fn try_ident_or_contextual_name(&self) -> Option<IdentName<'arena>> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.current_ident_name()),
             TokenKind::Keyword(kw) if kw.can_be_identifier() => Some(self.current_raw_ident_name()),
@@ -663,7 +668,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Name channel for the current token as a function declaration name. Like
-    /// [`Parser::try_ident_or_keyword_name`], but `await` is accepted only
+    /// [`Parser::try_ident_or_contextual_name`], but `await` is accepted only
     /// where it is a valid identifier (Script `[~Await]`): at `Module` / `[+Await]`
     /// it is a reserved `BindingIdentifier` (the goal-level and `[Await]` early
     /// errors), so `function await(){}` / `export function await(){}` reject there,
@@ -675,13 +680,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         {
             return None;
         }
-        self.try_ident_or_keyword_name()
+        self.try_ident_or_contextual_name()
     }
 
     /// Name channel for the current token as a binding name, accepting contextual
     /// keywords.
     ///
-    /// Like `try_ident_or_keyword_name` but uses `can_be_binding_name()`,
+    /// Like `try_ident_or_contextual_name` but uses `can_be_binding_name()`,
     /// which excludes `await`, `yield`, and `let` (not valid as parameter/variable names).
     /// Whether the current token is binding-name-eligible — the allocation-free
     /// classification behind `try_binding_name().is_some()`, without building the
@@ -851,12 +856,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// Name channel for the current token as the `IdentifierName` half of a
-    /// module export name, accepting ANY keyword (e.g. `export { x as if }`).
+    /// Name channel for the current token as an `IdentifierName`, accepting ANY
+    /// keyword — `ReservedWord` is a subset of `IdentifierName`, so a position
+    /// spelled `IdentifierName` in the grammar takes `if` / `default` / `class`
+    /// as freely as `a`.
     ///
-    /// ES spec: `ModuleExportName : IdentifierName | StringLiteral`. This handles
-    /// only the `IdentifierName` arm; callers test for `TokenKind::String` first
-    /// and build a `ModuleExportName::Literal` for the `StringLiteral` arm.
+    /// Two such positions, both single-token productions where the reserved word
+    /// cannot be misread as a keyword:
+    ///
+    /// - `ModuleExportName : IdentifierName | StringLiteral` (`export { x as if }`)
+    ///   — this handles only the `IdentifierName` arm; callers test for
+    ///   `TokenKind::String` first and build a `ModuleExportName::Literal`.
+    /// - `PrivateIdentifier :: # IdentifierName` (`#default`).
+    ///
+    /// ⚠️ Not to be confused with [`Parser::try_ident_or_contextual_name`], which is
+    /// *narrower* despite the broader-sounding name: it admits only the contextual
+    /// keywords. Reaching for that one at an `IdentifierName` position is what made
+    /// `#default` an over-rejection.
     pub(super) fn try_identifier_name(&self) -> Option<IdentName<'arena>> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.current_ident_name()),
@@ -1243,6 +1259,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
+    /// Consume the current `IdentifierName` token — an identifier or any keyword —
+    /// as an [`Identifier`] node spanning exactly that token.
+    ///
+    /// The consuming counterpart of [`Parser::current_is_identifier_or_keyword`],
+    /// shared by the *key* positions that take an `IdentifierName`: the property
+    /// after `.` / `?.` (`obj.class`, including a `new` callee's chain), a class
+    /// member key, and a type-member key. `\u` escapes decode (`x.a` → name
+    /// `a`; ecma262 `IdentifierName` StringValue) — acorn parity.
+    ///
+    /// # Precondition
+    /// Current token must satisfy [`Parser::current_is_identifier_or_keyword`], so
+    /// callers own the "not a name here" error and its wording.
+    pub(super) fn parse_identifier_name_node(&mut self) -> Result<Identifier<'arena>, ParseError> {
+        debug_assert!(self.current_is_identifier_or_keyword());
+        let (start, end) = self.current_pos();
+        let name = self.current_ident_name();
+        self.advance()?;
+        Ok(Identifier::simple(
+            name,
+            Span::new(start as u32, end as u32),
+        ))
+    }
+
     /// Check if peek token could be a class member name (identifier, keyword, computed key, or private identifier)
     ///
     /// Used to detect accessor syntax in class bodies:
@@ -1263,20 +1302,35 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Parse a private identifier: `#name`
     ///
-    /// Current token must be `#`, followed by an identifier.
+    /// Current token must be `#`. ecma262 `PrivateIdentifier :: # IdentifierName`
+    /// is a single *lexical* token, which pins both halves of what may follow:
+    ///
+    /// - the name is an `IdentifierName`, so **every** reserved word is a valid
+    ///   private name (`#default`, `#class`, `#true`) — not just the contextual
+    ///   keywords a `BindingIdentifier` admits. The one reserved private name,
+    ///   `#constructor`, is rejected by the `ClassElementName` early error at the
+    ///   class-member key site, on decoded StringValue.
+    /// - the name is *glued* to the `#`: `# a`, `#/*c*/a` and `#⏎a` are two tokens,
+    ///   not a private name (acorn rejects them in the lexer). Without the check
+    ///   tsv accepted them and reprinted `#a` — rewriting invalid code as valid.
+    ///
     /// Returns the PrivateIdentifier with span including the `#`.
     pub(super) fn parse_private_identifier(
         &mut self,
     ) -> Result<PrivateIdentifier<'arena>, ParseError> {
         debug_assert!(matches!(self.current_kind(), TokenKind::Hash));
-        let start = self.current_pos().0;
+        let (start, hash_end) = self.current_pos();
         self.advance()?; // consume '#'
 
-        // Must be followed by an identifier (keywords like `async` are valid: `#async`)
-        let (_, end) = self.current_pos();
-        let Some(name) = self.try_ident_or_keyword_name() else {
+        // The `IdentifierName` name channel decodes `\u` escapes, so an escaped
+        // spelling names the same private name (`#\u0061` is `#a`) — acorn parity.
+        let (name_start, end) = self.current_pos();
+        let Some(name) = self.try_identifier_name() else {
             return Err(self.error_expected_after("identifier", "#"));
         };
+        if name_start != hash_end {
+            return Err(self.error_msg_at("A private name must follow '#' immediately", hash_end));
+        }
         self.advance()?;
 
         Ok(PrivateIdentifier {
