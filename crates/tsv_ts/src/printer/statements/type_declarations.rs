@@ -955,9 +955,11 @@ impl<'a> Printer<'a> {
 
         // Handle trailing comments after the last member (before closing `}`)
         if body_has_comments {
-            parts.extend(
-                self.build_trailing_body_comments_doc(prev_end, body_end.saturating_sub(1)),
-            );
+            parts.extend(self.build_trailing_body_comments_doc(
+                prev_end,
+                body_end.saturating_sub(1),
+                false,
+            ));
         }
 
         d.concat(&parts)
@@ -1170,7 +1172,8 @@ impl<'a> Printer<'a> {
 
             // Handle trailing comments after the last member
             if body_has_comments {
-                member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
+                member_parts
+                    .extend(self.build_trailing_body_comments_doc(prev_end, body_end, false));
             }
 
             parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&member_parts)])));
@@ -1409,7 +1412,7 @@ impl<'a> Printer<'a> {
                     let body_start = block.span.start + 1; // After opening '{'
                     let body_end = block.span.end.saturating_sub(1); // Before '}'
                     let mut stmt_parts = d.pooled_docbuf();
-                    let (prev_end, _prev_stmt_end) = self.build_statement_list_docs_into(
+                    let tail = self.build_statement_list_docs_into(
                         &mut stmt_parts,
                         block.body,
                         Span::new(body_start, body_end),
@@ -1419,7 +1422,11 @@ impl<'a> Printer<'a> {
                     );
 
                     // Handle own-line trailing comments after the last statement
-                    stmt_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
+                    stmt_parts.extend(self.build_trailing_body_comments_doc(
+                        tail.prev_end,
+                        body_end,
+                        tail.claims_trailing,
+                    ));
 
                     parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&stmt_parts)])));
                     parts.push(d.hardline());

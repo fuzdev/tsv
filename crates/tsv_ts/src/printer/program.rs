@@ -152,7 +152,8 @@ impl<'a> Printer<'a> {
         }
 
         // Trailing program comments
-        let trailing_comments_doc = self.build_program_trailing_comments_doc(prev_end);
+        let trailing_comments_doc =
+            self.build_program_trailing_comments_doc(prev_end, prev_deferred_line_comment);
         if !trailing_comments_doc.is_empty() {
             has_output = true;
         }
@@ -301,18 +302,22 @@ impl<'a> Printer<'a> {
     /// Build docs for trailing comments at the end of the program
     ///
     /// Handles comments that appear after all statements but before end of file.
-    fn build_program_trailing_comments_doc(&self, prev_end: u32) -> DocBuf {
+    /// `claims_trailing` says this run owns the comments sharing `prev_end`'s source line —
+    /// set when the last statement deferred a line comment past its own `;`
+    /// (`terminator_defers_line_comment`), so it trailed nothing on that line and, with no
+    /// further statement to lead, this emitter is their last chance to be printed.
+    fn build_program_trailing_comments_doc(&self, prev_end: u32, claims_trailing: bool) -> DocBuf {
         let d = self.d();
         let mut docs = DocBuf::new();
         let mut last_comment_end = prev_end;
         let mut is_first_comment = true;
 
         for comment in comments_to_emit_after(self.comments, prev_end) {
-            // Skip comments on same line as prev_end - those are inline trailing comments
-            // already handled by build_trailing_same_line_comment_docs
-            // BUT: When prev_end == 0 (no statements), there's no previous statement to be
-            // trailing from, so comments at position 0 should NOT be skipped.
-            if prev_end > 0 && self.is_same_line(prev_end, comment.span.start) {
+            // Skip comments the previous statement's trailing emitter already took. A
+            // `prev_end` of 0 means there was no previous statement to trail from, which is
+            // exactly what the `None` anchor says.
+            let anchor = (prev_end > 0).then_some(prev_end);
+            if self.comment_already_trailed(anchor, comment, claims_trailing) {
                 last_comment_end = comment.span.end;
                 continue;
             }
