@@ -6,8 +6,7 @@
 use crate::ast::internal;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::{
-    CommentPosition, classify_comment_fast, comments_to_emit_after, comments_to_emit_in_range,
-    doc::arena::DocId,
+    CommentPosition, classify_comment_fast, comments_to_emit_in_range, doc::arena::DocId,
 };
 
 use super::{Printer, next_printed_stmt_start};
@@ -301,42 +300,19 @@ impl<'a> Printer<'a> {
 
     /// Build docs for trailing comments at the end of the program
     ///
-    /// Handles comments that appear after all statements but before end of file.
+    /// Handles comments that appear after all statements but before end of file — the
+    /// `}`-less end-of-body run, so it is the shared
+    /// [`Printer::build_trailing_body_comments_doc`] with the source length as its bound
+    /// (equivalent by construction to an unbounded scan: `self.comments` is already
+    /// island-local for an embedded `<script>`). Its one distinguishing state, a
+    /// comments-only file with no previous statement, is the `prev_end == 0` the shared
+    /// emitter reads.
+    ///
     /// `claims_trailing` says this run owns the comments sharing `prev_end`'s source line —
     /// set when the last statement deferred a line comment past its own `;`
     /// (`terminator_defers_line_comment`), so it trailed nothing on that line and, with no
     /// further statement to lead, this emitter is their last chance to be printed.
     fn build_program_trailing_comments_doc(&self, prev_end: u32, claims_trailing: bool) -> DocBuf {
-        let d = self.d();
-        let mut docs = DocBuf::new();
-        let mut last_comment_end = prev_end;
-        let mut is_first_comment = true;
-
-        for comment in comments_to_emit_after(self.comments, prev_end) {
-            // Skip comments the previous statement's trailing emitter already took. A
-            // `prev_end` of 0 means there was no previous statement to trail from, which is
-            // exactly what the `None` anchor says.
-            let anchor = (prev_end > 0).then_some(prev_end);
-            if self.comment_already_trailed(anchor, comment, claims_trailing) {
-                last_comment_end = comment.span.end;
-                continue;
-            }
-
-            // For comments-only files (no statements), don't add leading newline for first comment
-            if prev_end > 0 || !is_first_comment {
-                // Blank line before this comment (add literalline BEFORE hardline)
-                if self.has_blank_line_between(last_comment_end, comment.span.start) {
-                    docs.push(d.literalline());
-                }
-
-                docs.push(d.hardline());
-            }
-
-            docs.push(self.build_comment_doc(comment));
-            last_comment_end = comment.span.end;
-            is_first_comment = false;
-        }
-
-        docs
+        self.build_trailing_body_comments_doc(prev_end, self.source.len() as u32, claims_trailing)
     }
 }

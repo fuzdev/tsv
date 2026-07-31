@@ -99,22 +99,18 @@ impl<'a> Printer<'a> {
         self.build_block_body_doc(block, expand_empty, DocBuf::new(), in_program_or_block)
     }
 
-    /// Build inner comments doc for empty block
+    /// Build inner comments doc for empty block — the dangling run, hardline-joined
+    /// ([`Printer::push_dangling_comment_run`]). Only the run itself: the caller supplies
+    /// the break before it (and any hoisted leading content above it) and the one before
+    /// `}`.
     fn build_inner_comments_for_empty_block(&self, block: &internal::BlockStatement<'_>) -> DocBuf {
-        let d = self.d();
         let block_start = block.span.start + 1; // After '{'
         let block_end = block.span.end - 1; // Before '}'
-        let comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, block_start, block_end).collect();
         let mut comment_parts = DocBuf::new();
-        for (i, comment) in comments.iter().enumerate() {
-            comment_parts.push(self.build_comment_doc(comment));
-            // Add hardline after line comments, except for the last one
-            // (the hardline before `}` handles that)
-            if !comment.is_block && i < comments.len() - 1 {
-                comment_parts.push(d.hardline());
-            }
-        }
+        self.push_dangling_comment_run(
+            &mut comment_parts,
+            comments_to_emit_in_range(self.comments, block_start, block_end),
+        );
         comment_parts
     }
 
@@ -195,7 +191,9 @@ impl<'a> Printer<'a> {
         );
 
         // Handle trailing comments after the last statement (on their own line)
-        // Preserve blank lines between last statement and trailing comments, and between comments
+        // Preserve blank lines between last statement and trailing comments, and between
+        // comments — the shared end-of-body run, same emitter the class/interface/enum/
+        // type-literal/namespace bodies use.
         if let Some(last_stmt_end) = tail.last_stmt_end {
             // A last statement that deferred a line comment past its own `;` trailed
             // nothing on that line, and there is no further statement to lead — so this
@@ -206,20 +204,11 @@ impl<'a> Printer<'a> {
             } else {
                 self.find_end_with_trailing_comments(last_stmt_end)
             };
-            let mut trailing_prev_end = trailing_start;
-            for comment in comments_to_emit_in_range(self.comments, trailing_start, block_end) {
-                if self.comment_already_trailed(Some(trailing_start), comment, tail.claims_trailing)
-                {
-                    continue; // Already emitted as the last statement's trailing run
-                }
-                // Check for blank line before this comment
-                if self.has_blank_line_between(trailing_prev_end, comment.span.start) {
-                    body_parts.push(d.literalline());
-                }
-                body_parts.push(d.hardline());
-                body_parts.push(self.build_comment_doc(comment));
-                trailing_prev_end = comment.span.end;
-            }
+            body_parts.extend(self.build_trailing_body_comments_doc(
+                trailing_start,
+                block_end,
+                tail.claims_trailing,
+            ));
         }
 
         d.concat(&[
