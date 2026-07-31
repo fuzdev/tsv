@@ -558,7 +558,7 @@ impl<'a> Printer<'a> {
         if force_multiline && comments_present {
             // Trailing comments after last member
             let body_end = t.span.end.saturating_sub(1);
-            member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
+            member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end, false));
         }
 
         d.concat(&member_parts)
@@ -866,7 +866,8 @@ impl<'a> Printer<'a> {
 
             let body_end = t.span.end.saturating_sub(1);
             if comments_present {
-                member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
+                member_parts
+                    .extend(self.build_trailing_body_comments_doc(prev_end, body_end, false));
             }
 
             parts.push(d.indent(d.concat(&member_parts)));

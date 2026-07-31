@@ -17,6 +17,20 @@ use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
+/// What [`Printer::build_statement_list_docs_into`] leaves for its caller's end-of-body
+/// comment emitter.
+pub(in crate::printer) struct StatementListTail {
+    /// Source cursor past everything the walk emitted.
+    pub prev_end: u32,
+    /// End of the last statement actually printed; `None` when the walk printed none.
+    pub last_stmt_end: Option<u32>,
+    /// The last statement deferred a line comment past its own `;`
+    /// ([`Printer::terminator_defers_line_comment`]), so the comments sharing that line
+    /// are still UNCLAIMED — the caller's end-of-body emitter must print them, and must
+    /// not advance its anchor past them first.
+    pub claims_trailing: bool,
+}
+
 impl<'a> Printer<'a> {
     /// Build a Doc for a block statement. Its body is a genuine `BlockStatement`
     /// (a function/method/catch body, or a plain block reached through the
@@ -171,7 +185,7 @@ impl<'a> Printer<'a> {
         // in place — one RAII owner, released back to the free-list on scope exit.
         let mut body_parts = d.pooled_docbuf();
         body_parts.extend(leading_content);
-        let (_prev_end, prev_stmt_end) = self.build_statement_list_docs_into(
+        let tail = self.build_statement_list_docs_into(
             &mut body_parts,
             block.body,
             Span::new(block_start, block_end),
@@ -182,12 +196,21 @@ impl<'a> Printer<'a> {
 
         // Handle trailing comments after the last statement (on their own line)
         // Preserve blank lines between last statement and trailing comments, and between comments
-        if let Some(last_stmt_end) = prev_stmt_end {
-            let trailing_start = self.find_end_with_trailing_comments(last_stmt_end);
+        if let Some(last_stmt_end) = tail.last_stmt_end {
+            // A last statement that deferred a line comment past its own `;` trailed
+            // nothing on that line, and there is no further statement to lead — so this
+            // run claims them, and its anchor must stay at the `;` rather than advancing
+            // past the very comments it has to print (`terminator_defers_line_comment`).
+            let trailing_start = if tail.claims_trailing {
+                tail.prev_end
+            } else {
+                self.find_end_with_trailing_comments(last_stmt_end)
+            };
             let mut trailing_prev_end = trailing_start;
             for comment in comments_to_emit_in_range(self.comments, trailing_start, block_end) {
-                if self.is_same_line(trailing_start, comment.span.start) {
-                    continue; // Skip same-line comments (already handled above)
+                if self.comment_already_trailed(Some(trailing_start), comment, tail.claims_trailing)
+                {
+                    continue; // Already emitted as the last statement's trailing run
                 }
                 // Check for blank line before this comment
                 if self.has_blank_line_between(trailing_prev_end, comment.span.start) {
@@ -243,7 +266,7 @@ impl<'a> Printer<'a> {
         has_leading: bool,
         delimiter_pull_pos: Option<u32>,
         in_program_or_block: bool,
-    ) -> (u32, Option<u32>) {
+    ) -> StatementListTail {
         let Span {
             start: body_start,
             end: body_end,
@@ -251,6 +274,9 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut prev_end = body_start;
         let mut prev_stmt_end: Option<u32> = None;
+        // Set when the statement just emitted deferred a line comment past its own `;`, so
+        // its doc ends on a later line than the `;` and cannot carry that line's comments.
+        let mut prev_deferred_line_comment = false;
 
         // Zero-comment fast gate: one binary search over the whole statement-list
         // window short-circuits every per-statement comment sub-query (leading
@@ -282,7 +308,7 @@ impl<'a> Printer<'a> {
                 };
 
                 let mut leading_comments = if body_has_comments {
-                    self.collect_leading_comments(prev_end, search_end, prev_stmt_end)
+                    self.collect_leading_comments(prev_end, search_end, prev_stmt_end, false)
                 } else {
                     CommentVec::new()
                 };
@@ -310,8 +336,14 @@ impl<'a> Printer<'a> {
 
             // Collect leading comments (skip trailing same-line from previous
             // statement). Skipped entirely on a comment-free block.
+            //
             let mut leading_comments = if body_has_comments {
-                self.collect_leading_comments(prev_end, stmt_start, prev_stmt_end)
+                self.collect_leading_comments(
+                    prev_end,
+                    stmt_start,
+                    prev_stmt_end,
+                    prev_deferred_line_comment,
+                )
             } else {
                 CommentVec::new()
             };
@@ -371,7 +403,15 @@ impl<'a> Printer<'a> {
             // each grab the trailing comment. With no comment in the block,
             // `find_end_with_trailing_comments(end) == end`.
             let stmt_end = stmt.span().end;
-            if body_has_comments {
+            prev_deferred_line_comment =
+                body_has_comments && self.terminator_defers_line_comment(stmt_start, stmt_end);
+            if prev_deferred_line_comment {
+                // …unless this statement's doc ends with a line comment its terminator gap
+                // deferred past the `;`. Nothing may share that line, so leaving `prev_end`
+                // at the `;` hands the comments to the next statement's leading run;
+                // advancing it (what the trailing case does below) would DROP them.
+                prev_end = stmt_end;
+            } else if body_has_comments {
                 // Bound at the next *printed* statement, skipping dropped `;`s, so a
                 // same-line comment trailing a dropped `;` (`a();; // c`) attaches here
                 // rather than being stranded (the `;` emits nothing to carry it).
@@ -386,22 +426,26 @@ impl<'a> Printer<'a> {
             prev_stmt_end = Some(stmt_end);
         }
 
-        (prev_end, prev_stmt_end)
+        StatementListTail {
+            prev_end,
+            last_stmt_end: prev_stmt_end,
+            claims_trailing: prev_deferred_line_comment,
+        }
     }
 
-    /// Collect leading comments for a statement, filtering out trailing same-line from previous
+    /// Collect leading comments for a statement, filtering out the ones the previous
+    /// statement's trailing emitter already took ([`Printer::comment_already_trailed`] —
+    /// `claims_trailing` is that predicate's escape hatch).
     pub(in crate::printer) fn collect_leading_comments(
         &self,
         prev_end: u32,
         stmt_start: u32,
         prev_stmt_end: Option<u32>,
+        claims_trailing: bool,
     ) -> CommentVec<'_> {
         let collected: CommentVec<'_> =
             comments_to_emit_in_range(self.comments, prev_end, stmt_start)
-                .filter(|c| {
-                    prev_stmt_end
-                        .is_none_or(|prev_stmt| !self.is_same_line(prev_stmt, c.span.start))
-                })
+                .filter(|c| !self.comment_already_trailed(prev_stmt_end, c, claims_trailing))
                 .collect();
         #[cfg(feature = "buffer_stats")]
         crate::printer::buffer_stats::record_leading_comments(collected.len());

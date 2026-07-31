@@ -197,34 +197,11 @@ impl<'a> Printer<'a> {
 
     /// Collect leading comments for a case-consequent statement (or a dropped
     /// `EmptyStatement` standing in for one), filtering out whatever's already
-    /// claimed: a trailing same-line comment of the previous statement, or —
-    /// for the first statement, which has no previous statement — an inline
-    /// comment on the case label's own line (already handled by the caller).
-    fn collect_case_leading_comments(
-        &self,
-        body_has_comments: bool,
-        prev_end: u32,
-        boundary: u32,
-        prev_stmt_end: Option<u32>,
-        case_label_end: u32,
-    ) -> CommentVec<'_> {
-        if !body_has_comments {
-            return CommentVec::new();
-        }
-        let comments: CommentVec<'_> =
-            comments_to_emit_in_range(self.comments, prev_end, boundary).collect();
-        let anchor = prev_stmt_end.unwrap_or(case_label_end);
-        comments
-            .iter()
-            .filter(|c| !self.is_same_line(anchor, c.span.start))
-            .copied()
-            .collect()
-    }
-
     /// Build a doc for a switch case (without outer indent - that's handled by switch)
     ///
     /// `inline_comment_boundary` is the position up to which we should look for inline comments
     /// on this case label (typically the next case start or switch body end).
+    ///
     fn build_switch_case_doc_inner(
         &self,
         case: &internal::SwitchCase<'_>,
@@ -290,6 +267,9 @@ impl<'a> Printer<'a> {
         // Handle comments between statements like block statements do
         let mut prev_end = case_label_end;
         let mut prev_stmt_end: Option<u32> = None;
+        // Set when the statement just emitted deferred a line comment past its own `;`, so
+        // its doc ends on a later line than the `;` and cannot carry that line's comments.
+        let mut prev_deferred_line_comment = false;
 
         // Check if first statement is a block - it hugs the case label: `case 'a': { ... }`
         let first_is_block = case
@@ -316,13 +296,16 @@ impl<'a> Printer<'a> {
                     .find_end_with_trailing_comments(stmt_end)
                     .min(next_bound);
 
-                let leading_comments = self.collect_case_leading_comments(
-                    body_has_comments,
-                    prev_end,
-                    search_end,
-                    prev_stmt_end,
-                    case_label_end,
-                );
+                let leading_comments = if body_has_comments {
+                    self.collect_leading_comments(
+                        prev_end,
+                        search_end,
+                        Some(prev_stmt_end.unwrap_or(case_label_end)),
+                        prev_deferred_line_comment,
+                    )
+                } else {
+                    CommentVec::new()
+                };
 
                 if !leading_comments.is_empty() {
                     let mut stmt_parts: DocBuf = smallvec![d.hardline()];
@@ -345,13 +328,20 @@ impl<'a> Printer<'a> {
             // whatever's already claimed (a trailing same-line comment of the
             // previous statement, or — for the first statement — an inline
             // comment on the case label's own line, handled above).
-            let leading_comments = self.collect_case_leading_comments(
-                body_has_comments,
-                prev_end,
-                stmt_start,
-                prev_stmt_end,
-                case_label_end,
-            );
+            // The shared statement-list collector, with the consequent's own anchor: the
+            // FIRST statement has no previous statement, so what its leading run must skip
+            // is an inline comment on the CASE LABEL's line (the caller already emitted
+            // that one). Every later statement anchors on the previous statement as usual.
+            let leading_comments = if body_has_comments {
+                self.collect_leading_comments(
+                    prev_end,
+                    stmt_start,
+                    Some(prev_stmt_end.unwrap_or(case_label_end)),
+                    prev_deferred_line_comment,
+                )
+            } else {
+                CommentVec::new()
+            };
 
             // Trailing same-line comments on THIS statement (mirrors the block
             // statement joiner `build_statement_list_docs_into`). Without this the
@@ -365,9 +355,34 @@ impl<'a> Printer<'a> {
             // (next case / switch end) for the last one, so a comment attaches only to
             // the statement it follows — while a same-line comment trailing a dropped
             // `;` (`f();; // c`) still attaches here (the `;` emits nothing to carry it).
+            // …unless this statement's doc ends with a line comment its terminator gap
+            // deferred past the `;`. Nothing may share that line, so the run is left for
+            // the next statement's leading collector to claim (which the `prev_end` left
+            // at the `;` below hands over); trailing it here welds a following block onto
+            // the line comment, making it the comment's text.
             let stmt_end = stmt.span().end;
             let next_bound = next_printed_stmt_start(case.consequent, i, inline_comment_boundary);
-            let trailing = self.build_trailing_same_line_comment_docs(stmt_end, next_bound);
+            // Deferring hands the `;` line's comments to the NEXT statement's leading run,
+            // so it needs one to exist. For the last statement of a consequent there is no
+            // such run, and the switch's own after-last-case emitter sits at CASE-LABEL
+            // indent — which prettier agrees is right for a post-consequent comment, but
+            // the deferred `//` is emitted inside the statement's doc at consequent indent,
+            // so the pair could never share a fixed point (pass 2 dedents the `//`). That
+            // shape keeps the ordinary trailing path; the class / block / program lists
+            // have a body-level emitter at the right indent and defer to the end.
+            let has_next_stmt = next_bound != inline_comment_boundary;
+            // THIS statement's verdict — distinct from `prev_deferred_line_comment`, which
+            // is the PREVIOUS statement's and is still being read below (the leading run
+            // and the blank scan). The trailing gate needs its own answer here, before the
+            // loop tail hands it forward, so the two must not share one variable.
+            let this_defers_line_comment = body_has_comments
+                && has_next_stmt
+                && self.terminator_defers_line_comment(stmt_start, stmt_end);
+            let trailing = if this_defers_line_comment {
+                DocBuf::new()
+            } else {
+                self.build_trailing_same_line_comment_docs(stmt_end, next_bound)
+            };
 
             // Rule A over the consequent list: an own-line directive in the label→first
             // gap or between statements freezes the statement that follows it. Resolved
@@ -414,8 +429,16 @@ impl<'a> Printer<'a> {
                 // Build the indented content for this statement
                 let mut stmt_parts: DocBuf = smallvec![d.hardline()];
 
-                // Preserve blank lines between statements within case consequent
-                if prev_stmt_end.is_some() {
+                // Preserve blank lines between statements within case consequent.
+                //
+                // Suppressed when the previous statement DEFERRED. The deferred `//` is
+                // emitted from inside that statement's own doc, so the blank this scan
+                // finds sits between it and this run — and on the next pass, with the `;`
+                // glued, the pair are two ordinary LEADING comments, a position where the
+                // consequent drops the blank between them. Emitting it here would make
+                // pass 1 disagree with pass 2 (an F1 non-idempotency); the block and class
+                // lists preserve it in both passes and so keep it.
+                if prev_stmt_end.is_some() && !prev_deferred_line_comment {
                     let check_end = leading_comments
                         .first()
                         .map_or(stmt_start, |c| c.span.start);
@@ -451,9 +474,16 @@ impl<'a> Printer<'a> {
             }
 
             // Advance past the trailing comments so the next statement's leading
-            // scan and blank-line detection start after them.
-            prev_end = self.find_end_with_trailing_comments(stmt_end);
+            // scan and blank-line detection start after them — but not when this
+            // statement deferred, since nothing trailed and advancing would step the
+            // leading scan PAST the comments it now has to claim, dropping them.
+            prev_end = if this_defers_line_comment {
+                stmt_end
+            } else {
+                self.find_end_with_trailing_comments(stmt_end)
+            };
             prev_stmt_end = Some(stmt_end);
+            prev_deferred_line_comment = this_defers_line_comment;
         }
 
         // Note: a same-line trailing comment on the *last* statement is consumed

@@ -286,6 +286,9 @@ impl<'a> Printer<'a> {
         // none sit inside the body all sub-queries are provably empty/false.
         // Blank-line preservation is comment-independent and stays.
         let body_has_comments = self.has_comments_on_page_between(body.span.start, body.span.end);
+        // Set when the member just emitted deferred a line comment past its own `;`, so
+        // its doc ends on a later line than the `;` and cannot carry that line's comments.
+        let mut prev_deferred_line_comment = false;
 
         for (i, member) in body.body.iter().enumerate() {
             let member_start = member.span().start;
@@ -296,16 +299,23 @@ impl<'a> Printer<'a> {
             let comments: CommentVec<'_> = if body_has_comments {
                 let all_comments: CommentVec<'_> =
                     comments_to_emit_in_range(self.comments, prev_end, member_start).collect();
-                if !is_first {
+                if is_first {
+                    // First member: drop comments pulled onto the `{` line (emitted as the
+                    // brace-line prefix below). A first member has no previous member, so
+                    // it can never be the deferring case.
+                    self.first_member_leading_comments(all_comments, delimiter_pull_pos)
+                } else {
                     all_comments
                         .iter()
-                        .filter(|c| !self.is_same_line(prev_end, c.span.start))
+                        .filter(|c| {
+                            !self.comment_already_trailed(
+                                Some(prev_end),
+                                c,
+                                prev_deferred_line_comment,
+                            )
+                        })
                         .copied()
                         .collect()
-                } else {
-                    // First member: drop comments pulled onto the `{` line
-                    // (emitted as the brace-line prefix below).
-                    self.first_member_leading_comments(all_comments, delimiter_pull_pos)
                 }
             } else {
                 CommentVec::new()
@@ -342,26 +352,38 @@ impl<'a> Printer<'a> {
             // Handle trailing inline comments on same line after member, and
             // advance `prev_end` past them. With no comment in the body,
             // `find_end_with_trailing_comments(end) == end`.
-            if body_has_comments {
+            let member_end = member.span().end;
+            prev_deferred_line_comment =
+                body_has_comments && self.terminator_defers_line_comment(member_start, member_end);
+            if prev_deferred_line_comment {
+                // …unless this member's doc ends with a line comment its terminator gap
+                // deferred past the `;`. Nothing may share that line, so leaving `prev_end`
+                // at the `;` hands the comments to the next member's leading run; advancing
+                // it (what the trailing case does) would DROP them.
+                prev_end = member_end;
+            } else if body_has_comments {
                 let upper_bound = body
                     .body
                     .get(i + 1)
                     .map_or(body.span.end, |next| next.span().start);
-                member_parts.extend(
-                    self.build_trailing_same_line_comment_docs(member.span().end, upper_bound),
-                );
+                member_parts
+                    .extend(self.build_trailing_same_line_comment_docs(member_end, upper_bound));
                 // Update prev_end past trailing comments (including comments on the
                 // closing */ line of multi-line block comments)
-                prev_end = self.find_end_with_trailing_comments(member.span().end);
+                prev_end = self.find_end_with_trailing_comments(member_end);
             } else {
-                prev_end = member.span().end;
+                prev_end = member_end;
             }
         }
 
         // Handle trailing comments after the last member (before closing `}`)
         if body_has_comments {
             let body_end = body.span.end.saturating_sub(1); // Before '}'
-            member_parts.extend(self.build_trailing_body_comments_doc(prev_end, body_end));
+            member_parts.extend(self.build_trailing_body_comments_doc(
+                prev_end,
+                body_end,
+                prev_deferred_line_comment,
+            ));
         }
 
         // Wrap body content in indent
