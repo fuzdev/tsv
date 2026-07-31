@@ -1078,25 +1078,17 @@ impl<'a> Printer<'a> {
         last_was_own_line
     }
 
-    /// Build a doc for a JS comment's text (without surrounding separators)
+    /// Build a doc for a JS comment's text (without surrounding separators).
+    ///
+    /// The bare `Printer::js_comment_text_doc` spelling plus the ledger tag — this builder
+    /// adds no separator and no break of its own; the caller
+    /// ([`Self::push_attr_comment_docs`]) supplies both.
     pub(super) fn build_attr_js_comment_doc(&self, comment: &tsv_lang::Comment) -> DocId {
-        let d = self.d();
-        let doc = if comment.is_block {
-            d.concat(&[
-                d.text("/*"),
-                d.source_span(comment.content_span, self.source),
-                d.text("*/"),
-            ])
-        } else {
-            d.concat(&[
-                d.text("//"),
-                d.source_span(comment.content_span, self.source),
-            ])
-        };
+        let doc = self.js_comment_text_doc(comment);
         // The renderer records the emit when it reaches the node — see
         // `tsv_lang::comment_ledger`.
         #[cfg(feature = "comment_check")]
-        d.tag_comment_doc(doc, comment.span, self.source);
+        self.d().tag_comment_doc(doc, comment.span, self.source);
         doc
     }
 

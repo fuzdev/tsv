@@ -54,9 +54,19 @@ cargo run --profile corpus -p tsv_debug --features audits swallow_audit ~/dev/zz
 # its sub-renders (fill segments, the line-suffix flush), all driving one
 # per-thread state machine. A `line_suffix` comment is NOT exempt: two of them
 # flushed at the same line break land back-to-back on one line (`x; // c2 // c1`)
-# and the first `//` swallows the second. Comments written straight to the output
-# buffer (the Svelte template buffer path) bypass the doc renderer and stay out
-# of scope.
+# and the first `//` swallows the second.
+#
+# ONLY a `//` (and the hashbang) can swallow — `/* */` and `<!-- -->` close at their
+# own delimiter, so they carry no tag and appear here only as a swallow's VICTIM.
+# What arms the check is a text node carrying the WHOLE comment
+# (`line_comment_source_span` / `line_comment_text_pooled`); an emitter that spells
+# one as `text("//") + <content>` is invisible to it, so every line-comment emitter
+# in tsv_ts and tsv_svelte uses the one-node form. Out of scope, victim-direction
+# only: content written straight to the output buffer (the Svelte hoisted-section
+# `<!-- -->` path), and a `//` left pending across a top-level render boundary
+# (each `<script>`/`<style>`/template root node is its own render, which clears the
+# pending state). Neither is reachable today — every Svelte `//` emitter ends its
+# line — and the census covers both from the output side.
 ```
 
 ⚠️ **A green `swallow:audit` does not mean "no swallows"** — it formats each file **as
@@ -66,8 +76,8 @@ formats and reports what that reaches, as its report-only
 [SWALLOW class](gap_audit.md#the-swallow-class). The
 [comment census](#comment-census-audit-censusaudit) sees an as-authored swallow from the other
 side — the comment's interior GAINS the swallowed code, a multiset imbalance — with no
-instrumentation seam at all, so it also covers the Svelte-emitted `//` paths this check's
-tracker never arms (its first external sweep caught a live `as const` swallow this way).
+instrumentation seam at all, so it covers the two seams listed above that this check cannot
+reach (its first external sweep caught a live `as const` swallow this way).
 
 ## Comment Ledger Audit (`comments:audit`)
 

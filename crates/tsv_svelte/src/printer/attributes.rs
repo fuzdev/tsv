@@ -110,6 +110,33 @@ impl<'a> Printer<'a> {
     // JS Comment Doc builders
     //
 
+    /// One JS comment's own text, verbatim from source — no separator, no break, no
+    /// ledger tag. **The single spelling** the three JS-comment builders in this crate
+    /// share ([`Self::build_leading_js_comment_doc`],
+    /// [`Self::build_trailing_js_comment_doc`], `Printer::build_attr_js_comment_doc`);
+    /// each wraps it in its own separators and tags the result once.
+    ///
+    /// ⚠️ **A line comment must reach the doc as ONE node**, which is why this returns a
+    /// whole-`span` slice rather than assembling `text("//") + <content>`. The swallow
+    /// check arms on a text node carrying the entire comment
+    /// (`DocArena::line_comment_source_span`), so the split spelling — which is what all
+    /// three sites used to hand-roll — presents nothing for it to tag, and every `//`
+    /// this crate prints goes unguarded. Spelling, not intent, decides whether an emitter
+    /// is instrumented; keep new emitters on this function.
+    ///
+    /// A block comment's whole span is verbatim `/*…*/` for the same reason the content
+    /// slice was: the delimiters are source bytes, not synthesized. Multi-line blocks are
+    /// emitted verbatim here — the leading builder routes them to `tsv_ts` *before*
+    /// reaching this, for the reindent its own doc explains.
+    pub(super) fn js_comment_text_doc(&self, comment: &Comment) -> DocId {
+        let d = self.d();
+        if comment.is_block {
+            d.source_span(comment.span, self.source)
+        } else {
+            d.line_comment_source_span(comment.span, self.source)
+        }
+    }
+
     /// Build a Doc for a leading JS comment (before content)
     ///
     /// Multi-line block comments: routed through tsv_ts's comment builder — the *same*
@@ -127,30 +154,22 @@ impl<'a> Printer<'a> {
     /// Single-line block comments: `/*content*/ ` (with trailing space).
     /// Line comments: `// content\n` (with hardline).
     ///
-    /// The block arms take a hardline instead whenever the comment doesn't glue to what
-    /// follows — see [`Self::leading_js_comment_separator`], which owns that rule. The line
-    /// spelling already ends in a hardline, which is why only the block arms consult it.
+    /// A **block** comment's separator is a hardline whenever it doesn't glue to what
+    /// follows — see [`Self::leading_js_comment_separator`], which owns that rule. A `//`
+    /// always takes the hardline: it runs to end of line, so the glued answer is never
+    /// available to it.
     pub(super) fn build_leading_js_comment_doc(&self, comment: &Comment) -> DocId {
         let d = self.d();
         if comment.is_block && comment.multiline {
             let doc = tsv_ts::build_comment_doc(d, comment, &self.ts_inputs());
             return d.concat(&[doc, self.leading_js_comment_separator(comment)]);
         }
-        let doc = if comment.is_block {
-            let body = d.concat(&[
-                d.text("/*"),
-                d.source_span(comment.content_span, self.source),
-                d.text("*/"),
-            ]);
-            d.concat(&[body, self.leading_js_comment_separator(comment)])
+        let separator = if comment.is_block {
+            self.leading_js_comment_separator(comment)
         } else {
-            // Content already includes the space after // (e.g., " comment" from "// comment")
-            d.concat(&[
-                d.text("//"),
-                d.source_span(comment.content_span, self.source),
-                d.hardline(),
-            ])
+            d.hardline()
         };
+        let doc = d.concat(&[self.js_comment_text_doc(comment), separator]);
         // The renderer records the emit when it reaches the node — see
         // `tsv_lang::comment_ledger`.
         #[cfg(feature = "comment_check")]
@@ -255,25 +274,21 @@ impl<'a> Printer<'a> {
         dedent_break: bool,
     ) -> DocId {
         let d = self.d();
-        let starts_line = self.trailing_comment_starts_line(comment);
-        let doc = if comment.is_block {
-            d.concat(&[
-                d.text(if starts_line { "/*" } else { " /*" }),
-                d.source_span(comment.content_span, self.source),
-                d.text("*/"),
-            ])
-        } else {
-            // Content already includes the space after // (e.g., " comment" from "// comment")
-            d.concat(&[
-                d.text(if starts_line { "//" } else { " //" }),
-                d.source_span(comment.content_span, self.source),
-                if dedent_break {
-                    d.dedent(d.hardline())
-                } else {
-                    d.hardline()
-                },
-            ])
-        };
+        // Both payloads take the same leading separator; only the trailing one differs, so
+        // the two arms are one assembly rather than two spellings of the comment.
+        let mut parts = DocBuf::new();
+        if !self.trailing_comment_starts_line(comment) {
+            parts.push(d.text(" "));
+        }
+        parts.push(self.js_comment_text_doc(comment));
+        if !comment.is_block {
+            parts.push(if dedent_break {
+                d.dedent(d.hardline())
+            } else {
+                d.hardline()
+            });
+        }
+        let doc = d.concat(&parts);
         // The renderer records the emit when it reaches the node — see
         // `tsv_lang::comment_ledger`.
         #[cfg(feature = "comment_check")]
@@ -1201,6 +1216,105 @@ impl<'a> Printer<'a> {
 #[cfg(test)]
 mod tests {
     use super::normalize_class_text;
+
+    /// Every comment emitter in this crate prints a comment as its **whole span**, so the
+    /// span must reproduce the delimiters the old per-part spelling assembled by hand:
+    /// `//` + content for a line comment, `/*` + content + `*/` for a block. That is pure
+    /// span arithmetic in the parser (`content_start = start + 2`, shared `end` for a line
+    /// comment; `content_end = end - 2` for a block), and **no corpus can grade it** — a
+    /// content span off by one still yields plausible output, and the formatter would
+    /// simply start emitting different bytes. This is the check that would fail first.
+    #[test]
+    fn a_comment_span_reproduces_its_own_delimiters() {
+        // Both payloads in every position a JS comment reaches: template expression,
+        // block head, attribute value, attribute gap, `<script>` island, and a multi-line
+        // block (whose span crosses a newline).
+        let sources = [
+            "{a // c\n}",
+            "{a /* c */}",
+            "{#if x // c\n}\n\ty\n{/if}",
+            "<div class={x /* c */}></div>",
+            "<div id=\"a\" // c\n></div>",
+            "<div /* c */ id=\"a\"></div>",
+            "<script>\n\tlet a = 1; // c\n</script>",
+            "{@const a = b /* m1\n\t * m2 */}",
+            "{@debug a /* c */}",
+        ];
+        for source in sources {
+            let arena = bumpalo::Bump::new();
+            let root = crate::parse(source, &arena)
+                .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
+            assert!(
+                !root.comments.is_empty(),
+                "no comment parsed from {source:?} — the case stopped exercising the rule"
+            );
+            for comment in &root.comments {
+                let whole = comment.span.extract(source);
+                let content = comment.content_span.extract(source);
+                let rebuilt = if comment.is_block {
+                    format!("/*{content}*/")
+                } else {
+                    format!("//{content}")
+                };
+                assert_eq!(
+                    whole, rebuilt,
+                    "comment span must equal delimiters + content, in {source:?}"
+                );
+            }
+        }
+    }
+
+    /// The `<!-- -->` twin of the rule above, for the two HTML-comment emitters
+    /// (`build_html_comment_doc` and the hoisted-section `print_comment`).
+    ///
+    /// It also pins the assumption those emitters now rest on: `parse_comment`'s
+    /// `token_value.len() >= 7` guard has a fallback that collapses `content_span` to
+    /// EMPTY, and a re-assembling emitter would then print `<!---->` for a shorter source
+    /// run — a content rewrite. The guard is unreachable (`<!-->` and `<!--->` both fail
+    /// as unterminated, so the shortest comment that parses is the 7-byte `<!---->`), and
+    /// the degenerate cases below are here to fail loudly if that ever stops being true.
+    #[test]
+    fn an_html_comment_span_reproduces_its_own_delimiters() {
+        use crate::ast::internal::FragmentNode;
+
+        let sources = [
+            "<!--c-->",
+            "<!-- c -->",
+            "<!---->",
+            "<!----->",
+            "<!--\n\tmulti\n\tline\n-->",
+            "<div><!--nested--></div>",
+        ];
+        for source in sources {
+            let arena = bumpalo::Bump::new();
+            let root = crate::parse(source, &arena)
+                .unwrap_or_else(|e| panic!("parse failed for {source:?}: {e}"));
+            let mut seen = 0;
+            let mut stack = vec![&root.fragment];
+            while let Some(fragment) = stack.pop() {
+                for node in fragment.nodes {
+                    match node {
+                        FragmentNode::Comment(comment) => {
+                            seen += 1;
+                            let whole = comment.span.extract(source);
+                            let content = comment.content_span.extract(source);
+                            assert_eq!(
+                                whole,
+                                format!("<!--{content}-->"),
+                                "HTML comment span must equal delimiters + content, in {source:?}"
+                            );
+                        }
+                        FragmentNode::Element(el) => stack.push(&el.fragment),
+                        _ => {}
+                    }
+                }
+            }
+            assert_eq!(
+                seen, 1,
+                "expected exactly one HTML comment in {source:?} — the case stopped exercising the rule"
+            );
+        }
+    }
 
     #[test]
     fn collapses_runs_and_trims_trailing_per_line() {
