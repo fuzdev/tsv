@@ -4,6 +4,7 @@ use bumpalo::collections::Vec as BumpVec;
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
+use crate::whitespace::{char_at, is_svelte_ws};
 use tsv_lang::{ParseError, Span};
 
 use super::parser_impl::SvelteParser;
@@ -589,6 +590,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// in place for the caller to re-read. The name must be exactly `tag_name`
     /// followed by a tag-name terminator (whitespace, `/`, `>`, or EOF), so `</li>`
     /// matches `li` but `</link>` does not.
+    ///
+    /// The terminators are Svelte's `regex_whitespace_or_slash_or_closing_tag = /(\s|\/|>)/`,
+    /// so the whitespace arm is the full [`crate::whitespace::is_svelte_ws`] set, not just
+    /// ASCII — `</div\u{a0}>` closes a `div`.
     fn is_closing_tag_for(&self, tag_name: &str) -> bool {
         let name_start = self.current_start + 2; // past `</`
         if !self
@@ -598,9 +603,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         {
             return false;
         }
-        match self.source.as_bytes().get(name_start + tag_name.len()) {
+        // `(\s|\/|>)`, or EOF.
+        match char_at(self.source, name_start + tag_name.len()) {
             None => true,
-            Some(b) => b.is_ascii_whitespace() || *b == b'/' || *b == b'>',
+            Some((c, _)) => is_svelte_ws(c) || c == '/' || c == '>',
         }
     }
 
@@ -659,11 +665,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Nested raw-text uses an EXACT `</tag>` close (no `\s*` before `>`), matching
         // Svelte's generic element parser — unlike a top-level `<script>`/`<style>`, which
         // reads via the whitespace-tolerant `find_raw_text_close`. See that function.
-        let content_end =
-            find_exact_tag_close(self.source.as_bytes(), content_start, tag_name.as_bytes())
-                .ok_or_else(|| {
-                    self.error_msg_at(&format!("Unterminated <{tag_name}> element"), element_start)
-                })?;
+        let content_end = find_exact_tag_close(self.source, content_start, tag_name.as_bytes())
+            .ok_or_else(|| {
+                self.error_msg_at(&format!("Unterminated <{tag_name}> element"), element_start)
+            })?;
 
         // Reposition the lexer to the closing tag. We resume AT the `<`, which lexes to
         // `LeftAngle` in either mode, so the (stale, content-dependent) `inside_tag` here
@@ -714,7 +719,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let close_gt = loop {
             // A `</textarea…>` at `i` ends the RCDATA (checked first, like `read_sequence`'s
             // `done()`); flush the pending text and stop.
-            if let Some((close_lt, close_gt)) = rcdata_close_at(bytes, i, b"textarea") {
+            if let Some((close_lt, close_gt)) = rcdata_close_at(self.source, i, b"textarea") {
                 self.push_rcdata_text(&mut nodes, chunk_start, close_lt);
                 break close_gt;
             }

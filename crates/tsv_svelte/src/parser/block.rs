@@ -5,6 +5,7 @@
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
+use crate::whitespace::is_svelte_ws;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia};
 use tsv_lang::{ParseError, Span};
 use tsv_ts::Expression;
@@ -796,7 +797,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         keyword_start: usize,
     ) -> Result<&'a str, ParseError> {
         let rest = content.strip_prefix(keyword).unwrap_or(content);
-        if rest.is_empty() || rest.starts_with(|c: char| c.is_whitespace()) {
+        if rest.is_empty() || rest.starts_with(is_svelte_ws) {
             Ok(rest)
         } else {
             Err(self.error_expected_at(&format!("whitespace after `{keyword}`"), keyword_start))

@@ -4,6 +4,7 @@ use bumpalo::collections::Vec as BumpVec;
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
+use crate::whitespace::{char_at, is_svelte_ws};
 use tsv_lang::{ParseError, Span};
 use tsv_ts::ast::internal::{Expression, IdentName, Identifier};
 
@@ -24,15 +25,22 @@ use super::parser_impl::SvelteParser;
 // rejects: an unquoted `a={/a` was re-emitted quoted as `a="{/a"`, where the `{`
 // reopens as an expression and runs unterminated.
 
-/// Svelte's `regex_token_ending_character = /[\s=/>"']/` — the bytes that end an
-/// attribute/directive name run (`read_tag` in `1-parse/state/element.js`). Everything
-/// else (including `%`, `&`, `#`, digits, …) is part of the name; the lexer's identifier
-/// scan is narrower, so the name reader extends past its token end up to one of these.
-const fn is_attr_name_terminator(b: u8) -> bool {
-    matches!(
-        b,
-        b' ' | b'\t' | b'\n' | b'\r' | b'\x0b' | b'\x0c' | b'=' | b'/' | b'>' | b'"' | b'\''
-    )
+/// Svelte's `regex_token_ending_character = /[\s=/>"']/` — the characters that end an
+/// attribute/directive name run (`read_tag` in `1-parse/state/element.js`). Everything else
+/// (including `%`, `&`, `#`, digits, …) is part of the name; the lexer's identifier scan is
+/// narrower, so the name reader extends past its token end up to one of these.
+///
+/// A `char` question, not a byte one: the `\s` arm is Unicode ([`is_svelte_ws`]), so no lone
+/// byte can answer it.
+const fn is_attr_name_terminator(c: char) -> bool {
+    is_svelte_ws(c) || matches!(c, '=' | '/' | '>' | '"' | '\'')
+}
+
+/// The UTF-8 width of the attribute-name character at byte offset `i` in `source`, or `None`
+/// when the run ends there — a `regex_token_ending_character` match, or EOF.
+fn attr_name_char_width_at(source: &str, i: usize) -> Option<usize> {
+    let (c, width) = char_at(source, i)?;
+    (!is_attr_name_terminator(c)).then_some(width)
 }
 
 /// Directive prefix types
@@ -184,36 +192,32 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// Peek at the first non-whitespace character after the opening brace
     fn peek_char_after_brace(&self) -> Option<char> {
         let pos = self.current_start + 1; // Skip the '{'
-        self.source.get(pos..)?.chars().find(|c| !c.is_whitespace())
+        self.source.get(pos..)?.chars().find(|&c| !is_svelte_ws(c))
     }
 
     /// Whether the current token begins a (possibly symbol-led) attribute-name run — its first
-    /// byte is not one of Svelte's name terminators (`/[\s=/>"']/`). The dispatch peels off
+    /// character is not one of Svelte's name terminators (`/[\s=/>"']/`). The dispatch peels off
     /// `{`/`<` (spread/shorthand/attach) and `>`/`/` (tag close) first, so a non-terminator here
     /// is a leading-symbol name like `<p }>` (Svelte's `read_static_attribute` raw run).
     fn current_token_starts_attribute_name(&self) -> bool {
-        self.source
-            .as_bytes()
-            .get(self.current_start)
-            .is_some_and(|&b| !is_attr_name_terminator(b))
+        attr_name_char_width_at(self.source, self.current_start).is_some()
     }
 
     /// Byte offset of the first attribute-name terminator at/after `start`, mirroring
     /// Svelte's `read_tag(regex_token_ending_character)`. The name is `source[start..end]`.
     /// Shared by the plain/directive name reader and `parse_static_brace_attribute`.
     fn attribute_name_end(&self, start: usize) -> usize {
-        let bytes = self.source.as_bytes();
         let mut end = start;
-        while end < bytes.len() && !is_attr_name_terminator(bytes[end]) {
-            end += 1;
+        while let Some(width) = attr_name_char_width_at(self.source, end) {
+            end += width;
         }
         end
     }
 
     /// End of the current attribute/directive name run. The lexer already scanned the
     /// leading identifier into `current`; Svelte folds any trailing non-terminator chars
-    /// (`%`, `&`, `#`, …) into the same name. Fast path (the common case): the token
-    /// already ends at a terminator or EOF, so return its end without re-scanning.
+    /// (`%`, `&`, `#`, …) into the same name. In the common case the token already ends
+    /// at a terminator or EOF, so the scan stops on its first check.
     //
     // TODO: this covers names that *start* with a lexer-identifier char (the realistic
     // case). Svelte also accepts attribute names starting with a symbol (`<div %foo>`),
@@ -223,11 +227,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     // *tag* name (`<%foo>`) directly, so a lexer change can't turn that into an
     // over-acceptance. Off-frontier (no corpus/real occurrence), deferred deliberately.
     fn attribute_name_run_end(&self) -> usize {
-        match self.source.as_bytes().get(self.current_end) {
-            None => self.current_end,
-            Some(&b) if is_attr_name_terminator(b) => self.current_end,
-            _ => self.attribute_name_end(self.current_end),
-        }
+        self.attribute_name_end(self.current_end)
     }
 
     /// Resync the lexer past an attribute/directive name ending at `name_end`. Fast path
@@ -608,7 +608,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // and the two failures share one error.
         let Some(after_attach) = content
             .strip_prefix("attach")
-            .filter(|rest| rest.starts_with(char::is_whitespace))
+            .filter(|rest| rest.starts_with(is_svelte_ws))
         else {
             return Err(self.error_expected_at("'attach' keyword", content_start));
         };

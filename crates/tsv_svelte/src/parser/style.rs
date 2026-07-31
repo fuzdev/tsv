@@ -34,7 +34,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Find closing </style> tag (raw scan, `/<\/style\s*>/`; see
         // `find_raw_text_close` for the shared string-context limitation).
-        let content_end = find_raw_text_close(self.source.as_bytes(), content_start, b"style")
+        let content_end = find_raw_text_close(self.source, content_start, b"style")
             .ok_or_else(|| self.error_msg_at("Unterminated style tag", start))?;
 
         // Reposition the lexer to the closing `</style>` tag (resumes at `<`) and

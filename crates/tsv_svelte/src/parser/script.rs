@@ -39,7 +39,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // - Template strings with </script>: `const a = \`</script>\`;`
         // For proper implementation, could use TypeScript lexer to tokenize and track
         // string/comment contexts. (Svelte's own `read_until` scan has the same gap.)
-        let content_end = find_raw_text_close(self.source.as_bytes(), content_start, b"script")
+        let content_end = find_raw_text_close(self.source, content_start, b"script")
             .ok_or_else(|| self.error_msg_at("Unterminated script tag", start))?;
 
         // Extract script content

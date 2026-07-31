@@ -78,3 +78,37 @@ fn module_script_indented() {
     let loc = content_loc(" <script module>\n\tlet a = 1;\n</script>", "module");
     assert_loc(&loc, 1, 1, 3, 9);
 }
+
+/// A Unicode space inside the *closing* tag — legal, since a tag name ends at any
+/// JS `\s` character. The end column counts it as the one UTF-16 unit it is, so
+/// `</script\u{a0}>` reports column 10 like a plain `</script >` would.
+///
+/// The regression this guards: the column math used to be anchored at the
+/// `Program`'s content offset rather than at the tag position, which left every
+/// multibyte character *between* the content end and the tag end uncounted — this
+/// input reported the byte column 11. Unreachable before a Unicode space was
+/// accepted there, so the bug and its trigger arrived together.
+#[test]
+fn multibyte_in_closing_tag_counts_utf16_units() {
+    for close in ["</script\u{a0}>", "</script\u{feff}>", "</script\u{3000}>"] {
+        let loc = content_loc(&format!("<script>\n\tlet a = 1;\n{close}"), "instance");
+        assert_loc(&loc, 1, 0, 3, 10);
+    }
+}
+
+/// A run of them, mixed with an ASCII space — three separators, three units.
+#[test]
+fn multiple_unicode_spaces_in_closing_tag() {
+    let loc = content_loc(
+        "<script>\n\tlet a = 1;\n</script\u{a0}\u{3000} >",
+        "instance",
+    );
+    assert_loc(&loc, 1, 0, 3, 12);
+}
+
+/// The module script's closing tag takes the same path.
+#[test]
+fn module_script_multibyte_closing_tag() {
+    let loc = content_loc("<script module>\n\tlet a = 1;\n</script\u{a0}>", "module");
+    assert_loc(&loc, 1, 0, 3, 10);
+}

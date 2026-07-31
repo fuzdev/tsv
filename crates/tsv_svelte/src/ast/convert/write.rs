@@ -59,6 +59,7 @@
 //! the shape the canonical Svelte parser's `expected.json` records.
 
 use crate::ast::internal;
+use crate::whitespace::is_svelte_ws;
 use tsv_css::ast::convert::write_css_node;
 use tsv_lang::{
     Comment, JsonWriter, LocationMapper, LocationTracker, Position, Span, estimated_json_capacity,
@@ -923,7 +924,7 @@ fn const_declarator_end(tag: &internal::ConstTag<'_>, ctx: &Ctx<'_>) -> u32 {
     let mut i = end as usize;
     loop {
         while let Some(ch) = ctx.source[i..close].chars().next() {
-            if !ch.is_whitespace() {
+            if !is_svelte_ws(ch) {
                 break;
             }
             i += ch.len_utf8();
@@ -1420,11 +1421,8 @@ fn write_script(
 /// Svelte overrides the byte-space `Program.loc` to `locator(<script> tag
 /// start)` and `locator(</script> end)` — `{line, column}` of the tag's own
 /// `<`/`>` positions, not of the `Program`'s content span. The final char-space
-/// columns rewrite those against the `Program`'s own `start`/`end` byte offsets.
-/// `translate_column` is exactly that delta-preserving column math, so applying
-/// it here yields the final char-space columns directly (on ASCII it collapses to
-/// the raw override — the tag's byte column at each end, so an indented
-/// `\t<script>` reports the tag's column, not `0`).
+/// columns are those same tag positions translated to char space, so an indented
+/// `\t<script>` reports the tag's column rather than `0`.
 #[allow(clippy::cast_possible_truncation)]
 fn write_script_program_fused(
     w: &mut JsonWriter,
@@ -1434,30 +1432,25 @@ fn write_script_program_fused(
     comments: CommentMode<'_>,
 ) {
     let program = &script.content;
-    // The line/column of a tag position (`<script>` `<` / `</script>` end),
-    // rewritten to char space against the Program's own content byte offset —
-    // `translate_column` is multibyte-correct and the identity (raw byte column) on
-    // ASCII. Start and end are the same computation.
-    let position_at = |tag_pos: u32, content_pos: u32| {
+    // The line/column of a tag position (`<script>` `<` / `</script>` end) in char
+    // space. Translated at the tag position **itself**: anchoring the column math at
+    // the Program's content offset instead would leave every multibyte character
+    // *between* the content end and the tag end uncounted, which the closing tag can
+    // now hold (`</script\u{a0}>` — a Unicode space is a valid tag-name terminator).
+    // Start and end are the same computation.
+    let position_at = |tag_pos: u32| {
         let (line, byte_column) = ctx.loc.tracker.get_line_column(tag_pos as usize);
         Position {
             line,
-            column: translate_column(
-                content_pos,
-                byte_column as u64,
-                ctx.loc.map,
-                ctx.loc.tracker,
-            ) as usize,
+            column: translate_column(tag_pos, byte_column as u64, ctx.loc.map, ctx.loc.tracker)
+                as usize,
         }
     };
     // The override is only consumed when `loc` is emitted; `ProgramLoc::Omit` is
     // the no-locations path, which skips the two `get_line_column` line-table
     // lookups (which would only hit the stub `[0]` table anyway — see `new_map_only`).
     let program_loc = if ctx.emit_loc {
-        ProgramLoc::Emit(
-            position_at(script.span.start, program.span.start),
-            position_at(script.span.end, program.span.end),
-        )
+        ProgramLoc::Emit(position_at(script.span.start), position_at(script.span.end))
     } else {
         ProgramLoc::Omit
     };

@@ -203,13 +203,15 @@ const NAME_LOC_KINDS = new Map([
 ]);
 
 /**
- * The chars that end an attribute/directive name run — tsv's parse of Svelte's
- * `read_tag` (`regex_token_ending_character = /[\s=/>"']/`), whose ASCII-only
- * whitespace set it mirrors exactly, so the derived span always agrees with the
- * wire it reconstructs. (A Unicode space inside a name run, which Svelte's `\s`
- * would end the run on, is the one shape where both read it as a name char.)
+ * The chars that end an attribute/directive name run — Svelte's
+ * `regex_token_ending_character` verbatim, which is also what tsv's parser
+ * implements, so the derived span always agrees with the wire it reconstructs.
+ *
+ * Spelled as the regex rather than a character list on purpose: `\s` is Unicode
+ * (U+00A0, U+3000, U+FEFF, …), so an enumerated ASCII list would silently under-match
+ * and swallow a Unicode space into a name. Sharing the literal makes drift impossible.
  */
-const NAME_TERMINATORS = ' \t\n\r\v\f=/>"\'';
+const NAME_TERMINATORS = /[\s=/>"']/;
 
 /**
  * Whether an `Attribute` is the shorthand form (`{x}`, or padded: `{ x }`), whose
@@ -241,7 +243,7 @@ function name_span_of(node, source) {
 	}
 	if (kind === 'directive') {
 		let end = node.start;
-		while (end < node.end && !NAME_TERMINATORS.includes(source[end])) end++;
+		while (end < node.end && !NAME_TERMINATORS.test(source[end])) end++;
 		return [node.start, end];
 	}
 	if (is_shorthand_attribute(node, source)) {

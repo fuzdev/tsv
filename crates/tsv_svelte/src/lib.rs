@@ -6,6 +6,7 @@ pub mod ast;
 mod lexer;
 mod parser;
 mod printer;
+mod whitespace;
 
 pub use tsv_lang::{ParseError, Result};
 
