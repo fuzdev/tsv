@@ -39,6 +39,9 @@ prettier-plugin-svelte), and reports and feedback are appreciated.
 See the [issues](https://github.com/fuzdev/tsv/issues)
 and [discussions](https://github.com/fuzdev/tsv/discussions).
 
+The only direct use of `unsafe` is in `tsv_ffi` and `tsv_napi`,
+because it's required at the language boundaries. Otherwise `unsafe_code = "forbid"`.
+
 AI disclosure: this codebase is mostly LLM-generated, and the usual caveats apply.
 It's a high-effort project that prioritizes quality.
 
