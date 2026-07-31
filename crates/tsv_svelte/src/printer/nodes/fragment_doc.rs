@@ -99,6 +99,17 @@ struct TextChildContext {
     /// Carried on the context rather than recomputed per child: the question is per-FRAGMENT, and
     /// asking it per node would rescan the sibling list at every text (O(n²) on a long fragment).
     content_bounds: (usize, usize),
+    /// A byte-glued HTML-comment run immediately preceding this text
+    /// ([`Printer::glued_comment_run_text`]), already built as one doc by the caller and **not**
+    /// pushed as a sibling — this handler fuses it into the fill's first item instead, so the unit
+    /// is unbreakable by construction. `None` for every other text child. See the `glued_lead`
+    /// comment in [`Printer::handle_text_child`] for why a comment prefix is fused where every
+    /// other glued predecessor is flagged.
+    ///
+    /// Carries the run's **head index** beside the doc because fusing moves the unit's leading
+    /// boundary: the break point in front of the unit is the one in front of the *comment*, not the
+    /// one in front of the text, and only the head index can name it.
+    glued_prefix: Option<(DocId, usize)>,
 }
 
 /// Whether `raw` begins with a linebreak, ignoring leading horizontal whitespace — prettier's
@@ -288,6 +299,12 @@ impl<'a> Printer<'a> {
         // `trimmed_nodes[..i]` through the `continue`s (format-ignore, whitespace-run collapse,
         // glued-run skip).
         let mut has_preceding_breakable = false;
+        // A glued HTML-comment run that prefixes the NEXT text child, built at the run's head and
+        // carried forward instead of pushed — `handle_text_child` fuses it into the text's fill so
+        // the unbreakable boundary is expressed structurally (see its `glued_lead` comment). Held
+        // across exactly one iteration: the run's own indices are skipped via
+        // `glued_run_consumed_until`, so the very next node visited is the text that takes it.
+        let mut pending_glued_prefix: Option<(DocId, usize)> = None;
         // Inline-run prose cursor for the sibling-newline flow rule at its standalone-separator
         // site (`handle_text_child`'s whitespace-only arm). Runs partition `trimmed_nodes`, so
         // advancing the cursor here — at the TOP of the body, ahead of every `continue` — visits
@@ -357,6 +374,7 @@ impl<'a> Printer<'a> {
                         cause,
                         run_has_prose,
                         content_bounds,
+                        glued_prefix: pending_glued_prefix.take(),
                     },
                     &mut child_docs,
                     &mut handle_whitespace_of_prev_text,
@@ -468,6 +486,25 @@ impl<'a> Printer<'a> {
                 // a `<!-- prettier-ignore -->` directive still routes to the raw path below.
                 self.push_inline_child_doc(&mut child_docs, unit_doc, prev_text_ws);
                 glued_run_consumed_until = run_end + 1;
+            } else if !format_ignore_next
+                && !prev_text_ws
+                && let Some((prefix, text_idx)) =
+                    self.try_build_glued_comment_prefix_for_text(trimmed_nodes, i)
+            {
+                // Glued comment prefix on a TEXT run (`<!--c-->text1 text2`) — the text sibling of
+                // the element arm above, and carried rather than pushed: `handle_text_child` fuses
+                // it into the fill's first item. Skipping to `text_idx` (not past it) consumes only
+                // the comments, so the text is the next node visited and takes the prefix.
+                //
+                // The two dispatch guards are the caller's state, which is why they stay here rather
+                // than inside the builder: `!format_ignore_next` so a directive still routes to the
+                // raw path, and `!prev_text_ws` so a trimmed boundary space from the previous text
+                // is never dropped — that space wants the `group([line, …])` wrap
+                // `push_inline_child_doc` applies, which a fused prefix has nowhere to carry, so the
+                // ordinary per-node path handles it (`glued_lead` then guards the boundary as
+                // before).
+                pending_glued_prefix = Some((prefix, i));
+                glued_run_consumed_until = text_idx;
             } else {
                 // Other nodes (comments, `{@const}`/`{@debug}`/`{const}`/`{let}` tags).
                 // `has_preceding_breakable` (tracked above) affects whether block conditions use
@@ -513,6 +550,66 @@ impl<'a> Printer<'a> {
     /// layout-conservative rather than a render change.
     fn byte_glued(a: &FragmentNode<'_>, b: &FragmentNode<'_>) -> bool {
         a.span().end == b.span().start
+    }
+
+    /// Whether a content text's **leading** edge is glued — its raw slice starts with no
+    /// collapsible whitespace, so the boundary in front of it carries no break point and breaking
+    /// there would inject a rendered space.
+    ///
+    /// ⚠️ **This is a claim about the text node's own BYTES, not about sibling adjacency**, and the
+    /// distinction is the reason it sits beside [`Self::byte_glued`] rather than folding into it.
+    /// The two answer different halves of "is this boundary breakable": this one says the separator
+    /// is not inside the *text*, `byte_glued` says there is no *node* between the two siblings. A
+    /// caller needs both only where a byte gap can exist between siblings — at the ROOT, where a
+    /// lifted `<script>` / `<style>` / `<svelte:options>` leaves one ([`Self::byte_glued`]'s own
+    /// warning). Inside any other fragment sibling spans tile, so this predicate alone decides, and
+    /// that is why [`Self::build_container_content_doc`] can ask it bare while
+    /// [`Self::handle_text_child`] conjoins `byte_glued`.
+    ///
+    /// The character class is `is_collapsible_ws_char` (`[ \t\n\r]`), deliberately narrower than
+    /// ASCII whitespace — a non-breaking space or form feed is rendered content, so a text that
+    /// begins with one is glued.
+    pub(super) fn text_glued_before(raw: &str) -> bool {
+        !raw.starts_with(is_collapsible_ws_char)
+    }
+
+    /// Whether a content text's **trailing** edge is glued — the mirror of
+    /// [`Self::text_glued_before`], whose doc carries the shared rules.
+    pub(super) fn text_glued_after(raw: &str) -> bool {
+        !raw.ends_with(is_collapsible_ws_char)
+    }
+
+    /// Whether the boundary immediately in FRONT of `nodes[idx]` carries no whitespace — so no break
+    /// may land there, since one would inject a rendered space.
+    ///
+    /// Composes the two halves the question actually has: `byte_glued` says no *node* sits between
+    /// the two siblings, and — when that sibling is a text — [`Self::text_glued_after`] says no
+    /// whitespace sits at its edge *inside* it. Asking only the first is the mistake
+    /// [`Self::glued_comment_run_text`] documents from the other direction.
+    ///
+    /// Two positions are never glued however the bytes fall: the fragment's own content edge
+    /// (`idx <= content_start`), whose boundary belongs to the parent and is trimmed, and a
+    /// predecessor that owns its own line ([`Self::is_own_line_declaration`]), which supplies the
+    /// break itself.
+    fn leading_boundary_glued(
+        &self,
+        nodes: &[FragmentNode<'_>],
+        idx: usize,
+        content_start: usize,
+    ) -> bool {
+        if idx <= content_start {
+            return false;
+        }
+        let Some(j) = idx.checked_sub(1) else {
+            return false;
+        };
+        if self.is_own_line_declaration(nodes, j) || !Self::byte_glued(&nodes[j], &nodes[idx]) {
+            return false;
+        }
+        match &nodes[j] {
+            FragmentNode::Text(t) => Self::text_glued_after(t.raw(self.source)),
+            _ => true,
+        }
     }
 
     /// Whether the node at `i` is a **declaration that owns its own line** — `{@const}` /
@@ -576,11 +673,13 @@ impl<'a> Printer<'a> {
             match &nodes[j] {
                 FragmentNode::Text(t) if t.is_collapsible_ws_only => return false,
                 FragmentNode::Text(t) => {
+                    // The neighbour's FACING edge, so the directions invert: scanning backward we
+                    // ask about that text's trailing edge, forward about its leading one.
                     let raw = t.raw(self.source);
                     return if before {
-                        !raw.ends_with(is_collapsible_ws_char)
+                        Self::text_glued_after(raw)
                     } else {
-                        !raw.starts_with(is_collapsible_ws_char)
+                        Self::text_glued_before(raw)
                     };
                 }
                 n if n.is_hoisted_from_fragment() => cur = j,
@@ -653,6 +752,7 @@ impl<'a> Printer<'a> {
             cause,
             run_has_prose,
             content_bounds,
+            glued_prefix,
         } = ctx;
         let multiline = cause.is_multiline();
         let FragmentNode::Text(text) = &trimmed_nodes[i] else {
@@ -729,8 +829,8 @@ impl<'a> Printer<'a> {
         // feed is content). A leading/trailing non-breaking space or form feed is
         // content, so a node made only of those is not whitespace-only and is
         // preserved verbatim.
-        let has_leading_ws = raw.starts_with(is_collapsible_ws_char);
-        let has_trailing_ws = raw.ends_with(is_collapsible_ws_char);
+        let has_leading_ws = !Self::text_glued_before(raw);
+        let has_trailing_ws = !Self::text_glued_after(raw);
 
         if text.is_collapsible_ws_only {
             // Whitespace-only text node (never at a fragment boundary — those are skipped
@@ -1135,16 +1235,43 @@ impl<'a> Printer<'a> {
         }
 
         // The run's LEADING boundary is byte-glued to the previous sibling — no whitespace there,
-        // so there is no break point: dropping the run's first word to a fresh line would inject a
-        // rendered space (and the mangled form is a fixed point, so F1 is blind to it). The fill
-        // renders that first item in place instead and breaks inside the run — see
-        // [`DocContext::glued_lead`], the mirror of `break_before_wide_flow`'s glued half. A first
-        // node's boundary is the parent's (trimmed), and a previous sibling that owns its own line
-        // supplies the break itself, so neither is glued.
-        let glued_lead = !has_leading_ws
-            && !is_first
-            && !prev_owns_line
-            && prev_node.is_some_and(|p| Self::byte_glued(p, &trimmed_nodes[i]));
+        // so there is no break point WITHIN the boundary: moving the run's first word alone to a
+        // fresh line would inject a rendered space (and the mangled form is a fixed point, so F1 is
+        // blind to it). A first node's boundary is the parent's (trimmed), and a previous sibling
+        // that owns its own line supplies the break itself, so neither is glued.
+        //
+        // There are two ways to honor that, and which one applies is decided by whether the prefix
+        // can be **carried**:
+        // - A glued COMMENT run is fused into the fill's first item (`glued_prefix`, supplied by the
+        //   caller). The boundary is then unbreakable *structurally* — a fill breaks only between
+        //   items — and, because the unit is one item, it travels to a fresh line **together** when
+        //   it doesn't fit. That is the mirror of `try_build_glued_comment_prefixed_element`, which
+        //   does the same for a comment run prefixing an inline element.
+        // - Any other glued predecessor (an element, a tag, a control-flow block) is a sibling with
+        //   its own layout, already built and placed, so there is nothing to fuse. There
+        //   [`DocContext::glued_lead`] suppresses the fill's fresh-line drop at the head instead —
+        //   the run renders in place and breaks at its first *internal* whitespace boundary. It is
+        //   the mirror of `break_before_wide_flow`'s glued half, on the other end of the run.
+        //
+        // TODO: the fused arm also gained a *layout* improvement the flagged arm did not — an
+        // overflowing unit now travels to the breakable boundary one hop back, instead of standing
+        // and overrunning. `foo <span>…</span>text1` is the same shape and keeps the old behavior,
+        // and fusion cannot close it: an element carries its own groups, so folding it into the
+        // fill's item 0 would force the fits check to measure it flat. Closing it needs the fill to
+        // learn a width that sits *before* item 0, which is a renderer change, not a builder one.
+        //
+        // ⚠️ **Fusing does not retire the flag — it MOVES which boundary the flag is about.** The
+        // fused unit begins at the comment, so the break point in front of it is the one in front of
+        // the *comment*, and that one can be glued too (`0<!--c-->text`). Before the fusion the
+        // comment was its own sibling doc and that boundary was safe by construction — sibling docs
+        // in a concat have no break between them — so asking only about the text's own edge was
+        // enough; afterwards the boundary is a real fill boundary and must be guarded. Missing this
+        // injected a rendered space at `0<!--`, found by the seeded fuzzer mutating the fixture, and
+        // by nothing else: the mangled form is a fixed point, so F1 is blind and the corpus does not
+        // carry the shape.
+        let unit_head = glued_prefix.map_or(i, |(_, head)| head);
+        let glued_lead = (glued_prefix.is_some() || !has_leading_ws)
+            && self.leading_boundary_glued(trimmed_nodes, unit_head, content_bounds.0);
 
         // Build fill for this text node's words.
         // leading_line: fill starts with line() (text after expression tag)
@@ -1158,6 +1285,7 @@ impl<'a> Printer<'a> {
             trim_right,
             leading_line,
             trailing_line,
+            glued_prefix.map(|(doc, _)| doc),
         ) {
             // Text immediately before a flowing inline element/component ends with a trailing
             // `line`. Couple that boundary to the wide-element drop at render position: if the
@@ -1172,7 +1300,7 @@ impl<'a> Printer<'a> {
             // `inline_break_before_*` divergences). tsv converges every authoring to that form where
             // prettier keeps the opening tag on the text line — see conformance_prettier.md §Svelte:
             // Inline content block-style. A first-child element with NO preceding text is unaffected
-            // (it never reaches this text handler; `hug_wide_first` still guards its idempotency).
+            // (it never reaches this text handler; the fold's head hug still guards its idempotency).
             //
             // The run's two ends are INDEPENDENT questions, so they are answered independently and
             // carried on one context rather than by an if/else chain that made them look exclusive:
@@ -1472,7 +1600,7 @@ impl<'a> Printer<'a> {
         let break_before = match prev {
             Some((j, _)) if self.owns_own_line(trimmed_nodes, j) => false,
             Some((_, FragmentNode::Text(t))) => {
-                prev_text_ws || !t.raw(self.source).ends_with(is_collapsible_ws_char)
+                prev_text_ws || Self::text_glued_after(t.raw(self.source))
             }
             Some(_) => true,
             None => false,
@@ -1626,9 +1754,9 @@ impl<'a> Printer<'a> {
             } else if let FragmentNode::Text(t) = node {
                 let raw = t.raw(self.source);
                 (
-                    self.build_text_fill_doc_trimmed(raw, true, true, false, false),
-                    !raw.starts_with(is_collapsible_ws_char),
-                    !raw.ends_with(is_collapsible_ws_char),
+                    self.build_text_fill_doc_trimmed(raw, true, true, false, false, None),
+                    Self::text_glued_before(raw),
+                    Self::text_glued_after(raw),
                 )
             } else {
                 if Self::is_format_ignore_comment(node, self.source) {
@@ -1868,7 +1996,7 @@ impl<'a> Printer<'a> {
         };
         if pt.is_collapsible_ws_only
             || !Self::byte_glued(prev, node)
-            || pt.raw(self.source).ends_with(is_collapsible_ws_char)
+            || !Self::text_glued_after(pt.raw(self.source))
         {
             return None;
         }
@@ -1880,7 +2008,7 @@ impl<'a> Printer<'a> {
         };
         if nt.is_collapsible_ws_only
             || !Self::byte_glued(node, next)
-            || nt.raw(self.source).starts_with(is_collapsible_ws_char)
+            || !Self::text_glued_before(nt.raw(self.source))
         {
             return None;
         }
@@ -1916,17 +2044,18 @@ impl<'a> Printer<'a> {
         Some((run_doc, end))
     }
 
-    /// If `nodes[i]` **begins** a byte-glued run of one or more HTML comments that ends glued to an
-    /// inline element/component, return that element's index. Every comment in the run must be
-    /// byte-adjacent to the next node and the last one byte-adjacent to the element
-    /// (`<!--a--><!--b--><a…>`); any whitespace inside the run stops it (`None`), as does a run
-    /// glued to a non-inline node, and a **format-ignore directive** anywhere in the run (see below).
-    /// Whitespace *before* `nodes[i]` is the boundary the break lands on, exactly as for a glued
-    /// text prefix — but a *glued comment* before `nodes[i]` makes it a non-head member of a longer
-    /// run, and only the head opens the unit (`None` otherwise). The comment run is the element's
-    /// glued prefix; the break-before machinery then measures comments + element as one unit (see
-    /// [`Self::try_build_glued_comment_prefixed_element`] and [`Self::handle_text_child`]'s
-    /// `comment_glued_next_flow`).
+    /// If `nodes[i]` **begins** a byte-glued run of one or more HTML comments, return the index of
+    /// the node the run ends at — the first non-comment member. Every comment in the run must be
+    /// byte-adjacent to the next node (`<!--a--><!--b-->X`); any whitespace inside the run stops it
+    /// (`None`), as does running off the end, and a **format-ignore directive** anywhere in the run.
+    /// Whitespace *before* `nodes[i]` is the boundary the break lands on — but a *glued comment*
+    /// before `nodes[i]` makes it a non-head member of a longer run, and only the head opens the
+    /// unit (`None` otherwise).
+    ///
+    /// The run is the terminator's glued **prefix**: no break may land between them, so the two
+    /// travel as one. Which terminators qualify is the caller's question, and there are two, one
+    /// per way of carrying a prefix — [`Self::glued_comment_run_element`] (built with the element as
+    /// one concat) and [`Self::glued_comment_run_text`] (fused into the text run's fill).
     ///
     /// Two bail conditions beyond "not a clean glued run":
     /// - **Head-only** — a comment byte-glued *after* another comment is a non-head member, and the
@@ -1937,7 +2066,7 @@ impl<'a> Printer<'a> {
     /// - **Directive** — a `<!-- prettier-ignore -->` / `format-ignore` comment must reach the
     ///   per-node path so it suppresses its target; absorbing it into a glued unit would format the
     ///   very node it means to pin.
-    fn glued_comment_run_element(&self, nodes: &[FragmentNode<'_>], i: usize) -> Option<usize> {
+    fn glued_comment_run_end(&self, nodes: &[FragmentNode<'_>], i: usize) -> Option<usize> {
         if !matches!(nodes.get(i)?, FragmentNode::Comment(_)) {
             return None;
         }
@@ -1961,10 +2090,64 @@ impl<'a> Printer<'a> {
             }
             match next {
                 FragmentNode::Comment(_) => j += 1,
-                _ if self.is_inline_el_or_comp(next) => return Some(j + 1),
-                _ => return None,
+                _ => return Some(j + 1),
             }
         }
+    }
+
+    /// The [`Self::glued_comment_run_end`] run that ends at an **inline element/component**
+    /// (`<!--a--><!--b--><a…>`), returning that element's index. The break-before machinery then
+    /// measures comments + element as one unit (see
+    /// [`Self::try_build_glued_comment_prefixed_element`] and [`Self::handle_text_child`]'s
+    /// `comment_glued_next_flow`).
+    fn glued_comment_run_element(&self, nodes: &[FragmentNode<'_>], i: usize) -> Option<usize> {
+        let end = self.glued_comment_run_end(nodes, i)?;
+        self.is_inline_el_or_comp(&nodes[end]).then_some(end)
+    }
+
+    /// The [`Self::glued_comment_run_end`] run that ends at a **content text**
+    /// (`<!--a-->text1 text2`), returning that text's index.
+    ///
+    /// The text-terminated sibling of [`Self::glued_comment_run_element`], and the two are the same
+    /// claim about the same boundary — only the way of carrying the prefix differs, because a text
+    /// run is a `fill` rather than a single doc. Here the comments are **fused into the fill's first
+    /// item** ([`Self::build_text_fill_doc_trimmed`]'s `glued_prefix`), so the unit is one fill item
+    /// and the fill physically cannot break inside it — the same guarantee the element arm gets from
+    /// building one concat. A **whitespace-only** text does not qualify: it is the separator, not
+    /// content, so there is nothing to be glued to.
+    ///
+    /// ⚠️ **Span adjacency is not enough here, and this is where the two terminators genuinely
+    /// differ.** An element's leading boundary is the byte gap before its `<`, so
+    /// [`Self::byte_glued`] settles it; a text node's boundary lives *inside* the node, as its own
+    /// leading whitespace run. `<!--c--> text1` tiles exactly as `<!--c-->text1` does — the space is
+    /// the text's first byte — so the edge must be asked separately
+    /// ([`Self::text_glued_before`]). Without that the spaced boundary would be fused too, welding a
+    /// run that has a perfectly good break point (`fill_after_comment_spaced_long_prettier_divergence`
+    /// is the fixture that says so).
+    fn glued_comment_run_text(&self, nodes: &[FragmentNode<'_>], i: usize) -> Option<usize> {
+        let end = self.glued_comment_run_end(nodes, i)?;
+        matches!(&nodes[end], FragmentNode::Text(t)
+            if !t.is_collapsible_ws_only && Self::text_glued_before(t.raw(self.source)))
+        .then_some(end)
+    }
+
+    /// Build the comments of a glued run — `nodes[start..end]`, the members before its terminator —
+    /// as ONE concat. The single producer for both carriers
+    /// ([`Self::try_build_glued_comment_prefixed_element`] and the text arm in
+    /// [`Self::build_nodes_doc_trimmed`]), so the prefix a run resolves to cannot depend on which
+    /// terminator claimed it.
+    fn build_glued_comment_run_doc(
+        &self,
+        nodes: &[FragmentNode<'_>],
+        start: usize,
+        end: usize,
+    ) -> Option<DocId> {
+        let d = self.d();
+        let mut parts = d.pooled_docbuf();
+        for node in &nodes[start..end] {
+            parts.push(self.build_fragment_node_doc(node)?);
+        }
+        Some(d.concat(&parts))
     }
 
     /// When `nodes[i]` heads a glued HTML-comment run ending in an inline element
@@ -1987,13 +2170,30 @@ impl<'a> Printer<'a> {
             Some((run_doc, run_end)) => (run_doc, run_end),
             None => (self.build_fragment_node_doc(&nodes[elem_idx])?, elem_idx),
         };
-        let d = self.d();
-        let mut parts = d.pooled_docbuf();
-        for node in &nodes[i..elem_idx] {
-            parts.push(self.build_fragment_node_doc(node)?);
-        }
-        parts.push(elem_doc);
-        Some((d.concat(&parts), end))
+        let prefix = self.build_glued_comment_run_doc(nodes, i, elem_idx)?;
+        Some((self.d().concat(&[prefix, elem_doc]), end))
+    }
+
+    /// When `nodes[i]` heads a glued HTML-comment run ending in a content TEXT
+    /// ([`Self::glued_comment_run_text`]), build the comments as ONE concat and return
+    /// `(prefix_doc, text_idx)` — the doc the text's fill fuses into its first item, and the index
+    /// of the text that takes it (also the exclusive bound of what this consumes, since the text
+    /// itself still has to be visited).
+    ///
+    /// The text-terminated sibling of [`Self::try_build_glued_comment_prefixed_element`]: same run,
+    /// same prefix, different **carrier**. There the prefix is concatenated with the element and
+    /// pushed as one child doc; here it is handed forward, because a text run's doc is a `fill` and
+    /// a `fill` breaks between its items — so the only place a prefix is safe is *inside* item 0.
+    fn try_build_glued_comment_prefix_for_text(
+        &self,
+        nodes: &[FragmentNode<'_>],
+        i: usize,
+    ) -> Option<(DocId, usize)> {
+        let text_idx = self.glued_comment_run_text(nodes, i)?;
+        Some((
+            self.build_glued_comment_run_doc(nodes, i, text_idx)?,
+            text_idx,
+        ))
     }
 
     /// Build a maximal run of byte-adjacent (glued) inline **elements** — `nodes[start..=end]`,
@@ -2140,7 +2340,7 @@ impl<'a> Printer<'a> {
     /// to its own line — whether pushed there by the preceding text or dropped mid-fill — the
     /// trailing text flows greedily after it rather than being isolated (matching prettier's
     /// pairwise fill; a preceding sibling doesn't change that). A **wide** element that wraps still
-    /// dangles its `>` and the terminal tail hugs it (`hug_terminal_after_break`).
+    /// dangles its `>` and the terminal tail hugs it (`DocContext::after_element_fold`).
     fn build_after_element_fold(&self, prev: DocId, raw: &str) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
@@ -2148,17 +2348,17 @@ impl<'a> Printer<'a> {
         parts.push(d.line());
         self.extend_with_word_fill(&mut parts, raw);
         let fill = d.fill(&parts);
-        // `hug_wide_first` is always set: the fold's first item is the inline element, and when it
-        // sits mid-line right after a parent element's `>` and is too wide for its own line, it must
-        // hug-and-break-internally rather than drop (which would strand a spurious `>⏎<child` break —
-        // the nested-`<span>` non-idempotency).
+        // The fold's marker — a statement of what this fill IS, not of a layout preference, and the
+        // sole site that sets it. Three things follow from it (see [`DocContext::after_element_fold`]):
+        // the head hugs rather than drops when it is too wide for its own line anyway (dropping would
+        // strand a spurious `>⏎<child` break — the nested-`<span>` non-idempotency); the terminal
+        // trailing text hugs the dangled `>` once the head has wrapped, respecting the author's space
+        // boundary (the fold only ever runs for terminal text); and a *preceding* text run's
+        // break-before measurement can extract the head alone via `after_element_fold_lead`.
         d.with_context(
             fill,
             tsv_lang::doc::DocContext {
-                hug_wide_first: true,
-                // The fold only ever runs for terminal trailing text, which hugs the dangled `>`
-                // (respecting the author's space boundary).
-                hug_terminal_after_break: true,
+                after_element_fold: true,
                 ..Default::default()
             },
         )
@@ -2185,7 +2385,7 @@ impl<'a> Printer<'a> {
         } else {
             // Has content: use fill() for word-level line breaking
             // This matches Prettier's splitTextToDocs behavior
-            self.build_text_fill_doc_trimmed(raw, false, false, false, false)
+            self.build_text_fill_doc_trimmed(raw, false, false, false, false, None)
         }
     }
 
@@ -2195,6 +2395,15 @@ impl<'a> Printer<'a> {
     /// When `leading_line` or `trailing_line` is true, the fill uses `line()` at the
     /// boundary instead of wrapping the adjacent expression in a group. This lets fill
     /// continue on the expression's continuation line rather than forcing a newline.
+    ///
+    /// `glued_prefix` is a doc byte-glued to the run's first word (a
+    /// [`Self::glued_comment_run_text`] comment prefix), **fused into the fill's first item** rather
+    /// than pushed as a sibling doc. That is what makes the boundary unbreakable *structurally*: a
+    /// fill can only break between items, so a prefix inside item 0 can never be split from the word
+    /// it is glued to, and the whole unit travels to a fresh line together when it moves. It is
+    /// mutually exclusive with a leading boundary space by construction — a glued prefix means the
+    /// run starts with no collapsible whitespace, so `leading_line` is false and the `prepend_space`
+    /// path below cannot fire.
     fn build_text_fill_doc_trimmed(
         &self,
         raw: &str,
@@ -2202,14 +2411,15 @@ impl<'a> Printer<'a> {
         trim_trailing: bool,
         leading_line: bool,
         trailing_line: bool,
+        glued_prefix: Option<DocId>,
     ) -> Option<DocId> {
         let d = self.d();
         // Collapsible whitespace only (matching the word split below): a boundary
         // space is emitted only when the split consumed a collapsible-whitespace
         // run. A boundary non-breaking space (U+00A0 / U+202F) stays attached to its
         // word and must not get a spurious regular space prepended/appended.
-        let has_leading_ws = raw.starts_with(is_collapsible_ws_char);
-        let has_trailing_ws = raw.ends_with(is_collapsible_ws_char);
+        let has_leading_ws = !Self::text_glued_before(raw);
+        let has_trailing_ws = !Self::text_glued_after(raw);
 
         // Split on collapsible whitespace only and collect non-empty words, so every
         // non-collapsible separator stays attached to its word and is preserved verbatim:
@@ -2220,6 +2430,13 @@ impl<'a> Printer<'a> {
         if words.is_empty() {
             return None;
         }
+
+        // Fuse the glued prefix into whatever becomes the run's FIRST item — the one place it may
+        // go, since a fill breaks only *between* items.
+        let fuse_head = |head: DocId| match glued_prefix {
+            Some(prefix) => d.concat(&[prefix, head]),
+            None => head,
+        };
 
         // Single word: return text (with boundary handling)
         if words.len() == 1 && !leading_line {
@@ -2232,7 +2449,7 @@ impl<'a> Printer<'a> {
                 } else {
                     d.text_pooled(words[0])
                 };
-                let parts = [word, d.line()];
+                let parts = [fuse_head(word), d.line()];
                 return Some(d.fill(&parts));
             }
             let mut result = d.pool_writer();
@@ -2243,7 +2460,7 @@ impl<'a> Printer<'a> {
             if !trim_trailing && has_trailing_ws {
                 result.push(' ');
             }
-            return Some(result.finish_text());
+            return Some(fuse_head(result.finish_text()));
         }
 
         // Multiple words (or leading_line): build fill parts
@@ -2262,19 +2479,27 @@ impl<'a> Printer<'a> {
             if i > 0 {
                 parts.push(d.line());
             }
-            if i == 0 && prepend_space {
+            let word_doc = if i == 0 && prepend_space {
                 let mut w = d.pool_writer();
                 w.push(' ');
                 w.push_str(word);
-                parts.push(w.finish_text());
+                w.finish_text()
             } else if i == words.len() - 1 && append_space {
                 let mut w = d.pool_writer();
                 w.push_str(word);
                 w.push(' ');
-                parts.push(w.finish_text());
+                w.finish_text()
             } else {
-                parts.push(d.text_pooled(word));
-            }
+                d.text_pooled(word)
+            };
+            // `leading_line` puts a `line` in the first slot instead, and it never coexists with a
+            // glued prefix (the run would have to both start with whitespace and not) — so the
+            // prefix always lands on word 0, which is the fill's first item.
+            parts.push(if i == 0 {
+                fuse_head(word_doc)
+            } else {
+                word_doc
+            });
         }
 
         if trailing_line && has_trailing_ws {

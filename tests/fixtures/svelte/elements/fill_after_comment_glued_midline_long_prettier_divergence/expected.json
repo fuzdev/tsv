@@ -1,0 +1,224 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1419,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 939,
+				"data": "\n\tA text run byte-glued to a preceding HTML comment travels WITH it: that boundary carries no\n\twhitespace, so the only break point is the one in FRONT of the comment. Once the glued unit no\n\tlonger fits where it sits, the whole unit moves to a fresh line — the space ahead of it is\n\tinter-node whitespace that collapses to one rendered space, so tsv is free to spend it on the\n\tbreak. Cases below, in order: the unit still fits mid-line (control, no move); the unit\n\toverflows mid-line at 104 but fits at line start (it moves, and now fits at exactly 100); the\n\tunit is wider than a whole line at 101 (it moves anyway — the break is spent, the limit still\n\tis not met); the boundary in FRONT of the unit is itself glued, so the unit cannot move at all\n\tand the break travels further left, to the space inside the preceding run. Prettier welds the\n\tunit to the preceding word and lets the line run over — see output_prettier.svelte.\n"
+			},
+			{
+				"type": "Text",
+				"start": 939,
+				"end": 940,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 940,
+				"end": 1053,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 941
+					},
+					"end": {
+						"line": 13,
+						"column": 2,
+						"character": 942
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 943,
+							"end": 949,
+							"raw": "\n\tfoo ",
+							"data": "\n\tfoo "
+						},
+						{
+							"type": "Comment",
+							"start": 949,
+							"end": 1036,
+							"data": "pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14 pad15"
+						},
+						{
+							"type": "Text",
+							"start": 1036,
+							"end": 1049,
+							"raw": "text1\n\ttext2\n",
+							"data": "text1\n\ttext2\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1053,
+				"end": 1054,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1054,
+				"end": 1174,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 1055
+					},
+					"end": {
+						"line": 17,
+						"column": 2,
+						"character": 1056
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1057,
+							"end": 1064,
+							"raw": "\n\tfoo\n\t",
+							"data": "\n\tfoo\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 1064,
+							"end": 1157,
+							"data": "pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14 pad15 pad16"
+						},
+						{
+							"type": "Text",
+							"start": 1157,
+							"end": 1170,
+							"raw": "text1\n\ttext2\n",
+							"data": "text1\n\ttext2\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1174,
+				"end": 1175,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1175,
+				"end": 1296,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 22,
+						"column": 1,
+						"character": 1176
+					},
+					"end": {
+						"line": 22,
+						"column": 2,
+						"character": 1177
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1178,
+							"end": 1185,
+							"raw": "\n\tfoo\n\t",
+							"data": "\n\tfoo\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 1185,
+							"end": 1279,
+							"data": "pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14 pad15 pad16x"
+						},
+						{
+							"type": "Text",
+							"start": 1279,
+							"end": 1292,
+							"raw": "text1\n\ttext2\n",
+							"data": "text1\n\ttext2\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1296,
+				"end": 1297,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1297,
+				"end": 1418,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 27,
+						"column": 1,
+						"character": 1298
+					},
+					"end": {
+						"line": 27,
+						"column": 2,
+						"character": 1299
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1300,
+							"end": 1308,
+							"raw": "\n\tfoo\n\t0",
+							"data": "\n\tfoo\n\t0"
+						},
+						{
+							"type": "Comment",
+							"start": 1308,
+							"end": 1401,
+							"data": "pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14 pad15 pad16"
+						},
+						{
+							"type": "Text",
+							"start": 1401,
+							"end": 1414,
+							"raw": "text1\n\ttext2\n",
+							"data": "text1\n\ttext2\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

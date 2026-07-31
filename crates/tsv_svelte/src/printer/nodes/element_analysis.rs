@@ -328,11 +328,13 @@ impl<'a> Printer<'a> {
             return true;
         }
 
-        run.iter().any(|n| self.is_run_prose(n))
-            && run.windows(2).any(|w| {
-                matches!(&w[0], FragmentNode::Text(t) if t.raw(source).ends_with(is_collapsible_ws_char))
-                    || matches!(&w[1], FragmentNode::Text(t) if t.raw(source).starts_with(is_collapsible_ws_char))
-            })
+        // A pair is reflowable when the boundary between them is NOT glued — the whitespace lives on
+        // one of the two texts' facing edges, so there is a break point to reflow at. Same predicate
+        // the fragment path's glue decisions ask, negated (`Printer::text_glued_before` / `_after`).
+        run.iter().any(|n| self.is_run_prose(n)) && run.windows(2).any(|w| {
+            matches!(&w[0], FragmentNode::Text(t) if !Self::text_glued_after(t.raw(source)))
+                || matches!(&w[1], FragmentNode::Text(t) if !Self::text_glued_before(t.raw(source)))
+        })
     }
 
     /// Whether the author left this whole run on **one line** — no separator in it broke.
