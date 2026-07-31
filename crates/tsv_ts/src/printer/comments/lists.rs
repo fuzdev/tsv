@@ -307,6 +307,32 @@ impl<'a> Printer<'a> {
                 .all(u8::is_ascii_whitespace)
     }
 
+    /// Whether `comment` was already emitted as the PREVIOUS item's trailing run — it
+    /// shares `anchor`'s source line — so this leading / end-of-body run must skip it.
+    ///
+    /// The single home for a question **six** emitters used to answer with their own
+    /// `is_same_line` call: the two statement-list leading runs (block body, switch
+    /// consequent), the class-member leading run, and the three end-of-body runs (program,
+    /// block, the shared [`Self::build_trailing_body_comments_doc`]). Answering it
+    /// independently is exactly what let them drift — see the
+    /// one-question-one-predicate rule the printer keeps re-learning.
+    ///
+    /// `anchor` is `None` when there is no previous item at all: nothing trailed, so
+    /// nothing is claimed and the run keeps everything.
+    ///
+    /// `claims_trailing` forces `false`. The previous item deferred a line comment past its
+    /// own `;` ([`Self::terminator_defers_line_comment`]) and therefore trailed **nothing**
+    /// on that line, which leaves this run the only emitter left for it. Skipping the run
+    /// in BOTH places is a dropped comment; trailing it in both is a double-print.
+    pub(crate) fn comment_already_trailed(
+        &self,
+        anchor: Option<u32>,
+        comment: &tsv_lang::Comment,
+        claims_trailing: bool,
+    ) -> bool {
+        !claims_trailing && anchor.is_some_and(|a| self.is_same_line(a, comment.span.start))
+    }
+
     /// Build docs for trailing same-line comments after a node
     ///
     /// Line comments are wrapped in `line_suffix` so they don't affect width
@@ -427,10 +453,21 @@ impl<'a> Printer<'a> {
     /// with blank line preservation between them. Returns a Vec of docs to append.
     ///
     /// Used by: class body, interface body, enum body, type literal, namespace body.
-    pub(crate) fn build_trailing_body_comments_doc(&self, prev_end: u32, body_end: u32) -> DocBuf {
+    /// `claims_trailing` says this run owns the comments sharing `prev_end`'s source line.
+    /// Normally the last item's trailing emitter took them, so they are skipped here; a
+    /// caller whose last item deferred a line comment past its own `;`
+    /// ([`Self::terminator_defers_line_comment`]) trailed nothing, so it passes `true` and
+    /// this run claims them. Skipping them in BOTH places is a dropped comment — and with
+    /// no further item in the list, this emitter is the last chance to print them.
+    pub(crate) fn build_trailing_body_comments_doc(
+        &self,
+        prev_end: u32,
+        body_end: u32,
+        claims_trailing: bool,
+    ) -> DocBuf {
         let trailing_comments: CommentVec<'_> =
             comments_to_emit_in_range(self.comments, prev_end, body_end)
-                .filter(|c| !self.is_same_line(prev_end, c.span.start))
+                .filter(|c| !self.comment_already_trailed(Some(prev_end), c, claims_trailing))
                 .collect();
 
         if trailing_comments.is_empty() {
