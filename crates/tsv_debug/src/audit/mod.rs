@@ -6,6 +6,12 @@
 //!
 //! - [`ratchet`] — the "every line is a known bug, the file shrinking is the goal"
 //!   snapshot gate (the shape a large, churny finding set needs instead of a count).
+//! - [`census`] — the raw-text comment-trivia scanners behind the comment census
+//!   (`census_audit`): per-language extraction that never consults the parser's
+//!   own comment carrying, so parse-time drops are visible.
+//! - [`sweep`] — the pristine-format corpus loop the as-authored ratchet audits
+//!   (`fabrication_audit`, `census_audit`) share: skip/read/format bookkeeping
+//!   with a per-file visitor.
 //! - [`examples`] — the bounded, `--jobs`-deterministic example set every audit's
 //!   per-shape aggregate keeps its reproducers in.
 //! - [`tally`] — run-level tally primitives (the capped skipped-path bucket).
@@ -21,8 +27,8 @@
 //!   example, detail}`) and the human / JSON printers.
 //!
 //! `gap_audit`, `blank_audit`, and `ignore_audit` are the consumers of the whole
-//! substrate; [`ratchet`] additionally serves `fabrication_audit` and
-//! `compile_corpus_compare --ratchet`, which drive no ledger. The modules are
+//! substrate; [`ratchet`] additionally serves `fabrication_audit`, `census_audit`,
+//! and `compile_corpus_compare --ratchet`, which drive no ledger. The modules are
 //! written generic where a second consumer would actually reuse them, and no
 //! further.
 
@@ -31,10 +37,19 @@
 // verify layer is internally feature-gated.)
 pub(crate) mod properties;
 
+// The census scanners are NOT gated: `census_audit` lexes comment trivia off raw
+// text (its independence from the parser's comment carrying is the whole point),
+// so it drives no ledger and must exist in a default build.
+pub(crate) mod census;
+
 // The ratchet is NOT gated: `compile_corpus_compare --ratchet` (the validation-suite
 // gate) drives no comment ledger, so it must exist in a default build. It is pure
 // generic snapshot plumbing with no ledger dependency of its own.
 pub(crate) mod ratchet;
+
+// The pristine-format sweep is NOT gated: its consumers (`fabrication_audit`,
+// `census_audit`) drive no instrumentation seam.
+pub(crate) mod sweep;
 
 // The injection machinery is only reachable through `gap_audit` / `blank_audit`,
 // both themselves behind the `comment_check` feature (they arm

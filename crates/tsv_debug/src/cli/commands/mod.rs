@@ -10,6 +10,7 @@ pub mod build_fanout_audit;
 pub mod canonical_compile;
 pub mod canonical_parse;
 pub mod canonicalize_audit;
+pub mod census_audit;
 pub mod check;
 #[cfg(feature = "comment_check")]
 pub mod comment_audit;

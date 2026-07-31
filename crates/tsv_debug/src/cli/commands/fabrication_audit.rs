@@ -3,11 +3,10 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use crate::audit::ratchet::{Ratchet, SnapshotKey, refuse_narrowed_update};
+use crate::audit::sweep::{PristineSweep, sweep_pristine};
 use crate::cli::CliError;
-use tsv_cli::cli::format_source::format_source;
-use tsv_cli::cli::input::ParserType;
 
-use super::profile::{is_input_invalid_fixture, resolve_files};
+use super::profile::resolve_files;
 
 /// Audit for blank lines the formatter INVENTS.
 ///
@@ -162,11 +161,11 @@ impl FabricationAuditCommand {
             print_report(&sweep);
         }
 
-        if default_paths && sweep.formatted < FORMATTED_MIN {
+        if default_paths && sweep.pristine.formatted < FORMATTED_MIN {
             eprintln!(
                 "Error: pinned minimum — formatted {} files < pinned {FORMATTED_MIN}. \
                  The fixtures walk shrank (or parsing collapsed); if deliberate, re-pin FORMATTED_MIN.",
-                sweep.formatted
+                sweep.pristine.formatted
             );
             return Err(CliError::Failed);
         }
@@ -191,7 +190,7 @@ impl FabricationAuditCommand {
         if diff.holds() {
             println!(
                 "\n✓ ratchet holds — {} known fabrication shape(s), no new ones ({} files)",
-                diff.known, sweep.formatted
+                diff.known, sweep.pristine.formatted
             );
             return Ok(());
         }
@@ -218,77 +217,37 @@ struct Sweep {
     fabrications: Vec<Fabrication>,
     /// Every fabrication shape seen, deduped — what the ratchet grades.
     shapes: BTreeSet<FabricationShape>,
-    /// Files successfully formatted (the `FORMATTED_MIN` vacuity guard reads this).
-    formatted: usize,
-    /// Files the parser or formatter rejected — no output to compare.
-    parse_errors: usize,
-    /// Files `read_to_string` failed on (vanished mid-walk, permissions, non-UTF-8) — never
-    /// formatted, so outside every other bucket. Counted rather than silently skipped so the
-    /// report's file totals always add up to the walk.
-    read_errors: usize,
-    /// Files whose format PANICKED. Reported separately rather than folded into
-    /// `parse_errors`: a crash is not a rejection, and a bucket that calls it one would
-    /// launder the loudest possible finding into a routine skip line. Not gated here —
-    /// the panic gates (`fuzz`, `blank_audit`) own that class.
-    panics: usize,
+    /// The shared skip/format bookkeeping (the `FORMATTED_MIN` vacuity guard
+    /// reads `formatted`; panics are counted there, not gated here — the panic
+    /// gates own that class).
+    pristine: PristineSweep,
 }
 
-/// Format every file and collect the fabrications.
+/// Format every file (via the shared pristine sweep) and collect the fabrications.
 ///
 /// Split out of `run` so that function reads as scope → sweep → report → gate, rather than
 /// interleaving the corpus walk with the ratchet's argument handling.
 fn sweep_files(files: &[PathBuf]) -> Sweep {
-    let mut sweep = Sweep {
-        fabrications: Vec::new(),
-        shapes: BTreeSet::new(),
-        formatted: 0,
-        parse_errors: 0,
-        read_errors: 0,
-        panics: 0,
-    };
-    for path in files {
-        // Skip fixtures expected to fail parsing.
-        if is_input_invalid_fixture(path) {
-            continue;
-        }
-        let Ok(source) = std::fs::read_to_string(path) else {
-            sweep.read_errors += 1;
-            continue;
-        };
-        let parser = ParserType::from_extension(&path.to_string_lossy());
-        // `--profile corpus` keeps panics unwinding, so a formatter panic is a skip here
-        // rather than a killed run; the panic gates (fuzz, blank_audit) own that class.
-        let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-            format_source(&source, parser)
-        }));
-        let output = match result {
-            Ok(Ok(output)) => output,
-            Ok(Err(_)) => {
-                sweep.parse_errors += 1;
-                continue;
-            }
-            Err(_) => {
-                sweep.panics += 1;
-                continue;
-            }
-        };
-        sweep.formatted += 1;
-
-        let input_runs = count_blank_runs(&source);
-        let scan = scan_output(&output);
+    let mut fabrications = Vec::new();
+    let mut shapes = BTreeSet::new();
+    let pristine = sweep_pristine(files, |path, _parser, source, output| {
+        let input_runs = count_blank_runs(source);
+        let scan = scan_output(output);
         if scan.invented.len() > input_runs {
-            sweep
-                .shapes
-                .extend(scan.invented.iter().map(|i| i.shape.clone()));
-            sweep.fabrications.push(Fabrication {
-                path: path.clone(),
+            shapes.extend(scan.invented.iter().map(|i| i.shape.clone()));
+            fabrications.push(Fabrication {
+                path: path.to_path_buf(),
                 input_runs,
                 sanctioned: scan.sanctioned,
                 invented: scan.invented,
             });
         }
+    });
+    Sweep {
+        fabrications,
+        shapes,
+        pristine,
     }
-    sweep
 }
 
 /// The ratchet snapshot, colocated with this module and read at runtime by the [`Ratchet`]
@@ -497,10 +456,11 @@ fn scan_output(out: &str) -> OutputScan {
 fn print_report(sweep: &Sweep) {
     let Sweep {
         fabrications,
-        formatted,
+        pristine,
         ..
     } = sweep;
-    let skipped = skipped_note(sweep);
+    let formatted = pristine.formatted;
+    let skipped = pristine.skipped_note();
     if fabrications.is_empty() {
         println!("✓ no fabricated blank lines across {formatted} files ({skipped})");
         return;
@@ -534,27 +494,10 @@ fn print_report(sweep: &Sweep) {
     }
 }
 
-/// The skipped-file tail of a report line. A read failure or a panic is named only when one
-/// happened, so the common line stays short — but neither is ever folded into the parse count
-/// (see [`Sweep::read_errors`] / [`Sweep::panics`]).
-fn skipped_note(sweep: &Sweep) -> String {
-    let mut parts = vec![format!("{} parse-skipped", sweep.parse_errors)];
-    if sweep.read_errors > 0 {
-        parts.push(format!("{} read-skipped", sweep.read_errors));
-    }
-    if sweep.panics > 0 {
-        parts.push(format!("⚠ {} PANICKED", sweep.panics));
-    }
-    parts.join(", ")
-}
-
 fn print_json(sweep: &Sweep) {
     let Sweep {
         fabrications,
-        formatted,
-        parse_errors,
-        read_errors,
-        panics,
+        pristine,
         ..
     } = sweep;
     let items: Vec<serde_json::Value> = fabrications
@@ -582,10 +525,10 @@ fn print_json(sweep: &Sweep) {
         })
         .collect();
     let output = serde_json::json!({
-        "formatted": formatted,
-        "parse_skipped": parse_errors,
-        "read_skipped": read_errors,
-        "panicked": panics,
+        "formatted": pristine.formatted,
+        "parse_skipped": pristine.parse_errors,
+        "read_skipped": pristine.read_errors,
+        "panicked": pristine.panics,
         "fabrications": fabrications.len(),
         "files": items,
     });

@@ -15,6 +15,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Gap injection](#gap-injection-audit-gapsaudit) | `gaps:audit` | comment drops in gaps no fixture covers | `deno task check` (ratchet) |
 | [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse / ledger / blank-run | `deno task check` (ratchet) |
 | [Blank fabrication](#blank-fabrication-audit-fabricationaudit) | `fabrication:audit` | a blank line the formatter INVENTS on a pristine seed (the author never wrote it) | `deno task check` (ratchet) |
+| [Comment census](#comment-census-audit-censusaudit) | `census:audit` | a comment interior lost, gained, or rewritten between raw input and raw output — parse-time drops included, which the ledger can't see | `deno task check` (ratchet) |
 | [Ignore honoring](#ignore-directive-honoring-audit-ignoreaudit) | `ignore:audit` | `prettier-ignore` positions that silently reformat an ignored node, misbind a trailing directive, over-freeze, or lose the freeze on pass 2 | `deno task check` (ratchet) |
 | [Build fanout](#build-fanout-audit-fanoutaudit) | `fanout:audit` | exponential doc-node rebuild in nested layout candidates | `deno task check` |
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
@@ -62,11 +63,15 @@ cargo run --profile corpus -p tsv_debug --features audits swallow_audit ~/dev/zz
 authored**, so a swallow only reachable once a comment sits in some other gap is a swallow it
 never provokes. The [gap-injection audit](gap_audit.md) arms this same check on its injected
 formats and reports what that reaches, as its report-only
-[SWALLOW class](gap_audit.md#the-swallow-class).
+[SWALLOW class](gap_audit.md#the-swallow-class). The
+[comment census](#comment-census-audit-censusaudit) sees an as-authored swallow from the other
+side — the comment's interior GAINS the swallowed code, a multiset imbalance — with no
+instrumentation seam at all, so it also covers the Svelte-emitted `//` paths this check's
+tracker never arms (its first external sweep caught a live `as const` swallow this way).
 
 ## Comment Ledger Audit (`comments:audit`)
 
-The print-once comment ledger: every comment a document PARSES must be EMITTED exactly once. tsv's answer to prettier's `ensureAllCommentsPrinted`, and the structural guard on the [detached comment model](./comments.md): nothing else forces a comment that the parser produced to actually reach the output.
+The print-once comment ledger: every comment a document PARSES must be EMITTED exactly once. tsv's answer to prettier's `ensureAllCommentsPrinted`, and the structural guard on the [detached comment model](./comments.md): nothing else *inside the model* forces a comment that the parser produced to actually reach the output. (The [comment census](#comment-census-audit-censusaudit) forces conservation from *outside* the model — content-level, registration-independent — which is what covers the comments the parser never produced at all.)
 
 ```bash
 # comment_audit - format files with the print-once comment ledger on and report every
@@ -86,7 +91,7 @@ cargo run --profile corpus -p tsv_debug --features audits comment_audit ~/dev/zz
 
 **Model.** A format entry point (`tsv_ts::format_in`, `tsv_css`'s `format_css*`, `tsv_svelte`'s `format_svelte*`) REGISTERS the comment list it is about to print — that is the expectation. A doc-based printer (tsv_ts, tsv_svelte) TAGS each comment's doc node (`DocArena::tag_comment_doc`) and the RENDERER records the emit when it reaches the node; tsv_css, which writes comments straight to its buffer, records at the write. The render-time seam is load-bearing: a builder may assemble the same subtree into two `conditional_group` candidates of which one renders, so counting at build time reads as a double-print (and a comment built only into a LOSING candidate would read as printed while being lost). A `format-ignore` region — and any other raw source slice that carries comments out verbatim (a raw at-rule prelude, a glued CSS compound selector) — records a VERBATIM RANGE that counts as one emit per comment it covers; keep those ranges tight, a too-wide carve-out silently re-opens the hole.
 
-**Scope.** Both comment carriers are registered and guarded: the DETACHED comments (the flat `Vec<Comment>` on the language root) and the AST-NODE comments — a Svelte `<!-- … -->` (`FragmentNode::Comment`) and a CSS in-block `CssBlockChild::Comment`. The latter are carried by the tree rather than by the positional model, but a printer can still drop or double-print one, so each format entry walks its tree and registers their spans; with that, `unregistered emits` is a pure registration-gap signal (0 over clean fixtures) — a nonzero count means the walk missed a container. CSS declaration-VALUE comments remain outside the model by construction — never lexed as `Comment`s at all (re-derived from source), so there is nothing to register.
+**Scope.** Both comment carriers are registered and guarded: the DETACHED comments (the flat `Vec<Comment>` on the language root) and the AST-NODE comments — a Svelte `<!-- … -->` (`FragmentNode::Comment`) and a CSS in-block `CssBlockChild::Comment`. The latter are carried by the tree rather than by the positional model, but a printer can still drop or double-print one, so each format entry walks its tree and registers their spans; with that, `unregistered emits` is a pure registration-gap signal (0 over clean fixtures) — a nonzero count means the walk missed a container. CSS declaration-VALUE comments remain outside the model by construction — never lexed as `Comment`s at all (re-derived from source), so there is nothing to register. Everything outside the ledger's model — those value comments, and any comment a parse path consumes without registering — is the [comment census](#comment-census-audit-censusaudit)'s remit, which lexes both raw sides and never consults registration at all.
 
 **Blind to: any position no input actually puts a comment in.** The ledger grades a document AS AUTHORED, so its verdict is only ever as strong as the corpus. A builder that emits its children's docs and never looks up a gap at all ([comments.md](./comments.md) hazard 4) drops *every* comment in that gap and still reports green everywhere the shape happens not to occur — `build_object_doc_expanded` / `build_array_doc_expanded` did exactly that on the member-chain hugged-argument route while `comments:audit` passed over tests/fixtures, zzz, gro, fuz_app, fuz_ui, prettier's TS+JS suites, and svelte's own source. `gaps:audit` is the discovery arm for that class — it had the same drops pinned as sixteen known shapes. A green ledger is evidence about the corpus, not about the printer; when adding or changing an alternate-layout builder, inject a comment into each of its gaps by hand.
 
@@ -186,6 +191,48 @@ cargo run --profile corpus -p tsv_debug --features audits fabrication_audit ~/de
 - **Net-zero.** The metric compares counts, so a run fabricated in one place while another is dropped elsewhere in the same file nets out and is missed. Closing it needs a position-preserving alignment between input and output, which reflow (and section hoisting, which relocates blanks wholesale) makes unavailable.
 - **Vacuous on fixed points.** Where `format(S) == S` the property holds by construction, so over a corpus of already-tsv-formatted files the audit adds nothing over F1. Its yield is on **pristine, not-yet-formatted** code — exactly where a first-format fabrication would otherwise go unnoticed, because every later format is a fixed point.
 - **Shape attribution.** A file trips on a count, and every unsanctioned run in *that file* then contributes its shape. So a tripped file can pin an innocent shape alongside the guilty one. Harmless while the snapshot is empty; if it fills, read a line as "a shape present in a file that fabricated", not "this shape fabricated".
+
+## Comment-Census Audit (`census:audit`)
+
+The whole-comment conservation gate: does every comment the author wrote survive formatting, byte-for-byte (modulo re-indent)? Per file, lex the comment trivia off the raw INPUT and the raw formatted OUTPUT — with the audit's own trivia scanners, **never** `parse().comments` — and compare the interior **multisets**, per language bucket. A drop, a duplication, a merge, or an interior rewrite is a plain arithmetic imbalance, no matter which internal layer caused it.
+
+Why it needs its own gate: every other comment instrument reads a channel the parser controls. The print-once ledger guards what a format entry *registered*; `parse().comments` is what the parser chose to carry. A comment a parse path consumes without registering (the CSS `skip_whitespace_and_comments` class that motivated this audit) never existed as far as those instruments know — the corpus stays green **by absence**, and every corrupted output in that family was a format fixed point, so F1, roundtrip, fuzz, and the authoring audit were all structurally blind too. The census's independence from the parser's comment carrying is its entire design.
+
+```bash
+# census_audit - format each pristine seed, lex comment trivia from BOTH raw sides with
+# self-contained scanners (audit/census.rs), and compare per-line-trimmed interior
+# multisets per language bucket: `ts` (TS-family files, <script> islands, template
+# {expressions}), `css` (.css files, <style> islands), `template` (Svelte <!-- -->).
+# MISSING = dropped comment; EXTRA = duplicated/fabricated one; a merge or interior
+# rewrite shows as a MISSING + EXTRA pair. Pure Rust, no Deno.
+cargo run --profile corpus -p tsv_debug --features audits census_audit                # tests/fixtures
+cargo run --profile corpus -p tsv_debug --features audits census_audit ~/dev/zzz/src  # a real codebase
+# Also: --json, --update. ~0.35 s over tests/fixtures.
+#
+# GATED as a RATCHET over `census_audit_known.txt`, keyed (path, bucket, direction) —
+# file-level, like the compile validation ratchet (the file IS the reproducer). Born
+# EMPTY: the CSS parse-time-drop class it was argued from was fixed by hand before the
+# audit landed, so over tests/fixtures it stands as the tripwire that keeps the class
+# closed. Whole-comment drops are sanctioned in exactly ONE place — the CSS CDO/CDC
+# `<!-- ... -->` span, which tsv (matching parseCss) discards WHOLESALE, CSS between the
+# markers included — and that carve-out lives in the scanner (those comments never enter
+# the input multiset), so a snapshot line is always a bug. Rejected inputs make no
+# format claim and are skipped; a format PANIC is counted, not gated (the panic gates
+# own that class).
+```
+
+**The scanners** (`audit/census.rs`) are deliberately self-contained rather than driving the product lexers: TS comment *extents* depend on parser context (a regex body is opaque only because the parser said "regex here"), so a raw `next_token` loop mis-lexes real code — and an instrument sharing the product lexer's extent rules would inherit its bugs. TS handles strings, template literals (interpolation stack included), and regexes via the classic previous-token heuristic; CSS handles strings and unquoted `url()` opacity; Svelte is a lexical mode machine — `<script>`/`<style>` raw-text islands bounded by the first matching close tag (exactly Svelte's own rule, so a `</script>` inside a JS string bounds identically), `{...}` expressions in text, attribute, and quoted-attribute-value position, block sigils stepped over so `{/if}` is never a regex head. Interiors normalize by **per-line ASCII trim only** (`[ \t\r]` — multi-line blocks legitimately re-indent; NBSP/form feed at a line edge is content and stays significant).
+
+**Where the yield is.** Over `tests/fixtures` the gate is a cheap standing tripwire; the discovery arm is external corpora. Its first sweep over the prettier suites found a live `as const` **code swallow** (`(1 // comment⏎) as const;` → `1 // comment as const;` — the code after the paren pulled into the comment) plus four line-comment **merge** sites (`// a⏎// b` → `// a // b`, the second comment demoted to text) — all invisible to every other standing gate. Point it at real code after any parser/printer comment change.
+
+**Blind spots.**
+
+- **Position-blind by construction.** The multiset compares interiors, not placements — a comment relocated anywhere in the document (even to a semantically wrong place) balances. Placement is `binding:audit`'s and the fixtures' remit.
+- **Same-content cancellation.** A dropped `// x` plus a fabricated identical `// x` elsewhere in the same file nets zero, the same net-zero blindness `fabrication:audit` documents.
+- **Instrument-symmetry residue.** The scanners misread rare shapes (a regex after `)`, post-`}` division) — but they misread input and output with the same eyes, so the phantoms cancel. A false positive needs the formatter to rewrite text the scanner misreads *differently* across the two sides; none observed over tests/fixtures, zzz, svelte src, or the prettier suites.
+- **As-authored only.** Like every pristine audit, a drop in a gap no corpus file puts a comment in stays invisible — `gaps:audit` is the injection arm for that class (with the ledger, not the census, as its oracle).
+
+`deno task census:audit:update` regenerates the snapshot after fixing a pinned loss site (or pinning a newly found one); it refuses a narrowed run.
 
 ## Ignore-Directive Honoring Audit (`ignore:audit`)
 
