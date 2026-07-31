@@ -21,6 +21,7 @@
 		"@dprint/typescript": "0.96.1",
 		"oxc-parser": "0.140.0",
 		"oxfmt": "0.60.0",
+		"@rsvelte/fmt": "0.7.4",
 		"zod": "^4.4.3",
 		"@fuzdev/fuz_util": "0.65.2"
 	},
@@ -28,5 +29,6 @@
 	"devDependencies": {
 		"@types/node": "^24"
 	},
+	"//rsvelte": "@rsvelte/fmt is a CLI, not a library — the npm package is a Node launcher and the real formatter is a prebuilt binary carried by a platform `optionalDependency` (@rsvelte/fmt-<triple>), which is what lib/rsvelte.ts execs directly. Listing the launcher package is what pulls the right platform binary in; nothing imports it. Its only hard dep is prettier-plugin-tailwindcss (no transitive tree of its own), and its `oxfmt` peer is optional and unused here — .svelte formatting never leaves the binary. Because it has no in-process API its bench row is COVERAGE-ONLY (never timed) — see lib/rsvelte.ts and benches/js/CLAUDE.md §Fairness Caveats.",
 	"//oxc-wasi": "The oxc-parser WASM bench row needs @oxc-parser/binding-wasm32-wasi — pure-wasm (runtime-portable) but its metadata declares `cpu: wasm32`, so npm skips it on any non-wasm host. It is NOT listed as a dep here: declaring it errors on x64, and as an optionalDependency npm records it as known-skipped so a later `--force` reinstall no-ops. Instead `deno task bench:install` (install_deps.ts) force-fetches it at the oxc-parser version (oxc ships all bindings in lockstep), so the `oxc-parser` pin above is its single source of truth too."
 }
