@@ -129,7 +129,7 @@ pub(crate) struct ReportExample {
 /// `gap_audit`'s audit-specific detail — the per-shape aggregate the envelope
 /// carries verbatim.
 pub(crate) struct GapDetail {
-    /// The verbatim finding-kind label — `DROPPED` / `DOUBLE-PRINTED` / `PANIC`.
+    /// The verbatim finding-kind label — `DROPPED` / `DOUBLE-PRINTED` / `SWALLOW` / `PANIC`.
     pub(crate) kind_label: &'static str,
     /// How many injections hit this shape.
     pub(crate) count: usize,
@@ -143,10 +143,6 @@ pub(crate) struct GapDetail {
     /// the shape was not verified).
     pub(crate) verify_confirmed: Option<usize>,
     pub(crate) verify_total: Option<usize>,
-    /// Whether this shape is part of the RATCHET-GRADED set. `false` for the report-only
-    /// `SWALLOW` class, which prints but never gates — the same axis [`BlankDetail::gated`]
-    /// carries for `STRUCTURAL-DIVERGENCE`.
-    pub(crate) gated: bool,
 }
 
 /// `blank_audit`'s audit-specific detail — the per-shape aggregate the envelope carries
@@ -169,8 +165,7 @@ pub(crate) struct BlankDetail {
 /// `ignore_audit`'s audit-specific detail — the per-position aggregate the envelope carries
 /// verbatim. Like [`BlankDetail`] (kind / count / files), plus the canonical example's `node_type`
 /// (which AST node kind sits at the `{parent}.{field}` position — triage that the flat position key
-/// alone doesn't carry). Every kind is part of the gate — there is no report-only class — so
-/// `gated` is always `true`.
+/// alone doesn't carry).
 pub(crate) struct IgnoreDetail {
     /// The verbatim finding-kind label — `UNHONORED` / `TRAILING_FROZEN` / `OVERFROZEN` /
     /// `UNSTABLE` / `PANIC`.
@@ -181,8 +176,6 @@ pub(crate) struct IgnoreDetail {
     pub(crate) files: usize,
     /// The canonical example's node kind at this position.
     pub(crate) node_type: String,
-    /// Always `true` — no report-only class (kept for envelope uniformity with [`BlankDetail`]).
-    pub(crate) gated: bool,
 }
 
 /// The audit-specific detail slot — one variant per audit (enum-dispatch, the
@@ -218,14 +211,18 @@ impl Finding {
         }
     }
 
-    /// Whether the shape is part of its audit's ratchet-graded set. The report-only classes
-    /// (`gap_audit`'s `SWALLOW`, `blank_audit`'s `STRUCTURAL-DIVERGENCE`) answer `false`, so a
-    /// summary can speak for the graded invariants without counting them.
+    /// Whether the shape is part of its audit's ratchet-graded set, so a summary can speak for
+    /// the graded invariants without counting an ungraded shape as pinned.
+    ///
+    /// Only `blank_audit` has a report-only class (`STRUCTURAL-DIVERGENCE`, fuzz-soft parity),
+    /// so only its detail carries the flag; `gap_audit` and `ignore_audit` grade every kind
+    /// they report, and the answer is a property of the VARIANT rather than of the finding.
+    /// (`gap_audit`'s `SWALLOW` was the other carve-out until it was ratcheted with the rest.)
+    /// Storing an always-`true` field on those two would be a value a reader has to go verify.
     pub(crate) fn gated(&self) -> bool {
         match &self.detail {
-            Detail::Gap(d) => d.gated,
+            Detail::Gap(_) | Detail::Ignore(_) => true,
             Detail::Blank(d) => d.gated,
-            Detail::Ignore(d) => d.gated,
         }
     }
 }
@@ -502,7 +499,9 @@ pub(crate) fn print_json(
                     "count": d.count,
                     "files": d.files,
                     "node_type": d.node_type,
-                    "gated": d.gated,
+                    // Constant `true` — ignore has no report-only class. Emitted anyway so a
+                    // consumer reading several audits' findings can filter on one field.
+                    "gated": f.gated(),
                     "example_payload": ex.payload,
                     "example_path": ex.path,
                     "example_injection_offset": ex.injection_offset,

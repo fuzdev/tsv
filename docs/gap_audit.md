@@ -18,7 +18,7 @@ twice?"; the render-time [swallow check](audits.md#line-comment-swallow-audit-sw
 answers "did a `//` comment eat following content on its output line?" — a class the ledger is
 **structurally blind** to, since a swallowing comment is printed exactly once and the
 print-once account balances. Arming both on the *same* format call is what makes the second
-detector affordable: no extra format, no extra parse. Its findings are held **report-only**
+detector affordable: no extra format, no extra parse. Both detectors' findings are ratcheted
 (see [The SWALLOW class](#the-swallow-class)).
 
 **Design rationale lives next to the code** — why sites are byte offsets rather than tokens,
@@ -75,19 +75,20 @@ is news, and any finding exits 1.
 
 `crates/tsv_debug/src/cli/commands/gap_audit_known.txt` is a **machine-generated** snapshot
 of every finding shape `tests/fixtures` currently produces. Unlike `scan_audit`'s
-hand-curated `ALLOW`, it carries **no per-entry rationale by design**: at ~700 shapes that is
-not a thing a human can keep honest. Every line is a **known bug**, and the file shrinking is
-the goal.
+hand-curated `ALLOW`, it carries **no per-entry rationale by design**: at several hundred
+shapes that is not a thing a human can keep honest. Every line is a **known bug**, and the
+file shrinking is the goal.
 
 ```
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
 DROPPED	import⟨⟩.	block
 DOUBLE-PRINTED	IDENT⟨⟩=	block,line
+SWALLOW	()⟨⟩;	line
 ```
 
 The gate fails on:
 
-- a shape **not** on the list — a new *kind* of drop, which must not land silently;
+- a shape **not** on the list — a new *kind* of loss, which must not land silently;
 - a listed shape that **no longer fires** — a stale entry, so the list can't rot;
 - a **panic**, always. A crash is never pinnable (see below).
 
@@ -103,23 +104,29 @@ fixture is added.
 
 ### The SWALLOW class
 
-A `SWALLOW` shape is **report-only**: neither pinned into the snapshot nor able to fail the
-gate. Mechanically it is *filtered out of the graded key set* (`is_graded`) — a third category
-beside pinnable and never-pinnable, mirroring `blank_audit`'s `STRUCTURAL-DIVERGENCE`. Making
-it *un*-pinnable instead would make it fail like a panic, the opposite of what is wanted.
+A `SWALLOW` shape is **pinned and graded exactly like a drop** — same file, same key
+(`KIND<TAB>SHAPE<TAB>PAYLOADS`), same two failure modes (a shape not on the list, a listed
+shape that no longer fires). It is the only kind here that loses **code** rather than a
+comment, so a run that holds still names its share (`○ of those, N SWALLOW shape(s) …`) rather
+than letting a `✓` over hundreds of them read as "no swallows".
 
-It is real content loss, so this is a **staging decision, not a verdict**: the class only
-became visible when the check was armed here, and pinning several hundred untriaged claims
-into a ratchet whose shrinking is the goal would be pinning noise. It reports until its
-shapes are triaged; the run prints its own `○ N SWALLOW shape(s) … reported, NOT gated`
-section so a quiet `✓` can never be misread as "no swallows".
+It was **staged report-only** through its first phase, and the reason is worth keeping: the
+check only arms on a text node carrying a whole comment, and at the time only `tsv_ts`'s
+emitters spelled one that way — `tsv_svelte`'s built `text("//") + content` and were invisible
+to it. Freezing a shape set that half the printers could not produce would have pinned a
+property of the *instrument*. Every Svelte comment emitter now routes through the one-node
+form, so the arm is whole and the class ratchets.
 
-Two properties differ from the ledger kinds. It is **not self-verified** — a swallow is
+Two properties still differ from the ledger kinds. It is **not self-verified** — a swallow is
 observed directly on the rendered output (like `blank_audit`'s F1/reparse kinds), so the
 `UNCONFIRMED`/`PARTIAL` axis does not apply; the verify pass's oracle is the multiset of
 comment *contents*, which answers the ledger's question and not this one. And it has **no
 bystander axis**: the tracker reports a property of an output *line*, not of a registered
 comment, so every finding keys at its injection site.
+
+Most shapes fire on the `line` payload alone — the injected `//` is the swallower. A handful
+carry the block payloads too: there the injection merely reflowed the file and a comment the
+*author* wrote does the swallowing, which is the same bug reached from further away.
 
 Cost: arming the check adds roughly **+10% CPU** to a run (measured over `tests/fixtures`:
 ~146 s → ~160 s user, ~17 s → ~19 s wall), against a whole-`deno task check` budget of
@@ -177,11 +184,11 @@ next fixture edit.
 their structural key `(node_type, edge)` — the enclosing AST node and the child-role edge each
 site's gap sits in (`(CallExpression, arguments→$)`, `(VariableDeclarator, id→init)`), read off
 the wire tree. Where the site shape keys a finding by its raw adjacent tokens (the fine ratchet
-key), this keys it by the **emitter**: the ~700 shapes fold into a few dozen `(node, edge)`
-clusters — each roughly one printer function — ranked worst-first, the burn-down work-list. The
-comment-attachment fields the wire mirrors from acorn (`leadingComments` / `trailingComments`)
-are **not** treated as structural children, so a gap keys to its emitter edge regardless of
-whether a comment happens to sit beside it. A **bystander** finding keys on its victim's site
+key), this keys it by the **emitter**: the several hundred shapes fold into a few dozen
+`(node, edge)` clusters — each roughly one printer function — ranked worst-first, the
+burn-down work-list. The comment-attachment fields the wire mirrors from acorn
+(`leadingComments` / `trailingComments`) are **not** treated as structural children, so a gap
+keys to its emitter edge regardless of whether a comment happens to sit beside it. A **bystander** finding keys on its victim's site
 (the attribution offset), so it rolls up onto the emitter that dropped the comment — not the one
 whose gap the payload perturbed.
 
@@ -266,8 +273,8 @@ another; no corpus example does this.
 The ratio is triage information, not a gate signal: it is a property of the shape's sampled
 examples, not of the shape, so it is deliberately not part of the ratchet key (and `--update`
 regenerates a byte-identical snapshot regardless of it). `--update` still reports the tallies —
-how many shapes are fully `UNCONFIRMED` and how many `PARTIAL` — since pinning ~700 claims is
-the moment worth naming the ones the audit couldn't reproduce.
+how many shapes are fully `UNCONFIRMED` and how many `PARTIAL` — since pinning several hundred
+claims is the moment worth naming the ones the audit couldn't reproduce.
 
 ## Triaging and fixing a shape
 
@@ -292,18 +299,20 @@ quiet about it until now.
 Two limits compose, and neither is visible in a `✓`. Both are detailed in the module docs;
 the short version:
 
-- **The ledger's scope.** Only **detached** comments count. A Svelte `<!-- … -->` and a CSS
-  in-block comment are AST nodes carried by the tree; a CSS declaration's *value* comments are
-  never lexed as `Comment`s at all. All outside the model by construction. CSS also has no
-  line comments, so the `line` payload is inert in a `.css` file.
+- **The ledger's scope.** Both comment carriers count: the **detached** comments a format
+  entry registers, and the **AST-node** ones — a Svelte `<!-- … -->` and a CSS in-block
+  `CssBlockChild::Comment`, which the ledger registers by span. What stays outside the model
+  by construction is a CSS declaration's *value* comments: never lexed as `Comment`s at all,
+  so there is nothing to register (that surface belongs to the
+  [comment census](audits.md#comment-census-audit-censusaudit)). CSS also has no line
+  comments, so the `line` payload is inert in a `.css` file.
 - **`code_regions`' reach.** A gap the region walk doesn't name is a gap never probed. Today
   a `.svelte` file's `<style>` content is unprobed — so a Svelte fixture containing only a
   `<style>` block yields **zero sites**. That one is held back by **yield, not difficulty**:
   `Style::content_span` names it in a line, but measured over `tests/fixtures` it is +154k
   sites (+20% runtime) for 3 shapes, all `@import`-prelude double-prints. The thinness is
-  structural — the ledger registers only *detached* comments, and CSS keeps its in-block
-  comments as AST nodes and never lexes a declaration-value comment as a `Comment` at all —
-  so extending the ledger (see `comment_ledger`'s TODO) is the honest prerequisite.
+  structural — CSS's remaining unguarded comment surface is the declaration-value one the
+  ledger cannot see at all — so the census, not the ledger, is what covers it.
 
 Related: [Comment Ledger Audit](audits.md#comment-ledger-audit-commentsaudit) (the detector this drives),
 [conformance_prettier.md §Comment Position Philosophy](conformance_prettier.md#comment-position-philosophy).
