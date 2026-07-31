@@ -284,28 +284,27 @@ impl<'a> Printer<'a> {
             // `((// leading⏎ T))` — as if it sat between `extends` and the constraint,
             // so it forces the indent-and-break layout (matching prettier's paren
             // stripping).
+            let mut line_gap = None;
             let head = if has_comments {
                 #[allow(clippy::expect_used)] // extends always present for a constraint
                 let extends_pos = self
                     .find_keyword_in_range(prev_end, constraint.span().start, "extends")
                     .expect("extends keyword must exist when constraint is present");
 
-                // Comments between name and `extends`: <T /* c */ extends A>
-                if let Some(pre) = self.build_comments_between_filtered_opt(
-                    prev_end,
-                    extends_pos,
-                    CommentSpacing::Leading,
-                    CommentFilter::All,
-                ) {
-                    parts.push(pre);
-                }
+                line_gap = self.route_pre_keyword_gap(&mut parts, prev_end, extends_pos);
                 self.keyword_value_head(extends_pos + "extends".len() as u32, constraint)
             } else {
                 KeywordValueHead::without_gap(constraint)
             };
 
-            parts.push(d.text(" extends"));
-            self.append_keyword_value(&mut parts, &head, GroupId::TypeParameterConstraint);
+            self.push_keyword_value_or_continuation(
+                &mut parts,
+                line_gap,
+                "extends",
+                " extends",
+                &head,
+                GroupId::TypeParameterConstraint,
+            );
             prev_end = constraint.span().end;
         }
 
@@ -315,6 +314,7 @@ impl<'a> Printer<'a> {
             // bare `<T = // c⏎ U>`. A mixed / trailing shell hoists losslessly too — the
             // trailing comment is reattached in `append_keyword_value` via
             // `build_hang_value_doc`.
+            let mut line_gap = None;
             let head = if has_comments {
                 #[allow(clippy::expect_used)] // = must exist when a default is present
                 let eq_pos = find_char_skipping_comments(
@@ -325,22 +325,20 @@ impl<'a> Printer<'a> {
                 )
                 .expect("= must exist when default is present");
 
-                // Comments before `=`: <T extends B /* c */ = C>
-                if let Some(pre) = self.build_comments_between_filtered_opt(
-                    prev_end,
-                    eq_pos as u32,
-                    CommentSpacing::Leading,
-                    CommentFilter::All,
-                ) {
-                    parts.push(pre);
-                }
+                line_gap = self.route_pre_keyword_gap(&mut parts, prev_end, eq_pos as u32);
                 self.keyword_value_head((eq_pos + 1) as u32, default)
             } else {
                 KeywordValueHead::without_gap(default)
             };
 
-            parts.push(d.text(" ="));
-            self.append_keyword_value(&mut parts, &head, GroupId::TypeParameterDefault);
+            self.push_keyword_value_or_continuation(
+                &mut parts,
+                line_gap,
+                "=",
+                " =",
+                &head,
+                GroupId::TypeParameterDefault,
+            );
             prev_end = default.span().end;
         }
 
@@ -357,6 +355,91 @@ impl<'a> Printer<'a> {
         }
 
         d.concat(&parts)
+    }
+
+    /// Route a type parameter's pre-keyword gap (name→`extends`, pre-`=`): a **line**
+    /// comment defers the whole `<keyword> <value>` tail to a continuation line
+    /// (return `Some(gap)`, nothing pushed — the caller routes through
+    /// [`Self::push_keyword_value_or_continuation`]), else the gap's inline block
+    /// comments trail the head here (`<T /* c */ extends A>`) and the keyword stays
+    /// inline (`None`). Pushing the keyword inline after a `//` run would swallow it
+    /// into the comment (content loss). See conformance_prettier.md §Uniform
+    /// Forced-Continuation Indent.
+    fn route_pre_keyword_gap(
+        &self,
+        parts: &mut DocBuf,
+        gap_start: u32,
+        keyword_pos: u32,
+    ) -> Option<(u32, u32)> {
+        if self.has_line_comments_between(gap_start, keyword_pos) {
+            return Some((gap_start, keyword_pos));
+        }
+        if let Some(pre) = self.build_comments_between_filtered_opt(
+            gap_start,
+            keyword_pos,
+            CommentSpacing::Leading,
+            CommentFilter::All,
+        ) {
+            parts.push(pre);
+        }
+        None
+    }
+
+    /// Push ` <keyword>` and its value ([`Self::append_keyword_value`]) — or, when
+    /// [`Self::route_pre_keyword_gap`] deferred a line-comment gap, the gap's comment
+    /// run with the whole `<keyword> <value>` tail dropped to a continuation line one
+    /// indent level in (the uniform forced-continuation indent,
+    /// `build_continuation_indent`). `keyword`/`spaced_keyword` are the same literal
+    /// with and without the leading space, so the inline arm keeps its single text
+    /// node.
+    fn push_keyword_value_or_continuation(
+        &self,
+        parts: &mut DocBuf,
+        line_gap: Option<(u32, u32)>,
+        keyword: &'static str,
+        spaced_keyword: &'static str,
+        head: &KeywordValueHead<'_>,
+        group_id: GroupId,
+    ) {
+        let d = self.d();
+        if let Some((gap_start, keyword_pos)) = line_gap {
+            let mut tail: DocBuf = smallvec![d.text(keyword)];
+            self.append_keyword_value(&mut tail, head, group_id);
+            parts.push(self.build_continuation_indent(gap_start, keyword_pos, d.concat(&tail)));
+        } else {
+            parts.push(d.text(spaced_keyword));
+            self.append_keyword_value(parts, head, group_id);
+        }
+    }
+
+    /// Emit the keyword→value gap and the value doc — the shared routing of the
+    /// frozen and clarity-paren arms in [`Self::append_keyword_value`]: an
+    /// own-line-forcing comment (line, or own-line multiline block) hangs
+    /// `value_doc` on its own indented line
+    /// ([`Self::append_keyword_value_line_comments`]); otherwise inline block
+    /// comments trail the keyword and the value follows on the line.
+    fn push_hang_or_inline_value(
+        &self,
+        parts: &mut DocBuf,
+        keyword_end: u32,
+        value_start: u32,
+        value_doc: DocId,
+    ) {
+        let d = self.d();
+        if self.comments_force_own_line_between(keyword_end, value_start) {
+            self.append_keyword_value_line_comments(parts, keyword_end, value_start, value_doc);
+            return;
+        }
+        if let Some(comments) = self.build_comments_between_filtered_opt(
+            keyword_end,
+            value_start,
+            CommentSpacing::Leading,
+            CommentFilter::All,
+        ) {
+            parts.push(comments);
+        }
+        parts.push(d.text(" "));
+        parts.push(value_doc);
     }
 
     /// Append a constraint/default value after its keyword (`extends` / `=`),
@@ -408,25 +491,7 @@ impl<'a> Printer<'a> {
                 };
             let frozen_doc = self.build_frozen_head_doc(head.child, member_parens);
             // Under a freeze the head's window already ends at the child's own start.
-            if self.comments_force_own_line_between(keyword_end, head.value_start) {
-                self.append_keyword_value_line_comments(
-                    parts,
-                    keyword_end,
-                    head.value_start,
-                    frozen_doc,
-                );
-            } else {
-                if let Some(comments) = self.build_comments_between_filtered_opt(
-                    keyword_end,
-                    head.value_start,
-                    CommentSpacing::Leading,
-                    CommentFilter::All,
-                ) {
-                    parts.push(comments);
-                }
-                parts.push(d.text(" "));
-                parts.push(frozen_doc);
-            }
+            self.push_hang_or_inline_value(parts, keyword_end, head.value_start, frozen_doc);
             return;
         }
         // Strip redundant comment-free parens so `(A | B)` / `(A & B)` constraints
@@ -440,20 +505,18 @@ impl<'a> Printer<'a> {
         if matches!(value_type, TSType::Conditional(_))
             && group_id == GroupId::TypeParameterConstraint
         {
-            let mut inner: DocBuf = smallvec![d.text(" (")];
-            if let Some(keyword_end) = head.gap_start
-                && let Some(comments) = self.build_comments_between_filtered_opt(
-                    keyword_end,
-                    head.value_start,
-                    CommentSpacing::Leading,
-                    CommentFilter::All,
-                )
-            {
-                inner.push(comments);
+            // The clarity parens are re-emitted around the conditional, so the
+            // keyword→value gap follows the same protocol as the unparenthesized
+            // arms below: a line comment (or own-line multiline block) hangs the
+            // parenthesized value on its own indented line, an inline block trails
+            // the keyword before the `(`.
+            let paren_doc = d.concat(&[d.text("("), self.build_type_doc(value_type), d.text(")")]);
+            if let Some(keyword_end) = head.gap_start {
+                self.push_hang_or_inline_value(parts, keyword_end, head.value_start, paren_doc);
+            } else {
+                parts.push(d.text(" "));
+                parts.push(paren_doc);
             }
-            inner.push(self.build_type_doc(value_type));
-            inner.push(d.text(")"));
-            parts.push(d.concat(&inner));
             return;
         }
         if let Some(keyword_end) = head.gap_start {
