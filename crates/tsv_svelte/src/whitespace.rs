@@ -96,6 +96,34 @@ pub(crate) fn char_at(source: &str, i: usize) -> Option<(char, usize)> {
     Some((c, c.len_utf8()))
 }
 
+/// Byte offset of the first character at/after `start` that `is_terminator` accepts, or the
+/// end of `source` when none does. The name is `source[start..end]`.
+///
+/// The one scan behind both of Svelte's `read_tag` name runs — the tag-name class
+/// (`parser/element.rs`) and the attribute/directive class (`parser/attribute.rs`) ask the
+/// same question of the same cursor and differ **only** in that predicate, so the loop lives
+/// here once and each class stays its own named predicate
+/// (`is_tag_name_terminator` / `is_attr_name_terminator` — the two sets are genuinely
+/// different, and collapsing them into one predicate would be the bug).
+///
+/// Generic over the predicate rather than taking a `fn` pointer so each caller monomorphizes
+/// to its own inlined class test: this runs per character of every name in the document.
+#[inline]
+pub(crate) fn name_run_end(
+    source: &str,
+    start: usize,
+    is_terminator: impl Fn(char) -> bool,
+) -> usize {
+    let mut end = start;
+    while let Some((c, width)) = char_at(source, end) {
+        if is_terminator(c) {
+            break;
+        }
+        end += width;
+    }
+    end
+}
+
 /// The UTF-8 width of the Svelte-whitespace character at byte offset `i` in `source`, or
 /// `None` when `i` is at/past the end or the character there is not whitespace.
 ///
