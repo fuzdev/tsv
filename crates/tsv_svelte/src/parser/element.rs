@@ -513,11 +513,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let mut child_nodes = self.bvec();
         let mut last_end = opening_tag_end;
 
-        #[allow(unused_assignments)]
         loop {
             // Capture text/whitespace gaps between tokens
             self.capture_text_if_gap(last_end, &mut child_nodes)?;
-            last_end = self.current_start;
 
             if self.check(TokenKind::Comment) {
                 let comment = self.parse_comment()?;
