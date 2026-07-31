@@ -8,11 +8,12 @@
 
 use crate::ast::internal::{self, SpecialElementKind};
 use crate::printer::Printer;
-use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
-use super::element_doc::{AttrGaps, ElementContext, ElementKind, ElementLayout, ElementParts};
+use super::element_doc::{
+    AttrGaps, ElementContext, ElementKind, ElementLayout, ElementParts, ThisClaim,
+};
 
 impl<'a> Printer<'a> {
     /// Build a doc for a special element (`<svelte:component>`, `<svelte:element>`, `<slot>`, …).
@@ -181,31 +182,31 @@ impl<'a> Printer<'a> {
             _ => None,
         };
 
-        // What this site prints, from the tag name through the end of the bound value. The
-        // attribute scan below probes the whole name→`>` window, which that region sits
-        // inside, so it is also what the scan must skip — without the claim every comment in
-        // it prints twice, once by each. It runs from the *name* rather than from the value
-        // because this site prints the comments before the binding too (below); a comment
-        // after the value is outside it and belongs to the attribute list as usual.
-        let claimed = synthesized_this.map(|(_, value)| Span {
-            start: element.name_span.end,
-            end: value.end,
-        });
+        // What this site prints: the comments that bind the `this` it synthesizes (or the
+        // tag name it rides behind), plus the value's interior — [`ThisClaim`]'s routing.
+        // The attribute scan below probes the whole name→`>` window, which all of that sits
+        // inside, so the claim is also what the scan must skip — without it every comment
+        // here prints twice, once by each.
+        let claimed = synthesized_this
+            .map(|(_, value)| ThisClaim::new(element.name_span.end, value, element.attributes));
 
         // Pre-allocate: 2 docs per attr (separator + attr), plus the synthesized `this={…}`.
         let capacity = (element.attributes.len() + usize::from(synthesized_this.is_some())) * 2;
         let mut docs: DocBuf = DocBuf::with_capacity(capacity);
 
-        if let Some((this_doc, value)) = synthesized_this {
-            // Comments the author wrote BEFORE the binding are printed here, through the same
-            // seam the attribute loop uses — the only site that can keep them on that side of
-            // it. Left to the attribute list they would be emitted after a binding that is not
-            // in `attributes` at all, which both relocates them past it and, once the tag
-            // breaks, is not even a fixed point (see `Printer::comment_starts_its_own_line`).
+        if let Some(((this_doc, value), claim)) = synthesized_this.zip(claimed) {
+            // Comments that bind the `this` (or trail the tag name it prints behind) are
+            // printed here, through the same seam the attribute loop uses — the only site
+            // that can keep them on that side of the binding. Left to the attribute list
+            // they would be emitted after a binding that is not in `attributes` at all,
+            // which both relocates them past it and, once the tag breaks, is not even a
+            // fixed point (see `Printer::comment_starts_its_own_line`). The filter is the
+            // claim itself, so this run and the scan's skip cannot disagree.
             self.push_attr_item_with_leading_comments(
                 &mut docs,
                 separator,
-                comments_to_emit_in_range(self.comments, element.name_span.end, value.start),
+                comments_to_emit_in_range(self.comments, element.name_span.end, value.start)
+                    .filter(|c| claim.claims(self, c)),
                 this_doc,
             );
         }

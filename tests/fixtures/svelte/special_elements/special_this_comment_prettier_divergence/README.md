@@ -50,6 +50,8 @@ and the catalog entry in
 
 ## Related
 
+- [special_this_mid_list_comment](../special_this_mid_list_comment/) — comments staying put while a later-written `this` hoists past (matches prettier)
+- [special_this_mid_list_comment_prettier_divergence](../special_this_mid_list_comment_prettier_divergence/) — the two positions that ride at the head with the hoisted `this`
 - [comment_no_attributes](../../attributes/comment_no_attributes_prettier_divergence/) — the same deletion in tags with no attributes at all
 - [special_this_duplicate](../special_this_duplicate/) — the `this` binding's parse-side rules
 - [svelte_element_this_string_attr_comment](../svelte_element_this_string_attr_comment/) — a comment *inside* an attribute value on the same tag (matches prettier)

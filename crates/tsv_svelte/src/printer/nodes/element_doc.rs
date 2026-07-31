@@ -152,19 +152,88 @@ pub(in crate::printer) struct AttrGaps {
     pub(in crate::printer) first_range_start: u32,
     /// The `>` closing the opening tag; bounds the gap after the last attribute.
     pub(in crate::printer) open_tag_end: u32,
-    /// A region inside the window that the caller prints itself, whose comments the scan
-    /// must therefore skip. `<svelte:element this={…}>` keeps its `this` out of the attribute
-    /// list and synthesizes the attribute, so that region lands in one of the gaps probed
-    /// here while the tag's own doc is what prints it; without the skip a comment in there is
+    /// The comments inside the window that the caller prints itself, which the scan must
+    /// therefore skip. `<svelte:element this={…}>` keeps its `this` out of the attribute
+    /// list and synthesizes the attribute, so what it prints lands in the gaps probed here
+    /// while the tag's own doc is what prints it; without the skip a comment in there is
     /// emitted twice, once by each. Ownership does not cover this on its own: a *glued block*
     /// comment is `owned_by_node` and already skipped on the `to emit` axis, but a line
     /// comment never is (`owned ⇒ is_block`).
-    ///
-    /// It runs from the **tag name**, not from the binding's `{`: the caller prints the
-    /// comments *before* the binding too (they are the only ones that can stay on that side
-    /// of it), so they are claimed alongside the ones inside it. A comment after the bound
-    /// value is outside the region and belongs to the attribute list as usual.
-    pub(in crate::printer) claimed: Option<Span>,
+    pub(in crate::printer) claimed: Option<ThisClaim>,
+}
+
+/// Which comments the synthesized `this={…}` prints — [`AttrGaps::claimed`]'s payload, and
+/// the single predicate ([`Self::claims`]) both sides of the seam ask: the attribute scan
+/// skips exactly what the `this` site emits.
+///
+/// Not a contiguous span, because the binding may be **written after other attributes** yet
+/// always prints first, and a comment must stay with the token it binds when the list is
+/// reordered around it. A same-line comment trails the token before it; an own-line comment
+/// leads the token after it (the same axioms the attribute-list emitters apply). Under the
+/// hoist, exactly two positions therefore travel with `this`: a same-line comment in the
+/// **tag-name gap** (it trails the tag name, the one token that never moves, so the head is
+/// still its place) and an own-line comment in the **gap immediately before the binding**
+/// (it leads `this`). Everything else stays in its source slot for the attribute scan — a
+/// single `[name_end, value.end]` claim instead is how a comment trailing `data-x` got torn
+/// off and re-anchored to `this`. When the binding is written first the regions coincide
+/// and every window comment travels, which is the common authored form.
+///
+/// One deliberate approximation: a same-line comment *trailing an own-line comment* in the
+/// tag-name gap travels while its predecessor stays. The pair splits once (each lands in a
+/// stable slot, so the output is a fixed point); chain-aware anchoring would cost a
+/// backward comment walk per query for a shape no authored code has produced.
+#[derive(Clone, Copy)]
+pub(in crate::printer) struct ThisClaim {
+    /// The bound value as written — the `{…}` braces, or the plain form's text. Comments
+    /// inside are printed by the binding's own doc.
+    value: Span,
+    /// End of the tag-name gap: the first source item's start (`value.start` when the
+    /// binding is written first). A same-line comment ending by here trails the tag name.
+    head_gap_end: u32,
+    /// End of the last attribute written before the binding (the tag name's end when none
+    /// is). An own-line comment at or after it leads the binding.
+    prev_end: u32,
+}
+
+impl ThisClaim {
+    pub(in crate::printer) fn new(
+        name_end: u32,
+        value: Span,
+        attrs: &[internal::AttributeNode<'_>],
+    ) -> Self {
+        let head_gap_end = attrs
+            .iter()
+            .map(|a| a.span().start)
+            .min()
+            .map_or(value.start, |first| first.min(value.start));
+        let prev_end = attrs
+            .iter()
+            .map(|a| a.span().end)
+            .filter(|&end| end <= value.start)
+            .max()
+            .unwrap_or(name_end);
+        Self {
+            value,
+            head_gap_end,
+            prev_end,
+        }
+    }
+
+    /// Whether the synthesized `this` site prints `comment` — see the type docs for the
+    /// routing rule.
+    pub(in crate::printer) fn claims(&self, p: &Printer<'_>, comment: &tsv_lang::Comment) -> bool {
+        if comment.span.start >= self.value.start {
+            // At or past the value: claimed only inside it (the braces interior).
+            return comment.span.end <= self.value.end;
+        }
+        if p.comment_starts_its_own_line(comment) {
+            // Own-line: travels only when it leads the binding itself.
+            self.prev_end <= comment.span.start
+        } else {
+            // Same-line: travels only when it trails the tag name.
+            comment.span.end <= self.head_gap_end
+        }
+    }
 }
 
 /// Why an element's content lays out multiline — and whether that reason survives reformatting.
@@ -973,13 +1042,13 @@ impl<'a> Printer<'a> {
             open_tag_end,
             claimed,
         } = gaps;
-        // The gap probes below all go through these, so the claimed region is skipped once
-        // here rather than at each of the four sites.
+        // The gap probes below all go through this, so the claim is honored once here
+        // rather than at each of the sites.
         let gap_comments = |start: u32, end: u32| {
-            comments_to_emit_in_range(self.comments, start, end).filter(move |c| {
-                !claimed.is_some_and(|r| r.start <= c.span.start && c.span.end <= r.end)
-            })
+            comments_to_emit_in_range(self.comments, start, end)
+                .filter(move |c| !claimed.is_some_and(|cl| cl.claims(self, c)))
         };
+        let has_gap_comments = |start: u32, end: u32| gap_comments(start, end).next().is_some();
         // Where the gap *before* attribute `i` starts: the previous attribute's end, or the
         // window start when there is no previous one. Asked of `attrs.len()` it is the gap
         // after the last attribute — and, for an empty list, the whole window. One rule for
@@ -1001,7 +1070,7 @@ impl<'a> Printer<'a> {
         // share `gap_comments`, so the claim is honored identically by both — a claim that
         // shortcut only the per-gap probes would re-open the double-print through this fast
         // path.)
-        if gap_comments(first_range_start, open_tag_end).next().is_none() {
+        if !has_gap_comments(first_range_start, open_tag_end) {
             for attr in attrs {
                 docs.push(separator);
                 docs.push(self.build_attribute_node_doc(attr, is_html));
