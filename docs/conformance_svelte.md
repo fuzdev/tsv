@@ -241,6 +241,28 @@ them an upstream candidate:
   characters, which have their own single-code-point references, are unaffected. Pinned by
   [multi_codepoint](../tests/fixtures/svelte/syntax/entities/multi_codepoint_svelte_divergence/).
 
+### Static Attribute Reader Corrections
+
+A **top-level** `<script>` / `<style>` head is the one place Svelte reads
+attributes with `read_static_attribute` rather than `read_attribute`
+(`1-parse/state/element.js`): no comments, no whitespace before `=`, no
+directives, no `{expr}` — a name run plus a raw value, both taken by regex. tsv
+reproduces that reader, including the shapes it admits that the element reader
+rejects (`a=<b`, ``a=`b` ``, `a=b'c`, a lone or unbalanced brace in a quoted
+value). One case is corrected:
+
+- **Unterminated quoted value** — the value regex's third alternative
+  (`[^>\s]+`) matches the run `"b` when neither quoted alternative does, and
+  Svelte then decides it was quoted from `raw[0]` alone and strips a character
+  off *each* end. `"b`.slice(1, -1) is empty, so `<script a="b>` keeps an empty
+  value and the `b` is gone from the AST. The one-sided test is a slip: the
+  value never terminated, so any reading loses source, and a formatter matching
+  it would print `<script a=""></script>` and discard the author's bytes. tsv
+  rejects (`Unterminated string literal in template`). Pinned by
+  [static_attribute_unterminated_quote](../tests/fixtures/svelte/script/static_attribute_unterminated_quote_svelte_divergence/);
+  the matched half of the reader is
+  [static_attribute_grammar](../tests/fixtures/svelte/script/static_attribute_grammar/).
+
 ### TypeScript Corrections
 
 Svelte uses acorn + acorn-typescript, which lags behind TypeScript's parser. tsv implements the full spec.

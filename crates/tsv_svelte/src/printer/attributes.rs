@@ -390,31 +390,40 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Choose the delimiter for a quoted attribute value from its raw text.
+    /// Choose the delimiter for an attribute value from its raw text.
     ///
     /// Defaults to double quotes (`'value'` normalizes to `"value"`, matching
     /// prettier-plugin-svelte), but a value whose raw text contains a literal `"`
     /// cannot be double-quoted: HTML §13.1.2.3 requires a double-quoted value to
     /// hold no literal `"`, and re-wrapping one in `"` corrupts the markup (the
     /// interior `"` closes the value early). Such a value takes single-quote
-    /// delimiters instead — the only spec-conformant quoted form. In valid source a
-    /// value's raw text carries at most one literal quote kind (the delimiter quote
-    /// must appear as an entity inside), so a value with a `"` never also has a
-    /// literal `'`; single quotes are lossless and no escaping is needed. `{expr}`
-    /// parts are brace-delimited, so their interior quotes never reach the value
-    /// boundary and don't affect the choice.
+    /// delimiters instead. `{expr}` parts are brace-delimited, so their interior
+    /// quotes never reach the value boundary and don't affect the choice.
+    ///
+    /// A value carrying **both** quote kinds can take no delimiter at all, and is
+    /// emitted unquoted. Only a top-level `<script>`/`<style>` head reaches this: the
+    /// element reader's unquoted value stops at either quote and its quoted value
+    /// cannot hold its own delimiter, so there a raw value has at most one kind — but
+    /// the static reader's value alternative is `[^>\s]+`, which admits both
+    /// (`<script a=x'y"z>`). The unquoted form is always available for exactly that
+    /// value: having come from that alternative, it holds no whitespace and no `>`.
     fn attribute_value_delims(
         &self,
         parts: &[internal::AttributeValue<'_>],
     ) -> (&'static str, &'static str) {
-        let has_literal_double_quote = parts.iter().any(|part| match part {
-            internal::AttributeValue::Text(text) => text.raw(self.source).contains('"'),
-            internal::AttributeValue::ExpressionTag(_) => false,
-        });
-        if has_literal_double_quote {
-            ("='", "'")
-        } else {
-            ("=\"", "\"")
+        let mut has_double = false;
+        let mut has_single = false;
+        for part in parts {
+            if let internal::AttributeValue::Text(text) = part {
+                let raw = text.raw(self.source);
+                has_double |= raw.contains('"');
+                has_single |= raw.contains('\'');
+            }
+        }
+        match (has_double, has_single) {
+            (true, true) => ("=", ""),
+            (true, false) => ("='", "'"),
+            _ => ("=\"", "\""),
         }
     }
 

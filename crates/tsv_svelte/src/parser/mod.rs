@@ -3,7 +3,7 @@
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::parser::element::ParsedElement;
-use crate::whitespace::svelte_ws_width_at;
+use crate::whitespace::{skip_svelte_ws, svelte_ws_width_at};
 use tsv_lang::source_scan::{TriviaProfile, skip_template_literal, skip_trivia};
 use tsv_lang::{ParseError, Span};
 
@@ -351,9 +351,7 @@ fn find_tag_close(
             let mut j = i + 2 + tag.len();
             if allow_ws_before_gt {
                 // The full `\s` of `/<\/tag\s*>/`, so `</style\u{a0}>` closes.
-                while let Some(width) = svelte_ws_width_at(source, j) {
-                    j += width;
-                }
+                j = skip_svelte_ws(source, j);
             }
             if bytes.get(j) == Some(&b'>') {
                 return Some(i);

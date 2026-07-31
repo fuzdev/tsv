@@ -154,7 +154,7 @@ const ALLOW: &[Allow] = &[
     // ── tsv_svelte ───────────────────────────────────────────────────────────
     (
         "tsv_svelte/src/parser/attribute.rs",
-        "if let Some(colon_idx) = name_str.find(':') {",
+        "&& let Some(colon_idx) = name_str.find(':')",
         "attr-name",
     ),
     // ── tsv_ts ───────────────────────────────────────────────────────────────

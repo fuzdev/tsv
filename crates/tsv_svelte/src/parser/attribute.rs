@@ -4,7 +4,7 @@ use bumpalo::collections::Vec as BumpVec;
 
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
-use crate::whitespace::{char_at, is_svelte_ws, name_run_end};
+use crate::whitespace::{char_at, is_svelte_ws, name_run_end, skip_svelte_ws};
 use tsv_lang::{ParseError, Span};
 use tsv_ts::ast::internal::{Expression, IdentName, Identifier};
 
@@ -50,6 +50,24 @@ fn is_attr_name_char_at(source: &str, i: usize) -> bool {
 /// same reason — so it can be graded directly by a unit test.
 fn attr_name_end(source: &str, start: usize) -> usize {
     name_run_end(source, start, is_attr_name_terminator)
+}
+
+/// Which of Svelte's two attribute readers a tag head runs (`1-parse/state/element.js`).
+///
+/// A **top-level** `<script>` / `<style>` uses `read_static_attribute`, every other tag
+/// `read_attribute`. The two are not "the same reader with expressions turned off" — the
+/// static one is strictly a name run plus an optional raw value, and each construct the
+/// element reader adds is a separate `if` there that the static reader simply does not have.
+/// Whenever this enum is consulted, it is that structural difference being asked about.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum AttributeReader {
+    /// `read_attribute`: JS comments between attributes, `{...spread}` / `{shorthand}` /
+    /// `{@attach}`, directives, `{expr}` values, and whitespace before the `=`.
+    Element,
+    /// `read_static_attribute`: a `read_tag` name run, then — only if `=` follows it with no
+    /// gap — a `regex_attribute_value` raw value. A `{` is an ordinary name/value character,
+    /// a `:` name is a plain attribute, and a comment is not a token.
+    Static,
 }
 
 /// Directive prefix types
@@ -123,30 +141,33 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     pub(crate) fn parse_attributes(
         &mut self,
     ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, ParseError> {
-        self.parse_attributes_inner(true)
+        self.parse_attributes_inner(AttributeReader::Element)
     }
 
-    /// Parse attribute list for script/style tags where expressions are NOT parsed in quoted values
-    ///
-    /// Script and style tags use plain text attribute values - `{a: A}` is literal text,
-    /// not an expression tag.
+    /// Parse the attribute list of a top-level `<script>` / `<style>` tag head, which Svelte
+    /// reads with [`AttributeReader::Static`] — no comments, no spread/shorthand/attach, no
+    /// directives, and a raw value in which `{a: A}` is literal text rather than an expression.
     pub(crate) fn parse_attributes_literal(
         &mut self,
     ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, ParseError> {
-        self.parse_attributes_inner(false)
+        self.parse_attributes_inner(AttributeReader::Static)
     }
 
     fn parse_attributes_inner(
         &mut self,
-        parse_expressions: bool,
+        reader: AttributeReader,
     ) -> Result<BumpVec<'arena, AttributeNode<'arena>>, ParseError> {
         let mut attributes = self.bvec();
 
         loop {
-            // Skip JS comments (// and /* */) between attributes
-            while self.check(TokenKind::Slash) {
-                if !self.try_read_js_comment()? {
-                    break; // Regular slash (self-closing />)
+            // Skip JS comments (// and /* */) between attributes. `read_static_attribute` has
+            // no `read_comment` loop, so in a top-level `<script>`/`<style>` head a comment is
+            // not trivia: the `/` ends the attribute list and the required `>` is missing.
+            if reader == AttributeReader::Element {
+                while self.check(TokenKind::Slash) {
+                    if !self.try_read_js_comment()? {
+                        break; // Regular slash (self-closing />)
+                    }
                 }
             }
 
@@ -155,41 +176,32 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 break;
             }
 
-            if self.check(TokenKind::Identifier) {
-                attributes.push(self.parse_attribute_or_directive(parse_expressions)?);
-            } else if self.check(TokenKind::TagOpen) || self.check(TokenKind::LeftBrace) {
-                if parse_expressions {
-                    // Element attribute reader: `{@attach}`, `{...spread}`, or `{shorthand}`.
-                    if self.check(TokenKind::TagOpen) {
-                        attributes.push(AttributeNode::AttachTag(self.parse_attach_tag()?));
-                    } else {
-                        // Peek ahead to distinguish spread `{...obj}` from shorthand `{name}`.
-                        let next_char = self.peek_char_after_brace();
-                        if next_char == Some('.') {
-                            attributes.push(AttributeNode::SpreadAttribute(
-                                self.parse_spread_attribute()?,
-                            ));
-                        } else {
-                            attributes
-                                .push(AttributeNode::Attribute(self.parse_shorthand_attribute()?));
-                        }
-                    }
+            if reader == AttributeReader::Element
+                && (self.check(TokenKind::TagOpen) || self.check(TokenKind::LeftBrace))
+            {
+                // Element attribute reader: `{@attach}`, `{...spread}`, or `{shorthand}`.
+                if self.check(TokenKind::TagOpen) {
+                    attributes.push(AttributeNode::AttachTag(self.parse_attach_tag()?));
                 } else {
-                    // Static/literal reader (top-level `<script>`/`<style>`): a leading `{` is
-                    // never a spread/shorthand/attach — Svelte's `read_static_attribute` reads the
-                    // raw run up to a token-ending char as a boolean-attribute *name*.
-                    attributes.push(AttributeNode::Attribute(
-                        self.parse_static_brace_attribute()?,
-                    ));
+                    // Peek ahead to distinguish spread `{...obj}` from shorthand `{name}`.
+                    let next_char = self.peek_char_after_brace();
+                    if next_char == Some('.') {
+                        attributes.push(AttributeNode::SpreadAttribute(
+                            self.parse_spread_attribute()?,
+                        ));
+                    } else {
+                        attributes
+                            .push(AttributeNode::Attribute(self.parse_shorthand_attribute()?));
+                    }
                 }
             } else if self.current_token_starts_attribute_name() {
-                // Leading-symbol attribute name (e.g. `<p }>`) — Svelte's `read_static_attribute`
-                // reads any run of non-terminator chars as a name, so a name can start with a
-                // symbol the lexer tokenized on its own (`}`) rather than an identifier char.
-                // `parse_attribute_or_directive` reads the raw run from `current_start`, so it
-                // handles this once the dispatch routes here. `{`/`<` (spread/shorthand/attach)
-                // and `>`/`/` (tag close) are peeled off above, so this only sees stray symbols.
-                attributes.push(self.parse_attribute_or_directive(parse_expressions)?);
+                // A name run. What the lexer made of its first character is not the question —
+                // an Identifier token, a symbol the lexer tokenized alone (`<p }>`), or the
+                // `{`/`<` a static head reads as an ordinary name character all reach here, and
+                // `parse_attribute_or_directive` reads the raw run from `current_start` either
+                // way. `>`/`/` (tag close) and, for the element reader, `{`/`<` are peeled off
+                // above.
+                attributes.push(self.parse_attribute_or_directive(reader)?);
             } else {
                 return Err(self.error_expected_found("attribute name or '>'"));
             }
@@ -198,10 +210,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok(attributes)
     }
 
-    /// Peek at the first non-whitespace character after the opening brace
+    /// Peek at the first non-whitespace character after the opening brace — Svelte's
+    /// `parser.eat('{')` + `allow_whitespace()` before the spread/shorthand split.
     fn peek_char_after_brace(&self) -> Option<char> {
-        let pos = self.current_start + 1; // Skip the '{'
-        self.source.get(pos..)?.chars().find(|&c| !is_svelte_ws(c))
+        let pos = skip_svelte_ws(self.source, self.current_start + 1); // past the '{'
+        char_at(self.source, pos).map(|(c, _)| c)
     }
 
     /// Whether the current token begins a (possibly symbol-led) attribute-name run — its first
@@ -234,7 +247,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// and routes to the appropriate parser.
     fn parse_attribute_or_directive(
         &mut self,
-        parse_expressions: bool,
+        reader: AttributeReader,
     ) -> Result<AttributeNode<'arena>, ParseError> {
         // Read the full attribute/directive name as Svelte's `read_tag` does — a raw run up
         // to a token-ending char (`/[\s=/>"']/`). The lexer only scanned the leading
@@ -245,20 +258,21 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let name_end = self.attribute_name_run_end();
         let name_str = &self.source[name_start..name_end];
 
-        // Check if this is a directive (contains colon)
-        if let Some(colon_idx) = name_str.find(':') {
-            let prefix = &name_str[..colon_idx];
-            if let Some(directive_type) = DirectiveType::from_prefix(prefix) {
-                return self.parse_directive(directive_type, name_str, colon_idx, name_end);
-            }
+        // Check if this is a directive (contains colon). A static head has no directive
+        // split at all — `read_static_attribute` never looks at the name's `:`, so
+        // `<script on:click={fn}>` is a plain attribute named `on:click` whose value is the
+        // literal text `{fn}`, and a nameless `on:` is an attribute rather than an error.
+        if reader == AttributeReader::Element
+            && let Some(colon_idx) = name_str.find(':')
+            && let Some(directive_type) = DirectiveType::from_prefix(&name_str[..colon_idx])
+        {
+            return self.parse_directive(directive_type, name_str, colon_idx, name_end);
         }
 
         // Not a directive, parse as regular attribute
-        Ok(AttributeNode::Attribute(self.parse_attribute_inner(
-            name_start,
-            name_end,
-            parse_expressions,
-        )?))
+        Ok(AttributeNode::Attribute(
+            self.parse_attribute_inner(name_start, name_end, reader)?,
+        ))
     }
 
     /// Parse a directive (on:, bind:, class:, style:, use:, transition:, in:, out:, animate:, let:)
@@ -514,7 +528,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 }
             } else if self.check(TokenKind::Identifier) {
                 // Unquoted value: style:background=green
-                let parts = self.parse_unquoted_attribute_value(true)?;
+                let parts = self.parse_unquoted_attribute_value()?;
                 StyleDirectiveValue::Parts(parts.into_bump_slice())
             } else {
                 return Err(
@@ -777,37 +791,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         })
     }
 
-    /// Parse a leading `{` as a static (literal) boolean attribute — the top-level
-    /// `<script>`/`<style>` behavior. Svelte reads these tags' attributes with
-    /// `read_static_attribute` (`1-parse/state/element.js`), which never parses `{...spread}` /
-    /// `{shorthand}` / `{@attach}`: it reads the raw run up to a token-ending character
-    /// (`[\s=/>"']`, so the `}` is included) as the attribute *name* and leaves `value = true`.
-    /// So `<script {...wheee}>` → `Attribute { name: "{...wheee}", value: true }`, not a
-    /// `SpreadAttribute`. (`{name="value"}` never arises — the run stops at `=`; a name run is
-    /// followed by the normal `=`-value handling in `parse_attribute_or_directive`, but a `{`-led
-    /// name has no `=` in practice.)
-    fn parse_static_brace_attribute(&mut self) -> Result<Attribute<'arena>, ParseError> {
-        let start = self.current_start;
-        // Svelte's `read_static_attribute` reads the raw run up to a token-ending char
-        // (`regex_token_ending_character = /[\s=/>"']/`) as the attribute name.
-        let end = attr_name_end(self.source, start);
-        let span = Span {
-            start: start as u32,
-            end: end as u32,
-        };
-        self.advance_to_position(end)?;
-        Ok(Attribute {
-            value: None,
-            span,
-            name_span: span,
-        })
-    }
-
     fn parse_attribute_inner(
         &mut self,
         name_start: usize,
         name_end: usize,
-        parse_expressions: bool,
+        reader: AttributeReader,
     ) -> Result<Attribute<'arena>, ParseError> {
         // The name was already read as a Svelte `read_tag` run by the caller; it starts at
         // an Identifier token but may extend past it over special chars (`a%b`). The name is
@@ -815,12 +803,16 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let start = name_start;
         self.advance_past_name(name_end)?;
 
+        if reader == AttributeReader::Static {
+            return self.parse_static_attribute_tail(start, name_end);
+        }
+
         // Check for = (attribute with value)
         if self.check(TokenKind::Equals) {
             self.advance()?; // consume =
 
             // Parse attribute value (string or expression)
-            let value = self.parse_attribute_value_inner(parse_expressions)?;
+            let value = self.parse_attribute_value()?;
 
             // Find the end position from the last value part
             let value_end = if let Some(last_part) = value.last() {
@@ -866,17 +858,109 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
     }
 
+    /// Finish a [`AttributeReader::Static`] attribute once its name run is read — Svelte's
+    /// `read_static_attribute` minus the name (`1-parse/state/element.js`).
+    ///
+    /// The `=` must abut the name: the static reader runs no `allow_whitespace()` between the
+    /// two, so a gap is not a value separator at all — the attribute is boolean and the `=`
+    /// is left where the caller's `parser.eat('>', true)` will reject it. (The element reader
+    /// *does* allow the gap, which is why `<div a = "b">` is fine and `<script a = "b">` is
+    /// not.) Reading the gap as a separator here was how a mangled tag head swallowed the
+    /// script body: `<script lang="ts"}⏎type T = {…>` re-emitted as `type T="{"`, whose `{`
+    /// reopens as an expression and runs unterminated.
+    fn parse_static_attribute_tail(
+        &mut self,
+        start: usize,
+        name_end: usize,
+    ) -> Result<Attribute<'arena>, ParseError> {
+        let name_span = Span {
+            start: start as u32,
+            end: name_end as u32,
+        };
+        if !(self.check(TokenKind::Equals) && self.current_start == name_end) {
+            return Ok(Attribute {
+                value: None,
+                span: name_span,
+                name_span,
+            });
+        }
+
+        let (text, value_end) = self.read_static_attribute_value(name_end + 1)?;
+        let mut parts = self.bvec();
+        parts.push(AttributeValue::Text(text));
+        self.advance_to_position(value_end)?;
+
+        Ok(Attribute {
+            value: Some(parts.into_bump_slice()),
+            span: Span {
+                start: start as u32,
+                end: value_end as u32,
+            },
+            name_span,
+        })
+    }
+
+    /// Read a static attribute's raw value starting at `eq_end` (just past the `=`), returning
+    /// the value `Text` and the offset the attribute ends at.
+    ///
+    /// Svelte allows whitespace here (`parser.eat('=')` is followed by `allow_whitespace()`),
+    /// then matches `regex_attribute_value` — `"([^"]*)"`, `'([^']*)'`, or `[^>\s]+`, in that
+    /// order. Only the last alternative is shared with the element reader's terminator set, and
+    /// it is far laxer: `<`, `` ` ``, `'` and `=` are all ordinary value characters here
+    /// (`<script a=<b>` is a value of `<b`), and no `{` is an expression.
+    ///
+    /// The one divergence: on an unterminated quote neither quoted alternative matches, and
+    /// Svelte's third one takes the run (`"b`) and then decides it was quoted from its FIRST
+    /// character alone, slicing a character off each end — so `<script a="b>` silently loses
+    /// the `b`. tsv rejects instead; see `conformance_svelte.md` §Static Attribute Reader
+    /// Corrections.
+    fn read_static_attribute_value(&self, eq_end: usize) -> Result<(Text, usize), ParseError> {
+        let source = self.source;
+        let bytes = source.as_bytes();
+        let value_start = skip_svelte_ws(source, eq_end);
+
+        let text_of = |content: Span, raw_end: usize| {
+            (
+                Text::new(content, TextDecoding::AttributeValue, content, source),
+                raw_end,
+            )
+        };
+
+        if let Some(quote @ (b'"' | b'\'')) = bytes.get(value_start).copied() {
+            let content_start = value_start + 1;
+            let Some(offset) = bytes[content_start..].iter().position(|&b| b == quote) else {
+                return Err(
+                    self.error_msg_at("Unterminated string literal in template", value_start)
+                );
+            };
+            let content_end = content_start + offset;
+            return Ok(text_of(
+                Span {
+                    start: content_start as u32,
+                    end: content_end as u32,
+                },
+                content_end + 1,
+            ));
+        }
+
+        // `[^>\s]+`
+        let end = name_run_end(source, value_start, |c| c == '>' || is_svelte_ws(c));
+        if end == value_start {
+            return Err(self.error_msg_at("Expected attribute value", value_start));
+        }
+        Ok(text_of(
+            Span {
+                start: value_start as u32,
+                end: end as u32,
+            },
+            end,
+        ))
+    }
+
     /// Parse attribute value (e.g., `"ts"`, `{expr}`, or unquoted `value`)
     /// Returns a `Vec<AttributeValue>` to support mixed text/expressions
     pub(crate) fn parse_attribute_value(
         &mut self,
-    ) -> Result<BumpVec<'arena, AttributeValue<'arena>>, ParseError> {
-        self.parse_attribute_value_inner(true)
-    }
-
-    fn parse_attribute_value_inner(
-        &mut self,
-        parse_expressions: bool,
     ) -> Result<BumpVec<'arena, AttributeValue<'arena>>, ParseError> {
         // Any value not starting with a quote is unquoted, read as a Svelte
         // `read_sequence` — a run of Text + {expr} chunks to the terminator regex.
@@ -884,7 +968,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // (`prop={a}`), concatenations (`prop={a}{b}`, `src={a}//cdn`), and
         // slash-led paths (`href=/path`).
         if !self.check(TokenKind::String) {
-            return self.parse_unquoted_attribute_value(parse_expressions);
+            return self.parse_unquoted_attribute_value();
         }
 
         let mut parts = self.bvec();
@@ -898,21 +982,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Advance past the string token now, before we start parsing expression tags
         self.advance()?;
-
-        // For script/style tag attributes, don't parse expressions - treat as literal text
-        if !parse_expressions {
-            let span = Span {
-                start: content_start as u32,
-                end: content_end as u32,
-            };
-            parts.push(AttributeValue::Text(Text::new(
-                span,
-                TextDecoding::AttributeValue,
-                span,
-                self.source,
-            )));
-            return Ok(parts);
-        }
 
         // Scan the quoted value as a sequence of Text and {expr} chunks. Each
         // `{expr}` is parsed by the shared `parse_expression_tag_at`, which skips
@@ -984,11 +1053,11 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     /// `:`, and the like. `Text` chunks decode with attribute-context rules to
     /// match Svelte (`decode_character_references(raw, true)`).
     ///
-    /// `parse_expressions` is `false` for `<script>` / `<style>` tag attributes,
-    /// where `{` is literal text and the whole value is a single `Text` chunk.
+    /// The [`AttributeReader::Static`] twin of this is
+    /// [`read_static_attribute_value`](Self::read_static_attribute_value), whose terminator
+    /// set is far laxer and whose `{` is never an expression.
     pub(crate) fn parse_unquoted_attribute_value(
         &mut self,
-        parse_expressions: bool,
     ) -> Result<BumpVec<'arena, AttributeValue<'arena>>, ParseError> {
         // `src`/`bytes` borrow the source data (lifetime `'a`), so they stay valid
         // across the `&mut self` `parse_expression_tag_at` call below.
@@ -1032,9 +1101,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 break;
             }
 
-            // An `{expr}` chunk starts a new part. Every `{` is literal text when
-            // expressions are disabled (script/style tag attributes).
-            if parse_expressions && bytes[pos] == b'{' {
+            // An `{expr}` chunk starts a new part.
+            if bytes[pos] == b'{' {
                 flush_text(&mut parts, text_start, pos);
                 // Parse the `{expr}` without disturbing the lexer (it handles nested
                 // braces, strings, comments, and regex that a raw byte scan cannot);
