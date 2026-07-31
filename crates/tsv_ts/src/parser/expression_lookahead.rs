@@ -205,8 +205,10 @@ fn scan_for_arrow(bytes: &[u8], colon: usize) -> bool {
                 // The extends-type and both branches are full types.
                 saw_extends = true;
                 TypePos::Full
-            } else if is_word_at(bytes, pos, b"new") || is_word_at(bytes, pos, b"abstract") {
-                // A construct type's `(params) =>` is the function-type shape.
+            } else if TYPE_FULL_POSITION_WORDS
+                .iter()
+                .any(|w| is_word_at(bytes, pos, w))
+            {
                 TypePos::Full
             } else if TYPE_PREFIX_WORDS.iter().any(|w| is_word_at(bytes, pos, w)) {
                 TypePos::Operand
@@ -324,7 +326,21 @@ enum TypePos {
 /// Type-level prefix keywords that take an operand of their own, so a `(` right
 /// after one still belongs to the type (`keyof (A | B)`, `typeof import('m')`)
 /// rather than ending it.
-const TYPE_PREFIX_WORDS: [&[u8]; 5] = [b"keyof", b"typeof", b"readonly", b"infer", b"import"];
+const TYPE_PREFIX_WORDS: &[&[u8]] = &[b"keyof", b"typeof", b"readonly", b"infer", b"import"];
+
+/// Type-level keywords after which a *whole* type may start again, function and
+/// construct types included — the [`TypePos::Full`] counterpart of
+/// [`TYPE_PREFIX_WORDS`]. `new`/`abstract` open a construct type, whose
+/// `(params) =>` is the function-type shape. A type predicate's `is` hands its
+/// operand to the same type entry as the plain `: type` branch — acorn-typescript's
+/// `tsParseTypeOrTypePredicateAnnotation` calls `tsParseTypeAnnotation` either way,
+/// and tsv's two predicate paths likewise call `Parser::parse_type` — so `x is T`
+/// stands where the return-type colon itself stood, and `x is (A | B)[]` /
+/// `x is (p: P) => R` scan like any other annotation.
+///
+/// `extends` belongs to this class too but keeps its own arm: it additionally arms
+/// the conditional-type `?`. Matching is whole-word, so `isFoo` stays an atom.
+const TYPE_FULL_POSITION_WORDS: &[&[u8]] = &[b"new", b"abstract", b"is"];
 
 /// Whether the `(` at `paren` opens a **function type**'s parameter list rather
 /// than a parenthesized type — acorn-typescript's
