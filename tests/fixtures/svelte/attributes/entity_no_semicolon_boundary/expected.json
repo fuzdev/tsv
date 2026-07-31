@@ -1,0 +1,232 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 471,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 313,
+				"data": "\n\tA named reference that drops its semicolon decodes inside an attribute value unless the\n\tcharacter after it is `=` or an ASCII alphanumeric. A non-ASCII letter or digit is not\n\tASCII alphanumeric, so such a reference still decodes. Text content asks no such\n\tquestion — a reference there always decodes.\n"
+			},
+			{
+				"type": "Text",
+				"start": 313,
+				"end": 314,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 314,
+				"end": 361,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 315
+					},
+					"end": {
+						"line": 7,
+						"column": 4,
+						"character": 318
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 319,
+						"end": 354,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 7,
+								"column": 5,
+								"character": 319
+							},
+							"end": {
+								"line": 7,
+								"column": 14,
+								"character": 328
+							}
+						},
+						"value": [
+							{
+								"start": 330,
+								"end": 353,
+								"type": "Text",
+								"raw": "&AMP=1 &AMPersand &AMP1",
+								"data": "&AMP=1 &AMPersand &AMP1"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 361,
+				"end": 362,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 362,
+				"end": 405,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 363
+					},
+					"end": {
+						"line": 8,
+						"column": 4,
+						"character": 366
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 367,
+						"end": 398,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 8,
+								"column": 5,
+								"character": 367
+							},
+							"end": {
+								"line": 8,
+								"column": 14,
+								"character": 376
+							}
+						},
+						"value": [
+							{
+								"start": 378,
+								"end": 397,
+								"type": "Text",
+								"raw": "&AMP中 &COPYé &nbsp１",
+								"data": "&中 ©é  １"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 405,
+				"end": 406,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 406,
+				"end": 446,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 407
+					},
+					"end": {
+						"line": 9,
+						"column": 4,
+						"character": 410
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 411,
+						"end": 439,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 9,
+								"column": 5,
+								"character": 411
+							},
+							"end": {
+								"line": 9,
+								"column": 14,
+								"character": 420
+							}
+						},
+						"value": [
+							{
+								"start": 422,
+								"end": 438,
+								"type": "Text",
+								"raw": "&AMP; &AMP- &AMP",
+								"data": "& &- &"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 446,
+				"end": 447,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 447,
+				"end": 470,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 448
+					},
+					"end": {
+						"line": 10,
+						"column": 2,
+						"character": 449
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 450,
+							"end": 466,
+							"raw": "&AMPersand &AMP中",
+							"data": "&ersand &中"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -4,9 +4,9 @@ Tests hexadecimal numeric character references in HTML/Svelte templates.
 
 ## Note on Uppercase X
 
-The HTML5 spec allows both lowercase (`&#x41;`) and uppercase (`&#X41;`) hex entity syntax.
-
-- **tsv**: Supports both per HTML5 spec
-- **Svelte**: Only decodes lowercase `&#x41;`, treats uppercase `&#X41;` as literal text
-
-Uppercase `&#X` is excluded from this fixture to match Svelte's behavior in tests, but the tsv decoder correctly handles both forms per spec.
+The HTML5 spec's numeric-character-reference state opens a hex reference on either
+`U+0078 x` or `U+0058 X`, so `&#X41;` decodes to `A`. Svelte's decoder spells only the
+lowercase form and leaves `&#X41;` as literal text — a divergence, so the uppercase
+cases live in
+[spec_decoding_svelte_divergence](../spec_decoding_svelte_divergence/) rather than
+here.

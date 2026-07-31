@@ -1,10 +1,57 @@
 {
 	"css": {
 		"type": "StyleSheet",
-		"start": 199,
-		"end": 322,
+		"start": 162,
+		"end": 285,
 		"attributes": [],
 		"children": [
+			{
+				"type": "Rule",
+				"prelude": {
+					"type": "SelectorList",
+					"start": 171,
+					"end": 178,
+					"children": [
+						{
+							"type": "ComplexSelector",
+							"start": 171,
+							"end": 178,
+							"children": [
+								{
+									"type": "RelativeSelector",
+									"combinator": null,
+									"selectors": [
+										{
+											"type": "ClassSelector",
+											"name": "class1",
+											"start": 171,
+											"end": 178
+										}
+									],
+									"start": 171,
+									"end": 178
+								}
+							]
+						}
+					]
+				},
+				"block": {
+					"type": "Block",
+					"start": 179,
+					"end": 205,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 183,
+							"end": 201,
+							"property": "content",
+							"value": "'\\10FFFF'"
+						}
+					]
+				},
+				"start": 171,
+				"end": 205
+			},
 			{
 				"type": "Rule",
 				"prelude": {
@@ -23,7 +70,7 @@
 									"selectors": [
 										{
 											"type": "ClassSelector",
-											"name": "class1",
+											"name": "class2",
 											"start": 208,
 											"end": 215
 										}
@@ -38,78 +85,31 @@
 				"block": {
 					"type": "Block",
 					"start": 216,
-					"end": 242,
+					"end": 240,
 					"children": [
 						{
 							"type": "Declaration",
 							"start": 220,
-							"end": 238,
-							"property": "content",
-							"value": "'\\10FFFF'"
-						}
-					]
-				},
-				"start": 208,
-				"end": 242
-			},
-			{
-				"type": "Rule",
-				"prelude": {
-					"type": "SelectorList",
-					"start": 245,
-					"end": 252,
-					"children": [
-						{
-							"type": "ComplexSelector",
-							"start": 245,
-							"end": 252,
-							"children": [
-								{
-									"type": "RelativeSelector",
-									"combinator": null,
-									"selectors": [
-										{
-											"type": "ClassSelector",
-											"name": "class2",
-											"start": 245,
-											"end": 252
-										}
-									],
-									"start": 245,
-									"end": 252
-								}
-							]
-						}
-					]
-				},
-				"block": {
-					"type": "Block",
-					"start": 253,
-					"end": 277,
-					"children": [
-						{
-							"type": "Declaration",
-							"start": 257,
-							"end": 273,
+							"end": 236,
 							"property": "content",
 							"value": "'\\FFFF'"
 						}
 					]
 				},
-				"start": 245,
-				"end": 277
+				"start": 208,
+				"end": 240
 			},
 			{
 				"type": "Rule",
 				"prelude": {
 					"type": "SelectorList",
-					"start": 280,
-					"end": 287,
+					"start": 243,
+					"end": 250,
 					"children": [
 						{
 							"type": "ComplexSelector",
-							"start": 280,
-							"end": 287,
+							"start": 243,
+							"end": 250,
 							"children": [
 								{
 									"type": "RelativeSelector",
@@ -118,12 +118,12 @@
 										{
 											"type": "ClassSelector",
 											"name": "class3",
-											"start": 280,
-											"end": 287
+											"start": 243,
+											"end": 250
 										}
 									],
-									"start": 280,
-									"end": 287
+									"start": 243,
+									"end": 250
 								}
 							]
 						}
@@ -131,32 +131,32 @@
 				},
 				"block": {
 					"type": "Block",
-					"start": 288,
-					"end": 313,
+					"start": 251,
+					"end": 276,
 					"children": [
 						{
 							"type": "Declaration",
-							"start": 292,
-							"end": 309,
+							"start": 255,
+							"end": 272,
 							"property": "content",
 							"value": "'\\1F600'"
 						}
 					]
 				},
-				"start": 280,
-				"end": 313
+				"start": 243,
+				"end": 276
 			}
 		],
 		"content": {
-			"start": 206,
-			"end": 314,
+			"start": 169,
+			"end": 277,
 			"styles": "\n\t.class1 {\n\t\tcontent: '\\10FFFF';\n\t}\n\n\t.class2 {\n\t\tcontent: '\\FFFF';\n\t}\n\n\t.class3 {\n\t\tcontent: '\\1F600';\n\t}\n",
 			"comment": null
 		}
 	},
 	"js": [],
 	"start": 0,
-	"end": 323,
+	"end": 286,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -171,7 +171,7 @@
 			{
 				"type": "RegularElement",
 				"start": 112,
-				"end": 148,
+				"end": 136,
 				"name": "p",
 				"name_loc": {
 					"start": {
@@ -192,45 +192,7 @@
 						{
 							"type": "Text",
 							"start": 115,
-							"end": 144,
-							"raw": "max valid Unicode: &#x10FFFF;",
-							"data": "max valid Unicode: \u0000"
-						}
-					]
-				}
-			},
-			{
-				"type": "Text",
-				"start": 148,
-				"end": 149,
-				"raw": "\n",
-				"data": "\n"
-			},
-			{
-				"type": "RegularElement",
-				"start": 149,
-				"end": 173,
-				"name": "p",
-				"name_loc": {
-					"start": {
-						"line": 8,
-						"column": 1,
-						"character": 150
-					},
-					"end": {
-						"line": 8,
-						"column": 2,
-						"character": 151
-					}
-				},
-				"attributes": [],
-				"fragment": {
-					"type": "Fragment",
-					"nodes": [
-						{
-							"type": "Text",
-							"start": 152,
-							"end": 169,
+							"end": 132,
 							"raw": "BMP max: &#65535;",
 							"data": "BMP max: ￿"
 						}
@@ -239,26 +201,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 173,
-				"end": 174,
+				"start": 136,
+				"end": 137,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 174,
-				"end": 197,
+				"start": 137,
+				"end": 160,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 9,
+						"line": 8,
 						"column": 1,
-						"character": 175
+						"character": 138
 					},
 					"end": {
-						"line": 9,
+						"line": 8,
 						"column": 2,
-						"character": 176
+						"character": 139
 					}
 				},
 				"attributes": [],
@@ -267,8 +229,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 177,
-							"end": 193,
+							"start": 140,
+							"end": 156,
 							"raw": "emoji: &#x1F600;",
 							"data": "emoji: 😀"
 						}
@@ -277,8 +239,8 @@
 			},
 			{
 				"type": "Text",
-				"start": 197,
-				"end": 199,
+				"start": 160,
+				"end": 162,
 				"raw": "\n\n",
 				"data": "\n\n"
 			}

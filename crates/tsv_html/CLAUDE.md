@@ -34,7 +34,10 @@ not here. This crate stays AST-agnostic.
 - **Entity decoding** (`entities.rs`): `decode_character_references` —
   named, decimal, and hex (lower- and uppercase) character references
   with HTML5 attribute-context rules and Windows-1252 / surrogate
-  normalization.
+  normalization. Svelte's decoder is the AST-parity target, so its
+  deliberate answers are replicated quirk for quirk while its
+  implementation slips are corrected to the spec — the module docs draw
+  the line case by case.
 
 ## Distinctives
 

@@ -15,11 +15,30 @@
 //! - Source: <https://html.spec.whatwg.org/entities.json> (first codepoint only)
 //! - Generated at compile time from `src/entities.json` by `build.rs`
 //!
-//! ## Enhancement over Svelte
+//! ## Svelte's decoder: which quirks are matched, which are corrected
 //!
-//! Our decoder is more thorough than Svelte's in one area:
-//! - We support uppercase hex entities: `&#X41;` → 'A' (HTML5 spec-compliant)
-//! - Svelte only supports lowercase: `&#x41;` → 'A', treats `&#X41;` as literal text
+//! The public AST is parity with Svelte's parser, so the decoder replicates the answers
+//! Svelte's `validate_code` deliberately chose over the spec's:
+//! - **NUL, not U+FFFD, for a code that cannot be represented** — a surrogate half or a
+//!   code past the last code point Unicode defines.
+//! - **A line feed becomes a space** (`&#10;` → U+0020).
+//! - **Multi-codepoint references keep their first codepoint only** (the map above).
+//!
+//! Four others are *slips* in Svelte's implementation rather than choices, so the decoder
+//! follows the spec instead — cataloged in `docs/conformance_svelte.md` §Entity Decoding
+//! Corrections, and each one an upstream candidate:
+//! - **Uppercase hex** — `&#X41;` decodes. The spec's numeric-character-reference state
+//!   lists `U+0078 x` and `U+0058 X` side by side; Svelte's pattern spells only the
+//!   lowercase one.
+//! - **A zero code** — `&#0;` decodes (to NUL, per the sentinel above). Svelte's
+//!   `if (!code) return match` guards against an unknown/unparseable reference, and a code
+//!   of 0 is merely the falsy value caught in passing.
+//! - **The attribute-value boundary** — the spec blocks a semicolon-less reference only
+//!   before `=` or an ASCII alphanumeric. Svelte reaches for JS's `\b`, whose word class
+//!   also holds `_`, though its own comment quotes the spec rule.
+//! - **The admitted planes** — every code point but a surrogate half is emitted as itself.
+//!   Svelte enumerates the planes it will emit and drops the rest to NUL, destroying
+//!   assigned characters (`&#x30000;` is CJK Extension G) — see `validate_code`.
 //!
 //! References:
 //! - <https://html.spec.whatwg.org/multipage/parsing.html#named-character-reference-state>
@@ -75,11 +94,7 @@ pub fn decode_character_references(html: &str, is_attribute_value: bool) -> Stri
     let mut result = String::with_capacity(html.len());
     let mut i = 0;
 
-    while i < html.len() {
-        // SAFETY: i < html.len() guarantees at least one char exists
-        #[allow(clippy::unwrap_used)]
-        let ch = html[i..].chars().next().unwrap();
-
+    while let Some(ch) = html[i..].chars().next() {
         if ch != '&' {
             result.push(ch);
             i += ch.len_utf8();
@@ -97,9 +112,7 @@ pub fn decode_character_references(html: &str, is_attribute_value: bool) -> Stri
         }
 
         // Named character reference
-        if let Some((_entity_name, entity_len, decoded_char)) =
-            decode_named_entity(rest, is_attribute_value)
-        {
+        if let Some((entity_len, decoded_char)) = decode_named_entity(rest, is_attribute_value) {
             result.push(decoded_char);
             i += 1 + entity_len; // +1 for '&'
             continue;
@@ -123,37 +136,46 @@ fn decode_numeric_entity(rest: &str) -> Option<(char, usize)> {
     }
 
     let after_hash = &rest[1..];
+    // Either case opens a hex reference, per the spec's numeric-character-reference state.
+    // Svelte's pattern (`#(?:x[a-fA-F\d]+|\d+)`) spells only the lowercase one — a slip the
+    // module docs catalog.
     let is_hex = after_hash.starts_with('x') || after_hash.starts_with('X');
 
     let digits_start_offset = if is_hex { 1 } else { 0 };
     let digits_start = &after_hash[digits_start_offset..];
 
-    // Collect hex or decimal digits
-    let mut digit_count = 0;
-    let mut value_str = String::new();
-
-    for ch in digits_start.chars() {
-        if (is_hex && ch.is_ascii_hexdigit()) || (!is_hex && ch.is_ascii_digit()) {
-            value_str.push(ch);
-            digit_count += 1;
+    // Collect hex or decimal digits. A digit is ASCII, so scanning bytes ends the run at the
+    // first byte of any multibyte character and every index below stays on a boundary.
+    let is_digit = |b: u8| {
+        if is_hex {
+            b.is_ascii_hexdigit()
         } else {
-            break;
+            b.is_ascii_digit()
         }
-    }
+    };
+    let digit_count = digits_start
+        .bytes()
+        .position(|b| !is_digit(b))
+        .unwrap_or(digits_start.len());
 
     if digit_count == 0 {
         return None;
     }
+    let digits = &digits_start[..digit_count];
 
-    // Parse the number
+    // Parse the number. A run too long for `u32` is still just an out-of-range code — the
+    // digits were collected by the ASCII scan above, so overflow is the only way parsing
+    // can fail — and `validate_code` answers NUL for every code past the last code point,
+    // so saturating at `u32::MAX` (itself past that) reaches the same answer.
     let code = if is_hex {
-        u32::from_str_radix(&value_str, 16).ok()?
+        u32::from_str_radix(digits, 16)
     } else {
-        value_str.parse::<u32>().ok()?
-    };
+        digits.parse::<u32>()
+    }
+    .unwrap_or(u32::MAX);
 
     // Check for optional semicolon
-    let has_semicolon = digits_start.chars().nth(digit_count) == Some(';');
+    let has_semicolon = digits_start.as_bytes().get(digit_count) == Some(&b';');
 
     // Total consumed: '#' + optional 'x'/'X' + digits + optional ';'
     let total_consumed = 1 + digits_start_offset + digit_count + if has_semicolon { 1 } else { 0 };
@@ -167,76 +189,52 @@ fn decode_numeric_entity(rest: &str) -> Option<(char, usize)> {
 
 /// Decode a named character reference
 ///
-/// Returns (entity_name, consumed_length, decoded_char) if successful
-fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(&str, usize, char)> {
-    // Try to match entity names
-    // We need to handle both with and without semicolons
+/// Returns (consumed_length, decoded_char) if successful
+fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(usize, char)> {
+    // Every named character reference is ASCII, so the name run ends at the first byte that
+    // could not appear in one — which for a multibyte character is its first byte, so every
+    // slice below stays on a character boundary. That is load-bearing rather than tidy:
+    // `&rest[..len]` is a BYTE range, and a multibyte character reaching one of these lines
+    // slices mid-character and panics (`&a中pos;` in an attribute value did, all the way out
+    // through `tsv parse`). It also keeps the run's byte length equal to its character
+    // count, which the attribute-context look-ahead at the bottom relies on.
+    let run_len = rest
+        .bytes()
+        .position(|b| !b.is_ascii_alphanumeric())
+        .unwrap_or(rest.len());
+    let run = &rest[..run_len];
 
-    // First, try with semicolon (most common case)
-    for (i, ch) in rest.char_indices() {
-        if ch == ';' {
-            // Try lookup with semicolon included
-            let entity_name_with_semi = &rest[..=i];
-            if let Some(&codepoint) = ENTITIES.get(entity_name_with_semi) {
-                let decoded = char::from_u32(codepoint)?;
-                return Some((entity_name_with_semi, i + 1, decoded)); // +1 for semicolon
+    // A semicolon closes the reference (the common case). Try the name with it, then — for
+    // the legacy references that also have a semicolon-less spelling — without; either way
+    // the semicolon is consumed.
+    if rest[run_len..].starts_with(';') {
+        let consumed = run_len + 1;
+        for name in [&rest[..consumed], run] {
+            if let Some(&codepoint) = ENTITIES.get(name) {
+                return Some((consumed, char::from_u32(codepoint)?));
             }
-
-            // Also try without semicolon for legacy entities
-            let entity_name = &rest[..i];
-            if let Some(&codepoint) = ENTITIES.get(entity_name) {
-                let decoded = char::from_u32(codepoint)?;
-                return Some((entity_name, i + 1, decoded)); // +1 for semicolon
-            }
-            break;
-        }
-        // Stop at anything that cannot appear in a name. Every named character reference is
-        // ASCII, so a non-ASCII character can only ever *end* the run — scanning past it could
-        // never reach a match, and `char::is_alphanumeric` (which admits `中`, `٣`, …) would
-        // carry a multibyte character into the name slices below.
-        if !ch.is_ascii_alphanumeric() {
-            break;
         }
     }
 
-    // Try without semicolon (legacy entities)
-    // Per HTML5 spec: in attribute values, only decode if not followed by '=' or alphanumeric
-    let mut longest_match: Option<(&str, u32)> = None;
-    let mut longest_len = 0;
+    // Otherwise (and for a semicolon that closed no reference — `&notit;` is `&not` + `it;`)
+    // the longest prefix of the run that names one wins.
+    let (longest_len, codepoint) = (1..=run_len)
+        .rev()
+        .find_map(|len| ENTITIES.get(&run[..len]).map(|&codepoint| (len, codepoint)))?;
 
-    for (i, ch) in rest.char_indices() {
-        // ASCII-only, as above — and load-bearing here rather than merely tidy: `&rest[..=i]` is a
-        // BYTE range, so a multibyte character reaching this line slices mid-character and panics
-        // (`&a中pos;` in an attribute value did, all the way out through `tsv parse`). Keeping the
-        // run ASCII also keeps `longest_len` a byte length that equals the char count, which the
-        // `rest.chars().nth(longest_len)` look-ahead below relies on.
-        if !ch.is_ascii_alphanumeric() {
-            break;
-        }
-        let entity_name = &rest[..=i];
-        if let Some(&codepoint) = ENTITIES.get(entity_name) {
-            longest_match = Some((entity_name, codepoint));
-            longest_len = i + 1;
-        }
+    // Check if we should decode in attribute context: don't decode if followed by '=' or an
+    // ASCII alphanumeric — the spec's named-character-reference state, verbatim. The class is
+    // deliberately narrower than `char::is_alphanumeric` (which would hold `中`, `٣`, …, so
+    // `&AMP中` would stop decoding) and than JS's `\b` word class (which also holds `_`, the
+    // shorthand Svelte reaches for).
+    if is_attribute_value
+        && let Some(next) = rest[longest_len..].chars().next()
+        && (next == '=' || next.is_ascii_alphanumeric())
+    {
+        return None;
     }
 
-    if let Some((entity_name, codepoint)) = longest_match {
-        // Check if we should decode in attribute context
-        if is_attribute_value {
-            let next_char = rest.chars().nth(longest_len);
-            if let Some(next) = next_char {
-                // Don't decode if followed by '=' or alphanumeric
-                if next == '=' || next.is_alphanumeric() {
-                    return None;
-                }
-            }
-        }
-
-        let decoded = char::from_u32(codepoint)?;
-        return Some((entity_name, longest_len, decoded));
-    }
-
-    None
+    Some((longest_len, char::from_u32(codepoint)?))
 }
 
 /// Validate and normalize a Unicode code point per HTML5 spec
@@ -245,14 +243,25 @@ fn decode_named_entity(rest: &str, is_attribute_value: bool) -> Option<(&str, us
 /// - Line feed (10) becomes space (32)
 /// - Code points 128-159 use Windows-1252 replacements
 /// - UTF-16 surrogate halves (D800-DFFF) become NUL
-/// - Invalid/unsupported planes become NUL
+/// - Code points past U+10FFFF become NUL
+///
+/// The two NUL answers are Svelte's sentinel where the spec asks for U+FFFD — a
+/// deliberate choice of its decoder, replicated here (see the module docs). Every other
+/// code point is emitted as itself: the spec replaces only surrogates and values past
+/// U+10FFFF, so a plane carrying assigned characters (U+30000 is CJK Extension G) or a
+/// private-use one is text like any other. Svelte instead enumerates the planes it
+/// admits, which drops the rest to NUL — a slip it has been patching one plane at a time
+/// ([sveltejs/svelte#15823](https://github.com/sveltejs/svelte/pull/15823) added the
+/// supplementary special-purpose ranges), so tsv follows the spec here.
 ///
 /// References:
 /// - <http://en.wikipedia.org/wiki/Character_encodings_in_HTML#Illegal_characters>
-/// - <https://en.wikipedia.org/wiki/Plane_(Unicode)>
+/// - <https://html.spec.whatwg.org/multipage/parsing.html#numeric-character-reference-end-state>
 /// - <https://html.spec.whatwg.org/multipage/parsing.html#preprocessing-the-input-stream>
 fn validate_code(code: u32) -> u32 {
     const NUL: u32 = 0;
+    const MAX_CODE_POINT: u32 = 0x10FFFF;
+    const SURROGATES: std::ops::RangeInclusive<u32> = 0xD800..=0xDFFF;
 
     // Line feed becomes generic whitespace
     if code == 10 {
@@ -270,38 +279,13 @@ fn validate_code(code: u32) -> u32 {
         return WINDOWS_1252[(code - 128) as usize];
     }
 
-    // Basic multilingual plane (below D800)
-    if code < 0xD800 {
-        return code;
-    }
-
-    // UTF-16 surrogate halves (D800-DFFF) are invalid
-    if code <= 0xDFFF {
+    // A surrogate half is not a character, and neither is anything past the last code
+    // point Unicode defines — both are unrepresentable, so they take the sentinel
+    if SURROGATES.contains(&code) || code > MAX_CODE_POINT {
         return NUL;
     }
 
-    // Rest of basic multilingual plane (E000-FFFF)
-    if code <= 0xFFFF {
-        return code;
-    }
-
-    // Supplementary multilingual plane (10000-1FFFF)
-    if (0x10000..=0x1FFFF).contains(&code) {
-        return code;
-    }
-
-    // Supplementary ideographic plane (20000-2FFFF)
-    if (0x20000..=0x2FFFF).contains(&code) {
-        return code;
-    }
-
-    // Supplementary special-purpose plane (E0000-E007F and E0100-E01EF)
-    if (0xE0000..=0xE007F).contains(&code) || (0xE0100..=0xE01EF).contains(&code) {
-        return code;
-    }
-
-    // Everything else is invalid
-    NUL
+    code
 }
 
 #[cfg(test)]
@@ -403,6 +387,29 @@ mod tests {
 
         // Should always decode with semicolon
         assert_eq!(decode_character_references("&AMP;=test", true), "&=test");
+
+        // The blocking class is ASCII alphanumeric, nothing wider and nothing narrower:
+        // an underscore does not block (JS's `\b` word class, which Svelte reaches for,
+        // would), and neither does a non-ASCII letter or digit (`char::is_alphanumeric`
+        // would). Both decode in text content too, where no rule applies at all.
+        assert_eq!(decode_character_references("&AMP_x", true), "&_x");
+        assert_eq!(
+            decode_character_references("&COPY\u{4e2d}", true),
+            "©\u{4e2d}"
+        );
+        assert_eq!(
+            decode_character_references("&COPY\u{663}", true),
+            "©\u{663}"
+        );
+        assert_eq!(
+            decode_character_references("&COPY\u{ff11}", true),
+            "©\u{ff11}"
+        );
+        assert_eq!(decode_character_references("&AMP_x", false), "&_x");
+        assert_eq!(
+            decode_character_references("&COPY\u{4e2d}", false),
+            "©\u{4e2d}"
+        );
     }
 
     #[test]
@@ -458,6 +465,96 @@ mod tests {
         assert_eq!(decode_character_references("&#X;", false), "&#X;");
     }
 
+    /// Every scan in this module walks a `&str` by byte offset while the runs it slices are
+    /// found with `char` predicates, so a multibyte character in any position is a slicing
+    /// hazard — `&a中pos;` in an attribute value once panicked all the way out through
+    /// `tsv parse`. Sweep every short string over an alphabet mixing the syntax characters
+    /// with 2-, 3- and 4-byte ones, in both contexts.
+    #[test]
+    fn test_multibyte_scan_sweep() {
+        const ALPHABET: [char; 14] = [
+            '&',
+            '#',
+            'x',
+            'X',
+            ';',
+            '1',
+            'a',
+            'A',
+            '_',
+            '\u{4e2d}',
+            '\u{663}',
+            '\u{1f4a9}',
+            '\u{feff}',
+            '\u{301}',
+        ];
+        let base = ALPHABET.len() as u64;
+
+        let mut input = String::new();
+        for len in 1..=4 {
+            for n in 0..base.pow(len) {
+                input.clear();
+                let mut rest = n;
+                for _ in 0..len {
+                    input.push(ALPHABET[(rest % base) as usize]);
+                    rest /= base;
+                }
+
+                for is_attribute_value in [false, true] {
+                    let decoded = decode_character_references(&input, is_attribute_value);
+                    // Decoding replaces a whole reference with one character and copies
+                    // every other character through, so it can only ever shorten the run.
+                    assert!(
+                        decoded.chars().count() <= input.chars().count(),
+                        "{input:?} grew to {decoded:?} (attribute value: {is_attribute_value})"
+                    );
+                    // Nothing but a reference is rewritten, and a reference needs an '&'.
+                    if !input.contains('&') {
+                        assert_eq!(
+                            decoded, input,
+                            "rewrote {input:?} with no reference in it (attribute value: {is_attribute_value})"
+                        );
+                    }
+                }
+            }
+        }
+    }
+
+    #[test]
+    fn test_multibyte_name_run() {
+        // A non-ASCII character can only end a name run — no such run can name an entity,
+        // so the source is preserved verbatim, semicolon or not.
+        assert_eq!(
+            decode_character_references("a&b\u{4e2d}pos;", true),
+            "a&b\u{4e2d}pos;"
+        );
+        assert_eq!(
+            decode_character_references("a&b\u{4e2d}pos", true),
+            "a&b\u{4e2d}pos"
+        );
+        // A well-formed reference beside one still decodes.
+        assert_eq!(
+            decode_character_references("&amp; a&b\u{4e2d}pos;", true),
+            "& a&b\u{4e2d}pos;"
+        );
+        // A numeric reference's digit run ends at the same place for the same reason, but
+        // the prefix it collected is still a reference (the spec's missing-semicolon path),
+        // so the decode takes it and the multibyte character starts the text after it.
+        assert_eq!(
+            decode_character_references("&#4\u{663}1;", false),
+            "\u{4}\u{663}1;"
+        );
+        assert_eq!(
+            decode_character_references("&#x4\u{1f4a9}1;", false),
+            "\u{4}\u{1f4a9}1;"
+        );
+        // With no ASCII digit at all there is no reference to take.
+        assert_eq!(
+            decode_character_references("&#x\u{663}1;", false),
+            "&#x\u{663}1;"
+        );
+    }
+
     #[test]
     fn test_longest_match_fallthrough() {
         // No-semicolon longest match: "COPY" is a legacy entity but "COPYRIGHT" is
@@ -471,19 +568,29 @@ mod tests {
 
     #[test]
     fn test_numeric_overflow_and_plane_boundaries() {
-        // Values that overflow u32 fail to parse and remain literal text.
+        // A value too large for u32 is just another code past the last supported plane,
+        // so it normalizes to NUL like any other out-of-range one (Svelte parity — its
+        // `parseInt` never overflows).
         assert_eq!(
             decode_character_references("&#99999999999999;", false),
-            "&#99999999999999;"
+            "\0"
         );
-        assert_eq!(
-            decode_character_references("&#xFFFFFFFFFF;", false),
-            "&#xFFFFFFFFFF;"
-        );
-        // Plane boundary: 0x2FFFF (end of plane 2) is preserved, but the unlisted
-        // higher planes and beyond-Unicode-max both normalize to NUL (Svelte parity).
+        assert_eq!(decode_character_references("&#xFFFFFFFFFF;", false), "\0");
+        assert_eq!(decode_character_references("&#4294967296;", false), "\0");
+        // The largest value that still fits, one past the largest supported code point,
+        // and the plane boundary just below — all the same answer.
+        assert_eq!(decode_character_references("&#4294967295;", false), "\0");
+        assert_eq!(decode_character_references("&#1114112;", false), "\0");
+        // Every code point Unicode defines survives, in whichever plane — an assigned one
+        // (0x30000 is CJK Extension G) and a private-use one alike. Only a surrogate half
+        // and a value past the last code point take the NUL sentinel.
         assert_eq!(decode_character_references("&#x2FFFF;", false), "\u{2FFFF}");
-        assert_eq!(decode_character_references("&#x30000;", false), "\0");
+        assert_eq!(decode_character_references("&#x30000;", false), "\u{30000}");
+        assert_eq!(decode_character_references("&#xF0000;", false), "\u{F0000}");
+        assert_eq!(
+            decode_character_references("&#x10FFFF;", false),
+            "\u{10FFFF}"
+        );
         assert_eq!(decode_character_references("&#x110000;", false), "\0");
     }
 }
