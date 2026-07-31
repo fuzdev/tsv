@@ -71,8 +71,11 @@ use tsv_ts::ast::internal::{
 /// here now, and only here; `fragment.rs` keeps the checks whose inputs really are
 /// emission state (children, illegal attributes, invalid binds).
 ///
-/// `svelte:options` is in the oracle's map too and is covered upstream by
-/// `analyze()`'s unconditional [`Refusal::SvelteOptions`].
+/// `svelte:options` is in the oracle's map too, and both its halves are covered
+/// upstream: a nested one is rejected at PARSE (it is the one member with no node type
+/// of its own — it fills `Root`'s `options` slot, so a nested one is unrepresentable and
+/// could only be a fabricated `RegularElement`), and one at the root is taken by
+/// `analyze()`'s unconditional [`Refusal::SvelteOptions`]. So no arm here can ever fire.
 fn root_only_meta_tag(kind: &SpecialElementKind<'_>) -> Option<&'static str> {
     match kind {
         SpecialElementKind::SvelteHead => Some("svelte:head"),
