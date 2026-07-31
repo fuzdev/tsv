@@ -75,9 +75,10 @@ pub struct DocContext {
     /// — rather than packing it onto the text line, where it would break its own tag in place.
     ///
     /// When that following node is an *after-element fold* (an inline element + its trailing text,
-    /// carrying [`Self::hug_wide_first`]), only the fold's **lead element** is measured, not the whole
-    /// element+tail unit — the tail can wrap, so a short element packs after the last word instead of
-    /// dropping (prettier's fill is pairwise: last word, separator, element — never the tail). See
+    /// carrying [`Self::after_element_fold`]), only the fold's **lead element** is measured, not the
+    /// whole element+tail unit — the tail can wrap, so a short element packs after the last word
+    /// instead of dropping (prettier's fill is pairwise: last word, separator, element — never the
+    /// tail). See
     /// [`crate::doc::arena::DocArena::after_element_fold_lead`].
     ///
     /// Scoped to the Svelte text→flow-element boundary fill (a text run whose next sibling is a
@@ -105,30 +106,34 @@ pub struct DocContext {
     /// for a groupless leaf — so the shared flag stays free of cross-case contamination.
     pub break_before_wide_flow: bool,
 
-    /// When set, the fill's FIRST item, if it sits mid-line (right after a small prefix such as a
-    /// parent inline element's `>`) and does not fit on its own line *either* (wider than printWidth
-    /// even at line start), is rendered **in place** — it breaks internally — rather than dropped to
-    /// the next line. Dropping a too-wide-anyway first item only strands a spurious break before it
-    /// (a `>⏎<child` dangle that the next pass collapses → non-idempotent); rendering in place keeps
-    /// the child hugging the prefix, matching the newline-authored form.
+    /// When set, this fill **is** the Svelte after-element fold (`fill([element, line, words…])`,
+    /// built only by `build_after_element_fold`) — an inline element followed by its terminal
+    /// trailing text. Unlike the other flags this one states the fill's *identity*, not a policy;
+    /// two render behaviors and one shape query follow from it, and they are one field rather than
+    /// three because there is exactly one construction site and no fill wants a subset:
     ///
-    /// Scoped to the Svelte after-element fold (`fill([element, line, words…])`), whose first item
-    /// is always a breakable inline element/component. Off for every other fill, so text word-wrap
-    /// and CSS value lists still drop a too-wide item onto its own line.
-    pub hug_wide_first: bool,
-
-    /// When set, a fill item that wraps at line start (the after-element fold's wide element) lets
-    /// the *terminal* trailing text hug the dangled closing `>` (`</tag⏎> tail`) if it fits there,
-    /// instead of forcing it onto its own line. The separator after the wrapped element is chosen
-    /// by the actual resulting column — flat (hug) when the next item still fits, else break.
+    /// - **Head hug.** The fold's FIRST item — always a breakable inline element/component — is a
+    ///   breakable atom the fill must not drop. Sitting mid-line right after a small prefix (a
+    ///   parent inline element's `>`) and not fitting on its own line *either* (wider than
+    ///   printWidth even at line start), it renders **in place** and breaks internally, rather than
+    ///   dropping to the next line. Dropping a too-wide-anyway head only strands a spurious break
+    ///   before it (a `>⏎<child` dangle the next pass collapses → non-idempotent); rendering in
+    ///   place keeps the child hugging the prefix, matching the newline-authored form.
+    /// - **Terminal tail hug.** Once the head has wrapped at line start, the terminal trailing text
+    ///   hugs the dangled closing `>` (`</tag⏎> tail`) if it fits there, instead of taking its own
+    ///   line. The separator after the wrapped head is chosen by the actual resulting column — flat
+    ///   (hug) when the next item still fits, else break. This is how tsv respects an author's
+    ///   *space* boundary after a wide inline element, mirroring how short inline elements already
+    ///   keep `<el>x</el> tail` inline; a *newline*-authored boundary still takes its own line (the
+    ///   text node carries the newline, so it never reaches this fold).
+    /// - **Lead extraction.** [`crate::doc::arena::DocArena::after_element_fold_lead`] recognizes
+    ///   the fold by this flag and returns its head, so a *preceding* text run's
+    ///   [`Self::break_before_wide_flow`] measurement grades the element alone rather than the whole
+    ///   element+tail unit.
     ///
-    /// Scoped to the Svelte after-element fold whose trailing text is *terminal* (`!trailing_line`
-    /// — no following flowing element). This is how tsv respects an author's *space* boundary after
-    /// a wide inline element, mirroring how short inline elements already keep `<el>x</el> tail`
-    /// inline; a *newline*-authored boundary still takes its own line (the text node carries the
-    /// newline, so it never reaches this fold). Off for every other fill — CSS value lists and
-    /// non-terminal text (`trailing_line`, the non-convergent cascade) keep their own-line break.
-    pub hug_terminal_after_break: bool,
+    /// Off for every other fill: text word-wrap and CSS value lists still drop a too-wide item onto
+    /// its own line, and a wrapped item never lets the next hug its last line.
+    pub after_element_fold: bool,
 
     /// When set, the fill's LAST item is measured **alone** (rest-of-render ignored) even though a
     /// node follows it on the render stack. That following node is glued to the last word with no
@@ -166,15 +171,21 @@ pub struct DocContext {
 // target — 16 B on wasm32, the tightest budget and the one the shipped npm packages build under.
 // Nothing in `deno task check` builds wasm32, so without this assert a context that outgrows the
 // budget passes every gate and fails only at `deno task build:packages` (it already did once:
-// adding `glued_lead` blew the `DocNode` assert, invisibly to the whole gate chain).
+// growing the context blew the `DocNode` assert, invisibly to the whole gate chain).
 //
-// This pins the cost **here**, natively, where the field is added. A new flag is free while the
-// bools fit the padding; the moment one doesn't, pack them into a bitfield rather than raising
-// these numbers — `DocNode`'s own budget has no room to give.
+// This pins the cost **here**, natively, where the field is added, and the threshold is a cliff
+// rather than a slope: `WithContext`'s payload is `DocId` + this struct, so it stays 12 B — under
+// wasm32's 16 B budget, with room for the enum tag — while `DocContext` is **8 B or less**, i.e.
+// while the `u16` is joined by at most **six** `bool`s. The seventh takes the struct to 10 B, the
+// payload to 16 B, and `DocNode` on wasm32 to 20 B. At four bools there are two slots left; pack
+// them into a bitfield rather than raising these numbers when the cliff is reached.
+//
+// Note this is the ONLY budget in play — `WithContext` is not what sizes `DocNode` on either
+// target. See the `DocNode` size assert in `arena.rs` for the variants that actually are.
 #[cfg(target_pointer_width = "64")]
-const _: () = assert!(size_of::<DocContext>() == 8);
+const _: () = assert!(size_of::<DocContext>() == 6);
 #[cfg(target_pointer_width = "32")]
-const _: () = assert!(size_of::<DocContext>() == 8);
+const _: () = assert!(size_of::<DocContext>() == 6);
 
 impl DocContext {
     /// A context that only reserves `columns` trailing columns — the CSS trailing-punctuation

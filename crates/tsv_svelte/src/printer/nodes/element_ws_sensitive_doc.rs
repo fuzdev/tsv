@@ -106,6 +106,13 @@ impl<'a> Printer<'a> {
                 if let FragmentNode::Text(text) = node {
                     let raw = text.raw(self.source);
                     if is_first_node {
+                        // Deliberately NOT `Printer::text_glued_before` (whose spelling this is the
+                        // negation of), for the same reason the `is_inline` probe above is its own
+                        // question: that predicate means "no break may land here, because one would
+                        // inject a *collapsible* space", and inside a whitespace-PRESERVING subtree
+                        // this whitespace is literal content — a break here injects a literal
+                        // newline. Same character class, different claim; folding them would let a
+                        // change to one silently retarget the other.
                         starts_with_ws = raw.starts_with(is_collapsible_ws_char);
                     }
                     if raw.contains('\n') {

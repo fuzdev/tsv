@@ -919,6 +919,165 @@ mod arena_tests {
         assert_eq!(render_pw_tab(&a, doc, 10), "aaa bbb\n\tccc");
     }
 
+    // ---------------------------------------------------------------------
+    // Fill render policies — the per-fill layout flags on `DocContext`.
+    //
+    // Each is set by exactly one builder in `tsv_svelte`, and each was reachable only
+    // through that crate's fixture suite: the crate that OWNS the render behavior had no
+    // test for it, so a change here could only be graded a crate away. Every test below
+    // renders the same fill parts twice, with the flag and without, so the assertion is
+    // about the flag rather than about fills in general — a control that also documents
+    // what the default fill does at the same site.
+    // ---------------------------------------------------------------------
+
+    /// `after_element_fold`, head hug: a breakable head that does not fit on its own line
+    /// *either* renders in place and breaks internally, instead of dropping to a fresh line
+    /// — which would only strand a break in front of it (the `>⏎<child` non-idempotency).
+    #[test]
+    fn test_fill_after_element_fold_hugs_wide_head() {
+        let a = DocArena::new();
+        // Flat width 16, wider than the print width even at column 0.
+        let head = a.group(a.concat(&[a.text("AAAAAAAA"), a.softline(), a.text("BBBBBBBB")]));
+        let parts = [head, a.line(), a.text("tail")];
+        let fold = a.with_context(
+            a.fill(&parts),
+            DocContext {
+                after_element_fold: true,
+                ..Default::default()
+            },
+        );
+        let plain = a.fill(&parts);
+
+        // `>` is the small prefix that puts the fill mid-line (the parent element's `>`).
+        assert_eq!(
+            render_pw_tab(&a, a.concat(&[a.text(">"), fold]), 10),
+            ">AAAAAAAA\nBBBBBBBB\ntail"
+        );
+        assert_eq!(
+            render_pw_tab(&a, a.concat(&[a.text(">"), plain]), 10),
+            ">\nAAAAAAAA\nBBBBBBBB\ntail"
+        );
+    }
+
+    /// `after_element_fold`, terminal-tail hug: once the head has wrapped at line start, the
+    /// trailing item hugs the dangled last line when it fits at the resulting column. Every
+    /// other fill isolates a wrapped item from what follows it.
+    #[test]
+    fn test_fill_after_element_fold_tail_hugs_wrapped_head() {
+        let a = DocArena::new();
+        // Flat width 12: wraps at print width 10, ending at column 6.
+        let head = a.group(a.concat(&[a.text("AAAAAA"), a.softline(), a.text("BBBBBB")]));
+        let parts = [head, a.line(), a.text("t")];
+        let fold = a.with_context(
+            a.fill(&parts),
+            DocContext {
+                after_element_fold: true,
+                ..Default::default()
+            },
+        );
+
+        assert_eq!(render_pw_tab(&a, fold, 10), "AAAAAA\nBBBBBB t");
+        assert_eq!(render_pw_tab(&a, a.fill(&parts), 10), "AAAAAA\nBBBBBB\nt");
+    }
+
+    /// `break_before_wide_flow`: the fill's trailing separator measures the *following*
+    /// render-stack node as a whole FLAT unit, so a node that cannot fit flat after the
+    /// separator drops to its own line intact. Without it the following node is measured in
+    /// its inherited Break mode, where `arena_fits` short-circuits at the node's first
+    /// internal line and wrongly reports a fit — packing it onto this line and breaking it
+    /// in place instead.
+    #[test]
+    fn test_fill_break_before_wide_flow_measures_next_flat() {
+        let a = DocArena::new();
+        let parts = [a.text("word"), a.line()];
+        let wide = a.group(a.concat(&[a.text("<AAAA"), a.softline(), a.text("BBBB>")]));
+        let flow = a.with_context(
+            a.fill(&parts),
+            DocContext {
+                break_before_wide_flow: true,
+                ..Default::default()
+            },
+        );
+
+        // 4 + 1 + 10 = 15 > 12, so the separator breaks and `wide` renders intact at column 0.
+        assert_eq!(
+            render_pw_tab(&a, a.concat(&[flow, wide]), 12),
+            "word\n<AAAABBBB>"
+        );
+        // Control: the Break-mode short-circuit reports a fit, `wide` packs onto the word's
+        // line, and it is the node's own content that breaks.
+        assert_eq!(
+            render_pw_tab(&a, a.concat(&[a.fill(&parts), wide]), 12),
+            "word <AAAA\nBBBB>"
+        );
+    }
+
+    /// `trailing_glued_tag`: the fill's last item is measured ALONE even though a node
+    /// follows it on the render stack, because that node is byte-glued to the item and
+    /// belongs to it. The glued pair then rides past print width rather than the fill
+    /// breaking in front of a word it is welded to.
+    #[test]
+    fn test_fill_trailing_glued_tag_ignores_rest() {
+        let a = DocArena::new();
+        let parts = [a.text("word")];
+        let glued = a.with_context(
+            a.fill(&parts),
+            DocContext {
+                trailing_glued_tag: true,
+                ..Default::default()
+            },
+        );
+        let pad = a.text("PADDING");
+        // Stands in for the Svelte `{tag}` this flag exists for — braces would read as format
+        // arguments to clippy, and the width (5) is what the trace below turns on.
+        let tag = a.text("[tag]");
+
+        // `word` alone fits the 5 remaining columns; `word[tag]` does not.
+        assert_eq!(
+            render_pw_tab(&a, a.concat(&[pad, glued, tag]), 12),
+            "PADDINGword[tag]"
+        );
+        assert_eq!(
+            render_pw_tab(&a, a.concat(&[pad, a.fill(&parts), tag]), 12),
+            "PADDING\nword[tag]"
+        );
+    }
+
+    /// `glued_lead`: the fill's FIRST item is byte-glued to what precedes it, so the boundary
+    /// in front of it carries no whitespace and the fresh-line drop would inject a rendered
+    /// space. The head renders in place and the run breaks at its first *internal* whitespace
+    /// boundary instead. Head only — every later item keeps the ordinary drop.
+    #[test]
+    fn test_fill_glued_lead_keeps_head_in_place() {
+        let a = DocArena::new();
+        let parts = [
+            a.text("wwwwww"),
+            a.line(),
+            a.text("xxxx"),
+            a.line(),
+            a.text("y"),
+        ];
+        let glued = a.with_context(
+            a.fill(&parts),
+            DocContext {
+                glued_lead: true,
+                ..Default::default()
+            },
+        );
+        let pad = a.text("PADDING");
+
+        // The head does not fit in the 5 remaining columns but does fit at column 0, so the
+        // control drops it; the glued fill must not, since there is no break point there.
+        assert_eq!(
+            render_pw_tab(&a, a.concat(&[pad, glued]), 12),
+            "PADDINGwwwwww\nxxxx y"
+        );
+        assert_eq!(
+            render_pw_tab(&a, a.concat(&[pad, a.fill(&parts)]), 12),
+            "PADDING\nwwwwww\nxxxx y"
+        );
+    }
+
     #[test]
     fn test_arena_indent_softline_break() {
         let a = DocArena::new();

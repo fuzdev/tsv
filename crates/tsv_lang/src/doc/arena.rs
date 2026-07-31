@@ -210,10 +210,13 @@ const _: () = assert!(!std::mem::needs_drop::<DocNode>());
 // pinned per target: 24 B on 64-bit (the native flagship) and 16 B on wasm32 (the shipped WASM
 // bundles, where the locality/allocator budget matters most).
 //
-// ⚠️ **`WithContext` is the 64-bit size driver** — it carries a `DocContext` by value, so a field
-// added there lands on *every* node in the store. That is why `DocContext::trailing_reserve` is a
-// `u16` (it is a column count; as a `usize` it alone held the whole node store at 32 B) and why
-// `DocContext` carries its own size assert. Check that one first when this pin moves.
+// ⚠️ The drivers are **`Text`** on 64-bit (a `DocText` is 24 B, from `Static`'s fat pointer plus
+// its width slot) and **`Group`** on wasm32 (16 B). `WithContext` is *not* one on either target
+// (12 B, so 12 B of slack on 64-bit and 4 B on wasm32) — but it is the variant most likely to grow,
+// since it carries a `DocContext` by value and a field added there lands on *every* node in the
+// store. That is why `DocContext::trailing_reserve` is a `u16` (it is a column count; as a `usize`
+// it alone held the whole node store at 32 B) and why `DocContext` carries its own size assert with
+// the exact threshold. Check that one first when this pin moves.
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<DocNode>() == 24);
 #[cfg(target_pointer_width = "32")]
@@ -1179,7 +1182,7 @@ impl DocArena {
     }
 
     /// If `id` is an after-element fold — a `Fill` wrapped in a `WithContext` carrying
-    /// [`DocContext::hug_wide_first`], the marker `build_after_element_fold` always sets —
+    /// [`DocContext::after_element_fold`], the shape marker `build_after_element_fold` sets —
     /// return the fold's LEAD item: the inline element the trailing text packs after. `None`
     /// for any other node.
     ///
@@ -1193,7 +1196,7 @@ impl DocArena {
         let DocNode::WithContext { doc, context } = &nodes[id.index()] else {
             return None;
         };
-        if !context.hug_wide_first {
+        if !context.after_element_fold {
             return None;
         }
         let DocNode::Fill(range) = &nodes[doc.index()] else {

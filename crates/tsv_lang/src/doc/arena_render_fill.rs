@@ -165,8 +165,8 @@ pub(super) fn render_fill_iterative(
         // longer isolates its trailing text: it packs like every other fill word so the run flows
         // after it (conformance_prettier.md §Svelte: Inline content block-style, "a text run flows as
         // one fill"). The at-line-start case falls through to Case 3's `both_fit` flow; the mid-fill
-        // case flows via the `hug_terminal_after_break`-gated arm in Case 3. A *wide* element that
-        // wraps still hugs the dangled `>` (`hug_terminal_after_break`) / owns its line.
+        // case flows via the `after_element_fold`-gated arm in Case 3. A *wide* element that wraps
+        // still hugs the dangled `>` (the fold's terminal-tail hug) / owns its line.
 
         // Case 1: Last item
         if offset + 1 >= parts.len() {
@@ -393,7 +393,7 @@ pub(super) fn render_fill_iterative(
                     source,
                 );
 
-                if context.hug_wide_first && !content_fits_at_start {
+                if context.after_element_fold && !content_fits_at_start {
                     // The first fill item is a breakable inline element (the after-element fold's
                     // element) sitting mid-line right after a small prefix — the parent inline
                     // element's `>`. It does not fit flat here, and it would not fit on its own line
@@ -585,7 +585,7 @@ pub(super) fn render_fill_iterative(
 /// rendered on its own line, the trailing text hugs the dangled `>` — separator rendered Flat, the
 /// one space it stands for — when the next item actually fits at the resulting column (`+ 1` for
 /// that space), and takes its own line (Break) otherwise. Gated on the fold via
-/// [`DocContext::hug_terminal_after_break`]; every non-fold fill keeps the isolating Break, where a
+/// [`DocContext::after_element_fold`]; every non-fold fill keeps the isolating Break, where a
 /// wrapped item never lets the next hug its last line.
 #[inline]
 fn hug_terminal_sep_mode(
@@ -594,7 +594,7 @@ fn hug_terminal_sep_mode(
     next_content: DocId,
     pos: usize,
 ) -> Mode {
-    if context.hug_terminal_after_break
+    if context.after_element_fold
         && arena_fits_with_lookahead(
             ctx.arena,
             next_content,
