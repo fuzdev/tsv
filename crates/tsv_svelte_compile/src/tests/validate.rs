@@ -25,6 +25,12 @@ fn compile_duplicate_attribute_refuses() {
         "{#await p}<i>x</i>{:catch e}<div id=\"a\" id=\"b\"></div>{/await}",
         "duplicate",
     );
+    // And on a SPECIAL element, not just a regular one — the walk reaches both
+    // attribute lists, so a `<svelte:boundary>` gets the rule for free.
+    assert_unsupported(
+        "<script>let a, b;</script><svelte:boundary onerror={a} onerror={b}>x</svelte:boundary>",
+        "duplicate",
+    );
 }
 
 #[test]
@@ -91,6 +97,31 @@ fn compile_unknown_svelte_meta_tag_is_parse_rejected() {
     let _ = compile_js("<svelte:element this=\"div\" />");
     let _ = compile_js("<svelte:boundary>x</svelte:boundary>");
     let _ = compile_js("<foo:bar />");
+}
+
+#[test]
+fn compile_nested_svelte_options_is_parse_rejected() {
+    // `<svelte:options>` is the one `root_only_meta_tags` member with no node type of
+    // its own — it fills `Root`'s `options` slot, which only the root dispatch fills —
+    // so a nested one is unrepresentable and is rejected at PARSE, not here. That is
+    // why `validate.rs`'s `root_only_meta_tag` has no arm for it: no such element can
+    // reach the compiler. Its four siblings DO have node types, so their placement rule
+    // is a compiler refusal (the test above).
+    const INVALID_PLACEMENT: &str = "cannot be inside elements or blocks";
+    assert_parse_rejected("<div><svelte:options /></div>", INVALID_PLACEMENT);
+    assert_parse_rejected("{#if x}<svelte:options />{/if}", INVALID_PLACEMENT);
+    // Including a `<svelte:boundary>` container, and a region SSR DROPS.
+    assert_parse_rejected(
+        "<svelte:boundary><svelte:options /></svelte:boundary>",
+        INVALID_PLACEMENT,
+    );
+    assert_parse_rejected(
+        "{#await p}a{:then v}b{:catch e}<svelte:options />{/await}",
+        INVALID_PLACEMENT,
+    );
+
+    // At the root it parses, and the compiler's own unconditional refusal takes it.
+    assert_unsupported("<svelte:options runes />", "<svelte:options>");
 }
 
 #[test]

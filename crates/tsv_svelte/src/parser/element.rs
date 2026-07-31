@@ -61,6 +61,33 @@ fn is_reserved_namespace_miss(name: &str) -> bool {
     name.starts_with("svelte:") && !SpecialElementTag::is_meta_tag_name(name)
 }
 
+/// Whether `name` is the meta tag that has **no fragment-node form**, so it exists only
+/// where the root dispatch (`parse_root`) builds it. Exactly `svelte:options` today: it
+/// fills `Root`'s single `Option` slot rather than becoming a `FragmentNode`. Reaching
+/// *this* parser therefore means it is nested inside an element or a block, which Svelte
+/// rejects as `svelte_meta_invalid_placement`.
+///
+/// Rejecting is the only representable answer — the same argument that makes
+/// [`is_reserved_namespace_miss`] a parser concern rather than a later validate pass's:
+/// accepting fabricates a `RegularElement { name: "svelte:options" }`, a shape Svelte's
+/// AST never contains, and no post-parse pass can repair a wire that is already wrong.
+/// Its four `root_only_meta_tags` siblings are **not** this case — `svelte:head` /
+/// `svelte:window` / `svelte:body` / `svelte:document` each have a `SpecialElementTag`, so
+/// a nested one builds exactly the node type Svelte builds before erroring; their
+/// placement (and duplicate) rule is representable, so it stays diagnostics-layer work.
+///
+/// Derived from [`SpecialElementTag`] rather than a second literal, so the two cannot
+/// drift: within the reserved namespace, a meta tag with no variant *is* a meta tag with
+/// no fragment-node form. The `svelte:` gate comes first for the reason
+/// [`SpecialElementTag::is_meta_tag_name`] documents — without it `slot` inside a
+/// `<template shadowrootmode>` would match, since it is admitted as a meta tag yet
+/// deliberately yields `None` there.
+fn is_root_slot_meta_tag(name: &str) -> bool {
+    name.starts_with("svelte:")
+        && SpecialElementTag::is_meta_tag_name(name)
+        && SpecialElementTag::from_tag_name(name, false, false).is_none()
+}
+
 /// Port of Svelte's `is_valid_element_name` (`1-parse/state/element.js`): a doctype
 /// (`<!DOCTYPE>`), a namespaced meta/element name (`<svelte:head>`, `<foo:bar>`), or a valid
 /// HTML/SVG/MathML/custom element name (`REGEX_VALID_TAG_NAME`).
@@ -135,10 +162,10 @@ pub(crate) enum ParsedElement<'arena> {
 /// positional: `gt` is the `>` byte itself — the element's `open_tag_end`, which is where the
 /// printer looks for a comment run trailing the last attribute — while `after_gt` is the byte
 /// past it, where content starts and where a childless element ends.
-struct OpeningTagEnd {
-    self_closing: bool,
-    gt: u32,
-    after_gt: usize,
+pub(super) struct OpeningTagEnd {
+    pub(super) self_closing: bool,
+    pub(super) gt: u32,
+    pub(super) after_gt: usize,
 }
 
 /// What the `this` attribute of a special element bound to, if it was there at all.
@@ -230,6 +257,17 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             return Err(self.error_msg_at("Expected a valid element or component name", start + 1));
         }
 
+        // Only the root dispatch can build `<svelte:options>`, so one that reaches the
+        // element parser is nested — a placement Svelte rejects, and one tsv's AST cannot
+        // hold. As in Svelte, the check comes *after* the name gates and *before* the
+        // node-type decision below.
+        if is_root_slot_meta_tag(tag_name) {
+            return Err(self.error_msg_at(
+                &format!("`<{tag_name}>` cannot be inside elements or blocks"),
+                start,
+            ));
+        }
+
         self.advance_past_name(name_end)?;
 
         // Check if this is a special element. `title`/`slot` classification depends on the
@@ -254,9 +292,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Consume what closes an opening tag: the optional self-closing `/`, then the required
-    /// `>`. Shared by both element bodies, which differ in everything *around* the tag but
-    /// terminate it identically.
-    fn finish_opening_tag(&mut self) -> Result<OpeningTagEnd, ParseError> {
+    /// `>`. Shared by both element bodies and by the root dispatch's
+    /// [`parse_svelte_options`](super::SvelteParser::parse_svelte_options), which differ in
+    /// everything *around* the tag but terminate it identically.
+    pub(super) fn finish_opening_tag(&mut self) -> Result<OpeningTagEnd, ParseError> {
         let self_closing = self.check(TokenKind::Slash);
         if self_closing {
             self.advance()?; // consume /
@@ -858,8 +897,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 #[cfg(test)]
 mod tests {
     use super::{
-        is_namespaced_name, is_reserved_namespace_miss, is_valid_element_name, is_valid_tag_name,
-        tag_name_end,
+        is_namespaced_name, is_reserved_namespace_miss, is_root_slot_meta_tag,
+        is_valid_element_name, is_valid_tag_name, tag_name_end,
     };
     use crate::ast::internal::is_component_name;
 
@@ -1041,5 +1080,47 @@ mod tests {
                 "<{name}> is outside the reserved namespace"
             );
         }
+    }
+
+    /// The root-slot predicate must select `svelte:options` and nothing else — every other
+    /// meta tag has a `SpecialElementTag`, so a nested one is representable and its
+    /// placement rule belongs to a later pass, not to the parser.
+    #[test]
+    fn root_slot_meta_tag_is_only_svelte_options() {
+        assert!(is_root_slot_meta_tag("svelte:options"));
+        // The four `root_only_meta_tags` siblings share the placement RULE but not the
+        // representability problem, so the parser must let them through.
+        for name in [
+            "svelte:head",
+            "svelte:window",
+            "svelte:body",
+            "svelte:document",
+        ] {
+            assert!(
+                !is_root_slot_meta_tag(name),
+                "<{name}> has a node type, so it is not a root-slot tag"
+            );
+        }
+        // The freely-nestable meta tags, and names outside the namespace.
+        for name in [
+            "svelte:element",
+            "svelte:component",
+            "svelte:self",
+            "svelte:fragment",
+            "svelte:boundary",
+            "svelte:foo",
+            "div",
+            "title",
+            "Comp",
+        ] {
+            assert!(
+                !is_root_slot_meta_tag(name),
+                "<{name}> is not a root-slot tag"
+            );
+        }
+        // ⚠️ `slot` is the trap the `svelte:` gate exists for: it is admitted by
+        // `is_meta_tag_name`, yet `from_tag_name` deliberately returns `None` inside a
+        // `<template shadowrootmode>` — without the gate that context would reject it.
+        assert!(!is_root_slot_meta_tag("slot"));
     }
 }

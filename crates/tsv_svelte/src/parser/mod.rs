@@ -192,7 +192,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Parse `<svelte:options ... />` tag
     ///
-    /// svelte:options is always self-closing and has no children.
+    /// svelte:options has no children, but it may be written with an explicit closing tag
+    /// (`<svelte:options></svelte:options>`), whose `>` the span must reach.
     /// It configures component behavior via attributes like `runes`, `customElement`, etc.
     fn parse_svelte_options(&mut self) -> Result<SvelteOptions<'arena>, ParseError> {
         let start = self.current_start;
@@ -204,25 +205,29 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Parse attributes
         let attributes = self.parse_attributes()?;
 
-        // Check for self-closing: />
-        let self_closing = self.check(TokenKind::Slash);
-        if self_closing {
-            self.advance()?; // consume /
-        }
+        // Terminate the opening tag through the shared seam, so this tag can't drift from
+        // element parsing on what `/` and `>` mean. `after_gt` is both the span end for the
+        // self-closing form and where the closing tag must begin for the other.
+        let opening = self.finish_opening_tag()?;
 
-        let end = self.current_end as u32;
-        self.expect(TokenKind::RightAngle)?;
-
-        // If not self-closing, expect closing tag
-        if !self_closing {
-            self.expect(TokenKind::LeftAngle)?;
-            self.expect(TokenKind::Slash)?;
-            if !self.check(TokenKind::Identifier) || self.current_value() != "svelte:options" {
-                return Err(self.error_expected("</svelte:options>"));
+        let end = if opening.self_closing {
+            opening.after_gt as u32
+        } else {
+            // `<svelte:options>` holds no children — Svelte's `disallow_children`, run
+            // over the RAW fragment before any whitespace cleaning, so a lone space and a
+            // comment are content too (`svelte_meta_invalid_content`). tsv rejects rather
+            // than defers because `SvelteOptions` carries no fragment at all: a child is
+            // unrepresentable, so the alternatives are dropping it (content loss) or
+            // letting it fall out to the ROOT fragment, which fabricates a node Svelte's
+            // AST never contains. One position test covers every kind of content, since
+            // the lexer skips whitespace but never moves a token backward.
+            if self.current_start != opening.after_gt {
+                return Err(
+                    self.error_msg_at("<svelte:options> cannot have children", opening.after_gt)
+                );
             }
-            self.advance()?;
-            self.expect(TokenKind::RightAngle)?;
-        }
+            self.parse_closing_tag("svelte:options")?
+        };
 
         Ok(SvelteOptions {
             attributes: attributes.into_bump_slice(),

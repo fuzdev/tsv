@@ -1112,12 +1112,14 @@ Both recurse back into `fragment.rs` through `emit_child_body`.
   validated against the oracle's closed `onerror`/`failed`/`pending` list (six
   distinct over-acceptances otherwise); `onerror` drops but is guard-walked, and the
   `failed=`/`pending=` attribute FORMS refuse. ⚠️ Emitting rather than refusing a
-  boundary makes three **pre-existing, general** validation over-acceptances
-  newly REACHABLE through one — a `<svelte:head>`/`<svelte:options>` inside it
+  boundary made three **pre-existing, general** validation over-acceptances
+  REACHABLE through one — a `<svelte:head>`/`<svelte:options>` inside it
   (`svelte_meta_invalid_placement`), a duplicate `onerror` (`attribute_duplicate`),
-  and a duplicate snippet name (`declaration_duplicate`). Each fails identically
-  with no boundary in the document, so the fix is the oracle's whole-component
-  validations, never a boundary-scoped refusal; tracked in
+  and a duplicate snippet name (`declaration_duplicate`). Each failed identically
+  with no boundary in the document, so the fix was always the oracle's
+  whole-component validations, never a boundary-scoped refusal — and all are now
+  closed exactly there (the `<svelte:options>` half in the **parser**, being a
+  fabricated node type rather than a validation miss); see
   `../../docs/checklist_svelte_compiler.md`. `{@const}` hoists a
   `const` declaration to the top of its branch body and enters the evaluator's
   innermost block-scope overlay so later reads fold. Each/await locals and the

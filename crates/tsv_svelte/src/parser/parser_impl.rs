@@ -337,11 +337,6 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         ParseError::invalid_syntax(message.to_string(), position)
     }
 
-    /// Create "Expected X" error at current position
-    pub(crate) fn error_expected(&self, what: &str) -> ParseError {
-        ParseError::invalid_syntax(format!("Expected {what}"), self.current_start)
-    }
-
     /// Create "Expected X" error at specified position
     pub(crate) fn error_expected_at(&self, what: &str, position: usize) -> ParseError {
         ParseError::invalid_syntax(format!("Expected {what}"), position)

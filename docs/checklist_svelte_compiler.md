@@ -532,7 +532,9 @@ compiler therefore carries no refusal for it — no such element can reach it.
   `root_only_meta_tags` set (`element.js:45,155-164`). Placement is a *direct*-child
   test against the root, so any element, block or `<svelte:boundary>` in between makes
   the tag invalid; placement is checked before duplicate, and a mis-placed tag never
-  joins the duplicate set. `<svelte:options>` is covered upstream by the unconditional
+  joins the duplicate set. `<svelte:options>` is covered upstream on both halves — a
+  nested one is a **parse** error (it is the one member with no node type of its own, so
+  a nested one is unrepresentable), and one at the root is taken by the unconditional
   `SvelteOptions` refusal.
 
 ⚠️ Both rules were already enforced for the SSR-inert three
@@ -1243,27 +1245,27 @@ A **static** component invocation compiles to `Name($$renderer, props)` (`shared
 | `<svelte:boundary>` with the `failed={expr}` / `pending={expr}` **attribute** forms — a deferred gap, not a fence: precedence against a same-named snippet is asymmetric (`failed`: the snippet wins; `pending`: the attribute wins), and a statically-nullish `pending` emits an extra `if`/`else` fork keyed on the evaluator's `is_defined` | **Refused**: `<svelte:boundary> {name}={…} attribute form` |
 | `<svelte:options>` | **Refused**: `<svelte:options>` |
 
-#### Validation holes a `<svelte:boundary>` can now reach
+#### Validation holes a `<svelte:boundary>` could reach — closed
 
-Three **pre-existing, general** over-acceptances (tsv compiles what the oracle
-rejects) become reachable through a boundary now that it emits rather than
-refuses. None is boundary-specific — each fails identically with no boundary in
-the document, so the fix belongs with the oracle's whole-component validations,
-not with `emit_boundary`:
+Emitting a `<svelte:boundary>` rather than refusing it made three **pre-existing,
+general** over-acceptances (tsv compiles what the oracle rejects) reachable through
+one. None was boundary-specific — each failed identically with no boundary in the
+document — so the prediction was that every fix would land on the oracle's
+whole-component validations, never on `emit_boundary`. All three are now closed, and
+all three landed exactly there:
 
-| Shape | Oracle error | Boundary-free analog that over-accepts identically |
-| --- | --- | --- |
-| `<svelte:head>` / `<svelte:options>` inside a boundary | `svelte_meta_invalid_placement` | `<div><svelte:head>…`, `{#if true}<svelte:head>…`, `<div><svelte:options …>` |
-| `<svelte:boundary onerror={a} onerror={b}>` | `attribute_duplicate` | `<div onclick={a} onclick={b}>` |
-| ~~two `{#snippet failed}` (or `pending`) in one boundary~~ — **closed** | `declaration_duplicate` | `<div>{#snippet a}…{/snippet}{#snippet a}…{/snippet}</div>` |
+| Shape | Oracle error | Boundary-free analog that over-accepted identically | Closed at |
+| --- | --- | --- | --- |
+| `<svelte:head>` inside a boundary | `svelte_meta_invalid_placement` | `<div><svelte:head>…`, `{#if true}<svelte:head>…` | `validate.rs`'s `root_only_meta_tag` walk |
+| `<svelte:options>` inside a boundary | `svelte_meta_invalid_placement` | `<div><svelte:options …>` | the **parser** — it is the one `root_only_meta_tags` member with no node type of its own, so a nested one was a fabricated `RegularElement` rather than a validation miss |
+| `<svelte:boundary onerror={a} onerror={b}>` | `attribute_duplicate` | `<div onclick={a} onclick={b}>` | `validate.rs`'s `attribute_duplicate` port, which reaches a special element's attribute list too |
+| two `{#snippet failed}` (or `pending`) in one boundary | `declaration_duplicate` | `<div>{#snippet a}…{/snippet}{#snippet a}…{/snippet}</div>` | `validate.rs`'s per-fragment `declaration_duplicate` port |
 
-The last row was closed exactly where that reasoning predicted: not at
-`emit_boundary` but at the general rule, `validate.rs`'s per-fragment
-`declaration_duplicate` port (see
-[Snippet declaration and export](#snippet-declaration-and-export--closed)). It is why
-`emit_boundary`'s fragment split takes the first snippet of each name without refusing
-a second: the oracle's server visitor does pair `filter` with `find`, but it never has
-to choose — scope analysis has already rejected the duplicate, and now so has tsv's.
+That last one is why `emit_boundary`'s fragment split takes the first snippet of each
+name without refusing a second: the oracle's server visitor does pair `filter` with
+`find`, but it never has to choose — scope analysis has already rejected the
+duplicate, and now so has tsv's. See
+[Snippet declaration and export](#snippet-declaration-and-export--closed).
 
 ### select-family
 

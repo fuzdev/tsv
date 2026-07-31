@@ -484,6 +484,11 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - `customElement` option (object)
 - `css="injected"`
 - Deprecated: `immutable`, `accessors`
+- Root-only: it fills `Root`'s options slot rather than becoming a fragment node, so
+  there is no nested form and one inside an element or a block is a parse error. Its
+  four `root_only_meta_tags` siblings (`<svelte:head>` / `<svelte:window>` /
+  `<svelte:body>` / `<svelte:document>`) each have a node type, so a nested one parses
+  and the placement rule is left to a later diagnostics pass
 
 ### slot
 
