@@ -1,17 +1,19 @@
 //! Lint-table parity: pin `tsv_ffi`'s and `tsv_napi`'s hand-mirrored lint
 //! tables against the workspace's.
 //!
-//! Those two crates need `unsafe_code = "allow"` (the FFI / N-API boundary),
-//! and Cargo replaces the **whole** `[lints]` table on override — there is no
-//! partial inherit — so each re-declares every `[workspace.lints.*]` entry
-//! verbatim. That copy silently drifts when a lint is added to the workspace
-//! and not mirrored (it already had: `elided_lifetimes_in_paths` went missing).
+//! Those two crates can't inherit the workspace's `unsafe_code = "forbid"` (the
+//! FFI / N-API boundary), and Cargo replaces the **whole** `[lints]` table on
+//! override — there is no partial inherit — so each re-declares every
+//! `[workspace.lints.*]` entry verbatim. That copy silently drifts when a lint
+//! is added to the workspace and not mirrored (it already had:
+//! `elided_lifetimes_in_paths` went missing).
 //!
 //! This test is the guard: it extracts the `[lints.rust]` / `[lints.clippy]`
 //! tables from both crates and the `[workspace.lints.*]` tables from the root
-//! manifest, then asserts they are identical — except `unsafe_code`, which the
-//! two crates intentionally relax from `forbid` to `allow`. A drift fails here
-//! with the offending lint named, so the mirrored tables can't rot unnoticed.
+//! manifest, then asserts they are identical — except `unsafe_code`, where each
+//! crate is pinned to its own relaxation level (see the table in the test body;
+//! they differ). A drift fails here with the offending lint named, so the
+//! mirrored tables can't rot unnoticed.
 //!
 //! Pure string parsing (section header → next `[`), no TOML dependency.
 
@@ -68,7 +70,10 @@ fn ffi_napi_lint_tables_match_workspace() {
         "workspace [lints.rust] should forbid unsafe_code"
     );
 
-    for crate_name in ["tsv_ffi", "tsv_napi"] {
+    // Pinned to the *exact* level each crate relaxes to, not merely "weaker
+    // than forbid" — they differ on purpose, and each crate's own manifest
+    // comment carries the reasoning.
+    for (crate_name, expected_unsafe_code) in [("tsv_ffi", "\"allow\""), ("tsv_napi", "\"deny\"")] {
         let toml =
             fs::read_to_string(root.join("crates").join(crate_name).join("Cargo.toml")).unwrap();
         let clippy = lint_table(&toml, "[lints.clippy]");
@@ -81,12 +86,12 @@ fn ffi_napi_lint_tables_match_workspace() {
              re-sync it verbatim (Cargo replaces the whole table on override)"
         );
 
-        // Rust table mirrors the workspace too, except `unsafe_code`: these
-        // crates relax it from `forbid` to `allow` for the FFI / N-API boundary.
+        // Rust table mirrors the workspace too, except `unsafe_code`, which
+        // each crate relaxes from `forbid` to its own pinned level.
         assert_eq!(
             rust.remove("unsafe_code").as_deref(),
-            Some("\"allow\""),
-            "{crate_name} should set unsafe_code = \"allow\""
+            Some(expected_unsafe_code),
+            "{crate_name} should set unsafe_code = {expected_unsafe_code}"
         );
         let mut root_rust_sans_unsafe = root_rust.clone();
         root_rust_sans_unsafe.remove("unsafe_code");
