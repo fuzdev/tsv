@@ -350,9 +350,6 @@ impl Refusal {
             Self::RuneInvalidSpread { .. } => {
                 Cow::Borrowed("{rune} cannot be called with a spread argument (the oracle rejects it)")
             }
-            Self::SvelteMetaInvalidTag { .. } => {
-                Cow::Borrowed("<{name}> is not a valid <svelte:...> meta tag (the oracle rejects it)")
-            }
             Self::SpecialElementInvalidPlacement { .. } => {
                 Cow::Borrowed("<{name}> must be a top-level element (the oracle rejects it)")
             }
@@ -641,9 +638,6 @@ impl Refusal {
             Self::SvelteHeadWithConstTag,
             Self::RuneInvalidSpread {
                 rune: "{rune}".to_string(),
-            },
-            Self::SvelteMetaInvalidTag {
-                name: "{name}".to_string(),
             },
             Self::SpecialElementInvalidPlacement {
                 name: "{name}".to_string(),

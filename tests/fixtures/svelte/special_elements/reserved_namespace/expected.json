@@ -1,0 +1,172 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 382,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 271,
+				"data": "\n\tThe `svelte:` namespace is reserved: a tag in it must name one of the known meta\n\ttags, so an unknown local name is a parse error (see the input_invalid_* files).\n\tOnly that exact prefix is reserved — every other namespace stays an ordinary\n\tnamespaced element.\n"
+			},
+			{
+				"type": "Text",
+				"start": 271,
+				"end": 272,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteHead",
+				"start": 272,
+				"end": 322,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 273
+					},
+					"end": {
+						"line": 7,
+						"column": 12,
+						"character": 284
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 285,
+							"end": 287,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "TitleElement",
+							"start": 287,
+							"end": 307,
+							"name": "title",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 2,
+									"character": 288
+								},
+								"end": {
+									"line": 8,
+									"column": 7,
+									"character": 293
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 294,
+										"end": 299,
+										"raw": "text1",
+										"data": "text1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 307,
+							"end": 308,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 322,
+				"end": 324,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 324,
+				"end": 356,
+				"name": "sveltex:foo",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 325
+					},
+					"end": {
+						"line": 11,
+						"column": 12,
+						"character": 336
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 337,
+							"end": 342,
+							"raw": "text2",
+							"data": "text2"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 356,
+				"end": 357,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 357,
+				"end": 381,
+				"name": "foo:bar",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 358
+					},
+					"end": {
+						"line": 12,
+						"column": 8,
+						"character": 365
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 366,
+							"end": 371,
+							"raw": "text3",
+							"data": "text3"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

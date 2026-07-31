@@ -492,6 +492,15 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Slot with fallback content
 - Slot props
 
+### Reserved `svelte:` namespace
+
+- The ten meta tags above are the whole namespace — any other local name is a parse
+  error (`<svelte:foo>`, `<svelte:headx>`, `<svelte:optionsx>`)
+- Matched case-sensitively on both halves: `<svelte:Head>` is rejected, `<SVELTE:head>`
+  is an ordinary namespaced element
+- Only that exact prefix is reserved — `<sveltex:foo>` and `<foo:bar>` stay ordinary
+  namespaced elements
+
 ---
 
 ## Runes (Svelte 5)
