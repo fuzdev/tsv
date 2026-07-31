@@ -46,7 +46,7 @@ Foundation for all parsing.
 - ASCII identifiers (`foo`, `_private`, `$jquery`)
 - Unicode identifiers (`π`, `日本語`) — full `ID_Start`/`ID_Continue` per UAX #31, including the `Other_ID_*` and NFKC-excluded code points (`゛` U+309B, …) that `XID_*` drops
 - Escaped identifiers (`\u0041` = A)
-- Private identifiers (`#privateField`) - ES2022
+- Private identifiers (`#privateField`) - ES2022. `PrivateIdentifier :: # IdentifierName` is a single lexical token, so every reserved word is a valid name (`#default`, `#class`, `#true`) and nothing may sit between the `#` and the name (`# a` is not a private name). `#constructor` is the one reserved private name, by the `ClassElementName` early error
 - Reserved word restrictions
 
 ---

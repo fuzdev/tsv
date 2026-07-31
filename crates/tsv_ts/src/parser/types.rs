@@ -717,7 +717,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         while self.eat(TokenKind::Dot) {
             let right_name = self
-                .try_ident_or_keyword_name()
+                .try_ident_or_contextual_name()
                 .ok_or_else(|| self.error_expected_after("identifier", "."))?;
 
             let (right_start, right_end) = self.current_pos();
@@ -1235,7 +1235,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `finish_mapped_type`).
         let param_start = self.current_pos().0;
         let param_name = self
-            .try_ident_or_keyword_name()
+            .try_ident_or_contextual_name()
             .ok_or_else(|| self.error_expected("type parameter name in mapped type"))?;
         self.advance()?;
 
