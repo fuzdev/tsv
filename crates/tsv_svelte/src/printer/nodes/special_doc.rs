@@ -8,6 +8,8 @@
 
 use crate::ast::internal::{self, SpecialElementKind};
 use crate::printer::Printer;
+use tsv_lang::Span;
+use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::{DocBuf, arena::DocId};
 
 use super::element_doc::{AttrGaps, ElementContext, ElementKind, ElementLayout, ElementParts};
@@ -164,29 +166,48 @@ impl<'a> Printer<'a> {
         // apart because their types differ: the component's `this` is always braced, the
         // element's may be a plain string.
         //
-        // `claimed` is decided here, beside the doc, because it is the same fact as which
-        // form was just built: the braces the `this` doc has now printed the comments of.
-        // The attribute scan below probes the whole name→`>` gap, which those braces sit
-        // inside — without the claim it prints them a second time. A plain-string `this`
-        // claims nothing: no braces, so no gap a comment could occupy.
-        let (this_doc, claimed) = match &element.kind {
-            SpecialElementKind::SvelteElement { tag } => {
-                (Some(self.build_this_attr_doc_for_inline(tag)), tag.braces())
+        // The doc and the source span of the value it prints travel together — one `Option`
+        // rather than two in lockstep, so no reader downstream has to handle a state that
+        // cannot exist (a doc without its span, or the reverse). The span is the same fact as
+        // which form was just built, which is why it is decided here beside the doc.
+        let synthesized_this = match &element.kind {
+            SpecialElementKind::SvelteElement { tag } => Some((
+                self.build_this_attr_doc_for_inline(tag),
+                tag.braces().unwrap_or_else(|| tag.span()),
+            )),
+            SpecialElementKind::SvelteComponent { expression } => {
+                Some((self.build_this_braced_doc(expression), expression.span))
             }
-            SpecialElementKind::SvelteComponent { expression } => (
-                Some(self.build_this_braced_doc(expression)),
-                Some(expression.span),
-            ),
-            _ => (None, None),
+            _ => None,
         };
 
+        // What this site prints, from the tag name through the end of the bound value. The
+        // attribute scan below probes the whole name→`>` window, which that region sits
+        // inside, so it is also what the scan must skip — without the claim every comment in
+        // it prints twice, once by each. It runs from the *name* rather than from the value
+        // because this site prints the comments before the binding too (below); a comment
+        // after the value is outside it and belongs to the attribute list as usual.
+        let claimed = synthesized_this.map(|(_, value)| Span {
+            start: element.name_span.end,
+            end: value.end,
+        });
+
         // Pre-allocate: 2 docs per attr (separator + attr), plus the synthesized `this={…}`.
-        let capacity = (element.attributes.len() + usize::from(this_doc.is_some())) * 2;
+        let capacity = (element.attributes.len() + usize::from(synthesized_this.is_some())) * 2;
         let mut docs: DocBuf = DocBuf::with_capacity(capacity);
 
-        if let Some(this_doc) = this_doc {
-            docs.push(separator);
-            docs.push(this_doc);
+        if let Some((this_doc, value)) = synthesized_this {
+            // Comments the author wrote BEFORE the binding are printed here, through the same
+            // seam the attribute loop uses — the only site that can keep them on that side of
+            // it. Left to the attribute list they would be emitted after a binding that is not
+            // in `attributes` at all, which both relocates them past it and, once the tag
+            // breaks, is not even a fixed point (see `Printer::comment_starts_its_own_line`).
+            self.push_attr_item_with_leading_comments(
+                &mut docs,
+                separator,
+                comments_to_emit_in_range(self.comments, element.name_span.end, value.start),
+                this_doc,
+            );
         }
 
         // svelte:element renders as HTML, so normalize class attribute whitespace

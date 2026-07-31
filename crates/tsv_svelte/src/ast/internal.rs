@@ -714,11 +714,14 @@ impl<'arena> SpecialElementKind<'arena> {
         }
     }
 
-    /// The `<svelte:component>` `this` expression — the wire's `expression` field. Always an
-    /// island, so the bare expression is all its writer needs.
-    pub fn expression(&self) -> Option<&Expression<'arena>> {
+    /// The `<svelte:component>` `this` binding — the wire's `expression` field.
+    ///
+    /// The whole tag, not the bare expression: its `{…}` span is what bounds the expression's
+    /// comment-attach window, and handing out the expression without it is how comments
+    /// outside the braces came to attach to it.
+    pub fn expression(&self) -> Option<&ExpressionTag<'arena>> {
         match self {
-            Self::SvelteComponent { expression } => Some(&expression.expression),
+            Self::SvelteComponent { expression } => Some(expression),
             _ => None,
         }
     }
@@ -754,6 +757,14 @@ pub struct SpecialElement<'arena> {
 pub struct SvelteOptions<'arena> {
     pub attributes: &'arena [AttributeNode<'arena>],
     pub span: Span,
+    /// End of the `svelte:options` tag name — where the attribute list's first gap begins.
+    /// Kept from the parse rather than derived from `span.start` + the tag's length, so no
+    /// reader has to assume how the name was spelled.
+    pub name_end: u32,
+    /// The `>` closing the opening tag; with `name_end` it bounds the region the attribute
+    /// list's comments live in. `span.end` is not it: the paired form
+    /// (`<svelte:options></svelte:options>`) runs on to the closing tag.
+    pub open_tag_end: u32,
 }
 
 impl<'arena> FragmentNode<'arena> {

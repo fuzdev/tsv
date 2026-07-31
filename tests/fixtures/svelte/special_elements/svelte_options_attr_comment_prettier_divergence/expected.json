@@ -1,0 +1,135 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 154,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 85,
+				"data": " Block comments at all three attribute-list positions (prettier deletes them) "
+			},
+			{
+				"type": "Text",
+				"start": 85,
+				"end": 86,
+				"raw": "\n",
+				"data": "\n"
+			}
+		]
+	},
+	"options": {
+		"start": 86,
+		"end": 153,
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 111,
+				"end": 116,
+				"name": "runes",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 25,
+						"character": 111
+					},
+					"end": {
+						"line": 2,
+						"column": 30,
+						"character": 116
+					}
+				},
+				"value": true
+			},
+			{
+				"type": "Attribute",
+				"start": 126,
+				"end": 141,
+				"name": "namespace",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 40,
+						"character": 126
+					},
+					"end": {
+						"line": 2,
+						"column": 49,
+						"character": 135
+					}
+				},
+				"value": [
+					{
+						"start": 137,
+						"end": 140,
+						"type": "Text",
+						"raw": "svg",
+						"data": "svg"
+					}
+				]
+			}
+		],
+		"runes": true,
+		"namespace": "svg"
+	},
+	"comments": [
+		{
+			"type": "Block",
+			"start": 102,
+			"end": 110,
+			"value": " c1 ",
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 16,
+					"character": 102
+				},
+				"end": {
+					"line": 2,
+					"column": 24,
+					"character": 110
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 117,
+			"end": 125,
+			"value": " c2 ",
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 31,
+					"character": 117
+				},
+				"end": {
+					"line": 2,
+					"column": 39,
+					"character": 125
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 142,
+			"end": 150,
+			"value": " c3 ",
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 56,
+					"character": 142
+				},
+				"end": {
+					"line": 2,
+					"column": 64,
+					"character": 150
+				}
+			}
+		}
+	]
+}

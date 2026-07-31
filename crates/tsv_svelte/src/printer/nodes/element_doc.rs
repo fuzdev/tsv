@@ -11,7 +11,7 @@
 // in `element_analysis.rs`. The shared types (`BoundaryMode`, `ElementLayout`,
 // `ElementKind`, `ElementContext`) are defined here and used by both.
 
-use crate::ast::internal::{self, FragmentNode};
+use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -147,19 +147,24 @@ pub(super) struct TagClass {
 /// A named struct rather than loose `u32`s for the same reason [`TagClass`] is one: the two
 /// offsets are positional and silently swappable at the call site.
 #[derive(Clone, Copy)]
-pub(super) struct AttrGaps {
+pub(in crate::printer) struct AttrGaps {
     /// Where the gap before the first attribute starts — the tag name's end.
-    pub(super) first_range_start: u32,
+    pub(in crate::printer) first_range_start: u32,
     /// The `>` closing the opening tag; bounds the gap after the last attribute.
-    pub(super) open_tag_end: u32,
+    pub(in crate::printer) open_tag_end: u32,
     /// A region inside the window that the caller prints itself, whose comments the scan
-    /// must therefore skip. `<svelte:element this={…}>` keeps its `this` out of the
-    /// attribute list and synthesizes the attribute, so the braces land in one of the gaps
-    /// probed here while the tag's own doc is what prints them; without the skip a comment
-    /// in there is emitted twice, once by each. Ownership does not cover this on its own: a
-    /// *glued block* comment is `owned_by_node` and already skipped on the `to emit` axis,
-    /// but a line comment never is (`owned ⇒ is_block`).
-    pub(super) claimed: Option<Span>,
+    /// must therefore skip. `<svelte:element this={…}>` keeps its `this` out of the attribute
+    /// list and synthesizes the attribute, so that region lands in one of the gaps probed
+    /// here while the tag's own doc is what prints it; without the skip a comment in there is
+    /// emitted twice, once by each. Ownership does not cover this on its own: a *glued block*
+    /// comment is `owned_by_node` and already skipped on the `to emit` axis, but a line
+    /// comment never is (`owned ⇒ is_block`).
+    ///
+    /// It runs from the **tag name**, not from the binding's `{`: the caller prints the
+    /// comments *before* the binding too (they are the only ones that can stay on that side
+    /// of it), so they are claimed alongside the ones inside it. A comment after the bound
+    /// value is outside the region and belongs to the attribute list as usual.
+    pub(in crate::printer) claimed: Option<Span>,
 }
 
 /// Why an element's content lays out multiline — and whether that reason survives reformatting.
@@ -951,10 +956,11 @@ impl<'a> Printer<'a> {
 
     /// Push attribute docs with interleaved JS comment handling.
     ///
-    /// Shared between regular element and special element attr doc builders.
-    /// Handles comments between attributes and trailing comments after the last one, over
-    /// the window described by [`AttrGaps`].
-    pub(super) fn push_attrs_with_comments(
+    /// The one attribute-list emitter: regular elements, special elements, and the hoisted
+    /// `<svelte:options>` head all come through here. Handles comments before each attribute
+    /// and after the last one — or, when the list is empty, the whole window — over the range
+    /// described by [`AttrGaps`].
+    pub(in crate::printer) fn push_attrs_with_comments(
         &self,
         docs: &mut DocBuf,
         attrs: &[internal::AttributeNode<'_>],
@@ -962,7 +968,6 @@ impl<'a> Printer<'a> {
         gaps: AttrGaps,
         is_html: bool,
     ) {
-        let d = self.d();
         let AttrGaps {
             first_range_start,
             open_tag_end,
@@ -975,18 +980,28 @@ impl<'a> Printer<'a> {
                 !claimed.is_some_and(|r| r.start <= c.span.start && c.span.end <= r.end)
             })
         };
-        let has_gap_comments = |start: u32, end: u32| gap_comments(start, end).next().is_some();
+        // Where the gap *before* attribute `i` starts: the previous attribute's end, or the
+        // window start when there is no previous one. Asked of `attrs.len()` it is the gap
+        // after the last attribute — and, for an empty list, the whole window. One rule for
+        // every gap, so the trailing range cannot be anchored differently from the rest:
+        // guarding that one on `attrs.last()` instead is exactly how an attribute-less tag
+        // (`<div // c⏎>`, `<Comp /* c */ />`) silently deleted every comment in its head, and
+        // one real attribute was enough to hide it.
+        let gap_start = |i: usize| {
+            i.checked_sub(1)
+                .map_or(first_range_start, |prev| attrs[prev].span().end)
+        };
 
-        // Every gap this fn probes — each attribute's leading range and the trailing range
-        // after the last one — lies inside `[first_range_start, open_tag_end]`. A comment
+        // Every gap this fn probes lies inside `[first_range_start, open_tag_end]`. A comment
         // lands in a probe only when it sits fully inside the queried range, so a
         // comment-free open tag means every one of those gaps is comment-free: each would
-        // take the bare-separator branch below and the trailing block would emit nothing.
-        // Answer that with one probe instead of one per attribute plus one. (Whole-window
-        // and per-gap probes share `gap_comments`, so the claim is honored identically by
-        // both — a claim that shortcut only the per-gap probes would re-open the
-        // double-print through this fast path.)
-        if !has_gap_comments(first_range_start, open_tag_end) {
+        // reach `push_attr_item_with_leading_comments` with an empty run and take its
+        // bare-separator branch, and the trailing block would emit nothing. Answer that with
+        // one probe instead of one per attribute plus one. (Whole-window and per-gap probes
+        // share `gap_comments`, so the claim is honored identically by both — a claim that
+        // shortcut only the per-gap probes would re-open the double-print through this fast
+        // path.)
+        if gap_comments(first_range_start, open_tag_end).next().is_none() {
             for attr in attrs {
                 docs.push(separator);
                 docs.push(self.build_attribute_node_doc(attr, is_html));
@@ -995,44 +1010,72 @@ impl<'a> Printer<'a> {
         }
 
         for (i, attr) in attrs.iter().enumerate() {
-            // Check for JS comments before this attribute
-            let range_start = if i == 0 {
-                first_range_start
-            } else {
-                attrs[i - 1].span().end
-            };
-            let range_end = attr.span().start;
-
-            if !has_gap_comments(range_start, range_end) {
-                docs.push(separator);
-            } else {
-                let last_is_own_line = self.push_attr_comment_docs(
-                    docs,
-                    gap_comments(range_start, range_end),
-                    range_start,
-                );
-                // Separator before the next attribute
-                if last_is_own_line {
-                    docs.push(d.hardline());
-                } else {
-                    docs.push(d.text(" "));
-                }
-            }
-
-            docs.push(self.build_attribute_node_doc(attr, is_html));
+            self.push_attr_item_with_leading_comments(
+                docs,
+                separator,
+                gap_comments(gap_start(i), attr.span().start),
+                self.build_attribute_node_doc(attr, is_html),
+            );
         }
 
-        // Check for trailing comments after last attribute
-        if let Some(last_attr) = attrs.last() {
-            let range_start = last_attr.span().end;
-            if has_gap_comments(range_start, open_tag_end) {
-                self.push_attr_comment_docs(
-                    docs,
-                    gap_comments(range_start, open_tag_end),
-                    range_start,
-                );
-            }
+        // The gap after the last attribute — or, for an empty list, the whole window, where
+        // the loop above ran zero times and this is the tag's only emitter. An empty run is
+        // a no-op, so it needs no guard.
+        self.push_attr_comment_docs(docs, gap_comments(gap_start(attrs.len()), open_tag_end));
+    }
+
+    /// Push one attribute-list item behind whatever comments lead it.
+    ///
+    /// With no comment in the gap the item takes `separator`; with one it takes the run's own
+    /// tail rule instead — a run ending on its own line, or on any line comment (a `//` runs
+    /// to end of line), pushes the item to a fresh line, and otherwise it stays inline.
+    ///
+    /// One seam for two callers, because it is one decision: the attribute loop in
+    /// [`Self::push_attrs_with_comments`], and the synthesized `this={…}` that
+    /// `build_special_element_attrs_doc` prints before that loop runs. Keeping a second copy
+    /// beside the `this` binding is how the two drifted in the first place — that one printed
+    /// no leading comments at all, so every comment before the binding was dropped.
+    pub(super) fn push_attr_item_with_leading_comments<'c>(
+        &self,
+        docs: &mut DocBuf,
+        separator: DocId,
+        comments: impl IntoIterator<Item = &'c tsv_lang::Comment>,
+        item: DocId,
+    ) {
+        let d = self.d();
+        let mut comments = comments.into_iter().peekable();
+        if comments.peek().is_none() {
+            docs.push(separator);
+        } else {
+            let last_is_own_line = self.push_attr_comment_docs(docs, comments);
+            docs.push(if last_is_own_line {
+                d.hardline()
+            } else {
+                d.text(" ")
+            });
         }
+        docs.push(item);
+    }
+
+    /// Whether the author put `comment` on a line of its own — the question every
+    /// attribute-list gap emitter asks to pick the comment's separator.
+    ///
+    /// Answered by scanning **backwards** from the comment over inter-token whitespace
+    /// ([`is_collapsible_ws_char`], shared rather than restated — anything outside that class
+    /// is a token, and stopping there is the answer): it starts its own line when a newline is
+    /// crossed first. The obvious alternative — "does `source[gap_start..comment_start]`
+    /// contain a newline?" — asks a *different* question wherever the printer emits something
+    /// into that span, and gets it wrong: `<svelte:element>` synthesizes `this={…}` from the
+    /// element kind rather than from `attributes`, so a comment after the binding is measured
+    /// from the **tag name** and, once the tag has broken across lines, the scan finds the
+    /// printer's own newline and moves the comment to its own line — a second pass that
+    /// changes the output. Asking about the comment alone has no anchor to get wrong.
+    fn comment_starts_its_own_line(&self, comment: &tsv_lang::Comment) -> bool {
+        self.source[..comment.span.start as usize]
+            .chars()
+            .rev()
+            .take_while(|&c| is_collapsible_ws_char(c))
+            .any(|c| c == '\n')
     }
 
     /// Push docs for JS comments between attributes.
@@ -1042,17 +1085,15 @@ impl<'a> Printer<'a> {
     /// the following attribute must start on a new line — true for any own-line
     /// comment and for any line comment (a `//` runs to end of line, so the next
     /// token can't share it); the caller uses this to pick that separator.
-    pub(super) fn push_attr_comment_docs<'c>(
+    fn push_attr_comment_docs<'c>(
         &self,
         docs: &mut DocBuf,
         comments: impl IntoIterator<Item = &'c tsv_lang::Comment>,
-        range_start: u32,
     ) -> bool {
         let d = self.d();
         let mut last_was_own_line = false;
         for comment in comments {
-            let is_own_line =
-                self.source[range_start as usize..comment.span.start as usize].contains('\n');
+            let is_own_line = self.comment_starts_its_own_line(comment);
 
             // Preserve the author's placement: a comment on its own line stays on its
             // own line; a comment on the same line as the preceding token stays
