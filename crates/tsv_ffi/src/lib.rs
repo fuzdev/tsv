@@ -89,7 +89,8 @@ fn format_panic(payload: &(dyn std::any::Any + Send)) -> String {
 /// Helper to convert source pointer to &str and run a closure returning the
 /// output payload verbatim (formatted source `String`, or already-serialized
 /// JSON wire bytes — the parse path returns `Vec<u8>` so the writer's
-/// UTF-8-by-construction output is never re-validated).
+/// UTF-8-by-construction output is never re-validated; the benchmark-only
+/// internal-parse path returns an empty `Vec`, which renders as empty output).
 /// Catches panics (when built with `panic = "unwind"`) and returns them as error JSON.
 ///
 /// # Safety
@@ -107,38 +108,6 @@ where
     let render = |source: &str| match panic::catch_unwind(|| f(source)) {
         // SAFETY: `out_len` validity is the caller's contract.
         Ok(Ok(result)) => unsafe { bytes_to_ptr(result, out_len) },
-        Ok(Err(e)) => unsafe { error_result(&e, out_len) },
-        Err(payload) => unsafe { error_result(&format_panic(&*payload), out_len) },
-    };
-    // SAFETY: the pointer contract is this function's own, forwarded verbatim.
-    unsafe { with_extracted_source(source_ptr, source_len, out_len, render) }
-}
-
-/// Helper for internal parse (no conversion, no JSON serialization).
-/// Returns empty string on success, error JSON on failure.
-/// Catches panics (when built with `panic = "unwind"`) and returns them as error JSON.
-///
-/// `f` yields nothing on success by design: this is the benchmark-only path, and
-/// the AST it parses never leaves the arena scope. **Keeping that parse from
-/// being optimized away is `f`'s own job** — `parse_internal!` holds the AST live
-/// with `std::hint::black_box(&ast)` *inside* the arena closure, which is the
-/// only place it still exists. Nothing out here can stand in for that.
-///
-/// # Safety
-/// Caller must ensure `source_ptr` points to valid UTF-8 of `source_len` bytes.
-#[cfg(feature = "parse")]
-unsafe fn with_source_parse_internal<F>(
-    source_ptr: *const u8,
-    source_len: usize,
-    out_len: *mut usize,
-    f: F,
-) -> *mut u8
-where
-    F: FnOnce(&str) -> Result<(), String> + panic::UnwindSafe,
-{
-    let render = |source: &str| match panic::catch_unwind(|| f(source)) {
-        // SAFETY: `out_len` validity is the caller's contract.
-        Ok(Ok(())) => unsafe { bytes_to_ptr(Vec::new(), out_len) }, // Success: empty output
         Ok(Err(e)) => unsafe { error_result(&e, out_len) },
         Err(payload) => unsafe { error_result(&format_panic(&*payload), out_len) },
     };
@@ -193,13 +162,20 @@ macro_rules! parse_convert {
     };
 }
 
+// Benchmark-only: parse and throw the AST away, so the timing isolates the parse
+// from the convert/serialize layers. Success renders as an empty payload.
+//
+// `black_box(&ast)` sits *inside* the arena closure on purpose — that is the only
+// scope where the AST still exists, so nothing further out can stand in for it.
+// Drop it and the whole parse becomes dead code the optimizer may delete, leaving
+// a benchmark that got faster by measuring nothing.
 #[cfg(feature = "parse")]
 macro_rules! parse_internal {
     ($lang:ident, $source:expr) => {
         with_ast_arena(|arena| {
             let ast = $lang::parse($source, arena).map_err(|e| e.to_string())?;
             std::hint::black_box(&ast);
-            Ok(())
+            Ok(Vec::new())
         })
     };
 }
@@ -270,7 +246,7 @@ macro_rules! lang_bindings {
             out_len: *mut usize,
         ) -> *mut u8 {
             unsafe {
-                with_source_parse_internal(source_ptr, source_len, out_len, |source| {
+                with_source_string(source_ptr, source_len, out_len, |source| {
                     parse_internal!($lang, source)
                 })
             }
@@ -399,12 +375,13 @@ pub unsafe extern "C" fn tsv_parse_internal_typescript_with_goal(
     out_len: *mut usize,
 ) -> *mut u8 {
     unsafe {
-        with_source_parse_internal(source_ptr, source_len, out_len, |source| {
+        with_source_string(source_ptr, source_len, out_len, |source| {
             with_ast_arena(|arena| {
                 let ast = tsv_ts::parse_with_goal(source, ffi_goal(goal), arena)
                     .map_err(|e| e.to_string())?;
+                // See `parse_internal!` — this must stay inside the arena closure.
                 std::hint::black_box(&ast);
-                Ok(())
+                Ok(Vec::new())
             })
         })
     }
@@ -534,7 +511,7 @@ mod tests {
 
     #[test]
     fn parse_internal_reports_errors() {
-        // Cover the error arm of `with_source_parse_internal` for all three
+        // Cover the error arm of the internal-parse exports for all three
         // languages (success arm is covered above for all three).
         let cases: [(&str, FfiFn, &str); 3] = [
             ("typescript", tsv_parse_internal_typescript, "const ="),
