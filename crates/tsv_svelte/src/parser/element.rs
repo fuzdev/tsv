@@ -89,18 +89,45 @@ pub(crate) enum ParsedElement<'arena> {
     SpecialElement(SpecialElement<'arena>),
 }
 
-/// Result of parsing special element attributes: the attribute list with any `this` lifted
-/// out of it, plus that `this` binding for whichever of the two tags carries one.
+/// Where an opening tag ended, as [`SvelteParser::finish_opening_tag`] read it.
 ///
-/// Two slots rather than one because the tags accept different forms — `<svelte:element>`
-/// takes either (`this="div"` and `this={tag}` are both legal), `<svelte:component>` only
-/// the braced one, a non-`{expression}` being rejected as it is parsed. So what survives
-/// for the component is always an `ExpressionTag`, and the two slots' types differ: they
-/// cannot be transposed at the call site, and only the one matching `tag` is ever `Some`.
+/// The two offsets are adjacent and easy to transpose, so they are named rather than
+/// positional: `gt` is the `>` byte itself — the element's `open_tag_end`, which is where the
+/// printer looks for a comment run trailing the last attribute — while `after_gt` is the byte
+/// past it, where content starts and where a childless element ends.
+struct OpeningTagEnd {
+    self_closing: bool,
+    gt: u32,
+    after_gt: usize,
+}
+
+/// What the `this` attribute of a special element bound to, if it was there at all.
+///
+/// The two tags accept different forms — `<svelte:element>` takes either (`this="div"` and
+/// `this={tag}` are both legal), `<svelte:component>` only the braced one, a
+/// non-`{expression}` being rejected as it is parsed — so what survives for the component is
+/// always an `ExpressionTag`. One enum rather than a pair of `Option`s because the forms are
+/// mutually exclusive: a value can't be built that claims to be both.
+enum SpecialThisBinding<'arena> {
+    /// Nothing bound: either no `this` was written, or the one that was is valueless
+    /// (`<svelte:element this>`). The two need no distinction — Svelte rejects both under
+    /// the one `svelte_element_missing_this`, and because the binding is taken **by index**
+    /// a valueless `this` cannot hand its position to a later one.
+    Absent,
+    /// `<svelte:element this={tag}>` / `<svelte:element this="div">`.
+    Element(SpecialThis<'arena>),
+    /// `<svelte:component this={Comp}>`.
+    Component(ExpressionTag<'arena>),
+}
+
+/// Result of parsing special element attributes: the attribute list with the binding `this`
+/// lifted out of it, plus that binding.
+///
+/// Only the *first* `this` is lifted — a repeated one stays in the attribute list, as an
+/// ordinary attribute of that name.
 type SpecialElementAttrs<'arena> = (
     BumpVec<'arena, AttributeNode<'arena>>,
-    Option<SpecialThis<'arena>>,
-    Option<ExpressionTag<'arena>>,
+    SpecialThisBinding<'arena>,
 );
 
 impl<'a, 'arena> SvelteParser<'a, 'arena> {
@@ -166,6 +193,27 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         self.parse_regular_element_body(start, tag_name, kind, name_span)
     }
 
+    /// Consume what closes an opening tag: the optional self-closing `/`, then the required
+    /// `>`. Shared by both element bodies, which differ in everything *around* the tag but
+    /// terminate it identically.
+    fn finish_opening_tag(&mut self) -> Result<OpeningTagEnd, ParseError> {
+        let self_closing = self.check(TokenKind::Slash);
+        if self_closing {
+            self.advance()?; // consume /
+        }
+
+        // Read both offsets before consuming `>` — see `OpeningTagEnd` for which is which.
+        let gt = self.current_start as u32;
+        let after_gt = self.current_end;
+        self.expect(TokenKind::RightAngle)?;
+
+        Ok(OpeningTagEnd {
+            self_closing,
+            gt,
+            after_gt,
+        })
+    }
+
     /// Parse a regular element (HTML or component)
     fn parse_regular_element_body(
         &mut self,
@@ -177,29 +225,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // Parse attributes
         let attributes = self.parse_attributes()?;
 
-        // Check for self-closing tag: <div/>
-        let self_closing = self.check(TokenKind::Slash);
-        if self_closing {
-            self.advance()?; // consume /
-        }
-
-        // Save positions before consuming > (needed for void/self-closing elements
-        // and for the printer to find trailing comments between last attr and >)
-        let open_tag_gt = self.current_start as u32;
-        let opening_tag_end = self.current_end;
-        self.expect(TokenKind::RightAngle)?;
+        let opening = self.finish_opening_tag()?;
 
         // Resolve this element's children and end offset. The four content regimes differ
         // only in how they produce `(nodes, end)`; the element is assembled once below.
         let (nodes, end): (&'arena [FragmentNode<'arena>], u32) =
-            if tsv_html::is_void_element(tag_name) || self_closing {
+            if tsv_html::is_void_element(tag_name) || opening.self_closing {
                 // Void and self-closing elements have no children or closing tag
                 // (classification lives in tsv_html, shared with the printer).
-                (&[], opening_tag_end as u32)
+                (&[], opening.after_gt as u32)
             } else if tag_name == "style" || tag_name == "script" {
                 // Nested <style>/<script> are raw text (not parsed as Svelte template) —
                 // per Svelte docs, "the <style> tag will be inserted as-is into the DOM".
-                let child_nodes = self.parse_raw_text_content(tag_name, opening_tag_end, start)?;
+                let child_nodes = self.parse_raw_text_content(tag_name, opening.after_gt, start)?;
                 let end = self.parse_closing_tag(tag_name)?;
                 (child_nodes.into_bump_slice(), end)
             } else if tag_name == "textarea" {
@@ -208,7 +246,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 // (never a nested element). Svelte's sole RCDATA element — a sibling of the
                 // <script>/<style> raw-text branch above, but interleaving Text +
                 // ExpressionTag chunks.
-                let (child_nodes, end) = self.parse_rcdata_content(opening_tag_end, start)?;
+                let (child_nodes, end) = self.parse_rcdata_content(opening.after_gt, start)?;
                 (child_nodes.into_bump_slice(), end)
             } else {
                 // Parse children. Only HTML elements participate in HTML5 implicit tag
@@ -227,7 +265,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                     false,
                     in_shadow,
                     tag_name,
-                    opening_tag_end,
+                    opening.after_gt,
                     start,
                     is_html,
                 )?;
@@ -244,7 +282,7 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 end,
             },
             name_span,
-            open_tag_end: open_tag_gt,
+            open_tag_end: opening.gt,
         }))
     }
 
@@ -255,69 +293,51 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         name_span: Span,
         tag: SpecialElementTag,
     ) -> Result<ParsedElement<'arena>, ParseError> {
-        let tag_name = tag.tag_name();
-
         // Parse attributes, extracting `this` for SvelteElement and SvelteComponent
-        let (attributes, tag_expr, component_expr) = self.parse_special_element_attributes(tag)?;
+        let (attributes, this) = self.parse_special_element_attributes(tag)?;
 
         // Construct the final SpecialElementKind, rejecting a `this`-less element/component
         // the way Svelte's parser does.
-        let kind = self.build_special_element_kind(tag, tag_expr, component_expr, name_span)?;
+        let kind = self.build_special_element_kind(tag, this, name_span)?;
 
-        // Check for self-closing tag
-        let self_closing = self.check(TokenKind::Slash);
-        if self_closing {
-            self.advance()?;
-        }
+        let opening = self.finish_opening_tag()?;
 
-        let open_tag_gt = self.current_start as u32;
-        let opening_tag_end = self.current_end;
-        self.expect(TokenKind::RightAngle)?;
-
-        // Self-closing special elements have no children
-        if self_closing {
-            return Ok(ParsedElement::SpecialElement(SpecialElement {
-                kind,
-                attributes: attributes.into_bump_slice(),
-                fragment: Fragment { nodes: &[] },
-                span: Span {
-                    start: start as u32,
-                    end: opening_tag_end as u32,
-                },
-                name_span,
-                open_tag_end: open_tag_gt,
-            }));
-        }
-
-        // Parse children. Special elements (`svelte:*`, `slot`, …) are not HTML
-        // RegularElements, so they never auto-close (`is_html = false`) — a
-        // mismatched close falls to `parse_closing_tag`'s strict error.
-        //
-        // Ancestor context: `<svelte:head>` turns head context on; every other special element is
-        // transparent (Svelte's `parent_is_head`/`parent_is_shadowroot_template` only stop at a
-        // RegularElement/Component), so both flags carry through unchanged otherwise.
-        let in_head = tag == SpecialElementTag::SvelteHead || self.in_svelte_head;
-        let (child_nodes, end) = self.parse_children_in_context(
-            in_head,
-            self.in_shadowroot_template,
-            tag_name,
-            opening_tag_end,
-            start,
-            false,
-        )?;
+        // Resolve children and end offset, then assemble once — the two content regimes here
+        // are the same shape as the regular element's four above.
+        let (nodes, end): (&'arena [FragmentNode<'arena>], u32) = if opening.self_closing {
+            // Self-closing special elements have no children or closing tag
+            (&[], opening.after_gt as u32)
+        } else {
+            // Parse children. Special elements (`svelte:*`, `slot`, …) are not HTML
+            // RegularElements, so they never auto-close (`is_html = false`) — a
+            // mismatched close falls to `parse_closing_tag`'s strict error.
+            //
+            // Ancestor context: `<svelte:head>` turns head context on; every other special
+            // element is transparent (Svelte's
+            // `parent_is_head`/`parent_is_shadowroot_template` only stop at a
+            // RegularElement/Component), so both flags carry through unchanged otherwise.
+            let in_head = tag == SpecialElementTag::SvelteHead || self.in_svelte_head;
+            let (child_nodes, end) = self.parse_children_in_context(
+                in_head,
+                self.in_shadowroot_template,
+                tag.tag_name(),
+                opening.after_gt,
+                start,
+                false,
+            )?;
+            (child_nodes.into_bump_slice(), end)
+        };
 
         Ok(ParsedElement::SpecialElement(SpecialElement {
             kind,
             attributes: attributes.into_bump_slice(),
-            fragment: Fragment {
-                nodes: child_nodes.into_bump_slice(),
-            },
+            fragment: Fragment { nodes },
             span: Span {
                 start: start as u32,
                 end,
             },
             name_span,
-            open_tag_end: open_tag_gt,
+            open_tag_end: opening.gt,
         }))
     }
 
@@ -337,13 +357,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     fn build_special_element_kind(
         &self,
         tag: SpecialElementTag,
-        tag_expr: Option<SpecialThis<'arena>>,
-        component_expr: Option<ExpressionTag<'arena>>,
+        this: SpecialThisBinding<'arena>,
         name_span: Span,
     ) -> Result<SpecialElementKind<'arena>, ParseError> {
         Ok(match tag {
             SpecialElementTag::SvelteElement => {
-                let Some(tag) = tag_expr else {
+                // A missing `this` and a valueless one are both `Absent` — Svelte reports
+                // them with the one `svelte_element_missing_this`.
+                let SpecialThisBinding::Element(tag) = this else {
                     return Err(self.error_msg_at(
                         "`<svelte:element>` must have a 'this' attribute with a value",
                         name_span.start as usize,
@@ -352,7 +373,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 SpecialElementKind::SvelteElement { tag }
             }
             SpecialElementTag::SvelteComponent => {
-                let Some(expression) = component_expr else {
+                // Only `Absent` can reach the `else`: a component's valueless or
+                // non-`{expression}` `this` was already rejected as it was parsed.
+                let SpecialThisBinding::Component(expression) = this else {
                     return Err(self.error_msg_at(
                         "`<svelte:component>` must have a 'this' attribute",
                         name_span.start as usize,
@@ -373,67 +396,78 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
     }
 
     /// Parse attributes for a special element, extracting `this` for svelte:element and svelte:component
+    ///
+    /// Only the **first** `this` binds, and only on the two tags that take one. This mirrors
+    /// Svelte's `findIndex` + `splice` directly — take the binding out **by index** — rather
+    /// than folding over the list, which is what makes "a repeated `this` is neither an error
+    /// nor a replacement" structural: there is no second chance to give away. It stays an
+    /// ordinary attribute, and the uniqueness check that would otherwise reject it is waived
+    /// for exactly this name (`<svelte:element bind:this this=…>` is legal).
     fn parse_special_element_attributes(
         &mut self,
         tag: SpecialElementTag,
     ) -> Result<SpecialElementAttrs<'arena>, ParseError> {
-        let mut attributes = self.bvec();
-        let mut tag_expr: Option<SpecialThis<'arena>> = None;
-        let mut component_expr: Option<ExpressionTag<'arena>> = None;
+        let mut attributes = self.parse_attributes()?;
 
-        // Parse all attributes
-        let all_attrs = self.parse_attributes()?;
-
-        for attr in all_attrs {
-            match &attr {
-                AttributeNode::Attribute(a) => {
-                    // Check for `this` attribute on svelte:element and svelte:component.
-                    // Compare the span-identity name directly — no per-attribute `String`.
-                    if a.name(self.source) == "this" {
-                        if tag == SpecialElementTag::SvelteElement {
-                            // Extract expression from the attribute value
-                            if let Some(values) = a.value {
-                                if let Some(AttributeValue::ExpressionTag(et)) = values.first() {
-                                    // Keep the whole tag, not just its expression: the `{…}`
-                                    // span is where the printer looks for comments.
-                                    tag_expr = Some(SpecialThis::Braced(et.clone()));
-                                    continue; // Don't add to attributes
-                                } else if let Some(AttributeValue::Text(t)) = values.first() {
-                                    // String value: no expression is parsed, so keep the
-                                    // decoded text itself. It is copied once into the arena
-                                    // (the source slice carries entities and no quotes, so
-                                    // it is not a verbatim slice of it).
-                                    tag_expr = Some(SpecialThis::Plain {
-                                        content: self.alloc_str_in(&t.data(self.source)),
-                                        span: t.span,
-                                    });
-                                    continue;
-                                }
-                            }
-                        } else if tag == SpecialElementTag::SvelteComponent {
-                            // Svelte's `is_expression_attribute`: exactly one chunk, and an
-                            // `{expression}`. A bare `this`, a string, or a multi-chunk
-                            // value (`this="a{b}"`, `this={a}{b}`) is rejected outright —
-                            // where `<svelte:element>` above merely warns and keeps the
-                            // first chunk, a Svelte 4 behaviour it preserves on purpose.
-                            let Some([AttributeValue::ExpressionTag(et)]) = a.value else {
-                                return Err(self.error_msg_at(
-                                    "Invalid component definition — must be an `{expression}`",
-                                    a.span.start as usize,
-                                ));
-                            };
-                            // Keep the whole tag — see the `svelte:element` arm above.
-                            component_expr = Some(et.clone());
-                            continue; // Don't add to attributes
-                        }
-                    }
-                    attributes.push(attr);
-                }
-                _ => attributes.push(attr),
-            }
+        // Nine of the eleven special tags never bind a `this`; for them the list is already
+        // the answer.
+        if !tag.takes_this() {
+            return Ok((attributes, SpecialThisBinding::Absent));
         }
 
-        Ok((attributes, tag_expr, component_expr))
+        // Svelte's `findIndex`. Compare the span-identity name directly — no per-attribute
+        // `String`.
+        let source = self.source;
+        let found = attributes
+            .iter()
+            .enumerate()
+            .find_map(|(i, node)| match node {
+                AttributeNode::Attribute(a) if a.name(source) == "this" => Some((i, a)),
+                _ => None,
+            });
+        let Some((index, a)) = found else {
+            return Ok((attributes, SpecialThisBinding::Absent));
+        };
+
+        let this = if tag == SpecialElementTag::SvelteElement {
+            // Svelte keeps chunk[0] and warns (`svelte_element_invalid_this`) when the value
+            // is not a lone `{expression}` — a Svelte 4 behaviour it preserves on purpose. A
+            // valueless `this` is the one it rejects, which it leaves to
+            // [`Self::build_special_element_kind`].
+            match a.value.and_then(<[_]>::first) {
+                // Keep the whole tag, not just its expression: the `{…}` span is where the
+                // printer looks for comments.
+                Some(AttributeValue::ExpressionTag(et)) => {
+                    SpecialThisBinding::Element(SpecialThis::Braced(et.clone()))
+                }
+                // String value: no expression is parsed, so keep the decoded text itself. It
+                // is copied once into the arena (the source slice carries entities and no
+                // quotes, so it is not a verbatim slice of it).
+                Some(AttributeValue::Text(t)) => SpecialThisBinding::Element(SpecialThis::Plain {
+                    content: self.alloc_str_in(&t.data(source)),
+                    span: t.span,
+                }),
+                None => SpecialThisBinding::Absent,
+            }
+        } else {
+            // `<svelte:component>`, the only other tag `takes_this` admits. Svelte's
+            // `is_expression_attribute`: exactly one chunk, and an `{expression}`. A bare
+            // `this`, a string, or a multi-chunk value (`this="a{b}"`, `this={a}{b}`) is
+            // rejected outright — where `<svelte:element>` above merely warns.
+            let Some([AttributeValue::ExpressionTag(et)]) = a.value else {
+                return Err(self.error_msg_at(
+                    "Invalid component definition — must be an `{expression}`",
+                    a.span.start as usize,
+                ));
+            };
+            // Keep the whole tag — see the `svelte:element` arm above.
+            SpecialThisBinding::Component(et.clone())
+        };
+
+        // Svelte's `splice`: the binding leaves the list, everything else keeps its place.
+        attributes.remove(index);
+
+        Ok((attributes, this))
     }
 
     /// Parse an element's children under a given ancestor context (`in_svelte_head` /
@@ -479,11 +513,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let mut child_nodes = self.bvec();
         let mut last_end = opening_tag_end;
 
-        #[allow(unused_assignments)]
         loop {
             // Capture text/whitespace gaps between tokens
             self.capture_text_if_gap(last_end, &mut child_nodes)?;
-            last_end = self.current_start;
 
             if self.check(TokenKind::Comment) {
                 let comment = self.parse_comment()?;
