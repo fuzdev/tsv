@@ -134,6 +134,20 @@ pub(crate) fn svelte_ws_width_at(source: &str, i: usize) -> Option<usize> {
     is_svelte_ws(c).then_some(width)
 }
 
+/// Byte offset of the first non-whitespace character at/after `start`, or the end of `source`
+/// when none follows.
+///
+/// Svelte's `allow_whitespace()` (`1-parse/index.js`) over a raw offset rather than the parser
+/// cursor — for the scans that own their own cursor and only resync the lexer once at the end.
+#[inline]
+pub(crate) fn skip_svelte_ws(source: &str, start: usize) -> usize {
+    let mut i = start;
+    while let Some(width) = svelte_ws_width_at(source, i) {
+        i += width;
+    }
+    i
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
