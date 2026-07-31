@@ -16,9 +16,26 @@
 //! one per-thread state machine (the `PENDING` thread-local below), reached through
 //! one [`SwallowTracker`] handle each. A `line_suffix` comment is not exempt: two of
 //! them flushed at the same line break land back-to-back on one line
-//! (`x; // c1 // c2`), and the first `//` swallows the second. Comments written
-//! straight to the output buffer (the Svelte template buffer path) bypass the doc
-//! renderer entirely and are out of scope here.
+//! (`x; // c1 // c2`), and the first `//` swallows the second.
+//!
+//! **Only a `//` (and the hashbang) can swallow** — `/* */` and `<!-- -->` close at
+//! their own delimiter, so they need no tag and reach the tracker as ordinary text,
+//! i.e. only ever as a swallow's *victim*. What arms the check is a text node
+//! carrying the WHOLE comment, built by
+//! [`crate::doc::arena::DocArena::line_comment_source_span`] or
+//! `line_comment_text_pooled`. A printer that spells a comment as
+//! `text("//") + <content>` presents no such node and is invisible here — which is
+//! why every line-comment emitter in `tsv_ts` and `tsv_svelte` uses the one-node
+//! form. Spelling, not intent, is what decides whether an emitter is guarded.
+//!
+//! Two seams stay out of scope, both in the victim direction only. Content written
+//! straight to the output buffer (the Svelte hoisted-section `<!-- -->` path) never
+//! reaches [`SwallowTracker::on_text`]; and [`SwallowTracker::begin_render`] clears
+//! `PENDING`, so a `//` left pending at the end of one top-level render cannot be
+//! seen swallowing the next (a Svelte component renders its `<script>`, `<style>`
+//! and each template root node separately). Neither is reachable today — every
+//! Svelte `//` emitter ends its line — and the comment census reads a swallow off
+//! the output text with no instrumentation seam at all, so it covers both.
 
 use std::cell::RefCell;
 use std::sync::atomic::{AtomicBool, Ordering};

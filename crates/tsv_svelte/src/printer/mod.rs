@@ -1288,8 +1288,8 @@ impl<'a> Printer<'a> {
         #[cfg(feature = "comment_check")]
         tsv_lang::comment_ledger::record_emitted(self.source, comment.span);
 
-        self.write("<!--");
-        self.write(comment.content(self.source));
-        self.write("-->");
+        // Verbatim whole span (`<!--…-->`), not re-assembled delimiters — see
+        // `build_html_comment_doc`, the doc-path twin.
+        self.write(comment.span.extract(self.source));
     }
 }

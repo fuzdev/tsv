@@ -2514,13 +2514,15 @@ impl<'a> Printer<'a> {
     //
 
     /// Build a doc for an HTML comment
+    ///
+    /// The whole span is verbatim `<!--…-->`, so it emits as one source slice rather than
+    /// re-assembling the delimiters around `content_span` — the same rule every comment
+    /// emitter in this crate follows (`Printer::js_comment_text_doc` carries the full
+    /// rationale; here it is only uniformity, since `<!-- -->` closes at its own delimiter
+    /// and so can never swallow).
     pub(crate) fn build_html_comment_doc(&self, comment: &internal::HtmlComment) -> DocId {
         let d = self.d();
-        let doc = d.concat(&[
-            d.text("<!--"),
-            d.source_span(comment.content_span, self.source),
-            d.text("-->"),
-        ]);
+        let doc = d.source_span(comment.span, self.source);
         // The renderer records the emit when it reaches the node — see
         // `tsv_lang::comment_ledger`. `<!-- -->` comments register by span in
         // `format_svelte_in`; this is the template (doc) emit path, `print_comment` the
