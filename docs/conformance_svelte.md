@@ -197,6 +197,41 @@ inputs, so the corpus AST differential is the regression oracle.
   [each/typed_context_destructured](../tests/fixtures/svelte/blocks/each/typed_context_destructured/)
   and [await/typed_value_destructured](../tests/fixtures/svelte/blocks/await/typed_value_destructured/).
 
+### Entity Decoding Corrections
+
+Svelte decodes character references with a generated regex over its entity table
+(`1-parse/utils/html.js`), and its `validate_code` deliberately answers some codes
+differently from [HTML5](https://html.spec.whatwg.org/multipage/parsing.html#character-reference-state).
+Those deliberate answers are **matched**, quirks and all — NUL rather than U+FFFD for a
+code with no character to emit (a surrogate half, or one past U+10FFFF), `&#10;` becoming
+a space, and the entity table keeping only the first codepoint of a multi-codepoint
+reference. Four others are slips in the implementation rather than choices, so tsv
+follows the spec — all four pinned by
+[spec_decoding](../tests/fixtures/svelte/syntax/entities/spec_decoding_svelte_divergence/),
+whose README carries the per-case argument, and all three upstream candidates:
+
+- **Uppercase hex marker** — the numeric-character-reference state opens a hex reference
+  on `U+0078 x` or `U+0058 X`; Svelte's pattern (`#(?:x[a-fA-F\d]+|\d+)(?:;)?`) spells only
+  the lowercase one, so `&#X41;` stays literal text where tsv decodes it to `A`.
+- **A zero code** — `if (!code) return match` guards the decode against an unknown or
+  unparseable reference and catches a code of `0` as the other falsy value, so `&#0;` (any
+  spelling) stays literal text. tsv decodes it, to NUL — the sentinel above, rather than the
+  spec's U+FFFD, so that a zero code and a surrogate half keep the same answer.
+- **An omitted plane** — the spec replaces only a surrogate half and a value past U+10FFFF;
+  Svelte's `validate_code` enumerates the planes it will emit (0–2, plus two ranges of plane
+  14) and drops the rest to NUL, destroying assigned characters — `&#x30000;` is CJK
+  Extension G. The enumeration is a slip rather than a policy: plane 14 was *added* by
+  [sveltejs/svelte#15823](https://github.com/sveltejs/svelte/pull/15823) after a user hit the
+  hole. tsv emits every code point Unicode defines, keeping Svelte's NUL sentinel for the two
+  it cannot.
+- **The attribute-value boundary** — a semicolon-less reference is held literal only before
+  `=` or an ASCII alphanumeric, but Svelte spells the test as JS's `\b(?!=)`, whose word
+  class also holds `_` (its own comment beside the regex quotes the spec rule). So
+  `<div a="&AMP_">` decodes to `&_` in tsv and stays literal in Svelte. The ASCII half of
+  that class is not a divergence — both decoders leave `&AMP中` decoding, since `\b` is
+  ASCII-only, and tsv's test is `is_ascii_alphanumeric`, never `char::is_alphanumeric`
+  ([attributes/entity_no_semicolon_boundary](../tests/fixtures/svelte/attributes/entity_no_semicolon_boundary/)).
+
 ### TypeScript Corrections
 
 Svelte uses acorn + acorn-typescript, which lags behind TypeScript's parser. tsv implements the full spec.

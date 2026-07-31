@@ -1,0 +1,134 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 428,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 284,
+				"data": "\n\tA numeric character reference with no character to decode to becomes NUL: a surrogate\n\thalf, a code past the last code point Unicode defines, and — the same answer — a digit\n\trun too long to fit a 32-bit value. The last reference is the contrast, a code point\n\tthat decodes.\n"
+			},
+			{
+				"type": "Text",
+				"start": 284,
+				"end": 285,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 285,
+				"end": 328,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 286
+					},
+					"end": {
+						"line": 7,
+						"column": 2,
+						"character": 287
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 288,
+							"end": 324,
+							"raw": "unrepresentable: &#xD800; &#1114112;",
+							"data": "unrepresentable: \u0000 \u0000"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 328,
+				"end": 329,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 329,
+				"end": 395,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 330
+					},
+					"end": {
+						"line": 8,
+						"column": 2,
+						"character": 331
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 332,
+							"end": 391,
+							"raw": "overflowing: &#4294967296; &#99999999999999; &#xFFFFFFFFFF;",
+							"data": "overflowing: \u0000 \u0000 \u0000"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 395,
+				"end": 396,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 396,
+				"end": 427,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 397
+					},
+					"end": {
+						"line": 9,
+						"column": 2,
+						"character": 398
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 399,
+							"end": 423,
+							"raw": "representable: &#x2FFFF;",
+							"data": "representable: 𯿿"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
