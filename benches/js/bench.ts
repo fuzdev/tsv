@@ -413,10 +413,14 @@ const total_file_counts = {
 	css: by_language.css.length
 };
 
-// Apply file filter and limit
+// Apply file filter and limit (`!== undefined` so an explicit BENCH_LIMIT=0
+// limits to zero files instead of silently meaning "no limit" — matching
+// `is_limited` below, which already treats 0 as a limited run)
 function limit_files(files: SourceFile[]): SourceFile[] {
 	const filtered = FILE_FILTER ? files.filter((f) => f.path.includes(FILE_FILTER)) : files;
-	return MAX_FILES_PER_LANGUAGE ? filtered.slice(0, MAX_FILES_PER_LANGUAGE) : filtered;
+	return MAX_FILES_PER_LANGUAGE !== undefined
+		? filtered.slice(0, MAX_FILES_PER_LANGUAGE)
+		: filtered;
 }
 
 const svelte_files = limit_files(by_language.svelte);
@@ -1737,21 +1741,13 @@ if (write_report) {
 	log(`Skipped canonical report (limited run — pass --save-report to override)`);
 }
 
-// Handle baseline operations. Coverage-only runs have no timing, so save/compare
-// are no-ops here — skip with a note rather than persisting/comparing an empty
-// baseline.
+// Handle baseline operations. These always have timing: the only coverage-only
+// mode is conformance, and conformance runs with baseline flags were rejected
+// up front (baseline flags are perf-corpus only).
 if (args.save_baseline) {
-	if (COVERAGE_ONLY) {
-		log('Skipping --save-baseline in coverage-only mode (no timing measured).');
-	} else {
-		await save_baseline(results_data);
-	}
+	await save_baseline(results_data);
 }
 
 if (args.compare_baseline) {
-	if (COVERAGE_ONLY) {
-		log('Skipping --compare-baseline in coverage-only mode (no timing measured).');
-	} else {
-		await compare_baseline(results_data);
-	}
+	await compare_baseline(results_data);
 }

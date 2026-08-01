@@ -25,7 +25,9 @@ export interface PerfOmit {
 	 * Substring the failing task's `tracking_key` (`operation/language/impl`, e.g.
 	 * `parse/svelte/native`) must contain. Omit to tolerate the file across every
 	 * task; use a coarse fragment (`svelte/native`) to cover a tool's variants, or
-	 * the full key to pin exactly one.
+	 * the full key to pin exactly one. Include the operation when the impl key is
+	 * shared across operations — `canonical` is both the parse (acorn/svelte) and
+	 * format (prettier) key, so a bare `typescript/canonical` would excuse either.
 	 */
 	task?: string;
 	/** Substring the failing file path must contain. */
@@ -55,18 +57,18 @@ export const PERF_OMITS: PerfOmit[] = [
 	// also flip prettier's `.js` parser routing (babel vs typescript) — a
 	// measurement-semantics change deliberately not bundled into this tolerance.
 	{
-		task: 'typescript/canonical',
+		task: 'parse/typescript/canonical',
 		path: 'kit/packages/kit/src/runtime/app/env',
 		reason: 'acorn-typescript cannot parse ambient const declarations (no .d.ts mode)'
 	},
 	{
-		task: 'typescript/oxc',
+		task: 'parse/typescript/oxc',
 		path: 'kit/packages/kit/src/runtime/app/env',
 		reason:
 			'oxc (native + wasm) rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
 	},
 	{
-		task: 'typescript/oxfmt',
+		task: 'format/typescript/oxfmt',
 		path: 'kit/packages/kit/src/runtime/app/env',
 		reason:
 			'oxfmt rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
@@ -77,7 +79,7 @@ export const PERF_OMITS: PerfOmit[] = [
 	// threading the entries above decline, so the tolerance stays uniform across
 	// the alternative parsers rather than special-casing one of them.
 	{
-		task: 'typescript/yuku',
+		task: 'parse/typescript/yuku',
 		path: 'kit/packages/kit/src/runtime/app/env',
 		reason:
 			'yuku (native + wasm) rejects ambient consts under the pinned `lang: ts` (its `dts` mode needs path threading the bench does not do)'
@@ -85,7 +87,7 @@ export const PERF_OMITS: PerfOmit[] = [
 	// acorn-typescript enforces the `arguments`-in-class-field-initializer early
 	// error; tsv (permissive / defer-diagnostics policy) and prettier accept it.
 	{
-		task: 'typescript/canonical',
+		task: 'parse/typescript/canonical',
 		path: 'svelte/packages/svelte/src/ambient.d.ts',
 		reason: 'acorn-typescript enforces an early error tsv defers (arguments in class field init)'
 	}
