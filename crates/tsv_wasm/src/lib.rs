@@ -250,53 +250,177 @@ const TS_AST_REEXPORT: &'static str = r#"
 export type * from "./tsv_ast";
 "#;
 
-/// Typed return types for `parse_*` exports. Each extern type points at
-/// the matching interface in the bundled `tsv_ast.d.ts`, so the
-/// wasm-pack-generated `tsv_wasm.d.ts` declares `parse_typescript` as
-/// returning `Program`, etc.
+/// Hand-written declarations for the parse exports, which are all
+/// `#[wasm_bindgen(skip_typescript)]`: wasm-bindgen can't express an
+/// options-dependent return type, and `{locations: false}` deliberately
+/// returns a shape `tsv_ast.d.ts` can't name (its interfaces declare `loc`
+/// required), so that overload returns `any` and must come first (the more
+/// specific signature). A signature change in `lang_bindings!` must update
+/// this block too; `ParseOptions` / `TypeScriptParseOptions` are re-exported
+/// through the npm facade (`scripts/patch_npm_package.ts`).
 #[cfg(feature = "parse")]
-#[wasm_bindgen]
-extern "C" {
-    #[wasm_bindgen(typescript_type = "import('./tsv_ast').Program")]
-    pub type TsProgram;
-
-    #[wasm_bindgen(typescript_type = "import('./tsv_ast').StyleSheetFile")]
-    pub type CssStyleSheet;
-
-    #[wasm_bindgen(typescript_type = "import('./tsv_ast').Root")]
-    pub type SvelteRoot;
+#[wasm_bindgen(typescript_custom_section)]
+const TS_PARSE_DECLS: &'static str = r#"
+/** Options accepted by every parse export. */
+export interface ParseOptions {
+	/**
+	 * Emit per-node `loc` (line/column) — the drop-in acorn/svelte wire.
+	 * `false` emits the span-only wire (~46% smaller; Svelte also omits
+	 * `name_loc`): `loc` stays derivable from `start`/`end` plus the source —
+	 * see `reconstruct_locations` / `create_locator`. Inert for CSS (its wire
+	 * has no `loc`) and for `parse_internal_*` (no wire at all).
+	 * @default true
+	 */
+	locations?: boolean;
 }
 
-/// Generate `parse_<lang>` / `parse_<lang>_json` / `parse_internal_<lang>` /
-/// `format_<lang>` WASM functions for one language module. `parse_*`,
-/// `parse_*_json`, and `parse_internal_*` are gated on `parse` (so the
-/// format-only build excludes the convert layer) and `format_*` on `format`
-/// (so the parse-only build drops the printers at link time). `$parse_ret`
-/// is the extern type from the block above whose `typescript_type` attribute
-/// names the matching interface in `tsv_ast.d.ts`.
-// Per-language compound-op helpers: parse the source into a per-thread AST arena
-// and run the conversion/format/no-op over it. Every language crate is
-// interner-free (identifier and element/attribute names are span-identity), so
-// these are uniform across svelte/typescript/css — no per-language arity split.
-// WASM is single-threaded, so the arena thread-local is a module static.
+/** `ParseOptions` plus the TypeScript-only parse goal. */
+export interface TypeScriptParseOptions extends ParseOptions {
+	/**
+	 * Parse goal: at `'script'`, `await` is an ordinary identifier and
+	 * `import`/`export`/`import.meta` are syntax errors.
+	 * @default 'module'
+	 */
+	goal?: 'script' | 'module';
+}
+
+export function parse_svelte(source: string, options: ParseOptions & { locations: false }): any;
+export function parse_svelte(source: string, options?: ParseOptions): import('./tsv_ast').Root;
+export function parse_svelte_json(source: string, options?: ParseOptions): string;
+export function parse_internal_svelte(source: string, options?: ParseOptions): void;
+
+export function parse_typescript(
+	source: string,
+	options: TypeScriptParseOptions & { locations: false }
+): any;
+export function parse_typescript(
+	source: string,
+	options?: TypeScriptParseOptions
+): import('./tsv_ast').Program;
+export function parse_typescript_json(source: string, options?: TypeScriptParseOptions): string;
+export function parse_internal_typescript(
+	source: string,
+	options?: TypeScriptParseOptions
+): void;
+
+export function parse_css(source: string, options?: ParseOptions): import('./tsv_ast').StyleSheetFile;
+export function parse_css_json(source: string, options?: ParseOptions): string;
+export function parse_internal_css(source: string, options?: ParseOptions): void;
+"#;
+
+/// The parsed options bag every parse export accepts: `{locations?, goal?}`.
+///
+/// `locations` (default `true`) selects the wire: the loc-bearing drop-in
+/// contract, or the span-only variant (the language crates'
+/// `convert_ast_json_string_no_locations`). It is accepted by every parse
+/// export and inert where nothing reads it (CSS emits no `loc`;
+/// `parse_internal_*` emits no wire). `goal` (default `module`) is
+/// TypeScript-only — Svelte hard-wires `Module` and CSS has no goal — so the
+/// other languages reject the key rather than silently ignoring a semantic
+/// axis. Unknown keys are an error: a typo like `{locatons: false}` silently
+/// succeeding would hand back the full wire while the caller believes they
+/// opted out.
 #[cfg(feature = "parse")]
-macro_rules! parse_convert {
-    ($lang:ident, $conv:ident, $source:expr) => {
-        with_ast_arena(|arena| {
-            let ast = $lang::parse($source, arena).map_err(err)?;
-            Ok($lang::$conv(&ast, $source))
-        })
+struct ParseOptions {
+    locations: bool,
+    goal: tsv_ts::Goal,
+}
+
+/// Read a `ParseOptions` off the raw `options` argument (`undefined`/`null`
+/// mean all-defaults; a supported key explicitly set to `undefined` means that
+/// key's default, matching the omitted-key JS convention — unknown keys error
+/// whatever their value).
+#[cfg(feature = "parse")]
+fn parse_parse_options(options: &JsValue, allow_goal: bool) -> Result<ParseOptions, JsError> {
+    let mut parsed = ParseOptions {
+        locations: true,
+        goal: tsv_ts::Goal::Module,
     };
+    if options.is_undefined() || options.is_null() {
+        return Ok(parsed);
+    }
+    // An array is `typeof 'object'` and yields no keys, so without the second
+    // test a positional-style `parse_typescript(src, [goal])` would read as
+    // all-defaults — the same silent-opt-out the unknown-key error exists to
+    // prevent. (A keyless non-plain object, e.g. `new Date()`, still defaults;
+    // ruling that out needs a prototype test this doesn't earn.)
+    if !options.is_object() || js_sys::Array::is_array(options) {
+        return Err(err("parse options must be an object"));
+    }
+    let object: &js_sys::Object = options.unchecked_ref();
+    for key in js_sys::Object::keys(object).iter() {
+        // `Object.keys` yields only string keys.
+        let Some(name) = key.as_string() else {
+            return Err(err("parse option keys must be strings"));
+        };
+        let value = js_sys::Reflect::get(options, &key)
+            .map_err(|_| err(format!("failed to read parse option '{name}'")))?;
+        // A supported key explicitly set to `undefined` means that key's default
+        // (the omitted-key JS convention) — decided per arm, AFTER the key match,
+        // so an unknown key errors whatever its value (`{locatons: undefined}` is
+        // the same typo as `{locatons: false}`). `goal`'s check runs before its
+        // language rejection: that's what lets one bag serve whichever parser
+        // with the inapplicable goal spelled `undefined` (`npm/cli.js` does).
+        match name.as_str() {
+            "locations" => {
+                if value.is_undefined() {
+                    continue;
+                }
+                parsed.locations = value
+                    .as_bool()
+                    .ok_or_else(|| err("parse option 'locations' must be a boolean"))?;
+            }
+            "goal" => {
+                if value.is_undefined() {
+                    continue;
+                }
+                if !allow_goal {
+                    return Err(err("parse option 'goal' is only supported for TypeScript"));
+                }
+                let goal = value
+                    .as_string()
+                    .ok_or_else(|| err("parse option 'goal' must be 'script' or 'module'"))?;
+                parsed.goal = goal_from_str(&goal)?;
+            }
+            other => {
+                let expected = if allow_goal {
+                    "'locations' or 'goal'"
+                } else {
+                    "'locations'"
+                };
+                return Err(err(format!(
+                    "unknown parse option '{other}' (expected {expected})"
+                )));
+            }
+        }
+    }
+    Ok(parsed)
 }
 
+/// The per-language parse call behind the uniform exports. `goal` (TypeScript)
+/// threads `ParseOptions.goal` into `parse_with_goal`; `nogoal` (Svelte, CSS)
+/// ignores it — the option key is already rejected by `parse_parse_options`.
 #[cfg(feature = "parse")]
-macro_rules! parse_internal {
-    ($lang:ident, $source:expr) => {
-        with_ast_arena(|arena| {
-            let ast = $lang::parse($source, arena).map_err(err)?;
-            std::hint::black_box(&ast);
-            Ok(())
-        })
+macro_rules! parse_ast {
+    (goal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {
+        $lang::parse_with_goal($source, $goal, $arena)
+    };
+    (nogoal, $lang:ident, $source:expr, $goal:expr, $arena:expr) => {{
+        // Consume the (always-`Module`) goal so the options binding stays used
+        // in every expansion.
+        let _ = $goal;
+        $lang::parse($source, $arena)
+    }};
+}
+
+/// Whether `parse_parse_options` accepts the `goal` key for this language.
+#[cfg(feature = "parse")]
+macro_rules! goal_allowed {
+    (goal) => {
+        true
+    };
+    (nogoal) => {
+        false
     };
 }
 
@@ -312,37 +436,67 @@ macro_rules! parse_format {
     };
 }
 
+/// Generate `parse_<lang>` / `parse_<lang>_json` / `parse_internal_<lang>` /
+/// `format_<lang>` WASM functions for one language module. The parse exports
+/// are gated on `parse` (so the format-only build excludes the convert layer)
+/// and `format_*` on `format` (so the parse-only build drops the printers at
+/// link time). Every parse export shares one uniform signature,
+/// `(source, options?)` — the `{locations?, goal?}` bag read by
+/// `parse_parse_options`, with `$goalness` (`goal` / `nogoal`) selecting
+/// whether the TypeScript-only `goal` key is accepted and threaded. Their
+/// `.d.ts` is the hand-written `TS_PARSE_DECLS` block above (each export is
+/// `skip_typescript`), so a signature change here must update that block too.
+// The bodies parse the source into a per-thread AST arena and run the
+// conversion/format/no-op over it. Every language crate is interner-free
+// (identifier and element/attribute names are span-identity), so these are
+// uniform across svelte/typescript/css — no per-language arity split. WASM is
+// single-threaded, so the arena thread-local is a module static.
 macro_rules! lang_bindings {
     (
+        $goalness:ident,
         $parse_fn:ident,
         $parse_json_fn:ident,
         $parse_internal_fn:ident,
         $format_fn:ident,
-        $lang:ident,
-        $parse_ret:ident $(,)?
+        $lang:ident $(,)?
     ) => {
-        /// Parse source into the typed JSON AST.
+        /// Parse source into the typed JSON AST (`options`: `{locations?, goal?}`,
+        /// see `TS_PARSE_DECLS` / `parse_parse_options`).
         #[cfg(feature = "parse")]
-        #[wasm_bindgen]
-        pub fn $parse_fn(source: &str) -> Result<$parse_ret, JsError> {
-            let json = $parse_json_fn(source)?;
-            let js_value = js_sys::JSON::parse(&json)
-                .map_err(|_| err("internal error: AST serialized to invalid JSON"))?;
-            Ok(js_value.unchecked_into::<$parse_ret>())
+        #[wasm_bindgen(skip_typescript)]
+        pub fn $parse_fn(source: &str, options: JsValue) -> Result<JsValue, JsError> {
+            let json = $parse_json_fn(source, options)?;
+            js_sys::JSON::parse(&json)
+                .map_err(|_| err("internal error: AST serialized to invalid JSON"))
         }
 
         /// Parse source into the JSON AST as a compact JSON string, skipping
         /// JS object materialization (for consumers forwarding the wire format).
         #[cfg(feature = "parse")]
-        #[wasm_bindgen]
-        pub fn $parse_json_fn(source: &str) -> Result<String, JsError> {
-            parse_convert!($lang, convert_ast_json_string, source)
+        #[wasm_bindgen(skip_typescript)]
+        pub fn $parse_json_fn(source: &str, options: JsValue) -> Result<String, JsError> {
+            let opts = parse_parse_options(&options, goal_allowed!($goalness))?;
+            with_ast_arena(|arena| {
+                let ast = parse_ast!($goalness, $lang, source, opts.goal, arena).map_err(err)?;
+                Ok(if opts.locations {
+                    $lang::convert_ast_json_string(&ast, source)
+                } else {
+                    $lang::convert_ast_json_string_no_locations(&ast, source)
+                })
+            })
         }
 
+        /// Parse only, no serialization — the benchmark coverage/throughput
+        /// probe. `options.locations` is inert (no wire is emitted).
         #[cfg(feature = "parse")]
-        #[wasm_bindgen]
-        pub fn $parse_internal_fn(source: &str) -> Result<(), JsError> {
-            parse_internal!($lang, source)
+        #[wasm_bindgen(skip_typescript)]
+        pub fn $parse_internal_fn(source: &str, options: JsValue) -> Result<(), JsError> {
+            let opts = parse_parse_options(&options, goal_allowed!($goalness))?;
+            with_ast_arena(|arena| {
+                let ast = parse_ast!($goalness, $lang, source, opts.goal, arena).map_err(err)?;
+                std::hint::black_box(&ast);
+                Ok(())
+            })
         }
 
         #[cfg(feature = "format")]
@@ -354,60 +508,48 @@ macro_rules! lang_bindings {
 }
 
 lang_bindings!(
+    nogoal,
     parse_svelte,
     parse_svelte_json,
     parse_internal_svelte,
     format_svelte,
     tsv_svelte,
-    SvelteRoot,
 );
 lang_bindings!(
+    goal,
     parse_typescript,
     parse_typescript_json,
     parse_internal_typescript,
     format_typescript,
     tsv_ts,
-    TsProgram,
 );
 lang_bindings!(
+    nogoal,
     parse_css,
     parse_css_json,
     parse_internal_css,
     format_css,
     tsv_css,
-    CssStyleSheet,
 );
 
-// --- TypeScript goal-aware exports ---
+// --- TypeScript goal-aware format export ---
 //
 // The parse goal (`Script` vs `Module`) is a TypeScript-only axis — Svelte
-// `<script>` is always a module and CSS has no goal — so these sit outside the
-// uniform `lang_bindings!` macro rather than threading a meaningless `goal`
-// through svelte/css. They mirror the `tsv_ts` arms of the macro
-// (`parse_typescript_json` / `format_typescript`) with an explicit goal; the
-// goalless exports remain the `Module` default. See `tsv parse|format --goal`.
+// `<script>` is always a module and CSS has no goal. The parse exports take it
+// as the `goal` option; format keeps a distinct flat export instead of an
+// options bag because parsing one in Rust needs `js_sys`, which deliberately
+// rides only the `parse` feature — an options object here would newly weigh
+// down the format-only package. See `tsv format --goal`.
 
-/// Parse a goal string (`"script"` / `"module"`) for the goal-aware exports,
-/// mirroring `tsv_cli`'s `parse_goal_arg`.
+/// Parse a goal string (`"script"` / `"module"`), mirroring `tsv_cli`'s
+/// `parse_goal_arg`. Used by the parse exports' `goal` option and by
+/// `format_typescript_with_goal`.
 #[cfg(any(feature = "parse", feature = "format"))]
 fn goal_from_str(goal: &str) -> Result<tsv_ts::Goal, JsError> {
     tsv_ts::Goal::from_source_type(goal).ok_or_else(|| {
         err(format!(
             "invalid goal '{goal}' (expected 'script' or 'module')"
         ))
-    })
-}
-
-/// `parse_typescript_json` against an explicit goal (`"script"` / `"module"`):
-/// at `script`, `await` is an ordinary identifier and `import`/`export`/
-/// `import.meta` are syntax errors. Returns the compact JSON-string wire form.
-#[cfg(feature = "parse")]
-#[wasm_bindgen]
-pub fn parse_typescript_json_with_goal(source: &str, goal: &str) -> Result<String, JsError> {
-    let goal = goal_from_str(goal)?;
-    with_ast_arena(|arena| {
-        let ast = tsv_ts::parse_with_goal(source, goal, arena).map_err(err)?;
-        Ok(tsv_ts::convert_ast_json_string(&ast, source))
     })
 }
 
@@ -422,91 +564,4 @@ pub fn format_typescript_with_goal(source: &str, goal: &str) -> Result<String, J
             tsv_ts::format_in(&ast, source, doc_arena)
         }))
     })
-}
-
-// --- `no-locations` parse exports (TypeScript + Svelte) ---
-//
-// The opt-in span-only wire (drops per-node `loc`; Svelte also drops `name_loc`
-// — see the language crates' `convert_ast_json_*_no_locations`). Hand-written
-// outside the uniform macro, like the goal-aware exports: CSS is a no-op
-// (`parseCss` emits no `loc`), so only TS and Svelte get a distinct export.
-//
-// Two forms per language, mirroring the macro's `$parse_fn` / `$parse_json_fn`
-// split: `_json` returns the compact wire string (for consumers forwarding it),
-// and the object form parses it in Rust via `js_sys::JSON::parse` so the return
-// crosses the boundary already materialized — the same transport the typed
-// `parse_*` exports use, which keeps a benchmark of this path mechanism-matched
-// with `parse_*`. The object form returns an untyped `JsValue` (not the
-// `tsv_ast.d.ts` interface, which declares `loc` as required) since the shape is
-// deliberately loc-less.
-
-/// `parse_typescript_json` without per-node `loc` (span-only wire string).
-#[cfg(feature = "parse")]
-#[wasm_bindgen]
-pub fn parse_typescript_json_no_locations(source: &str) -> Result<String, JsError> {
-    with_ast_arena(|arena| {
-        let ast = tsv_ts::parse(source, arena).map_err(err)?;
-        Ok(tsv_ts::convert_ast_json_string_no_locations(&ast, source))
-    })
-}
-
-/// `parse_typescript_json_no_locations` against an explicit goal — the parse
-/// goal and the no-locations wire are orthogonal (goal drives the parser, no-loc
-/// the writer), so the two combine, mirroring `tsv_cli`'s `--goal` + `--no-locations`.
-#[cfg(feature = "parse")]
-#[wasm_bindgen]
-pub fn parse_typescript_json_with_goal_no_locations(
-    source: &str,
-    goal: &str,
-) -> Result<String, JsError> {
-    let goal = goal_from_str(goal)?;
-    with_ast_arena(|arena| {
-        let ast = tsv_ts::parse_with_goal(source, goal, arena).map_err(err)?;
-        Ok(tsv_ts::convert_ast_json_string_no_locations(&ast, source))
-    })
-}
-
-/// `parse_internal_typescript` (parse-only, no serialization) against an explicit
-/// goal — the benchmark coverage/throughput probe. Mirrors the `tsv_ts` arm of
-/// the macro's `parse_internal_*` with a goal parameter.
-#[cfg(feature = "parse")]
-#[wasm_bindgen]
-pub fn parse_internal_typescript_with_goal(source: &str, goal: &str) -> Result<(), JsError> {
-    let goal = goal_from_str(goal)?;
-    with_ast_arena(|arena| {
-        let ast = tsv_ts::parse_with_goal(source, goal, arena).map_err(err)?;
-        std::hint::black_box(&ast);
-        Ok(())
-    })
-}
-
-/// `parse_typescript` without per-node `loc`, materialized in Rust. Untyped
-/// (`any`) return — the shape omits the `loc` that `tsv_ast.d.ts` requires.
-#[cfg(feature = "parse")]
-#[wasm_bindgen]
-pub fn parse_typescript_no_locations(source: &str) -> Result<JsValue, JsError> {
-    let json = parse_typescript_json_no_locations(source)?;
-    js_sys::JSON::parse(&json).map_err(|_| err("internal error: AST serialized to invalid JSON"))
-}
-
-/// `parse_svelte_json` without per-node `loc`/`name_loc` (span-only wire string).
-#[cfg(feature = "parse")]
-#[wasm_bindgen]
-pub fn parse_svelte_json_no_locations(source: &str) -> Result<String, JsError> {
-    with_ast_arena(|arena| {
-        let ast = tsv_svelte::parse(source, arena).map_err(err)?;
-        Ok(tsv_svelte::convert_ast_json_string_no_locations(
-            &ast, source,
-        ))
-    })
-}
-
-/// `parse_svelte` without per-node `loc`/`name_loc`, materialized in Rust.
-/// Untyped (`any`) return — the shape omits the `loc`/`name_loc` that
-/// `tsv_ast.d.ts` requires.
-#[cfg(feature = "parse")]
-#[wasm_bindgen]
-pub fn parse_svelte_no_locations(source: &str) -> Result<JsValue, JsError> {
-    let json = parse_svelte_json_no_locations(source)?;
-    js_sys::JSON::parse(&json).map_err(|_| err("internal error: AST serialized to invalid JSON"))
 }
