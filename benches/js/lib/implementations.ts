@@ -245,6 +245,13 @@ export interface BenchmarkTaskOptions {
 	 * re-confirmation tool, not a standing measurement.
 	 */
 	forced_async?: boolean;
+	/**
+	 * Which corpus/surface this run measures (default `perf`). Only one task reads
+	 * it — the `yuku-parser` N-API row, dropped on the `conformance` surface
+	 * because that corpus carries inputs its native binding cannot survive. See the
+	 * registration site and CLAUDE.md §Known Issues.
+	 */
+	corpus_kind?: 'perf' | 'conformance';
 }
 
 /**
@@ -377,8 +384,14 @@ export function get_benchmark_tasks(
 		// forces yuku's LAZY materialization and reads its diagnostics — without
 		// either, the row would report an unearned throughput at a fabricated 100%
 		// coverage. See lib/yuku.ts + CLAUDE.md §Fairness Caveats.
+		//
+		// ⚠ The N-API row is CONFORMANCE-EXCLUDED: yuku's native binding SEGFAULTS
+		// the host process on that corpus's escaped-identifier test262 fixtures, so
+		// keeping it there would kill every run rather than score a rejection. The
+		// WASM binding is memory-safe and carries the engine on that surface. Both
+		// rows stay on the perf corpus, which contains no such input. See lib/yuku.ts.
 		add(
-			impls.yuku?.supports_parse_language(language),
+			impls.yuku?.supports_parse_language(language) && options.corpus_kind !== 'conformance',
 			'yuku-parser',
 			'yuku',
 			(source, _language, goal) => impls.yuku!.parse(source, language, goal)
