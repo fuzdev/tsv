@@ -1138,9 +1138,18 @@ impl<'a> Printer<'a> {
 
     /// Push one attribute-list item behind whatever comments lead it.
     ///
-    /// With no comment in the gap the item takes `separator`; with one it takes the run's own
-    /// tail rule instead — a run ending on its own line, or on any line comment (a `//` runs
-    /// to end of line), pushes the item to a fresh line, and otherwise it stays inline.
+    /// The item takes `separator` either way; a comment run only ever *upgrades* it to a
+    /// hardline, when the run ends on its own line or on any line comment (a `//` runs to end
+    /// of line). A same-line block comment upgrades nothing — the run trails the token before
+    /// it and the item goes on taking the list's own separator, which is a space in a flat
+    /// layout and a break in a wrapped one.
+    ///
+    /// Hard-coding that space instead is how a same-line block comment came to *weld* the
+    /// following attribute onto the preceding line — `data-a="1" /* c */ data-b="2"` sitting
+    /// on one line inside a list that is otherwise one attribute per line, and the comment
+    /// bound to the attribute after it rather than the token it was written after. Flat
+    /// layouts hid it completely, since there `separator` renders as that same space. Pinned
+    /// by [`comment_same_line_long`](../../../../../tests/fixtures/svelte/attributes/comment_same_line_long_prettier_divergence/).
     ///
     /// One seam for two callers, because it is one decision: the attribute loop in
     /// [`Self::push_attrs_with_comments`], and the synthesized `this={…}` that
@@ -1163,7 +1172,7 @@ impl<'a> Printer<'a> {
             docs.push(if tail.next_on_new_line {
                 d.hardline()
             } else {
-                d.text(" ")
+                separator
             });
         }
         docs.push(item);
