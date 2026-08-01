@@ -1371,7 +1371,7 @@ via `Cargo.lock`. Upgrading is always a deliberate, committed act. A plain
 cd benches/js && npm outdated   # shows current vs latest
 # bump the version in benches/js/package.json, then:
 deno task bench:install   # re-install at the new pins (+ re-fetch the oxc wasi binding)
-deno task smoke           # confirm every impl still loads + formats (37 checks)
+deno task smoke           # confirm every impl still loads + formats (38 checks)
 deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts benches/js/lib/dprint.ts  # catch type-surface breakage smoke can't (e.g. a major bump renaming an options field)
 deno task bench           # regenerate report.{deno,node,bun}.* + combined report.{json,md}
 # commit package.json + package-lock.json + results/report.*
