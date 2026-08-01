@@ -1205,6 +1205,23 @@ impl DocArena {
         range.resolve(&self.children.borrow()).first().copied()
     }
 
+    /// Whether `id` is a run whose FIRST item is **byte-glued** to whatever precedes it on the
+    /// render stack — a `WithContext` carrying [`DocContext::glued_lead`].
+    ///
+    /// The flow-boundary look-ahead ([`DocContext::break_before_wide_flow`]) reads this to decide
+    /// how far past the inline element its **pairwise** measurement reaches. It normally ends at the
+    /// element, because the next run owns a whitespace boundary to wrap at; a welded run owns none,
+    /// so it shares the element's line by construction and must share its fit check too. Measuring
+    /// the element as if the text fused to its closing tag were free to move packs it onto a line it
+    /// does not fit — which is the `inline_break_before_*` / `inline_nbsp_boundary_long` shape.
+    #[inline]
+    pub(crate) fn has_glued_lead(&self, id: DocId) -> bool {
+        matches!(
+            &self.nodes.borrow()[id.index()],
+            DocNode::WithContext { context, .. } if context.glued_lead
+        )
+    }
+
     /// The **single** constructor of the inline-sibling wrap — `group(concat([line, x]))`, an
     /// inline child led by a collapsible boundary `line` (a space when the fill fits, a break when
     /// it wraps). Every producer routes through here (`push_inline_child_doc` in `tsv_svelte`), and

@@ -2,14 +2,14 @@
 
 An inline `<span>` wraps a wide inline child `<span>` (its open tag overflows print width) plus
 trailing text. Under block-style both tags stay intact and the content goes on its own indented
-lines (no dangle). The trailing-text boundary is currently **authoring-dependent**:
+lines (no dangle). The trailing text **hugs** the child's closing tag (`</span> text`) whichever way
+its boundary is authored:
 
-- **`input.svelte`** (space boundary) — the trailing text **hugs** the child's closing tag
-  (`</span> text`). This is the fixture's canonical form, matching the `_trailing_space` name and
+- **`input.svelte`** (space boundary) — the canonical form, matching the `_trailing_space` name and
   the terminal sibling `inline_wide_content_trailing_long`.
-- **`variant_ownline.svelte`** (newline boundary) — the trailing text keeps its **own line**.
-
-Both forms are **dual-stable** — tsv and prettier each keep their respective form idempotent.
+- **`prettier_variant_ownline.svelte`** (newline boundary) — prettier keeps the text on its own line;
+  tsv converges it to `input.svelte`, since the boundary is render-free and so carries no authoring
+  signal to preserve.
 
 The prettier divergence is pinned on the **compact authoring**: `unformatted_ours_compact` (the
 content on one line) normalizes to `input.svelte` under tsv, while prettier dangles the tag
@@ -19,10 +19,9 @@ delimiters into the pyramid captured by `prettier_variant_compact` (which tsv li
 
 ## Reason
 
-Converging the two authorings (always hugging the trailing text, reflowing the newline boundary as
-render-free under Svelte 5) is a deliberate **pending follow-up** — the between/terminal-text
-hug-convergence. The terminal case (`inline_wide_content_trailing_long`) already hugs a space-
-authored tail; this nested-child case goes through a different render branch (the wide child is
-itself multiline) and is not yet converged, so the newline authoring (`variant_ownline`) settles on
-its own distinct stable form. See
+tsv treats printWidth as a hard limit and lays the nested child + trailing text out block-style
+rather than dangling. The tail's placement is **not** authoring-dependent: the boundary between a
+closing tag and a terminal text sibling is render-free under Svelte 5, so both authorings converge on
+the hug — the same rule the terminal sibling `inline_wide_content_trailing_long` follows, reached
+here through a different render branch (the wide child is itself multiline). See
 [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
