@@ -177,14 +177,12 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
     modules, this affects only standalone JS scripts to force modern patterns
 
 Each language is a self-contained Rust crate exposing the same
-`parse`/`format`/`convert_ast_json_bytes` functions over its own concrete types - there's no
-central `Language` trait, registry, or dynamic dispatch ("closed scope, open convention and crates").
-That means builds tree-shake, so the parse build excludes the printers,
-and the formatter build excludes the JSON-AST conversion layer.
-Languages tree-shake the same way - a TypeScript-only build would exclude
-Svelte and CSS entirely (publishing lang-specific builds is a TODO).
-Future LSP/incremental features will be later feature-gated layers that don't bloat
-these artifacts - see [docs/architecture.md](docs/architecture.md)
+`parse`/`format`/`convert_ast_json_bytes` functions over its own concrete types - no
+central `Language` trait, registry, or dynamic dispatch ("closed scope, open convention").
+Each artifact carries only what it uses: the parse build excludes the printers,
+the format build excludes the JSON-AST conversion layer, and a TypeScript-only
+build would exclude Svelte and CSS entirely (lang-specific builds aren't published yet) -
+see [docs/architecture.md](docs/architecture.md)
 
 tsv currently has no support JS plugins or JS/WASM runtime integration.
 JS bridging and WASM plugins will be evaluated to see if the tradeoffs work for tsv's goals,
