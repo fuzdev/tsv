@@ -6,10 +6,11 @@
  */
 
 import {
+	BaseImplementation,
 	type Language,
 	LANGUAGE_EXTENSIONS,
-	type ParseGoal,
-	type TsvImplementation
+	LANGUAGES,
+	type ParseGoal
 } from './types.ts';
 import type { OxcVersions } from './versions.ts';
 
@@ -47,13 +48,14 @@ interface OxfmtModule {
  * - Parse: TypeScript, JS (NOT Svelte, NOT CSS)
  * - Format: TypeScript, JS, CSS, Svelte (Svelte is experimental, expect partial coverage)
  */
-export class OxcImplementation implements TsvImplementation {
-	name = 'oxc' as const;
+export class OxcImplementation extends BaseImplementation {
+	readonly name = 'oxc' as const;
 	readonly versions: OxcVersions;
 	private _parser: OxcParserModule | null = null;
 	private _formatter: OxfmtModule | null = null;
 
 	constructor(versions: OxcVersions) {
+		super();
 		this.versions = versions;
 	}
 
@@ -64,21 +66,8 @@ export class OxcImplementation implements TsvImplementation {
 		this._formatter = formatter_mod as OxfmtModule;
 	}
 
-	/** Languages supported for parsing */
-	static readonly PARSE_LANGUAGES: Language[] = ['typescript'];
-
-	/** Languages supported for formatting */
-	static readonly FORMAT_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
-
-	/** Check if parsing is supported for this language */
-	supports_parse_language(language: Language): boolean {
-		return OxcImplementation.PARSE_LANGUAGES.includes(language);
-	}
-
-	/** Check if formatting is supported for this language */
-	supports_format_language(language: Language): boolean {
-		return OxcImplementation.FORMAT_LANGUAGES.includes(language);
-	}
+	readonly parse_languages: ReadonlyArray<Language> = ['typescript'];
+	readonly format_languages = LANGUAGES;
 
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
 		if (!this._parser) throw new Error('OXC parser not initialized');

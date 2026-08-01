@@ -82,7 +82,10 @@ const DISPLAY_ORDER = [
 	'dprint-wasm',
 	'oxc-parser',
 	'oxc-parser-wasm',
-	'oxfmt'
+	'oxfmt',
+	'rsvelte-fmt',
+	'yuku-parser',
+	'yuku-parser-wasm'
 ];
 
 /** Sort results by stable display order */
@@ -188,20 +191,24 @@ export function generate_summary_report(
 			);
 		}
 
-		// Curated payload-matched line: tsv's span-only `no-locations` wire is the
-		// apples-to-apples comparison with oxc's span-only default AST (plain
-		// `tsv-json` carries the richer loc-bearing drop-in AST oxc omits). Emitted
-		// only where both rows exist (TS/JS — oxc doesn't parse svelte/css).
-		for (const [noloc, oxc] of [
+		// Curated payload-matched lines: tsv's span-only `no-locations` wire is the
+		// apples-to-apples comparison with the span-only default ASTs oxc and yuku
+		// emit (plain `tsv-json` carries the richer loc-bearing drop-in AST both
+		// omit; yuku pads `decorators`/`typeAnnotation`/`optional` exactly as oxc
+		// does, so the two opponents are payload-matched to each other too). Emitted
+		// only where both rows exist (TS/JS — neither parses svelte/css).
+		for (const [noloc, opponent] of [
 			['tsv-json-no-locations', 'oxc-parser'],
-			['tsv_wasm-json-no-locations', 'oxc-parser-wasm']
+			['tsv-json-no-locations', 'yuku-parser'],
+			['tsv_wasm-json-no-locations', 'oxc-parser-wasm'],
+			['tsv_wasm-json-no-locations', 'yuku-parser-wasm']
 		] as const) {
 			const noloc_result = results.find((r) => r.name === noloc);
-			const oxc_result = results.find((r) => r.name === oxc);
-			if (noloc_result && oxc_result) {
+			const opponent_result = results.find((r) => r.name === opponent);
+			if (noloc_result && opponent_result) {
 				lines.push(
-					`      ↳ ${noloc} vs ${oxc}: ${format_comparison(
-						oxc_result.stats.mean_ns,
+					`      ↳ ${noloc} vs ${opponent}: ${format_comparison(
+						opponent_result.stats.mean_ns,
 						noloc_result.stats.mean_ns
 					)} (payload-matched, span-only)`
 				);
@@ -386,21 +393,74 @@ export function generate_skipped_files_report(
 	return lines.join('\n');
 }
 
-/**
- * Versions block for the terminal run. (Corpus counts already print at the
- * top of the run, so this used to duplicate them — now versions only.)
- */
-export function generate_versions_info(versions: {
+/** The five canonical-oracle versions every report carries. */
+export interface CanonicalVersionInfo {
 	svelte: string;
 	acorn: string;
 	acorn_ts: string;
 	prettier: string;
 	prettier_svelte: string;
+}
+
+/**
+ * The alternative-impl versions a report carries — each optional, since an impl
+ * that didn't load contributes nothing. Mirrors `get_alternative_versions`.
+ */
+export interface AlternativeVersionInfo {
 	oxc_parser?: string;
 	oxfmt?: string;
+	yuku_parser?: string;
+	yuku_parser_wasm?: string;
 	biome?: string;
 	dprint?: string;
-}): string {
+	rsvelte_fmt?: string;
+}
+
+/** Everything the versions blocks render. */
+export type ReportVersions = CanonicalVersionInfo & AlternativeVersionInfo;
+
+/**
+ * Version parts for yuku's two packages. They ship one engine behind two
+ * bindings and version in lockstep upstream, so the matched case collapses to a
+ * single `yuku-parser@X`; a skewed local install prints both, making the skew
+ * legible in the report rather than silently comparing two engines.
+ */
+function yuku_version_parts(versions: AlternativeVersionInfo): string[] {
+	const { yuku_parser, yuku_parser_wasm } = versions;
+	if (yuku_parser && yuku_parser_wasm && yuku_parser === yuku_parser_wasm) {
+		return [`yuku-parser@${yuku_parser}`];
+	}
+	const parts: string[] = [];
+	if (yuku_parser) parts.push(`yuku-parser@${yuku_parser}`);
+	if (yuku_parser_wasm) parts.push(`@yuku-parser/wasm@${yuku_parser_wasm}`);
+	return parts;
+}
+
+/**
+ * Every alternative impl's version label, in report order — the ONE list both
+ * versions blocks render (the terminal run's and the committed markdown's).
+ *
+ * They were two hand-maintained copies and had already drifted: `@rsvelte/fmt`
+ * reached the markdown but never the terminal block, and each impl added since
+ * widened the seam. An impl absent from the run contributes nothing, so callers
+ * can append the result unconditionally.
+ */
+export function alternative_version_parts(versions: AlternativeVersionInfo): string[] {
+	const parts: string[] = [];
+	if (versions.oxc_parser) parts.push(`oxc-parser@${versions.oxc_parser}`);
+	if (versions.oxfmt) parts.push(`oxfmt@${versions.oxfmt}`);
+	parts.push(...yuku_version_parts(versions));
+	if (versions.biome) parts.push(`@biomejs/wasm-bundler@${versions.biome}`);
+	if (versions.dprint) parts.push(`@dprint/typescript@${versions.dprint}`);
+	if (versions.rsvelte_fmt) parts.push(`@rsvelte/fmt@${versions.rsvelte_fmt}`);
+	return parts;
+}
+
+/**
+ * Versions block for the terminal run. (Corpus counts already print at the
+ * top of the run, so this used to duplicate them — now versions only.)
+ */
+export function generate_versions_info(versions: ReportVersions): string {
 	const lines: string[] = [];
 	lines.push('');
 	lines.push('-'.repeat(80));
@@ -410,12 +470,7 @@ export function generate_versions_info(versions: {
 	);
 	lines.push(`  prettier@${versions.prettier}, prettier-plugin-svelte@${versions.prettier_svelte}`);
 
-	const alt_versions: string[] = [];
-	if (versions.oxc_parser) alt_versions.push(`oxc-parser@${versions.oxc_parser}`);
-	if (versions.oxfmt) alt_versions.push(`oxfmt@${versions.oxfmt}`);
-	if (versions.biome) alt_versions.push(`@biomejs/wasm-bundler@${versions.biome}`);
-	if (versions.dprint) alt_versions.push(`@dprint/typescript@${versions.dprint}`);
-
+	const alt_versions = alternative_version_parts(versions);
 	if (alt_versions.length > 0) {
 		lines.push(`  ${alt_versions.join(', ')}`);
 	}
@@ -614,6 +669,8 @@ function build_comparison_data(
 		];
 		const oxc_ns = get_mean_ns(group_name, 'oxc-parser');
 		if (oxc_ns !== null) comparisons.push({ name: 'oxc-parser', ratio: ratio(tsv_ns, oxc_ns) });
+		const yuku_ns = get_mean_ns(group_name, 'yuku-parser');
+		if (yuku_ns !== null) comparisons.push({ name: 'yuku-parser', ratio: ratio(tsv_ns, yuku_ns) });
 
 		native_rows.push({
 			operation: 'parse',
@@ -672,6 +729,10 @@ function build_comparison_data(
 		if (oxc_wasm_ns !== null) {
 			comparisons.push({ name: 'oxc-parser-wasm', ratio: ratio(tsv_wasm_ns, oxc_wasm_ns) });
 		}
+		const yuku_wasm_ns = get_mean_ns(group_name, 'yuku-parser-wasm');
+		if (yuku_wasm_ns !== null) {
+			comparisons.push({ name: 'yuku-parser-wasm', ratio: ratio(tsv_wasm_ns, yuku_wasm_ns) });
+		}
 
 		wasm_rows.push({
 			operation: 'parse',
@@ -696,6 +757,34 @@ function build_comparison_data(
  * Each cell carries an `(Mf)` annotation — the iterated file count timing
  * reflects.
  */
+/**
+ * Which alternative parsers a comparison run actually produced rows for.
+ *
+ * The fairness notes below each renderer are gated on this, and both the terminal
+ * and the markdown renderer need the same answer — so it is computed once. As two
+ * copies the predicates had already diverged in shape (the oxc test pinned the
+ * section label, the yuku test didn't), and a note silently missing from one
+ * surface is the exact failure the notes exist to prevent.
+ *
+ * An opponent counts as present when any section carries a comparison against it;
+ * the oxc test additionally requires the native/wasm row to sit under its
+ * like-tier section, since a cross-tier oxc comparison wouldn't justify the
+ * apples-to-apples note.
+ */
+function detect_comparison_opponents(sections: ComparisonSection[]): {
+	oxc: boolean;
+	yuku: boolean;
+} {
+	const has = (label: string, opponent: string) =>
+		sections.some(
+			(s) => s.label === label && s.rows.some((r) => r.comparisons.some((c) => c.name === opponent))
+		);
+	return {
+		oxc: has('tsv', 'oxc-parser') || has('tsv_wasm', 'oxc-parser-wasm'),
+		yuku: has('tsv', 'yuku-parser') || has('tsv_wasm', 'yuku-parser-wasm')
+	};
+}
+
 export function generate_comparison_summary(
 	all_group_results: GroupResults[],
 	languages: Language[],
@@ -736,27 +825,28 @@ export function generate_comparison_summary(
 		}
 	}
 
-	// Fairness notes (only shown when oxc-parser data is present)
-	const has_native_oxc = sections.some(
-		(s) =>
-			s.label === 'tsv' && s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser'))
-	);
-	const has_wasm_oxc = sections.some(
-		(s) =>
-			s.label === 'tsv_wasm' &&
-			s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser-wasm'))
-	);
+	// Fairness notes, gated on which opponents this run actually produced rows for.
+	const { oxc: has_oxc, yuku: has_yuku } = detect_comparison_opponents(sections);
 
 	lines.push('');
 	lines.push('  (`Nx` = self is N× faster; `(Mf)` = files the timing reflects)');
 	lines.push('  (parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts)');
-	if (has_native_oxc || has_wasm_oxc) {
+	if (has_oxc) {
 		lines.push('  (oxc-parser — native and wasm — serializes the AST to JSON in Rust and');
 		lines.push(
 			'   deserializes in JS, the same eager materialization as tsv-json — apples-to-apples)'
 		);
-		lines.push('  (tsv-internal/tsv_wasm-internal are parse-only, no JS materialization;');
-		lines.push('   oxc has no comparably cheap mode, so they have no oxc counterpart)');
+	}
+	if (has_yuku) {
+		lines.push('  (yuku-parser — native and wasm — decodes a binary AST buffer into JS objects,');
+		lines.push('   also full eager materialization; its parse() is lazy, so the bench forces it —');
+		lines.push(
+			'   verified: no lazy accessors survive, and its tree serializes to oxc-parser’s size)'
+		);
+	}
+	if (has_oxc || has_yuku) {
+		lines.push('  (tsv-internal/tsv_wasm-internal are parse-only, no JS materialization; neither');
+		lines.push('   oxc nor yuku has a matching mode, so they have no counterpart row)');
 	}
 	lines.push('  (format groups include parse time — each formatter parses internally)');
 	lines.push('  (oxfmt formats JS/TS natively; its css/svelte rows route through its BUNDLED');
@@ -804,28 +894,27 @@ export function generate_comparison_markdown(
 		lines.push('');
 	}
 
-	// Fairness notes (only shown when oxc-parser data is present)
-	const has_native_oxc = sections.some(
-		(s) =>
-			s.label === 'tsv' && s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser'))
-	);
-	const has_wasm_oxc = sections.some(
-		(s) =>
-			s.label === 'tsv_wasm' &&
-			s.rows.some((r) => r.comparisons.some((c) => c.name === 'oxc-parser-wasm'))
-	);
+	// Fairness notes, gated on which opponents this run actually produced rows for.
+	const { oxc: has_oxc, yuku: has_yuku } = detect_comparison_opponents(sections);
 
 	const notes: string[] = [
 		'`Nx` is speedup — self is N× faster than the named opponent',
 		"`(Mf)` is the self impl's iterated count (per-group intersection in default mode; per-impl success set in `BENCH_MODE=union`)",
 		'Parse canonical: svelte/compiler for .svelte/.css, acorn-typescript for .ts'
 	];
-	if (has_native_oxc || has_wasm_oxc) {
+	if (has_oxc) {
 		notes.push(
 			'oxc-parser (native and wasm) serializes the AST to JSON in Rust and deserializes it in JS — the same eager materialization as tsv-json/tsv_wasm-json, so these parse rows are apples-to-apples'
 		);
+	}
+	if (has_yuku) {
 		notes.push(
-			'tsv-internal/tsv_wasm-internal are parse-only (no JS materialization) and have no oxc counterpart — oxc exposes no comparably cheap mode (its JS API always serializes; experimentalLazy is setup-dominated)'
+			'yuku-parser (native and wasm) decodes a binary AST buffer into JS objects — also full eager materialization (verified: no lazy accessors survive, and the tree serializes to within 3 bytes of oxc-parser), but its `parse()` is lazy, so the bench reads `.program` to force it — an unforced row would report a throughput for a tree nobody built'
+		);
+	}
+	if (has_oxc || has_yuku) {
+		notes.push(
+			'tsv-internal/tsv_wasm-internal are parse-only (no JS materialization) and have no counterpart row — oxc always serializes to cross into JS (experimentalLazy is setup-dominated), and yuku still serializes to a binary buffer before its decode, so neither is the same tier'
 		);
 	}
 	notes.push('Format groups include parse time — each formatter parses internally');
@@ -996,9 +1085,11 @@ export function generate_coverage_only_markdown(
  */
 export function generate_json_overhead_note(results: BenchmarkResult[]): string | null {
 	// Each pair is [non-materializing parse, full-JS-tree parse]; the ratio is the
-	// cost of materializing the AST into JS. tsv-only: oxc has no comparably cheap
-	// parse-only mode (its JS API always serializes to cross into JS; experimentalLazy
-	// is setup-dominated — see oxc.ts), so there's no oxc pair to show here.
+	// cost of materializing the AST into JS. tsv-only: neither alternative parser has
+	// a comparably cheap parse-only mode — oxc's JS API always serializes to cross
+	// into JS (experimentalLazy is setup-dominated — see oxc.ts), and yuku's lazy
+	// `parse()` has already serialized the AST to a binary buffer by the time it
+	// returns (see yuku.ts), so neither yields a pair that belongs in this table.
 	const pairs = [
 		['tsv-internal', 'tsv-json'],
 		['tsv_wasm-internal', 'tsv_wasm-json']

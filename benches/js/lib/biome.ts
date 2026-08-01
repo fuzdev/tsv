@@ -4,7 +4,7 @@
  * Supports: TypeScript, JS, CSS, Svelte
  */
 
-import { type Language, LANGUAGE_EXTENSIONS, type TsvImplementation } from './types.ts';
+import { BaseImplementation, type Language, LANGUAGE_EXTENSIONS, LANGUAGES } from './types.ts';
 import type { BiomeVersions } from './versions.ts';
 // Type-only — `import type` is erased, so referencing `Biome` here does NOT load
 // the WASM package at this module's import. The value import is deferred to
@@ -20,19 +20,18 @@ import type { Biome } from '@biomejs/js-api/bundler';
  *   point (only `formatContent`/`lintContent`/`fixFile`); Biome parses
  *   internally but never surfaces the AST across the JS boundary.
  */
-export class BiomeImplementation implements TsvImplementation {
-	name = 'biome-wasm' as const;
+export class BiomeImplementation extends BaseImplementation {
+	readonly name = 'biome-wasm' as const;
 	readonly versions: BiomeVersions;
 	private _biome: Biome | null = null;
 	private _project_key: number | null = null;
 
-	/** Languages supported for parsing (none — the js-api exposes no parser) */
-	static readonly PARSE_LANGUAGES: Language[] = [];
-
-	/** Languages supported for formatting */
-	static readonly FORMAT_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
+	/** The js-api exposes no parser. */
+	readonly parse_languages: ReadonlyArray<Language> = [];
+	readonly format_languages = LANGUAGES;
 
 	constructor(versions: BiomeVersions) {
+		super();
 		this.versions = versions;
 	}
 
@@ -87,16 +86,6 @@ export class BiomeImplementation implements TsvImplementation {
 				}
 			}
 		});
-	}
-
-	/** Check if parsing is supported for this language */
-	supports_parse_language(language: Language): boolean {
-		return BiomeImplementation.PARSE_LANGUAGES.includes(language);
-	}
-
-	/** Check if formatting is supported for this language */
-	supports_format_language(language: Language): boolean {
-		return BiomeImplementation.FORMAT_LANGUAGES.includes(language);
 	}
 
 	parse(_source: string, _language: Language): unknown {

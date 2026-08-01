@@ -21,7 +21,7 @@
 import { stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { native_library_filename } from './runtime.ts';
-import type { Language, ParseGoal, TsvImplementation } from './types.ts';
+import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 
 /** The N-API addon's exported functions (snake_case `js_name`s, matching WASM/FFI). */
 export interface NapiAddon {
@@ -49,18 +49,15 @@ export function get_napi_library_path(): string {
 	return `${project_root}target/release/${native_library_filename('tsv_napi')}`;
 }
 
-export class NapiImplementation implements TsvImplementation {
+export class NapiImplementation extends BaseImplementation {
 	// Distinct from FFI's `'native'` so the two native bindings are
 	// self-describing (one is instantiated per runtime — FFI under Deno, N-API
 	// under Node/Bun). Nothing branches on this tag; rows key on `tracking_key`.
-	name = 'napi' as const;
+	readonly name = 'napi' as const;
 	private _addon: NapiAddon | null = null;
 
-	/** Languages supported for parsing */
-	static readonly PARSE_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
-
-	/** Languages supported for formatting */
-	static readonly FORMAT_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
+	readonly parse_languages = LANGUAGES;
+	readonly format_languages = LANGUAGES;
 
 	private get addon(): NapiAddon {
 		if (!this._addon) throw new Error('N-API addon not initialized');
@@ -80,14 +77,6 @@ export class NapiImplementation implements TsvImplementation {
 		const mod: { exports: NapiAddon } = { exports: {} as NapiAddon };
 		process.dlopen(mod, path);
 		this._addon = mod.exports;
-	}
-
-	supports_parse_language(language: Language): boolean {
-		return NapiImplementation.PARSE_LANGUAGES.includes(language);
-	}
-
-	supports_format_language(language: Language): boolean {
-		return NapiImplementation.FORMAT_LANGUAGES.includes(language);
 	}
 
 	private get parse_fns(): Record<Language, (source: string) => string> {

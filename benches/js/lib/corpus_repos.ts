@@ -129,7 +129,10 @@ export async function enrich_source_repos(sources: CorpusSource[]): Promise<void
  * checkout root the entry lives under (e.g. `../svelte`).
  */
 export function clone_hint(source_path: string): string | null {
+	// Match the checkout root exactly, not by raw string prefix — `../svelte` is a
+	// character prefix of `../svelte-docinfo/src` (an unrelated real-tier repo),
+	// which would hint cloning the Svelte framework into `../svelte-docinfo`.
 	const dir = checkout_prefix(source_path);
-	const match = CLONE_URL_BY_PREFIX.find(([prefix]) => source_path.startsWith(prefix));
+	const match = CLONE_URL_BY_PREFIX.find(([prefix]) => prefix === dir);
 	return match ? `git clone ${match[1]} ${dir}` : null;
 }

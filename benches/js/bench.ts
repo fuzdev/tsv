@@ -8,7 +8,7 @@
  * - Canonical: prettier + svelte/compiler (JS baseline)
  * - Native: tsv via FFI (Rust, maximum performance)
  * - WASM: tsv compiled to WASM (portable, near-native)
- * - Alternatives: oxc-parser, oxfmt, biome-wasm (for comparison)
+ * - Alternatives: oxc-parser, oxfmt, biome-wasm, dprint-wasm, yuku-parser (for comparison)
  *
  * Run with: deno task bench:deno:run (Deno) or deno task bench:node:run (Node).
  * The same body runs under both — it detects the runtime and writes a
@@ -99,7 +99,9 @@ import {
 	generate_skipped_files_report,
 	generate_summary_report,
 	generate_versions_info,
-	type GroupResults
+	type GroupResults,
+	alternative_version_parts,
+	type ReportVersions
 } from './lib/report.ts';
 import {
 	type BinarySize,
@@ -411,10 +413,14 @@ const total_file_counts = {
 	css: by_language.css.length
 };
 
-// Apply file filter and limit
+// Apply file filter and limit (`!== undefined` so an explicit BENCH_LIMIT=0
+// limits to zero files instead of silently meaning "no limit" — matching
+// `is_limited` below, which already treats 0 as a limited run)
 function limit_files(files: SourceFile[]): SourceFile[] {
 	const filtered = FILE_FILTER ? files.filter((f) => f.path.includes(FILE_FILTER)) : files;
-	return MAX_FILES_PER_LANGUAGE ? filtered.slice(0, MAX_FILES_PER_LANGUAGE) : filtered;
+	return MAX_FILES_PER_LANGUAGE !== undefined
+		? filtered.slice(0, MAX_FILES_PER_LANGUAGE)
+		: filtered;
 }
 
 const svelte_files = limit_files(by_language.svelte);
@@ -608,6 +614,7 @@ function enforce_perf_coverage(): void {
 /** The wasm-variant task name paired with a native task name, or `null` when no pairing exists. */
 const wasm_sibling_name = (name: string): string | null => {
 	if (name === 'oxc-parser') return 'oxc-parser-wasm';
+	if (name === 'yuku-parser') return 'yuku-parser-wasm';
 	if (name === 'tsv' || name.startsWith('tsv-')) return name.replace(/^tsv/, 'tsv_wasm');
 	return null;
 };
@@ -1036,20 +1043,15 @@ interface BaselineEntry {
 	runtime: Runtime;
 }
 
-/** Package versions used in the benchmark run */
-interface BaselineVersions {
+/**
+ * Package versions used in the benchmark run — the report's `ReportVersions`
+ * (canonical oracles + whichever alternatives loaded) plus tsv's own. Adding an
+ * impl means extending `AlternativeVersionInfo` in `lib/report.ts`, one place,
+ * rather than the three hand-kept field lists this used to be.
+ */
+interface BaselineVersions extends ReportVersions {
 	/** tsv's own version, from `Cargo.toml` `[workspace.package]` (the binary under test). */
 	tsv: string;
-	svelte: string;
-	acorn: string;
-	acorn_ts: string;
-	prettier: string;
-	prettier_svelte: string;
-	oxc_parser?: string;
-	oxfmt?: string;
-	biome?: string;
-	dprint?: string;
-	rsvelte_fmt?: string;
 }
 
 interface Baseline {
@@ -1323,11 +1325,7 @@ function generate_markdown_report(
 		`prettier@${versions.prettier}`,
 		`prettier-plugin-svelte@${versions.prettier_svelte}`
 	];
-	if (versions.oxc_parser) version_parts.push(`oxc-parser@${versions.oxc_parser}`);
-	if (versions.oxfmt) version_parts.push(`oxfmt@${versions.oxfmt}`);
-	if (versions.biome) version_parts.push(`@biomejs/wasm-bundler@${versions.biome}`);
-	if (versions.dprint) version_parts.push(`@dprint/typescript@${versions.dprint}`);
-	if (versions.rsvelte_fmt) version_parts.push(`@rsvelte/fmt@${versions.rsvelte_fmt}`);
+	version_parts.push(...alternative_version_parts(versions));
 	lines.push(`**Versions:** ${version_parts.join(', ')}\n`);
 
 	lines.push(
@@ -1619,6 +1617,7 @@ const binary_sizes = await collect_binary_sizes({
 	has_native: !!impls.native,
 	has_wasm: !!impls.wasm,
 	has_oxc: !!impls.oxc,
+	has_yuku: !!impls.yuku || !!impls.yuku_wasm,
 	has_biome: !!impls.biome,
 	has_dprint: !!impls.dprint,
 	has_rsvelte: !!impls.rsvelte
@@ -1742,21 +1741,13 @@ if (write_report) {
 	log(`Skipped canonical report (limited run — pass --save-report to override)`);
 }
 
-// Handle baseline operations. Coverage-only runs have no timing, so save/compare
-// are no-ops here — skip with a note rather than persisting/comparing an empty
-// baseline.
+// Handle baseline operations. These always have timing: the only coverage-only
+// mode is conformance, and conformance runs with baseline flags were rejected
+// up front (baseline flags are perf-corpus only).
 if (args.save_baseline) {
-	if (COVERAGE_ONLY) {
-		log('Skipping --save-baseline in coverage-only mode (no timing measured).');
-	} else {
-		await save_baseline(results_data);
-	}
+	await save_baseline(results_data);
 }
 
 if (args.compare_baseline) {
-	if (COVERAGE_ONLY) {
-		log('Skipping --compare-baseline in coverage-only mode (no timing measured).');
-	} else {
-		await compare_baseline(results_data);
-	}
+	await compare_baseline(results_data);
 }
