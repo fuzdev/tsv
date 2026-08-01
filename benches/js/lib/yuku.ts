@@ -21,6 +21,23 @@
  * result buffer back out — a boundary tax of the same shape `tsv_wasm` pays, and
  * the reason that row belongs beside `tsv_wasm-json` and `oxc-parser-wasm` rather
  * than beside the native ones.
+ *
+ * ⚠ **The native binding is not memory-safe on adversarial input, so the N-API row
+ * is excluded from the CONFORMANCE surface** (`get_benchmark_tasks`). An identifier
+ * built from a long run of BRACED unicode escapes — `var _` + `'\u{11A01}'` ×75,
+ * i.e. once the decoded identifier passes ~300 bytes — SEGFAULTS the host process
+ * inside the Zig parse call; one escape fewer throws an ordinary `ParseFailed`.
+ * Non-braced escapes (`\uXXXX`) and literal non-ASCII identifiers are unaffected at
+ * any length, as is the wasm binding (the overrun stays inside linear memory, and
+ * it parses the same inputs cleanly). test262's
+ * `language/identifiers/part-unicode-*-{,class-}escaped.js` fixtures are exactly
+ * this shape, and they live only in the conformance corpus — real code has no such
+ * identifiers, so both rows stay on the perf corpus.
+ *
+ * A skip list is NOT a workaround here: which files of that family fault is
+ * heap-layout dependent (a sweep that skipped the 17 observed crashers faulted on
+ * an 18th that had survived the same sweep), so screening can neither be cached nor
+ * graded reproducibly. The exclusion is the whole row, and the report says so.
  */
 
 import { BaseImplementation, type Language, type ParseGoal } from './types.ts';

@@ -786,7 +786,8 @@ async function run_preflight_group(
 	log(`\n· ${group_name}`);
 
 	const tasks = get_benchmark_tasks(impls, operation, language, {
-		forced_async: BENCH_FORCED_ASYNC
+		forced_async: BENCH_FORCED_ASYNC,
+		corpus_kind: CORPUS_MODE
 	});
 	await run_preflight(tasks, files, language);
 
@@ -1327,6 +1328,16 @@ function generate_markdown_report(
 	];
 	version_parts.push(...alternative_version_parts(versions));
 	lines.push(`**Versions:** ${version_parts.join(', ')}\n`);
+
+	// A row absent from a coverage report reads as "not measured"; say why.
+	if (IS_CONFORMANCE) {
+		lines.push(
+			'**Excluded here:** yuku-parser (N-API) — its native binding faults the host process on ' +
+				'this corpus (test262 escaped-identifier fixtures), so it cannot be measured against it. ' +
+				'The WASM binding runs the same engine and carries the row; both are measured on the perf ' +
+				'corpus.\n'
+		);
+	}
 
 	lines.push(
 		'**Methodology:** Single-threaded — every implementation formats/parses one file at a time, ' +

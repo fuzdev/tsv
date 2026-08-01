@@ -1581,7 +1581,10 @@ prettier. This is load-bearing, not cosmetic, on two axes:
   how the oxc WASI row broke. That's the difference from `oxc.ts`/`oxc_wasm.ts`,
   whose two packages genuinely differ. Unlike oxc's wasi binding the wasm package
   declares no `cpu`/`os`, so it installs as an ordinary dep everywhere and needs no
-  force-fetch.
+  force-fetch. The **N-API row is excluded from the conformance surface** — its
+  native binding faults the host process on that corpus's escaped-identifier
+  fixtures (§Known Issues); the wasm row carries the engine there, and both rows run
+  on perf.
 - rsvelte-fmt (native binary) — the other Rust-native Svelte formatter; languages:
   **Svelte only**, and **COVERAGE-ONLY** — measured for what it accepts, never timed.
   See §Coverage-only rows for both decisions.
@@ -1808,6 +1811,24 @@ Implementation: `lib/binary_sizes.ts`
   `serde_wasm_bindgen`-built object graph). The Rust-side parse-vs-write timing
   is measured by `cargo run --release -p tsv_debug -- json_profile <paths>` —
   `wasm_json_probe.ts` covers the end-to-end view including the JS boundary.
+- **The yuku-parser N-API binding SEGFAULTS on long braced-escape identifiers,
+  so its row is conformance-excluded.** An identifier built from a run of braced
+  unicode escapes faults the host process inside the Zig parse call once the decoded
+  identifier passes ~300 bytes — `parse('var _' + '\u{11A01}'.repeat(75) + ';')`
+  crashes, `repeat(74)` throws an ordinary `ParseFailed`. Non-braced escapes
+  (`\uXXXX`) and literal non-ASCII identifiers are unaffected at any length, and so
+  is the wasm binding (the overrun stays inside linear memory; it parses the same
+  inputs cleanly, which is itself a variant-parity divergence — the process dies
+  before `warn_variant_parity` can report it). test262's
+  `language/identifiers/part-unicode-*-{,class-}escaped.js` are exactly this shape,
+  so the conformance corpus kills the whole run mid-preflight; the perf corpus has no
+  such identifiers. A skip list is not a workaround: **which** files of that family
+  fault is heap-layout dependent (a sweep skipping the 17 observed crashers faulted
+  on an 18th that had survived it), so the screen is neither cacheable nor
+  reproducible. Hence the row — not the files — is dropped on that surface
+  (`get_benchmark_tasks`, keyed on `BenchmarkTaskOptions.corpus_kind`), disclosed in
+  the conformance report's `**Excluded here:**` line. Revisit on a yuku bump: re-add
+  the row and run `deno task bench:conformance`.
 - **The oxc WASI binding's `errors` getter is CONSUME-ONCE.** On
   `@oxc-parser/binding-wasm32-wasi`, the first access to `result.errors`
   returns the real error array; every later access returns `[]` (the native
