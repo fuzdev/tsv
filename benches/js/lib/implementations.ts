@@ -19,6 +19,7 @@ import { OxcImplementation } from './oxc.ts';
 import { OxcWasmImplementation } from './oxc_wasm.ts';
 import { BiomeImplementation } from './biome.ts';
 import { DprintImplementation } from './dprint.ts';
+import { RsvelteImplementation } from './rsvelte.ts';
 import { type AllVersions, load_all_versions } from './versions.ts';
 
 export type { TsvImplementation };
@@ -41,6 +42,12 @@ export interface InitializedImplementations {
 	biome: BiomeImplementation | undefined;
 	/** dprint implementation (via WASM; the engine `deno fmt` runs) - undefined if not available */
 	dprint: DprintImplementation | undefined;
+	/**
+	 * rsvelte-fmt implementation (native binary, one process per file) - undefined
+	 * if this platform has no prebuilt binary. Coverage-only: it has no in-process
+	 * API, so it is never timed (see `get_benchmark_tasks`).
+	 */
+	rsvelte: RsvelteImplementation | undefined;
 }
 
 /** Options for implementation initialization */
@@ -184,6 +191,21 @@ export async function init_implementations(
 		}
 	}
 
+	// Initialize rsvelte-fmt (optional)
+	let rsvelte_impl: RsvelteImplementation | undefined;
+	const rsvelte = new RsvelteImplementation(versions.rsvelte);
+	try {
+		await rsvelte.init();
+		logger('  ✓ rsvelte-fmt (native binary, coverage-only)');
+		rsvelte_impl = rsvelte;
+	} catch (e) {
+		if (skip_missing) {
+			logger(`  ⚠ rsvelte-fmt: not available`);
+		} else {
+			throw e;
+		}
+	}
+
 	logger('');
 
 	return {
@@ -194,7 +216,8 @@ export async function init_implementations(
 		oxc: oxc_impl,
 		oxc_wasm: oxc_wasm_impl,
 		biome: biome_impl,
-		dprint: dprint_impl
+		dprint: dprint_impl,
+		rsvelte: rsvelte_impl
 	};
 }
 
@@ -206,6 +229,19 @@ export interface BenchmarkTask {
 	tracking_key: string;
 	/** Whether this benchmark runs async */
 	is_async: boolean;
+	/**
+	 * Measure this impl's pre-flight coverage but never TIME it. Set for an impl
+	 * with no in-process API, where a timed row would be dominated by process
+	 * spawn rather than format work (`rsvelte-fmt` — see `lib/rsvelte.ts`).
+	 *
+	 * `bench.ts` honors this in four places, and all four are load-bearing: the
+	 * task is excluded from the timed loop, from the per-group **intersection**
+	 * (so a file it rejects can't shrink the corpus the real rows are timed on),
+	 * and from the perf 100%-coverage hard-fail (its sub-100% coverage IS the
+	 * metric, not a regression); its row is then synthesized with null timing so
+	 * the coverage still reaches the report.
+	 */
+	coverage_only?: boolean;
 	/** The benchmark function - processes all files once. `goal` (TS-only, from
 	 * the conformance surface's test262 files) selects the parse goal; parse tasks
 	 * forward it, format tasks ignore it. */
@@ -418,6 +454,24 @@ export function get_benchmark_tasks(
 				run: (source) => impls.dprint!.format(source, language)
 			});
 		}
+
+		// rsvelte-fmt (Svelte only) — COVERAGE-ONLY. It ships no in-process format
+		// API in any package (the sibling N-API addon is the compiler), so this task
+		// spawns a process per file: measured on ~5 KB of Svelte the spawn floor
+		// alone is over half the per-file cost and ~15x tsv's entire in-process
+		// format, so a timed row would rank `fork`/`exec`, not engines. It is
+		// measured for what it ACCEPTS instead. Its end-to-end CLI numbers — the
+		// shape that suits a CLI — live in the separate hyperfine comparison
+		// published on tsv.fuz.dev. See lib/rsvelte.ts + CLAUDE.md §Fairness Caveats.
+		if (impls.rsvelte?.supports_format_language(language)) {
+			tasks.push({
+				name: 'rsvelte-fmt',
+				tracking_key: `${group_name}/rsvelte`,
+				is_async: false,
+				coverage_only: true,
+				run: (source) => impls.rsvelte!.format(source, language)
+			});
+		}
 	}
 
 	return tasks;
@@ -510,6 +564,19 @@ export function get_formatters(impls: InitializedImplementations): FormatterInfo
 		});
 	}
 
+	// rsvelte-fmt - sync (subprocess). Coverage-only in the bench, but the smoke
+	// test is exactly where a subprocess impl belongs: it asserts the binary
+	// resolves, runs, and round-trips, which is the failure mode that would
+	// otherwise read as a legitimate 0% coverage row.
+	if (impls.rsvelte) {
+		formatters.push({
+			name: 'rsvelte-fmt',
+			is_async: false,
+			format: (source, lang) => impls.rsvelte!.format(source, lang),
+			supports_language: (lang) => impls.rsvelte!.supports_format_language(lang)
+		});
+	}
+
 	return formatters;
 }
 
@@ -519,6 +586,7 @@ export interface AlternativeVersions {
 	oxfmt?: string;
 	biome?: string;
 	dprint?: string;
+	rsvelte_fmt?: string;
 }
 
 /**
@@ -532,6 +600,7 @@ export function get_alternative_versions(impls: InitializedImplementations): Alt
 		biome: impls.biome?.versions.wasm,
 		// The plugin version is the one worth citing — `@dprint/formatter` is just
 		// the Wasm host, the TS/JS formatting behavior lives in the plugin.
-		dprint: impls.dprint?.versions.typescript
+		dprint: impls.dprint?.versions.typescript,
+		rsvelte_fmt: impls.rsvelte?.versions.fmt
 	};
 }

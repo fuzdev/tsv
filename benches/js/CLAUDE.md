@@ -753,7 +753,12 @@ see [Corpus](#corpus)), `versions`, and `binary_sizes` (each with
 `entries[]` timing stats. Each `entries[]` row adds a `runtime` field,
 `files_processed`/`files_total` (per-impl preflight coverage — the `Coverage:`
 line) and `files_iterated` (the timed set — the `Files (intersection):`
-count). A top-level `suppressed_noise` map records silenced third-party stderr
+count). **Null timing is not exclusive to a coverage-only report:** a
+coverage-only ROW (`rsvelte-fmt` — see §Coverage-only rows) carries null stats
+inside an otherwise fully-timed perf report, and is identifiable by
+`files_iterated: null` — it was timed on nothing, rather than timed on the
+group's intersection. A consumer that reads `entries[]` as speeds must skip a
+row with null `ops_per_second`, not treat it as a zero. A top-level `suppressed_noise` map records silenced third-party stderr
 crashes as `{pattern: count}`, and a top-level `variant_parity` array records
 any same-engine native/wasm pair whose pre-flight accept sets disagreed
 (`[]` when healthy — see `warn_variant_parity` in bench.ts; a non-empty list
@@ -1157,6 +1162,14 @@ Things the published numbers measure that aren't quite what they look like:
     (parse-only, no JS materialization) have **no fair oxc counterpart** — oxc's
     JS API always serializes to cross into JS — and that asymmetry is left
     honest rather than papered over with a misleading lazy row.
+- **One row is measured but not timed.** `rsvelte-fmt` appears in the Svelte
+  format group as a **coverage-only** row — an accept rate, with no timing at
+  all — because it ships no in-process API and a per-file subprocess row would
+  rank process spawn rather than format work. It is excluded from the timed loop,
+  from the group intersection, and from the perf coverage invariant, so it moves
+  no other number in the report. Full rationale + the four honor points:
+  §Coverage-only rows. Its end-to-end CLI speed lives in the separate hyperfine
+  comparison instead.
 - **Format groups include parse time.** Every formatter parses internally
   before printing. The numbers measure "how fast can implementation X
   format my file end-to-end," which is what users care about — but format
@@ -1275,6 +1288,7 @@ gap is disclosed rather than invisible.
 ```
 benches/js/
 ├── package.json           # npm dep source of truth (both runtimes); install_deps drives it
+├── rsvelte.oxfmtrc.json   # the two rsvelte-fmt options with no CLI flag (quotes, trailing commas); passed with `--config`. NOT named `.oxfmtrc.json` — that exact name is what oxfmt/rsvelte-fmt discover by walking up, so a real one here would reach into every oxfmt-backed row
 ├── package-lock.json      # npm lock (committed for reproducibility)
 ├── deno.json              # nodeModulesDir: manual + lock: false (npm from package.json; no jsr/remote deps)
 ├── install_deps.ts        # `bench:install`: npm install + force-fetch the oxc wasi binding
@@ -1308,6 +1322,7 @@ benches/js/
 │   ├── compare_cli.ts     # Shared scaffolding for the corpus_compare_* entry points
 │   ├── corpus.ts          # DevReposLoader + DirectoryLoader (load/stream; node: builtins)
 │   ├── dprint.ts          # dprint WASM wrapper (TypeScript/JS only; the engine `deno fmt` runs)
+│   ├── rsvelte.ts         # rsvelte-fmt wrapper (Svelte only; native binary, one process per file — COVERAGE-ONLY, never timed)
 │   ├── gate_counts.ts     # Pinned gate counts (exact pins + live-corpus minimums + negative-bucket pins) — see §Pinned gate counts
 │   ├── harvest_stamp.ts   # Harvest freshness stamps (source commit + pins) — skip unchanged re-harvests
 │   ├── prettier_cache.ts  # Content-addressed prettier-output cache for the format comparison
@@ -1356,7 +1371,7 @@ via `Cargo.lock`. Upgrading is always a deliberate, committed act. A plain
 cd benches/js && npm outdated   # shows current vs latest
 # bump the version in benches/js/package.json, then:
 deno task bench:install   # re-install at the new pins (+ re-fetch the oxc wasi binding)
-deno task smoke           # confirm every impl still loads + formats (37 checks)
+deno task smoke           # confirm every impl still loads + formats (38 checks)
 deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts benches/js/lib/dprint.ts  # catch type-surface breakage smoke can't (e.g. a major bump renaming an options field)
 deno task bench           # regenerate report.{deno,node,bun}.* + combined report.{json,md}
 # commit package.json + package-lock.json + results/report.*
@@ -1469,6 +1484,64 @@ prettier. This is load-bearing, not cosmetic, on two axes:
   throwing — without that check a renamed key would silently leave an option at its
   default and skew the row (the config-vs-engine conflation the fairness rules exist
   to prevent).
+- rsvelte-fmt (native binary) — the other Rust-native Svelte formatter; languages:
+  **Svelte only**, and **COVERAGE-ONLY** — measured for what it accepts, never timed.
+  See §Coverage-only rows for both decisions.
+
+### Coverage-only rows
+
+A **coverage-only** row (`BenchmarkTask.coverage_only`) is an impl the pre-flight
+runs over the whole corpus — so its accept rate is measured and published — but
+that the timed loop never touches. `rsvelte-fmt` is the only one.
+
+**Why it can't be timed.** It ships no in-process format API in any package: the
+npm package is a Node launcher that `spawnSync`s a prebuilt binary, and the
+sibling `@rsvelte/vite-plugin-svelte-native` N-API addon is the *compiler*
+(`compile` / `parse` / `svelte2tsx`, no format export). Driving it means a
+process per file. Measured on a ~5 KB `.svelte` file, the binary costs ~2.4 ms
+per file of which ~1.3 ms is the bare spawn floor (`--version`), against tsv's
+~0.09 ms in-process — so a timed row would rank `fork`/`exec` and report it as an
+engine gap. That is the same objection that keeps `deno fmt` out as a subprocess
+row (see the dprint entry above), with one difference: dprint had an in-process
+engine to measure instead, and rsvelte-fmt has none, so the choice was a
+disclosed non-number or no row.
+
+**The shape that DOES suit a CLI already exists.** The separate hyperfine
+comparison (`../oxc-bench-formatter`, published on tsv.fuz.dev) benches
+rsvelte-fmt end-to-end — process spawn, discovery, IO, each tool's own
+parallelism, plus peak memory — on a third-party `.svelte` corpus. That's where
+its speed numbers live; this row answers only "what does it accept."
+
+**Svelte only.** Its `.ts`/`.js` path is `oxc_formatter` and its CSS path
+`oxc_formatter_css` — the same engine as the `oxfmt` row, by its own
+`--no-native-js` / `--no-native-css` escape-hatch docs. A ts or css row would
+re-measure oxfmt's acceptance through a spawn, adding no information.
+
+**What the flag must be honored by** — four places in `bench.ts`, each
+load-bearing:
+
+1. The **timed loop** skips it (`group_setups` stores the timed tasks only).
+2. The per-group **intersection** skips it — otherwise a file only it rejects
+   would drop out of the set every real row is timed on, letting a
+   non-participant move the published numbers.
+3. The perf **100%-coverage hard-fail** skips it: that invariant governs tools
+   whose throughput is published, and sub-100% here is the measurement rather
+   than an erosion of one.
+4. Its report row is **synthesized** (`build_coverage_entries(true)`) with null
+   timing and a `files_iterated: null`, since the bench library produced no
+   result for it — without that its coverage would vanish for not being a speed.
+
+The markdown renders it as a per-group `**Coverage-only (not timed):**` line
+carrying its own reason inline, so an untimed name in a throughput report is
+never unexplained.
+
+**Setup.** The binary comes from `@rsvelte/fmt`'s platform `optionalDependency`
+and is exec'd directly, not through the published Node launcher (which would add
+a Node cold start measuring npm packaging). `lib/rsvelte.ts` probes `--version`
+at init, so a present-but-unexecutable package fails as a broken setup instead of
+reading as an honest 0%. Under Deno the spawn needs `--allow-run`; all five
+published platform paths are listed on `bench:deno:run` and `smoke` (see the
+`//rsvelte-allow-run` note in `deno.json`).
 
 ### OXC Package Details
 
@@ -1556,6 +1629,10 @@ Benchmark output includes binary/WASM size comparison across implementations:
   (`tsv_format_wasm` / `tsv format (ffi)`), not the full both-features bundle.
 - **oxc-parser**: N-API binding (`.node`) and WASM (`.wasm` from `binding-wasm32-wasi`) from node_modules
 - **oxfmt**: N-API binding (`.node`) from node_modules (no WASM variant)
+- **rsvelte-fmt**: the standalone executable from its platform package. The one
+  native row not scope-matched to a tsv artifact — it carries a CLI plus the whole
+  oxc formatter for JS/TS/CSS beside its Svelte engine, where `tsv (ffi)` is a bare
+  library. Read it as "what that tool ships", not as an engine-size comparison.
 
 Each row reports **raw on-disk size** plus **gzipped size** (≈ npm-tarball
 wire size). Sizes are grouped by kind (WASM vs native) with ratios

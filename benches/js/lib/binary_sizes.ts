@@ -20,6 +20,7 @@ import { readdir, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
 import { current_arch, current_os, current_runtime, native_library_filename } from './runtime.ts';
+import { rsvelte_binary_path } from './rsvelte.ts';
 
 const exec_file = promisify(execFile);
 
@@ -60,7 +61,8 @@ const LABELS = {
 	oxc_parser_napi: 'oxc-parser (napi)',
 	oxfmt_napi: 'oxfmt (napi)',
 	oxc_parser_wasm: 'oxc-parser (wasm)',
-	oxc_combined_napi: 'oxc-parser+oxfmt (napi)'
+	oxc_combined_napi: 'oxc-parser+oxfmt (napi)',
+	rsvelte_fmt_native: 'rsvelte-fmt (binary)'
 } as const;
 
 /** Absolute path to the bench harness's `node_modules` (where the alternative
@@ -192,6 +194,7 @@ export async function collect_binary_sizes(options?: {
 	has_oxc?: boolean;
 	has_biome?: boolean;
 	has_dprint?: boolean;
+	has_rsvelte?: boolean;
 }): Promise<BinarySize[]> {
 	const project_root = fileURLToPath(new URL('../../..', import.meta.url));
 	const node_modules = node_modules_dir();
@@ -317,6 +320,20 @@ export async function collect_binary_sizes(options?: {
 			[`${node_modules}/@oxc-parser/binding-wasm32-wasi`],
 			'.wasm'
 		);
+	}
+
+	// rsvelte-fmt — a standalone EXECUTABLE, not a binding, so it's the one
+	// native row that isn't scope-matched to a tsv artifact: it carries a CLI
+	// (arg parsing, file discovery, config) plus the whole oxc formatter for
+	// JS/TS/CSS alongside its Svelte engine, where `tsv (ffi)` is a bare library.
+	// Listed anyway because omitting the only other Rust Svelte formatter from a
+	// size table that lists every other alternative would read as an oversight;
+	// read it as "what that tool ships", not as an engine-size comparison.
+	if (options?.has_rsvelte !== false) {
+		const rsvelte_bin = rsvelte_binary_path();
+		if (rsvelte_bin !== null) {
+			await push_size(staged, LABELS.rsvelte_fmt_native, 'native', rsvelte_bin);
+		}
 	}
 
 	// Stage 2: gzip every collected file in parallel.

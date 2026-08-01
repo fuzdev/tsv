@@ -66,7 +66,15 @@ export interface SourceFile {
 
 /** Implementation names for benchmarking */
 export type ImplementationName =
-	'canonical' | 'native' | 'napi' | 'wasm' | 'oxc' | 'oxc-wasm' | 'biome-wasm' | 'dprint-wasm';
+	| 'canonical'
+	| 'native'
+	| 'napi'
+	| 'wasm'
+	| 'oxc'
+	| 'oxc-wasm'
+	| 'biome-wasm'
+	| 'dprint-wasm'
+	| 'rsvelte-fmt';
 
 /** Common interface for parser/formatter implementations */
 export interface TsvImplementation {

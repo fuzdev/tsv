@@ -35,12 +35,19 @@ export interface DprintVersions {
 	typescript: string;
 }
 
+/** rsvelte-fmt implementation versions (the CLI package; the platform binary
+ * tracks it in lockstep via `optionalDependencies`) */
+export interface RsvelteVersions {
+	fmt: string;
+}
+
 /** All implementation versions */
 export interface AllVersions {
 	canonical: CanonicalVersions;
 	oxc: OxcVersions;
 	biome: BiomeVersions;
 	dprint: DprintVersions;
+	rsvelte: RsvelteVersions;
 }
 
 /** Default versions when loading fails */
@@ -63,6 +70,9 @@ const DEFAULT_VERSIONS: AllVersions = {
 	dprint: {
 		formatter: 'unknown',
 		typescript: 'unknown'
+	},
+	rsvelte: {
+		fmt: 'unknown'
 	}
 };
 
@@ -105,6 +115,9 @@ export async function load_all_versions(): Promise<AllVersions> {
 			dprint: {
 				formatter: clean_version(deps['@dprint/formatter']),
 				typescript: clean_version(deps['@dprint/typescript'])
+			},
+			rsvelte: {
+				fmt: clean_version(deps['@rsvelte/fmt'])
 			}
 		};
 	} catch {

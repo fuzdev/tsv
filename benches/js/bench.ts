@@ -90,6 +90,7 @@ import {
 	generate_effective_corpus_report,
 	generate_group_bench_table_markdown,
 	generate_group_coverage_markdown,
+	generate_group_coverage_only_markdown,
 	generate_group_files_markdown,
 	generate_group_throughput_markdown,
 	generate_json_overhead_note,
@@ -564,16 +565,30 @@ function record_skip(bench_name: string, file_path: string, error: unknown): voi
 }
 
 /**
+ * Tracking keys of coverage-only tasks — measured in pre-flight, never timed.
+ * Populated per group by `run_preflight_group`, and read wherever a task's
+ * participation would otherwise be assumed: the intersection, the perf
+ * hard-fail, and the timed loop. See `BenchmarkTask.coverage_only`.
+ */
+const coverage_only_keys: Set<string> = new Set();
+
+/**
  * Fail the run if the perf pre-flight skipped any file for an in-scope task that
  * `PERF_OMITS` doesn't excuse. `skipped_files` is keyed by tracking_key and only
  * ever holds in-scope failures (a task exists only for the languages its impl
  * declares), so every unlisted entry is a real regression. Sorted, one line per
  * violation, so a reviewer can transcribe a genuine tolerance straight into
  * `PERF_OMITS`.
+ *
+ * Coverage-only tasks are exempt: the invariant says every tool whose THROUGHPUT
+ * we publish must process every real-world file, and a coverage-only row
+ * publishes no throughput — sub-100% there is the measurement, not an erosion of
+ * one.
  */
 function enforce_perf_coverage(): void {
 	const violations: string[] = [];
 	for (const [tracking_key, files] of skipped_files) {
+		if (coverage_only_keys.has(tracking_key)) continue;
 		for (const [path, error] of files) {
 			if (perf_omit_reason(PERF_OMITS, tracking_key, path) === null) {
 				violations.push(`  ${tracking_key}  ${path}: ${error}`);
@@ -771,6 +786,7 @@ async function run_preflight_group(
 	const task_tracking = new Map<string, string>();
 	for (const task of tasks) {
 		task_tracking.set(task.name, task.tracking_key);
+		if (task.coverage_only) coverage_only_keys.add(task.tracking_key);
 	}
 	task_tracking_by_group.set(group_name, task_tracking);
 
@@ -780,10 +796,16 @@ async function run_preflight_group(
 	// task iterates its own preflight success set — ratios then reflect
 	// different file sets per impl, useful for auditing what intersection
 	// mode hides.
+	// A coverage-only task is never timed, so it must not narrow the intersection
+	// either — otherwise a file it alone rejects would silently drop out of the
+	// set every REAL row is measured on, letting a non-participant move the
+	// published numbers.
+	const timed_tasks = tasks.filter((task) => !task.coverage_only);
+
 	const filtered_files_by_task = new Map<string, SourceFile[]>();
 	if (USE_INTERSECTION) {
 		let intersection: Set<string> | null = null;
-		for (const task of tasks) {
+		for (const task of timed_tasks) {
 			const success_set = successful_files.get(task.tracking_key) ?? new Set<string>();
 			if (intersection === null) {
 				intersection = new Set(success_set);
@@ -794,12 +816,12 @@ async function run_preflight_group(
 			}
 		}
 		const intersection_list = files.filter((f) => (intersection ?? new Set<string>()).has(f.path));
-		for (const task of tasks) {
+		for (const task of timed_tasks) {
 			filtered_files_by_task.set(task.tracking_key, intersection_list);
 		}
 		log(`  Intersection: ${intersection_list.length}/${files.length} files`);
 	} else {
-		for (const task of tasks) {
+		for (const task of timed_tasks) {
 			const success_set = successful_files.get(task.tracking_key) ?? new Set<string>();
 			filtered_files_by_task.set(
 				task.tracking_key,
@@ -812,7 +834,14 @@ async function run_preflight_group(
 	// throughput math (`ops_per_sec × effective_corpus_bytes`) reflects what was
 	// actually measured. Also record per-task iteration size for the
 	// `Nx (Mf)` annotation in the bench-table `vs baseline` column.
-	for (const task of tasks) {
+	//
+	// Coverage-only tasks are skipped, deliberately leaving them with NO
+	// `iterated_file_count` entry: they were timed on nothing, so their
+	// `files_iterated` must read `null` rather than borrow the intersection's
+	// count and imply a measurement that never happened. Their
+	// `effective_corpus_bytes` likewise keeps the pre-flight value, which is the
+	// only bytes figure that means anything for them.
+	for (const task of timed_tasks) {
 		const task_files = filtered_files_by_task.get(task.tracking_key)!;
 		effective_corpus_bytes.set(
 			task.tracking_key,
@@ -821,7 +850,7 @@ async function run_preflight_group(
 		iterated_file_count.set(task.tracking_key, task_files.length);
 	}
 
-	group_setups.set(group_name, { tasks, filtered_files_by_task });
+	group_setups.set(group_name, { tasks: timed_tasks, filtered_files_by_task });
 }
 
 /** Run the timed measurement loop for one group using its stashed pre-flight setup. */
@@ -1020,6 +1049,7 @@ interface BaselineVersions {
 	oxfmt?: string;
 	biome?: string;
 	dprint?: string;
+	rsvelte_fmt?: string;
 }
 
 interface Baseline {
@@ -1130,8 +1160,13 @@ const NULL_STATS = {
  * row per impl per group, carrying the per-tool coverage counts with null
  * timing — the shape `derive_conformance_groups` reads. Iterates
  * `LANGUAGES × OPERATIONS` for a stable order matching pre-flight.
+ *
+ * Two callers, distinguished by `only_coverage_only_tasks`: a coverage-only RUN
+ * (`BENCH_COVERAGE_ONLY=1`) synthesizes every row because nothing was timed,
+ * while a timed run synthesizes only the coverage-only IMPLS — the rows the
+ * bench library never produced a result for (see `BenchmarkTask.coverage_only`).
  */
-function build_coverage_entries(): BaselineEntry[] {
+function build_coverage_entries(only_coverage_only_tasks: boolean): BaselineEntry[] {
 	const entries: BaselineEntry[] = [];
 	for (const language of LANGUAGES) {
 		for (const operation of OPERATIONS) {
@@ -1139,6 +1174,7 @@ function build_coverage_entries(): BaselineEntry[] {
 			const tracking = task_tracking_by_group.get(group_name);
 			if (!tracking) continue;
 			for (const [name, tracking_key] of tracking) {
+				if (only_coverage_only_tasks && !coverage_only_keys.has(tracking_key)) continue;
 				const coverage = effective_corpus_size.get(tracking_key);
 				const iterated = iterated_file_count.get(tracking_key);
 				entries.push({
@@ -1165,7 +1201,7 @@ async function build_results_data(
 ): Promise<Baseline> {
 	const entries: BaselineEntry[] = [];
 	if (COVERAGE_ONLY) {
-		entries.push(...build_coverage_entries());
+		entries.push(...build_coverage_entries(false));
 	} else {
 		for (const group of groups) {
 			// Resolve per-impl preflight coverage (the markdown `Coverage:` line) via
@@ -1197,6 +1233,11 @@ async function build_results_data(
 				});
 			}
 		}
+		// Coverage-only impls produced no timed result, so the loop above skipped
+		// them entirely. Append their rows — null timing, real coverage — so the
+		// measurement they DID contribute reaches the report instead of vanishing
+		// because it wasn't a throughput number.
+		entries.push(...build_coverage_entries(true));
 	}
 
 	return {
@@ -1286,6 +1327,7 @@ function generate_markdown_report(
 	if (versions.oxfmt) version_parts.push(`oxfmt@${versions.oxfmt}`);
 	if (versions.biome) version_parts.push(`@biomejs/wasm-bundler@${versions.biome}`);
 	if (versions.dprint) version_parts.push(`@dprint/typescript@${versions.dprint}`);
+	if (versions.rsvelte_fmt) version_parts.push(`@rsvelte/fmt@${versions.rsvelte_fmt}`);
 	lines.push(`**Versions:** ${version_parts.join(', ')}\n`);
 
 	lines.push(
@@ -1339,6 +1381,18 @@ function generate_markdown_report(
 
 		const coverage = generate_group_coverage_markdown(group.results, tracking, effective_size);
 		if (coverage) lines.push(coverage, '');
+
+		// Coverage-only impls have no row in the tables above (nothing timed them),
+		// so their measurement is rendered here or nowhere.
+		const coverage_only_names = tracking
+			? [...tracking].filter(([, key]) => coverage_only_keys.has(key)).map(([name]) => name)
+			: [];
+		const coverage_only = generate_group_coverage_only_markdown(
+			coverage_only_names,
+			tracking,
+			effective_size
+		);
+		if (coverage_only) lines.push(coverage_only, '');
 
 		if (operation === 'parse') {
 			const json_note = generate_json_overhead_note(group.results);
@@ -1566,7 +1620,8 @@ const binary_sizes = await collect_binary_sizes({
 	has_wasm: !!impls.wasm,
 	has_oxc: !!impls.oxc,
 	has_biome: !!impls.biome,
-	has_dprint: !!impls.dprint
+	has_dprint: !!impls.dprint,
+	has_rsvelte: !!impls.rsvelte
 });
 
 // Build results data (used by all output paths and always saved)

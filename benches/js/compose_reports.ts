@@ -26,12 +26,19 @@ import { fileURLToPath } from 'node:url';
 const RUNTIMES = ['deno', 'node', 'bun'] as const;
 type Runtime = (typeof RUNTIMES)[number];
 
-/** The fields of a per-runtime `report.<runtime>.json` row this composer reads. */
+/**
+ * The fields of a per-runtime `report.<runtime>.json` row this composer reads.
+ *
+ * The timings are nullable because a perf report can carry a **coverage-only**
+ * row — a tool measured for what it accepts but deliberately never timed
+ * (`rsvelte-fmt`; see benches/js/CLAUDE.md §Coverage-only rows). Such a row is
+ * dropped below rather than folded.
+ */
 interface Entry {
 	name: string;
 	group: string;
-	mean_ns: number;
-	ops_per_second: number;
+	mean_ns: number | null;
+	ops_per_second: number | null;
 	files_iterated: number | null;
 	runtime: Runtime;
 }
@@ -97,6 +104,12 @@ const rows = new Map<string, Row>();
 const order: string[] = [];
 for (const r of present) {
 	for (const e of reports.get(r)!.entries) {
+		// Coverage-only rows carry no timing, and this report is purely the
+		// cross-runtime THROUGHPUT view — folding one in would mint a row whose
+		// every cell is empty, and whose per-runtime delta (the whole point of the
+		// combined report) can't exist. Its coverage is already published in each
+		// per-runtime sibling.
+		if (e.ops_per_second == null || e.mean_ns == null) continue;
 		const key = `${e.group}/${e.name}`;
 		let row = rows.get(key);
 		if (!row) {

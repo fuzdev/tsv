@@ -914,6 +914,41 @@ export function generate_group_coverage_markdown(
 }
 
 /**
+ * Per-group line for the impls that were measured for coverage but never timed
+ * (`BenchmarkTask.coverage_only`) — an impl with no in-process API, whose timed
+ * row would rank process spawn rather than format work.
+ *
+ * Always emitted when such an impl ran, including at 100%: unlike
+ * `generate_group_coverage_markdown` (where a line means "some impl skipped
+ * files"), coverage IS the entire measurement here, so suppressing it at 100%
+ * would erase the row. Carries its own inline reason so a reader meeting an
+ * untimed name in a throughput report never has to hunt for why.
+ */
+export function generate_group_coverage_only_markdown(
+	names: readonly string[],
+	tracking: Map<string, string> | undefined,
+	effective_corpus_size: Map<string, EffectiveCorpusEntry>
+): string | null {
+	if (!tracking || names.length === 0) return null;
+	const rows: { name: string; processed: number; total: number }[] = [];
+	for (const name of names) {
+		const tracking_key = tracking.get(name);
+		if (!tracking_key) continue;
+		const e = effective_corpus_size.get(tracking_key);
+		if (!e) continue;
+		rows.push({ name, processed: e.processed, total: e.total });
+	}
+	if (rows.length === 0) return null;
+	const parts = rows.map(
+		(e) => `${e.name} ${e.processed}/${e.total} (${coverage_pct(e.processed, e.total)}%)`
+	);
+	return (
+		`**Coverage-only (not timed):** ${parts.join(', ')} — no in-process API, so a timed row ` +
+		`would measure process spawn rather than format work; these are accept rates, not speeds.`
+	);
+}
+
+/**
  * Coverage-only conformance report body: one `## group` + `**Coverage:**`
  * section per `language × operation`, rendered straight from pre-flight state
  * (a `BENCH_COVERAGE_ONLY=1` run skips the timed phase, so no result groups
