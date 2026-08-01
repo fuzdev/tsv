@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 418,
+	"end": 590,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -313,55 +313,192 @@
 			{
 				"type": "Comment",
 				"start": 288,
-				"end": 370,
-				"data": " A mixed run in one gap: the block stays inline, the `//` forces the break "
+				"end": 367,
+				"data": " Whitespace-sensitive elements: the `>` hugs through the inline comment "
 			},
 			{
 				"type": "Text",
-				"start": 370,
-				"end": 371,
+				"start": 367,
+				"end": 368,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 371,
-				"end": 417,
-				"name": "div",
+				"start": 368,
+				"end": 409,
+				"name": "pre",
 				"name_loc": {
 					"start": {
 						"line": 13,
 						"column": 1,
-						"character": 372
+						"character": 369
 					},
 					"end": {
 						"line": 13,
 						"column": 4,
-						"character": 375
+						"character": 372
 					}
 				},
 				"attributes": [
 					{
 						"type": "Attribute",
-						"start": 377,
-						"end": 394,
+						"start": 373,
+						"end": 390,
 						"name": "data-attr",
 						"name_loc": {
 							"start": {
-								"line": 14,
-								"column": 1,
-								"character": 377
+								"line": 13,
+								"column": 5,
+								"character": 373
 							},
 							"end": {
-								"line": 14,
-								"column": 10,
-								"character": 386
+								"line": 13,
+								"column": 14,
+								"character": 382
 							}
 						},
 						"value": [
 							{
-								"start": 388,
-								"end": 393,
+								"start": 384,
+								"end": 389,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 399,
+							"end": 403,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 409,
+				"end": 411,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 411,
+				"end": 458,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 15,
+						"column": 1,
+						"character": 412
+					},
+					"end": {
+						"line": 15,
+						"column": 9,
+						"character": 420
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 421,
+						"end": 438,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 15,
+								"column": 10,
+								"character": 421
+							},
+							"end": {
+								"line": 15,
+								"column": 19,
+								"character": 430
+							}
+						},
+						"value": [
+							{
+								"start": 432,
+								"end": 437,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 458,
+				"end": 460,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 460,
+				"end": 542,
+				"data": " A mixed run in one gap: the block stays inline, the `//` forces the break "
+			},
+			{
+				"type": "Text",
+				"start": 542,
+				"end": 543,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 543,
+				"end": 589,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 18,
+						"column": 1,
+						"character": 544
+					},
+					"end": {
+						"line": 18,
+						"column": 4,
+						"character": 547
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 549,
+						"end": 566,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 19,
+								"column": 1,
+								"character": 549
+							},
+							"end": {
+								"line": 19,
+								"column": 10,
+								"character": 558
+							}
+						},
+						"value": [
+							{
+								"start": 560,
+								"end": 565,
 								"type": "Text",
 								"raw": "value",
 								"data": "value"
@@ -470,37 +607,73 @@
 		},
 		{
 			"type": "Block",
-			"start": 395,
-			"end": 403,
+			"start": 391,
+			"end": 398,
+			"value": " c ",
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 23,
+					"character": 391
+				},
+				"end": {
+					"line": 13,
+					"column": 30,
+					"character": 398
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 439,
+			"end": 446,
+			"value": " c ",
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 28,
+					"character": 439
+				},
+				"end": {
+					"line": 15,
+					"column": 35,
+					"character": 446
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 567,
+			"end": 575,
 			"value": " c1 ",
 			"loc": {
 				"start": {
-					"line": 14,
+					"line": 19,
 					"column": 19,
-					"character": 395
+					"character": 567
 				},
 				"end": {
-					"line": 14,
+					"line": 19,
 					"column": 27,
-					"character": 403
+					"character": 575
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"start": 404,
-			"end": 409,
+			"start": 576,
+			"end": 581,
 			"value": " c2",
 			"loc": {
 				"start": {
-					"line": 14,
+					"line": 19,
 					"column": 28,
-					"character": 404
+					"character": 576
 				},
 				"end": {
-					"line": 14,
+					"line": 19,
 					"column": 33,
-					"character": 409
+					"character": 581
 				}
 			}
 		}

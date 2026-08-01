@@ -50,3 +50,8 @@
 <!-- A mixed run in one gap: the block stays inline, the `//` still forces the break (prettier deletes both) -->
 <div /* c1 */ // c2
 ></div>
+
+<!-- Whitespace-sensitive elements (their own printer) keep the comment too (prettier deletes it) -->
+<pre /* c */>text</pre>
+
+<textarea /* c */></textarea>

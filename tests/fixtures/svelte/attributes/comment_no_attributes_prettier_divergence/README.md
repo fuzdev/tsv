@@ -27,8 +27,10 @@ Prettier drops the comment outright:
 The loss is total — the comment does not move, it disappears — and it is keyed on the
 attribute list being **empty**: one real attribute is enough for both formatters to keep
 the comment, at every position in the list. Every tag kind is affected the same way:
-HTML elements (with or without content), components, void elements, `<slot>`, and the
-special elements that take no `this` binding (`<svelte:head>`, `<svelte:window>`).
+HTML elements (with or without content), components, void elements, `<slot>`, the
+special elements that take no `this` binding (`<svelte:head>`, `<svelte:window>`), and
+the whitespace-sensitive elements (`<pre>`, `<textarea>`), whose head is printed by a
+builder of its own.
 
 Both comment kinds are affected, and each keeps its authored placement: a `//` on the
 tag-name line stays there (forcing the `>` / `/>` to the next line), an own-line comment
@@ -49,3 +51,4 @@ and the catalog entry in
 - [comment_same_line](../comment_same_line_prettier_divergence/) — where prettier *moves* a same-line `//` instead of deleting it
 - [comment](../comment/) — own-line attribute-list comments with attributes present (matches prettier)
 - [special_this_comment](../../special_elements/special_this_comment_prettier_divergence/) — the same region around a synthesized `this` binding
+- [ws_sensitive_attr_comment_line](../../elements/ws_sensitive_attr_comment_line_prettier_divergence/) — the `//` forms in a whitespace-sensitive head, where the `>` hug is at stake

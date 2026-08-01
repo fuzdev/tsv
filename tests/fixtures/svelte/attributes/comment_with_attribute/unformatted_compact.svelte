@@ -9,6 +9,11 @@
 
 <slot name="value"/* c */ />
 
+<!-- Whitespace-sensitive elements: the `>` hugs through the inline comment -->
+<pre data-attr="value"/* c */>text</pre>
+
+<textarea data-attr="value"/* c */></textarea>
+
 <!-- A mixed run in one gap: the block stays inline, the `//` forces the break -->
 <div data-attr="value"/* c1 */// c2
 ></div>

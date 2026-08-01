@@ -167,10 +167,15 @@ impl<'a> Printer<'a> {
         // apart because their types differ: the component's `this` is always braced, the
         // element's may be a plain string.
         //
-        // The doc and the source span of the value it prints travel together — one `Option`
-        // rather than two in lockstep, so no reader downstream has to handle a state that
-        // cannot exist (a doc without its span, or the reverse). The span is the same fact as
-        // which form was just built, which is why it is decided here beside the doc.
+        // The doc and the claim describing what it prints travel together — one `Option`, so
+        // no reader downstream has to handle a state that cannot exist (a doc without its
+        // claim, or the reverse). The claim is the same fact as which form was just built —
+        // the value span it routes on is exactly what the doc prints — which is why it is
+        // decided here beside the doc: the comments that bind the `this` (or the tag name it
+        // rides behind), plus the value's interior ([`ThisClaim`]'s routing). The attribute
+        // scan below probes the whole name→`>` window, which all of that sits inside, so the
+        // claim is also what the scan must skip — without it every comment here prints
+        // twice, once by each.
         let synthesized_this = match &element.kind {
             SpecialElementKind::SvelteElement { tag } => Some((
                 self.build_this_attr_doc_for_inline(tag),
@@ -180,21 +185,20 @@ impl<'a> Printer<'a> {
                 Some((self.build_this_braced_doc(expression), expression.span))
             }
             _ => None,
-        };
-
-        // What this site prints: the comments that bind the `this` it synthesizes (or the
-        // tag name it rides behind), plus the value's interior — [`ThisClaim`]'s routing.
-        // The attribute scan below probes the whole name→`>` window, which all of that sits
-        // inside, so the claim is also what the scan must skip — without it every comment
-        // here prints twice, once by each.
-        let claimed = synthesized_this
-            .map(|(_, value)| ThisClaim::new(element.name_span.end, value, element.attributes));
+        }
+        .map(|(doc, value)| {
+            (
+                doc,
+                ThisClaim::new(element.name_span.end, value, element.attributes),
+            )
+        });
+        let claimed = synthesized_this.map(|(_, claim)| claim);
 
         // Pre-allocate: 2 docs per attr (separator + attr), plus the synthesized `this={…}`.
         let capacity = (element.attributes.len() + usize::from(synthesized_this.is_some())) * 2;
         let mut docs: DocBuf = DocBuf::with_capacity(capacity);
 
-        if let Some(((this_doc, value), claim)) = synthesized_this.zip(claimed) {
+        if let Some((this_doc, claim)) = synthesized_this {
             // Comments that bind the `this` (or trail the tag name it prints behind) are
             // printed here, through the same seam the attribute loop uses — the only site
             // that can keep them on that side of the binding. Left to the attribute list
@@ -205,8 +209,12 @@ impl<'a> Printer<'a> {
             self.push_attr_item_with_leading_comments(
                 &mut docs,
                 separator,
-                comments_to_emit_in_range(self.comments, element.name_span.end, value.start)
-                    .filter(|c| claim.claims(self, c)),
+                comments_to_emit_in_range(
+                    self.comments,
+                    element.name_span.end,
+                    claim.value_start(),
+                )
+                .filter(|c| claim.claims(self, c)),
                 this_doc,
             );
         }

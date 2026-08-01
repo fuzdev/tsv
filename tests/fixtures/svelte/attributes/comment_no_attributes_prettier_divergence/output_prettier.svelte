@@ -39,3 +39,8 @@
 
 <!-- A mixed run in one gap: the block stays inline, the `//` still forces the break (prettier deletes both) -->
 <div></div>
+
+<!-- Whitespace-sensitive elements (their own printer) keep the comment too (prettier deletes it) -->
+<pre>text</pre>
+
+<textarea></textarea>

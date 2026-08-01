@@ -22,6 +22,9 @@ over-width `<textarea>` already takes, pinned by
 [elements/textarea_attrs_long](../textarea_attrs_long/). With no content there is nothing for the
 `>` to protect, so it sits at base indent, the shape every other element takes
 ([attributes/comment_trailing_same_line](../../attributes/comment_trailing_same_line/)).
+An **own-line** `//` before the `>` carries its line break with it — the attributes wrap one per
+line ([ws_sensitive_attr_comment_own_line](../ws_sensitive_attr_comment_own_line/)'s rule) and the
+`>` keeps the next line, one level in.
 
 Prettier **ejects the comment out of the element**:
 

@@ -20,3 +20,9 @@
 
 <textarea
 	data-attr="value"></textarea> // c
+
+<!-- An own-line `//` before the `>` carries its line break with it: the attributes wrap
+	one per line and the `>` keeps the next line, one level in -->
+<pre
+	data-attr="value">text</pre>
+	// c

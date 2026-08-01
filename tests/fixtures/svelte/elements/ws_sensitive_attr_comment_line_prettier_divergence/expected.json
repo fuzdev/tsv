@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 791,
+	"end": 989,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -339,6 +339,85 @@
 					"type": "Fragment",
 					"nodes": []
 				}
+			},
+			{
+				"type": "Text",
+				"start": 790,
+				"end": 792,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 792,
+				"end": 944,
+				"data": " An own-line `//` before the `>` carries its line break with it: the attributes wrap\n\tone per line and the `>` keeps the next line, one level in "
+			},
+			{
+				"type": "Text",
+				"start": 944,
+				"end": 945,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 945,
+				"end": 988,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 34,
+						"column": 1,
+						"character": 946
+					},
+					"end": {
+						"line": 34,
+						"column": 4,
+						"character": 949
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 951,
+						"end": 968,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 35,
+								"column": 1,
+								"character": 951
+							},
+							"end": {
+								"line": 35,
+								"column": 10,
+								"character": 960
+							}
+						},
+						"value": [
+							{
+								"start": 962,
+								"end": 967,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 977,
+							"end": 981,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
 			}
 		]
 	},
@@ -449,6 +528,24 @@
 					"line": 29,
 					"column": 23,
 					"character": 777
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 970,
+			"end": 974,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 1,
+					"character": 970
+				},
+				"end": {
+					"line": 36,
+					"column": 5,
+					"character": 974
 				}
 			}
 		}

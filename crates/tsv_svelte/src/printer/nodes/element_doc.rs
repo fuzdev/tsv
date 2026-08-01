@@ -162,6 +162,39 @@ pub(in crate::printer) struct AttrGaps {
     pub(in crate::printer) claimed: Option<ThisClaim>,
 }
 
+/// A built attribute list and the facts about its emission a caller may need before
+/// printing the tag's closer — [`Printer::build_element_attrs_doc`]'s product, one value so
+/// they cannot be separated and a flag silently dropped where it mattered.
+///
+/// Most callers read only `docs`: their `>` / `/>` already sits behind a `line` in the
+/// list's own group, so the `break_parent` a line comment pushes moves it off the comment's
+/// line unaided, and their attributes already wrap behind those same `line` separators. The
+/// whitespace-sensitive builder is the one that must consult the emission — it hugs the `>`
+/// onto the last attribute and holds its attributes flat, with no line to break for either
+/// question (see [`Printer::push_attrs_with_comments`]).
+pub(super) struct ElementAttrsDoc {
+    pub(super) docs: DocBuf,
+    pub(super) emission: AttrListEmission,
+}
+
+/// What emitting an attribute list did that a layout keeping the list **flat** must know —
+/// [`Printer::push_attrs_with_comments`]'s summary of its comment runs.
+///
+/// Both fields are read off the emission as it happens rather than re-derived from source
+/// or probed off the docs, so they cannot disagree with what was printed —
+/// [`DocArena::will_break`](tsv_lang::doc::arena::DocArena::will_break) is *not* the
+/// `has_hardline` question: it counts the `break_parent` a trailing `//` pushes, which
+/// forces only the `>` off the comment's line while the list itself stays flat.
+#[derive(Clone, Copy, Default)]
+pub(in crate::printer) struct AttrListEmission {
+    /// Whether the emitted list ends on a `//`, so nothing may share its line.
+    pub(in crate::printer) ends_with_line_comment: bool,
+    /// Whether a comment forced a hardline *into* the list — an own-line comment keeping
+    /// its own line, or a same-line `//` pushing the following attribute to a fresh one.
+    /// The list can no longer render flat at any width.
+    pub(in crate::printer) has_hardline: bool,
+}
+
 /// What an emitted attribute-comment run leaves behind for whoever prints next.
 ///
 /// Two questions, not one, and a caller that conflates them gets a different bug for each
@@ -177,6 +210,10 @@ struct AttrCommentRun {
     next_on_new_line: bool,
     /// Whether the run's **last** comment is a `//`, so nothing may share its line.
     ends_with_line_comment: bool,
+    /// Whether **any** comment in the run kept a line of its own (accumulated, unlike the
+    /// two tail facts above): the run pushed a hardline, so the list holding it can never
+    /// render flat — [`AttrListEmission::has_hardline`]'s per-run input.
+    has_own_line_comment: bool,
 }
 
 /// Which comments the synthesized `this={…}` prints — [`AttrGaps::claimed`]'s payload, and
@@ -234,6 +271,13 @@ impl ThisClaim {
             head_gap_end,
             prev_end,
         }
+    }
+
+    /// Start of the bound value as written — the end of the leading window whose claimed
+    /// comments the `this` site emits itself (`[name_end, value_start)`). Comments past it
+    /// that the claim covers sit *inside* the value and are printed by the binding's own doc.
+    pub(in crate::printer) fn value_start(&self) -> u32 {
+        self.value.start
     }
 
     /// Whether the synthesized `this` site prints `comment` — see the type docs for the
@@ -371,7 +415,7 @@ impl<'a> Printer<'a> {
         let is_html = element.kind == internal::ElementKind::Html;
 
         // Build attribute docs (needed for all paths)
-        let (attr_docs, attrs_end_with_line_comment) = self.build_element_attrs_doc(
+        let attrs = self.build_element_attrs_doc(
             element.attributes,
             self.d().line(),
             element.name_span.end,
@@ -381,7 +425,7 @@ impl<'a> Printer<'a> {
 
         // Special handling for <style> and <script> elements
         if class.is_style || class.is_script {
-            return self.build_raw_content_element_doc(class.is_style, element, attr_docs);
+            return self.build_raw_content_element_doc(class.is_style, element, attrs.docs);
         }
 
         // Foreign language <template> elements (e.g., <template lang="pug">)
@@ -396,13 +440,10 @@ impl<'a> Printer<'a> {
         // Whitespace-sensitive elements (pre, textarea, etc.) — these keep the mandatory
         // delimiter dangle, so they must never reach the shared layout analysis below.
         if class.is_ws_sensitive {
-            return self.build_whitespace_sensitive_element_doc(
-                element,
-                attr_docs,
-                attrs_end_with_line_comment,
-            );
+            return self.build_whitespace_sensitive_element_doc(element, attrs);
         }
 
+        let attr_docs = attrs.docs;
         let parts = self.element_parts(element, class);
 
         // Phase 1: Analyze element
@@ -483,13 +524,15 @@ impl<'a> Printer<'a> {
         let is_html = element.kind == internal::ElementKind::Html;
         // Every layout below puts the `>` behind a line of this list's own group, so a
         // trailing `//`'s `break_parent` moves it off the comment's line unaided.
-        let (attr_docs, _) = self.build_element_attrs_doc(
-            element.attributes,
-            self.d().line(),
-            element.name_span.end,
-            element.open_tag_end,
-            is_html,
-        );
+        let attr_docs = self
+            .build_element_attrs_doc(
+                element.attributes,
+                self.d().line(),
+                element.name_span.end,
+                element.open_tag_end,
+                is_html,
+            )
+            .docs;
         let parts = self.element_parts(element, class);
         let ctx = self.analyze_element(&parts, &attr_docs);
         match self.compute_element_layout(&parts, &ctx) {
@@ -843,13 +886,15 @@ impl<'a> Printer<'a> {
 
             // State 2: Hug mode - attrs inline (space-separated), > on new line.
             // The `>` takes a hardline of its own here, so a trailing `//` cannot swallow it.
-            let (hug_attrs, _) = self.build_element_attrs_doc(
-                element.attributes,
-                self.d().text(" "),
-                element.name_span.end,
-                element.open_tag_end,
-                is_html,
-            );
+            let hug_attrs = self
+                .build_element_attrs_doc(
+                    element.attributes,
+                    self.d().text(" "),
+                    element.name_span.end,
+                    element.open_tag_end,
+                    is_html,
+                )
+                .docs;
             let hug_state = d.concat(&[
                 d.text("<"),
                 name_doc,
@@ -859,13 +904,15 @@ impl<'a> Printer<'a> {
             ]);
 
             // State 3: Full multiline - attrs on separate lines, > on new line
-            let (multiline_attrs, _) = self.build_element_attrs_doc(
-                element.attributes,
-                self.d().line(),
-                element.name_span.end,
-                element.open_tag_end,
-                is_html,
-            );
+            let multiline_attrs = self
+                .build_element_attrs_doc(
+                    element.attributes,
+                    self.d().line(),
+                    element.name_span.end,
+                    element.open_tag_end,
+                    is_html,
+                )
+                .docs;
             let multiline_concat = d.concat(&multiline_attrs);
             let multiline_indent = d.indent(multiline_concat);
             let multiline_state = d.concat(&[
@@ -898,13 +945,15 @@ impl<'a> Printer<'a> {
         // template body and the output stopped re-parsing. `build_opening_tag` ends in a
         // dedented softline, which the `break_parent` a line comment pushes expands unaided.
         // Foreign template elements are always HTML, so is_html=true.
-        let (attr_docs, _) = self.build_element_attrs_doc(
-            element.attributes,
-            self.d().line(),
-            element.name_span.end,
-            element.open_tag_end,
-            true,
-        );
+        let attr_docs = self
+            .build_element_attrs_doc(
+                element.attributes,
+                self.d().line(),
+                element.name_span.end,
+                element.open_tag_end,
+                true,
+            )
+            .docs;
         let mut parts: DocBuf = smallvec![self.build_opening_tag(name_doc, &attr_docs, false)];
         parts.push(d.text(">"));
 
@@ -1025,9 +1074,6 @@ impl<'a> Printer<'a> {
     /// `name_end`: end position of the element tag name (for finding comments before first attr).
     /// `open_tag_end`: position of the `>` that closes the open tag (for trailing comment range).
     /// `is_html`: true for HTML elements, enables class attribute whitespace normalization.
-    ///
-    /// Paired with [`Printer::push_attrs_with_comments`]'s answer to whether the list ends on
-    /// a `//` — see there for who has to care.
     pub(super) fn build_element_attrs_doc(
         &self,
         attrs: &[internal::AttributeNode<'_>],
@@ -1035,12 +1081,12 @@ impl<'a> Printer<'a> {
         name_end: u32,
         open_tag_end: u32,
         is_html: bool,
-    ) -> (DocBuf, bool) {
+    ) -> ElementAttrsDoc {
         // Most elements have a handful of attributes, so the per-element parts
         // buffer stays on the stack (`DocBuf`'s inline capacity); attribute-dense
         // elements spill to the heap as before.
         let mut docs: DocBuf = DocBuf::with_capacity(attrs.len() * 2);
-        let ends_with_line_comment = self.push_attrs_with_comments(
+        let emission = self.push_attrs_with_comments(
             &mut docs,
             attrs,
             separator,
@@ -1053,7 +1099,7 @@ impl<'a> Printer<'a> {
             },
             is_html,
         );
-        (docs, ends_with_line_comment)
+        ElementAttrsDoc { docs, emission }
     }
 
     /// Push attribute docs with interleaved JS comment handling.
@@ -1063,14 +1109,13 @@ impl<'a> Printer<'a> {
     /// and after the last one — or, when the list is empty, the whole window — over the range
     /// described by [`AttrGaps`].
     ///
-    /// Returns whether the emitted list ends on a `//`
-    /// ([`AttrCommentRun::ends_with_line_comment`] of the trailing run), which is the one
-    /// thing a caller must know before printing the tag's `>` on the same line. Most callers
-    /// need not: their `>` already sits behind a `line` in this list's own group, so the
-    /// `break_parent` a line comment pushes puts it on the next line by itself. The callers
-    /// that **hug** the `>` onto the last attribute — the whitespace-sensitive builder, where
-    /// a break would otherwise be free to inject rendered whitespace — have no such line to
-    /// break and must ask.
+    /// Returns the [`AttrListEmission`] summary, which is what a caller keeping the list or
+    /// its closer **flat** must know. Most callers need neither field: their `>` already
+    /// sits behind a `line` in this list's own group, so the `break_parent` a line comment
+    /// pushes puts it on the next line by itself, and their attributes already wrap behind
+    /// those same `line` separators. The whitespace-sensitive builder — where a hug is a
+    /// refusal to inject rendered whitespace — has no such line for either question and
+    /// must ask.
     pub(in crate::printer) fn push_attrs_with_comments(
         &self,
         docs: &mut DocBuf,
@@ -1078,7 +1123,7 @@ impl<'a> Printer<'a> {
         separator: DocId,
         gaps: AttrGaps,
         is_html: bool,
-    ) -> bool {
+    ) -> AttrListEmission {
         let AttrGaps {
             first_range_start,
             open_tag_end,
@@ -1117,11 +1162,12 @@ impl<'a> Printer<'a> {
                 docs.push(separator);
                 docs.push(self.build_attribute_node_doc(attr, is_html));
             }
-            return false;
+            return AttrListEmission::default();
         }
 
+        let mut has_hardline = false;
         for (i, attr) in attrs.iter().enumerate() {
-            self.push_attr_item_with_leading_comments(
+            has_hardline |= self.push_attr_item_with_leading_comments(
                 docs,
                 separator,
                 gap_comments(gap_start(i), attr.span().start),
@@ -1132,8 +1178,12 @@ impl<'a> Printer<'a> {
         // The gap after the last attribute — or, for an empty list, the whole window, where
         // the loop above ran zero times and this is the tag's only emitter. An empty run is
         // a no-op, so it needs no guard.
-        self.push_attr_comment_docs(docs, gap_comments(gap_start(attrs.len()), open_tag_end))
-            .ends_with_line_comment
+        let trailing =
+            self.push_attr_comment_docs(docs, gap_comments(gap_start(attrs.len()), open_tag_end));
+        AttrListEmission {
+            ends_with_line_comment: trailing.ends_with_line_comment,
+            has_hardline: has_hardline || trailing.has_own_line_comment,
+        }
     }
 
     /// Push one attribute-list item behind whatever comments lead it.
@@ -1156,17 +1206,22 @@ impl<'a> Printer<'a> {
     /// `build_special_element_attrs_doc` prints before that loop runs. Keeping a second copy
     /// beside the `this` binding is how the two drifted in the first place — that one printed
     /// no leading comments at all, so every comment before the binding was dropped.
+    ///
+    /// Returns whether the emission put a hardline into the list — a comment in the run kept
+    /// its own line, or the run's tail forced the item onto a fresh one
+    /// ([`AttrListEmission::has_hardline`]'s per-item input).
     pub(super) fn push_attr_item_with_leading_comments<'c>(
         &self,
         docs: &mut DocBuf,
         separator: DocId,
         comments: impl IntoIterator<Item = &'c tsv_lang::Comment>,
         item: DocId,
-    ) {
+    ) -> bool {
         let d = self.d();
         let mut comments = comments.into_iter().peekable();
-        if comments.peek().is_none() {
+        let pushed_hardline = if comments.peek().is_none() {
             docs.push(separator);
+            false
         } else {
             let tail = self.push_attr_comment_docs(docs, comments);
             docs.push(if tail.next_on_new_line {
@@ -1174,8 +1229,10 @@ impl<'a> Printer<'a> {
             } else {
                 separator
             });
-        }
+            tail.has_own_line_comment || tail.next_on_new_line
+        };
         docs.push(item);
+        pushed_hardline
     }
 
     /// Whether the author put `comment` on a line of its own — the question every
@@ -1236,6 +1293,7 @@ impl<'a> Printer<'a> {
             tail = AttrCommentRun {
                 next_on_new_line: is_own_line || !comment.is_block,
                 ends_with_line_comment: !comment.is_block,
+                has_own_line_comment: tail.has_own_line_comment || is_own_line,
             };
         }
         tail
