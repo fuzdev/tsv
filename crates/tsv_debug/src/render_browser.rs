@@ -44,17 +44,49 @@ use crate::render_normalize::{
 
 /// Block-level tags for the **browser render** model.
 ///
-/// ⚠️ This is NOT `tsv_html::is_block_element`, which is a *formatting* set
-/// (prettier's inline/block split — it carries `details`/`dialog`/`hgroup`/
-/// `menu`/`pre` and deliberately treats table cells as inline). This set must
-/// mirror the sidecar's `BLOCK_TAGS`, or the fallback arm and the authoritative
-/// compile arm would disagree about the same document. `sidecar_block_tags_match`
-/// asserts that agreement against the embedded `sidecar.ts` source.
+/// Membership asks one question — does this tag's **UA-stylesheet display**
+/// (`~/dev/html/source`, rendering section) make adjacent collapsible whitespace
+/// non-rendering? — and it must be answered UNCONDITIONALLY. That is a different
+/// question from `tsv_html::is_block_element`, the *formatting* set, and the two
+/// differ in **both** directions rather than one being a subset of the other:
+///
+/// - Here but not there: `thead`/`tbody`/`tr`/`td`/`th`. Their display is
+///   table-internal, so the whitespace does vanish, but prettier lays table cells
+///   out as inline and the formatting set follows prettier.
+/// - There but not here: `dialog`. `dialog:not([open]) { display: none; }`
+///   precedes `dialog { … display: block }`, so the attribute-less spelling — the
+///   default authoring — generates no box at all. Its neighbours then share ONE
+///   inline formatting context and the surrounding whitespace collapses to a
+///   RENDERED space: `a<dialog>x</dialog>b` paints `ab`, `a <dialog>x</dialog> b`
+///   paints `a b`. Admitting it would make this model vouch a false equivalence,
+///   the one direction the soundness note above forbids — so the model keeps
+///   flagging a formatter break there, and that verdict is correct. (Prettier core
+///   reaches the opposite answer only because its generator drops every
+///   non-bare-tag selector, `dialog:not([open])` included.)
+///
+/// The five tags that ARE shared with the formatting set — `details`, `hgroup`,
+/// `menu`, `pre`, `summary` — are unconditionally block there, and they are also
+/// the whole of this oracle's exposure: a break can only ever appear at a
+/// `tsv_html` block element, so any tag outside that set costs nothing to omit and
+/// omitting it keeps the sensitivity.
+///
+/// TODO: neither arm models `display: none` at all, so a closed `<dialog>`'s
+/// CONTENT still counts as flow text here — which is why the boundary shape above
+/// is the one that bites, while `<div><dialog>x</dialog>text</div>` over-flags for
+/// an unrelated reason. Modelling it properly is a bigger question than one tag
+/// (`[hidden]`, `<template>`, `<datalist>`, a non-selected `<option>`); until then
+/// the omission keeps this tag in the loud direction, which is the safe one.
+///
+/// ⚠️ This set must mirror the sidecar's `BLOCK_TAGS`, or the fallback arm and the
+/// authoritative compile arm would disagree about the same document.
+/// `sidecar_block_tags_match` asserts that agreement against the embedded
+/// `sidecar.ts` source.
 const BLOCK_TAGS: &[&str] = &[
     "address",
     "article",
     "aside",
     "blockquote",
+    "details",
     "div",
     "dl",
     "dt",
@@ -71,13 +103,17 @@ const BLOCK_TAGS: &[&str] = &[
     "h5",
     "h6",
     "header",
+    "hgroup",
     "hr",
     "li",
     "main",
+    "menu",
     "nav",
     "ol",
     "p",
+    "pre",
     "section",
+    "summary",
     "table",
     "thead",
     "tbody",
@@ -95,6 +131,8 @@ pub fn browser_render_normalize(value: Value) -> Value {
     let mut value = render_normalize(value);
     // Rule 1. Inside `<pre>` / `<textarea>` whitespace is verbatim, so the
     // block-boundary trim is suspended exactly where the compiler model's is.
+    // `pre` being a block tag is about the OUTSIDE — whitespace against a `<pre>`
+    // sibling, which the sidecar drops via its separate verbatim-run split.
     for_each_fragment(&mut value, false, &mut |nodes, preserve| {
         if !preserve {
             trim_fragment_at_block_boundaries(nodes);
@@ -273,6 +311,62 @@ mod tests {
             vec![element("div", vec![]), text("x"), element("div", vec![])],
         )]));
         assert_ne!(a, b);
+    }
+
+    /// Format both spellings of a one-element sandwich, so a tag's block-ness is
+    /// read off the only thing that distinguishes them: the boundary whitespace.
+    fn sandwich_pair(tag: &str) -> (Value, Value) {
+        let glued = browser_render_normalize(root(vec![
+            text("a"),
+            element(tag, vec![text("x")]),
+            text("b"),
+        ]));
+        let spaced = browser_render_normalize(root(vec![
+            text("a "),
+            element(tag, vec![text("x")]),
+            text(" b"),
+        ]));
+        (glued, spaced)
+    }
+
+    /// The five tags the formatting set carries that this one lacked. Each is
+    /// UNCONDITIONALLY `display: block` in the UA stylesheet, so a formatter break
+    /// at its boundary is not a render change — and since a break can only appear
+    /// at a `tsv_html` block element, these five were the whole of the gap.
+    #[test]
+    fn unconditionally_block_tags_drop_boundary_whitespace() {
+        for tag in ["details", "hgroup", "menu", "pre", "summary"] {
+            let (glued, spaced) = sandwich_pair(tag);
+            assert_eq!(
+                glued, spaced,
+                "<{tag}> is display:block in the UA stylesheet, so the whitespace \
+                 against it is not render"
+            );
+        }
+    }
+
+    /// ⚠️ `dialog` is deliberately NOT a member, though `tsv_html` classifies it
+    /// block for formatting. `dialog:not([open]) { display: none; }` means the
+    /// attribute-less spelling generates no box, so its neighbours share one inline
+    /// formatting context and the boundary whitespace collapses to a RENDERED
+    /// space. Admitting it would buy a false equivalence — an under-flag, the
+    /// silent failure. This pins the omission against a "finish the set" cleanup.
+    #[test]
+    fn dialog_keeps_its_boundary_whitespace() {
+        let (glued, spaced) = sandwich_pair("dialog");
+        assert_ne!(
+            glued, spaced,
+            "a closed <dialog> is display:none, so `a<dialog>x</dialog>b` and its \
+             spaced twin render differently — this model must keep flagging it"
+        );
+    }
+
+    /// The counterpart control: an inline tag's boundary whitespace is a visible
+    /// space, and widening the block set must not have touched that.
+    #[test]
+    fn inline_tag_keeps_its_boundary_whitespace() {
+        let (glued, spaced) = sandwich_pair("span");
+        assert_ne!(glued, spaced, "a space against <span> is visible render");
     }
 
     /// A block element reached through a block is invisible to the AST, so the
