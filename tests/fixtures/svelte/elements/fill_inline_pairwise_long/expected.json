@@ -1,0 +1,515 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1397,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 92,
+				"data": " fits at exactly 100: the element and the word after it both pack onto the text line "
+			},
+			{
+				"type": "Text",
+				"start": 92,
+				"end": 93,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 93,
+				"end": 225,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 94
+					},
+					"end": {
+						"line": 2,
+						"column": 2,
+						"character": 95
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 96,
+							"end": 173,
+							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo ",
+							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo "
+						},
+						{
+							"type": "RegularElement",
+							"start": 173,
+							"end": 190,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 3,
+									"column": 77,
+									"character": 174
+								},
+								"end": {
+									"line": 3,
+									"column": 81,
+									"character": 178
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 179,
+										"end": 183,
+										"raw": "pppp",
+										"data": "pppp"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 190,
+							"end": 203,
+							"raw": " qqqqq\n\trrrr ",
+							"data": " qqqqq\n\trrrr "
+						},
+						{
+							"type": "RegularElement",
+							"start": 203,
+							"end": 220,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 4,
+									"column": 7,
+									"character": 204
+								},
+								"end": {
+									"line": 4,
+									"column": 11,
+									"character": 208
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 209,
+										"end": 213,
+										"raw": "ssss",
+										"data": "ssss"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 220,
+							"end": 221,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 225,
+				"end": 227,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 227,
+				"end": 511,
+				"data": " 101: only the word after the element wraps. The boundary before an inline element measures the\n     ELEMENT alone — prettier's fill is pairwise (last word, separator, element), never the element\n     plus the text that trails it — so the element stays on the text line at 94. "
+			},
+			{
+				"type": "Text",
+				"start": 511,
+				"end": 512,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 512,
+				"end": 645,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 10,
+						"column": 1,
+						"character": 513
+					},
+					"end": {
+						"line": 10,
+						"column": 2,
+						"character": 514
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 515,
+							"end": 592,
+							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo ",
+							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo "
+						},
+						{
+							"type": "RegularElement",
+							"start": 592,
+							"end": 609,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 11,
+									"column": 77,
+									"character": 593
+								},
+								"end": {
+									"line": 11,
+									"column": 81,
+									"character": 597
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 598,
+										"end": 602,
+										"raw": "pppp",
+										"data": "pppp"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 609,
+							"end": 623,
+							"raw": "\n\tqqqqqq rrrr ",
+							"data": "\n\tqqqqqq rrrr "
+						},
+						{
+							"type": "RegularElement",
+							"start": 623,
+							"end": 640,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 12,
+									"column": 14,
+									"character": 624
+								},
+								"end": {
+									"line": 12,
+									"column": 18,
+									"character": 628
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 629,
+										"end": 633,
+										"raw": "ssss",
+										"data": "ssss"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 640,
+							"end": 641,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 645,
+				"end": 647,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 647,
+				"end": 835,
+				"data": " The same boundary GLUED (no whitespace before the element), at exactly 100: the glued word and\n     the element are one unit, and the word after it still packs onto the text line. "
+			},
+			{
+				"type": "Text",
+				"start": 835,
+				"end": 836,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 836,
+				"end": 968,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 17,
+						"column": 1,
+						"character": 837
+					},
+					"end": {
+						"line": 17,
+						"column": 2,
+						"character": 838
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 839,
+							"end": 916,
+							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn ooooo",
+							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn ooooo"
+						},
+						{
+							"type": "RegularElement",
+							"start": 916,
+							"end": 933,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 18,
+									"column": 77,
+									"character": 917
+								},
+								"end": {
+									"line": 18,
+									"column": 81,
+									"character": 921
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 922,
+										"end": 926,
+										"raw": "pppp",
+										"data": "pppp"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 933,
+							"end": 946,
+							"raw": " qqqqq\n\trrrr ",
+							"data": " qqqqq\n\trrrr "
+						},
+						{
+							"type": "RegularElement",
+							"start": 946,
+							"end": 963,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 19,
+									"column": 7,
+									"character": 947
+								},
+								"end": {
+									"line": 19,
+									"column": 11,
+									"character": 951
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 952,
+										"end": 956,
+										"raw": "ssss",
+										"data": "ssss"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 963,
+							"end": 964,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 968,
+				"end": 970,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 970,
+				"end": 1262,
+				"data": " Glued at 101: the same pairwise answer as the space-authored case above. The glued unit ends at\n     94, so it stays on the text line and only the word after it wraps — the run does NOT drop to a\n     fresh line, since the overflow lands past the element rather than inside the pair. "
+			},
+			{
+				"type": "Text",
+				"start": 1262,
+				"end": 1263,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1263,
+				"end": 1396,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 25,
+						"column": 1,
+						"character": 1264
+					},
+					"end": {
+						"line": 25,
+						"column": 2,
+						"character": 1265
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1266,
+							"end": 1344,
+							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooooo",
+							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooooo"
+						},
+						{
+							"type": "RegularElement",
+							"start": 1344,
+							"end": 1361,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 26,
+									"column": 78,
+									"character": 1345
+								},
+								"end": {
+									"line": 26,
+									"column": 82,
+									"character": 1349
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1350,
+										"end": 1354,
+										"raw": "pppp",
+										"data": "pppp"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1361,
+							"end": 1374,
+							"raw": "\n\tqqqqq rrrr ",
+							"data": "\n\tqqqqq rrrr "
+						},
+						{
+							"type": "RegularElement",
+							"start": 1374,
+							"end": 1391,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 27,
+									"column": 13,
+									"character": 1375
+								},
+								"end": {
+									"line": 27,
+									"column": 17,
+									"character": 1379
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 1380,
+										"end": 1384,
+										"raw": "ssss",
+										"data": "ssss"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1391,
+							"end": 1392,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

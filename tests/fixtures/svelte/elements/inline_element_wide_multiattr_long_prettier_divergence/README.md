@@ -18,11 +18,11 @@ This pins **element/component parity for the after-element fold**: unlike `inlin
 (whose single long attribute overflows even on its own line, so the drop falls out of the
 content-overflow path), here the element's attributes *fit* on its own line, so it drops whole only
 because the preceding text is too long — the same case the component fixture
-`inline_component_wide_multiattr_long` covers. The trailing text follows the **authored boundary**,
-exactly like the wide-content case (`inline_wide_content_trailing_long`): a space flows after the
-intact `</a>` (both `unformatted_ours_compact.svelte` and prettier's hugged form normalize to this
-input), a newline keeps it on its own line — the drop no longer isolates its tail regardless of
-authoring.
+`inline_component_wide_multiattr_long` covers. The trailing text **hugs the intact `</a>`** whatever
+the authored boundary, exactly like the wide-content case (`inline_wide_content_trailing_long`): that
+boundary is render-free, so a newline converges to the same form a space produces (both
+`unformatted_ours_compact.svelte` and prettier's hugged form normalize to this input). The drop does
+not isolate its tail regardless of authoring.
 
 ## Reason
 

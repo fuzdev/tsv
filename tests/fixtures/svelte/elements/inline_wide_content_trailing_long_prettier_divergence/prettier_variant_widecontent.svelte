@@ -7,13 +7,15 @@
 	line and distinguishes the two boundaries. See README. Covers <strong>/<a>.
 -->
 <p>
-	<strong>
-		alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar
-	</strong> tail
+	<strong
+		>alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar</strong
+	>
+	tail
 </p>
 
 <p>
-	<a href="#">
-		november oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu abcdefg
-	</a> tail
+	<a href="#"
+		>november oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu abcdefg</a
+	>
+	tail
 </p>

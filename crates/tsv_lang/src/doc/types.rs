@@ -81,6 +81,13 @@ pub struct DocContext {
     /// tail). See
     /// [`crate::doc::arena::DocArena::after_element_fold_lead`].
     ///
+    /// Pairwise cuts on the other side too: the measurement STOPS at that following node (plus any
+    /// run welded to it, which owns no break point of its own and so rides its line by
+    /// construction), rather than running the whole render stack. A later sibling the fill reaches
+    /// only across a break point of its own does not belong in the element's fit check. The stack
+    /// is built by `flow_lookahead` in `arena_render_fill`, which both halves of the boundary rule
+    /// share.
+    ///
     /// Scoped to the Svelte text→flow-element boundary fill (a text run whose next sibling is a
     /// flowing inline element/component). Off for every other fill, so a small element after text
     /// still packs and CSS/value-list fills are unaffected. It re-couples the width-driven drop
