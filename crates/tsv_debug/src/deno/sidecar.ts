@@ -170,11 +170,22 @@ function bakedSkeleton(code: string): string {
 // visible space. The model splits the baked HTML at block-tag boundaries and collapses each
 // flow segment independently, so block-boundary whitespace vanishes while inline whitespace
 // (and text presence) is preserved. `<pre>` runs are kept verbatim (Svelte preserves them).
+//
+// Membership is keyed on UNCONDITIONAL `display: block` (or a block-level `display`) in the
+// HTML spec's UA stylesheet — a tag whose display is attribute-conditional does NOT belong,
+// however it is classified for formatting. `<dialog>` is the standing example and the reason
+// this set is not simply `tsv_html`'s: `dialog:not([open]) { display: none; }` makes the
+// attribute-less spelling generate no box at all, so the whitespace on either side stays in
+// ONE inline formatting context and collapses to a RENDERED space — `a<dialog>x</dialog>b`
+// paints `ab`, its spaced twin paints `a b`. Admitting it would buy a false equivalence, the
+// one direction this oracle must never take. `tsv_debug::render_browser::BLOCK_TAGS` is the
+// Rust twin of this set (the fallback arm) and `sidecar_block_tags_match` pins them together.
 const BLOCK_TAGS = new Set([
 	'address',
 	'article',
 	'aside',
 	'blockquote',
+	'details',
 	'div',
 	'dl',
 	'dt',
@@ -191,13 +202,17 @@ const BLOCK_TAGS = new Set([
 	'h5',
 	'h6',
 	'header',
+	'hgroup',
 	'hr',
 	'li',
 	'main',
+	'menu',
 	'nav',
 	'ol',
 	'p',
+	'pre',
 	'section',
+	'summary',
 	'table',
 	'thead',
 	'tbody',
@@ -231,6 +246,10 @@ function collapseRenderWhitespace(seg: string): string {
 
 function visibleSegments(body: string): string[] {
 	const segments: string[] = [];
+	// A closed `<pre>…</pre>` run is lifted out whole, so its tags never reach `pushFlow` and
+	// its `BLOCK_TAGS` membership is inert here — the run's own edges already split the flow,
+	// which is why `</pre>text` was never over-flagged. Membership carries the UNCLOSED case,
+	// where the stray `<pre` falls through to the tag replace below.
 	const pre_re = /<pre[\s\S]*?<\/pre>/gi;
 	let last = 0;
 	let m: RegExpExecArray | null;
