@@ -1031,7 +1031,8 @@ Things the published numbers measure that aren't quite what they look like:
   (`BENCH_MODE=union` audits what it hides). test262 files are parsed at the
   goal test262 **declares** (`SourceFile.goal`, from the harvest's per-file
   `module` flag → `module`, else strict `script`): tsv routes through its
-  goal-aware bindings (`parse_*_typescript*_with_goal`), acorn takes
+  goal-aware bindings (the native `*_with_goal` exports; the WASM `goal`
+  parse option), acorn takes
   `sourceType: goal`, and oxc takes an explicit `sourceType` — so a script-goal
   `await`-identifier test is scored as valid against every tool, not counted as a
   module-goal failure. (Before this, everything parsed at module goal and those

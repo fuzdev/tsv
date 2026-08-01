@@ -466,7 +466,14 @@ function reconstruct_in(ast, starts, source, language) {
 	const comments = is_svelte && Array.isArray(ast?.comments) ? ast.comments : null;
 	const elements = comments !== null && comments.length > 0 ? [] : null;
 	walk_add_loc(ast, { starts, source, is_svelte, elements });
-	if (elements !== null) stamp_in_tag_comment_locs(comments, elements, starts, source);
+	if (elements !== null) {
+		// `<svelte:options>` is the one attribute-bearing tag head whose wire node
+		// carries no `type` (Svelte's `root.options`), so the type-keyed walk can't
+		// collect it as a host — push it directly so its in-tag comments get the
+		// `character`-bearing loc like any element's.
+		if (ast?.options) elements.push(ast.options);
+		stamp_in_tag_comment_locs(comments, elements, starts, source);
+	}
 	return ast;
 }
 

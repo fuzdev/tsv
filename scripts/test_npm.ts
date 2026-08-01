@@ -186,6 +186,57 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 			node_entry.parse_css('a { color: red }')
 		);
 	});
+
+	it('parse options: {locations: false} emits the span-only wire', { skip: !has_parse }, () => {
+		const full = node_entry.parse_typescript('const x = 1;');
+		const span_only = node_entry.parse_typescript('const x = 1;', { locations: false });
+		assert.ok(full.loc);
+		assert.equal('loc' in span_only, false);
+		assert.equal(span_only.type, 'Program');
+		// svelte also drops name_loc
+		const sv = '<div class="a">x</div>';
+		assert.match(JSON.stringify(node_entry.parse_svelte(sv)), /"name_loc"/);
+		const sv_span_only = JSON.stringify(node_entry.parse_svelte(sv, { locations: false }));
+		assert.doesNotMatch(sv_span_only, /"name_loc"|"loc"/);
+		// css accepts the option as an inert no-op (its wire has no loc either way)
+		assert.deepEqual(
+			node_entry.parse_css('a { color: red }', { locations: false }),
+			node_entry.parse_css('a { color: red }')
+		);
+	});
+
+	it('parse options: goal switches the TypeScript parse goal', { skip: !has_parse }, () => {
+		const program = node_entry.parse_typescript('var await = 1;', { goal: 'script' });
+		assert.equal(program.sourceType, 'script');
+		// module goal (default and explicit) reserves `await`
+		assert.throws(() => node_entry.parse_typescript('var await = 1;'));
+		assert.throws(() => node_entry.parse_typescript('var await = 1;', { goal: 'module' }));
+		assert.throws(() => node_entry.parse_typescript('x;', { goal: 'bogus' }), /invalid goal/);
+		// goal composes with locations (goal drives the parser, locations the writer)
+		const composed = node_entry.parse_typescript('var await = 1;', {
+			goal: 'script',
+			locations: false
+		});
+		assert.equal(composed.sourceType, 'script');
+		assert.equal('loc' in composed, false);
+	});
+
+	it('parse options: unknown keys and misapplied goal error', { skip: !has_parse }, () => {
+		assert.throws(
+			() => node_entry.parse_typescript('x;', { locatons: false }),
+			/unknown parse option 'locatons'/
+		);
+		assert.throws(
+			() => node_entry.parse_svelte('<div>x</div>', { goal: 'script' }),
+			/only supported for TypeScript/
+		);
+		assert.throws(
+			() => node_entry.parse_typescript('x;', { locations: 'yes' }),
+			/'locations' must be a boolean/
+		);
+		// an explicitly-undefined value means that key's default (omitted-key convention)
+		assert.ok(node_entry.parse_typescript('x;', { locations: undefined, goal: undefined }).loc);
+	});
 });
 
 // Locations helper (locations.js, re-exported from index.js) — reconstruct the
@@ -197,7 +248,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		const ts = 'const x = 1;\nconst y = 2;\n';
 		const full = node_entry.parse_typescript(ts);
 		const recon = node_entry.reconstruct_locations(
-			node_entry.parse_typescript_no_locations(ts),
+			node_entry.parse_typescript(ts, { locations: false }),
 			ts
 		);
 		// The span-only wire is the full wire minus `loc`; adding it back must
@@ -206,7 +257,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 	});
 
 	it('reconstruct_locations mutates in place and returns the same object', () => {
-		const ast = node_entry.parse_typescript_no_locations('const x = 1;');
+		const ast = node_entry.parse_typescript('const x = 1;', { locations: false });
 		const returned = node_entry.reconstruct_locations(ast, 'const x = 1;');
 		assert.equal(returned, ast); // same reference
 		assert.ok(ast.loc); // mutated in place
@@ -215,7 +266,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 	it('loc_of derives a single node line/column', () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';
 		const full = node_entry.parse_typescript(ts);
-		const noloc = node_entry.parse_typescript_no_locations(ts);
+		const noloc = node_entry.parse_typescript(ts, { locations: false });
 		// second statement starts on line 2, column 0
 		assert.deepEqual(node_entry.loc_of(noloc.body[1], ts), full.body[1].loc);
 		assert.equal(node_entry.loc_of({ type: 'X' }, ts), null); // no start/end → null
@@ -224,7 +275,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 	it('create_locator reuses one line table for many lookups', () => {
 		const ts = 'const x = 1;\nconst y = 2;\n';
 		const full = node_entry.parse_typescript(ts);
-		const noloc = node_entry.parse_typescript_no_locations(ts);
+		const noloc = node_entry.parse_typescript(ts, { locations: false });
 		const locator = node_entry.create_locator(ts);
 		assert.deepEqual(locator.loc_of(noloc.body[0]), full.body[0].loc);
 		assert.deepEqual(locator.loc_of(noloc.body[1]), full.body[1].loc);
@@ -249,7 +300,10 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 		const sv =
 			'<script>\nconst x = 1;\n</script>\n\n<div class="a" on:click|preventDefault={x} {x} { x }>\n\t<svelte:head><title>t</title></svelte:head>\n\t{@const y = x}\n\t{#each [x] as item}{item}{/each}\n\t{#await x}p{:then value}{value}{:catch err}{err}{/await}\n</div>\n{#snippet row(a)}{a}{/snippet}';
 		const full = node_entry.parse_svelte(sv);
-		const recon = node_entry.reconstruct_locations(node_entry.parse_svelte_no_locations(sv), sv);
+		const recon = node_entry.reconstruct_locations(
+			node_entry.parse_svelte(sv, { locations: false }),
+			sv
+		);
 		let checked = 0;
 		let name_locs_checked = 0;
 		const walk = (r: any, f: any): void => {
@@ -348,7 +402,7 @@ describe(`locations helper (index.js): ${pkg_dir}`, { skip: !has_parse }, () => 
 			let span_only;
 			try {
 				full = node_entry.parse_svelte(source);
-				span_only = node_entry.parse_svelte_no_locations(source);
+				span_only = node_entry.parse_svelte(source, { locations: false });
 			} catch {
 				continue; // a fixture tsv rejects on purpose (input_invalid_*, tsv_rejects)
 			}
@@ -405,6 +459,21 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 
 	it('parse works after init', { skip: !has_parse }, () => {
 		assert.equal(browser.parse_typescript('const x = 1;').type, 'Program');
+	});
+
+	// Regression: the guard wrappers once hardcoded a single `(source)` param,
+	// silently dropping every later argument in the browser entry only.
+	it('the init guard forwards extra args (parse options)', { skip: !has_parse }, () => {
+		const program = browser.parse_typescript('var await = 1;', {
+			goal: 'script',
+			locations: false
+		});
+		assert.equal(program.sourceType, 'script');
+		assert.equal('loc' in program, false);
+	});
+
+	it('the init guard forwards extra args (format goal)', { skip: !has_format }, () => {
+		assert.equal(browser.format_typescript_with_goal('await => 1;', 'script'), '(await) => 1;\n');
 	});
 
 	it('init is idempotent after init_sync', async () => {
@@ -509,6 +578,52 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.equal(mod.status, 1);
 		const dflt = run_cli(['parse', '--content', 'var await = 1;', '--parser', 'ts']);
 		assert.equal(dflt.status, 1);
+	});
+
+	it('parse --no-locations omits per-node loc and composes with --goal', () => {
+		const bare = run_cli([
+			'parse',
+			'--no-locations',
+			'--content',
+			'const x = 1;',
+			'--parser',
+			'ts'
+		]);
+		assert.equal(bare.status, 0, bare.stderr);
+		assert.doesNotMatch(bare.stdout, /"loc"/);
+		const composed = run_cli([
+			'parse',
+			'--no-locations',
+			'--goal',
+			'script',
+			'--content',
+			'var await = 1;',
+			'--parser',
+			'ts'
+		]);
+		assert.equal(composed.status, 0, composed.stderr);
+		assert.match(composed.stdout, /"sourceType":"script"/);
+		assert.doesNotMatch(composed.stdout, /"loc"/);
+		// svelte drops name_loc too; css accepts the flag as a no-op
+		const sv = run_cli([
+			'parse',
+			'--no-locations',
+			'--content',
+			'<div>x</div>',
+			'--parser',
+			'svelte'
+		]);
+		assert.equal(sv.status, 0, sv.stderr);
+		assert.doesNotMatch(sv.stdout, /"name_loc"|"loc"/);
+		const css = run_cli([
+			'parse',
+			'--no-locations',
+			'--content',
+			'a{color:red}',
+			'--parser',
+			'css'
+		]);
+		assert.equal(css.status, 0, css.stderr);
 	});
 
 	it('format --goal script formats an `await` arrow param', () => {
