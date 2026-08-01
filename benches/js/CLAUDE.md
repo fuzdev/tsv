@@ -1149,6 +1149,16 @@ Things the published numbers measure that aren't quite what they look like:
     so the row materializes like the others. Before that fix it skipped the
     parse and looked artificially fast, even beating native oxc (the old
     "NAPI marshalling" note that tried to explain this was wrong).
+  - **Regex literals cost the opponents a `RegExp` compile the tsv rows skip.**
+    `oxc-parser` and `yuku-parser` both set a regex `Literal`'s `value` to a real
+    `RegExp` instance; tsv's wire is JSON, so it carries acorn's `"value": {}`
+    beside the `regex: {pattern, flags}` object and a consumer constructs its own.
+    `JSON.stringify` normalizes the two to the same bytes, so the payload
+    comparison is unaffected — but the opponents do a little work per regex
+    literal that tsv doesn't, which tilts these rows tsv's way. Regex literals are
+    sparse in the corpus (single digits per file at most), so the effect is well
+    under the noise floor; it is recorded because it runs in tsv's favor, not
+    because it moves a number.
   - **There is intentionally no `oxc-parser-lazy` row.** oxc's genuine lazy
     mode (`experimentalLazy` raw transfer, native-only — `rawTransferSupported()`
     is `false` on WASI) is _not_ a fast parse-only path: it eagerly copies the
@@ -1162,6 +1172,75 @@ Things the published numbers measure that aren't quite what they look like:
     (parse-only, no JS materialization) have **no fair oxc counterpart** — oxc's
     JS API always serializes to cross into JS — and that asymmetry is left
     honest rather than papered over with a misleading lazy row.
+- **The `yuku-parser` rows need two corrections to be honest, and both are
+  load-bearing.** yuku is payload-matched to oxc (span-only AST, same padding
+  fields), so read it against `oxc-parser` / `tsv-json-no-locations` rather than
+  against `tsv-json`. **Both halves of that are measured, not inferred**: on a
+  15.7 KB TS file the forced tree is 1,318 plain objects at depth 24 with **zero
+  accessor properties** anywhere — so nothing stays lazy behind `.program`, and a
+  deep walk afterwards adds no measurable time (a lazily-decoded tree would pay
+  exactly there) — and `JSON.stringify` of it is **128,567 chars against oxc's
+  128,570**, a payload ratio of 1.000. But its JS API carries two traps the
+  wrapper defuses in
+  `lib/yuku.ts` `parse_yuku` — reached by BOTH rows, since one `YukuImplementation`
+  drives both bindings (they expose the identical module surface, so a wrapper per
+  binding would be a copy free to drift — the oxc WASI failure below):
+  - **`parse()` is LAZY.** It returns memoized getters over the binary buffer the
+    Zig side produced; the JS AST is decoded only when `.program` is read. Measured
+    in the harness path, forcing it costs **1.69x** (native) / **1.91x** (wasm) —
+    so an unforced row would publish that much more throughput than yuku really
+    delivers, for a tree nobody built, and would not be measuring the deliverable
+    `oxc-parser` (whose `.program` getter `JSON.parse`s) and `tsv-json` produce.
+    The wrapper returns `result.program`; never "simplify" that to `return result`.
+  - **The parser is ERROR-TOLERANT — it never throws.** An invalid file yields an
+    empty AST plus `diagnostics`, so without reading them every file counts as
+    accepted and the coverage row reads 100% regardless of what it parsed. This is
+    the same fabricated-coverage failure the oxc WASI binding's consume-once
+    `errors` getter produced (§Known Issues); it is caught here by construction and
+    by `warn_variant_parity`, which pairs `yuku-parser` with `yuku-parser-wasm`.
+    Only `severity: 'error'` rejects — treating a warning/hint as a failure would
+    under-report coverage instead.
+
+  Its options are pinned rather than defaulted, on the same rule the formatter rows
+  follow: `sourceType: 'module'` (the goal tsv and acorn parse the perf corpus at —
+  overridden per file when the harness threads a test262 goal), `lang: 'ts'` (the
+  corpus collapses `.js`/`.ts`, as tsv and the synthetic `file.ts` handed to oxc both
+  do), `semanticErrors: false` (oxc's default; enabling it buys a second AST pass no
+  opponent pays for), `attachComments: false` (payload match — neither oxc's
+  `.program` nor tsv's wire AST carries comments), and `preserveParens: true`. That
+  last one is yuku's *and* oxc's default while acorn — and so tsv — effectively
+  parses with it off; measured on this corpus it is immaterial (7–14 extra nodes out
+  of ~5,600, a delta inside the noise floor), so it is pinned to oxc's value to keep
+  the two span-only rows like-for-like rather than re-baselining oxc's committed
+  numbers over a rounding error. Because the module is consumed through a cast,
+  `init()` **asserts the pins actually land** — a behavioral probe in the spirit of
+  the `dprint` config-diagnostics check, since yuku reports nothing for an
+  unrecognized option key. Only the two whose loss would be silent are probed
+  (`lang`, `sourceType`); the other three match yuku's own defaults, so a rename
+  there is a no-op by construction. The two `sourceType` probes prove different
+  things and both are load-bearing: `var await` must be REJECTED under the pinned
+  options (which pins the default the perf path relies on, since `module` is also
+  what a dropped key falls back to) and ACCEPTED under an explicit
+  `sourceType: 'script'` — only the second can catch an upstream rename.
+
+  **One disclosed parser difference the goal probe turned up:** yuku's `script` goal
+  is *permissive* about module syntax — `import`, `export`, and `import.meta` all
+  parse cleanly at `sourceType: 'script'`, where tsv and acorn make them syntax
+  errors. The goal itself lands correctly on the axis the harness threads it for
+  (`await` is an ordinary identifier at `script`, reserved at `module`), so
+  script-goal test262 files are scored at their declared goal as intended, and a
+  script-goal positive carries no module syntax by definition — so this moves no
+  published number. It does mean a yuku script-goal *accept* is a weaker claim than a
+  tsv one, which would matter if the conformance surface ever graded negatives.
+
+  **There is deliberately no `yuku-internal` row.** yuku's unforced `parse()` *is* a
+  genuinely cheaper non-materializing mode — unlike oxc's `experimentalLazy`, which
+  is setup-dominated — but it is not `tsv-internal`'s tier either: it has already
+  serialized the AST into a binary buffer (and, in wasm, copied it out of linear
+  memory) by the time it returns, where `tsv-internal` does no serialization at all.
+  Publishing it beside `tsv-internal` would invite exactly the tier confusion the
+  `-internal` rows exist to avoid, so `tsv-internal`/`tsv_wasm-internal` keep their
+  "no counterpart" note, now naming both alternatives.
 - **One row is measured but not timed.** `rsvelte-fmt` appears in the Svelte
   format group as a **coverage-only** row — an accept rate, with no timing at
   all — because it ships no in-process API and a per-file subprocess row would
@@ -1335,8 +1414,9 @@ benches/js/
 │   ├── parse_sanctions.ts # Shared parse-parity tracking vocabulary: Sanction (keep deliberately) + KnownGap (fix eventually) types + SVELTE_/TS_FIXTURE_SANCTIONS data; used by skip_triage + all the gates
 │   ├── oxc.ts             # OXC native wrappers (oxc-parser + oxfmt)
 │   ├── oxc_wasm.ts        # OXC WASM wrapper (oxc-parser via wasm32-wasi; per-runtime wasi entry)
+│   ├── yuku.ts            # yuku-parser wrapper, BOTH bindings from one class (parse-only, TS/JS; forces its lazy decode + reads its diagnostics)
 │   ├── report.ts          # Summary report generation
-│   ├── types.ts           # Shared type definitions
+│   ├── types.ts           # Shared type definitions + `BaseImplementation` (the language-support pair every wrapper inherits)
 │   ├── versions.ts        # Version loading from package.json
 │   ├── wasm.ts            # WASM module loader (WasmImplementation — deno/nodejs target by runtime)
 │   └── divergence/        # Divergence detection module
@@ -1371,8 +1451,8 @@ via `Cargo.lock`. Upgrading is always a deliberate, committed act. A plain
 cd benches/js && npm outdated   # shows current vs latest
 # bump the version in benches/js/package.json, then:
 deno task bench:install   # re-install at the new pins (+ re-fetch the oxc wasi binding)
-deno task smoke           # confirm every impl still loads + formats (38 checks)
-deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts benches/js/lib/dprint.ts  # catch type-surface breakage smoke can't (e.g. a major bump renaming an options field)
+deno task smoke           # confirm every impl still loads + formats (40 checks)
+deno check --config benches/js/deno.json benches/js/bench.ts benches/js/lib/biome.ts benches/js/lib/dprint.ts benches/js/lib/yuku.ts  # catch type-surface breakage smoke can't (e.g. a major bump renaming an options field)
 deno task bench           # regenerate report.{deno,node,bun}.* + combined report.{json,md}
 # commit package.json + package-lock.json + results/report.*
 ```
@@ -1484,6 +1564,23 @@ prettier. This is load-bearing, not cosmetic, on two axes:
   throwing — without that check a renamed key would silently leave an option at its
   default and skew the row (the config-vs-engine conflation the fairness rules exist
   to prevent).
+- yuku-parser (NAPI) / @yuku-parser/wasm (WASM) — a JS/TS parser written in Zig;
+  languages: **TypeScript, JS only** — no Svelte, no CSS, and no formatter at all, so
+  it contributes two rows to `parse/typescript` and nothing else. One engine behind
+  two bindings, versioned in lockstep (bump both together). Its default AST is
+  **span-only and padded exactly like oxc's** (`decorators: []` / `typeAnnotation:
+  null` / `optional: false`, no per-node `loc`), so the yuku rows are payload-matched
+  to the oxc rows and to `tsv-json-no-locations` — not to plain `tsv-json`, which
+  carries the loc-bearing drop-in AST neither emits. Two properties of its JS API
+  decide how `lib/yuku.ts` must drive it, and getting either wrong inflates the row:
+  its `parse()` is **lazy** and its parser is **error-tolerant** — see
+  §Fairness Caveats. **One `YukuImplementation` drives both bindings** (constructed
+  twice, with the row name selecting the specifier): they expose the identical module
+  surface, so a wrapper per binding would be a copy free to drift, which is exactly
+  how the oxc WASI row broke. That's the difference from `oxc.ts`/`oxc_wasm.ts`,
+  whose two packages genuinely differ. Unlike oxc's wasi binding the wasm package
+  declares no `cpu`/`os`, so it installs as an ordinary dep everywhere and needs no
+  force-fetch.
 - rsvelte-fmt (native binary) — the other Rust-native Svelte formatter; languages:
   **Svelte only**, and **COVERAGE-ONLY** — measured for what it accepts, never timed.
   See §Coverage-only rows for both decisions.
@@ -1629,6 +1726,12 @@ Benchmark output includes binary/WASM size comparison across implementations:
   (`tsv_format_wasm` / `tsv format (ffi)`), not the full both-features bundle.
 - **oxc-parser**: N-API binding (`.node`) and WASM (`.wasm` from `binding-wasm32-wasi`) from node_modules
 - **oxfmt**: N-API binding (`.node`) from node_modules (no WASM variant)
+- **yuku-parser**: N-API binding (`.node`) and WASM (`.wasm`) from node_modules. Both
+  are parse-only artifacts (yuku ships no formatter), so the row to pair each against
+  is the parse-only tsv build (`tsv parse (ffi)` / `tsv_parse_wasm`) — against a bundle
+  carrying the printers it would size a scope difference and read as an engine one.
+  As for `oxc-parser` and `dprint`, that pairing is the reader's to make: the emitted
+  `vs tsv` ratio anchors every row on the full build.
 - **rsvelte-fmt**: the standalone executable from its platform package. The one
   native row not scope-matched to a tsv artifact — it carries a CLI plus the whole
   oxc formatter for JS/TS/CSS beside its Svelte engine, where `tsv (ffi)` is a bare

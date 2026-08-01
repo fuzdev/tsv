@@ -5,7 +5,7 @@
  */
 
 import { native_library_filename } from './runtime.ts';
-import type { Language, ParseGoal, TsvImplementation } from './types.ts';
+import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 
 // FFI symbol definitions.
 //
@@ -142,18 +142,15 @@ const next_capacity = (needed: number, current: number): number => {
 
 const INITIAL_BUFFER_CAPACITY = 1 << 16;
 
-export class NativeImplementation implements TsvImplementation {
-	name = 'native' as const;
+export class NativeImplementation extends BaseImplementation {
+	readonly name = 'native' as const;
 	private _lib: Deno.DynamicLibrary<typeof symbols> | null = null;
 	private _marshal: MarshalState | null = null;
 	private encoder = new TextEncoder();
 	private decoder = new TextDecoder();
 
-	/** Languages supported for parsing */
-	static readonly PARSE_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
-
-	/** Languages supported for formatting */
-	static readonly FORMAT_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
+	readonly parse_languages = LANGUAGES;
+	readonly format_languages = LANGUAGES;
 
 	/** Get initialized library or throw */
 	private get lib(): Deno.DynamicLibrary<typeof symbols> {
@@ -298,16 +295,6 @@ export class NativeImplementation implements TsvImplementation {
 				throw new Error(parsed.error);
 			}
 		}
-	}
-
-	/** Check if parsing is supported for this language */
-	supports_parse_language(language: Language): boolean {
-		return NativeImplementation.PARSE_LANGUAGES.includes(language);
-	}
-
-	/** Check if formatting is supported for this language */
-	supports_format_language(language: Language): boolean {
-		return NativeImplementation.FORMAT_LANGUAGES.includes(language);
 	}
 
 	// Lookup tables for FFI functions by language

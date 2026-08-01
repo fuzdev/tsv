@@ -1,5 +1,6 @@
 /**
- * Shared types for benchmark infrastructure
+ * Shared types for benchmark infrastructure, plus the small `BaseImplementation`
+ * every impl wrapper extends (the one piece of behavior all of them had verbatim).
  */
 
 /** Logger function type */
@@ -72,6 +73,8 @@ export type ImplementationName =
 	| 'wasm'
 	| 'oxc'
 	| 'oxc-wasm'
+	| 'yuku-parser'
+	| 'yuku-parser-wasm'
 	| 'biome-wasm'
 	| 'dprint-wasm'
 	| 'rsvelte-fmt';
@@ -114,4 +117,45 @@ export interface TsvImplementation {
 
 	/** Clean up resources */
 	dispose(): void;
+}
+
+/**
+ * Shared base for every impl wrapper: language support declared as DATA rather
+ * than re-implemented as a predicate pair per class.
+ *
+ * Each wrapper states which languages it can parse and which it can format; `[]`
+ * means "none", which is how a parse-only tool (yuku, oxc's wasm binding) and a
+ * format-only one (biome, dprint, rsvelte-fmt) say so. Every class previously
+ * carried a `static PARSE_LANGUAGES`/`FORMAT_LANGUAGES` pair plus two one-line
+ * `.includes()` methods, and the "none" case had drifted into two spellings — an
+ * empty array in most, a hand-rolled `return false` in others — so the same fact
+ * read two different ways depending on which file you opened.
+ *
+ * Deliberately minimal. It holds ONLY what was identical everywhere; how a binding
+ * loads, what it does per call, and its fairness corrections stay in the wrapper,
+ * where the differences that matter live. A wrapper needing different support
+ * logic can still override the two methods.
+ */
+export abstract class BaseImplementation implements TsvImplementation {
+	abstract readonly name: ImplementationName;
+
+	/** Languages this impl can parse; `[]` for a format-only tool. */
+	abstract readonly parse_languages: ReadonlyArray<Language>;
+
+	/** Languages this impl can format; `[]` for a parse-only tool. */
+	abstract readonly format_languages: ReadonlyArray<Language>;
+
+	supports_parse_language(language: Language): boolean {
+		return this.parse_languages.includes(language);
+	}
+
+	supports_format_language(language: Language): boolean {
+		return this.format_languages.includes(language);
+	}
+
+	abstract init(): Promise<void>;
+
+	abstract parse(source: string, language: Language, goal?: ParseGoal): unknown;
+
+	abstract dispose(): void;
 }

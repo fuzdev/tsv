@@ -15,7 +15,7 @@ import { stat } from 'node:fs/promises';
 import { createRequire } from 'node:module';
 import { fileURLToPath } from 'node:url';
 import { current_runtime } from './runtime.ts';
-import type { Language, ParseGoal, TsvImplementation } from './types.ts';
+import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 
 /** WASM module function signatures */
 interface WasmModule {
@@ -39,30 +39,17 @@ interface WasmModule {
 	parse_internal_typescript_with_goal: (source: string, goal: string) => void;
 }
 
-export class WasmImplementation implements TsvImplementation {
-	name = 'wasm' as const;
+export class WasmImplementation extends BaseImplementation {
+	readonly name = 'wasm' as const;
 	private _module: WasmModule | null = null;
 
-	/** Languages supported for parsing */
-	static readonly PARSE_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
-
-	/** Languages supported for formatting */
-	static readonly FORMAT_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
+	readonly parse_languages = LANGUAGES;
+	readonly format_languages = LANGUAGES;
 
 	/** Get initialized module or throw */
 	private get module(): WasmModule {
 		if (!this._module) throw new Error('WASM module not initialized');
 		return this._module;
-	}
-
-	/** Check if parsing is supported for this language */
-	supports_parse_language(language: Language): boolean {
-		return WasmImplementation.PARSE_LANGUAGES.includes(language);
-	}
-
-	/** Check if formatting is supported for this language */
-	supports_format_language(language: Language): boolean {
-		return WasmImplementation.FORMAT_LANGUAGES.includes(language);
 	}
 
 	// Lookup tables for WASM functions by language

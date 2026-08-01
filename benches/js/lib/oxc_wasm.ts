@@ -8,12 +8,7 @@
  * Supports: Parse only (TypeScript, JS). No formatting (oxfmt has no WASM variant).
  */
 
-import {
-	type Language,
-	LANGUAGE_EXTENSIONS,
-	type ParseGoal,
-	type TsvImplementation
-} from './types.ts';
+import { BaseImplementation, type Language, LANGUAGE_EXTENSIONS, type ParseGoal } from './types.ts';
 import type { OxcVersions } from './versions.ts';
 import { current_runtime } from './runtime.ts';
 
@@ -26,6 +21,9 @@ interface OxcParserWasmModule {
 	) => { program: unknown; errors: unknown[] };
 }
 
+/** oxc-parser's own `{node, fixes}` deserializer (`src-js/wrap.js`, untyped). */
+type JsonParseAst = (programJson: string) => unknown;
+
 /**
  * OXC WASM implementation using @oxc-parser/binding-wasm32-wasi.
  *
@@ -33,12 +31,18 @@ interface OxcParserWasmModule {
  * - Parse: TypeScript, JS (NOT Svelte, NOT CSS)
  * - Format: None (oxfmt has no WASM variant)
  */
-export class OxcWasmImplementation implements TsvImplementation {
-	name = 'oxc-wasm' as const;
+export class OxcWasmImplementation extends BaseImplementation {
+	readonly name = 'oxc-wasm' as const;
 	readonly versions: OxcVersions;
 	private _parser: OxcParserWasmModule | null = null;
+	private _json_parse_ast: JsonParseAst | null = null;
+
+	readonly parse_languages: ReadonlyArray<Language> = ['typescript'];
+	/** oxfmt has no WASM variant. */
+	readonly format_languages: ReadonlyArray<Language> = [];
 
 	constructor(versions: OxcVersions) {
+		super();
 		this.versions = versions;
 	}
 
@@ -54,22 +58,12 @@ export class OxcWasmImplementation implements TsvImplementation {
 				: '@oxc-parser/binding-wasm32-wasi';
 		const mod = await import(entry);
 		this._parser = mod as OxcParserWasmModule;
-	}
-
-	/** Languages supported for parsing */
-	static readonly PARSE_LANGUAGES: Language[] = ['typescript'];
-
-	/** Languages supported for formatting (none) */
-	static readonly FORMAT_LANGUAGES: Language[] = [];
-
-	/** Check if parsing is supported for this language */
-	supports_parse_language(language: Language): boolean {
-		return OxcWasmImplementation.PARSE_LANGUAGES.includes(language);
-	}
-
-	/** Check if formatting is supported for this language */
-	supports_format_language(_language: Language): boolean {
-		return false;
+		// The native package's own deserializer (dependency-free ESM; the package has
+		// no `exports` map, so the deep import resolves). Importing rather than
+		// copying keeps the two rows' materialization identical by construction and
+		// tracks the pinned oxc-parser version; a moved upstream path fails init loudly.
+		const wrap = await import('oxc-parser/src-js/wrap.js');
+		this._json_parse_ast = (wrap as { jsonParseAst: JsonParseAst }).jsonParseAst;
 	}
 
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
@@ -94,14 +88,18 @@ export class OxcWasmImplementation implements TsvImplementation {
 		}
 
 		// Unlike the native `oxc-parser` package (whose `index.js` `wrap()` runs
-		// `JSON.parse` on `.program` access), the WASI binding hands back `program`
+		// `jsonParseAst` on `.program` access), the WASI binding hands back `program`
 		// as the raw JSON string the Rust side serialized — it never deserializes.
-		// Parse it so `oxc-parser-wasm` materializes a full JS AST, matching what
-		// native `oxc-parser` and `tsv_wasm-json` both do (apples-to-apples timing).
-		// The string is `{"node": <program>, "fixes": [...]}` (see oxc-parser
-		// `src-js/wrap.js`); `.node` is the program.
+		// Run it through the SAME `jsonParseAst` (imported in `init`) so
+		// `oxc-parser-wasm` materializes the identical JS AST native `oxc-parser`
+		// does — including the `fixes` pass that turns bigint/regex `Literal.value`s
+		// into real `BigInt`/`RegExp` instances (apples-to-apples timing AND shape;
+		// a bare `JSON.parse(...).node` would skip that work and leave the two rows'
+		// ASTs disagreeing on those literals).
 		const program = result.program;
-		return typeof program === 'string' ? JSON.parse(program).node : program;
+		if (typeof program !== 'string') return program;
+		if (!this._json_parse_ast) throw new Error('OXC WASM jsonParseAst not initialized');
+		return this._json_parse_ast(program);
 	}
 
 	format(_source: string, _language: Language): string {
@@ -110,5 +108,6 @@ export class OxcWasmImplementation implements TsvImplementation {
 
 	dispose(): void {
 		this._parser = null;
+		this._json_parse_ast = null;
 	}
 }

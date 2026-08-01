@@ -19,11 +19,7 @@ import {
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { get_library_path } from './lib/ffi.ts';
 import { get_napi_library_path } from './lib/napi.ts';
-import {
-	get_benchmark_tasks,
-	get_formatters,
-	init_implementations
-} from './lib/implementations.ts';
+import { get_benchmark_tasks, init_implementations } from './lib/implementations.ts';
 import { current_runtime } from './lib/runtime.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 
@@ -101,61 +97,75 @@ const impls = await init_implementations({ logger: () => {} });
 //
 
 console.log('Formatters:');
-const formatters = get_formatters(impls);
+
+// One registry for both halves of this file and for the bench: `get_benchmark_tasks`.
+// A second formatter list here would let a newly added impl reach the bench while
+// silently missing from smoke. Its per-language list simply omits an impl that
+// declines the language, so the union across languages is what still lets the
+// `(unsupported)` line name it — the signal that an impl LOADED but doesn't do this
+// language, as opposed to not loading at all.
+const format_tasks_by_language = new Map(
+	LANGUAGES.map((lang) => [lang, get_benchmark_tasks(impls, 'format', lang)] as const)
+);
+const format_names = [
+	...new Set([...format_tasks_by_language.values()].flat().map((task) => task.name))
+];
 
 for (const lang of LANGUAGES) {
 	console.log(`  ${lang}:`);
 	const input = INPUTS[lang];
+	const by_name = new Map(format_tasks_by_language.get(lang)!.map((task) => [task.name, task]));
 
-	for (const fmt of formatters) {
-		if (!fmt.supports_language(lang)) {
-			console.log(`    ${fmt.name.padEnd(12)} - (unsupported)`);
+	for (const name of format_names) {
+		const task = by_name.get(name);
+		if (!task) {
+			console.log(`    ${name.padEnd(12)} - (unsupported)`);
 			continue;
 		}
 
-		const call = (src: string) =>
-			fmt.is_async ? fmt.format_async!(src, lang) : Promise.resolve(fmt.format!(src, lang));
+		const call = (src: string): Promise<unknown> =>
+			task.is_async ? task.run_async!(src, lang) : Promise.resolve(task.run(src, lang));
 
-		let first: string;
+		let first: unknown;
 		try {
 			first = await call(input);
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
-			console.log(`    ${fmt.name.padEnd(12)} ✗ threw: ${msg.slice(0, 80)}`);
-			record_fail({ kind: 'format', lang, impl: fmt.name, reason: `threw: ${msg}` });
+			console.log(`    ${name.padEnd(12)} ✗ threw: ${msg.slice(0, 80)}`);
+			record_fail({ kind: 'format', lang, impl: name, reason: `threw: ${msg}` });
 			continue;
 		}
 
 		if (typeof first !== 'string' || first.length === 0) {
-			console.log(`    ${fmt.name.padEnd(12)} ✗ empty or non-string output`);
-			record_fail({ kind: 'format', lang, impl: fmt.name, reason: 'empty/non-string output' });
+			console.log(`    ${name.padEnd(12)} ✗ empty or non-string output`);
+			record_fail({ kind: 'format', lang, impl: name, reason: 'empty/non-string output' });
 			continue;
 		}
 
-		let second: string;
+		let second: unknown;
 		try {
 			second = await call(first);
 		} catch (e) {
 			const msg = e instanceof Error ? e.message : String(e);
-			console.log(`    ${fmt.name.padEnd(12)} ✗ second pass threw: ${msg.slice(0, 80)}`);
+			console.log(`    ${name.padEnd(12)} ✗ second pass threw: ${msg.slice(0, 80)}`);
 			record_fail({
 				kind: 'format',
 				lang,
-				impl: fmt.name,
+				impl: name,
 				reason: `second pass threw: ${msg}`
 			});
 			continue;
 		}
 
 		if (first !== second) {
-			console.log(`    ${fmt.name.padEnd(12)} ✗ not idempotent`);
+			console.log(`    ${name.padEnd(12)} ✗ not idempotent`);
 			console.log(`      first:  ${JSON.stringify(first)}`);
 			console.log(`      second: ${JSON.stringify(second)}`);
-			record_fail({ kind: 'format', lang, impl: fmt.name, reason: 'not idempotent' });
+			record_fail({ kind: 'format', lang, impl: name, reason: 'not idempotent' });
 			continue;
 		}
 
-		console.log(`    ${fmt.name.padEnd(12)} ✓`);
+		console.log(`    ${name.padEnd(12)} ✓`);
 		record_pass();
 	}
 }
