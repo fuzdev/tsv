@@ -26,7 +26,10 @@ wire). `goal` (`'script'` / `'module'`, default `'module'`) is TypeScript-only
 — Svelte hard-wires `Module`, CSS has no goal — so the other languages reject
 the key. Unknown keys always error (a typo like `{locatons: false}` silently
 succeeding would hand back the full wire while the caller believes they opted
-out); an explicitly-`undefined` value means that key's default.
+out); an explicitly-`undefined` value means that key's default — including the
+TS-only `goal` on a language that rejects it, which is what lets a caller
+forward one bag to whichever parser (`npm/cli.js` does). A non-object argument
+errors, arrays included.
 
 The parse exports are all `#[wasm_bindgen(skip_typescript)]`; their `.d.ts` is
 the hand-written `TS_PARSE_DECLS` `typescript_custom_section` in `src/lib.rs`.
@@ -222,7 +225,7 @@ require dual updates.
 - `src/lib.rs` — WASM bindings (`lang_bindings!` macro + `parse_parse_options` + the hand-written `TS_PARSE_DECLS` declarations) + the wasm32-gated talc `#[global_allocator]` and panic hook
 - `types/tsv_ast.d.ts` — Hand-maintained TS types, bundled into the parse-capable packages
 - `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv_wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); `node:util` `parseArgs`, zero deps
-- `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only `no-locations` wire; ships in the parse-capable packages, re-exported from index.js/browser.js by `patch_npm_package.ts` (see [No-Locations Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
+- `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only `no-locations` wire; ships in the parse-capable packages, re-exported from index.js/browser.js by `patch_npm_package.ts` (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv_format_wasm` (copied by `patch_npm_package.ts`)
 - `README_parse.md` — Shipped as `README.md` in `@fuzdev/tsv_parse_wasm` (copied by `patch_npm_package.ts`)
 - `README_all.md` — Shipped as `README.md` in `@fuzdev/tsv_wasm` (copied by `patch_npm_package.ts`)

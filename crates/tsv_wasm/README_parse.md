@@ -38,9 +38,9 @@ Each parser also has a `parse_*_json` variant (`parse_svelte_json`, `parse_types
 Every parser accepts an optional second argument, like acorn:
 
 - `locations` (default `true`) — emit per-node `loc` (line/column), the drop-in acorn/svelte wire. Pass `false` for the **span-only** wire: `start`/`end` offsets only (Svelte also drops `name_loc`), ~46% smaller and much faster to materialize, mirroring acorn's `locations: false`. Line/column stays derivable from the offsets plus your source, so nothing is lost if you have the source. Inert for CSS (its wire carries no `loc` either way).
-- `goal` (TypeScript only, default `'module'`) — the parse goal: at `'script'`, `await` is an ordinary identifier and `import`/`export`/`import.meta` are syntax errors.
+- `goal` (TypeScript only, default `'module'`) — the parse goal: at `'script'`, `await` is an ordinary identifier and `import`/`export`/`import.meta` are syntax errors. `parse_svelte` and `parse_css` **throw** on the key rather than ignoring it (Svelte's `<script>` is always a module, CSS has no goal), so code forwarding one options bag to whichever parser should spell the inapplicable goal as `undefined` — every key reads `undefined` as its default.
 
-Unknown option keys throw — a typo like `{locatons: false}` fails loudly instead of silently handing back the full wire.
+Unknown option keys throw — a typo like `{locatons: false}` fails loudly instead of silently handing back the full wire. (A key explicitly set to `undefined` is read as absent, so it never throws.)
 
 ### Reconstructing line/column
 

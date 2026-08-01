@@ -338,7 +338,12 @@ fn parse_parse_options(options: &JsValue, allow_goal: bool) -> Result<ParseOptio
     if options.is_undefined() || options.is_null() {
         return Ok(parsed);
     }
-    if !options.is_object() {
+    // An array is `typeof 'object'` and yields no keys, so without the second
+    // test a positional-style `parse_typescript(src, [goal])` would read as
+    // all-defaults — the same silent-opt-out the unknown-key error exists to
+    // prevent. (A keyless non-plain object, e.g. `new Date()`, still defaults;
+    // ruling that out needs a prototype test this doesn't earn.)
+    if !options.is_object() || js_sys::Array::is_array(options) {
         return Err(err("parse options must be an object"));
     }
     let object: &js_sys::Object = options.unchecked_ref();

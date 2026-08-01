@@ -236,6 +236,15 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		);
 		// an explicitly-undefined value means that key's default (omitted-key convention)
 		assert.ok(node_entry.parse_typescript('x;', { locations: undefined, goal: undefined }).loc);
+		// ...including the TS-only key on a language that REJECTS it. Load-bearing:
+		// `npm/cli.js` forwards one options bag to whichever parser and spells the
+		// inapplicable goal as `undefined` rather than branching the call. Moving the
+		// undefined skip below the key match would break that with `check` still green.
+		assert.ok(node_entry.parse_svelte('<div>x</div>', { goal: undefined }));
+		assert.ok(node_entry.parse_css('a { color: red }', { goal: undefined }));
+		// a non-object options argument is an error, arrays included
+		assert.throws(() => node_entry.parse_typescript('x;', 'locations'), /must be an object/);
+		assert.throws(() => node_entry.parse_typescript('x;', []), /must be an object/);
 	});
 });
 
