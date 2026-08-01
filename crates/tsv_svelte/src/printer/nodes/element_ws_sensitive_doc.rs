@@ -10,6 +10,7 @@
 #![allow(clippy::literal_string_with_formatting_args)]
 
 use super::blocks_doc::{EACH_BLOCK_OPEN, ELSE_IF_BLOCK_OPEN, IF_BLOCK_OPEN};
+use super::element_doc::ElementAttrsDoc;
 use super::helpers::each_expr_comment_end;
 use crate::ast::internal::{self, Fragment, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
@@ -38,11 +39,29 @@ impl<'a> Printer<'a> {
     ///   attrs + content would exceed print width.
     /// - **Inline empty with attrs**: self-closing `/>` drops on wrap; explicit `></tag>` hugs.
     /// - **Fallback**: block hugs `>` with the last attr; no attrs → plain `<tag>`.
+    ///
+    /// Every one of those hugs is a deliberate refusal to break before the `>`: a break there
+    /// is free for an ordinary element but here it borders literal content. The
+    /// [`AttrListEmission`](super::element_doc::AttrListEmission) from the one attribute-list emitter
+    /// ([`Printer::push_attrs_with_comments`]) carries the two comment facts that override
+    /// it, each selecting a shape that is already pinned elsewhere, not a new one. A list
+    /// **ending on a `//`** cannot share its line with the `>` (a line comment runs to end
+    /// of line — a hugged `>` lands *inside* it and the output stops re-parsing), so the `>`
+    /// breaks — [`ws_sensitive_attr_comment_line`](../../../../../tests/fixtures/svelte/elements/ws_sensitive_attr_comment_line_prettier_divergence/).
+    /// A list a comment **holds a hardline in** cannot render flat at any width, so the
+    /// attributes wrap one per line —
+    /// [`ws_sensitive_attr_comment_own_line`](../../../../../tests/fixtures/svelte/elements/ws_sensitive_attr_comment_own_line/).
+    /// Either break stays inside the tag, where no character is content, so the render is
+    /// unchanged.
     pub(super) fn build_whitespace_sensitive_element_doc(
         &self,
         element: &internal::Element<'_>,
-        attr_docs: DocBuf,
+        attrs: ElementAttrsDoc,
     ) -> DocId {
+        let ElementAttrsDoc {
+            docs: attr_docs,
+            emission,
+        } = attrs;
         let d = self.d();
         let name_doc = d.source_span_ident(element.name_span);
 
@@ -183,32 +202,74 @@ impl<'a> Printer<'a> {
         // The closing `>` of `</tag>` is outside the group so fits() doesn't count it.
         // At the boundary (e.g. 100 chars), `<tag attr>content</tag` fits but adding `>`
         // would be 101. The softline puts `>` on its own line in that case.
-        if is_inline && has_content && !attr_docs.is_empty() {
+        //
+        // A **block** element (`<pre>`) whose list ends on a `//` comes here too, rather than
+        // to the hugging arm below: this is already the shape for "the `>` cannot share the
+        // attribute line but the content must still start right after it", and the two
+        // whitespace-sensitive tags answering that with different layouts would be a
+        // distinction with no source in the elements.
+        if (is_inline || emission.ends_with_line_comment) && has_content && !attr_docs.is_empty() {
             let content_doc = self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
-            // Rebuild as space-separated (caller passes line-separated which we can't use here)
-            let space_attrs = self.build_element_attrs_doc(
-                element.attributes,
-                self.d().text(" "),
-                element.name_span.end,
-                element.open_tag_end,
-                is_html,
-            );
 
-            // In break mode: \n\t>content</tag (closing > handled by outer group)
-            let break_doc = d.indent(d.concat(&[
-                d.hardline(),
-                d.text(">"),
-                content_doc,
-                d.text("</"),
-                name_doc,
-            ]));
-            // In flat mode: >content</tag (no closing > — it's outside the group)
-            let flat_doc = d.concat(&[d.text(">"), content_doc, d.text("</"), name_doc]);
-            let if_break = d.if_break(break_doc, flat_doc);
-            let inner =
-                d.group(d.concat(&[d.text("<"), name_doc, d.concat(&space_attrs), if_break]));
-            // Outer group: closing `>` with softline breaks to new line at boundary.
-            // Inner group stays flat when attrs+content fit, outer breaks only for the `>`.
+            let inner = if emission.has_hardline {
+                // A comment holds a line of its own inside the list, so the head can never
+                // render flat and the flat machinery below has nothing to decide: the
+                // attributes wrap one per line — the line-separated docs the caller already
+                // built, indented — and the `>` hugs the last one, prettier's own shape here.
+                // A list ending on a `//` is the one thing nothing may share a line with, so
+                // there the `>` takes the next line one level in instead — the same slot the
+                // flat path's break form puts it in. Feeding these lists to the
+                // space-separated rebuild below instead is how a broken head rendered its
+                // remaining attributes at ambient indent: a hardline inside a plain concat
+                // has no indent to land in.
+                let close_sep = if emission.ends_with_line_comment {
+                    d.hardline()
+                } else {
+                    d.empty()
+                };
+                d.concat(&[
+                    d.text("<"),
+                    name_doc,
+                    d.indent(d.concat(&[
+                        d.concat(&attr_docs),
+                        close_sep,
+                        d.text(">"),
+                        content_doc,
+                        d.text("</"),
+                        name_doc,
+                    ])),
+                ])
+            } else {
+                // Rebuild as space-separated (caller passes line-separated which we can't
+                // use here: behind this arm's own group they would wrap on width, and a
+                // whitespace-sensitive head holds its attributes flat, tolerating overflow).
+                let space_attrs = self
+                    .build_element_attrs_doc(
+                        element.attributes,
+                        self.d().text(" "),
+                        element.name_span.end,
+                        element.open_tag_end,
+                        is_html,
+                    )
+                    .docs;
+
+                // In break mode: \n\t>content</tag (closing > handled by outer group)
+                let break_doc = d.indent(d.concat(&[
+                    d.hardline(),
+                    d.text(">"),
+                    content_doc,
+                    d.text("</"),
+                    name_doc,
+                ]));
+                // In flat mode: >content</tag (no closing > — it's outside the group)
+                let flat_doc = d.concat(&[d.text(">"), content_doc, d.text("</"), name_doc]);
+                let if_break = d.if_break(break_doc, flat_doc);
+                d.group(d.concat(&[d.text("<"), name_doc, d.concat(&space_attrs), if_break]))
+            };
+
+            // Outer group: closing `>` with softline breaks to new line at boundary — for
+            // the flat form only at the width boundary, for the wrapped form always (its
+            // hardlines break this group).
             let sl = d.softline();
             return d.group(d.concat(&[inner, sl, d.text(">")]));
         }
@@ -281,9 +342,16 @@ impl<'a> Printer<'a> {
                 ]));
             }
             // group(['>', '</tag']): the final `>` is appended outside, so the softline's
-            // fits() weighs `></tag>` and the trailing suffix together.
+            // fits() weighs `></tag>` and the trailing suffix together. A trailing `//` is
+            // not a width question — the hug is impossible at any width — so it takes the
+            // break directly rather than through the group.
             let close_seq = d.group(d.concat(&[d.text(">"), d.text("</"), name_doc]));
-            let hugged = d.group(d.concat(&[d.softline(), close_seq]));
+            let before_close = if emission.ends_with_line_comment {
+                d.hardline()
+            } else {
+                d.softline()
+            };
+            let hugged = d.group(d.concat(&[before_close, close_seq]));
             return d.group(d.concat(&[d.text("<"), name_doc, attr_indent, hugged, d.text(">")]));
         }
 
@@ -292,10 +360,25 @@ impl<'a> Printer<'a> {
             self.start_tag(name_doc)
         } else {
             // Block whitespace-sensitive elements (pre): hug `>` with the last attr when
-            // attrs wrap (prettier tolerates the overflow rather than breaking `>`).
+            // attrs wrap (prettier tolerates the overflow rather than breaking `>`). Only a
+            // trailing `//` overrides that, and only the empty-content shapes reach here with
+            // one — anything with content took the break arm above. With no content there is
+            // nothing for the `>` to be adjacent to, so it drops to base indent, which is
+            // where every other element puts it.
             let attr_concat = d.concat(&attr_docs);
             let attr_indent = d.indent(attr_concat);
-            d.group(d.concat(&[d.text("<"), name_doc, attr_indent, d.text(">")]))
+            let before_close = if emission.ends_with_line_comment {
+                d.hardline()
+            } else {
+                d.empty()
+            };
+            d.group(d.concat(&[
+                d.text("<"),
+                name_doc,
+                attr_indent,
+                before_close,
+                d.text(">"),
+            ]))
         };
 
         // Build content preserving text whitespace but formatting expressions/blocks
@@ -356,14 +439,14 @@ impl<'a> Printer<'a> {
             FragmentNode::Element(element) => {
                 let ws_is_html = element.kind == internal::ElementKind::Html;
                 // Always use whitespace-sensitive path when nested inside whitespace-sensitive elements
-                let attr_docs = self.build_element_attrs_doc(
+                let attrs = self.build_element_attrs_doc(
                     element.attributes,
                     self.d().line(),
                     element.name_span.end,
                     element.open_tag_end,
                     ws_is_html,
                 );
-                self.build_whitespace_sensitive_element_doc(element, attr_docs)
+                self.build_whitespace_sensitive_element_doc(element, attrs)
             }
             FragmentNode::SpecialElement(element) => {
                 // Special elements in whitespace-sensitive context: format normally without indent

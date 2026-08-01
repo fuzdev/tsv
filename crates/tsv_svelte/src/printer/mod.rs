@@ -26,6 +26,7 @@ mod script_style;
 mod text;
 
 use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
+use nodes::AttrGaps;
 use smallvec::SmallVec;
 use std::cell::{Cell, RefCell};
 use tsv_lang::FxHashSet;
@@ -916,18 +917,43 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Format `<svelte:options ... />` tag
+    /// Format the `<svelte:options ... />` tag, always in the self-closing form.
     ///
-    /// Always outputs self-closing form with attributes.
-    /// Uses doc-based attribute wrapping for width-aware line breaking.
+    /// Hoisted out of the fragment and printed here at its canonical position, so it is the
+    /// one tag head outside the element pipeline — but its attribute list is read by the
+    /// ordinary `read_attribute` like any other, comments included, so it goes through the
+    /// same [`Printer::push_attrs_with_comments`] the pipeline uses. Doc-based from there on,
+    /// for width-aware wrapping.
     fn print_svelte_options(&mut self, options: &internal::SvelteOptions<'_>) {
-        if options.attributes.is_empty() {
+        let d = self.d();
+        // Built before the empty check, not after: the attribute list can be empty and still
+        // carry comments (`<svelte:options /* c */ />`), and an early return keyed on
+        // `attributes.is_empty()` deletes them — the comment-blind alternate arm, at the one
+        // tag whose head is printed from here rather than from the element pipeline.
+        let mut parts: DocBuf = DocBuf::with_capacity(options.attributes.len() * 2);
+        self.push_attrs_with_comments(
+            &mut parts,
+            options.attributes,
+            d.line(),
+            AttrGaps {
+                first_range_start: options.name_end,
+                open_tag_end: options.open_tag_end,
+                // Nothing here is synthesized: `<svelte:options>` has no `this` binding, so
+                // every attribute in the window is in `attributes`.
+                claimed: None,
+            },
+            false,
+        );
+        if parts.is_empty() {
             self.write("<svelte:options />\n");
             return;
         }
 
-        let d = self.d();
-        let (attr_indent, has_multiline) = self.build_indented_attrs_doc(options.attributes);
+        let attrs = d.concat(&parts);
+        // A comment's own break counts the same as an attribute value's — both are reasons
+        // the head cannot stay on one line — so the question is asked of the assembled list.
+        let has_multiline = d.will_break(attrs);
+        let attr_indent = d.indent(attrs);
         let line = d.line();
         let inner = d.concat(&[d.text("<svelte:options"), attr_indent, line, d.text("/>")]);
 

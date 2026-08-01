@@ -1,0 +1,363 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 454,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 94,
+				"data": " A `this` written after other attributes is hoisted to the head of the list; a comment "
+			},
+			{
+				"type": "Text",
+				"start": 94,
+				"end": 95,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Comment",
+				"start": 95,
+				"end": 189,
+				"data": " bound to another attribute keeps its place, matching prettier. Trailing an attribute: "
+			},
+			{
+				"type": "Text",
+				"start": 189,
+				"end": 190,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 190,
+				"end": 244,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 191
+					},
+					"end": {
+						"line": 3,
+						"column": 15,
+						"character": 205
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 215,
+						"end": 232,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 3,
+								"column": 25,
+								"character": 215
+							},
+							"end": {
+								"line": 3,
+								"column": 34,
+								"character": 224
+							}
+						},
+						"value": [
+							{
+								"start": 226,
+								"end": 231,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "Identifier",
+					"start": 212,
+					"end": 213,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 22
+						},
+						"end": {
+							"line": 3,
+							"column": 23
+						}
+					},
+					"name": "x"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 244,
+				"end": 246,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 246,
+				"end": 277,
+				"data": " Between two attributes "
+			},
+			{
+				"type": "Text",
+				"start": 277,
+				"end": 278,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 278,
+				"end": 354,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 279
+					},
+					"end": {
+						"line": 6,
+						"column": 15,
+						"character": 293
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 303,
+						"end": 322,
+						"name": "data-attr1",
+						"name_loc": {
+							"start": {
+								"line": 6,
+								"column": 25,
+								"character": 303
+							},
+							"end": {
+								"line": 6,
+								"column": 35,
+								"character": 313
+							}
+						},
+						"value": [
+							{
+								"start": 315,
+								"end": 321,
+								"type": "Text",
+								"raw": "value1",
+								"data": "value1"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 332,
+						"end": 351,
+						"name": "data-attr2",
+						"name_loc": {
+							"start": {
+								"line": 6,
+								"column": 54,
+								"character": 332
+							},
+							"end": {
+								"line": 6,
+								"column": 64,
+								"character": 342
+							}
+						},
+						"value": [
+							{
+								"start": 344,
+								"end": 350,
+								"type": "Text",
+								"raw": "value2",
+								"data": "value2"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "Identifier",
+					"start": 300,
+					"end": 301,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 22
+						},
+						"end": {
+							"line": 6,
+							"column": 23
+						}
+					},
+					"name": "x"
+				}
+			},
+			{
+				"type": "Text",
+				"start": 354,
+				"end": 356,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 356,
+				"end": 395,
+				"data": " Own-line, leading an attribute "
+			},
+			{
+				"type": "Text",
+				"start": 395,
+				"end": 396,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteElement",
+				"start": 396,
+				"end": 453,
+				"name": "svelte:element",
+				"name_loc": {
+					"start": {
+						"line": 9,
+						"column": 1,
+						"character": 397
+					},
+					"end": {
+						"line": 9,
+						"column": 15,
+						"character": 411
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 433,
+						"end": 450,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 12,
+								"column": 1,
+								"character": 433
+							},
+							"end": {
+								"line": 12,
+								"column": 10,
+								"character": 442
+							}
+						},
+						"value": [
+							{
+								"start": 444,
+								"end": 449,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				},
+				"tag": {
+					"type": "Identifier",
+					"start": 419,
+					"end": 420,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 7
+						},
+						"end": {
+							"line": 10,
+							"column": 8
+						}
+					},
+					"name": "x"
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"start": 233,
+			"end": 241,
+			"value": " c1 ",
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 43,
+					"character": 233
+				},
+				"end": {
+					"line": 3,
+					"column": 51,
+					"character": 241
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 323,
+			"end": 331,
+			"value": " c2 ",
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 45,
+					"character": 323
+				},
+				"end": {
+					"line": 6,
+					"column": 53,
+					"character": 331
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 423,
+			"end": 431,
+			"value": " c3 ",
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1,
+					"character": 423
+				},
+				"end": {
+					"line": 11,
+					"column": 9,
+					"character": 431
+				}
+			}
+		}
+	]
+}

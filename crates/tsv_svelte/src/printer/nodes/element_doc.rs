@@ -11,7 +11,7 @@
 // in `element_analysis.rs`. The shared types (`BoundaryMode`, `ElementLayout`,
 // `ElementKind`, `ElementContext`) are defined here and used by both.
 
-use crate::ast::internal::{self, FragmentNode};
+use crate::ast::internal::{self, FragmentNode, is_collapsible_ws_char};
 use crate::printer::Printer;
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -147,19 +147,154 @@ pub(super) struct TagClass {
 /// A named struct rather than loose `u32`s for the same reason [`TagClass`] is one: the two
 /// offsets are positional and silently swappable at the call site.
 #[derive(Clone, Copy)]
-pub(super) struct AttrGaps {
+pub(in crate::printer) struct AttrGaps {
     /// Where the gap before the first attribute starts — the tag name's end.
-    pub(super) first_range_start: u32,
+    pub(in crate::printer) first_range_start: u32,
     /// The `>` closing the opening tag; bounds the gap after the last attribute.
-    pub(super) open_tag_end: u32,
-    /// A region inside the window that the caller prints itself, whose comments the scan
-    /// must therefore skip. `<svelte:element this={…}>` keeps its `this` out of the
-    /// attribute list and synthesizes the attribute, so the braces land in one of the gaps
-    /// probed here while the tag's own doc is what prints them; without the skip a comment
-    /// in there is emitted twice, once by each. Ownership does not cover this on its own: a
-    /// *glued block* comment is `owned_by_node` and already skipped on the `to emit` axis,
-    /// but a line comment never is (`owned ⇒ is_block`).
-    pub(super) claimed: Option<Span>,
+    pub(in crate::printer) open_tag_end: u32,
+    /// The comments inside the window that the caller prints itself, which the scan must
+    /// therefore skip. `<svelte:element this={…}>` keeps its `this` out of the attribute
+    /// list and synthesizes the attribute, so what it prints lands in the gaps probed here
+    /// while the tag's own doc is what prints it; without the skip a comment in there is
+    /// emitted twice, once by each. Ownership does not cover this on its own: a *glued block*
+    /// comment is `owned_by_node` and already skipped on the `to emit` axis, but a line
+    /// comment never is (`owned ⇒ is_block`).
+    pub(in crate::printer) claimed: Option<ThisClaim>,
+}
+
+/// A built attribute list and the facts about its emission a caller may need before
+/// printing the tag's closer — [`Printer::build_element_attrs_doc`]'s product, one value so
+/// they cannot be separated and a flag silently dropped where it mattered.
+///
+/// Most callers read only `docs`: their `>` / `/>` already sits behind a `line` in the
+/// list's own group, so the `break_parent` a line comment pushes moves it off the comment's
+/// line unaided, and their attributes already wrap behind those same `line` separators. The
+/// whitespace-sensitive builder is the one that must consult the emission — it hugs the `>`
+/// onto the last attribute and holds its attributes flat, with no line to break for either
+/// question (see [`Printer::push_attrs_with_comments`]).
+pub(super) struct ElementAttrsDoc {
+    pub(super) docs: DocBuf,
+    pub(super) emission: AttrListEmission,
+}
+
+/// What emitting an attribute list did that a layout keeping the list **flat** must know —
+/// [`Printer::push_attrs_with_comments`]'s summary of its comment runs.
+///
+/// Both fields are read off the emission as it happens rather than re-derived from source
+/// or probed off the docs, so they cannot disagree with what was printed —
+/// [`DocArena::will_break`](tsv_lang::doc::arena::DocArena::will_break) is *not* the
+/// `has_hardline` question: it counts the `break_parent` a trailing `//` pushes, which
+/// forces only the `>` off the comment's line while the list itself stays flat.
+#[derive(Clone, Copy, Default)]
+pub(in crate::printer) struct AttrListEmission {
+    /// Whether the emitted list ends on a `//`, so nothing may share its line.
+    pub(in crate::printer) ends_with_line_comment: bool,
+    /// Whether a comment forced a hardline *into* the list — an own-line comment keeping
+    /// its own line, or a same-line `//` pushing the following attribute to a fresh one.
+    /// The list can no longer render flat at any width.
+    pub(in crate::printer) has_hardline: bool,
+}
+
+/// What an emitted attribute-comment run leaves behind for whoever prints next.
+///
+/// Two questions, not one, and a caller that conflates them gets a different bug for each
+/// direction: the separator question is about *any* comment that ends a line, while the
+/// `>` question is about a `//` specifically — a `//` runs to end of line and would swallow
+/// whatever shares it, where an own-line block comment is self-delimiting and the closer may
+/// follow it inline. Both are read off the run as it is emitted rather than rescanned from
+/// source, so the two answers cannot disagree with what was printed.
+#[derive(Clone, Copy, Default)]
+struct AttrCommentRun {
+    /// Whether the next attribute must start on a fresh line — true for an own-line comment
+    /// and for any line comment.
+    next_on_new_line: bool,
+    /// Whether the run's **last** comment is a `//`, so nothing may share its line.
+    ends_with_line_comment: bool,
+    /// Whether **any** comment in the run kept a line of its own (accumulated, unlike the
+    /// two tail facts above): the run pushed a hardline, so the list holding it can never
+    /// render flat — [`AttrListEmission::has_hardline`]'s per-run input.
+    has_own_line_comment: bool,
+}
+
+/// Which comments the synthesized `this={…}` prints — [`AttrGaps::claimed`]'s payload, and
+/// the single predicate ([`Self::claims`]) both sides of the seam ask: the attribute scan
+/// skips exactly what the `this` site emits.
+///
+/// Not a contiguous span, because the binding may be **written after other attributes** yet
+/// always prints first, and a comment must stay with the token it binds when the list is
+/// reordered around it. A same-line comment trails the token before it; an own-line comment
+/// leads the token after it (the same axioms the attribute-list emitters apply). Under the
+/// hoist, exactly two positions therefore travel with `this`: a same-line comment in the
+/// **tag-name gap** (it trails the tag name, the one token that never moves, so the head is
+/// still its place) and an own-line comment in the **gap immediately before the binding**
+/// (it leads `this`). Everything else stays in its source slot for the attribute scan — a
+/// single `[name_end, value.end]` claim instead is how a comment trailing `data-x` got torn
+/// off and re-anchored to `this`. When the binding is written first the regions coincide
+/// and every window comment travels, which is the common authored form.
+///
+/// One deliberate approximation: a same-line comment *trailing an own-line comment* in the
+/// tag-name gap travels while its predecessor stays. The pair splits once (each lands in a
+/// stable slot, so the output is a fixed point); chain-aware anchoring would cost a
+/// backward comment walk per query for a shape no authored code has produced.
+#[derive(Clone, Copy)]
+pub(in crate::printer) struct ThisClaim {
+    /// The bound value as written — the `{…}` braces, or the plain form's text. Comments
+    /// inside are printed by the binding's own doc.
+    value: Span,
+    /// End of the tag-name gap: the first source item's start (`value.start` when the
+    /// binding is written first). A same-line comment ending by here trails the tag name.
+    head_gap_end: u32,
+    /// End of the last attribute written before the binding (the tag name's end when none
+    /// is). An own-line comment at or after it leads the binding.
+    prev_end: u32,
+}
+
+impl ThisClaim {
+    pub(in crate::printer) fn new(
+        name_end: u32,
+        value: Span,
+        attrs: &[internal::AttributeNode<'_>],
+    ) -> Self {
+        let head_gap_end = attrs
+            .iter()
+            .map(|a| a.span().start)
+            .min()
+            .map_or(value.start, |first| first.min(value.start));
+        let prev_end = attrs
+            .iter()
+            .map(|a| a.span().end)
+            .filter(|&end| end <= value.start)
+            .max()
+            .unwrap_or(name_end);
+        Self {
+            value,
+            head_gap_end,
+            prev_end,
+        }
+    }
+
+    /// Start of the bound value as written — the end of the leading window whose claimed
+    /// comments the `this` site emits itself (`[name_end, value_start)`). Comments past it
+    /// that the claim covers sit *inside* the value and are printed by the binding's own doc.
+    pub(in crate::printer) fn value_start(&self) -> u32 {
+        self.value.start
+    }
+
+    /// Whether the synthesized `this` site prints `comment` — see the type docs for the
+    /// routing rule.
+    pub(in crate::printer) fn claims(&self, p: &Printer<'_>, comment: &tsv_lang::Comment) -> bool {
+        if comment.span.start >= self.value.start {
+            // At or past the value: claimed only inside it (the braces interior).
+            return comment.span.end <= self.value.end;
+        }
+        if p.comment_starts_its_own_line(comment) {
+            // Own-line: travels only when it leads the binding itself.
+            self.prev_end <= comment.span.start
+        } else {
+            // Same-line: travels only when it trails the tag name.
+            comment.span.end <= self.head_gap_end
+        }
+    }
 }
 
 /// Why an element's content lays out multiline — and whether that reason survives reformatting.
@@ -280,7 +415,7 @@ impl<'a> Printer<'a> {
         let is_html = element.kind == internal::ElementKind::Html;
 
         // Build attribute docs (needed for all paths)
-        let attr_docs = self.build_element_attrs_doc(
+        let attrs = self.build_element_attrs_doc(
             element.attributes,
             self.d().line(),
             element.name_span.end,
@@ -290,7 +425,7 @@ impl<'a> Printer<'a> {
 
         // Special handling for <style> and <script> elements
         if class.is_style || class.is_script {
-            return self.build_raw_content_element_doc(class.is_style, element, attr_docs);
+            return self.build_raw_content_element_doc(class.is_style, element, attrs.docs);
         }
 
         // Foreign language <template> elements (e.g., <template lang="pug">)
@@ -305,9 +440,10 @@ impl<'a> Printer<'a> {
         // Whitespace-sensitive elements (pre, textarea, etc.) — these keep the mandatory
         // delimiter dangle, so they must never reach the shared layout analysis below.
         if class.is_ws_sensitive {
-            return self.build_whitespace_sensitive_element_doc(element, attr_docs);
+            return self.build_whitespace_sensitive_element_doc(element, attrs);
         }
 
+        let attr_docs = attrs.docs;
         let parts = self.element_parts(element, class);
 
         // Phase 1: Analyze element
@@ -386,13 +522,17 @@ impl<'a> Printer<'a> {
             return None;
         }
         let is_html = element.kind == internal::ElementKind::Html;
-        let attr_docs = self.build_element_attrs_doc(
-            element.attributes,
-            self.d().line(),
-            element.name_span.end,
-            element.open_tag_end,
-            is_html,
-        );
+        // Every layout below puts the `>` behind a line of this list's own group, so a
+        // trailing `//`'s `break_parent` moves it off the comment's line unaided.
+        let attr_docs = self
+            .build_element_attrs_doc(
+                element.attributes,
+                self.d().line(),
+                element.name_span.end,
+                element.open_tag_end,
+                is_html,
+            )
+            .docs;
         let parts = self.element_parts(element, class);
         let ctx = self.analyze_element(&parts, &attr_docs);
         match self.compute_element_layout(&parts, &ctx) {
@@ -744,14 +884,17 @@ impl<'a> Printer<'a> {
             // State 1: All inline
             let inline_state = d.concat(&[opening_tag, closing]);
 
-            // State 2: Hug mode - attrs inline (space-separated), > on new line
-            let hug_attrs = self.build_element_attrs_doc(
-                element.attributes,
-                self.d().text(" "),
-                element.name_span.end,
-                element.open_tag_end,
-                is_html,
-            );
+            // State 2: Hug mode - attrs inline (space-separated), > on new line.
+            // The `>` takes a hardline of its own here, so a trailing `//` cannot swallow it.
+            let hug_attrs = self
+                .build_element_attrs_doc(
+                    element.attributes,
+                    self.d().text(" "),
+                    element.name_span.end,
+                    element.open_tag_end,
+                    is_html,
+                )
+                .docs;
             let hug_state = d.concat(&[
                 d.text("<"),
                 name_doc,
@@ -761,13 +904,15 @@ impl<'a> Printer<'a> {
             ]);
 
             // State 3: Full multiline - attrs on separate lines, > on new line
-            let multiline_attrs = self.build_element_attrs_doc(
-                element.attributes,
-                self.d().line(),
-                element.name_span.end,
-                element.open_tag_end,
-                is_html,
-            );
+            let multiline_attrs = self
+                .build_element_attrs_doc(
+                    element.attributes,
+                    self.d().line(),
+                    element.name_span.end,
+                    element.open_tag_end,
+                    is_html,
+                )
+                .docs;
             let multiline_concat = d.concat(&multiline_attrs);
             let multiline_indent = d.indent(multiline_concat);
             let multiline_state = d.concat(&[
@@ -791,17 +936,25 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let name_doc = d.source_span_ident(element.name_span);
 
-        // Opening tag: <template attrs> — use space-separated attrs (no wrapping)
-        // Foreign template elements are always HTML, so is_html=true
-        let space_attrs = self.build_element_attrs_doc(
-            element.attributes,
-            self.d().text(" "),
-            element.name_span.end,
-            element.open_tag_end,
-            true,
-        );
-        let mut parts: DocBuf = smallvec![d.text("<"), name_doc];
-        parts.extend(space_attrs);
+        // Opening tag: the ordinary one. What is foreign here is the element's CONTENT, which
+        // tsv cannot format and so copies verbatim; the head above it is an attribute list like
+        // any other and gets the shared layout — attributes wrapped one per line and the `>` at
+        // base indent once it breaks. Answering that here instead cost both halves of the
+        // question: the hand-rolled concat had no group, so a 128-column head never wrapped,
+        // and no line before the `>`, so a trailing `//` swallowed it along with the whole
+        // template body and the output stopped re-parsing. `build_opening_tag` ends in a
+        // dedented softline, which the `break_parent` a line comment pushes expands unaided.
+        // Foreign template elements are always HTML, so is_html=true.
+        let attr_docs = self
+            .build_element_attrs_doc(
+                element.attributes,
+                self.d().line(),
+                element.name_span.end,
+                element.open_tag_end,
+                true,
+            )
+            .docs;
+        let mut parts: DocBuf = smallvec![self.build_opening_tag(name_doc, &attr_docs, false)];
         parts.push(d.text(">"));
 
         // Raw content from fragment text nodes
@@ -928,12 +1081,12 @@ impl<'a> Printer<'a> {
         name_end: u32,
         open_tag_end: u32,
         is_html: bool,
-    ) -> DocBuf {
+    ) -> ElementAttrsDoc {
         // Most elements have a handful of attributes, so the per-element parts
         // buffer stays on the stack (`DocBuf`'s inline capacity); attribute-dense
         // elements spill to the heap as before.
         let mut docs: DocBuf = DocBuf::with_capacity(attrs.len() * 2);
-        self.push_attrs_with_comments(
+        let emission = self.push_attrs_with_comments(
             &mut docs,
             attrs,
             separator,
@@ -946,113 +1099,177 @@ impl<'a> Printer<'a> {
             },
             is_html,
         );
-        docs
+        ElementAttrsDoc { docs, emission }
     }
 
     /// Push attribute docs with interleaved JS comment handling.
     ///
-    /// Shared between regular element and special element attr doc builders.
-    /// Handles comments between attributes and trailing comments after the last one, over
-    /// the window described by [`AttrGaps`].
-    pub(super) fn push_attrs_with_comments(
+    /// The one attribute-list emitter: regular elements, special elements, and the hoisted
+    /// `<svelte:options>` head all come through here. Handles comments before each attribute
+    /// and after the last one — or, when the list is empty, the whole window — over the range
+    /// described by [`AttrGaps`].
+    ///
+    /// Returns the [`AttrListEmission`] summary, which is what a caller keeping the list or
+    /// its closer **flat** must know. Most callers need neither field: their `>` already
+    /// sits behind a `line` in this list's own group, so the `break_parent` a line comment
+    /// pushes puts it on the next line by itself, and their attributes already wrap behind
+    /// those same `line` separators. The whitespace-sensitive builder — where a hug is a
+    /// refusal to inject rendered whitespace — has no such line for either question and
+    /// must ask.
+    pub(in crate::printer) fn push_attrs_with_comments(
         &self,
         docs: &mut DocBuf,
         attrs: &[internal::AttributeNode<'_>],
         separator: DocId,
         gaps: AttrGaps,
         is_html: bool,
-    ) {
-        let d = self.d();
+    ) -> AttrListEmission {
         let AttrGaps {
             first_range_start,
             open_tag_end,
             claimed,
         } = gaps;
-        // The gap probes below all go through these, so the claimed region is skipped once
-        // here rather than at each of the four sites.
+        // The gap probes below all go through this, so the claim is honored once here
+        // rather than at each of the sites.
         let gap_comments = |start: u32, end: u32| {
-            comments_to_emit_in_range(self.comments, start, end).filter(move |c| {
-                !claimed.is_some_and(|r| r.start <= c.span.start && c.span.end <= r.end)
-            })
+            comments_to_emit_in_range(self.comments, start, end)
+                .filter(move |c| !claimed.is_some_and(|cl| cl.claims(self, c)))
         };
         let has_gap_comments = |start: u32, end: u32| gap_comments(start, end).next().is_some();
+        // Where the gap *before* attribute `i` starts: the previous attribute's end, or the
+        // window start when there is no previous one. Asked of `attrs.len()` it is the gap
+        // after the last attribute — and, for an empty list, the whole window. One rule for
+        // every gap, so the trailing range cannot be anchored differently from the rest:
+        // guarding that one on `attrs.last()` instead is exactly how an attribute-less tag
+        // (`<div // c⏎>`, `<Comp /* c */ />`) silently deleted every comment in its head, and
+        // one real attribute was enough to hide it.
+        let gap_start = |i: usize| {
+            i.checked_sub(1)
+                .map_or(first_range_start, |prev| attrs[prev].span().end)
+        };
 
-        // Every gap this fn probes — each attribute's leading range and the trailing range
-        // after the last one — lies inside `[first_range_start, open_tag_end]`. A comment
+        // Every gap this fn probes lies inside `[first_range_start, open_tag_end]`. A comment
         // lands in a probe only when it sits fully inside the queried range, so a
         // comment-free open tag means every one of those gaps is comment-free: each would
-        // take the bare-separator branch below and the trailing block would emit nothing.
-        // Answer that with one probe instead of one per attribute plus one. (Whole-window
-        // and per-gap probes share `gap_comments`, so the claim is honored identically by
-        // both — a claim that shortcut only the per-gap probes would re-open the
-        // double-print through this fast path.)
+        // reach `push_attr_item_with_leading_comments` with an empty run and take its
+        // bare-separator branch, and the trailing block would emit nothing. Answer that with
+        // one probe instead of one per attribute plus one. (Whole-window and per-gap probes
+        // share `gap_comments`, so the claim is honored identically by both — a claim that
+        // shortcut only the per-gap probes would re-open the double-print through this fast
+        // path.)
         if !has_gap_comments(first_range_start, open_tag_end) {
             for attr in attrs {
                 docs.push(separator);
                 docs.push(self.build_attribute_node_doc(attr, is_html));
             }
-            return;
+            return AttrListEmission::default();
         }
 
+        let mut has_hardline = false;
         for (i, attr) in attrs.iter().enumerate() {
-            // Check for JS comments before this attribute
-            let range_start = if i == 0 {
-                first_range_start
-            } else {
-                attrs[i - 1].span().end
-            };
-            let range_end = attr.span().start;
-
-            if !has_gap_comments(range_start, range_end) {
-                docs.push(separator);
-            } else {
-                let last_is_own_line = self.push_attr_comment_docs(
-                    docs,
-                    gap_comments(range_start, range_end),
-                    range_start,
-                );
-                // Separator before the next attribute
-                if last_is_own_line {
-                    docs.push(d.hardline());
-                } else {
-                    docs.push(d.text(" "));
-                }
-            }
-
-            docs.push(self.build_attribute_node_doc(attr, is_html));
+            has_hardline |= self.push_attr_item_with_leading_comments(
+                docs,
+                separator,
+                gap_comments(gap_start(i), attr.span().start),
+                self.build_attribute_node_doc(attr, is_html),
+            );
         }
 
-        // Check for trailing comments after last attribute
-        if let Some(last_attr) = attrs.last() {
-            let range_start = last_attr.span().end;
-            if has_gap_comments(range_start, open_tag_end) {
-                self.push_attr_comment_docs(
-                    docs,
-                    gap_comments(range_start, open_tag_end),
-                    range_start,
-                );
-            }
+        // The gap after the last attribute — or, for an empty list, the whole window, where
+        // the loop above ran zero times and this is the tag's only emitter. An empty run is
+        // a no-op, so it needs no guard.
+        let trailing =
+            self.push_attr_comment_docs(docs, gap_comments(gap_start(attrs.len()), open_tag_end));
+        AttrListEmission {
+            ends_with_line_comment: trailing.ends_with_line_comment,
+            has_hardline: has_hardline || trailing.has_own_line_comment,
         }
+    }
+
+    /// Push one attribute-list item behind whatever comments lead it.
+    ///
+    /// The item takes `separator` either way; a comment run only ever *upgrades* it to a
+    /// hardline, when the run ends on its own line or on any line comment (a `//` runs to end
+    /// of line). A same-line block comment upgrades nothing — the run trails the token before
+    /// it and the item goes on taking the list's own separator, which is a space in a flat
+    /// layout and a break in a wrapped one.
+    ///
+    /// Hard-coding that space instead is how a same-line block comment came to *weld* the
+    /// following attribute onto the preceding line — `data-a="1" /* c */ data-b="2"` sitting
+    /// on one line inside a list that is otherwise one attribute per line, and the comment
+    /// bound to the attribute after it rather than the token it was written after. Flat
+    /// layouts hid it completely, since there `separator` renders as that same space. Pinned
+    /// by [`comment_same_line_long`](../../../../../tests/fixtures/svelte/attributes/comment_same_line_long_prettier_divergence/).
+    ///
+    /// One seam for two callers, because it is one decision: the attribute loop in
+    /// [`Self::push_attrs_with_comments`], and the synthesized `this={…}` that
+    /// `build_special_element_attrs_doc` prints before that loop runs. Keeping a second copy
+    /// beside the `this` binding is how the two drifted in the first place — that one printed
+    /// no leading comments at all, so every comment before the binding was dropped.
+    ///
+    /// Returns whether the emission put a hardline into the list — a comment in the run kept
+    /// its own line, or the run's tail forced the item onto a fresh one
+    /// ([`AttrListEmission::has_hardline`]'s per-item input).
+    pub(super) fn push_attr_item_with_leading_comments<'c>(
+        &self,
+        docs: &mut DocBuf,
+        separator: DocId,
+        comments: impl IntoIterator<Item = &'c tsv_lang::Comment>,
+        item: DocId,
+    ) -> bool {
+        let d = self.d();
+        let mut comments = comments.into_iter().peekable();
+        let pushed_hardline = if comments.peek().is_none() {
+            docs.push(separator);
+            false
+        } else {
+            let tail = self.push_attr_comment_docs(docs, comments);
+            docs.push(if tail.next_on_new_line {
+                d.hardline()
+            } else {
+                separator
+            });
+            tail.has_own_line_comment || tail.next_on_new_line
+        };
+        docs.push(item);
+        pushed_hardline
+    }
+
+    /// Whether the author put `comment` on a line of its own — the question every
+    /// attribute-list gap emitter asks to pick the comment's separator.
+    ///
+    /// Answered by scanning **backwards** from the comment over inter-token whitespace
+    /// ([`is_collapsible_ws_char`], shared rather than restated — anything outside that class
+    /// is a token, and stopping there is the answer): it starts its own line when a newline is
+    /// crossed first. The obvious alternative — "does `source[gap_start..comment_start]`
+    /// contain a newline?" — asks a *different* question wherever the printer emits something
+    /// into that span, and gets it wrong: `<svelte:element>` synthesizes `this={…}` from the
+    /// element kind rather than from `attributes`, so a comment after the binding is measured
+    /// from the **tag name** and, once the tag has broken across lines, the scan finds the
+    /// printer's own newline and moves the comment to its own line — a second pass that
+    /// changes the output. Asking about the comment alone has no anchor to get wrong.
+    fn comment_starts_its_own_line(&self, comment: &tsv_lang::Comment) -> bool {
+        self.source[..comment.span.start as usize]
+            .chars()
+            .rev()
+            .take_while(|&c| is_collapsible_ws_char(c))
+            .any(|c| c == '\n')
     }
 
     /// Push docs for JS comments between attributes.
     ///
     /// Each comment gets a preceding separator (hardline when it starts its own
-    /// line, an inline space when it trails the previous token). Returns whether
-    /// the following attribute must start on a new line — true for any own-line
-    /// comment and for any line comment (a `//` runs to end of line, so the next
-    /// token can't share it); the caller uses this to pick that separator.
-    pub(super) fn push_attr_comment_docs<'c>(
+    /// line, an inline space when it trails the previous token). Returns what the
+    /// emitted run leaves behind for whoever prints next — see [`AttrCommentRun`].
+    fn push_attr_comment_docs<'c>(
         &self,
         docs: &mut DocBuf,
         comments: impl IntoIterator<Item = &'c tsv_lang::Comment>,
-        range_start: u32,
-    ) -> bool {
+    ) -> AttrCommentRun {
         let d = self.d();
-        let mut last_was_own_line = false;
+        let mut tail = AttrCommentRun::default();
         for comment in comments {
-            let is_own_line =
-                self.source[range_start as usize..comment.span.start as usize].contains('\n');
+            let is_own_line = self.comment_starts_its_own_line(comment);
 
             // Preserve the author's placement: a comment on its own line stays on its
             // own line; a comment on the same line as the preceding token stays
@@ -1073,9 +1290,13 @@ impl<'a> Printer<'a> {
             }
             // A line comment always pushes the next token to a new line; a same-line
             // block comment lets it stay inline.
-            last_was_own_line = is_own_line || !comment.is_block;
+            tail = AttrCommentRun {
+                next_on_new_line: is_own_line || !comment.is_block,
+                ends_with_line_comment: !comment.is_block,
+                has_own_line_comment: tail.has_own_line_comment || is_own_line,
+            };
         }
-        last_was_own_line
+        tail
     }
 
     /// Build a doc for a JS comment's text (without surrounding separators).

@@ -1,0 +1,50 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 116,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 88,
+				"data": " Comment in a `<svelte:options>` with no attributes at all (prettier deletes it) "
+			},
+			{
+				"type": "Text",
+				"start": 88,
+				"end": 89,
+				"raw": "\n",
+				"data": "\n"
+			}
+		]
+	},
+	"options": {
+		"start": 89,
+		"end": 115,
+		"attributes": []
+	},
+	"comments": [
+		{
+			"type": "Block",
+			"start": 105,
+			"end": 112,
+			"value": " c ",
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 16,
+					"character": 105
+				},
+				"end": {
+					"line": 2,
+					"column": 23,
+					"character": 112
+				}
+			}
+		}
+	]
+}

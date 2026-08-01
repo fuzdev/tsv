@@ -1,0 +1,1031 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1532,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 90,
+				"data": " Line comment after the tag name, no attributes: stays there (prettier deletes it) "
+			},
+			{
+				"type": "Text",
+				"start": 90,
+				"end": 91,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 91,
+				"end": 108,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 92
+					},
+					"end": {
+						"line": 2,
+						"column": 4,
+						"character": 95
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 108,
+				"end": 110,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 110,
+				"end": 204,
+				"data": " Own-line comment in an empty attribute list: keeps its own line (prettier deletes it) "
+			},
+			{
+				"type": "Text",
+				"start": 204,
+				"end": 205,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 205,
+				"end": 223,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 6,
+						"column": 1,
+						"character": 206
+					},
+					"end": {
+						"line": 6,
+						"column": 4,
+						"character": 209
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 223,
+				"end": 225,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 225,
+				"end": 305,
+				"data": " Inline block comment, no attributes: stays inline (prettier deletes it) "
+			},
+			{
+				"type": "Text",
+				"start": 305,
+				"end": 306,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 306,
+				"end": 325,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 307
+					},
+					"end": {
+						"line": 11,
+						"column": 4,
+						"character": 310
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 325,
+				"end": 327,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 327,
+				"end": 400,
+				"data": " Own-line block comment: keeps its own line (prettier deletes it) "
+			},
+			{
+				"type": "Text",
+				"start": 400,
+				"end": 401,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 401,
+				"end": 422,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 402
+					},
+					"end": {
+						"line": 14,
+						"column": 4,
+						"character": 405
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 422,
+				"end": 424,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 424,
+				"end": 500,
+				"data": " Consecutive block comments keep their order (prettier deletes both) "
+			},
+			{
+				"type": "Text",
+				"start": 500,
+				"end": 501,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 501,
+				"end": 530,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 1,
+						"character": 502
+					},
+					"end": {
+						"line": 19,
+						"column": 4,
+						"character": 505
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 530,
+				"end": 532,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 532,
+				"end": 615,
+				"data": " Element with content: the comment is in the open tag (prettier deletes it) "
+			},
+			{
+				"type": "Text",
+				"start": 615,
+				"end": 616,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 616,
+				"end": 639,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 22,
+						"column": 1,
+						"character": 617
+					},
+					"end": {
+						"line": 22,
+						"column": 4,
+						"character": 620
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 629,
+							"end": 633,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 639,
+				"end": 641,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 641,
+				"end": 717,
+				"data": " A `//` breaks the open tag, so the content goes block-style with it "
+			},
+			{
+				"type": "Text",
+				"start": 717,
+				"end": 718,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 718,
+				"end": 742,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 25,
+						"column": 1,
+						"character": 719
+					},
+					"end": {
+						"line": 25,
+						"column": 4,
+						"character": 722
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 729,
+							"end": 736,
+							"raw": "\n\ttext\n",
+							"data": "\n\ttext\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 742,
+				"end": 744,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 744,
+				"end": 797,
+				"data": " Self-closing component (prettier deletes it) "
+			},
+			{
+				"type": "Text",
+				"start": 797,
+				"end": 798,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 798,
+				"end": 814,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 31,
+						"column": 1,
+						"character": 799
+					},
+					"end": {
+						"line": 31,
+						"column": 5,
+						"character": 803
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 814,
+				"end": 816,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 816,
+				"end": 894,
+				"data": " Line comment on a self-closing component: `/>` drops to the next line "
+			},
+			{
+				"type": "Text",
+				"start": 894,
+				"end": 895,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "Component",
+				"start": 895,
+				"end": 908,
+				"name": "Comp",
+				"name_loc": {
+					"start": {
+						"line": 34,
+						"column": 1,
+						"character": 896
+					},
+					"end": {
+						"line": 34,
+						"column": 5,
+						"character": 900
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 908,
+				"end": 910,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 910,
+				"end": 953,
+				"data": " Void element (prettier deletes it) "
+			},
+			{
+				"type": "Text",
+				"start": 953,
+				"end": 954,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 954,
+				"end": 971,
+				"name": "input",
+				"name_loc": {
+					"start": {
+						"line": 38,
+						"column": 1,
+						"character": 955
+					},
+					"end": {
+						"line": 38,
+						"column": 6,
+						"character": 960
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 971,
+				"end": 973,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 973,
+				"end": 1042,
+				"data": " Special element with no `this` binding (prettier deletes it) "
+			},
+			{
+				"type": "Text",
+				"start": 1042,
+				"end": 1043,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteHead",
+				"start": 1043,
+				"end": 1078,
+				"name": "svelte:head",
+				"name_loc": {
+					"start": {
+						"line": 41,
+						"column": 1,
+						"character": 1044
+					},
+					"end": {
+						"line": 41,
+						"column": 12,
+						"character": 1055
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1078,
+				"end": 1080,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1080,
+				"end": 1154,
+				"data": " Special element, self-closing, line comment (prettier deletes it) "
+			},
+			{
+				"type": "Text",
+				"start": 1154,
+				"end": 1155,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SvelteWindow",
+				"start": 1155,
+				"end": 1177,
+				"name": "svelte:window",
+				"name_loc": {
+					"start": {
+						"line": 44,
+						"column": 1,
+						"character": 1156
+					},
+					"end": {
+						"line": 44,
+						"column": 14,
+						"character": 1169
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1177,
+				"end": 1179,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1179,
+				"end": 1214,
+				"data": " Slot (prettier deletes it) "
+			},
+			{
+				"type": "Text",
+				"start": 1214,
+				"end": 1215,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "SlotElement",
+				"start": 1215,
+				"end": 1231,
+				"name": "slot",
+				"name_loc": {
+					"start": {
+						"line": 48,
+						"column": 1,
+						"character": 1216
+					},
+					"end": {
+						"line": 48,
+						"column": 5,
+						"character": 1220
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1231,
+				"end": 1233,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1233,
+				"end": 1345,
+				"data": " A mixed run in one gap: the block stays inline, the `//` still forces the break (prettier deletes both) "
+			},
+			{
+				"type": "Text",
+				"start": 1345,
+				"end": 1346,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1346,
+				"end": 1373,
+				"name": "div",
+				"name_loc": {
+					"start": {
+						"line": 51,
+						"column": 1,
+						"character": 1347
+					},
+					"end": {
+						"line": 51,
+						"column": 4,
+						"character": 1350
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1373,
+				"end": 1375,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 1375,
+				"end": 1476,
+				"data": " Whitespace-sensitive elements (their own printer) keep the comment too (prettier deletes it) "
+			},
+			{
+				"type": "Text",
+				"start": 1476,
+				"end": 1477,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1477,
+				"end": 1500,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 55,
+						"column": 1,
+						"character": 1478
+					},
+					"end": {
+						"line": 55,
+						"column": 4,
+						"character": 1481
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1490,
+							"end": 1494,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1500,
+				"end": 1502,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1502,
+				"end": 1531,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 57,
+						"column": 1,
+						"character": 1503
+					},
+					"end": {
+						"line": 57,
+						"column": 9,
+						"character": 1511
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"start": 96,
+			"end": 100,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 5,
+					"character": 96
+				},
+				"end": {
+					"line": 2,
+					"column": 9,
+					"character": 100
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 211,
+			"end": 215,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1,
+					"character": 211
+				},
+				"end": {
+					"line": 7,
+					"column": 5,
+					"character": 215
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 311,
+			"end": 318,
+			"value": " c ",
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 5,
+					"character": 311
+				},
+				"end": {
+					"line": 11,
+					"column": 12,
+					"character": 318
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 407,
+			"end": 414,
+			"value": " c ",
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1,
+					"character": 407
+				},
+				"end": {
+					"line": 15,
+					"column": 8,
+					"character": 414
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 506,
+			"end": 514,
+			"value": " c1 ",
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 5,
+					"character": 506
+				},
+				"end": {
+					"line": 19,
+					"column": 13,
+					"character": 514
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 515,
+			"end": 523,
+			"value": " c2 ",
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 14,
+					"character": 515
+				},
+				"end": {
+					"line": 19,
+					"column": 22,
+					"character": 523
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 621,
+			"end": 628,
+			"value": " c ",
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 5,
+					"character": 621
+				},
+				"end": {
+					"line": 22,
+					"column": 12,
+					"character": 628
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 723,
+			"end": 727,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 5,
+					"character": 723
+				},
+				"end": {
+					"line": 25,
+					"column": 9,
+					"character": 727
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 804,
+			"end": 811,
+			"value": " c ",
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 6,
+					"character": 804
+				},
+				"end": {
+					"line": 31,
+					"column": 13,
+					"character": 811
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 901,
+			"end": 905,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 6,
+					"character": 901
+				},
+				"end": {
+					"line": 34,
+					"column": 10,
+					"character": 905
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 961,
+			"end": 968,
+			"value": " c ",
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 7,
+					"character": 961
+				},
+				"end": {
+					"line": 38,
+					"column": 14,
+					"character": 968
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 1056,
+			"end": 1063,
+			"value": " c ",
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 13,
+					"character": 1056
+				},
+				"end": {
+					"line": 41,
+					"column": 20,
+					"character": 1063
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 1170,
+			"end": 1174,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 44,
+					"column": 15,
+					"character": 1170
+				},
+				"end": {
+					"line": 44,
+					"column": 19,
+					"character": 1174
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 1221,
+			"end": 1228,
+			"value": " c ",
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 6,
+					"character": 1221
+				},
+				"end": {
+					"line": 48,
+					"column": 13,
+					"character": 1228
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 1351,
+			"end": 1359,
+			"value": " c1 ",
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 5,
+					"character": 1351
+				},
+				"end": {
+					"line": 51,
+					"column": 13,
+					"character": 1359
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 1360,
+			"end": 1365,
+			"value": " c2",
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 14,
+					"character": 1360
+				},
+				"end": {
+					"line": 51,
+					"column": 19,
+					"character": 1365
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 1482,
+			"end": 1489,
+			"value": " c ",
+			"loc": {
+				"start": {
+					"line": 55,
+					"column": 5,
+					"character": 1482
+				},
+				"end": {
+					"line": 55,
+					"column": 12,
+					"character": 1489
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"start": 1512,
+			"end": 1519,
+			"value": " c ",
+			"loc": {
+				"start": {
+					"line": 57,
+					"column": 10,
+					"character": 1512
+				},
+				"end": {
+					"line": 57,
+					"column": 17,
+					"character": 1519
+				}
+			}
+		}
+	]
+}
