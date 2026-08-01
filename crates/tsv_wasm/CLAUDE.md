@@ -24,9 +24,10 @@ contract, or the span-only variant (see below); it is accepted everywhere and
 inert where nothing reads it (CSS emits no `loc`; `parse_internal_*` emits no
 wire). `goal` (`'script'` / `'module'`, default `'module'`) is TypeScript-only
 — Svelte hard-wires `Module`, CSS has no goal — so the other languages reject
-the key. Unknown keys always error (a typo like `{locatons: false}` silently
-succeeding would hand back the full wire while the caller believes they opted
-out); an explicitly-`undefined` value means that key's default — including the
+the key. Unknown keys always error, whatever their value (a typo like
+`{locatons: false}` — or `{locatons: undefined}` — silently succeeding would
+hand back the full wire while the caller believes they opted out); a supported
+key explicitly set to `undefined` means that key's default — including the
 TS-only `goal` on a language that rejects it, which is what lets a caller
 forward one bag to whichever parser (`npm/cli.js` does). A non-object argument
 errors, arrays included.

@@ -327,8 +327,9 @@ struct ParseOptions {
 }
 
 /// Read a `ParseOptions` off the raw `options` argument (`undefined`/`null`
-/// mean all-defaults; an explicitly-`undefined` value means that key's
-/// default, matching the omitted-key JS convention).
+/// mean all-defaults; a supported key explicitly set to `undefined` means that
+/// key's default, matching the omitted-key JS convention — unknown keys error
+/// whatever their value).
 #[cfg(feature = "parse")]
 fn parse_parse_options(options: &JsValue, allow_goal: bool) -> Result<ParseOptions, JsError> {
     let mut parsed = ParseOptions {
@@ -354,23 +355,32 @@ fn parse_parse_options(options: &JsValue, allow_goal: bool) -> Result<ParseOptio
         };
         let value = js_sys::Reflect::get(options, &key)
             .map_err(|_| err(format!("failed to read parse option '{name}'")))?;
-        if value.is_undefined() {
-            continue;
-        }
+        // A supported key explicitly set to `undefined` means that key's default
+        // (the omitted-key JS convention) — decided per arm, AFTER the key match,
+        // so an unknown key errors whatever its value (`{locatons: undefined}` is
+        // the same typo as `{locatons: false}`). `goal`'s check runs before its
+        // language rejection: that's what lets one bag serve whichever parser
+        // with the inapplicable goal spelled `undefined` (`npm/cli.js` does).
         match name.as_str() {
             "locations" => {
+                if value.is_undefined() {
+                    continue;
+                }
                 parsed.locations = value
                     .as_bool()
                     .ok_or_else(|| err("parse option 'locations' must be a boolean"))?;
             }
-            "goal" if allow_goal => {
+            "goal" => {
+                if value.is_undefined() {
+                    continue;
+                }
+                if !allow_goal {
+                    return Err(err("parse option 'goal' is only supported for TypeScript"));
+                }
                 let goal = value
                     .as_string()
                     .ok_or_else(|| err("parse option 'goal' must be 'script' or 'module'"))?;
                 parsed.goal = goal_from_str(&goal)?;
-            }
-            "goal" => {
-                return Err(err("parse option 'goal' is only supported for TypeScript"));
             }
             other => {
                 let expected = if allow_goal {

@@ -234,14 +234,22 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 			() => node_entry.parse_typescript('x;', { locations: 'yes' }),
 			/'locations' must be a boolean/
 		);
-		// an explicitly-undefined value means that key's default (omitted-key convention)
+		// a supported key explicitly set to undefined means that key's default
+		// (omitted-key convention)
 		assert.ok(node_entry.parse_typescript('x;', { locations: undefined, goal: undefined }).loc);
 		// ...including the TS-only key on a language that REJECTS it. Load-bearing:
 		// `npm/cli.js` forwards one options bag to whichever parser and spells the
-		// inapplicable goal as `undefined` rather than branching the call. Moving the
-		// undefined skip below the key match would break that with `check` still green.
+		// inapplicable goal as `undefined` rather than branching the call. The goal
+		// arm must read `undefined` before its language rejection, or this breaks
+		// with `check` still green.
 		assert.ok(node_entry.parse_svelte('<div>x</div>', { goal: undefined }));
 		assert.ok(node_entry.parse_css('a { color: red }', { goal: undefined }));
+		// an UNKNOWN key throws even at `undefined` — the typo guard has no
+		// undefined-valued hole; only supported keys read `undefined` as absent
+		assert.throws(
+			() => node_entry.parse_typescript('x;', { locatons: undefined }),
+			/unknown parse option 'locatons'/
+		);
 		// a non-object options argument is an error, arrays included
 		assert.throws(() => node_entry.parse_typescript('x;', 'locations'), /must be an object/);
 		assert.throws(() => node_entry.parse_typescript('x;', []), /must be an object/);

@@ -24,12 +24,6 @@ interface WasmParseOptions {
 	goal?: ParseGoal;
 }
 
-/** Hoisted so the span-only row doesn't allocate an options object per call: it
- * is timed against the loc-bearing row, which passes `undefined` (short-circuited
- * in Rust before any `Object.keys`/`Reflect::get`), so a per-call bag here would
- * put a cost on one side of that comparison and not the other. */
-const NO_LOCATIONS: WasmParseOptions = { locations: false };
-
 /** WASM module function signatures */
 interface WasmModule {
 	parse_svelte: (source: string, options?: WasmParseOptions) => unknown;
@@ -160,10 +154,10 @@ export class WasmImplementation extends BaseImplementation {
 	}
 
 	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
-		return this.parse_fns[language](
-			source,
-			goal && language === 'typescript' ? { locations: false, goal } : NO_LOCATIONS
-		);
+		return this.parse_fns[language](source, {
+			locations: false,
+			goal: goal && language === 'typescript' ? goal : undefined
+		});
 	}
 
 	format(source: string, language: Language): string {
