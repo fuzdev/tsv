@@ -17,26 +17,24 @@ import { fileURLToPath } from 'node:url';
 import { current_runtime } from './runtime.ts';
 import { BaseImplementation, type Language, LANGUAGES, type ParseGoal } from './types.ts';
 
+/** The `{locations?, goal?}` options bag the parse exports take (`goal` is
+ * TypeScript-only — the other languages reject the key). */
+interface WasmParseOptions {
+	locations?: boolean;
+	goal?: ParseGoal;
+}
+
 /** WASM module function signatures */
 interface WasmModule {
-	parse_svelte: (source: string) => unknown;
-	parse_internal_svelte: (source: string) => void;
+	parse_svelte: (source: string, options?: WasmParseOptions) => unknown;
+	parse_internal_svelte: (source: string, options?: WasmParseOptions) => void;
 	format_svelte: (source: string) => string;
-	parse_typescript: (source: string) => unknown;
-	parse_internal_typescript: (source: string) => void;
+	parse_typescript: (source: string, options?: WasmParseOptions) => unknown;
+	parse_internal_typescript: (source: string, options?: WasmParseOptions) => void;
 	format_typescript: (source: string) => string;
-	parse_css: (source: string) => unknown;
-	parse_internal_css: (source: string) => void;
+	parse_css: (source: string, options?: WasmParseOptions) => unknown;
+	parse_internal_css: (source: string, options?: WasmParseOptions) => void;
 	format_css: (source: string) => string;
-	// span-only wire, materialized in Rust (mechanism-matched with parse_*) —
-	// svelte + typescript only (CSS emits no `loc`)
-	parse_svelte_no_locations: (source: string) => unknown;
-	parse_typescript_no_locations: (source: string) => unknown;
-	// goal-aware TS parse (`'script'`/`'module'`) — the conformance surface's
-	// test262 files. The JSON-string exports (materialize via JSON.parse, like ffi/napi).
-	parse_typescript_json_with_goal: (source: string, goal: string) => string;
-	parse_typescript_json_with_goal_no_locations: (source: string, goal: string) => string;
-	parse_internal_typescript_with_goal: (source: string, goal: string) => void;
 }
 
 export class WasmImplementation extends BaseImplementation {
@@ -53,7 +51,10 @@ export class WasmImplementation extends BaseImplementation {
 	}
 
 	// Lookup tables for WASM functions by language
-	private get parse_fns(): Record<Language, (source: string) => unknown> {
+	private get parse_fns(): Record<
+		Language,
+		(source: string, options?: WasmParseOptions) => unknown
+	> {
 		return {
 			svelte: this.module.parse_svelte,
 			typescript: this.module.parse_typescript,
@@ -61,7 +62,10 @@ export class WasmImplementation extends BaseImplementation {
 		};
 	}
 
-	private get parse_internal_fns(): Record<Language, (source: string) => void> {
+	private get parse_internal_fns(): Record<
+		Language,
+		(source: string, options?: WasmParseOptions) => void
+	> {
 		return {
 			svelte: this.module.parse_internal_svelte,
 			typescript: this.module.parse_internal_typescript,
@@ -74,14 +78,6 @@ export class WasmImplementation extends BaseImplementation {
 			svelte: this.module.format_svelte,
 			typescript: this.module.format_typescript,
 			css: this.module.format_css
-		};
-	}
-
-	// Span-only wire — svelte + typescript only (CSS has no `loc`).
-	private get parse_no_locations_fns(): Partial<Record<Language, (source: string) => unknown>> {
-		return {
-			svelte: this.module.parse_svelte_no_locations,
-			typescript: this.module.parse_typescript_no_locations
 		};
 	}
 
@@ -124,13 +120,7 @@ export class WasmImplementation extends BaseImplementation {
 			format_typescript: module.format_typescript,
 			parse_css: module.parse_css,
 			parse_internal_css: module.parse_internal_css,
-			format_css: module.format_css,
-			parse_svelte_no_locations: module.parse_svelte_no_locations,
-			parse_typescript_no_locations: module.parse_typescript_no_locations,
-			parse_typescript_json_with_goal: module.parse_typescript_json_with_goal,
-			parse_typescript_json_with_goal_no_locations:
-				module.parse_typescript_json_with_goal_no_locations,
-			parse_internal_typescript_with_goal: module.parse_internal_typescript_with_goal
+			format_css: module.format_css
 		};
 
 		// Fairness guard for the parse rows: the wasm parse fns must return a
@@ -147,28 +137,27 @@ export class WasmImplementation extends BaseImplementation {
 		}
 	}
 
+	// The `goal` option is TypeScript-only (the other languages reject the key),
+	// so it's withheld unless the language is typescript.
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {
-		if (goal && language === 'typescript') {
-			return JSON.parse(this.module.parse_typescript_json_with_goal(source, goal));
-		}
-		return this.parse_fns[language](source);
+		return this.parse_fns[language](
+			source,
+			goal && language === 'typescript' ? { goal } : undefined
+		);
 	}
 
 	parse_internal(source: string, language: Language, goal?: ParseGoal): void {
-		if (goal && language === 'typescript') {
-			this.module.parse_internal_typescript_with_goal(source, goal);
-			return;
-		}
-		this.parse_internal_fns[language](source);
+		this.parse_internal_fns[language](
+			source,
+			goal && language === 'typescript' ? { goal } : undefined
+		);
 	}
 
 	parse_no_locations(source: string, language: Language, goal?: ParseGoal): unknown {
-		if (goal && language === 'typescript') {
-			return JSON.parse(this.module.parse_typescript_json_with_goal_no_locations(source, goal));
-		}
-		const fn = this.parse_no_locations_fns[language];
-		if (!fn) throw new Error(`no-locations parse unsupported for ${language}`);
-		return fn(source);
+		return this.parse_fns[language](source, {
+			locations: false,
+			goal: goal && language === 'typescript' ? goal : undefined
+		});
 	}
 
 	format(source: string, language: Language): string {

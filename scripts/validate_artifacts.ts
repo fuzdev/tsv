@@ -281,7 +281,12 @@ for (const { label, entry, has_format, has_parse, is_npm } of smoke_targets) {
 				const reconstruct = (mod as Record<string, unknown>).reconstruct_locations as
 					((ast: unknown, source: string) => { loc?: unknown }) | undefined;
 				if (typeof reconstruct !== 'function') return false;
-				const ast = mod.parse_typescript_no_locations('const x = 1;') as { loc?: unknown };
+				const parse = mod.parse_typescript as unknown as (
+					source: string,
+					options?: { locations?: boolean }
+				) => { loc?: unknown };
+				const ast = parse('const x = 1;', { locations: false });
+				if (ast.loc) return false; // span-only wire must carry no loc
 				const out = reconstruct(ast, 'const x = 1;');
 				return out === ast && !!out.loc; // same reference (in-place) + loc added
 			});

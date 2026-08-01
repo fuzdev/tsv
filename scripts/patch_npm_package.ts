@@ -178,10 +178,13 @@ export function init_sync(...args) {
 
 ${fns
 	.map(
+		// Arity-agnostic passthrough: the exports take differing extra args
+		// (parse_* an options object, format_typescript_with_goal a goal string),
+		// so the guard must forward every argument, not a fixed parameter list.
 		(f) =>
-			`export function ${f}(source) {
+			`export function ${f}(...args) {
 	_check();
-	return _${f}(source);
+	return _${f}(...args);
 }`
 	)
 	.join('\n\n')}
@@ -199,7 +202,13 @@ const ast_reexport = has_parse_exports ? `export type * from './tsv_ast';\n` : '
 const locations_reexport_dts = has_parse_exports
 	? `export * from './${locations_dts.replace(/\.d\.ts$/, '')}';\n`
 	: '';
-const index_dts = `${ast_reexport}${locations_reexport_dts}export {
+// The parse exports' hand-written option types (the `TS_PARSE_DECLS` custom
+// section in crates/tsv_wasm/src/lib.rs) — named, so tsv_ast/locations star
+// exports can never ambiguate them away (the TS2308 rule).
+const parse_options_reexport = has_parse_exports
+	? `export type { ParseOptions, TypeScriptParseOptions } from './${dts_file.replace(/\.d\.ts$/, '')}';\n`
+	: '';
+const index_dts = `${ast_reexport}${locations_reexport_dts}${parse_options_reexport}export {
 ${[...fns, ...classes].map((f) => `\t${f},`).join('\n')}
 } from './${dts_file.replace(/\.d\.ts$/, '')}';
 /** Initialize the WASM module. Required in browsers before calling any other export. No-op if already initialized. */

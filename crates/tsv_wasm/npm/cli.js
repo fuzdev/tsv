@@ -27,11 +27,7 @@ import {
 	IgnoreStack,
 	parse_css_json,
 	parse_svelte_json,
-	parse_svelte_json_no_locations,
-	parse_typescript_json,
-	parse_typescript_json_no_locations,
-	parse_typescript_json_with_goal,
-	parse_typescript_json_with_goal_no_locations
+	parse_typescript_json
 } from './index.js';
 
 /** tsv's native ignore file, discovered hierarchically (one per directory).
@@ -59,14 +55,6 @@ const FORMATTERS = {
 const PARSERS = {
 	svelte: parse_svelte_json,
 	typescript: parse_typescript_json,
-	css: parse_css_json
-};
-
-// Span-only variant (`--no-locations`): drops per-node `loc` (svelte also `name_loc`).
-// CSS is a no-op (`parseCss` emits no `loc`), so it maps to the plain parser.
-const PARSERS_NO_LOCATIONS = {
-	svelte: parse_svelte_json_no_locations,
-	typescript: parse_typescript_json_no_locations,
 	css: parse_css_json
 };
 
@@ -437,18 +425,18 @@ function run_parse(args) {
 		process.exit(1);
 	}
 
-	// --no-locations drops per-node `loc` (span-only wire); orthogonal to --goal
-	// (goal drives the TS parser, no-locations the writer), so they compose.
+	// --no-locations drops per-node `loc` (span-only wire; svelte also `name_loc`,
+	// a no-op for css); orthogonal to --goal (goal drives the TS parser,
+	// no-locations the writer), so they compose. The `goal` option is
+	// TypeScript-only in the WASM API, so a validated-but-inert --goal on the
+	// other parsers is withheld rather than passed (native-CLI parity).
 	const no_locations = values['no-locations'] === true;
 	let json;
 	try {
-		if (parser === 'typescript' && goal !== undefined) {
-			json = no_locations
-				? parse_typescript_json_with_goal_no_locations(input, goal)
-				: parse_typescript_json_with_goal(input, goal);
-		} else {
-			json = (no_locations ? PARSERS_NO_LOCATIONS : PARSERS)[parser](input);
-		}
+		json = PARSERS[parser](input, {
+			locations: !no_locations,
+			goal: parser === 'typescript' ? goal : undefined
+		});
 	} catch (error) {
 		eprint(`Parse error: ${error.message}\n`);
 		process.exit(1);

@@ -147,7 +147,8 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
     and tsv has its own internal optimal AST
   - the parser can also emit optimized JSON that drops the per-node `loc` and
     Svelte `name_loc` objects, mirroring acorn's `locations: false` for improved performance
-    (`parse --no-locations` or the `parse_*_no_locations` bindings)
+    (`parse --no-locations`, the JS API's `{locations: false}` option, or the
+    native bindings' `*_no_locations` exports)
 - compatible with Prettier, with generic rethought APIs
   - formatting is similar Prettier and prettier-plugin-svelte for the common case,
     but intentionally diverges in some cases and fixes numerous bugs
