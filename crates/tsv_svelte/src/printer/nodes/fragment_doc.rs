@@ -1109,33 +1109,22 @@ impl<'a> Printer<'a> {
                         // Last child: fold the element and the trailing words into ONE fill so a
                         // wide element wraps its own content within printWidth and the words pack
                         // after it — see `build_after_element_fold`.
-                        //
-                        // If the popped element is `handle_inline_child`'s `group([line, X])`
-                        // inline-sibling wrap (an element preceded by an inline sibling across a
-                        // bare space), keep X bare in the fold's lead content slot and hoist the
-                        // boundary line OUTSIDE the fold, reusing the standalone `group([line, …])`
-                        // shape. Folding the *line* into the lead double-counts the boundary: the
-                        // fill breaks before the fold AND the wrapping group re-renders its own
-                        // leading line flat → a stray leading space, non-idempotent
-                        // (`inline_break_before_prev_inline_long`).
-                        let folded = match d.strip_leading_line_group(last_doc) {
-                            Some(inner) => {
-                                let fold = self.build_after_element_fold(inner, raw);
-                                d.group(d.concat(&[d.line(), fold]))
-                            }
-                            None => self.build_after_element_fold(last_doc, raw),
-                        };
+                        let folded = self.rejoin_inside_leading_wrap(last_doc, |el| {
+                            self.build_after_element_fold(el, raw)
+                        });
                         child_docs.push(folded);
                         return;
                     }
-                    // Non-last (text between two inline elements): keep the group-wrapped boundary.
-                    // The following element supplies the next break point, and folding the middle
-                    // text into the element (packing it onto the dangled `>` line) is non-convergent
-                    // — it shifts where the following element lands, flip-flopping across passes.
-                    // Pinned by `inline_wide_content_text_sibling_long`.
-                    let line = d.line();
-                    let inner = d.concat(&[last_doc, line]);
-                    child_docs.push(d.group(inner));
+                    // Non-last (text between two inline elements): keep the trailing boundary
+                    // grouped WITH the element. The following element supplies the next break
+                    // point, and folding the middle text into the element (packing it onto the
+                    // dangled `>` line) is non-convergent — it shifts where the following element
+                    // lands, flip-flopping across passes. Pinned by
+                    // `inline_wide_content_text_sibling_long`.
+                    let joined = self.rejoin_inside_leading_wrap(last_doc, |el| {
+                        d.group(d.concat(&[el, d.line()]))
+                    });
+                    child_docs.push(joined);
                 }
             }
         } else if multiline && has_leading_ws && !is_first {
@@ -1355,6 +1344,46 @@ impl<'a> Printer<'a> {
         }
         for _ in 0..trailing_hardlines {
             child_docs.push(d.hardline());
+        }
+    }
+
+    /// Rejoin a popped inline element with the trailing text `build_tail` builds around it,
+    /// keeping the element's **leading** boundary outside that tail.
+    ///
+    /// `handle_text_child` pops the previous sibling to rejoin it with the text that follows, and
+    /// the popped doc is either the bare element or `push_inline_child_doc`'s inline-sibling wrap
+    /// `group([line, X])` — the collapsible boundary to the sibling before it. Two boundaries then
+    /// meet on one element, and they are **independent decisions**: the leading one asks whether
+    /// the element fits after its sibling, the trailing one whether the text fits after the
+    /// element. Building the tail around the whole wrap welds them into one group, where either
+    /// breaking forces the other. Hoisting the boundary back out afterwards keeps them separate,
+    /// and is why both arms route through here rather than each re-deriving the shape.
+    ///
+    /// The weld is not merely untidy — it costs the document its fixed point, differently per arm:
+    ///
+    /// - **Terminal tail** (the after-element fold): the boundary is *double-counted* — the fill
+    ///   breaks before the fold AND the wrapping group re-renders its own leading line flat,
+    ///   stranding a leading space (`inline_break_before_prev_inline_long`).
+    /// - **Non-terminal tail**: the welded group measures the trailing boundary against the column
+    ///   *before* the leading break — a column that no longer exists once the leading boundary
+    ///   breaks and the element starts a fresh line. The next pass, reading that fresh line,
+    ///   measures the trailing boundary from it and answers differently, so the two passes
+    ///   disagree forever (`inline_sibling_drop_tail_flow_long`). Breaking outside-in is what makes
+    ///   the first pass ask the question the second pass will ask.
+    ///
+    /// The tail keeps the trailing boundary grouped *with* the element on purpose: an element too
+    /// wide to sit flat must push its tail to the next line, and only measuring the two together
+    /// sees that. Detaching the trailing line to decide on its own column packs a tail after an
+    /// element that wrapped its own attributes, which the next pass then unpacks.
+    fn rejoin_inside_leading_wrap(
+        &self,
+        last_doc: DocId,
+        build_tail: impl FnOnce(DocId) -> DocId,
+    ) -> DocId {
+        let d = self.d();
+        match d.strip_leading_line_group(last_doc) {
+            Some(inner) => d.inline_sibling_line_group(build_tail(inner)),
+            None => build_tail(last_doc),
         }
     }
 
