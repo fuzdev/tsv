@@ -1,0 +1,105 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 189,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 139,
+				"data": " A `//` the author put on the tag-name line of a foreign `<template lang=\"…\">` head stays\n\tthere; prettier moves it to its own line "
+			},
+			{
+				"type": "Text",
+				"start": 139,
+				"end": 140,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 140,
+				"end": 188,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 141
+					},
+					"end": {
+						"line": 3,
+						"column": 9,
+						"character": 149
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 156,
+						"end": 166,
+						"name": "lang",
+						"name_loc": {
+							"start": {
+								"line": 4,
+								"column": 1,
+								"character": 156
+							},
+							"end": {
+								"line": 4,
+								"column": 5,
+								"character": 160
+							}
+						},
+						"value": [
+							{
+								"start": 162,
+								"end": 165,
+								"type": "Text",
+								"raw": "pug",
+								"data": "pug"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 168,
+							"end": 177,
+							"raw": "\nh1 text\n",
+							"data": "\nh1 text\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"start": 150,
+			"end": 154,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 10,
+					"character": 150
+				},
+				"end": {
+					"line": 3,
+					"column": 14,
+					"character": 154
+				}
+			}
+		}
+	]
+}

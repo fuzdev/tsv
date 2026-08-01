@@ -889,22 +889,23 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let name_doc = d.source_span_ident(element.name_span);
 
-        // Opening tag: <template attrs> — use space-separated attrs (no wrapping)
-        // Foreign template elements are always HTML, so is_html=true
-        //
-        // TODO: this head hugs its `>` onto the last attribute with no line to break, so a
-        // trailing `//` swallows it and the output does not re-parse — the same shape the
-        // whitespace-sensitive builder answers with the flag discarded here. Needs its own
-        // fixture (the raw-content head is a different claim from `<pre>`'s literal content).
-        let (space_attrs, _) = self.build_element_attrs_doc(
+        // Opening tag: the ordinary one. What is foreign here is the element's CONTENT, which
+        // tsv cannot format and so copies verbatim; the head above it is an attribute list like
+        // any other and gets the shared layout — attributes wrapped one per line and the `>` at
+        // base indent once it breaks. Answering that here instead cost both halves of the
+        // question: the hand-rolled concat had no group, so a 128-column head never wrapped,
+        // and no line before the `>`, so a trailing `//` swallowed it along with the whole
+        // template body and the output stopped re-parsing. `build_opening_tag` ends in a
+        // dedented softline, which the `break_parent` a line comment pushes expands unaided.
+        // Foreign template elements are always HTML, so is_html=true.
+        let (attr_docs, _) = self.build_element_attrs_doc(
             element.attributes,
-            self.d().text(" "),
+            self.d().line(),
             element.name_span.end,
             element.open_tag_end,
             true,
         );
-        let mut parts: DocBuf = smallvec![d.text("<"), name_doc];
-        parts.extend(space_attrs);
+        let mut parts: DocBuf = smallvec![self.build_opening_tag(name_doc, &attr_docs, false)];
         parts.push(d.text(">"));
 
         // Raw content from fragment text nodes
