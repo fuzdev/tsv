@@ -1,0 +1,456 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 791,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 255,
+				"data": " A `//` in a whitespace-sensitive element's attribute list runs to end of line, so the `>`\n\ttakes its own line instead of hugging the last attribute. The break lands inside the tag,\n\twhere no character is content, so the literal text is untouched. "
+			},
+			{
+				"type": "Text",
+				"start": 255,
+				"end": 257,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 257,
+				"end": 413,
+				"data": " With content, the attributes keep the tag-name line and the `>` hugs the content one\n\tlevel in, the layout an over-width `<textarea>` already takes "
+			},
+			{
+				"type": "Text",
+				"start": 413,
+				"end": 414,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 414,
+				"end": 437,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 415
+					},
+					"end": {
+						"line": 7,
+						"column": 4,
+						"character": 418
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 426,
+							"end": 430,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 437,
+				"end": 439,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 439,
+				"end": 480,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 11,
+						"column": 1,
+						"character": 440
+					},
+					"end": {
+						"line": 11,
+						"column": 4,
+						"character": 443
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 444,
+						"end": 461,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 11,
+								"column": 5,
+								"character": 444
+							},
+							"end": {
+								"line": 11,
+								"column": 14,
+								"character": 453
+							}
+						},
+						"value": [
+							{
+								"start": 455,
+								"end": 460,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 469,
+							"end": 473,
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 480,
+				"end": 482,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 482,
+				"end": 573,
+				"data": " With no content there is nothing for the `>` to protect, so it sits at base indent "
+			},
+			{
+				"type": "Text",
+				"start": 573,
+				"end": 574,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 574,
+				"end": 591,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 575
+					},
+					"end": {
+						"line": 16,
+						"column": 4,
+						"character": 578
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 591,
+				"end": 593,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 593,
+				"end": 629,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 19,
+						"column": 1,
+						"character": 594
+					},
+					"end": {
+						"line": 19,
+						"column": 4,
+						"character": 597
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 599,
+						"end": 616,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 20,
+								"column": 1,
+								"character": 599
+							},
+							"end": {
+								"line": 20,
+								"column": 10,
+								"character": 608
+							}
+						},
+						"value": [
+							{
+								"start": 610,
+								"end": 615,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			},
+			{
+				"type": "Text",
+				"start": 629,
+				"end": 631,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 631,
+				"end": 708,
+				"data": " `<textarea>` is the same element class and takes the same two shapes "
+			},
+			{
+				"type": "Text",
+				"start": 708,
+				"end": 709,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 709,
+				"end": 742,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 24,
+						"column": 1,
+						"character": 710
+					},
+					"end": {
+						"line": 24,
+						"column": 9,
+						"character": 718
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"start": 726,
+							"end": 730,
+							"type": "Text",
+							"raw": "text",
+							"data": "text"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 742,
+				"end": 744,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 744,
+				"end": 790,
+				"name": "textarea",
+				"name_loc": {
+					"start": {
+						"line": 28,
+						"column": 1,
+						"character": 745
+					},
+					"end": {
+						"line": 28,
+						"column": 9,
+						"character": 753
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 755,
+						"end": 772,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 29,
+								"column": 1,
+								"character": 755
+							},
+							"end": {
+								"line": 29,
+								"column": 10,
+								"character": 764
+							}
+						},
+						"value": [
+							{
+								"start": 766,
+								"end": 771,
+								"type": "Text",
+								"raw": "value",
+								"data": "value"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": []
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"start": 419,
+			"end": 423,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 5,
+					"character": 419
+				},
+				"end": {
+					"line": 7,
+					"column": 9,
+					"character": 423
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 462,
+			"end": 466,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 23,
+					"character": 462
+				},
+				"end": {
+					"line": 11,
+					"column": 27,
+					"character": 466
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 579,
+			"end": 583,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 5,
+					"character": 579
+				},
+				"end": {
+					"line": 16,
+					"column": 9,
+					"character": 583
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 617,
+			"end": 621,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 19,
+					"character": 617
+				},
+				"end": {
+					"line": 20,
+					"column": 23,
+					"character": 621
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 719,
+			"end": 723,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 10,
+					"character": 719
+				},
+				"end": {
+					"line": 24,
+					"column": 14,
+					"character": 723
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"start": 773,
+			"end": 777,
+			"value": " c",
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 19,
+					"character": 773
+				},
+				"end": {
+					"line": 29,
+					"column": 23,
+					"character": 777
+				}
+			}
+		}
+	]
+}

@@ -38,10 +38,21 @@ impl<'a> Printer<'a> {
     ///   attrs + content would exceed print width.
     /// - **Inline empty with attrs**: self-closing `/>` drops on wrap; explicit `></tag>` hugs.
     /// - **Fallback**: block hugs `>` with the last attr; no attrs → plain `<tag>`.
+    ///
+    /// Every one of those hugs is a deliberate refusal to break before the `>`: a break there
+    /// is free for an ordinary element but here it borders literal content. `//` is the one
+    /// thing that overrides it — a line comment runs to end of line, so a hugged `>` lands
+    /// *inside* the comment and the output stops re-parsing. `attrs_end_with_line_comment`
+    /// (from the one attribute-list emitter, [`Printer::push_attrs_with_comments`]) is that
+    /// override, and the shape it selects is in each case the arm's own already-pinned break
+    /// form, not a new one. The break stays inside the tag, where no character is content, so
+    /// the render is unchanged either way — see
+    /// [`ws_sensitive_attr_comment_line`](../../../../../tests/fixtures/svelte/elements/ws_sensitive_attr_comment_line_prettier_divergence/).
     pub(super) fn build_whitespace_sensitive_element_doc(
         &self,
         element: &internal::Element<'_>,
         attr_docs: DocBuf,
+        attrs_end_with_line_comment: bool,
     ) -> DocId {
         let d = self.d();
         let name_doc = d.source_span_ident(element.name_span);
@@ -183,10 +194,16 @@ impl<'a> Printer<'a> {
         // The closing `>` of `</tag>` is outside the group so fits() doesn't count it.
         // At the boundary (e.g. 100 chars), `<tag attr>content</tag` fits but adding `>`
         // would be 101. The softline puts `>` on its own line in that case.
-        if is_inline && has_content && !attr_docs.is_empty() {
+        //
+        // A **block** element (`<pre>`) whose list ends on a `//` comes here too, rather than
+        // to the hugging arm below: this is already the shape for "the `>` cannot share the
+        // attribute line but the content must still start right after it", and the two
+        // whitespace-sensitive tags answering that with different layouts would be a
+        // distinction with no source in the elements.
+        if (is_inline || attrs_end_with_line_comment) && has_content && !attr_docs.is_empty() {
             let content_doc = self.build_whitespace_sensitive_content_doc(element.fragment.nodes);
             // Rebuild as space-separated (caller passes line-separated which we can't use here)
-            let space_attrs = self.build_element_attrs_doc(
+            let (space_attrs, _) = self.build_element_attrs_doc(
                 element.attributes,
                 self.d().text(" "),
                 element.name_span.end,
@@ -281,9 +298,16 @@ impl<'a> Printer<'a> {
                 ]));
             }
             // group(['>', '</tag']): the final `>` is appended outside, so the softline's
-            // fits() weighs `></tag>` and the trailing suffix together.
+            // fits() weighs `></tag>` and the trailing suffix together. A trailing `//` is
+            // not a width question — the hug is impossible at any width — so it takes the
+            // break directly rather than through the group.
             let close_seq = d.group(d.concat(&[d.text(">"), d.text("</"), name_doc]));
-            let hugged = d.group(d.concat(&[d.softline(), close_seq]));
+            let before_close = if attrs_end_with_line_comment {
+                d.hardline()
+            } else {
+                d.softline()
+            };
+            let hugged = d.group(d.concat(&[before_close, close_seq]));
             return d.group(d.concat(&[d.text("<"), name_doc, attr_indent, hugged, d.text(">")]));
         }
 
@@ -292,10 +316,25 @@ impl<'a> Printer<'a> {
             self.start_tag(name_doc)
         } else {
             // Block whitespace-sensitive elements (pre): hug `>` with the last attr when
-            // attrs wrap (prettier tolerates the overflow rather than breaking `>`).
+            // attrs wrap (prettier tolerates the overflow rather than breaking `>`). Only a
+            // trailing `//` overrides that, and only the empty-content shapes reach here with
+            // one — anything with content took the break arm above. With no content there is
+            // nothing for the `>` to be adjacent to, so it drops to base indent, which is
+            // where every other element puts it.
             let attr_concat = d.concat(&attr_docs);
             let attr_indent = d.indent(attr_concat);
-            d.group(d.concat(&[d.text("<"), name_doc, attr_indent, d.text(">")]))
+            let before_close = if attrs_end_with_line_comment {
+                d.hardline()
+            } else {
+                d.empty()
+            };
+            d.group(d.concat(&[
+                d.text("<"),
+                name_doc,
+                attr_indent,
+                before_close,
+                d.text(">"),
+            ]))
         };
 
         // Build content preserving text whitespace but formatting expressions/blocks
@@ -356,14 +395,18 @@ impl<'a> Printer<'a> {
             FragmentNode::Element(element) => {
                 let ws_is_html = element.kind == internal::ElementKind::Html;
                 // Always use whitespace-sensitive path when nested inside whitespace-sensitive elements
-                let attr_docs = self.build_element_attrs_doc(
+                let (attr_docs, attrs_end_with_line_comment) = self.build_element_attrs_doc(
                     element.attributes,
                     self.d().line(),
                     element.name_span.end,
                     element.open_tag_end,
                     ws_is_html,
                 );
-                self.build_whitespace_sensitive_element_doc(element, attr_docs)
+                self.build_whitespace_sensitive_element_doc(
+                    element,
+                    attr_docs,
+                    attrs_end_with_line_comment,
+                )
             }
             FragmentNode::SpecialElement(element) => {
                 // Special elements in whitespace-sensitive context: format normally without indent
