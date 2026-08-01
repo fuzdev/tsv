@@ -21,6 +21,8 @@
 		"@dprint/typescript": "0.96.1",
 		"oxc-parser": "0.140.0",
 		"oxfmt": "0.60.0",
+		"yuku-parser": "0.8.1",
+		"@yuku-parser/wasm": "0.8.1",
 		"@rsvelte/fmt": "0.7.4",
 		"zod": "^4.4.3",
 		"@fuzdev/fuz_util": "0.65.2"
@@ -30,5 +32,6 @@
 		"@types/node": "^24"
 	},
 	"//rsvelte": "@rsvelte/fmt is a CLI, not a library — the npm package is a Node launcher and the real formatter is a prebuilt binary carried by a platform `optionalDependency` (@rsvelte/fmt-<triple>), which is what lib/rsvelte.ts execs directly. Listing the launcher package is what pulls the right platform binary in; nothing imports it. Its only hard dep is prettier-plugin-tailwindcss (no transitive tree of its own), and its `oxfmt` peer is optional and unused here — .svelte formatting never leaves the binary. Because it has no in-process API its bench row is COVERAGE-ONLY (never timed) — see lib/rsvelte.ts and benches/js/CLAUDE.md §Fairness Caveats.",
+	"//yuku": "yuku-parser (N-API) and @yuku-parser/wasm are one Zig parser behind two bindings, versioned in lockstep — bump both together. Unlike the oxc wasi binding, the wasm package declares no `cpu`/`os`, so it installs as an ordinary dep on every host; the native package pulls its platform binary through `optionalDependencies` like oxc/oxfmt do. Both are PARSE-only (TS/JS — no Svelte, no CSS, no formatter), so they contribute rows to `parse/typescript` alone. Two properties of its JS API decide how lib/yuku.ts must drive it: `parse()` is LAZY (the AST materializes only when `.program` is read — a 1.69x/1.91x measured cost) and the parser is ERROR-TOLERANT (it never throws; an invalid file yields an empty AST plus `diagnostics`). One wrapper class drives both bindings, so both rows force `.program` and read `.diagnostics` by construction — see benches/js/CLAUDE.md §Fairness Caveats.",
 	"//oxc-wasi": "The oxc-parser WASM bench row needs @oxc-parser/binding-wasm32-wasi — pure-wasm (runtime-portable) but its metadata declares `cpu: wasm32`, so npm skips it on any non-wasm host. It is NOT listed as a dep here: declaring it errors on x64, and as an optionalDependency npm records it as known-skipped so a later `--force` reinstall no-ops. Instead `deno task bench:install` (install_deps.ts) force-fetches it at the oxc-parser version (oxc ships all bindings in lockstep), so the `oxc-parser` pin above is its single source of truth too."
 }

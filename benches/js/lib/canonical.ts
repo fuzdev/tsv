@@ -7,11 +7,12 @@
 import { extname } from 'node:path';
 import { PrettierCache, prettier_cache_enabled } from './prettier_cache.ts';
 import {
+	BaseImplementation,
 	type Language,
 	LANGUAGE_EXTENSIONS,
 	LANGUAGE_PRETTIER_PARSERS,
-	type ParseGoal,
-	type TsvImplementation
+	LANGUAGES,
+	type ParseGoal
 } from './types.ts';
 import type { CanonicalVersions } from './versions.ts';
 
@@ -40,8 +41,8 @@ const PRETTIER_OPTIONS = {
 	trailingComma: 'none'
 } as const;
 
-export class CanonicalImplementation implements TsvImplementation {
-	name = 'canonical' as const;
+export class CanonicalImplementation extends BaseImplementation {
+	readonly name = 'canonical' as const;
 	readonly versions: CanonicalVersions;
 
 	#prettier: PrettierModule | null = null;
@@ -55,13 +56,11 @@ export class CanonicalImplementation implements TsvImplementation {
 	// deno-lint-ignore no-explicit-any
 	#acorn_ts_parser: any = null;
 
-	/** Languages supported for parsing */
-	static readonly PARSE_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
-
-	/** Languages supported for formatting */
-	static readonly FORMAT_LANGUAGES: Language[] = ['svelte', 'typescript', 'css'];
+	readonly parse_languages = LANGUAGES;
+	readonly format_languages = LANGUAGES;
 
 	constructor(versions: CanonicalVersions) {
+		super();
 		this.versions = versions;
 	}
 
@@ -103,16 +102,6 @@ export class CanonicalImplementation implements TsvImplementation {
 		if (!prettier_cache_enabled()) return null;
 		this.#format_cache = new PrettierCache(this.versions, JSON.stringify(PRETTIER_OPTIONS));
 		return this.#format_cache;
-	}
-
-	/** Check if parsing is supported for this language */
-	supports_parse_language(language: Language): boolean {
-		return CanonicalImplementation.PARSE_LANGUAGES.includes(language);
-	}
-
-	/** Check if formatting is supported for this language */
-	supports_format_language(language: Language): boolean {
-		return CanonicalImplementation.FORMAT_LANGUAGES.includes(language);
 	}
 
 	// Lookup table for parse functions by language

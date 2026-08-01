@@ -21,6 +21,18 @@ export interface OxcVersions {
 	oxfmt: string;
 }
 
+/**
+ * yuku-parser implementation versions. Two npm packages, one Zig engine behind
+ * two bindings — they version in lockstep upstream, but both are read so a
+ * skewed local install shows up in the report instead of hiding.
+ */
+export interface YukuVersions {
+	/** The N-API package (`yuku-parser`) */
+	parser: string;
+	/** The WASM package (`@yuku-parser/wasm`) */
+	wasm: string;
+}
+
 /** Biome implementation versions */
 export interface BiomeVersions {
 	js_api: string;
@@ -45,6 +57,7 @@ export interface RsvelteVersions {
 export interface AllVersions {
 	canonical: CanonicalVersions;
 	oxc: OxcVersions;
+	yuku: YukuVersions;
 	biome: BiomeVersions;
 	dprint: DprintVersions;
 	rsvelte: RsvelteVersions;
@@ -62,6 +75,10 @@ const DEFAULT_VERSIONS: AllVersions = {
 	oxc: {
 		'oxc-parser': 'unknown',
 		oxfmt: 'unknown'
+	},
+	yuku: {
+		parser: 'unknown',
+		wasm: 'unknown'
 	},
 	biome: {
 		js_api: 'unknown',
@@ -107,6 +124,10 @@ export async function load_all_versions(): Promise<AllVersions> {
 			oxc: {
 				'oxc-parser': clean_version(deps['oxc-parser']),
 				oxfmt: clean_version(deps['oxfmt'])
+			},
+			yuku: {
+				parser: clean_version(deps['yuku-parser']),
+				wasm: clean_version(deps['@yuku-parser/wasm'])
 			},
 			biome: {
 				js_api: clean_version(deps['@biomejs/js-api']),

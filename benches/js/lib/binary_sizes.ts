@@ -8,6 +8,7 @@
  * - biome: WASM (.wasm) from node_modules
  * - oxc-parser: N-API (.node) and WASM (.wasm via binding-wasm32-wasi) from node_modules
  * - oxfmt: N-API (.node) from node_modules (no WASM variant)
+ * - yuku-parser: N-API (.node) and WASM (.wasm) from node_modules
  *
  * Portable across runtimes: uses `node:` builtins (Deno supports them) and the
  * shared `runtime.ts` platform normalizer instead of `Deno.*`. The alternative
@@ -62,6 +63,8 @@ const LABELS = {
 	oxfmt_napi: 'oxfmt (napi)',
 	oxc_parser_wasm: 'oxc-parser (wasm)',
 	oxc_combined_napi: 'oxc-parser+oxfmt (napi)',
+	yuku_parser_napi: 'yuku-parser (napi)',
+	yuku_parser_wasm: 'yuku-parser (wasm)',
 	rsvelte_fmt_native: 'rsvelte-fmt (binary)'
 } as const;
 
@@ -192,6 +195,7 @@ export async function collect_binary_sizes(options?: {
 	has_napi?: boolean;
 	has_wasm?: boolean;
 	has_oxc?: boolean;
+	has_yuku?: boolean;
 	has_biome?: boolean;
 	has_dprint?: boolean;
 	has_rsvelte?: boolean;
@@ -318,6 +322,35 @@ export async function collect_binary_sizes(options?: {
 			LABELS.oxc_parser_wasm,
 			'wasm',
 			[`${node_modules}/@oxc-parser/binding-wasm32-wasi`],
+			'.wasm'
+		);
+	}
+
+	// yuku-parser — parse-only in both bindings, and yuku ships no formatter, so the
+	// row a reader should pair each against is the parse-only tsv build (`tsv parse
+	// (ffi)` / `tsv_parse_wasm`); against a bundle carrying the printers it would
+	// size a scope difference and read as an engine one. The emitted `vs tsv` ratio
+	// does NOT make that pairing — every row anchors on the full build (see
+	// `build_display_entries`), so the parse-only rows are listed for the reader to
+	// pair up, same as for `oxc-parser` and `dprint`. The wasm package is a plain dep
+	// on every host (no `cpu: wasm32` metadata), so unlike oxc's wasi binding it
+	// needs no force-fetch to be present.
+	if (options?.has_yuku !== false) {
+		const { os: npm_os, arch: npm_arch } = get_npm_platform();
+
+		await push_resolved(
+			staged,
+			LABELS.yuku_parser_napi,
+			'native',
+			napi_binding_dirs(node_modules, '@yuku-parser/binding', npm_os, npm_arch),
+			'.node'
+		);
+
+		await push_resolved(
+			staged,
+			LABELS.yuku_parser_wasm,
+			'wasm',
+			[`${node_modules}/@yuku-parser/wasm`],
 			'.wasm'
 		);
 	}

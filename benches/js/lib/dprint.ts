@@ -26,7 +26,7 @@
  */
 
 import { readFile } from 'node:fs/promises';
-import { type Language, LANGUAGE_EXTENSIONS, type TsvImplementation } from './types.ts';
+import { BaseImplementation, type Language, LANGUAGE_EXTENSIONS } from './types.ts';
 import type { DprintVersions } from './versions.ts';
 // Type-only — `import type` is erased, so naming `Formatter` here does NOT load
 // the Wasm plugin at this module's import. The value imports are deferred to
@@ -41,18 +41,17 @@ import type { Formatter } from '@dprint/formatter';
  * - Parse: unsupported — dprint is a formatter; its Wasm plugin protocol exposes
  *   only `format_text` and config entry points, never an AST across the boundary.
  */
-export class DprintImplementation implements TsvImplementation {
-	name = 'dprint-wasm' as const;
+export class DprintImplementation extends BaseImplementation {
+	readonly name = 'dprint-wasm' as const;
 	readonly versions: DprintVersions;
 	private _formatter: Formatter | null = null;
 
-	/** Languages supported for parsing (none — the plugin exposes no parser) */
-	static readonly PARSE_LANGUAGES: Language[] = [];
-
-	/** Languages supported for formatting */
-	static readonly FORMAT_LANGUAGES: Language[] = ['typescript'];
+	/** The Wasm plugin exposes no parser. */
+	readonly parse_languages: ReadonlyArray<Language> = [];
+	readonly format_languages: ReadonlyArray<Language> = ['typescript'];
 
 	constructor(versions: DprintVersions) {
+		super();
 		this.versions = versions;
 	}
 
@@ -90,16 +89,6 @@ export class DprintImplementation implements TsvImplementation {
 			const detail = diagnostics.map((d) => `${d.propertyName}: ${d.message}`).join('; ');
 			throw new Error(`dprint rejected the benchmark config (${detail})`);
 		}
-	}
-
-	/** Check if parsing is supported for this language */
-	supports_parse_language(language: Language): boolean {
-		return DprintImplementation.PARSE_LANGUAGES.includes(language);
-	}
-
-	/** Check if formatting is supported for this language */
-	supports_format_language(language: Language): boolean {
-		return DprintImplementation.FORMAT_LANGUAGES.includes(language);
 	}
 
 	parse(_source: string, _language: Language): unknown {

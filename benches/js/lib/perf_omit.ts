@@ -71,6 +71,17 @@ export const PERF_OMITS: PerfOmit[] = [
 		reason:
 			'oxfmt rejects ambient consts under the synthetic file.ts name (no path threading in the bench)'
 	},
+	// Same two files, same cause, one tool later: yuku (native + wasm) rejects the
+	// ambient consts. It differs from oxc in having an explicit `lang: 'dts'` mode
+	// that would accept them — but selecting it needs the real path, the same
+	// threading the entries above decline, so the tolerance stays uniform across
+	// the alternative parsers rather than special-casing one of them.
+	{
+		task: 'typescript/yuku',
+		path: 'kit/packages/kit/src/runtime/app/env',
+		reason:
+			'yuku (native + wasm) rejects ambient consts under the pinned `lang: ts` (its `dts` mode needs path threading the bench does not do)'
+	},
 	// acorn-typescript enforces the `arguments`-in-class-field-initializer early
 	// error; tsv (permissive / defer-diagnostics policy) and prettier accept it.
 	{

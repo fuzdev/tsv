@@ -8,12 +8,7 @@
  * Supports: Parse only (TypeScript, JS). No formatting (oxfmt has no WASM variant).
  */
 
-import {
-	type Language,
-	LANGUAGE_EXTENSIONS,
-	type ParseGoal,
-	type TsvImplementation
-} from './types.ts';
+import { BaseImplementation, type Language, LANGUAGE_EXTENSIONS, type ParseGoal } from './types.ts';
 import type { OxcVersions } from './versions.ts';
 import { current_runtime } from './runtime.ts';
 
@@ -33,12 +28,17 @@ interface OxcParserWasmModule {
  * - Parse: TypeScript, JS (NOT Svelte, NOT CSS)
  * - Format: None (oxfmt has no WASM variant)
  */
-export class OxcWasmImplementation implements TsvImplementation {
-	name = 'oxc-wasm' as const;
+export class OxcWasmImplementation extends BaseImplementation {
+	readonly name = 'oxc-wasm' as const;
 	readonly versions: OxcVersions;
 	private _parser: OxcParserWasmModule | null = null;
 
+	readonly parse_languages: ReadonlyArray<Language> = ['typescript'];
+	/** oxfmt has no WASM variant. */
+	readonly format_languages: ReadonlyArray<Language> = [];
+
 	constructor(versions: OxcVersions) {
+		super();
 		this.versions = versions;
 	}
 
@@ -54,22 +54,6 @@ export class OxcWasmImplementation implements TsvImplementation {
 				: '@oxc-parser/binding-wasm32-wasi';
 		const mod = await import(entry);
 		this._parser = mod as OxcParserWasmModule;
-	}
-
-	/** Languages supported for parsing */
-	static readonly PARSE_LANGUAGES: Language[] = ['typescript'];
-
-	/** Languages supported for formatting (none) */
-	static readonly FORMAT_LANGUAGES: Language[] = [];
-
-	/** Check if parsing is supported for this language */
-	supports_parse_language(language: Language): boolean {
-		return OxcWasmImplementation.PARSE_LANGUAGES.includes(language);
-	}
-
-	/** Check if formatting is supported for this language */
-	supports_format_language(_language: Language): boolean {
-		return false;
 	}
 
 	parse(source: string, language: Language, goal?: ParseGoal): unknown {

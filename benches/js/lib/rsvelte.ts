@@ -29,7 +29,7 @@ import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { join } from 'node:path';
-import type { Language, TsvImplementation } from './types.ts';
+import { BaseImplementation, type Language } from './types.ts';
 import type { RsvelteVersions } from './versions.ts';
 
 /**
@@ -76,19 +76,18 @@ export function rsvelte_binary_path(): string | null {
  * - Format: Svelte only (see the module doc)
  * - Parse: unsupported — the CLI emits formatted source, never an AST
  */
-export class RsvelteImplementation implements TsvImplementation {
-	name = 'rsvelte-fmt' as const;
+export class RsvelteImplementation extends BaseImplementation {
+	readonly name = 'rsvelte-fmt' as const;
 	readonly versions: RsvelteVersions;
 	private _bin: string | null = null;
 	private _config_path: string | null = null;
 
-	/** Languages supported for parsing (none — it's a formatter CLI) */
-	static readonly PARSE_LANGUAGES: Language[] = [];
-
-	/** Languages supported for formatting */
-	static readonly FORMAT_LANGUAGES: Language[] = ['svelte'];
+	/** It's a formatter CLI — it emits source, never an AST. */
+	readonly parse_languages: ReadonlyArray<Language> = [];
+	readonly format_languages: ReadonlyArray<Language> = ['svelte'];
 
 	constructor(versions: RsvelteVersions) {
+		super();
 		this.versions = versions;
 	}
 
@@ -133,16 +132,6 @@ export class RsvelteImplementation implements TsvImplementation {
 		if (probe.status !== 0) {
 			throw new Error(`rsvelte-fmt --version exited ${probe.status}`);
 		}
-	}
-
-	/** Check if parsing is supported for this language */
-	supports_parse_language(language: Language): boolean {
-		return RsvelteImplementation.PARSE_LANGUAGES.includes(language);
-	}
-
-	/** Check if formatting is supported for this language */
-	supports_format_language(language: Language): boolean {
-		return RsvelteImplementation.FORMAT_LANGUAGES.includes(language);
 	}
 
 	parse(_source: string, _language: Language): unknown {
