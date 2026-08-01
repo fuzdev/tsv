@@ -200,6 +200,9 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Parse opening: <svelte:options
         self.expect(TokenKind::LeftAngle)?;
+        // Read the name's end before consuming it — the attribute list's leading comment gap
+        // starts here.
+        let name_end = self.current_end as u32;
         self.expect(TokenKind::Identifier)?; // "svelte:options"
 
         // Parse attributes
@@ -235,6 +238,8 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
                 start: start as u32,
                 end,
             },
+            name_end,
+            open_tag_end: opening.gt,
         })
     }
 }

@@ -231,27 +231,30 @@ impl<'a> Printer<'a> {
         self.write("</style>\n");
     }
 
-    /// Build indented attribute docs and detect multiline values.
+    /// Build the attribute-list doc for the one head this applies to: `<script>` / `<style>`.
     ///
-    /// Returns `(indent([line, attr1, line, attr2, ...]), has_multiline)`.
-    /// Used by `write_section_opening_tag` (script/style) and `print_svelte_options`.
-    pub(crate) fn build_indented_attrs_doc(
-        &self,
-        attributes: &[internal::AttributeNode<'_>],
-    ) -> (DocId, bool) {
+    /// Returns `[line, attr1, line, attr2, …]` — un-indented, so the caller can ask
+    /// [`will_break`](tsv_lang::doc::arena::DocArena::will_break) of it before wrapping it,
+    /// the same way `print_svelte_options` asks of its own list. Two builders, one question,
+    /// one way of asking it: accumulating a `has_multiline` flag here instead answered the
+    /// same thing by a second route, and a second route is a second thing to keep in step.
+    ///
+    /// ⚠️ **Comment-blind by construction** — it walks `attributes` and never probes the gaps
+    /// between them, so a comment in such a head would be dropped. That is sound *here and
+    /// only here*: a top-level `<script>` / `<style>` head is read by Svelte's
+    /// `read_static_attribute`, which has no comment loop, so a `/* c */` in it makes the
+    /// required `>` missing and the component is **rejected** — the shape never reaches this
+    /// builder. Every other tag head, including `<svelte:options>`, goes through
+    /// `Printer::push_attrs_with_comments`, which probes the gaps. Do not reach for this one
+    /// from a head whose attributes come from the ordinary `read_attribute`.
+    fn build_section_attrs_doc(&self, attributes: &[internal::AttributeNode<'_>]) -> DocId {
         let d = self.d();
         let mut parts: DocBuf = DocBuf::with_capacity(attributes.len() * 2);
-        let mut has_multiline = false;
         for attr in attributes {
             parts.push(d.line());
-            let attr_doc = self.build_attribute_node_doc(attr, false);
-            if d.will_break(attr_doc) {
-                has_multiline = true;
-            }
-            parts.push(attr_doc);
+            parts.push(self.build_attribute_node_doc(attr, false));
         }
-        let concat = d.concat(&parts);
-        (d.indent(concat), has_multiline)
+        d.concat(&parts)
     }
 
     /// Build and render an opening tag for `<script>` or `<style>` with doc-based
@@ -277,7 +280,9 @@ impl<'a> Printer<'a> {
         }
 
         let d = self.d();
-        let (attr_indent, has_multiline) = self.build_indented_attrs_doc(attributes);
+        let attrs = self.build_section_attrs_doc(attributes);
+        let has_multiline = d.will_break(attrs);
+        let attr_indent = d.indent(attrs);
         let softline = d.softline();
         let tag_text = {
             let mut w = d.pool_writer();

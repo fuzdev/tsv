@@ -375,6 +375,11 @@ fn write_fragment_node(w: &mut JsonWriter, node: &internal::FragmentNode<'_>, ct
 /// A generic template expression island: fused when comment-free, else the
 /// comment-bearing path — precompute a `WriterComments` map off a byte-space
 /// skeleton (`build_expression_writer_comments`), then fuse-emit with it.
+///
+/// Call this directly only for a window that is **deliberately asymmetric** — a block head,
+/// whose attach runs from the `{#` to the end of its clause rather than to the expression's
+/// own end. Everything else wants [`write_braced_island`], which keys the window on the
+/// node's own span and cannot be handed two offsets from different nodes.
 fn write_generic_island(
     w: &mut JsonWriter,
     expr: &tsv_ts::ast::internal::Expression<'_>,
@@ -389,6 +394,30 @@ fn write_generic_island(
     } else {
         write_expression_embedded(w, expr, ctx.embed(CommentMode::Off));
     }
+}
+
+/// An expression island whose comment-attach window is the **braces it was written in** —
+/// what every `{…}` tag wants, and the only window that reproduces Svelte's own attach:
+/// `parse_expression_at` filters the comment set to `comment.start >= index`, where `index`
+/// is where that expression's own parse began (`1-parse/acorn.js`, `get_comment_handlers`).
+///
+/// One `Span` argument rather than the two loose offsets, because the defect this guards is
+/// keying the window on some *other* node: `<svelte:element this={x} />` used to pass the
+/// enclosing element's span, so a comment earlier in the tag head fell inside the window and
+/// attached to the expression as a `leadingComments` entry the canonical parser never emits.
+/// A directive passes its whole attribute span rather than the braces — an equivalent
+/// window, since no comment can sit between a directive head and its `{` (both parsers
+/// reject there) and none can follow the `}` inside the span's tail (at most a closing
+/// quote). A block head is the deliberate exception — its window runs from the `{#` to the
+/// end of the clause, not to the expression's end — and calls [`write_generic_island`]
+/// directly.
+fn write_braced_island(
+    w: &mut JsonWriter,
+    expr: &tsv_ts::ast::internal::Expression<'_>,
+    window: Span,
+    ctx: &Ctx<'_>,
+) {
+    write_generic_island(w, expr, window.start, window.end, ctx);
 }
 
 /// The shared `NameLocation` shape: `start`/`end` each `{line, column, character}`
@@ -472,33 +501,36 @@ fn write_special_element(w: &mut JsonWriter, elem: &internal::SpecialElement<'_>
     // `<svelte:element this={…}>` tag. A plain-string `this="x"` is a
     // Svelte-style `Literal` (no `loc`, single-quoted `raw`) that carries no
     // expression parse, so no template comment can attach — emit it fused.
-    // Every other `this={…}` is a generic island keyed on the element's span.
+    // Every other `this={…}` is a braced island keyed on its own `{…}` span.
     if let Some(tag) = elem.kind.tag() {
         w.raw(",\"tag\":");
-        write_special_tag(w, tag, elem.span, ctx);
+        write_special_tag(w, tag, ctx);
     }
     // `<svelte:component this={…}>` expression — a generic island.
-    if let Some(expr) = elem.kind.expression() {
+    if let Some(tag) = elem.kind.expression() {
         w.raw(",\"expression\":");
-        write_generic_island(w, expr, elem.span.start, elem.span.end, ctx);
+        write_braced_island(w, &tag.expression, tag.span, ctx);
     }
     w.raw("}");
 }
 
 /// A `<svelte:element this={…}>` tag. The plain-string form (`this="x"`) is a Svelte-style
 /// `Literal` (`{type, value, raw, start, end}` — no `loc`, single-quoted `raw`) fused
-/// directly; the braced form is a generic island keyed on the element's span (the window
-/// Svelte's own comment attach uses for `SvelteElement`).
+/// directly; the braced form is a generic island keyed on **its own `{…}` span**, like every
+/// other expression island.
+///
+/// That window is the binding's braces and not the enclosing element's span, which is what
+/// Svelte's attach reduces to: `parse_expression_at` filters the comment set to
+/// `comment.start >= index`, and `index` is where the expression's own parse began
+/// (`1-parse/acorn.js`, `get_comment_handlers`). Keyed on the element instead, a comment
+/// earlier in the tag head (`<svelte:element /* c */ this={x} />`) precedes the expression
+/// inside the window and attaches to it as a `leadingComments` entry the canonical parser
+/// never emits.
 ///
 /// The form is read off [`internal::SpecialThis`], never sniffed back out of the source: it
 /// is the parser's own answer, and a second way to ask the same question is a second way to
 /// get it wrong.
-fn write_special_tag(
-    w: &mut JsonWriter,
-    this: &internal::SpecialThis<'_>,
-    elem_span: Span,
-    ctx: &Ctx<'_>,
-) {
+fn write_special_tag(w: &mut JsonWriter, this: &internal::SpecialThis<'_>, ctx: &Ctx<'_>) {
     match this {
         internal::SpecialThis::Plain { content, span } => {
             w.raw("{\"type\":\"Literal\",\"value\":");
@@ -513,7 +545,7 @@ fn write_special_tag(
             w.raw("}");
         }
         internal::SpecialThis::Braced(tag) => {
-            write_generic_island(w, &tag.expression, elem_span.start, elem_span.end, ctx);
+            write_braced_island(w, &tag.expression, tag.span, ctx);
         }
     }
 }
@@ -525,7 +557,7 @@ fn write_expression_tag(w: &mut JsonWriter, tag: &internal::ExpressionTag<'_>, c
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
-    write_generic_island(w, &tag.expression, tag.span.start, tag.span.end, ctx);
+    write_braced_island(w, &tag.expression, tag.span, ctx);
     w.raw("}");
 }
 
@@ -812,7 +844,7 @@ fn write_html_tag(w: &mut JsonWriter, tag: &internal::HtmlTag<'_>, ctx: &Ctx<'_>
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
-    write_generic_island(w, &tag.expression, tag.span.start, tag.span.end, ctx);
+    write_braced_island(w, &tag.expression, tag.span, ctx);
     w.raw("}");
 }
 
@@ -823,7 +855,7 @@ fn write_render_tag(w: &mut JsonWriter, tag: &internal::RenderTag<'_>, ctx: &Ctx
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
-    write_generic_island(w, &tag.expression, tag.span.start, tag.span.end, ctx);
+    write_braced_island(w, &tag.expression, tag.span, ctx);
     w.raw("}");
 }
 
@@ -859,7 +891,7 @@ fn write_debug_tag(w: &mut JsonWriter, tag: &internal::DebugTag<'_>, ctx: &Ctx<'
         wc.debug_assert_consumed();
     } else {
         write_array(w, tag.identifiers, |w, id| {
-            write_generic_island(w, id, tag.span.start, tag.span.end, ctx);
+            write_braced_island(w, id, tag.span, ctx);
         });
     }
     w.raw("}");
@@ -1120,13 +1152,7 @@ fn write_spread_attribute(
     w.raw(",\"end\":");
     w.u32(ctx.pos(spread.span.end));
     w.raw(",\"expression\":");
-    write_generic_island(
-        w,
-        &spread.expression,
-        spread.span.start,
-        spread.span.end,
-        ctx,
-    );
+    write_braced_island(w, &spread.expression, spread.span, ctx);
     w.raw("}");
 }
 
@@ -1137,7 +1163,7 @@ fn write_attach_tag(w: &mut JsonWriter, tag: &internal::AttachTag<'_>, ctx: &Ctx
     w.raw(",\"end\":");
     w.u32(ctx.pos(tag.span.end));
     w.raw(",\"expression\":");
-    write_generic_island(w, &tag.expression, tag.span.start, tag.span.end, ctx);
+    write_braced_island(w, &tag.expression, tag.span, ctx);
     w.raw("}");
 }
 
@@ -1182,7 +1208,7 @@ fn write_optional_directive_expression(
     ctx: &Ctx<'_>,
 ) {
     write_or_null(w, expression, |w, e| {
-        write_generic_island(w, e, span.start, span.end, ctx);
+        write_braced_island(w, e, span, ctx);
     });
 }
 
@@ -1244,7 +1270,7 @@ fn write_directive_value_expression(
     ctx: &Ctx<'_>,
 ) {
     if has_expression_tag {
-        write_generic_island(w, expr, span.start, span.end, ctx);
+        write_braced_island(w, expr, span, ctx);
     } else {
         // Shorthand: the parser builds this as a synthetic `Identifier`.
         #[allow(clippy::unreachable)]

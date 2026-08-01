@@ -1,0 +1,219 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 386,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 55,
+				"data": " exactly 100 chars - the head stays on one line "
+			},
+			{
+				"type": "Text",
+				"start": 55,
+				"end": 56,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 56,
+				"end": 176,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 2,
+						"column": 1,
+						"character": 57
+					},
+					"end": {
+						"line": 2,
+						"column": 9,
+						"character": 65
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 66,
+						"end": 76,
+						"name": "lang",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 10,
+								"character": 66
+							},
+							"end": {
+								"line": 2,
+								"column": 14,
+								"character": 70
+							}
+						},
+						"value": [
+							{
+								"start": 72,
+								"end": 75,
+								"type": "Text",
+								"raw": "pug",
+								"data": "pug"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 77,
+						"end": 155,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 2,
+								"column": 21,
+								"character": 77
+							},
+							"end": {
+								"line": 2,
+								"column": 30,
+								"character": 86
+							}
+						},
+						"value": [
+							{
+								"start": 88,
+								"end": 154,
+								"type": "Text",
+								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 156,
+							"end": 165,
+							"raw": "\nh1 text\n",
+							"data": "\nh1 text\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 176,
+				"end": 178,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 178,
+				"end": 260,
+				"data": " 101 chars - the attributes wrap one per line and `>` drops to base indent "
+			},
+			{
+				"type": "Text",
+				"start": 260,
+				"end": 261,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 261,
+				"end": 385,
+				"name": "template",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 262
+					},
+					"end": {
+						"line": 7,
+						"column": 9,
+						"character": 270
+					}
+				},
+				"attributes": [
+					{
+						"type": "Attribute",
+						"start": 272,
+						"end": 282,
+						"name": "lang",
+						"name_loc": {
+							"start": {
+								"line": 8,
+								"column": 1,
+								"character": 272
+							},
+							"end": {
+								"line": 8,
+								"column": 5,
+								"character": 276
+							}
+						},
+						"value": [
+							{
+								"start": 278,
+								"end": 281,
+								"type": "Text",
+								"raw": "pug",
+								"data": "pug"
+							}
+						]
+					},
+					{
+						"type": "Attribute",
+						"start": 284,
+						"end": 363,
+						"name": "data-attr",
+						"name_loc": {
+							"start": {
+								"line": 9,
+								"column": 1,
+								"character": 284
+							},
+							"end": {
+								"line": 9,
+								"column": 10,
+								"character": 293
+							}
+						},
+						"value": [
+							{
+								"start": 295,
+								"end": 362,
+								"type": "Text",
+								"raw": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+								"data": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							}
+						]
+					}
+				],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 365,
+							"end": 374,
+							"raw": "\nh1 text\n",
+							"data": "\nh1 text\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -27,3 +27,7 @@ mod tags_doc;
 
 // Shared with the root-fragment printer (`crate::printer::mod`) for run detection.
 pub(crate) use helpers::is_control_flow_block;
+
+// Shared with the `<svelte:options>` printer (`crate::printer::mod`) — the one tag head
+// printed outside the element pipeline, but through the same attribute-list emitter.
+pub(in crate::printer) use element_doc::AttrGaps;
