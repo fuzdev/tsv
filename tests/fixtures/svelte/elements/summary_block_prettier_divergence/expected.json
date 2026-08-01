@@ -1,0 +1,83 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 60,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "RegularElement",
+				"start": 0,
+				"end": 59,
+				"name": "details",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 1,
+						"character": 1
+					},
+					"end": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 9,
+							"end": 11,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 11,
+							"end": 35,
+							"name": "summary",
+							"name_loc": {
+								"start": {
+									"line": 2,
+									"column": 2,
+									"character": 12
+								},
+								"end": {
+									"line": 2,
+									"column": 9,
+									"character": 19
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 20,
+										"end": 25,
+										"raw": "text1",
+										"data": "text1"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 35,
+							"end": 49,
+							"raw": "\n\ttext2 text3\n",
+							"data": "\n\ttext2 text3\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
