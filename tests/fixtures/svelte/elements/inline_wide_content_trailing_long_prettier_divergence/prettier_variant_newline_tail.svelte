@@ -9,11 +9,13 @@
 <p>
 	<strong>
 		alpha bravo charlie delta echo foxtrot golf hotel india juliett kilo lima mike november oscar
-	</strong> tail
+	</strong>
+	tail
 </p>
 
 <p>
 	<a href="#">
 		november oscar papa quebec romeo sierra tango uniform victor whiskey xray yankee zulu abcdefg
-	</a> tail
+	</a>
+	tail
 </p>

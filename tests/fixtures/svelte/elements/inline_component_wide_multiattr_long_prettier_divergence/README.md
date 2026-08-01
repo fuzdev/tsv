@@ -19,10 +19,10 @@ This complements `inline_component_wide_long` (a single long attribute): the flo
 on the component being too wide for the *text* line, not on whether the component's own
 attributes can break.
 
-The trailing text follows the **authored boundary**, exactly like the wide-content case
-(`inline_wide_content_trailing_long`): a space flows after the intact `/>` (both
-`unformatted_ours_compact.svelte` and prettier's hugged form normalize to this input), a newline
-keeps it on its own line — the drop no longer isolates its tail regardless of authoring.
+The trailing text **hugs the intact `/>`** whatever the authored boundary, exactly like the
+wide-content case (`inline_wide_content_trailing_long`): that boundary is render-free, so a newline
+converges to the same form a space produces (both `unformatted_ours_compact.svelte` and prettier's
+hugged form normalize to this input). The drop does not isolate its tail regardless of authoring.
 
 ## Reason
 
