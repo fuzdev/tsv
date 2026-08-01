@@ -106,14 +106,19 @@ element_set! {
      Elements NOT in this list are treated as inline for formatting (including table cells), \
      matching prettier's logic: `isInlineElement = !isBlockElement`. Intentionally absent: \
      `<center>`, `<select>`, `<svg>`, `<math>` — prettier-plugin-svelte omits these, and \
-     `<svg>`/`<math>` are handled separately as foreign elements. `<menu>` IS included (spec \
-     compliance) where prettier-plugin-svelte omits it: the HTML spec treats it identically to \
-     `<ul>`. See `tests/fixtures/svelte/elements/menu_block_prettier_divergence/README.md`.",
+     `<svg>`/`<math>` are handled separately as foreign elements. Two members are here for spec \
+     compliance where prettier-plugin-svelte omits them: `<menu>`, which the HTML spec treats \
+     identically to `<ul>`, and `<summary>`, whose every UA rule is block-level — plain \
+     `display: block`, and `display: list-item` (`li`'s own display, and `li` is a member) when \
+     it is a `details`' first summary. Note this list tracks UA *display*, not content model: \
+     `<p>` and `<summary>` are both phrasing-content-only and both block. See \
+     `tests/fixtures/svelte/elements/menu_block_prettier_divergence/README.md` and \
+     `tests/fixtures/svelte/elements/summary_block_prettier_divergence/README.md`.",
     [
         "address", "article", "aside", "blockquote", "details", "dialog", "dd", "div", "dl", "dt",
         "fieldset", "figcaption", "figure", "footer", "form", "h1", "h2", "h3", "h4", "h5", "h6",
         "header", "hgroup", "hr", "li", "main", "menu", "nav", "ol", "p", "pre", "section",
-        "table", "ul",
+        "summary", "table", "ul",
     ]
 }
 
