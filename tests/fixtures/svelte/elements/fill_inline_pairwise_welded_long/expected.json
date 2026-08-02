@@ -1,0 +1,261 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 746,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 329,
+				"data": "\n\tA WELDED unit — two inline elements fused by glued text — is one fill item: no break may land\n\tinside it, since breaking at a glued boundary would inject a rendered space. The boundary in\n\tfront of it therefore measures the WHOLE unit. At exactly 100 the unit packs onto the text line\n\tand only the tail after it wraps.\n"
+			},
+			{
+				"type": "Text",
+				"start": 329,
+				"end": 330,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 330,
+				"end": 449,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 7,
+						"column": 1,
+						"character": 331
+					},
+					"end": {
+						"line": 7,
+						"column": 2,
+						"character": 332
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 333,
+							"end": 398,
+							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk lllllll ",
+							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk lllllll "
+						},
+						{
+							"type": "RegularElement",
+							"start": 398,
+							"end": 415,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 65,
+									"character": 399
+								},
+								"end": {
+									"line": 8,
+									"column": 69,
+									"character": 403
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 404,
+										"end": 408,
+										"raw": "pppp",
+										"data": "pppp"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 415,
+							"end": 416,
+							"raw": "/",
+							"data": "/"
+						},
+						{
+							"type": "RegularElement",
+							"start": 416,
+							"end": 433,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 8,
+									"column": 83,
+									"character": 417
+								},
+								"end": {
+									"line": 8,
+									"column": 87,
+									"character": 421
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 422,
+										"end": 426,
+										"raw": "qqqq",
+										"data": "qqqq"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 433,
+							"end": 445,
+							"raw": "\n\trrrr ssss\n",
+							"data": "\n\trrrr ssss\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 449,
+				"end": 451,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 451,
+				"end": 624,
+				"data": "\n\t101: the unit does not fit after the last word, so the WHOLE unit drops to a fresh line together\n\t— the `/` boundary stays glued and the tail packs after the unit.\n"
+			},
+			{
+				"type": "Text",
+				"start": 624,
+				"end": 625,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 625,
+				"end": 745,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 626
+					},
+					"end": {
+						"line": 16,
+						"column": 2,
+						"character": 627
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 628,
+							"end": 695,
+							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llllllll\n\t",
+							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llllllll\n\t"
+						},
+						{
+							"type": "RegularElement",
+							"start": 695,
+							"end": 712,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 18,
+									"column": 2,
+									"character": 696
+								},
+								"end": {
+									"line": 18,
+									"column": 6,
+									"character": 700
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 701,
+										"end": 705,
+										"raw": "pppp",
+										"data": "pppp"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 712,
+							"end": 713,
+							"raw": "/",
+							"data": "/"
+						},
+						{
+							"type": "RegularElement",
+							"start": 713,
+							"end": 730,
+							"name": "code",
+							"name_loc": {
+								"start": {
+									"line": 18,
+									"column": 20,
+									"character": 714
+								},
+								"end": {
+									"line": 18,
+									"column": 24,
+									"character": 718
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 719,
+										"end": 723,
+										"raw": "qqqq",
+										"data": "qqqq"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 730,
+							"end": 741,
+							"raw": " rrrr ssss\n",
+							"data": " rrrr ssss\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

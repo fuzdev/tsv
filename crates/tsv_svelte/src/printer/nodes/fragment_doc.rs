@@ -110,6 +110,39 @@ struct TextChildContext {
     /// boundary: the break point in front of the unit is the one in front of the *comment*, not the
     /// one in front of the text, and only the head index can name it.
     glued_prefix: Option<(DocId, usize)>,
+    /// Index of the node the **previously pushed sibling doc** begins at — its unit's head, which
+    /// is not `i - 1` whenever that doc is a consume-ahead unit (a glued element run, a
+    /// comment-prefixed element). Only the after-element fold reads it, and only to ask whether the
+    /// element it folds is byte-glued to what precedes it: the fold's leading boundary is the one in
+    /// front of the *unit*, so a run's tail index would answer about an interior boundary that is
+    /// glued by construction. Tracked by the caller's loop, which visits each unit exactly once.
+    ///
+    /// ⚠️ Precisely: the previously **visited** unit's head — a visit that pushes no doc (a
+    /// whitespace-only text) claims it too. The fold reader is safe because it only fires when the
+    /// previous visit built the element doc it pops; a new reader must not assume a pushed doc.
+    prev_sibling_head: usize,
+}
+
+/// The treatment of an inline child doc's LEADING boundary, decided at the unit's head — the
+/// argument to [`Printer::push_inline_child_doc`]. Three mutually exclusive cases, and the
+/// exclusivity is structural: a previous text that trimmed a boundary space cannot also be glued
+/// ([`Printer::text_glued_after`] fails on a whitespace tail), so no caller ever holds two at once.
+#[derive(Clone, Copy)]
+enum LeadBoundary {
+    /// The previous text trimmed a space-only boundary and deferred the separator to this sibling
+    /// (prettier's `handleWhitespaceOfPrevTextNode`): lead with a collapsible `line` inside a
+    /// group — a space when the fill fits, a break when it wraps.
+    Spaced,
+    /// Byte-glued to the sibling before it: there is no boundary space to honor, and the doc is
+    /// instead **marked** as the continuation of a welded run (`glued_lead` + `glued_atom`). The
+    /// mark is inert at render — a `DocContext` is consumed only by a `Fill`, and this wraps an
+    /// element — and exists solely so a preceding text run's `break_before_wide_flow` look-ahead
+    /// can walk *through* this element to the rest of the run (`DocArena::welded_entry`). Without
+    /// it the walk stops at the last glued TEXT node and the run stands on the line, tearing a
+    /// later element open instead of travelling to the boundary whole.
+    Glued,
+    /// An ordinary boundary already carried by the surrounding docs: push bare.
+    Plain,
 }
 
 /// Whether `raw` begins with a linebreak, ignoring leading horizontal whitespace — prettier's
@@ -305,6 +338,11 @@ impl<'a> Printer<'a> {
         // across exactly one iteration: the run's own indices are skipped via
         // `glued_run_consumed_until`, so the very next node visited is the text that takes it.
         let mut pending_glued_prefix: Option<(DocId, usize)> = None;
+        // Index of the node the most recently VISITED iteration began its unit at — usually the
+        // head of the previously pushed sibling doc, but a visit that pushes nothing (a
+        // whitespace-only text) claims it too. Handed to the next visited node as
+        // `prev_sibling_head`.
+        let mut sibling_head = 0usize;
         // Inline-run prose cursor for the sibling-newline flow rule at its standalone-separator
         // site (`handle_text_child`'s whitespace-only arm). Runs partition `trimmed_nodes`, so
         // advancing the cursor here — at the TOP of the body, ahead of every `continue` — visits
@@ -323,6 +361,14 @@ impl<'a> Printer<'a> {
             if i < glued_run_consumed_until {
                 continue;
             }
+            // Hand the PREVIOUS visited index forward and claim this one. Every sibling doc is
+            // built at its unit's HEAD (a glued element run and a comment-prefixed element are both
+            // consume-ahead, their tails skipped by the `continue` above), so the previous visited
+            // index names where the previously pushed doc BEGINS — which is the only thing that can
+            // answer whether that doc's leading boundary is glued. Reading `i - 1` instead would
+            // name a run's tail element, whose own leading boundary is glued by construction and so
+            // says nothing about the unit's. See `handle_text_child`'s after-element fold.
+            let prev_sibling_head = std::mem::replace(&mut sibling_head, i);
             // format-ignore: skip whitespace, emit raw source for ignored node
             if format_ignore_next {
                 if let Some(raw_doc) = self.format_ignore_raw_doc(node) {
@@ -375,6 +421,7 @@ impl<'a> Printer<'a> {
                         run_has_prose,
                         content_bounds,
                         glued_prefix: pending_glued_prefix.take(),
+                        prev_sibling_head,
                     },
                     &mut child_docs,
                     &mut handle_whitespace_of_prev_text,
@@ -441,6 +488,16 @@ impl<'a> Printer<'a> {
                     }
                 }
             } else if is_inline_content(node) {
+                // The unit's leading-boundary treatment — the glue test is asked at the unit's
+                // HEAD (`i`, where every inline doc below is built), so it names the boundary in
+                // front of the whole unit. See `LeadBoundary`.
+                let lead = if prev_text_ws {
+                    LeadBoundary::Spaced
+                } else if self.leading_boundary_glued(trimmed_nodes, i, content_bounds.0) {
+                    LeadBoundary::Glued
+                } else {
+                    LeadBoundary::Plain
+                };
                 // Axis-3 sibling-`>` dangle onto glued following TEXT: an inline element byte-glued
                 // to text on both sides (no whitespace either side, so break-before can't fire)
                 // dangles its closing `>` onto the following text's line when that fits, else
@@ -448,7 +505,7 @@ impl<'a> Printer<'a> {
                 // element→block dangle. Checked before the element-run (disjoint: this needs a
                 // following TEXT, the run a following element).
                 if let Some(dangle_doc) = self.try_build_glued_both_text_dangle(trimmed_nodes, i) {
-                    self.push_inline_child_doc(&mut child_docs, dangle_doc, prev_text_ws);
+                    self.push_inline_child_doc(&mut child_docs, dangle_doc, lead);
                 }
                 // Axis-3 element→element sibling-`>` dangle ("G2"), over a maximal glued RUN: when
                 // this element heads a run of 2+ byte-glued inline elements (`<span>foo</span><b>b</b><a…>`),
@@ -466,10 +523,10 @@ impl<'a> Printer<'a> {
                     // an inter-sibling space before a glued run (`</span>` ` ` `<br/><br/>`)
                     // renders (a space when it fits, a break when the fill wraps) rather than
                     // being dropped.
-                    self.push_inline_child_doc(&mut child_docs, run_doc, prev_text_ws);
+                    self.push_inline_child_doc(&mut child_docs, run_doc, lead);
                     glued_run_consumed_until = run_end + 1;
                 } else {
-                    self.handle_inline_child(node, &mut child_docs, prev_text_ws);
+                    self.handle_inline_child(node, &mut child_docs, lead);
                 }
             } else if !format_ignore_next
                 && let Some((unit_doc, run_end)) =
@@ -484,7 +541,14 @@ impl<'a> Printer<'a> {
                 // the opening tag after a space. Honor a trimmed boundary space from the previous
                 // text exactly as the single-element path does. Guarded on `!format_ignore_next` so
                 // a `<!-- prettier-ignore -->` directive still routes to the raw path below.
-                self.push_inline_child_doc(&mut child_docs, unit_doc, prev_text_ws);
+                // Spaced or Plain only — the fused unit carries no welded-run mark, so an earlier
+                // boundary's welded walk ends in front of it.
+                let lead = if prev_text_ws {
+                    LeadBoundary::Spaced
+                } else {
+                    LeadBoundary::Plain
+                };
+                self.push_inline_child_doc(&mut child_docs, unit_doc, lead);
                 glued_run_consumed_until = run_end + 1;
             } else if !format_ignore_next
                 && !prev_text_ws
@@ -753,6 +817,7 @@ impl<'a> Printer<'a> {
             run_has_prose,
             content_bounds,
             glued_prefix,
+            prev_sibling_head,
         } = ctx;
         let multiline = cause.is_multiline();
         let FragmentNode::Text(text) = &trimmed_nodes[i] else {
@@ -1109,8 +1174,20 @@ impl<'a> Printer<'a> {
                         // Last child: fold the element and the trailing words into ONE fill so a
                         // wide element wraps its own content within printWidth and the words pack
                         // after it — see `build_after_element_fold`.
+                        //
+                        // The fold's head is the popped unit, so its leading boundary is the one in
+                        // front of `prev_sibling_head` — the same question `glued_lead` asks of a
+                        // text run, asked here of an element. A glued head must never drop to a
+                        // fresh line: there is no whitespace at that boundary, so the drop would
+                        // INJECT a rendered space (`</code>/` `<code>`), and the mangled form is
+                        // its own fixed point, so F1 cannot see it.
+                        let glued_head = self.leading_boundary_glued(
+                            trimmed_nodes,
+                            prev_sibling_head,
+                            content_bounds.0,
+                        );
                         let folded = self.rejoin_inside_leading_wrap(last_doc, |el| {
-                            self.build_after_element_fold(el, raw)
+                            self.build_after_element_fold(el, raw, glued_head)
                         });
                         child_docs.push(folded);
                         return;
@@ -1121,8 +1198,16 @@ impl<'a> Printer<'a> {
                     // dangled `>` line) is non-convergent — it shifts where the following element
                     // lands, flip-flopping across passes. Pinned by
                     // `inline_wide_content_text_sibling_long`.
-                    let joined = self.rejoin_inside_leading_wrap(last_doc, |el| {
-                        d.group(d.concat(&[el, d.line()]))
+                    //
+                    // A popped element that carries the welded-run marker (`LeadBoundary::Glued`)
+                    // takes the marker-hoisting join instead: a bare group would bury the marker,
+                    // the preceding boundary's welded walk would stop one node short, and the run
+                    // would stand and tear its last element open instead of travelling
+                    // (`inline_welded_run_travel_long`'s non-terminal-follower case).
+                    let joined = d.try_welded_sibling_join(last_doc).unwrap_or_else(|| {
+                        self.rejoin_inside_leading_wrap(last_doc, |el| {
+                            d.group(d.concat(&[el, d.line()]))
+                        })
                     });
                     child_docs.push(joined);
                 }
@@ -1242,12 +1327,13 @@ impl<'a> Printer<'a> {
         //   the run renders in place and breaks at its first *internal* whitespace boundary. It is
         //   the mirror of `break_before_wide_flow`'s glued half, on the other end of the run.
         //
-        // TODO: the fused arm also gained a *layout* improvement the flagged arm did not — an
-        // overflowing unit now travels to the breakable boundary one hop back, instead of standing
-        // and overrunning. `foo <span>…</span>text1` is the same shape and keeps the old behavior,
-        // and fusion cannot close it: an element carries its own groups, so folding it into the
-        // fill's item 0 would force the fits check to measure it flat. Closing it needs the fill to
-        // learn a width that sits *before* item 0, which is a renderer change, not a builder one.
+        // Both arms now also travel: an overflowing unit moves to the breakable boundary one hop
+        // back instead of standing and overrunning. The flagged arm gets it from the RENDERER
+        // rather than from fusion — the flag puts this run into the welded unit a preceding text's
+        // `break_before_wide_flow` look-ahead walks (`flow_lookahead`), so the boundary in front of
+        // the whole unit is what breaks. Fusion could never have closed it: an element carries its
+        // own groups, so folding it into the fill's item 0 would force the fits check to measure it
+        // flat.
         //
         // ⚠️ **Fusing does not retire the flag — it MOVES which boundary the flag is about.** The
         // fused unit begins at the comment, so the break point in front of it is the one in front of
@@ -1327,12 +1413,10 @@ impl<'a> Printer<'a> {
             let fill_doc = if break_before_wide_flow || trailing_glued_tag || glued_lead {
                 d.with_context(
                     fill_doc,
-                    tsv_lang::doc::DocContext {
-                        break_before_wide_flow,
-                        trailing_glued_tag,
-                        glued_lead,
-                        ..Default::default()
-                    },
+                    tsv_lang::doc::DocContext::default()
+                        .with_break_before_wide_flow(break_before_wide_flow)
+                        .with_trailing_glued_tag(trailing_glued_tag)
+                        .with_glued_lead(glued_lead),
                 )
             } else {
                 fill_doc
@@ -1392,33 +1476,40 @@ impl<'a> Printer<'a> {
         &self,
         node: &FragmentNode<'_>,
         child_docs: &mut DocBuf,
-        prev_text_ws: bool,
+        lead: LeadBoundary,
     ) {
         if let Some(node_doc) = self.build_fragment_node_doc(node) {
-            self.push_inline_child_doc(child_docs, node_doc, prev_text_ws);
+            self.push_inline_child_doc(child_docs, node_doc, lead);
         }
     }
 
-    /// Push an already-built inline child doc, honoring a pending trimmed-boundary space
-    /// from the previous text node. When `prev_text_ws` is set (the prev text trimmed a
-    /// space-only boundary and deferred the separator to the next sibling — prettier's
-    /// `handleWhitespaceOfPrevTextNode`), lead with a collapsible `line` inside a group: a
-    /// space when the fill fits, a break when it wraps.
+    /// Push an already-built inline child doc with its leading-boundary treatment
+    /// ([`LeadBoundary`], whose variants carry each case's contract).
     ///
-    /// Shared by the single-element path (`handle_inline_child`) and the glued-element-run
-    /// path in `build_nodes_doc`, so a trimmed boundary space is never dropped before a
-    /// byte-glued run (`</span>` ` ` `<br/><br/>`) — the single-sibling case already worked
-    /// because a run of one falls through to `handle_inline_child`. The caller snapshots and
-    /// clears the flag (`prev_text_ws`), so this only reads it.
-    fn push_inline_child_doc(&self, child_docs: &mut DocBuf, node_doc: DocId, prev_text_ws: bool) {
-        if prev_text_ws {
-            // The single producer of the inline-sibling wrap; `DocArena::strip_leading_line_group`
-            // (the after-element fold's matcher, a crate away) is its exact inverse. Routing through
-            // the named constructor keeps the two in lockstep — a shape drift here would silently
-            // return `None` there and reintroduce the stray-space non-idempotency.
-            child_docs.push(self.d().inline_sibling_line_group(node_doc));
-        } else {
-            child_docs.push(node_doc);
+    /// Shared by the single-element path (`handle_inline_child`), the glued-element-run path and
+    /// the comment-prefixed-unit path in `build_nodes_doc`, so a trimmed boundary space is never
+    /// dropped before a byte-glued run (`</span>` ` ` `<br/><br/>`) — the single-sibling case
+    /// already worked because a run of one falls through to `handle_inline_child`.
+    fn push_inline_child_doc(&self, child_docs: &mut DocBuf, node_doc: DocId, lead: LeadBoundary) {
+        match lead {
+            LeadBoundary::Spaced => {
+                // The single producer of the inline-sibling wrap; `DocArena::strip_leading_line_group`
+                // (the after-element fold's matcher, a crate away) is its exact inverse. Routing through
+                // the named constructor keeps the two in lockstep — a shape drift here would silently
+                // return `None` there and reintroduce the stray-space non-idempotency.
+                child_docs.push(self.d().inline_sibling_line_group(node_doc));
+            }
+            LeadBoundary::Glued => {
+                child_docs.push(
+                    self.d().with_context(
+                        node_doc,
+                        tsv_lang::doc::DocContext::default()
+                            .with_glued_lead(true)
+                            .with_glued_atom(true),
+                    ),
+                );
+            }
+            LeadBoundary::Plain => child_docs.push(node_doc),
         }
     }
 
@@ -2184,7 +2275,7 @@ impl<'a> Printer<'a> {
     /// return `(unit_doc, end)` — the last index the unit covers, so the caller skips the tail via
     /// `glued_run_consumed_until`. The comment prefix travels with the element: because the unit is
     /// a plain concat, the preceding text's break-before-flow measurement sees the whole thing flat
-    /// (`after_element_fold_lead` → `None`), so a wide element pulls its comment prefix to the fresh
+    /// (`welded_atom` → `None`), so a wide element pulls its comment prefix to the fresh
     /// line together rather than dangling the opening tag after a space. The element may itself head
     /// a glued-element run (G2) — reuse [`Self::try_build_glued_element_run`] there — else it is an
     /// ordinary inline child. `None` when `nodes[i]` is not a glued-comment prefix.
@@ -2230,7 +2321,7 @@ impl<'a> Printer<'a> {
     /// point of the "run travels together" posture:
     ///
     /// - **break-before as a unit**: the preceding text's break-before-flow measurement measures
-    ///   this whole concat flat (`after_element_fold_lead` returns `None` for a plain concat → the
+    ///   this whole concat flat (`welded_atom` returns `None` for a plain concat → the
     ///   whole thing), so a wide element anywhere in the run pulls the *entire* run to a fresh line
     ///   rather than stranding an opening tag after a space.
     /// - **per-pair sibling-`>` dangle (G2)**: each adjacent pair whose BOTH elements are
@@ -2370,7 +2461,7 @@ impl<'a> Printer<'a> {
     /// trailing text flows greedily after it rather than being isolated (matching prettier's
     /// pairwise fill; a preceding sibling doesn't change that). A **wide** element that wraps still
     /// dangles its `>` and the terminal tail hugs it (`DocContext::after_element_fold`).
-    fn build_after_element_fold(&self, prev: DocId, raw: &str) -> DocId {
+    fn build_after_element_fold(&self, prev: DocId, raw: &str, glued_lead: bool) -> DocId {
         let d = self.d();
         let mut parts = d.pooled_docbuf();
         parts.push(prev);
@@ -2383,13 +2474,21 @@ impl<'a> Printer<'a> {
         // strand a spurious `>⏎<child` break — the nested-`<span>` non-idempotency); the terminal
         // trailing text hugs the dangled `>` once the head has wrapped, respecting the author's space
         // boundary (the fold only ever runs for terminal text); and a *preceding* text run's
-        // break-before measurement can extract the head alone via `after_element_fold_lead`.
+        // break-before measurement can extract the head alone via `welded_atom`.
+        //
+        // `glued_lead` is the fold's OTHER end, and it is the ordinary flag with the ordinary
+        // meaning — the head element is byte-glued to the previous sibling, so no break may land in
+        // front of it. Two readers, and both were blind while the fold omitted it: the head's
+        // fresh-line drop (which would inject a rendered space at the glued boundary) and
+        // `welded_entry`, by which a preceding text run's break-before measurement extends across
+        // a welded run to the element on its far side. Nothing but the render oracle can catch a
+        // regression in the first: the split output is its own fixed point, so F1, the fuzzer and
+        // `authoring_audit` all pass straight through it.
         d.with_context(
             fill,
-            tsv_lang::doc::DocContext {
-                after_element_fold: true,
-                ..Default::default()
-            },
+            tsv_lang::doc::DocContext::default()
+                .with_after_element_fold(true)
+                .with_glued_lead(glued_lead),
         )
     }
 

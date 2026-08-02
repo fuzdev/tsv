@@ -941,10 +941,7 @@ mod arena_tests {
         let parts = [head, a.line(), a.text("tail")];
         let fold = a.with_context(
             a.fill(&parts),
-            DocContext {
-                after_element_fold: true,
-                ..Default::default()
-            },
+            DocContext::default().with_after_element_fold(true),
         );
         let plain = a.fill(&parts);
 
@@ -970,10 +967,7 @@ mod arena_tests {
         let parts = [head, a.line(), a.text("t")];
         let fold = a.with_context(
             a.fill(&parts),
-            DocContext {
-                after_element_fold: true,
-                ..Default::default()
-            },
+            DocContext::default().with_after_element_fold(true),
         );
 
         assert_eq!(render_pw_tab(&a, fold, 10), "AAAAAA\nBBBBBB t");
@@ -993,10 +987,7 @@ mod arena_tests {
         let wide = a.group(a.concat(&[a.text("<AAAA"), a.softline(), a.text("BBBB>")]));
         let flow = a.with_context(
             a.fill(&parts),
-            DocContext {
-                break_before_wide_flow: true,
-                ..Default::default()
-            },
+            DocContext::default().with_break_before_wide_flow(true),
         );
 
         // 4 + 1 + 10 = 15 > 12, so the separator breaks and `wide` renders intact at column 0.
@@ -1022,10 +1013,7 @@ mod arena_tests {
         let parts = [a.text("word")];
         let glued = a.with_context(
             a.fill(&parts),
-            DocContext {
-                trailing_glued_tag: true,
-                ..Default::default()
-            },
+            DocContext::default().with_trailing_glued_tag(true),
         );
         let pad = a.text("PADDING");
         // Stands in for the Svelte `{tag}` this flag exists for — braces would read as format
@@ -1057,13 +1045,7 @@ mod arena_tests {
             a.line(),
             a.text("y"),
         ];
-        let glued = a.with_context(
-            a.fill(&parts),
-            DocContext {
-                glued_lead: true,
-                ..Default::default()
-            },
-        );
+        let glued = a.with_context(a.fill(&parts), DocContext::default().with_glued_lead(true));
         let pad = a.text("PADDING");
 
         // The head does not fit in the 5 remaining columns but does fit at column 0, so the
@@ -1257,13 +1239,7 @@ mod arena_tests {
     #[test]
     fn test_fits_flat_width_with_context_trailing_reserve() {
         let a = DocArena::new();
-        let doc = a.with_context(
-            a.text("abcd"),
-            DocContext {
-                trailing_reserve: 3,
-                ..Default::default()
-            },
-        );
+        let doc = a.with_context(a.text("abcd"), DocContext::reserving(3));
         // 4 content + 3 reserved = 7
         assert_flat_width(&a, doc, 7);
     }
