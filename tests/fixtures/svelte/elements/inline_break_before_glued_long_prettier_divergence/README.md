@@ -11,6 +11,14 @@ render-significant (it injects a rendered space, so the text data would gain a t
 space). tsv only ever breaks at the whitespace boundary before the glued run, which is
 render-equivalent (confirmed by `ast_diff --render`).
 
+The second and third cases pin the measurement's **far edge** at the exact 100/101 boundary,
+with a spaced non-terminal follower (` mid <b>x</b>`) after the element: the unit is measured
+to its own end and no further, so the follower — and the unit's own trailing boundary, the
+space in front of `mid` — never enters the unit's fit check. At exactly 100 the unit packs
+onto the text line and only the follower wraps (a form **both** formatters keep — counting
+the trailing boundary into the unit would break this line one column early); at 101 the unit
+travels and the follower packs after it on the fresh line.
+
 tsv: `glued<a>` stays glued and moves to its own line together.
 Prettier: keeps the glued run on the text line and dangles the `<a>` closing tag — see
 `output_prettier.svelte` (prettier's stable form). `unformatted_ours_compact.svelte` is the

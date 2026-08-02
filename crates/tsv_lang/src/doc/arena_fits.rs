@@ -121,7 +121,7 @@ fn flat_width_fill(
         }
         DocNode::WithContext { doc, context } => {
             flat_width_memo(*doc, nodes, children, cache, source)
-                .map(|w| w.saturating_add(context.trailing_reserve as u32))
+                .map(|w| w.saturating_add(context.trailing_reserve() as u32))
         }
         DocNode::LineSuffix(_) | DocNode::LineSuffixBoundary => Some(0),
         DocNode::BreakParent => None,
@@ -298,7 +298,7 @@ pub(super) fn arena_fits_with_lookahead(
                 }
 
                 DocNode::WithContext { doc, context } => {
-                    remaining -= context.trailing_reserve as isize;
+                    remaining -= context.trailing_reserve() as isize;
                     if remaining < 0 {
                         return false;
                     }
@@ -482,13 +482,7 @@ mod break_mode_fits_tests {
         // (`remaining -= reserve`, then an inline `remaining < 0` guard) before
         // descending: 4 content + 3 reserved = 7.
         let a = DocArena::new();
-        let doc = a.with_context(
-            a.text("abcd"),
-            DocContext {
-                trailing_reserve: 3,
-                ..Default::default()
-            },
-        );
+        let doc = a.with_context(a.text("abcd"), DocContext::reserving(3));
         assert_break_boundary(&a, doc, 7);
     }
 }
