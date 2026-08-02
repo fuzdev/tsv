@@ -12,12 +12,20 @@ use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Span, comments_to_emit_in_range};
 
-/// The keyword-header end and outer bound that bracket a braced specifier list —
-/// the window in which `push_braced_specifier_list` locates the `{ … }`.
+/// The source offsets that bracket a braced specifier list — the window in which
+/// `push_braced_specifier_list` locates the `{ … }`, and the wider one its
+/// lone-specifier comment scan reads.
 pub(super) struct SpecifierListSpans {
+    /// Start of the declaration — the `import`/`export` keyword, where the
+    /// lone-specifier comment window opens. Everything between it and `kw_end` is
+    /// header keywords, so a comment there is the specifier's as far as prettier's
+    /// attachment is concerned (see [`Printer::lone_specifier_has_comment`]).
+    pub(super) header_start: u32,
     /// End of the keyword header, where the forward `{` search starts.
     pub(super) kw_end: u32,
-    /// Upper bound for the closing-`}` search (source-literal start or decl end).
+    /// Upper bound for every scan past the specifiers — the closing `}`, and the
+    /// `from` that ends the lone-specifier comment window (source-literal start,
+    /// or the declaration end for a local `export {…};`).
     pub(super) bound: u32,
 }
 
@@ -135,8 +143,35 @@ impl<'a> Printer<'a> {
     /// expanding a `{ a }` that would otherwise stay inline. Shared by named
     /// imports, named exports, and `with {…}`/`assert {…}` import attributes.
     pub(super) fn braced_group(&self, inner: DocId) -> DocId {
+        self.d().group(self.braced_body(inner))
+    }
+
+    /// [`Self::braced_group`] with the group already broken, so the list expands
+    /// regardless of width. The `objectWrap: 'preserve'` layout — an authored
+    /// newline after the `{` — reached only by the import-attribute clause, which
+    /// is the one braced module list prettier prints through `printObject`.
+    pub(super) fn braced_group_break(&self, inner: DocId) -> DocId {
+        self.d().group_break(self.braced_body(inner))
+    }
+
+    /// The braced body the two breakable wrappers share: `{`, the indented content,
+    /// and a `line` before the `}` that renders as bracketSpacing when flat and as
+    /// the closing newline when broken.
+    fn braced_body(&self, inner: DocId) -> DocId {
         let d = self.d();
-        d.group(d.concat(&[d.text("{"), d.indent_line(inner), d.line(), d.text("}")]))
+        d.concat(&[d.text("{"), d.indent_line(inner), d.line(), d.text("}")])
+    }
+
+    /// The unbreakable counterpart to [`Self::braced_group`]: the same
+    /// bracketSpacing-padded `{ <inner> }`, but as plain text — no group, no
+    /// `line`s — so the list can't expand at any width. Both of prettier's
+    /// never-break module braces render through it: a lone specifier (the
+    /// `can_break` note in [`Self::push_braced_specifier_list`]) and a lone
+    /// `type` import attribute (prettier's `removeLines`; see
+    /// `is_single_type_attribute`). Only reached when `inner` is itself line-free.
+    pub(super) fn braced_flat(&self, inner: DocId) -> DocId {
+        let d = self.d();
+        d.concat(&[d.text("{ "), inner, d.text(" }")])
     }
 
     /// Finish a module statement: emit the `;` right after the content, then any
@@ -180,6 +215,39 @@ impl<'a> Printer<'a> {
             .unwrap_or(bound)
     }
 
+    /// Whether prettier would see a comment ON a lone braced specifier — the
+    /// `hasComment` arm of the `canBreak` rule `push_braced_specifier_list` mirrors.
+    ///
+    /// Its comment attachment reaches past the braces on both sides: every header-gap
+    /// comment becomes the specifier's *leading* comment (`import /* c */ {a}` and
+    /// `import /* c */ type {a}` alike → `import type {⏎ /* c */ a⏎}`) and a `}`→`from`
+    /// comment its *trailing* one, so any of them restores breaking even though tsv
+    /// preserves them outside the braces (the relocation divergences). So the window
+    /// opens at the declaration start, not past the header: the `import`/`export`→`type`
+    /// gap is a header gap like the rest, and skipping it would hold an over-width lone
+    /// specifier on one line where prettier expands it.
+    ///
+    /// It stops at `from`, since a comment after it belongs to the source literal, and at
+    /// the `}` when there is no `from` — the `}`→`;` gap of a local `export {…};` is not
+    /// the specifier's (prettier attaches it to the declaration and floats it past the
+    /// `;`, leaving `canBreak` false).
+    ///
+    /// The question is ON-PAGE, not to-emit: a glued block comment is owned by the
+    /// specifier and printed from its own doc, but it still occupies the line, and
+    /// prettier's `hasComment` counts it.
+    fn lone_specifier_has_comment(&self, spans: &SpecifierListSpans, after_brace: u32) -> bool {
+        // Cheap superset first (one binary search): with no comment anywhere from
+        // the declaration to the source literal, none can be on the specifier — the
+        // comment-free path every ordinary `import { a } from 'x'` takes.
+        if !self.has_comments_on_page_between(spans.header_start, spans.bound) {
+            return false;
+        }
+        let window_end = self
+            .find_keyword_in_range(after_brace, spans.bound, "from")
+            .unwrap_or(after_brace);
+        self.has_comments_on_page_between(spans.header_start, window_end)
+    }
+
     /// Render a braced, comma-separated specifier list (`{a, b as c}`) with
     /// comment-aware wrapping, push the doc onto `parts`, and return the offset
     /// just past the closing `}` — the caller's trailing-comment anchor.
@@ -188,19 +256,25 @@ impl<'a> Printer<'a> {
     /// item type and per-item doc builder). `kw_end` is the offset past the
     /// `import`/`export [type]` header, where the `{` search begins; `bound`
     /// caps the brace scans (the source-literal start, or the `;` for a local
-    /// `export {…}`). When `capture_keyword_comment`, a comment in the keyword→`{`
-    /// gap (`import /* c */ {a}`, `export type /* c */ {a}`) is preserved in place
-    /// (prettier relocates it into the braces as the first specifier's leading
-    /// comment — a comment-position divergence). The caller sets it only when the
-    /// `{` directly follows the header — always so for exports, and for imports only
-    /// without a preceding default/namespace binding (whose own→`{` comments are
-    /// handled separately, so capturing here would double-emit them).
+    /// `export {…}`); `header_start` opens the lone-specifier comment window one
+    /// step earlier, at the declaration keyword itself.
+    ///
+    /// `brace_follows_header` states that the `{` directly follows the header —
+    /// always so for exports, and for imports only without a preceding
+    /// default/namespace binding (prettier's `standaloneSpecifiers`). Two rules read
+    /// that one fact: a comment in the keyword→`{` gap (`import /* c */ {a}`,
+    /// `export type /* c */ {a}`) is preserved in place only when it holds (prettier
+    /// relocates such a comment into the braces as the first specifier's leading
+    /// comment — a comment-position divergence; with a binding the caller already
+    /// emits that gap's comments as it builds `x, {…}`, so capturing here would
+    /// double-emit them), and a lone specifier is unbreakable only when it holds
+    /// (see `can_break` below).
     pub(super) fn push_braced_specifier_list<T>(
         &self,
         parts: &mut DocBuf,
         specifiers: &[T],
         spans: SpecifierListSpans,
-        capture_keyword_comment: bool,
+        brace_follows_header: bool,
         get_span: impl Fn(&T) -> Span,
         build_item: impl Fn(&T) -> DocId,
     ) -> u32 {
@@ -214,15 +288,17 @@ impl<'a> Printer<'a> {
             .find_char_outside_comments(spans.kw_end, first_start, b'{')
             .unwrap_or(0);
 
-        let last_spec_end = specifiers.last().map_or(0, |s| get_span(s).end);
+        let last_spec_end = get_span(&specifiers[specifiers.len() - 1]).end;
         let brace_close = self.close_brace_offset(last_spec_end, spans.bound);
+        // Just past the closing `}` — the exclusive end of every brace-window scan
+        // below, and the caller's trailing-comment anchor returned at the end.
+        let after_brace = brace_close + 1;
 
         // Expanding comments (line comments, or own-line single-line block
         // comments) force the multiline path. One zero-comment window check over
         // the braces gates all three queries (each is bounded within the braces).
-        let brace_span = Span::new(brace_start, brace_close + 1);
-        let has_expanding_comments = self
-            .has_comments_to_emit_between(brace_start, brace_close + 1)
+        let brace_span = Span::new(brace_start, after_brace);
+        let has_expanding_comments = self.has_comments_to_emit_between(brace_start, after_brace)
             && (self.has_line_comments_in_delimited_list(specifiers, &get_span, brace_close)
                 || self.has_line_comments_between(brace_start + 1, first_start)
                 || self.has_own_line_block_comments_in_bracket_list(
@@ -242,7 +318,15 @@ impl<'a> Printer<'a> {
                 &build_item,
             )
         } else {
-            // No expanding comments: group-based wrapping with comment splitting.
+            // No expanding comments: group-based wrapping with comment splitting —
+            // unless prettier's `canBreak` (its `printModuleSpecifiers`) is false. A
+            // lone braced specifier never breaks there, so `import { a } from 'x'` /
+            // `export { a as b } from 'x'` overflows print width rather than
+            // expanding; a second specifier, a leading default/namespace binding, or
+            // a comment on a specifier restores the group.
+            let can_break = specifiers.len() > 1
+                || !brace_follows_header
+                || self.lone_specifier_has_comment(&spans, after_brace);
             let spec_doc = self.build_softline_comma_list(
                 specifiers,
                 brace_start,
@@ -250,7 +334,11 @@ impl<'a> Printer<'a> {
                 &get_span,
                 &build_item,
             );
-            self.braced_group(spec_doc)
+            if can_break {
+                self.braced_group(spec_doc)
+            } else {
+                self.braced_flat(spec_doc)
+            }
         };
 
         // The keyword→`{` gap comment (`import /* c */ {a}`, `import type // c\n{a}`,
@@ -258,13 +346,13 @@ impl<'a> Printer<'a> {
         // into the braces. A line comment forces `{…}` onto a new line, which the
         // shared helper indents one level (statement continuation) — the leading
         // space comes from the caller's `import `/`export `/`type ` token. Captured
-        // only when the `{` directly follows the header (see `capture_keyword_comment`).
-        if capture_keyword_comment {
+        // only when the `{` directly follows the header (see `brace_follows_header`).
+        if brace_follows_header {
             parts.push(self.gap_comment_continuation_tail(spans.kw_end, brace_start, braces_doc));
         } else {
             parts.push(braces_doc);
         }
-        brace_close + 1
+        after_brace
     }
 
     /// Build a doc for a renamed `{a}` / `{a as b}` specifier — shared by import and
