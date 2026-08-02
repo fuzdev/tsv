@@ -2459,7 +2459,7 @@ const fill_101_boundary: DivergencePattern = {
 		'css/values/lists/comma_space_separated_long_prettier_divergence',
 		'svelte/elements/inline_element_fill_long_prettier_divergence',
 		'svelte/elements/inline_component_fill_long_prettier_divergence',
-		'svelte/elements/fill_expr_break_boundary_long_prettier_divergence',
+		'svelte/elements/fill_expr_travel_boundary_long_prettier_divergence',
 		'svelte/elements/fill_after_inline_prettier_divergence',
 		'svelte/elements/fill_multiple_expr_long_prettier_divergence',
 		'svelte/elements/block_multiline_attrs_content_hug_prettier_divergence',

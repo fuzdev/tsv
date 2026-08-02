@@ -1,0 +1,120 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 388,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 172,
+				"data": " fill continuation after a traveled expression tag: tsv breaks before the word that\n     would cross 100; prettier packs it onto the continuation line and overflows "
+			},
+			{
+				"type": "Text",
+				"start": 172,
+				"end": 173,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 173,
+				"end": 387,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 3,
+						"column": 1,
+						"character": 174
+					},
+					"end": {
+						"line": 3,
+						"column": 2,
+						"character": 175
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 176,
+							"end": 264,
+							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq\n\t",
+							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 264,
+							"end": 281,
+							"expression": {
+								"type": "BinaryExpression",
+								"start": 265,
+								"end": 280,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 17
+									}
+								},
+								"left": {
+									"type": "Literal",
+									"start": 265,
+									"end": 271,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 8
+										}
+									},
+									"value": "rrrr",
+									"raw": "'rrrr'"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Literal",
+									"start": 274,
+									"end": 280,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 11
+										},
+										"end": {
+											"line": 5,
+											"column": 17
+										}
+									},
+									"value": "ssss",
+									"raw": "'ssss'"
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 281,
+							"end": 383,
+							"raw": " aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp\n\tqqqq rrrr ssss tttt\n",
+							"data": " aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp\n\tqqqq rrrr ssss tttt\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

@@ -1,0 +1,608 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1455,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 840,
+				"data": "\n\tA spaced {expr} tag whose expression CAN break takes the same whole-flat pairwise\n\tmeasurement as every other flow follower: when the tag does not fit FLAT after the last\n\tword, the boundary in front of it breaks and the tag starts on a fresh line — collapsing\n\tflat there when it fits, breaking internally there when not — rather than opening\n\tmid-line. Prettier's measurement stops at the expression's first internal break, so it\n\tkeeps the tag on the text line and opens it mid-line (see prettier_variant_midline).\n\tCases at the exact boundary: at 100 the tag packs flat mid-line (both formatters keep\n\tit); at 101 it travels and collapses flat on the fresh line; a far wider expression\n\tstill collapses flat on the fresh line when it fits there; and one too wide even for\n\tthe fresh line travels first, then breaks internally.\n"
+			},
+			{
+				"type": "Text",
+				"start": 840,
+				"end": 841,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 841,
+				"end": 949,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 842
+					},
+					"end": {
+						"line": 13,
+						"column": 2,
+						"character": 843
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 844,
+							"end": 911,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 aaa ",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 aaa "
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 911,
+							"end": 944,
+							"expression": {
+								"type": "ConditionalExpression",
+								"start": 912,
+								"end": 943,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 67
+									},
+									"end": {
+										"line": 14,
+										"column": 98
+									}
+								},
+								"test": {
+									"type": "BinaryExpression",
+									"start": 912,
+									"end": 927,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 67
+										},
+										"end": {
+											"line": 14,
+											"column": 82
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 912,
+										"end": 917,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 67
+											},
+											"end": {
+												"line": 14,
+												"column": 72
+											}
+										},
+										"name": "cond1"
+									},
+									"operator": "===",
+									"right": {
+										"type": "Identifier",
+										"start": 922,
+										"end": 927,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 77
+											},
+											"end": {
+												"line": 14,
+												"column": 82
+											}
+										},
+										"name": "cond2"
+									}
+								},
+								"consequent": {
+									"type": "Literal",
+									"start": 930,
+									"end": 935,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 85
+										},
+										"end": {
+											"line": 14,
+											"column": 90
+										}
+									},
+									"value": "aaa",
+									"raw": "'aaa'"
+								},
+								"alternate": {
+									"type": "Literal",
+									"start": 938,
+									"end": 943,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 93
+										},
+										"end": {
+											"line": 14,
+											"column": 98
+										}
+									},
+									"value": "bbb",
+									"raw": "'bbb'"
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 944,
+							"end": 945,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 949,
+				"end": 950,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 950,
+				"end": 1060,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 951
+					},
+					"end": {
+						"line": 16,
+						"column": 2,
+						"character": 952
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 953,
+							"end": 1022,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 aaaa\n\t",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 aaaa\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1022,
+							"end": 1055,
+							"expression": {
+								"type": "ConditionalExpression",
+								"start": 1023,
+								"end": 1054,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 33
+									}
+								},
+								"test": {
+									"type": "BinaryExpression",
+									"start": 1023,
+									"end": 1038,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 2
+										},
+										"end": {
+											"line": 18,
+											"column": 17
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 1023,
+										"end": 1028,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 7
+											}
+										},
+										"name": "cond1"
+									},
+									"operator": "===",
+									"right": {
+										"type": "Identifier",
+										"start": 1033,
+										"end": 1038,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 12
+											},
+											"end": {
+												"line": 18,
+												"column": 17
+											}
+										},
+										"name": "cond2"
+									}
+								},
+								"consequent": {
+									"type": "Literal",
+									"start": 1041,
+									"end": 1046,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 20
+										},
+										"end": {
+											"line": 18,
+											"column": 25
+										}
+									},
+									"value": "aaa",
+									"raw": "'aaa'"
+								},
+								"alternate": {
+									"type": "Literal",
+									"start": 1049,
+									"end": 1054,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 28
+										},
+										"end": {
+											"line": 18,
+											"column": 33
+										}
+									},
+									"value": "bbb",
+									"raw": "'bbb'"
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1055,
+							"end": 1056,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1060,
+				"end": 1061,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1061,
+				"end": 1237,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 20,
+						"column": 1,
+						"character": 1062
+					},
+					"end": {
+						"line": 20,
+						"column": 2,
+						"character": 1063
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1064,
+							"end": 1135,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 spaced\n\t",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 spaced\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1135,
+							"end": 1232,
+							"expression": {
+								"type": "ConditionalExpression",
+								"start": 1136,
+								"end": 1231,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 97
+									}
+								},
+								"test": {
+									"type": "BinaryExpression",
+									"start": 1136,
+									"end": 1151,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 2
+										},
+										"end": {
+											"line": 22,
+											"column": 17
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 1136,
+										"end": 1141,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 2
+											},
+											"end": {
+												"line": 22,
+												"column": 7
+											}
+										},
+										"name": "cond1"
+									},
+									"operator": "===",
+									"right": {
+										"type": "Identifier",
+										"start": 1146,
+										"end": 1151,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 12
+											},
+											"end": {
+												"line": 22,
+												"column": 17
+											}
+										},
+										"name": "cond2"
+									}
+								},
+								"consequent": {
+									"type": "Literal",
+									"start": 1154,
+									"end": 1191,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 20
+										},
+										"end": {
+											"line": 22,
+											"column": 57
+										}
+									},
+									"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+									"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
+								},
+								"alternate": {
+									"type": "Literal",
+									"start": 1194,
+									"end": 1231,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 60
+										},
+										"end": {
+											"line": 22,
+											"column": 97
+										}
+									},
+									"value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+									"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1232,
+							"end": 1233,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1237,
+				"end": 1238,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1238,
+				"end": 1454,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 24,
+						"column": 1,
+						"character": 1239
+					},
+					"end": {
+						"line": 24,
+						"column": 2,
+						"character": 1240
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1241,
+							"end": 1312,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 spaced\n\t",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8 word9 word10 spaced\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 1312,
+							"end": 1449,
+							"expression": {
+								"type": "ConditionalExpression",
+								"start": 1313,
+								"end": 1448,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 59
+									}
+								},
+								"test": {
+									"type": "BinaryExpression",
+									"start": 1313,
+									"end": 1328,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 2
+										},
+										"end": {
+											"line": 26,
+											"column": 17
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 1313,
+										"end": 1318,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 2
+											},
+											"end": {
+												"line": 26,
+												"column": 7
+											}
+										},
+										"name": "cond1"
+									},
+									"operator": "===",
+									"right": {
+										"type": "Identifier",
+										"start": 1323,
+										"end": 1328,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 12
+											},
+											"end": {
+												"line": 26,
+												"column": 17
+											}
+										},
+										"name": "cond2"
+									}
+								},
+								"consequent": {
+									"type": "Literal",
+									"start": 1333,
+									"end": 1388,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 4
+										},
+										"end": {
+											"line": 27,
+											"column": 59
+										}
+									},
+									"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+									"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
+								},
+								"alternate": {
+									"type": "Literal",
+									"start": 1393,
+									"end": 1448,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 4
+										},
+										"end": {
+											"line": 28,
+											"column": 59
+										}
+									},
+									"value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+									"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+								}
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1449,
+							"end": 1450,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

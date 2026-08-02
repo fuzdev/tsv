@@ -1,14 +1,14 @@
-<!-- middle text after breaking expression continues on continuation line -->
+<!-- wide expression tag travels and collapses flat; middle text and a second tag flow after it -->
 <p>
 	aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq {'rrrr' +
 		'ssss'} tttt uuuu vvvv {'wwww' + 'xxxx'} yyyy
 </p>
 
-<!-- middle text with single word after breaking expression -->
+<!-- single word between the traveled tag and a second tag -->
 <p>
 	aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq {'rrrr' +
 		'ssss'} tttt {'uuuu' + 'vvvv'} wwww
 </p>
 
-<!-- expression doesn't break, all inline (contrast) -->
+<!-- short expressions fit inline, no travel (contrast) -->
 <p>aaaa bbbb {'cccc' + 'dddd'} eeee {'ffff' + 'gggg'} hhhh</p>

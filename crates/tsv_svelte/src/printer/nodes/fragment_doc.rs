@@ -676,30 +676,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether the tag at `nodes[tag_idx]` **heads a welded run** — its follower is byte-glued
-    /// and stays in the inline run in the OUTPUT: glued content text, an inline
-    /// element/component, or another tag. The SPACED text→tag boundary's gate for
-    /// [`Self::handle_text_child`]'s `break_before_wide_flow`: a spaced tag enters the flow rule
-    /// only as the head of a welded run — one that ends the run keeps the ordinary Case-2
-    /// measurement (the separated-tag divergence, `fill_break_before_expr_long`).
-    ///
-    /// The member set is "stays in the inline run", not "glued in the source": a BLOCK element
-    /// follower detaches to its own line by its own layout (render-free at a block boundary), so
-    /// a weld into it exists only in the source and measuring through it would grade a unit the
-    /// output never has. A comment or control-flow follower is likewise not a member —
-    /// conservative there, since the render-side welded walk (`flow_lookahead` in
-    /// `arena_render_fill`, whose contract lives on
-    /// [`tsv_lang::doc::DocContext::break_before_wide_flow`]) would end at it anyway.
-    fn tag_heads_welded_run(&self, nodes: &[FragmentNode<'_>], tag_idx: usize) -> bool {
-        nodes.get(tag_idx + 1).is_some_and(|follower| {
-            Self::byte_glued(&nodes[tag_idx], follower)
-                && match follower {
-                    FragmentNode::Text(t) => Self::text_glued_before(t.raw(self.source)),
-                    n => self.is_inline_el_or_comp(n) || Self::is_tag_node(n),
-                }
-        })
-    }
-
     /// Whether the node at `i` is a **declaration that owns its own line** — `{@const}` /
     /// `{const …}` / `{let …}` / `{#snippet}`, unless it is glued to content on both sides.
     ///
@@ -1415,15 +1391,23 @@ impl<'a> Printer<'a> {
             //   Case-1 last item; the same flat measurement breaks at the whitespace boundary BEFORE
             //   the glued word so the whole glued run moves to a fresh line together, never splitting
             //   the glued boundary (which would inject a rendered space).
-            // A glued TAG joins on both shapes — as the smallest welded unit (`… glued{x}`, the
-            // word and its tag travel together) or welded onward through the run (`… glued{x}<a…>`,
-            // `… word {expr}.w<b>…`): which member of the welded unit crosses the width cannot
+            // A TAG joins on both shapes, unconditionally. Glued, it is the smallest welded unit
+            // (`… glued{x}`, the word and its tag travel together) or mid-run glue
+            // (`… glued{x}<a…>`): which member of the welded unit crosses the width cannot
             // matter, so the unit is measured through the tag and travels whole. There is no
             // run-ending carve-out: prettier instead keeps a run-ending tag outside the fill and
             // lets it ride past printWidth after the word it is welded to — tsv breaks at the
             // whitespace boundary in front of the word, holding the hard limit (a cataloged
             // divergence — conformance_prettier.md §Print Width Philosophy,
-            // fill_glued_tag_travel_long).
+            // fill_glued_tag_travel_long). Spaced, the tag travels alone past the separator: a
+            // tag whose expression cannot fit FLAT after the text starts on the fresh line —
+            // collapsing flat there when it fits, breaking internally when not — rather than
+            // opening mid-line at the end of the text line (the wide-element drop's tag analog;
+            // fill_spaced_tag_travel_long, and the fill_expr_travel_* fixtures for what flows
+            // after the traveled tag). Prettier's boundary measurement stops at the expression's
+            // first internal break, so it opens the tag mid-line — the untruncated Break-mode
+            // measurement this flag exists to replace, one follower kind at a time until none
+            // was left conditional.
             //
             // Either way an inline element preceded by same-line content that must wrap starts on a
             // fresh line rather than dangling its opening tag at the text line's end (the
@@ -1437,13 +1421,16 @@ impl<'a> Printer<'a> {
             // ([`tsv_lang::doc::DocContext::break_before_wide_flow`] carries the render-side
             // mechanics — the whole-flat pairwise measurement and the welded walk):
             let break_before_wide_flow = if has_trailing_ws {
-                // SPACED half: the trailing `line` is the separator; a flowing element — or a
-                // tag heading a welded run ([`Self::tag_heads_welded_run`], which carries the
-                // member set; a spaced tag that ENDS the run keeps the ordinary Case-2
-                // measurement) — couples it to the whole-unit measurement.
-                trailing_line
-                    && (next_is_flow
-                        || (next_is_tag && self.tag_heads_welded_run(trimmed_nodes, i + 1)))
+                // SPACED half: the trailing `line` is the separator, and any flow follower —
+                // element, component, or tag — couples it to the whole-flat pairwise
+                // measurement. Deliberately no follower condition: how far the measured unit
+                // extends past the follower is the RENDER walk's question alone
+                // (`flow_lookahead` reading `DocArena::welded_entry` off the built docs), so a
+                // build-side classification cannot disagree with what the walk sees. A
+                // source-keyed follower set here was a two-pass hazard: a glued BLOCK follower
+                // detaches by its own layout, so its weld survives only in the source, and
+                // pass 2 re-classified the boundary pass 1 had measured.
+                trailing_line && (next_is_flow || next_is_tag)
             } else {
                 // GLUED half: no separator — the boundary in front of the last word is the
                 // break point, and ANY tag joins: the welded word+tag pair is the smallest

@@ -165,11 +165,13 @@ impl DocContext {
     /// Scoped to the Svelte text→flow boundary fill — a text run whose next sibling is a flowing
     /// inline element/component, or a `{expr}` / `{@html}` / `{@render}` tag. A TAG follower's
     /// doc is measured exactly like an element's (forced flat, its width the formatted
-    /// expression's): on a **glued** boundary any tag joins — the welded word+tag pair is the
-    /// smallest welded unit, travelling rather than riding past print width
-    /// (conformance_prettier.md §Print Width Philosophy) — while on a **spaced** boundary only a
-    /// tag heading a welded run joins (the builder decides; `tag_heads_welded_run` in
-    /// `handle_text_child`). Off for every other fill, so a small element after text still packs
+    /// expression's), on **both** boundary shapes, unconditionally: glued, the welded word+tag
+    /// pair is the smallest welded unit, travelling rather than riding past print width; spaced,
+    /// a tag whose expression cannot fit flat travels past the separator instead of opening
+    /// mid-line (conformance_prettier.md §Print Width Philosophy). There is deliberately no
+    /// build-side follower condition — how far the unit extends past the follower is decided at
+    /// render by `flow_lookahead`'s welded walk over the built docs, the single authority on
+    /// unit extent. Off for every other fill, so a small element after text still packs
     /// and CSS/value-list fills are unaffected. It re-couples the width-driven drop decision to
     /// the boundary rule at render position so the space- and newline-authored forms converge to
     /// one fixed point.
@@ -264,6 +266,17 @@ impl DocContext {
     /// composes with [`Self::after_element_fold`] rather than excluding it: the fold states what
     /// the fill *is*, this states what its head may not do. Off for every other fill, so the
     /// ordinary fresh-line drop (text word-wrap, CSS value lists) is unaffected.
+    ///
+    /// It composes with [`Self::break_before_wide_flow`] too — a MID-RUN welded fill (glued at
+    /// its head, ending before a flow follower: `… <b>a</b>glued {x}<i>…`) carries both, and a
+    /// third reader keys on this flag from *outside*: a preceding boundary's welded walk
+    /// ([`crate::doc::arena::DocArena::welded_entry`]) reads it to extend that boundary's
+    /// measured unit THROUGH this fill. The three consumers are disjoint — the head's drop
+    /// suppression (this flag, Case 3 at `offset == 0`), the trailing measurement
+    /// ([`Self::break_before_wide_flow`], Cases 1/2 at `is_final_segment`), and the upstream
+    /// walk (entry classification) — so the flags never contend, but a builder that WRAPS a
+    /// fill carrying them hides all three at once (the marker-burial hazard
+    /// [`Self::joined_atom`] exists to defuse for the sibling join).
     #[inline]
     #[must_use]
     pub const fn glued_lead(&self) -> bool {
