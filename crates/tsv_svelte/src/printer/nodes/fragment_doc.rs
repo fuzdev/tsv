@@ -1409,15 +1409,7 @@ impl<'a> Printer<'a> {
             // must wrap by width still converges to the fresh-line form (a short run that fits is a
             // no-op).
             //
-            // On a GLUED text→tag boundary (`!has_trailing_ws`) the tag always joins the flow
-            // rule: the last word and the tag are one welded unit whatever follows, and the
-            // render walk (`flow_lookahead` — the tag doc forced Flat as the unit's head, or
-            // resolving via its `glued_atom` marker mid-run; its flat width is the formatted
-            // expression's) extends the measurement through whatever glue actually SURVIVES in
-            // the output and stops at the first non-glued entry — so the measured unit is exactly
-            // the weld, however far it runs.
-            //
-            // `tag_continues_welded` exists for the SPACED text→tag boundary (`… word
+            // `tag_continues_welded` — the SPACED text→tag boundary's gate (`… word
             // {expr}.w<b>…`, `trailing_line`): there the tag enters the flow rule only when it
             // heads a welded run — a spaced tag that ends the run keeps the ordinary Case-2
             // measurement (the separated-tag divergence, fill_break_before_expr_long). Its
@@ -1426,16 +1418,33 @@ impl<'a> Printer<'a> {
             // boundary), so a weld into it exists only in the source and measuring through it
             // would grade a unit the output never has. A comment or control-flow follower is
             // likewise not a member — conservative there, since the walk would end at it anyway.
-            let tag_continues_welded = next_is_tag
+            // The leading `trailing_line &&` scopes the predicate to the one branch that reads
+            // it (`trailing_line ⟹ has_trailing_ws` — both assignments sit under that guard),
+            // so a glued boundary never pays for the lookahead.
+            let tag_continues_welded = trailing_line
+                && next_is_tag
                 && i + 2 < trimmed_nodes.len()
                 && Self::byte_glued(&trimmed_nodes[i + 1], &trimmed_nodes[i + 2])
                 && match &trimmed_nodes[i + 2] {
                     FragmentNode::Text(t) => Self::text_glued_before(t.raw(self.source)),
                     n => self.is_inline_el_or_comp(n) || Self::is_tag_node(n),
                 };
-            let break_before_wide_flow =
-                (next_is_flow || tag_continues_welded || (next_is_tag && !has_trailing_ws))
-                    && (trailing_line || !has_trailing_ws);
+            // The boundary's two shapes, split as the flag's own contract describes them
+            // ([`tsv_lang::doc::DocContext::break_before_wide_flow`] carries the render-side
+            // mechanics — the whole-flat pairwise measurement and the welded walk):
+            let break_before_wide_flow = if has_trailing_ws {
+                // SPACED half: the trailing `line` is the separator; a flowing element — or a
+                // tag heading a welded run — couples it to the whole-unit measurement.
+                trailing_line && (next_is_flow || tag_continues_welded)
+            } else {
+                // GLUED half: no separator — the boundary in front of the last word is the
+                // break point, and ANY tag joins: the welded word+tag pair is the smallest
+                // welded unit (conformance_prettier.md §Print Width Philosophy,
+                // fill_glued_tag_travel_long), and the render walk extends the measurement
+                // through whatever glue actually SURVIVES in the output, stopping at the
+                // first non-glued entry.
+                next_is_flow || next_is_tag
+            };
             let fill_doc = if break_before_wide_flow || glued_lead {
                 d.with_context(
                     fill_doc,

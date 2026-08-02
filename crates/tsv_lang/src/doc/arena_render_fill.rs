@@ -47,22 +47,26 @@ pub(super) fn render_fill_iterative(
             remaining
         };
 
+        // Flow boundary, forced-break follower — ONE condition shared by Case 1's `content_fits`
+        // and Case 2's `sep_fits` (the same boundary rule, differing only in where the separator
+        // sits): the node after this fill is already multiline (wrapped attributes, a block-body
+        // handler), so the welded unit can't stay on the line — never "fits". Prettier's
+        // `group([line, element])` breaks on that forced break and drops the element; a flat
+        // measurement here would instead short-circuit at the follower's own hardline and
+        // wrongly report a fit, hugging it onto the text line.
+        let flow_forced_break = context.break_before_wide_flow()
+            && is_final_segment
+            && rest_commands
+                .last()
+                .is_some_and(|c| arena.will_break(c.doc));
+
         // `break_before_wide_flow`, Case-1 half: a GLUED text→element boundary (`… glued<a…>`) has
         // no trailing separator, so the glued last word is the fill's last item and the element
         // follows on the render stack — the whole-flat measurement lands here (the space-separated
         // half lands in Case 2's `sep_fits`). A ws-fill also reaches this at `is_final_segment`, but
         // its content there is a bare word whose `content_fits` only feeds `should_remeasure` (inert
         // for a groupless leaf), so keying the block on the shared flag is contamination-free.
-        let content_fits = if context.break_before_wide_flow()
-            && is_final_segment
-            && rest_commands
-                .last()
-                .is_some_and(|c| arena.will_break(c.doc))
-        {
-            // Forced-break element: the following inline element glued to the last word is already
-            // multiline (wrapped attributes / block-body handler), so the glued run can't stay on
-            // the line — never "fits". Mirrors Case 2's forced-break short-circuit; a flat
-            // measurement would wrongly report a fit at the element's own hardline.
+        let content_fits = if flow_forced_break {
             false
         } else if context.break_before_wide_flow() && is_final_segment && !rest_commands.is_empty()
         {
@@ -244,17 +248,9 @@ pub(super) fn render_fill_iterative(
             // width and lets the following node overshoot printWidth by a column. Re-measure with
             // the separator counted just before the look-ahead so the boundary breaks (next node
             // to its own line) exactly when it should.
-            let sep_fits = if context.break_before_wide_flow()
-                && is_final_segment
-                && rest_commands
-                    .last()
-                    .is_some_and(|c| arena.will_break(c.doc))
-            {
-                // Flow boundary, forced-break element: the following inline element is already
-                // multiline (multiline attributes, a block-body event handler, …). Prettier's
-                // `group([line, element])` breaks on that forced break and drops the element, so the
-                // separator must break here too — a flat-width measurement would short-circuit at the
-                // element's hardline and wrongly report a fit (hugging it onto the text line).
+            // The forced-break short-circuit is [`flow_forced_break`], hoisted above Case 1 —
+            // the separator must break exactly where Case 1's content would.
+            let sep_fits = if flow_forced_break {
                 false
             } else if is_final_segment && !rest_commands.is_empty() {
                 // Inline-backed look-ahead stack plus the separator — matches the render

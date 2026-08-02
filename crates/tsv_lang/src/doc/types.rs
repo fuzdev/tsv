@@ -162,11 +162,17 @@ impl DocContext {
     /// is built by `flow_lookahead` in `arena_render_fill`, which both halves of the boundary rule
     /// share.
     ///
-    /// Scoped to the Svelte text→flow-element boundary fill (a text run whose next sibling is a
-    /// flowing inline element/component). Off for every other fill, so a small element after text
-    /// still packs and CSS/value-list fills are unaffected. It re-couples the width-driven drop
-    /// decision to the boundary rule at render position so the space- and newline-authored forms
-    /// converge to one fixed point.
+    /// Scoped to the Svelte text→flow boundary fill — a text run whose next sibling is a flowing
+    /// inline element/component, or a `{expr}` / `{@html}` / `{@render}` tag. A TAG follower's
+    /// doc is measured exactly like an element's (forced flat, its width the formatted
+    /// expression's): on a **glued** boundary any tag joins — the welded word+tag pair is the
+    /// smallest welded unit, travelling rather than riding past print width
+    /// (conformance_prettier.md §Print Width Philosophy) — while on a **spaced** boundary only a
+    /// tag heading a welded run joins (the builder decides; `tag_continues_welded` in
+    /// `handle_text_child`). Off for every other fill, so a small element after text still packs
+    /// and CSS/value-list fills are unaffected. It re-couples the width-driven drop decision to
+    /// the boundary rule at render position so the space- and newline-authored forms converge to
+    /// one fixed point.
     ///
     /// **One flag, both boundary shapes**, distinguished only by whether a separator sits between
     /// the last word and the following element — the fill's own parity routes each to the right
