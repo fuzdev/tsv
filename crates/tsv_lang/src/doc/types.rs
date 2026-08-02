@@ -49,12 +49,65 @@ impl GroupId {
 /// punctuation that will be added by the parent (e.g., semicolons in CSS,
 /// commas in object properties).
 ///
-/// These flags are deliberate per-fill render policies set by the language
-/// printers (Svelte boundary rules, CSS trailing punctuation); a flag bag is
-/// the intended shape, so the `excessive_bools` lint is allowed here.
-#[allow(clippy::struct_excessive_bools)]
+/// The layout flags are deliberate per-fill render policies set by the language
+/// printers (Svelte boundary rules, CSS trailing punctuation), packed into one
+/// private flag word — read through the named getters ([`Self::glued_lead`], …),
+/// set through the matching `with_*` builders.
 #[derive(Debug, Clone, Default)]
 pub struct DocContext {
+    /// Reserved trailing columns — [`Self::trailing_reserve`] carries the contract,
+    /// [`Self::reserving`] is the sole setter.
+    trailing_reserve: u16,
+
+    /// The per-fill layout flag bits — one packed word rather than `bool` fields, so a new flag
+    /// never moves `DocNode`'s size (the note below the struct carries the budget). Read through
+    /// the named getters ([`Self::break_before_wide_flow`], [`Self::after_element_fold`],
+    /// [`Self::glued_lead`], [`Self::glued_atom`],
+    /// [`Self::joined_atom`] — each carries its flag's full contract), set through the matching
+    /// `with_*` builders.
+    flags: u16,
+}
+
+// `DocContext` is stored **inline** in `DocNode::WithContext`, whose size is `const`-asserted per
+// target — 16 B on wasm32, the tightest budget and the one the shipped npm packages build under.
+// Nothing in `deno task check` builds wasm32, so without this assert a context that outgrows the
+// budget passes every gate and fails only at `deno task build:packages` (it already did once:
+// growing the context blew the `DocNode` assert, invisibly to the whole gate chain).
+//
+// This pins the cost **here**, natively, where a field would be added. `WithContext`'s payload is
+// `DocId` + this struct = 8 B, comfortably under wasm32's 16 B budget with room for the enum tag.
+// The layout flags are one packed `u16` (11 bits free), so a new flag is size-free until the
+// seventeenth; only a new *field* (or widening `trailing_reserve`) can move this number, and it
+// has ~8 B of slack before the wasm32 `DocNode` assert blows.
+//
+// Note this is the ONLY budget in play — `WithContext` is not what sizes `DocNode` on either
+// target. See the `DocNode` size assert in `arena.rs` for the variants that actually are.
+#[cfg(target_pointer_width = "64")]
+const _: () = assert!(size_of::<DocContext>() == 4);
+#[cfg(target_pointer_width = "32")]
+const _: () = assert!(size_of::<DocContext>() == 4);
+
+impl DocContext {
+    const BREAK_BEFORE_WIDE_FLOW: u16 = 1 << 0;
+    const AFTER_ELEMENT_FOLD: u16 = 1 << 1;
+    const GLUED_LEAD: u16 = 1 << 2;
+    const GLUED_ATOM: u16 = 1 << 3;
+    const JOINED_ATOM: u16 = 1 << 4;
+
+    /// A context that only reserves `columns` trailing columns — the CSS trailing-punctuation
+    /// case, and the sole reason [`Self::trailing_reserve`] exists.
+    ///
+    /// Callers hold their widths as `usize`, so the clamp lives here rather than at each of them.
+    /// It is unobservable: a reserve at all near `u16::MAX` already means "nothing fits", which is
+    /// what saturating produces.
+    #[must_use]
+    pub fn reserving(columns: usize) -> Self {
+        Self {
+            trailing_reserve: u16::try_from(columns).unwrap_or(u16::MAX),
+            ..Self::default()
+        }
+    }
+
     /// Reserve N chars when checking if content fits.
     ///
     /// This prevents greedy fills from packing to exactly printWidth,
@@ -64,8 +117,29 @@ pub struct DocContext {
     ///
     /// `u16`, not `usize`: this is a **column count**, bounded in practice by print width, and
     /// `DocContext` is stored *inline* in `DocNode::WithContext`, whose size is `const`-asserted
-    /// per target (see below). Widening it here spends the budget that the layout flags need.
-    pub trailing_reserve: u16,
+    /// per target (see the note beneath the struct). Widening it spends the budget that the
+    /// layout flags need.
+    #[inline]
+    #[must_use]
+    pub const fn trailing_reserve(&self) -> u16 {
+        self.trailing_reserve
+    }
+
+    #[inline]
+    const fn flag(&self, bit: u16) -> bool {
+        self.flags & bit != 0
+    }
+
+    #[inline]
+    #[must_use]
+    const fn with_flag(mut self, bit: u16, on: bool) -> Self {
+        if on {
+            self.flags |= bit;
+        } else {
+            self.flags &= !bit;
+        }
+        self
+    }
 
     /// When set, the fill's trailing separator (its terminal `line`, the only one reaching the
     /// "content + separator" render case) measures the *immediately following* node — the next
@@ -79,7 +153,7 @@ pub struct DocContext {
     /// whole element+tail unit — the tail can wrap, so a short element packs after the last word
     /// instead of dropping (prettier's fill is pairwise: last word, separator, element — never the
     /// tail). See
-    /// [`crate::doc::arena::DocArena::after_element_fold_lead`].
+    /// [`crate::doc::arena::DocArena::welded_atom`].
     ///
     /// Pairwise cuts on the other side too: the measurement STOPS at that following node (plus any
     /// run welded to it, which owns no break point of its own and so rides its line by
@@ -88,11 +162,17 @@ pub struct DocContext {
     /// is built by `flow_lookahead` in `arena_render_fill`, which both halves of the boundary rule
     /// share.
     ///
-    /// Scoped to the Svelte text→flow-element boundary fill (a text run whose next sibling is a
-    /// flowing inline element/component). Off for every other fill, so a small element after text
-    /// still packs and CSS/value-list fills are unaffected. It re-couples the width-driven drop
-    /// decision to the boundary rule at render position so the space- and newline-authored forms
-    /// converge to one fixed point.
+    /// Scoped to the Svelte text→flow boundary fill — a text run whose next sibling is a flowing
+    /// inline element/component, or a `{expr}` / `{@html}` / `{@render}` tag. A TAG follower's
+    /// doc is measured exactly like an element's (forced flat, its width the formatted
+    /// expression's): on a **glued** boundary any tag joins — the welded word+tag pair is the
+    /// smallest welded unit, travelling rather than riding past print width
+    /// (conformance_prettier.md §Print Width Philosophy) — while on a **spaced** boundary only a
+    /// tag heading a welded run joins (the builder decides; `tag_heads_welded_run` in
+    /// `handle_text_child`). Off for every other fill, so a small element after text still packs
+    /// and CSS/value-list fills are unaffected. It re-couples the width-driven drop decision to
+    /// the boundary rule at render position so the space- and newline-authored forms converge to
+    /// one fixed point.
     ///
     /// **One flag, both boundary shapes**, distinguished only by whether a separator sits between
     /// the last word and the following element — the fill's own parity routes each to the right
@@ -111,12 +191,23 @@ pub struct DocContext {
     /// A ws-fill also reaches the Case-1 measurement at `is_final_segment` (its last word), but
     /// there the measured content is a bare word whose only consumer is `should_remeasure`, inert
     /// for a groupless leaf — so the shared flag stays free of cross-case contamination.
-    pub break_before_wide_flow: bool,
+    #[inline]
+    #[must_use]
+    pub const fn break_before_wide_flow(&self) -> bool {
+        self.flag(Self::BREAK_BEFORE_WIDE_FLOW)
+    }
+
+    /// Returns `self` with [`Self::break_before_wide_flow`] set to `on`.
+    #[inline]
+    #[must_use]
+    pub const fn with_break_before_wide_flow(self, on: bool) -> Self {
+        self.with_flag(Self::BREAK_BEFORE_WIDE_FLOW, on)
+    }
 
     /// When set, this fill **is** the Svelte after-element fold (`fill([element, line, words…])`,
     /// built only by `build_after_element_fold`) — an inline element followed by its terminal
     /// trailing text. Unlike the other flags this one states the fill's *identity*, not a policy;
-    /// two render behaviors and one shape query follow from it, and they are one field rather than
+    /// two render behaviors and one shape query follow from it, and they are one flag rather than
     /// three because there is exactly one construction site and no fill wants a subset:
     ///
     /// - **Head hug.** The fold's FIRST item — always a breakable inline element/component — is a
@@ -133,28 +224,25 @@ pub struct DocContext {
     ///   *space* boundary after a wide inline element, mirroring how short inline elements already
     ///   keep `<el>x</el> tail` inline; a *newline*-authored boundary still takes its own line (the
     ///   text node carries the newline, so it never reaches this fold).
-    /// - **Lead extraction.** [`crate::doc::arena::DocArena::after_element_fold_lead`] recognizes
+    /// - **Lead extraction.** [`crate::doc::arena::DocArena::welded_atom`] recognizes
     ///   the fold by this flag and returns its head, so a *preceding* text run's
     ///   [`Self::break_before_wide_flow`] measurement grades the element alone rather than the whole
     ///   element+tail unit.
     ///
     /// Off for every other fill: text word-wrap and CSS value lists still drop a too-wide item onto
     /// its own line, and a wrapped item never lets the next hug its last line.
-    pub after_element_fold: bool,
+    #[inline]
+    #[must_use]
+    pub const fn after_element_fold(&self) -> bool {
+        self.flag(Self::AFTER_ELEMENT_FOLD)
+    }
 
-    /// When set, the fill's LAST item is measured **alone** (rest-of-render ignored) even though a
-    /// node follows it on the render stack. That following node is glued to the last word with no
-    /// whitespace — a Svelte `{expr}` / `{@html}` / `{@render}` tag welded to the end of a text run
-    /// (`… tsv is ~{ratio}`). prettier keeps the mustache *outside* the text `fill`, so the fill
-    /// never sees its width and never breaks before the word it is glued to: the word stays on the
-    /// line and the tag rides past printWidth after it. tsv's fill would otherwise fold the glued
-    /// tag into the last word's fit check (`~` + `{ratio}`) and break before `~`, stranding the tag
-    /// on its own line. This flag restores prettier's behavior for exactly that boundary.
-    ///
-    /// Scoped to a text-run fill immediately followed by a glued tag (`next_is_tag && !trailing_ws`).
-    /// Off for every other fill, so the general last-item look-ahead (a hard-limit guard that keeps
-    /// the following node from overshooting printWidth) is unaffected.
-    pub trailing_glued_tag: bool,
+    /// Returns `self` with [`Self::after_element_fold`] set to `on`.
+    #[inline]
+    #[must_use]
+    pub const fn with_after_element_fold(self, on: bool) -> Self {
+        self.with_flag(Self::AFTER_ELEMENT_FOLD, on)
+    }
 
     /// When set, the fill's FIRST item is **byte-glued** to whatever precedes it on the render
     /// stack, so the boundary before it carries no whitespace. The fill therefore never moves that
@@ -169,44 +257,83 @@ pub struct DocContext {
     /// `<!--c-->text` boundary) and there is no whitespace before it to travel to. Breaking anyway
     /// would inject a rendered space — and the mangled form is a fixed point, so F1 cannot see it.
     ///
-    /// Scoped to a Svelte text-run fill whose leading boundary is glued. Off for every other fill,
-    /// so the ordinary fresh-line drop (text word-wrap, CSS value lists) is unaffected.
-    pub glued_lead: bool,
-}
-
-// `DocContext` is stored **inline** in `DocNode::WithContext`, whose size is `const`-asserted per
-// target — 16 B on wasm32, the tightest budget and the one the shipped npm packages build under.
-// Nothing in `deno task check` builds wasm32, so without this assert a context that outgrows the
-// budget passes every gate and fails only at `deno task build:packages` (it already did once:
-// growing the context blew the `DocNode` assert, invisibly to the whole gate chain).
-//
-// This pins the cost **here**, natively, where the field is added, and the threshold is a cliff
-// rather than a slope: `WithContext`'s payload is `DocId` + this struct, so it stays 12 B — under
-// wasm32's 16 B budget, with room for the enum tag — while `DocContext` is **8 B or less**, i.e.
-// while the `u16` is joined by at most **six** `bool`s. The seventh takes the struct to 10 B, the
-// payload to 16 B, and `DocNode` on wasm32 to 20 B. At four bools there are two slots left; pack
-// them into a bitfield rather than raising these numbers when the cliff is reached.
-//
-// Note this is the ONLY budget in play — `WithContext` is not what sizes `DocNode` on either
-// target. See the `DocNode` size assert in `arena.rs` for the variants that actually are.
-#[cfg(target_pointer_width = "64")]
-const _: () = assert!(size_of::<DocContext>() == 6);
-#[cfg(target_pointer_width = "32")]
-const _: () = assert!(size_of::<DocContext>() == 6);
-
-impl DocContext {
-    /// A context that only reserves `columns` trailing columns — the CSS trailing-punctuation
-    /// case, and the sole reason [`Self::trailing_reserve`] exists.
-    ///
-    /// Callers hold their widths as `usize`, so the clamp lives here rather than at each of them.
-    /// It is unobservable: a reserve at all near `u16::MAX` already means "nothing fits", which is
-    /// what saturating produces.
+    /// Two Svelte fills set it, and they are the two ways a run can acquire a glued head: a
+    /// **text-run** fill whose leading boundary is glued (a `<!--c-->text` boundary), and the
+    /// **after-element fold**, whose head is the inline element the terminal tail packs after
+    /// (`.w<b>y</b> tail` — the `<b>` welded to the text before it). The second is why this flag
+    /// composes with [`Self::after_element_fold`] rather than excluding it: the fold states what
+    /// the fill *is*, this states what its head may not do. Off for every other fill, so the
+    /// ordinary fresh-line drop (text word-wrap, CSS value lists) is unaffected.
+    #[inline]
     #[must_use]
-    pub fn reserving(columns: usize) -> Self {
-        Self {
-            trailing_reserve: u16::try_from(columns).unwrap_or(u16::MAX),
-            ..Self::default()
-        }
+    pub const fn glued_lead(&self) -> bool {
+        self.flag(Self::GLUED_LEAD)
+    }
+
+    /// Returns `self` with [`Self::glued_lead`] set to `on`.
+    #[inline]
+    #[must_use]
+    pub const fn with_glued_lead(self, on: bool) -> Self {
+        self.with_flag(Self::GLUED_LEAD, on)
+    }
+
+    /// Set beside [`Self::glued_lead`] when the glued doc is a breakable **atom** — an inline
+    /// element, or a glued element run — rather than a text run. It exists only so a flow-boundary
+    /// look-ahead can tell the two apart ([`crate::doc::arena::DocArena::welded_atom`]): an atom is
+    /// measured **flat**, a text run rides in its own mode; the walk continues past either while
+    /// the next entry is still glued, and the unit ends at the first entry that is not.
+    ///
+    /// ⚠️ It is a separate flag because the distinction is **not** recoverable from the doc's shape.
+    /// A single-word text run is a bare `Text` (`build_text_fill_doc_trimmed` returns the word
+    /// itself, not a `Fill`), and one carrying a glued prefix is a `Concat` — so "the context wraps
+    /// a non-`Fill`" reads a single-word `.w` as an atom, ends the walk early, and the run it was
+    /// supposed to measure never reaches the boundary's fit check. That was a real regression; do
+    /// not replace this flag with a node-kind sniff.
+    ///
+    /// On such a marker the context is otherwise **inert**: the renderer applies a `DocContext` only
+    /// when it wraps a `Fill`, and this wraps an element, so the mark costs one node and changes no
+    /// layout by itself.
+    #[inline]
+    #[must_use]
+    pub const fn glued_atom(&self) -> bool {
+        self.flag(Self::GLUED_ATOM)
+    }
+
+    /// Returns `self` with [`Self::glued_atom`] set to `on`.
+    #[inline]
+    #[must_use]
+    pub const fn with_glued_atom(self, on: bool) -> Self {
+        self.with_flag(Self::GLUED_ATOM, on)
+    }
+
+    /// Set beside [`Self::glued_atom`] when the wrapped doc is not the atom itself but the
+    /// **sibling join** `group([atom, line])` — a welded-run atom rejoined with its trailing
+    /// boundary by the non-last text arm
+    /// ([`crate::doc::arena::DocArena::try_welded_sibling_join`], the sole producer). The join
+    /// must carry the popped marker's flags on top: buried inside the group, the preceding
+    /// boundary's welded walk reads the join as not-glued, stops one node short, and the run
+    /// stands and tears its last element open instead of travelling.
+    ///
+    /// [`crate::doc::arena::DocArena::welded_atom`] recognizes the join by this flag and
+    /// resolves the measured atom to the group's first child — the element alone. The trailing
+    /// `line` is the unit's own first whitespace, where everything after is free to wrap, so it
+    /// must not enter the boundary's fit check (the same cut the fold's lead extraction makes).
+    ///
+    /// ⚠️ A separate flag because the resolution is **not** safe on shape alone: a bare glued
+    /// element's own doc is routinely a `Group(Concat([…]))` too, so "look through the group"
+    /// keyed on [`Self::glued_atom`] would descend into an ordinary element and measure its
+    /// first part (the open tag) as the atom.
+    #[inline]
+    #[must_use]
+    pub const fn joined_atom(&self) -> bool {
+        self.flag(Self::JOINED_ATOM)
+    }
+
+    /// Returns `self` with [`Self::joined_atom`] set to `on`.
+    #[inline]
+    #[must_use]
+    pub const fn with_joined_atom(self, on: bool) -> Self {
+        self.with_flag(Self::JOINED_ATOM, on)
     }
 }
 

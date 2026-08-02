@@ -941,10 +941,7 @@ mod arena_tests {
         let parts = [head, a.line(), a.text("tail")];
         let fold = a.with_context(
             a.fill(&parts),
-            DocContext {
-                after_element_fold: true,
-                ..Default::default()
-            },
+            DocContext::default().with_after_element_fold(true),
         );
         let plain = a.fill(&parts);
 
@@ -970,10 +967,7 @@ mod arena_tests {
         let parts = [head, a.line(), a.text("t")];
         let fold = a.with_context(
             a.fill(&parts),
-            DocContext {
-                after_element_fold: true,
-                ..Default::default()
-            },
+            DocContext::default().with_after_element_fold(true),
         );
 
         assert_eq!(render_pw_tab(&a, fold, 10), "AAAAAA\nBBBBBB t");
@@ -993,10 +987,7 @@ mod arena_tests {
         let wide = a.group(a.concat(&[a.text("<AAAA"), a.softline(), a.text("BBBB>")]));
         let flow = a.with_context(
             a.fill(&parts),
-            DocContext {
-                break_before_wide_flow: true,
-                ..Default::default()
-            },
+            DocContext::default().with_break_before_wide_flow(true),
         );
 
         // 4 + 1 + 10 = 15 > 12, so the separator breaks and `wide` renders intact at column 0.
@@ -1012,34 +1003,30 @@ mod arena_tests {
         );
     }
 
-    /// `trailing_glued_tag`: the fill's last item is measured ALONE even though a node
-    /// follows it on the render stack, because that node is byte-glued to the item and
-    /// belongs to it. The glued pair then rides past print width rather than the fill
-    /// breaking in front of a word it is welded to.
+    /// The fill's last item is measured WITH the rest of the render stack (the default
+    /// look-ahead): a node byte-glued to the last word belongs to its fit check, so the
+    /// fill breaks in front of the word and the welded pair travels to the fresh line
+    /// together rather than the tail riding past print width. The smallest welded unit —
+    /// one word plus its glued tag — takes the same travel rule as any welded run.
     #[test]
-    fn test_fill_trailing_glued_tag_ignores_rest() {
+    fn test_fill_last_item_measures_glued_rest() {
         let a = DocArena::new();
         let parts = [a.text("word")];
-        let glued = a.with_context(
-            a.fill(&parts),
-            DocContext {
-                trailing_glued_tag: true,
-                ..Default::default()
-            },
-        );
         let pad = a.text("PADDING");
-        // Stands in for the Svelte `{tag}` this flag exists for — braces would read as format
-        // arguments to clippy, and the width (5) is what the trace below turns on.
+        // Stands in for the Svelte `{tag}` this rule exists for — braces would read as
+        // format arguments to clippy.
         let tag = a.text("[tag]");
 
-        // `word` alone fits the 5 remaining columns; `word[tag]` does not.
-        assert_eq!(
-            render_pw_tab(&a, a.concat(&[pad, glued, tag]), 12),
-            "PADDINGword[tag]"
-        );
+        // `word[tag]` (9) does not fit the 5 columns after `PADDING`: the fill breaks in
+        // front of `word` and the pair travels together.
         assert_eq!(
             render_pw_tab(&a, a.concat(&[pad, a.fill(&parts), tag]), 12),
             "PADDING\nword[tag]"
+        );
+        // At 16 the pair fits after the padding and packs.
+        assert_eq!(
+            render_pw_tab(&a, a.concat(&[pad, a.fill(&parts), tag]), 16),
+            "PADDINGword[tag]"
         );
     }
 
@@ -1057,13 +1044,7 @@ mod arena_tests {
             a.line(),
             a.text("y"),
         ];
-        let glued = a.with_context(
-            a.fill(&parts),
-            DocContext {
-                glued_lead: true,
-                ..Default::default()
-            },
-        );
+        let glued = a.with_context(a.fill(&parts), DocContext::default().with_glued_lead(true));
         let pad = a.text("PADDING");
 
         // The head does not fit in the 5 remaining columns but does fit at column 0, so the
@@ -1257,13 +1238,7 @@ mod arena_tests {
     #[test]
     fn test_fits_flat_width_with_context_trailing_reserve() {
         let a = DocArena::new();
-        let doc = a.with_context(
-            a.text("abcd"),
-            DocContext {
-                trailing_reserve: 3,
-                ..Default::default()
-            },
-        );
+        let doc = a.with_context(a.text("abcd"), DocContext::reserving(3));
         // 4 content + 3 reserved = 7
         assert_flat_width(&a, doc, 7);
     }

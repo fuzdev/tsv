@@ -288,7 +288,7 @@ impl<'a> Printer<'a> {
             .find_char_outside_comments(spans.kw_end, first_start, b'{')
             .unwrap_or(0);
 
-        let last_spec_end = specifiers.last().map_or(0, |s| get_span(s).end);
+        let last_spec_end = get_span(&specifiers[specifiers.len() - 1]).end;
         let brace_close = self.close_brace_offset(last_spec_end, spans.bound);
         // Just past the closing `}` — the exclusive end of every brace-window scan
         // below, and the caller's trailing-comment anchor returned at the end.

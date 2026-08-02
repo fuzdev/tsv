@@ -212,11 +212,12 @@ const _: () = assert!(!std::mem::needs_drop::<DocNode>());
 //
 // ⚠️ The drivers are **`Text`** on 64-bit (a `DocText` is 24 B, from `Static`'s fat pointer plus
 // its width slot) and **`Group`** on wasm32 (16 B). `WithContext` is *not* one on either target
-// (12 B, so 12 B of slack on 64-bit and 4 B on wasm32) — but it is the variant most likely to grow,
+// (8 B, so 16 B of slack on 64-bit and 8 B on wasm32) — but it is the variant most likely to grow,
 // since it carries a `DocContext` by value and a field added there lands on *every* node in the
 // store. That is why `DocContext::trailing_reserve` is a `u16` (it is a column count; as a `usize`
-// it alone held the whole node store at 32 B) and why `DocContext` carries its own size assert with
-// the exact threshold. Check that one first when this pin moves.
+// it alone held the whole node store at 32 B), why its layout flags are one packed `u16`, and why
+// `DocContext` carries its own size assert with the exact threshold. Check that one first when
+// this pin moves.
 #[cfg(target_pointer_width = "64")]
 const _: () = assert!(size_of::<DocNode>() == 24);
 #[cfg(target_pointer_width = "32")]
@@ -772,6 +773,22 @@ const STATIC_CACHE_SLOTS: usize = 512;
 // assert makes changing one without the other a compile error.
 const _: () = assert!(STATIC_CACHE_SLOTS == 1 << 9);
 
+/// How one render-stack entry classifies for the flow-boundary look-ahead's welded-unit walk
+/// ([`DocArena::welded_entry`]; consumed by `flow_lookahead` in `arena_render_fill`).
+#[derive(Debug, Clone, Copy)]
+pub(crate) enum WeldedEntry {
+    /// Not byte-glued to what precedes it on the render stack — the welded unit ended before this
+    /// entry, and the walk stops.
+    NotGlued,
+    /// A glued text **run**: its head alone is pinned, its internal whitespace boundaries are
+    /// ordinary break points. It rides in its own inherited mode and the walk continues past it.
+    TextRun,
+    /// A glued breakable **atom** (the payload is the doc to measure — an after-element fold's
+    /// lead, or a bare glued element / glued element run): measured **flat**, and it ENDS the
+    /// unit, since whatever follows it sits behind a break opportunity of its own.
+    Atom(DocId),
+}
+
 impl DocArena {
     /// Create a new empty arena.
     pub fn new() -> Self {
@@ -1181,45 +1198,101 @@ impl DocArena {
         )
     }
 
-    /// If `id` is an after-element fold — a `Fill` wrapped in a `WithContext` carrying
-    /// [`DocContext::after_element_fold`], the shape marker `build_after_element_fold` sets —
-    /// return the fold's LEAD item: the inline element the trailing text packs after. `None`
-    /// for any other node.
+    /// The **breakable atom** `id` contributes to a flow-boundary measurement, if it is one — an
+    /// after-element fold's LEAD element (the inline element its trailing text packs after), a
+    /// sibling join's element ([`DocContext::joined_atom`] — the join's trailing separator stays
+    /// out of the unit), or a bare glued element / glued element run
+    /// ([`DocContext::glued_atom`]). `None` for anything else — a text run, a plain concat, a
+    /// bare element carrying no context.
     ///
-    /// The preceding text's flow-boundary measurement (`break_before_wide_flow`) uses this to
-    /// decide the element's drop by whether the *element* fits, mirroring prettier's pairwise
-    /// fill (`text, separator, element` — never the trailing text). A short lead then packs
-    /// after the text rather than the whole element+tail fold forcing it to its own line.
+    /// This is the question asked of the node at the TOP of the look-ahead stack, and unlike
+    /// [`Self::welded_entry`] it does NOT ask whether `id` is glued: the top node sits behind the
+    /// very boundary being measured, so only its atom shape matters — a fold contributes its lead
+    /// whether or not its own head is welded to the text before it (prettier's pairwise fill:
+    /// `text, separator, element` — never the trailing tail, which wraps behind the fold's own
+    /// `line`).
     #[inline]
-    pub(crate) fn after_element_fold_lead(&self, id: DocId) -> Option<DocId> {
+    pub(crate) fn welded_atom(&self, id: DocId) -> Option<DocId> {
         let nodes = self.nodes.borrow();
         let DocNode::WithContext { doc, context } = &nodes[id.index()] else {
             return None;
         };
-        if !context.after_element_fold {
-            return None;
-        }
-        let DocNode::Fill(range) = &nodes[doc.index()] else {
-            return None;
-        };
-        range.resolve(&self.children.borrow()).first().copied()
+        self.welded_atom_in(&nodes, *doc, context)
     }
 
-    /// Whether `id` is a run whose FIRST item is **byte-glued** to whatever precedes it on the
-    /// render stack — a `WithContext` carrying [`DocContext::glued_lead`].
-    ///
-    /// The flow-boundary look-ahead ([`DocContext::break_before_wide_flow`]) reads this to decide
-    /// how far past the inline element its **pairwise** measurement reaches. It normally ends at the
-    /// element, because the next run owns a whitespace boundary to wrap at; a welded run owns none,
-    /// so it shares the element's line by construction and must share its fit check too. Measuring
-    /// the element as if the text fused to its closing tag were free to move packs it onto a line it
-    /// does not fit — which is the `inline_break_before_*` / `inline_nbsp_boundary_long` shape.
+    /// The atom-shape half of [`Self::welded_atom`] / [`Self::welded_entry`], under the caller's
+    /// node borrow: `doc`/`context` are a `WithContext`'s payload, already destructured.
     #[inline]
-    pub(crate) fn has_glued_lead(&self, id: DocId) -> bool {
-        matches!(
-            &self.nodes.borrow()[id.index()],
-            DocNode::WithContext { context, .. } if context.glued_lead
-        )
+    fn welded_atom_in(&self, nodes: &[DocNode], doc: DocId, context: &DocContext) -> Option<DocId> {
+        if context.after_element_fold() {
+            // The fold is `fill([element, line, words…])`; its breakable atom is the lead element.
+            let DocNode::Fill(range) = &nodes[doc.index()] else {
+                return None;
+            };
+            return range.resolve(&self.children.borrow()).first().copied();
+        }
+        if context.joined_atom() {
+            // The sibling join is `group([atom, line])` ([`Self::try_welded_sibling_join`]); its
+            // breakable atom is the group's first child — the fold's lead extraction, one shape
+            // over. The trailing `line` is the unit's own first whitespace, where everything
+            // after is free to wrap, so it stays out of the boundary's fit check.
+            let DocNode::Group { contents, .. } = &nodes[doc.index()] else {
+                return None;
+            };
+            let DocNode::Concat(range) = &nodes[contents.index()] else {
+                return None;
+            };
+            return range.resolve(&self.children.borrow()).first().copied();
+        }
+        if context.glued_atom() {
+            Some(doc)
+        } else {
+            None
+        }
+    }
+
+    /// Classify `id` as an entry of the welded-unit walk — the flow-boundary look-ahead
+    /// ([`DocContext::break_before_wide_flow`]) deciding how far past the inline element its
+    /// **pairwise** measurement reaches. It normally ends at the element, because the next run
+    /// owns a whitespace boundary to wrap at; a welded run ([`DocContext::glued_lead`]) owns none,
+    /// so it shares the element's line by construction and must share its fit check too. Measuring
+    /// the element as if the text fused to its closing tag were free to move packs it onto a line
+    /// it does not fit — which is the `inline_break_before_*` / `inline_nbsp_boundary_long` shape.
+    ///
+    /// The [`WeldedEntry::TextRun`]-vs-[`WeldedEntry::Atom`] split is the whole rule. An atom must
+    /// be measured **flat** (its inherited Break mode would let `arena_fits` short-circuit inside
+    /// the element's own group and report a fit after the open tag alone). A text run must NOT be
+    /// measured flat — forcing it counts words that will wrap anyway and breaks the boundary far
+    /// too early, isolating `(<Link …>` in `example (<Link …>see docs</Link>) for details.` (a
+    /// run's own first *internal* whitespace is where the measurement stops, since everything
+    /// past it wraps there). The walk continues past **either** kind while the next entry is
+    /// still glued — a weld can run element, glued text, element (`.w<b>yy</b>.z<i>q</i>`), and
+    /// stopping at the first atom lets an early short element strand a later wide one — and the
+    /// unit ends at the first entry that is not glued, which sits behind a break opportunity of
+    /// its own.
+    ///
+    /// The two atom sources are asymmetric on purpose. A fold announces itself by its own identity
+    /// flag, so its lead needs no extra marking. A bare glued element has nothing to announce, so
+    /// the builder marks it ([`DocContext::glued_atom`]) — inert at render, since only a `Fill`
+    /// consumes a context there.
+    ///
+    /// ⚠️ **Atom-ness is NOT recoverable from the node's shape**, and the `Fill`-sniff that looks
+    /// like it works is the trap: a single-word text run is a bare `Text` and a prefixed one is a
+    /// `Concat`, so "wraps a non-`Fill`" reads `.w` as an atom and ends the walk one node early —
+    /// the boundary then never sees the element behind it. Keep the question on the flag.
+    #[inline]
+    pub(crate) fn welded_entry(&self, id: DocId) -> WeldedEntry {
+        let nodes = self.nodes.borrow();
+        let DocNode::WithContext { doc, context } = &nodes[id.index()] else {
+            return WeldedEntry::NotGlued;
+        };
+        if !context.glued_lead() {
+            return WeldedEntry::NotGlued;
+        }
+        match self.welded_atom_in(&nodes, *doc, context) {
+            Some(atom) => WeldedEntry::Atom(atom),
+            None => WeldedEntry::TextRun,
+        }
     }
 
     /// The **single** constructor of the inline-sibling wrap — `group(concat([line, x]))`, an
@@ -1276,6 +1349,36 @@ impl DocArena {
             return None;
         }
         Some(*x)
+    }
+
+    /// Join a welded-run atom with its trailing sibling boundary — the non-last text arm's
+    /// `group([atom, line])`, with the marker's flags re-hoisted onto the join
+    /// ([`DocContext::joined_atom`]) so a preceding boundary's welded walk
+    /// ([`Self::welded_entry`]) still sees the run. Buried inside a bare group, the marker is
+    /// invisible, the walk stops one node short, and the run stands and tears its last element
+    /// open instead of travelling.
+    ///
+    /// `None` when `id` is not a welded-atom marker (the `LeadBoundary::Glued` shape
+    /// `push_inline_child_doc` pushes in `tsv_svelte` — [`DocContext::glued_atom`] without the
+    /// fold or join identities); the caller then joins the ordinary way. The sole producer of
+    /// the join shape, and [`Self::welded_atom`]'s `joined_atom` arm is its exact structural
+    /// inverse — keep them in lockstep, like the [`Self::inline_sibling_line_group`] /
+    /// [`Self::strip_leading_line_group`] pair above.
+    pub fn try_welded_sibling_join(&self, id: DocId) -> Option<DocId> {
+        let context = {
+            let nodes = self.nodes.borrow();
+            let DocNode::WithContext { context, .. } = &nodes[id.index()] else {
+                return None;
+            };
+            if !context.glued_atom() || context.after_element_fold() || context.joined_atom() {
+                return None;
+            }
+            context.clone()
+        };
+        Some(self.with_context(
+            self.group(self.concat(&[id, self.line()])),
+            context.with_joined_atom(true),
+        ))
     }
 
     /// Tag `id` as the doc node that emits the comment at `span` in `source`.
@@ -2840,5 +2943,55 @@ mod inline_sibling_line_group_tests {
         // A forced-break group of the right shape is also rejected (the wrap is non-breaking).
         let broken = a.group_break(a.concat(&[a.line(), x]));
         assert_eq!(a.strip_leading_line_group(broken), None);
+    }
+}
+
+#[cfg(test)]
+mod welded_sibling_join_tests {
+    //! The welded sibling join producer/matcher must stay in lockstep, like the inline-sibling
+    //! wrap pair above. The producer ([`super::DocArena::try_welded_sibling_join`]) is called a
+    //! crate away in `tsv_svelte`'s non-last text arm; the matcher is
+    //! [`super::DocArena::welded_atom`]'s `joined_atom` arm, consumed by `flow_lookahead`'s
+    //! welded walk. A silent shape drift makes the walk read the join as `NotGlued`, and the run
+    //! stands and tears its last element open instead of travelling — invisible to every
+    //! idempotency-shaped gate, since the torn form is its own fixed point.
+    use super::{DocArena, DocContext, WeldedEntry};
+
+    fn marker(a: &DocArena) -> super::DocId {
+        a.with_context(
+            a.text("el"),
+            DocContext::default()
+                .with_glued_lead(true)
+                .with_glued_atom(true),
+        )
+    }
+
+    #[test]
+    fn welded_sibling_join_round_trips() {
+        let a = DocArena::new();
+        let m = marker(&a);
+        let joined = a.try_welded_sibling_join(m).expect("a marker must join");
+        // The walk must still see the run through the join, and the measured atom is the marker
+        // alone — the join's trailing `line` stays out of the boundary's fit check.
+        assert!(
+            matches!(a.welded_entry(joined), WeldedEntry::Atom(atom) if atom == m),
+            "welded_atom's joined_atom arm must be the exact inverse of try_welded_sibling_join",
+        );
+    }
+
+    #[test]
+    fn welded_sibling_join_rejects_non_markers() {
+        let a = DocArena::new();
+        // A bare doc joins the ordinary way.
+        let x = a.text("x");
+        assert!(a.try_welded_sibling_join(x).is_none());
+        // A glued text run (`glued_lead` without `glued_atom`) is not an atom marker.
+        let run = a.with_context(x, DocContext::default().with_glued_lead(true));
+        assert!(a.try_welded_sibling_join(run).is_none());
+        // An existing join is never re-joined.
+        let joined = a
+            .try_welded_sibling_join(marker(&a))
+            .expect("a marker must join");
+        assert!(a.try_welded_sibling_join(joined).is_none());
     }
 }

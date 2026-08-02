@@ -201,7 +201,8 @@ impl<'a> Printer<'a> {
                 // Export named specifiers always have the `{` directly after the
                 // header (no default/namespace binding), so the keyword→`{` comment
                 // (`export /* c */ {a}`, `export type /* c */ {a}`) is always
-                // captured and a lone specifier is always unbreakable.
+                // captured and the lone-specifier no-break rule always applies (a
+                // comment on the specifier still restores breaking — `can_break`).
                 close_brace_end = self.push_braced_specifier_list(
                     &mut parts,
                     decl.specifiers,

@@ -5,7 +5,7 @@
 
 use smallvec::SmallVec;
 
-use super::arena::{ArenaCommand, DocArena, DocId, RenderIndent};
+use super::arena::{ArenaCommand, DocArena, DocId, RenderIndent, WeldedEntry};
 use super::arena_fits::{arena_fits_multi, arena_fits_with_lookahead};
 use super::arena_render::{
     RenderCtx, line_start_column, render_single_doc, trim_trailing_whitespace, write_indentation,
@@ -40,62 +40,57 @@ pub(super) fn render_fill_iterative(
         let content = parts[offset];
 
         let is_final_segment = offset + 2 >= parts.len();
+        // Final segment with following render-stack content — the boundary to whatever comes
+        // after the fill, where every look-ahead measurement below applies.
+        let final_with_rest = is_final_segment && !rest_commands.is_empty();
 
         let available = if is_final_segment {
-            remaining.saturating_sub(context.trailing_reserve as usize)
+            remaining.saturating_sub(context.trailing_reserve() as usize)
         } else {
             remaining
         };
 
-        // A text-run fill glued to a following tag (`… ~{ratio}`) measures its last word ALONE:
-        // prettier keeps the tag outside the fill, so the fill never breaks before the word it is
-        // glued to (the word stays put, the tag rides past printWidth after it). Suppress the
-        // last-item look-ahead so the glued tag doesn't fold into the word's fit check.
-        let lookahead_rest: &[ArenaCommand] = if context.trailing_glued_tag && is_final_segment {
-            &[]
-        } else {
-            rest_commands
-        };
+        // Flow boundary, forced-break follower — ONE condition shared by Case 1's `content_fits`
+        // and Case 2's `sep_fits` (the same boundary rule, differing only in where the separator
+        // sits): the node after this fill is already multiline (wrapped attributes, a block-body
+        // handler), so the welded unit can't stay on the line — never "fits". Prettier's
+        // `group([line, element])` breaks on that forced break and drops the element; a flat
+        // measurement here would instead short-circuit at the follower's own hardline and
+        // wrongly report a fit, hugging it onto the text line.
+        let flow_forced_break = context.break_before_wide_flow()
+            && is_final_segment
+            && rest_commands
+                .last()
+                .is_some_and(|c| arena.will_break(c.doc));
+
         // `break_before_wide_flow`, Case-1 half: a GLUED text→element boundary (`… glued<a…>`) has
         // no trailing separator, so the glued last word is the fill's last item and the element
         // follows on the render stack — the whole-flat measurement lands here (the space-separated
         // half lands in Case 2's `sep_fits`). A ws-fill also reaches this at `is_final_segment`, but
         // its content there is a bare word whose `content_fits` only feeds `should_remeasure` (inert
-        // for a groupless leaf), so keying the block on the shared flag is contamination-free.
-        let content_fits = if context.break_before_wide_flow
-            && is_final_segment
-            && rest_commands
-                .last()
-                .is_some_and(|c| arena.will_break(c.doc))
-        {
-            // Forced-break element: the following inline element glued to the last word is already
-            // multiline (wrapped attributes / block-body handler), so the glued run can't stay on
-            // the line — never "fits". Mirrors Case 2's forced-break short-circuit; a flat
-            // measurement would wrongly report a fit at the element's own hardline.
+        // for a groupless leaf), so keying the stack on the shared flag is contamination-free.
+        let content_fits = if flow_forced_break {
             false
-        } else if context.break_before_wide_flow && is_final_segment && !rest_commands.is_empty() {
-            // Measure the following element as a WHOLE flat unit so the fill breaks at the
-            // whitespace boundary BEFORE the glued last word when (word + element) don't fit. The
-            // element's inherited Break mode would otherwise let `arena_fits` short-circuit at its
-            // first internal line and wrongly report "fits", welding the word and breaking the
-            // element's own content in place. Pairwise like Case 2's `sep_fits` — the same
-            // boundary rule, only the separator differs — so it takes the same truncated stack
-            // (see [`flow_lookahead`]).
+        } else if final_with_rest {
+            let flow_stack;
+            let lookahead: &[ArenaCommand] = if context.break_before_wide_flow() {
+                // Measure the following element as a WHOLE flat unit so the fill breaks at the
+                // whitespace boundary BEFORE the glued last word when (word + element) don't fit.
+                // The element's inherited Break mode would otherwise let `arena_fits`
+                // short-circuit at its first internal line and wrongly report "fits", welding the
+                // word and breaking the element's own content in place. Pairwise like Case 2's
+                // `sep_fits` — the same boundary rule, only the separator differs — so it takes
+                // the same truncated stack (see [`flow_lookahead`]).
+                flow_stack = flow_lookahead(arena, rest_commands);
+                &flow_stack
+            } else {
+                rest_commands
+            };
             arena_fits_with_lookahead(
                 arena,
                 content,
                 Mode::Flat,
-                &flow_lookahead(arena, rest_commands),
-                remaining as isize,
-                embed,
-                source,
-            )
-        } else if is_final_segment && !lookahead_rest.is_empty() {
-            arena_fits_with_lookahead(
-                arena,
-                content,
-                Mode::Flat,
-                lookahead_rest,
+                lookahead,
                 remaining as isize,
                 embed,
                 source,
@@ -129,17 +124,13 @@ pub(super) fn render_fill_iterative(
         // `rest_commands` measurement already asks the right question.
         let content_fits = if offset + 1 < parts.len() && arena.is_collapsible_line(content) {
             let mut with_sep: SmallVec<[ArenaCommand; 8]> =
-                SmallVec::from_slice(if is_final_segment {
-                    lookahead_rest
-                } else {
-                    &[]
-                });
+                SmallVec::from_slice(if is_final_segment { rest_commands } else { &[] });
             with_sep.push(ArenaCommand {
                 indent,
                 mode: Mode::Flat,
                 doc: parts[offset + 1],
             });
-            let budget = if is_final_segment && !lookahead_rest.is_empty() {
+            let budget = if final_with_rest {
                 remaining
             } else {
                 available
@@ -251,24 +242,16 @@ pub(super) fn render_fill_iterative(
             // The separator (the last fill item) is rendered between `content` and whatever
             // follows the fill (`rest_commands`). The generic `content_fits` above measures
             // `content` + `rest_commands` but NOT this separator, so a trailing-`line` fill
-            // (the `next_node_is_flow` / after-element-fold boundary — the only fills that reach
+            // (the `next_is_flow` / after-element-fold boundary — the only fills that reach
             // Case 2, since they alone end in a separator) under-measures by the separator's
             // width and lets the following node overshoot printWidth by a column. Re-measure with
             // the separator counted just before the look-ahead so the boundary breaks (next node
             // to its own line) exactly when it should.
-            let sep_fits = if context.break_before_wide_flow
-                && is_final_segment
-                && rest_commands
-                    .last()
-                    .is_some_and(|c| arena.will_break(c.doc))
-            {
-                // Flow boundary, forced-break element: the following inline element is already
-                // multiline (multiline attributes, a block-body event handler, …). Prettier's
-                // `group([line, element])` breaks on that forced break and drops the element, so the
-                // separator must break here too — a flat-width measurement would short-circuit at the
-                // element's hardline and wrongly report a fit (hugging it onto the text line).
+            // The forced-break short-circuit is [`flow_forced_break`], hoisted above Case 1 —
+            // the separator must break exactly where Case 1's content would.
+            let sep_fits = if flow_forced_break {
                 false
-            } else if is_final_segment && !rest_commands.is_empty() {
+            } else if final_with_rest {
                 // Inline-backed look-ahead stack plus the separator — matches the render
                 // work-list's `N = 8` so the common case stays off the heap (this rare Case-2
                 // flow boundary still cloned a `Vec`).
@@ -278,7 +261,7 @@ pub(super) fn render_fill_iterative(
                 // the context flag to the in-flow (`!is_first`) text→element boundary; a
                 // first-child text leaves the element bare, which keeps hugging.
                 let mut rest_with_sep: SmallVec<[ArenaCommand; 8]> =
-                    if context.break_before_wide_flow {
+                    if context.break_before_wide_flow() {
                         flow_lookahead(arena, rest_commands)
                     } else {
                         SmallVec::from_slice(rest_commands)
@@ -378,7 +361,7 @@ pub(super) fn render_fill_iterative(
                     source,
                 );
 
-                if context.after_element_fold && !content_fits_at_start {
+                if context.after_element_fold() && !content_fits_at_start {
                     // The first fill item is a breakable inline element (the after-element fold's
                     // element) sitting mid-line right after a small prefix — the parent inline
                     // element's `>`. It does not fit flat here, and it would not fit on its own line
@@ -454,7 +437,7 @@ pub(super) fn render_fill_iterative(
                 // separator, so the run splits at the first whitespace boundary INSIDE it instead,
                 // even when the glued head overruns printWidth. Head only: every later item is
                 // separated by real whitespace and keeps the ordinary drop.
-                if context.glued_lead && offset == 0 {
+                if context.glued_lead() && offset == 0 {
                     render_single_doc(
                         ctx,
                         content,
@@ -588,16 +571,23 @@ pub(super) fn render_fill_iterative(
 ///   overflow lands after it — isolating the element on its own line while the word it was measured
 ///   against wraps anyway. Pinned by `tests/fixtures/svelte/elements/fill_inline_pairwise_long`,
 ///   whose four `<p>`s are the two boundary spellings at 100 and 101.
-/// - A **welded** run ([`DocArena::has_glued_lead`] — a `.` fused to `</a>`, a word held by a
+/// - A **welded** run ([`DocArena::welded_entry`] — a `.` fused to `</a>`, a word held by a
 ///   non-breaking space) is INCLUDED, and so is any welded run behind it. No break may land in front
 ///   of it, so it rides the element's line whichever way the boundary resolves and shares its width
 ///   by construction. Pinned by `inline_break_before_wrap_long`,
-///   `inline_break_before_comment_glued_long` and `inline_nbsp_boundary_long`.
+///   `inline_break_before_comment_glued_long` and `inline_nbsp_boundary_long`. A welded run reaches
+///   through **every glued member** — element, glued text, element, however long the weld runs
+///   (`<code>a</code>/<code>b</code>`, `.w<b>yy</b>.z<i>q</i>`): a mid-run element takes the top
+///   element's treatment (forced flat) and the walk continues while the next entry is still glued;
+///   the run's last element arrives bare, as a sibling join, or as a welded after-element fold,
+///   and ends the unit. Pinned by `fill_inline_pairwise_welded_long`,
+///   `inline_fold_glued_head_long_prettier_divergence` and
+///   `inline_welded_run_travel_long_prettier_divergence`.
 ///
 /// When the following node is an after-element fold (an inline element + its trailing text), measure
 /// only the fold's LEAD element — the same rule, since that trailing text is separated by the fold's
-/// own `line` and can wrap. A bare following element ([`DocArena::after_element_fold_lead`] →
-/// `None`) is already the whole unit.
+/// own `line` and can wrap. A bare following element ([`DocArena::welded_atom`] → `None`) is
+/// already the whole unit.
 ///
 /// Both halves of the boundary rule share this, since they differ only in where the separator sits:
 /// the space-authored half measures it as Case 2's `sep_fits` (separator counted after this stack),
@@ -609,15 +599,36 @@ fn flow_lookahead(arena: &DocArena, rest_commands: &[ArenaCommand]) -> SmallVec<
     };
     // The stack is consumed back-to-front: the element is its last entry, and the welded unit
     // extends DOWNWARD from there through `deeper`.
+    // A welded TEXT run rides in its OWN mode, deliberately: its head alone is pinned, so its
+    // internal whitespace boundaries are ordinary break points and the inherited Break mode
+    // stopping at the first of them is the right answer. A welded **atom**
+    // ([`DocArena::welded_entry`] — a bare glued element, a glued element run, an after-element
+    // fold's lead, or a sibling join's element) is the exception: measured in Break mode it would
+    // short-circuit inside the element's own group and report a fit after the open tag alone, so
+    // it takes the top element's treatment (forced flat). The walk continues past either kind
+    // while the next entry is still glued — a weld can run element, glued text, element
+    // (`.w<b>yy</b>.z<i>q</i>`), and ending the unit at the first atom would let its earlier
+    // members report a fit that strands the later wide one — and the unit ends at the first
+    // entry that is not glued, which sits behind a break opportunity of its own.
     let mut first = deeper.len();
-    while first > 0 && arena.has_glued_lead(deeper[first - 1].doc) {
-        first -= 1;
+    while first > 0 {
+        match arena.welded_entry(deeper[first - 1].doc) {
+            WeldedEntry::NotGlued => break,
+            WeldedEntry::TextRun | WeldedEntry::Atom(_) => first -= 1,
+        }
     }
-    out.extend_from_slice(&deeper[first..]);
+    for cmd in &deeper[first..] {
+        match arena.welded_entry(cmd.doc) {
+            WeldedEntry::Atom(a) => out.push(ArenaCommand {
+                doc: a,
+                mode: Mode::Flat,
+                ..*cmd
+            }),
+            _ => out.push(*cmd),
+        }
+    }
     out.push(ArenaCommand {
-        doc: arena
-            .after_element_fold_lead(el_cmd.doc)
-            .unwrap_or(el_cmd.doc),
+        doc: arena.welded_atom(el_cmd.doc).unwrap_or(el_cmd.doc),
         mode: Mode::Flat,
         ..el_cmd
     });
@@ -638,7 +649,7 @@ fn hug_terminal_sep_mode(
     next_content: DocId,
     pos: usize,
 ) -> Mode {
-    if context.after_element_fold
+    if context.after_element_fold()
         && arena_fits_with_lookahead(
             ctx.arena,
             next_content,

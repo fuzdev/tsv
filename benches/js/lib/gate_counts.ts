@@ -94,8 +94,8 @@ export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: strin
 	},
 	'../acorn-typescript': { commit: '312d079', pins: 'TS_FIXTURES_PINS' },
 	'../typescript': { commit: '637d5746b', pins: 'TS_REPO_PINS' },
-	'../kit': { commit: 'da5b08ea7', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
-	'../svelte.dev': { commit: 'c21c2d0f0', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
+	'../kit': { commit: 'b27c82f9c', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
+	'../svelte.dev': { commit: '996bd63e4', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
 	'../prettier': { commit: '1dcd0b05d', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
 	'../prettier-plugin-svelte': { commit: '7809486', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' }
 };
