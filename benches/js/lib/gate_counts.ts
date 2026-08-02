@@ -182,7 +182,7 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	typescript: 115,
+	typescript: 114,
 	css: 23
 };
 
@@ -194,7 +194,7 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 1,
-	typescript: 40,
+	typescript: 38,
 	css: 9
 };
 

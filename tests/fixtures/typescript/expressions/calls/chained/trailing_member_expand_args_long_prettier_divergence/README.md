@@ -18,6 +18,6 @@ only diverge from compact (or Prettier-authored) source. The Prettier form is th
 
 Print width, and consistency. tsv wraps a call's arguments the same way regardless of a trailing
 member — it expands the arguments rather than special-casing the chain — the same stance as its
-handling of module-path calls and single-specifier imports.
+handling of module-path calls.
 
 See [conformance_prettier.md §TypeScript](../../../../../../../docs/conformance_prettier.md#typescript) (Trailing member after a call with an object argument) and [§Print Width Philosophy](../../../../../../../docs/conformance_prettier.md#print-width-philosophy).

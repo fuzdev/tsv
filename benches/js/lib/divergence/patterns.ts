@@ -1413,73 +1413,6 @@ const block_expression_logical: DivergencePattern = {
 	}
 };
 
-const single_specifier_import: DivergencePattern = {
-	id: 'single_specifier_import',
-	description: 'Single-specifier import wraps at print width',
-	languages: ['typescript', 'svelte'],
-	conformance_sections: ['TypeScript'],
-	fixtures: ['typescript/modules/imports/single_specifier_long_prettier_divergence'],
-	detect(ctx) {
-		// Imports are tab-indented when inside a Svelte `<script>` block, so allow
-		// leading tabs. The keyword form may carry `type` (`import type { … }`), so
-		// match `import` + any non-brace prefix before the opening `{`.
-		// Prettier (inline) keeps the whole single-specifier import on one line:
-		// `import { … } from '…';` — both braces present on the same line.
-		const import_inline = /^\t*import\b[^{}]*\{[^{}]*\}/;
-		// Ours (broken) ends the close line on the module path: `} from '…';`.
-		const import_close = /^\t*\}\s*from\s+['"][^'"]+['"]/;
-		const from_path = (l: string) => l.match(/from\s+(['"][^'"]+['"])/)?.[1] ?? null;
-
-		// The module paths of every single-specifier import prettier kept INLINE past
-		// print width — the divergence target. Keyed on the path (not on hunk
-		// alignment), because consecutive imports make the LCS split the long inline
-		// line and ours' broken close into separate hunks (so the original
-		// same-hunk `opener + long-line` predicate missed real files).
-		const long_inline_paths = new Set<string>();
-		for (const l of ctx.prettier_lines!) {
-			if (import_inline.test(l) && visual_width(l) > 100) {
-				const p = from_path(l);
-				if (p) long_inline_paths.add(p);
-			}
-		}
-		if (long_inline_paths.size === 0) return null;
-
-		// Ours-side re-wrap evidence — a long path only counts if OUR output actually
-		// BROKE it into the multiline form (a `} from '<path>';` close on its own
-		// line). An import ours merely edited in place (same single line, different
-		// path) has no such close, so it is never claimed.
-		const broken_paths = new Set<string>();
-		for (const l of ctx.ours_lines!) {
-			const p = import_close.test(l) ? from_path(l) : null;
-			if (p && long_inline_paths.has(p)) broken_paths.add(p);
-		}
-		if (broken_paths.size === 0) return null;
-
-		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			// Prettier side: the long inline import itself.
-			const removed_long = hunk.removed_lines.some(
-				(l) =>
-					import_inline.test(l) && visual_width(l) > 100 && broken_paths.has(from_path(l) ?? '')
-			);
-			// Ours side: the broken close `} from '<same path>';`.
-			const added_break = hunk.added_lines.some(
-				(l) => import_close.test(l) && broken_paths.has(from_path(l) ?? '')
-			);
-			return removed_long || added_break;
-		});
-
-		if (hunk_indices.length > 0) {
-			return {
-				pattern: 'single_specifier_import',
-				confidence: 'likely',
-				hunk_indices,
-				reason: 'Single specifier import wraps at print width'
-			};
-		}
-		return null;
-	}
-};
-
 const member_expression_call: DivergencePattern = {
 	id: 'member_expression_call',
 	description: 'Member expression in call args breaks differently',
@@ -3231,7 +3164,6 @@ export const PATTERNS: DivergencePattern[] = [
 	template_embedded_verbatim,
 	field_key_unquote,
 	block_expression_logical,
-	single_specifier_import,
 	member_expression_call,
 	return_type_generic_union,
 	non_null_paren_base,

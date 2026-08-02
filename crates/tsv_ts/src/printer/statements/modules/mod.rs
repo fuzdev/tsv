@@ -200,11 +200,16 @@ impl<'a> Printer<'a> {
                 let bound = decl.source.as_ref().map_or(decl.span.end, |s| s.span.start);
                 // Export named specifiers always have the `{` directly after the
                 // header (no default/namespace binding), so the keyword→`{` comment
-                // (`export /* c */ {a}`, `export type /* c */ {a}`) is always captured.
+                // (`export /* c */ {a}`, `export type /* c */ {a}`) is always
+                // captured and a lone specifier is always unbreakable.
                 close_brace_end = self.push_braced_specifier_list(
                     &mut parts,
                     decl.specifiers,
-                    SpecifierListSpans { kw_end, bound },
+                    SpecifierListSpans {
+                        header_start: decl.span.start,
+                        kw_end,
+                        bound,
+                    },
                     true,
                     |s| s.span,
                     |s| self.build_export_specifier_doc(s, is_type_export),
@@ -783,19 +788,20 @@ impl<'a> Printer<'a> {
                 // Named specifiers: comment-aware braced list. `from_content_end`
                 // is the offset past `}`, for the `}`→`from` gap comment scan.
                 let kw_end = self.import_header_end(decl, named_specs[0].span.start);
-                // Capture the keyword→`{` comment here only when the brace directly
-                // follows the header; with a default/namespace binding its own→`{`
-                // comments are handled above (line builds `x, {…}`), so capturing
-                // here too would double-emit them.
-                let capture_keyword_comment = !has_binding;
+                // A default/namespace binding sits between the header and the `{`
+                // (prettier's `standaloneSpecifiers`), which both suppresses the
+                // keyword→`{` comment capture — those comments are emitted above, as
+                // the line builds `x, {…}` — and lets a lone specifier break.
+                let brace_follows_header = !has_binding;
                 from_content_end = Some(self.push_braced_specifier_list(
                     &mut parts,
                     &named_specs,
                     SpecifierListSpans {
+                        header_start: decl.span.start,
                         kw_end,
                         bound: decl.source.span.start,
                     },
-                    capture_keyword_comment,
+                    brace_follows_header,
                     |s| s.span,
                     |s| self.build_import_specifier_doc(s, is_type_import),
                 ));
