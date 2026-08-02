@@ -26,6 +26,17 @@ the run, what the run is made of, and what follows it, and all reach the same fo
   itself and never collapses, so the run is unbreakable for a different reason and the break must
   never land on it.
 - **component pair** and **expression tag** — the run's members are not all HTML elements.
+- **tag-headed run, @100 / @101** — the run's HEAD is an expression tag (`{expr}.w<b>…</b>`).
+  At exactly 100 the run packs onto the text line; at 101 it travels whole. The crossing point
+  sits past the tag, in the last element — the boundary's measurement must reach *through* the
+  tag to see it.
+- **tag-headed run, the tag is the crossing point** — the same run where the width runs out
+  inside the tag itself rather than past it. Both sides of the tag reach the same travel form:
+  which member crosses the width cannot matter (the sibling of the mid-run/last-element pair,
+  on the tag axis).
+- **run welded through a mid-run tag** — element-tag-element glue
+  (`<code>.x</code>{ex}<b>…</b>`), crossing past the tag: the walk from the boundary in front
+  must pass through the tag to reach the element that no longer fits.
 
 tsv: the run travels intact. Prettier keeps it on the text line and dangles the tag delimiters
 (double-dangling `<b⏎>yy</b⏎>` where both ends must give) — see `prettier_variant_dangle.svelte`,

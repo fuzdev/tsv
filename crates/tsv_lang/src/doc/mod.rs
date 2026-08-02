@@ -1003,31 +1003,30 @@ mod arena_tests {
         );
     }
 
-    /// `trailing_glued_tag`: the fill's last item is measured ALONE even though a node
-    /// follows it on the render stack, because that node is byte-glued to the item and
-    /// belongs to it. The glued pair then rides past print width rather than the fill
-    /// breaking in front of a word it is welded to.
+    /// The fill's last item is measured WITH the rest of the render stack (the default
+    /// look-ahead): a node byte-glued to the last word belongs to its fit check, so the
+    /// fill breaks in front of the word and the welded pair travels to the fresh line
+    /// together rather than the tail riding past print width. The smallest welded unit —
+    /// one word plus its glued tag — takes the same travel rule as any welded run.
     #[test]
-    fn test_fill_trailing_glued_tag_ignores_rest() {
+    fn test_fill_last_item_measures_glued_rest() {
         let a = DocArena::new();
         let parts = [a.text("word")];
-        let glued = a.with_context(
-            a.fill(&parts),
-            DocContext::default().with_trailing_glued_tag(true),
-        );
         let pad = a.text("PADDING");
-        // Stands in for the Svelte `{tag}` this flag exists for — braces would read as format
-        // arguments to clippy, and the width (5) is what the trace below turns on.
+        // Stands in for the Svelte `{tag}` this rule exists for — braces would read as
+        // format arguments to clippy.
         let tag = a.text("[tag]");
 
-        // `word` alone fits the 5 remaining columns; `word[tag]` does not.
-        assert_eq!(
-            render_pw_tab(&a, a.concat(&[pad, glued, tag]), 12),
-            "PADDINGword[tag]"
-        );
+        // `word[tag]` (9) does not fit the 5 columns after `PADDING`: the fill breaks in
+        // front of `word` and the pair travels together.
         assert_eq!(
             render_pw_tab(&a, a.concat(&[pad, a.fill(&parts), tag]), 12),
             "PADDING\nword[tag]"
+        );
+        // At 16 the pair fits after the padding and packs.
+        assert_eq!(
+            render_pw_tab(&a, a.concat(&[pad, a.fill(&parts), tag]), 16),
+            "PADDINGword[tag]"
         );
     }
 
