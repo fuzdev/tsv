@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 740,
+	"end": 889,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 78,
-				"data": " middle text before breaking expression continues on continuation line "
+				"end": 217,
+				"data": " the first wide tag travels and collapses flat; the second, in a hard-width run after it\n     (plain-space boundary), stays welded to the line and breaks internally — both formatters\n     keep that second form "
 			},
 			{
 				"type": "Text",
-				"start": 78,
-				"end": 79,
+				"start": 217,
+				"end": 218,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 79,
-				"end": 334,
+				"start": 218,
+				"end": 472,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 2,
+						"line": 4,
 						"column": 1,
-						"character": 80
+						"character": 219
 					},
 					"end": {
-						"line": 2,
+						"line": 4,
 						"column": 2,
-						"character": 81
+						"character": 220
 					}
 				},
 				"attributes": [],
@@ -43,41 +43,41 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 82,
-							"end": 169,
-							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq ",
-							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq "
+							"start": 221,
+							"end": 309,
+							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq\n\t",
+							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq\n\t"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 169,
-							"end": 188,
+							"start": 309,
+							"end": 326,
 							"expression": {
 								"type": "BinaryExpression",
-								"start": 170,
-								"end": 187,
+								"start": 310,
+								"end": 325,
 								"loc": {
 									"start": {
-										"line": 3,
-										"column": 87
+										"line": 6,
+										"column": 2
 									},
 									"end": {
-										"line": 4,
-										"column": 8
+										"line": 6,
+										"column": 17
 									}
 								},
 								"left": {
 									"type": "Literal",
-									"start": 170,
-									"end": 176,
+									"start": 310,
+									"end": 316,
 									"loc": {
 										"start": {
-											"line": 3,
-											"column": 87
+											"line": 6,
+											"column": 2
 										},
 										"end": {
-											"line": 3,
-											"column": 93
+											"line": 6,
+											"column": 8
 										}
 									},
 									"value": "rrrr",
@@ -86,16 +86,16 @@
 								"operator": "+",
 								"right": {
 									"type": "Literal",
-									"start": 181,
-									"end": 187,
+									"start": 319,
+									"end": 325,
 									"loc": {
 										"start": {
-											"line": 4,
-											"column": 2
+											"line": 6,
+											"column": 11
 										},
 										"end": {
-											"line": 4,
-											"column": 8
+											"line": 6,
+											"column": 17
 										}
 									},
 									"value": "ssss",
@@ -105,41 +105,41 @@
 						},
 						{
 							"type": "Text",
-							"start": 188,
-							"end": 205,
+							"start": 326,
+							"end": 343,
 							"raw": " tttt uuuu vvvv. ",
 							"data": " tttt uuuu vvvv. "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 205,
-							"end": 324,
+							"start": 343,
+							"end": 462,
 							"expression": {
 								"type": "BinaryExpression",
-								"start": 206,
-								"end": 323,
+								"start": 344,
+								"end": 461,
 								"loc": {
 									"start": {
-										"line": 4,
-										"column": 27
+										"line": 6,
+										"column": 36
 									},
 									"end": {
-										"line": 5,
+										"line": 7,
 										"column": 63
 									}
 								},
 								"left": {
 									"type": "Literal",
-									"start": 206,
-									"end": 257,
+									"start": 344,
+									"end": 395,
 									"loc": {
 										"start": {
-											"line": 4,
-											"column": 27
+											"line": 6,
+											"column": 36
 										},
 										"end": {
-											"line": 4,
-											"column": 78
+											"line": 6,
+											"column": 87
 										}
 									},
 									"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -148,15 +148,15 @@
 								"operator": "+",
 								"right": {
 									"type": "Literal",
-									"start": 262,
-									"end": 323,
+									"start": 400,
+									"end": 461,
 									"loc": {
 										"start": {
-											"line": 5,
+											"line": 7,
 											"column": 2
 										},
 										"end": {
-											"line": 5,
+											"line": 7,
 											"column": 63
 										}
 									},
@@ -167,8 +167,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 324,
-							"end": 330,
+							"start": 462,
+							"end": 468,
 							"raw": " cccc\n",
 							"data": " cccc\n"
 						}
@@ -177,39 +177,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 334,
-				"end": 336,
+				"start": 472,
+				"end": 474,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 336,
-				"end": 406,
-				"data": " two middle text segments surrounding expression, both with ws "
+				"start": 474,
+				"end": 559,
+				"data": " the traveled tag with a second, shorter tag packing flat in the continuation "
 			},
 			{
 				"type": "Text",
-				"start": 406,
-				"end": 407,
+				"start": 559,
+				"end": 560,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 407,
-				"end": 602,
+				"start": 560,
+				"end": 754,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 9,
+						"line": 11,
 						"column": 1,
-						"character": 408
+						"character": 561
 					},
 					"end": {
-						"line": 9,
+						"line": 11,
 						"column": 2,
-						"character": 409
+						"character": 562
 					}
 				},
 				"attributes": [],
@@ -218,41 +218,41 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 410,
-							"end": 497,
-							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq ",
-							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq "
+							"start": 563,
+							"end": 651,
+							"raw": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq\n\t",
+							"data": "\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq\n\t"
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 497,
-							"end": 516,
+							"start": 651,
+							"end": 668,
 							"expression": {
 								"type": "BinaryExpression",
-								"start": 498,
-								"end": 515,
+								"start": 652,
+								"end": 667,
 								"loc": {
 									"start": {
-										"line": 10,
-										"column": 87
+										"line": 13,
+										"column": 2
 									},
 									"end": {
-										"line": 11,
-										"column": 8
+										"line": 13,
+										"column": 17
 									}
 								},
 								"left": {
 									"type": "Literal",
-									"start": 498,
-									"end": 504,
+									"start": 652,
+									"end": 658,
 									"loc": {
 										"start": {
-											"line": 10,
-											"column": 87
+											"line": 13,
+											"column": 2
 										},
 										"end": {
-											"line": 10,
-											"column": 93
+											"line": 13,
+											"column": 8
 										}
 									},
 									"value": "rrrr",
@@ -261,16 +261,16 @@
 								"operator": "+",
 								"right": {
 									"type": "Literal",
-									"start": 509,
-									"end": 515,
+									"start": 661,
+									"end": 667,
 									"loc": {
 										"start": {
-											"line": 11,
-											"column": 2
+											"line": 13,
+											"column": 11
 										},
 										"end": {
-											"line": 11,
-											"column": 8
+											"line": 13,
+											"column": 17
 										}
 									},
 									"value": "ssss",
@@ -280,41 +280,41 @@
 						},
 						{
 							"type": "Text",
-							"start": 516,
-							"end": 528,
+							"start": 668,
+							"end": 680,
 							"raw": " tttt uuuu. ",
 							"data": " tttt uuuu. "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 528,
-							"end": 587,
+							"start": 680,
+							"end": 739,
 							"expression": {
 								"type": "BinaryExpression",
-								"start": 529,
-								"end": 586,
+								"start": 681,
+								"end": 738,
 								"loc": {
 									"start": {
-										"line": 11,
-										"column": 22
+										"line": 13,
+										"column": 31
 									},
 									"end": {
-										"line": 11,
-										"column": 79
+										"line": 13,
+										"column": 88
 									}
 								},
 								"left": {
 									"type": "Literal",
-									"start": 529,
-									"end": 561,
+									"start": 681,
+									"end": 713,
 									"loc": {
 										"start": {
-											"line": 11,
-											"column": 22
+											"line": 13,
+											"column": 31
 										},
 										"end": {
-											"line": 11,
-											"column": 54
+											"line": 13,
+											"column": 63
 										}
 									},
 									"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
@@ -323,16 +323,16 @@
 								"operator": "+",
 								"right": {
 									"type": "Literal",
-									"start": 564,
-									"end": 586,
+									"start": 716,
+									"end": 738,
 									"loc": {
 										"start": {
-											"line": 11,
-											"column": 57
+											"line": 13,
+											"column": 66
 										},
 										"end": {
-											"line": 11,
-											"column": 79
+											"line": 13,
+											"column": 88
 										}
 									},
 									"value": "bbbbbbbbbbbbbbbbbbbb",
@@ -342,8 +342,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 587,
-							"end": 598,
+							"start": 739,
+							"end": 750,
 							"raw": " cccc dddd\n",
 							"data": " cccc dddd\n"
 						}
@@ -352,39 +352,39 @@
 			},
 			{
 				"type": "Text",
-				"start": 602,
-				"end": 604,
+				"start": 754,
+				"end": 756,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "Comment",
-				"start": 604,
-				"end": 666,
-				"data": " short expression doesn't break, all inline (contrast) "
+				"start": 756,
+				"end": 815,
+				"data": " short expressions fit inline, no travel (contrast) "
 			},
 			{
 				"type": "Text",
-				"start": 666,
-				"end": 667,
+				"start": 815,
+				"end": 816,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 667,
-				"end": 739,
+				"start": 816,
+				"end": 888,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 15,
+						"line": 17,
 						"column": 1,
-						"character": 668
+						"character": 817
 					},
 					"end": {
-						"line": 15,
+						"line": 17,
 						"column": 2,
-						"character": 669
+						"character": 818
 					}
 				},
 				"attributes": [],
@@ -393,40 +393,40 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 670,
-							"end": 685,
+							"start": 819,
+							"end": 834,
 							"raw": "aaaa bbbb cccc ",
 							"data": "aaaa bbbb cccc "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 685,
-							"end": 702,
+							"start": 834,
+							"end": 851,
 							"expression": {
 								"type": "BinaryExpression",
-								"start": 686,
-								"end": 701,
+								"start": 835,
+								"end": 850,
 								"loc": {
 									"start": {
-										"line": 15,
+										"line": 17,
 										"column": 19
 									},
 									"end": {
-										"line": 15,
+										"line": 17,
 										"column": 34
 									}
 								},
 								"left": {
 									"type": "Literal",
-									"start": 686,
-									"end": 692,
+									"start": 835,
+									"end": 841,
 									"loc": {
 										"start": {
-											"line": 15,
+											"line": 17,
 											"column": 19
 										},
 										"end": {
-											"line": 15,
+											"line": 17,
 											"column": 25
 										}
 									},
@@ -436,15 +436,15 @@
 								"operator": "+",
 								"right": {
 									"type": "Literal",
-									"start": 695,
-									"end": 701,
+									"start": 844,
+									"end": 850,
 									"loc": {
 										"start": {
-											"line": 15,
+											"line": 17,
 											"column": 28
 										},
 										"end": {
-											"line": 15,
+											"line": 17,
 											"column": 34
 										}
 									},
@@ -455,40 +455,40 @@
 						},
 						{
 							"type": "Text",
-							"start": 702,
-							"end": 713,
+							"start": 851,
+							"end": 862,
 							"raw": " ffff gggg ",
 							"data": " ffff gggg "
 						},
 						{
 							"type": "ExpressionTag",
-							"start": 713,
-							"end": 730,
+							"start": 862,
+							"end": 879,
 							"expression": {
 								"type": "BinaryExpression",
-								"start": 714,
-								"end": 729,
+								"start": 863,
+								"end": 878,
 								"loc": {
 									"start": {
-										"line": 15,
+										"line": 17,
 										"column": 47
 									},
 									"end": {
-										"line": 15,
+										"line": 17,
 										"column": 62
 									}
 								},
 								"left": {
 									"type": "Literal",
-									"start": 714,
-									"end": 720,
+									"start": 863,
+									"end": 869,
 									"loc": {
 										"start": {
-											"line": 15,
+											"line": 17,
 											"column": 47
 										},
 										"end": {
-											"line": 15,
+											"line": 17,
 											"column": 53
 										}
 									},
@@ -498,15 +498,15 @@
 								"operator": "+",
 								"right": {
 									"type": "Literal",
-									"start": 723,
-									"end": 729,
+									"start": 872,
+									"end": 878,
 									"loc": {
 										"start": {
-											"line": 15,
+											"line": 17,
 											"column": 56
 										},
 										"end": {
-											"line": 15,
+											"line": 17,
 											"column": 62
 										}
 									},
@@ -517,8 +517,8 @@
 						},
 						{
 							"type": "Text",
-							"start": 730,
-							"end": 735,
+							"start": 879,
+							"end": 884,
 							"raw": " jjjj",
 							"data": " jjjj"
 						}

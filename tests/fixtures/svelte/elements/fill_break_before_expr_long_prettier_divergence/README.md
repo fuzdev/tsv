@@ -28,5 +28,7 @@ every pass.
 
 See [conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy).
 
-See also: `fill_expr_break_boundary_long/` (text continuation after a multiline expression) and
-`fill_expr_break_continuation_long/` (matching behavior when the continuation stays under 100).
+See also: `fill_expr_travel_boundary_long_prettier_divergence/` (the continuation line after a
+traveled expression tag) and `fill_spaced_tag_travel_long_prettier_divergence/` (the same
+break-before rule when the tag's expression itself must break — the tag travels rather than
+opening mid-line).
