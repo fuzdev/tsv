@@ -1,0 +1,903 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1276,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " lone re-export specifier - over print width, stays on one line ",
+			"start": 20,
+			"end": 88,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " lone renamed re-export - over print width, stays on one line ",
+			"start": 198,
+			"end": 264,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 67
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " lone type-only re-export - over print width, stays on one line ",
+			"start": 378,
+			"end": 446,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " lone per-specifier type modifier - over print width, stays on one line ",
+			"start": 561,
+			"end": 637,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " lone local export, no `from` - over print width, stays on one line ",
+			"start": 756,
+			"end": 828,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " two specifiers at exactly 100 - stays inline ",
+			"start": 940,
+			"end": 990,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " two specifiers at 101 - a second specifier restores breaking ",
+			"start": 1093,
+			"end": 1159,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 67
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1275,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1266,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 25,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 90,
+					"end": 195,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 106
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 99,
+							"end": 179,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 10
+								},
+								"end": {
+									"line": 3,
+									"column": 90
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 99,
+								"end": 179,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 10
+									},
+									"end": {
+										"line": 3,
+										"column": 90
+									}
+								},
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 99,
+								"end": 179,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 10
+									},
+									"end": {
+										"line": 3,
+										"column": 90
+									}
+								},
+								"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 187,
+						"end": 194,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 98
+							},
+							"end": {
+								"line": 3,
+								"column": 105
+							}
+						},
+						"value": "./mod",
+						"raw": "'./mod'"
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " lone re-export specifier - over print width, stays on one line ",
+							"start": 20,
+							"end": 88
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 266,
+					"end": 375,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 110
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 275,
+							"end": 359,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 10
+								},
+								"end": {
+									"line": 6,
+									"column": 94
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 275,
+								"end": 315,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 10
+									},
+									"end": {
+										"line": 6,
+										"column": 50
+									}
+								},
+								"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 319,
+								"end": 359,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 54
+									},
+									"end": {
+										"line": 6,
+										"column": 94
+									}
+								},
+								"name": "cccccccccccccccccccccccccccccccccccccccc"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 367,
+						"end": 374,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 102
+							},
+							"end": {
+								"line": 6,
+								"column": 109
+							}
+						},
+						"value": "./mod",
+						"raw": "'./mod'"
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " lone renamed re-export - over print width, stays on one line ",
+							"start": 198,
+							"end": 264
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 448,
+					"end": 558,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 111
+						}
+					},
+					"exportKind": "type",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 462,
+							"end": 542,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 15
+								},
+								"end": {
+									"line": 9,
+									"column": 95
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 462,
+								"end": 542,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 15
+									},
+									"end": {
+										"line": 9,
+										"column": 95
+									}
+								},
+								"name": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 462,
+								"end": 542,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 15
+									},
+									"end": {
+										"line": 9,
+										"column": 95
+									}
+								},
+								"name": "DDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDDD"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 550,
+						"end": 557,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 103
+							},
+							"end": {
+								"line": 9,
+								"column": 110
+							}
+						},
+						"value": "./mod",
+						"raw": "'./mod'"
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " lone type-only re-export - over print width, stays on one line ",
+							"start": 378,
+							"end": 446
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 639,
+					"end": 753,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 115
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 648,
+							"end": 737,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 10
+								},
+								"end": {
+									"line": 12,
+									"column": 99
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 653,
+								"end": 693,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 15
+									},
+									"end": {
+										"line": 12,
+										"column": 55
+									}
+								},
+								"name": "eeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeeee"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 697,
+								"end": 737,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 59
+									},
+									"end": {
+										"line": 12,
+										"column": 99
+									}
+								},
+								"name": "ffffffffffffffffffffffffffffffffffffffff"
+							},
+							"exportKind": "type"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 745,
+						"end": 752,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 107
+							},
+							"end": {
+								"line": 12,
+								"column": 114
+							}
+						},
+						"value": "./mod",
+						"raw": "'./mod'"
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " lone per-specifier type modifier - over print width, stays on one line ",
+							"start": 561,
+							"end": 637
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 830,
+					"end": 937,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 108
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 839,
+							"end": 934,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 10
+								},
+								"end": {
+									"line": 15,
+									"column": 105
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 839,
+								"end": 934,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 10
+									},
+									"end": {
+										"line": 15,
+										"column": 105
+									}
+								},
+								"name": "ggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 839,
+								"end": 934,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 10
+									},
+									"end": {
+										"line": 15,
+										"column": 105
+									}
+								},
+								"name": "ggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggggg"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " lone local export, no `from` - over print width, stays on one line ",
+							"start": 756,
+							"end": 828
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 992,
+					"end": 1090,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 99
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 1001,
+							"end": 1036,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 10
+								},
+								"end": {
+									"line": 18,
+									"column": 45
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 1001,
+								"end": 1036,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 10
+									},
+									"end": {
+										"line": 18,
+										"column": 45
+									}
+								},
+								"name": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 1001,
+								"end": 1036,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 10
+									},
+									"end": {
+										"line": 18,
+										"column": 45
+									}
+								},
+								"name": "hhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhhh"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 1038,
+							"end": 1074,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 47
+								},
+								"end": {
+									"line": 18,
+									"column": 83
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 1038,
+								"end": 1074,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 47
+									},
+									"end": {
+										"line": 18,
+										"column": 83
+									}
+								},
+								"name": "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 1038,
+								"end": 1074,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 47
+									},
+									"end": {
+										"line": 18,
+										"column": 83
+									}
+								},
+								"name": "iiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiiii"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 1082,
+						"end": 1089,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 91
+							},
+							"end": {
+								"line": 18,
+								"column": 98
+							}
+						},
+						"value": "./mod",
+						"raw": "'./mod'"
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " two specifiers at exactly 100 - stays inline ",
+							"start": 940,
+							"end": 990
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 1161,
+					"end": 1265,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 16
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 1172,
+							"end": 1207,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 2
+								},
+								"end": {
+									"line": 22,
+									"column": 37
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 1172,
+								"end": 1207,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 37
+									}
+								},
+								"name": "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 1172,
+								"end": 1207,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 37
+									}
+								},
+								"name": "jjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjjj"
+							},
+							"exportKind": "value"
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 1211,
+							"end": 1248,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 2
+								},
+								"end": {
+									"line": 23,
+									"column": 39
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 1211,
+								"end": 1248,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 39
+									}
+								},
+								"name": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 1211,
+								"end": 1248,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 39
+									}
+								},
+								"name": "kkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkkk"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 1257,
+						"end": 1264,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 8
+							},
+							"end": {
+								"line": 24,
+								"column": 15
+							}
+						},
+						"value": "./mod",
+						"raw": "'./mod'"
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " two specifiers at 101 - a second specifier restores breaking ",
+							"start": 1093,
+							"end": 1159
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

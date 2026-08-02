@@ -18,9 +18,15 @@ keep it).
 
 Per Comment Position Philosophy, tsv keeps a comment where the author wrote it —
 leading the value — rather than relocating it across the value to a canonical
-trailing position. A same-gap *block* comment stays inline and matches prettier
-(`type: /* c */ 'json'`, the plain
-[attributes_comma_comment](../attributes_comma_comment/) fixture); only a `//`,
-which forces the break, diverges.
+trailing position. A same-gap *block* comment matches prettier in **both**
+authorings, so only a `//` — which forces the break — diverges: written on the `:`
+line it stays inline (`type: /* c */ 'json'`, the plain
+[attributes_comma_comment](../attributes_comma_comment/) fixture), and written on
+its own line it keeps that line, hanging the value exactly as the `//` does
+(`type:⏎\t/* c */⏎\t'json'`, the plain
+[attributes_value_block_comment](../attributes_value_block_comment/) fixture — the
+same rule an object property follows). A block comment can trail the `:` without
+swallowing anything, which is why its authored position survives either way and a
+`//`'s cannot.
 
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

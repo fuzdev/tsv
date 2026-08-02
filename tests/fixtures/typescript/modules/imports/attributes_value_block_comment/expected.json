@@ -1,0 +1,902 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 684,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a block comment sharing the `:` line trails it inline",
+			"start": 10,
+			"end": 66,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 57
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 101,
+			"end": 108,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 34
+				},
+				"end": {
+					"line": 3,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a block comment the author isolated on its own line keeps it, hanging the value",
+			"start": 121,
+			"end": 203,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 243,
+			"end": 250,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 3
+				},
+				"end": {
+					"line": 8,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a multiline block comment sharing the `:` line stays inline",
+			"start": 267,
+			"end": 329,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\n   c2 ",
+			"start": 366,
+			"end": 382,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 8
+				},
+				"end": {
+					"line": 15,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a multiline block comment on its own line keeps it too",
+			"start": 396,
+			"end": 453,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\n   c2 ",
+			"start": 493,
+			"end": 510,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 3
+				},
+				"end": {
+					"line": 22,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the own-line comment on a non-first attribute hangs that value only",
+			"start": 527,
+			"end": 597,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 653,
+			"end": 660,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 3
+				},
+				"end": {
+					"line": 30,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 683,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 674,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 33,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 68,
+					"end": 118,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 51
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 75,
+							"end": 76,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 8
+								},
+								"end": {
+									"line": 3,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 75,
+								"end": 76,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 8
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "a"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 82,
+						"end": 87,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 15
+							},
+							"end": {
+								"line": 3,
+								"column": 20
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 95,
+							"end": 115,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 28
+								},
+								"end": {
+									"line": 3,
+									"column": 48
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 95,
+								"end": 99,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 28
+									},
+									"end": {
+										"line": 3,
+										"column": 32
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 109,
+								"end": 115,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 42
+									},
+									"end": {
+										"line": 3,
+										"column": 48
+									}
+								},
+								"value": "json",
+								"raw": "'json'",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 101,
+										"end": 108
+									}
+								]
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment sharing the `:` line trails it inline",
+							"start": 10,
+							"end": 66
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 205,
+					"end": 264,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 3
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 212,
+							"end": 213,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 8
+								},
+								"end": {
+									"line": 6,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 212,
+								"end": 213,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 8
+									},
+									"end": {
+										"line": 6,
+										"column": 9
+									}
+								},
+								"name": "b"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 219,
+						"end": 224,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 15
+							},
+							"end": {
+								"line": 6,
+								"column": 20
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 234,
+							"end": 260,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 9,
+									"column": 9
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 234,
+								"end": 238,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 6
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 254,
+								"end": 260,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 3
+									},
+									"end": {
+										"line": 9,
+										"column": 9
+									}
+								},
+								"value": "json",
+								"raw": "'json'",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 243,
+										"end": 250
+									}
+								]
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment the author isolated on its own line keeps it, hanging the value",
+							"start": 121,
+							"end": 203
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 331,
+					"end": 393,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 3
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 338,
+							"end": 339,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 8
+								},
+								"end": {
+									"line": 13,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 338,
+								"end": 339,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 8
+									},
+									"end": {
+										"line": 13,
+										"column": 9
+									}
+								},
+								"name": "c"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 345,
+						"end": 350,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 15
+							},
+							"end": {
+								"line": 13,
+								"column": 20
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 360,
+							"end": 389,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 2
+								},
+								"end": {
+									"line": 15,
+									"column": 17
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 360,
+								"end": 364,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 6
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 383,
+								"end": 389,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 11
+									},
+									"end": {
+										"line": 15,
+										"column": 17
+									}
+								},
+								"value": "json",
+								"raw": "'json'",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1\n   c2 ",
+										"start": 366,
+										"end": 382
+									}
+								]
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multiline block comment sharing the `:` line stays inline",
+							"start": 267,
+							"end": 329
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 455,
+					"end": 524,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 462,
+							"end": 463,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 8
+								},
+								"end": {
+									"line": 19,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 462,
+								"end": 463,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 8
+									},
+									"end": {
+										"line": 19,
+										"column": 9
+									}
+								},
+								"name": "d"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 469,
+						"end": 474,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 15
+							},
+							"end": {
+								"line": 19,
+								"column": 20
+							}
+						},
+						"value": "./d",
+						"raw": "'./d'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 484,
+							"end": 520,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 2
+								},
+								"end": {
+									"line": 23,
+									"column": 9
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 484,
+								"end": 488,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 6
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 514,
+								"end": 520,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 3
+									},
+									"end": {
+										"line": 23,
+										"column": 9
+									}
+								},
+								"value": "json",
+								"raw": "'json'",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1\n   c2 ",
+										"start": 493,
+										"end": 510
+									}
+								]
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multiline block comment on its own line keeps it too",
+							"start": 396,
+							"end": 453
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 599,
+					"end": 673,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 3
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 606,
+							"end": 607,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 8
+								},
+								"end": {
+									"line": 27,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 606,
+								"end": 607,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 8
+									},
+									"end": {
+										"line": 27,
+										"column": 9
+									}
+								},
+								"name": "e"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 613,
+						"end": 618,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 15
+							},
+							"end": {
+								"line": 27,
+								"column": 20
+							}
+						},
+						"value": "./e",
+						"raw": "'./e'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 628,
+							"end": 640,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 2
+								},
+								"end": {
+									"line": 28,
+									"column": 14
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 628,
+								"end": 633,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 7
+									}
+								},
+								"name": "alpha"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 635,
+								"end": 640,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 9
+									},
+									"end": {
+										"line": 28,
+										"column": 14
+									}
+								},
+								"value": "one",
+								"raw": "'one'"
+							}
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 644,
+							"end": 669,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 2
+								},
+								"end": {
+									"line": 31,
+									"column": 8
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 644,
+								"end": 648,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 6
+									}
+								},
+								"name": "beta"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 664,
+								"end": 669,
+								"loc": {
+									"start": {
+										"line": 31,
+										"column": 3
+									},
+									"end": {
+										"line": 31,
+										"column": 8
+									}
+								},
+								"value": "two",
+								"raw": "'two'",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 653,
+										"end": 660
+									}
+								]
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the own-line comment on a non-first attribute hangs that value only",
+							"start": 527,
+							"end": 597
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -107,10 +107,26 @@ impl<'a> Printer<'a> {
                     |a| a.span,
                     |a| self.build_import_attribute_doc(a),
                 );
-                // Own group so the braces fit independently of the outer statement —
-                // a preserved header line comment (source→`with` / `with`→`{`) forces
-                // the outer group to break but must not expand inline attributes.
-                self.braced_group(attr_doc)
+                if self.is_single_type_attribute(attributes, brace_start, brace_close) {
+                    // Ordered FIRST because prettier applies `removeLines` *after*
+                    // `printObject`: the never-break rule outranks the authored break
+                    // below, so `with {⏎ type: 'json'⏎}` still collapses.
+                    self.braced_flat(attr_doc)
+                } else if self.has_newline_between(brace_start + 1, attributes[0].span.start) {
+                    // `objectWrap: 'preserve'` — prettier's `hasNewLineAfterOpeningBrace`
+                    // in `printObject`, which it applies to the attribute clause too
+                    // (locating this same real `{`). A newline the author put after
+                    // `with {` keeps the clause expanded even when it would fit, exactly
+                    // as it does for an object literal (`build_object_doc`'s
+                    // `has_source_newline`). A newline anywhere else in the clause — a
+                    // broken import header above it, or one before the `}` — does not.
+                    self.braced_group_break(attr_doc)
+                } else {
+                    // Own group so the braces fit independently of the outer statement —
+                    // a preserved header line comment (source→`with` / `with`→`{`) forces
+                    // the outer group to break but must not expand inline attributes.
+                    self.braced_group(attr_doc)
+                }
             }
         };
 
@@ -127,6 +143,64 @@ impl<'a> Printer<'a> {
         ]);
         parts.push(self.gap_comment_indented_continuation(source_end, with_start, with_clause));
         brace_close + 1
+    }
+
+    /// Prettier's `isSingleTypeImportAttributes` (its `printImportAttributes`): a lone
+    /// `type: '…'` attribute — the `with { type: 'json' }` that is nearly every real
+    /// clause — is printed through `removeLines`, so it never breaks, at any width.
+    /// A second attribute, a non-`type` key, a non-string value, or a comment on the
+    /// attribute all fall back to the ordinary breakable group.
+    ///
+    /// The key matches in either authored form (`type` / `'type'`), so the quoted one
+    /// reaches the flat layout on the very pass that unquotes it rather than settling
+    /// over two.
+    ///
+    /// Comments: prettier asks `hasComment` of the attribute, its key and its value —
+    /// between the braces, and nowhere else. The `with`→`{` gap is deliberately not
+    /// included (prettier relocates such a comment before `with` and still flattens),
+    /// nor is the `}`→`;` gap. The question is ON-PAGE, so a glued block comment owned
+    /// by the value counts, exactly as prettier's `hasComment(value)` does.
+    fn is_single_type_attribute(
+        &self,
+        attributes: &[internal::ImportAttribute<'_>],
+        brace_start: u32,
+        brace_close: u32,
+    ) -> bool {
+        let [attribute] = attributes else {
+            return false;
+        };
+        if !matches!(attribute.value.value, internal::LiteralValue::String(_)) {
+            return false;
+        }
+        if self.has_comments_on_page_between(brace_start, brace_close + 1) {
+            return false;
+        }
+        match &attribute.key {
+            internal::ImportAttributeKey::Identifier(id) => {
+                self.with_ident_name(id, |name| name == "type")
+            }
+            internal::ImportAttributeKey::Literal(lit) => match &lit.value {
+                internal::LiteralValue::String(cooked) => {
+                    cooked.resolve(lit.span, self.source) == "type"
+                }
+                _ => false,
+            },
+        }
+    }
+
+    /// Whether a comment in an attribute's `:`→value gap was authored on its OWN line —
+    /// isolated from both the `:` before it and the value after it
+    /// ([`Self::comment_isolated_from_neighbors`]). Such a comment can only keep its line
+    /// if the value hangs, so it forces the same break-after-`:` layout a line comment
+    /// does; collapsing it onto the `:` line would move it.
+    ///
+    /// Asked here rather than by [`Self::has_own_line_attribute_comments`], which skips
+    /// everything *inside* an attribute's span: a comment there expands that attribute,
+    /// not the whole clause. The `:`→value gap is one of the two regions it so skips —
+    /// the key→`:` gap is the other, and takes the inline-trailing path instead.
+    fn has_own_line_value_gap_comment(&self, colon_pos: u32, value_start: u32) -> bool {
+        tsv_lang::comments_in_source_range(self.comments, colon_pos + 1, value_start)
+            .any(|c| self.comment_isolated_from_neighbors(colon_pos, c, value_start))
     }
 
     /// Whether any comment in the `with { … }` braces was authored on its OWN line —
@@ -236,12 +310,16 @@ impl<'a> Printer<'a> {
 
         // Comments between `:` and the value.
         let after_colon = colon_pos + 1;
-        if self.has_line_comments_between(after_colon, value_start) {
+        if self.has_line_comments_between(after_colon, value_start)
+            || self.has_own_line_value_gap_comment(colon_pos, value_start)
+        {
             // A line comment can't trail the `:` inline without swallowing the
             // value, so break after `:` and indent the value one level, each gap
             // comment on its own line — `type:⏎\t// c⏎\t'json'`. Matches prettier's
             // value-leading break, which puts any block comment sharing the gap on
-            // its own line too.
+            // its own line too. A block comment the author isolated on its own line
+            // takes the same layout, for the same reason it does in an object
+            // property: collapsing it onto the `:` line would move it.
             let mut cont: DocBuf = smallvec![d.hardline()];
             for comment in comments_to_emit_in_range(self.comments, after_colon, value_start) {
                 cont.push(self.build_comment_doc(comment));

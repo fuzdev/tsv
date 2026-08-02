@@ -1,0 +1,1413 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 951,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Block",
+			"value": " 1. authored inline - stays inline ",
+			"start": 20,
+			"end": 59,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " 2. newline after `with {` - stays expanded even though it fits ",
+			"start": 118,
+			"end": 186,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " 3. lone non-`type` attribute, newline after `{` - stays expanded ",
+			"start": 250,
+			"end": 320,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " 4. lone non-`type` attribute, authored inline - stays inline ",
+			"start": 369,
+			"end": 435,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 67
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " 5. lone `type` attribute collapses anyway - the never-break rule outranks the authored break ",
+			"start": 481,
+			"end": 579,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 99
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " 6. newline only before `}` - collapses to inline ",
+			"start": 625,
+			"end": 679,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " 7. re-export host - same rule ",
+			"start": 738,
+			"end": 773,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 36
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " 8. export-all host - same rule ",
+			"start": 842,
+			"end": 878,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 37
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 950,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 941,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 29,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 61,
+					"end": 116,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 56
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 68,
+							"end": 69,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 8
+								},
+								"end": {
+									"line": 3,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 68,
+								"end": 69,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 8
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "a"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 75,
+						"end": 80,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 15
+							},
+							"end": {
+								"line": 3,
+								"column": 20
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 88,
+							"end": 100,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 28
+								},
+								"end": {
+									"line": 3,
+									"column": 40
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 88,
+								"end": 93,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 28
+									},
+									"end": {
+										"line": 3,
+										"column": 33
+									}
+								},
+								"name": "alpha"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 95,
+								"end": 100,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 35
+									},
+									"end": {
+										"line": 3,
+										"column": 40
+									}
+								},
+								"value": "one",
+								"raw": "'one'"
+							}
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 102,
+							"end": 113,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 42
+								},
+								"end": {
+									"line": 3,
+									"column": 53
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 102,
+								"end": 106,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 42
+									},
+									"end": {
+										"line": 3,
+										"column": 46
+									}
+								},
+								"name": "beta"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 108,
+								"end": 113,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 48
+									},
+									"end": {
+										"line": 3,
+										"column": 53
+									}
+								},
+								"value": "two",
+								"raw": "'two'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " 1. authored inline - stays inline ",
+							"start": 20,
+							"end": 59
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 188,
+					"end": 248,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 195,
+							"end": 196,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 8
+								},
+								"end": {
+									"line": 5,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 195,
+								"end": 196,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 8
+									},
+									"end": {
+										"line": 5,
+										"column": 9
+									}
+								},
+								"name": "b"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 202,
+						"end": 207,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 15
+							},
+							"end": {
+								"line": 5,
+								"column": 20
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 217,
+							"end": 229,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 14
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 217,
+								"end": 222,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 7
+									}
+								},
+								"name": "alpha"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 224,
+								"end": 229,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 9
+									},
+									"end": {
+										"line": 6,
+										"column": 14
+									}
+								},
+								"value": "one",
+								"raw": "'one'"
+							}
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 233,
+							"end": 244,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 13
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 233,
+								"end": 237,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 6
+									}
+								},
+								"name": "beta"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 239,
+								"end": 244,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 8
+									},
+									"end": {
+										"line": 7,
+										"column": 13
+									}
+								},
+								"value": "two",
+								"raw": "'two'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " 2. newline after `with {` - stays expanded even though it fits ",
+							"start": 118,
+							"end": 186
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 322,
+					"end": 367,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 3
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 329,
+							"end": 330,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 8
+								},
+								"end": {
+									"line": 10,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 329,
+								"end": 330,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 8
+									},
+									"end": {
+										"line": 10,
+										"column": 9
+									}
+								},
+								"name": "c"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 336,
+						"end": 341,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 15
+							},
+							"end": {
+								"line": 10,
+								"column": 20
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 351,
+							"end": 363,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 14
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 351,
+								"end": 356,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 7
+									}
+								},
+								"name": "alpha"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 358,
+								"end": 363,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 9
+									},
+									"end": {
+										"line": 11,
+										"column": 14
+									}
+								},
+								"value": "one",
+								"raw": "'one'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " 3. lone non-`type` attribute, newline after `{` - stays expanded ",
+							"start": 250,
+							"end": 320
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 437,
+					"end": 479,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 43
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 444,
+							"end": 445,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 8
+								},
+								"end": {
+									"line": 14,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 444,
+								"end": 445,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 8
+									},
+									"end": {
+										"line": 14,
+										"column": 9
+									}
+								},
+								"name": "d"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 451,
+						"end": 456,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 15
+							},
+							"end": {
+								"line": 14,
+								"column": 20
+							}
+						},
+						"value": "./d",
+						"raw": "'./d'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 464,
+							"end": 476,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 28
+								},
+								"end": {
+									"line": 14,
+									"column": 40
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 464,
+								"end": 469,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 28
+									},
+									"end": {
+										"line": 14,
+										"column": 33
+									}
+								},
+								"name": "alpha"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 471,
+								"end": 476,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 35
+									},
+									"end": {
+										"line": 14,
+										"column": 40
+									}
+								},
+								"value": "one",
+								"raw": "'one'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " 4. lone non-`type` attribute, authored inline - stays inline ",
+							"start": 369,
+							"end": 435
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 581,
+					"end": 623,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 43
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 588,
+							"end": 589,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 8
+								},
+								"end": {
+									"line": 16,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 588,
+								"end": 589,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 8
+									},
+									"end": {
+										"line": 16,
+										"column": 9
+									}
+								},
+								"name": "e"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 595,
+						"end": 600,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 15
+							},
+							"end": {
+								"line": 16,
+								"column": 20
+							}
+						},
+						"value": "./e",
+						"raw": "'./e'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 608,
+							"end": 620,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 28
+								},
+								"end": {
+									"line": 16,
+									"column": 40
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 608,
+								"end": 612,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 28
+									},
+									"end": {
+										"line": 16,
+										"column": 32
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 614,
+								"end": 620,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 34
+									},
+									"end": {
+										"line": 16,
+										"column": 40
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " 5. lone `type` attribute collapses anyway - the never-break rule outranks the authored break ",
+							"start": 481,
+							"end": 579
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 681,
+					"end": 736,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 56
+						}
+					},
+					"importKind": "value",
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 688,
+							"end": 689,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 8
+								},
+								"end": {
+									"line": 18,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 688,
+								"end": 689,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 8
+									},
+									"end": {
+										"line": 18,
+										"column": 9
+									}
+								},
+								"name": "f"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 695,
+						"end": 700,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 15
+							},
+							"end": {
+								"line": 18,
+								"column": 20
+							}
+						},
+						"value": "./f",
+						"raw": "'./f'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 708,
+							"end": 720,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 28
+								},
+								"end": {
+									"line": 18,
+									"column": 40
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 708,
+								"end": 713,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 28
+									},
+									"end": {
+										"line": 18,
+										"column": 33
+									}
+								},
+								"name": "alpha"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 715,
+								"end": 720,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 35
+									},
+									"end": {
+										"line": 18,
+										"column": 40
+									}
+								},
+								"value": "one",
+								"raw": "'one'"
+							}
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 722,
+							"end": 733,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 42
+								},
+								"end": {
+									"line": 18,
+									"column": 53
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 722,
+								"end": 726,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 42
+									},
+									"end": {
+										"line": 18,
+										"column": 46
+									}
+								},
+								"name": "beta"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 728,
+								"end": 733,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 48
+									},
+									"end": {
+										"line": 18,
+										"column": 53
+									}
+								},
+								"value": "two",
+								"raw": "'two'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " 6. newline only before `}` - collapses to inline ",
+							"start": 625,
+							"end": 679
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 775,
+					"end": 840,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 3
+						}
+					},
+					"exportKind": "value",
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 784,
+							"end": 786,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 10
+								},
+								"end": {
+									"line": 20,
+									"column": 12
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 784,
+								"end": 786,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 10
+									},
+									"end": {
+										"line": 20,
+										"column": 12
+									}
+								},
+								"name": "gg"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 784,
+								"end": 786,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 10
+									},
+									"end": {
+										"line": 20,
+										"column": 12
+									}
+								},
+								"name": "gg"
+							},
+							"exportKind": "value"
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 794,
+						"end": 799,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 20
+							},
+							"end": {
+								"line": 20,
+								"column": 25
+							}
+						},
+						"value": "./g",
+						"raw": "'./g'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 809,
+							"end": 821,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 2
+								},
+								"end": {
+									"line": 21,
+									"column": 14
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 809,
+								"end": 814,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 7
+									}
+								},
+								"name": "alpha"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 816,
+								"end": 821,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 9
+									},
+									"end": {
+										"line": 21,
+										"column": 14
+									}
+								},
+								"value": "one",
+								"raw": "'one'"
+							}
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 825,
+							"end": 836,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 2
+								},
+								"end": {
+									"line": 22,
+									"column": 13
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 825,
+								"end": 829,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 6
+									}
+								},
+								"name": "beta"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 831,
+								"end": 836,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 8
+									},
+									"end": {
+										"line": 22,
+										"column": 13
+									}
+								},
+								"value": "two",
+								"raw": "'two'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " 7. re-export host - same rule ",
+							"start": 738,
+							"end": 773
+						}
+					]
+				},
+				{
+					"type": "ExportAllDeclaration",
+					"start": 880,
+					"end": 940,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 3
+						}
+					},
+					"exportKind": "value",
+					"exported": null,
+					"source": {
+						"type": "Literal",
+						"start": 894,
+						"end": 899,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 15
+							},
+							"end": {
+								"line": 25,
+								"column": 20
+							}
+						},
+						"value": "./h",
+						"raw": "'./h'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 909,
+							"end": 921,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 2
+								},
+								"end": {
+									"line": 26,
+									"column": 14
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 909,
+								"end": 914,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 7
+									}
+								},
+								"name": "alpha"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 916,
+								"end": 921,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 9
+									},
+									"end": {
+										"line": 26,
+										"column": 14
+									}
+								},
+								"value": "one",
+								"raw": "'one'"
+							}
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 925,
+							"end": 936,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 2
+								},
+								"end": {
+									"line": 27,
+									"column": 13
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 925,
+								"end": 929,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 6
+									}
+								},
+								"name": "beta"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 931,
+								"end": 936,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 8
+									},
+									"end": {
+										"line": 27,
+										"column": 13
+									}
+								},
+								"value": "two",
+								"raw": "'two'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " 8. export-all host - same rule ",
+							"start": 842,
+							"end": 878
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
