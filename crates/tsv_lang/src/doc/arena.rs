@@ -1199,9 +1199,11 @@ impl DocArena {
     }
 
     /// The **breakable atom** `id` contributes to a flow-boundary measurement, if it is one — an
-    /// after-element fold's LEAD element (the inline element its trailing text packs after), or a
-    /// bare glued element / glued element run ([`DocContext::glued_atom`]). `None` for anything
-    /// else — a text run, a plain concat, a bare element carrying no context.
+    /// after-element fold's LEAD element (the inline element its trailing text packs after), a
+    /// sibling join's element ([`DocContext::joined_atom`] — the join's trailing separator stays
+    /// out of the unit), or a bare glued element / glued element run
+    /// ([`DocContext::glued_atom`]). `None` for anything else — a text run, a plain concat, a
+    /// bare element carrying no context.
     ///
     /// This is the question asked of the node at the TOP of the look-ahead stack, and unlike
     /// [`Self::welded_entry`] it does NOT ask whether `id` is glued: the top node sits behind the
