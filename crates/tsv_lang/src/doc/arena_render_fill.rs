@@ -121,11 +121,7 @@ pub(super) fn render_fill_iterative(
         // `rest_commands` measurement already asks the right question.
         let content_fits = if offset + 1 < parts.len() && arena.is_collapsible_line(content) {
             let mut with_sep: SmallVec<[ArenaCommand; 8]> =
-                SmallVec::from_slice(if is_final_segment {
-                    rest_commands
-                } else {
-                    &[]
-                });
+                SmallVec::from_slice(if is_final_segment { rest_commands } else { &[] });
             with_sep.push(ArenaCommand {
                 indent,
                 mode: Mode::Flat,

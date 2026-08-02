@@ -1433,10 +1433,9 @@ impl<'a> Printer<'a> {
                     FragmentNode::Text(t) => Self::text_glued_before(t.raw(self.source)),
                     n => self.is_inline_el_or_comp(n) || Self::is_tag_node(n),
                 };
-            let break_before_wide_flow = (next_is_flow
-                || tag_continues_welded
-                || (next_is_tag && !has_trailing_ws))
-                && (trailing_line || !has_trailing_ws);
+            let break_before_wide_flow =
+                (next_is_flow || tag_continues_welded || (next_is_tag && !has_trailing_ws))
+                    && (trailing_line || !has_trailing_ws);
             let fill_doc = if break_before_wide_flow || glued_lead {
                 d.with_context(
                     fill_doc,
