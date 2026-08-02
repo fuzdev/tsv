@@ -62,7 +62,7 @@ pub struct DocContext {
     /// The per-fill layout flag bits — one packed word rather than `bool` fields, so a new flag
     /// never moves `DocNode`'s size (the note below the struct carries the budget). Read through
     /// the named getters ([`Self::break_before_wide_flow`], [`Self::after_element_fold`],
-    /// [`Self::trailing_glued_tag`], [`Self::glued_lead`], [`Self::glued_atom`],
+    /// [`Self::glued_lead`], [`Self::glued_atom`],
     /// [`Self::joined_atom`] — each carries its flag's full contract), set through the matching
     /// `with_*` builders.
     flags: u16,
@@ -90,10 +90,9 @@ const _: () = assert!(size_of::<DocContext>() == 4);
 impl DocContext {
     const BREAK_BEFORE_WIDE_FLOW: u16 = 1 << 0;
     const AFTER_ELEMENT_FOLD: u16 = 1 << 1;
-    const TRAILING_GLUED_TAG: u16 = 1 << 2;
-    const GLUED_LEAD: u16 = 1 << 3;
-    const GLUED_ATOM: u16 = 1 << 4;
-    const JOINED_ATOM: u16 = 1 << 5;
+    const GLUED_LEAD: u16 = 1 << 2;
+    const GLUED_ATOM: u16 = 1 << 3;
+    const JOINED_ATOM: u16 = 1 << 4;
 
     /// A context that only reserves `columns` trailing columns — the CSS trailing-punctuation
     /// case, and the sole reason [`Self::trailing_reserve`] exists.
@@ -237,31 +236,6 @@ impl DocContext {
     #[must_use]
     pub const fn with_after_element_fold(self, on: bool) -> Self {
         self.with_flag(Self::AFTER_ELEMENT_FOLD, on)
-    }
-
-    /// When set, the fill's LAST item is measured **alone** (rest-of-render ignored) even though a
-    /// node follows it on the render stack. That following node is glued to the last word with no
-    /// whitespace — a Svelte `{expr}` / `{@html}` / `{@render}` tag welded to the end of a text run
-    /// (`… tsv is ~{ratio}`). prettier keeps the mustache *outside* the text `fill`, so the fill
-    /// never sees its width and never breaks before the word it is glued to: the word stays on the
-    /// line and the tag rides past printWidth after it. tsv's fill would otherwise fold the glued
-    /// tag into the last word's fit check (`~` + `{ratio}`) and break before `~`, stranding the tag
-    /// on its own line. This flag restores prettier's behavior for exactly that boundary.
-    ///
-    /// Scoped to a text-run fill immediately followed by a glued tag (`next_is_tag && !trailing_ws`).
-    /// Off for every other fill, so the general last-item look-ahead (a hard-limit guard that keeps
-    /// the following node from overshooting printWidth) is unaffected.
-    #[inline]
-    #[must_use]
-    pub const fn trailing_glued_tag(&self) -> bool {
-        self.flag(Self::TRAILING_GLUED_TAG)
-    }
-
-    /// Returns `self` with [`Self::trailing_glued_tag`] set to `on`.
-    #[inline]
-    #[must_use]
-    pub const fn with_trailing_glued_tag(self, on: bool) -> Self {
-        self.with_flag(Self::TRAILING_GLUED_TAG, on)
     }
 
     /// When set, the fill's FIRST item is **byte-glued** to whatever precedes it on the render

@@ -47,15 +47,6 @@ pub(super) fn render_fill_iterative(
             remaining
         };
 
-        // A text-run fill glued to a following tag (`… ~{ratio}`) measures its last word ALONE:
-        // prettier keeps the tag outside the fill, so the fill never breaks before the word it is
-        // glued to (the word stays put, the tag rides past printWidth after it). Suppress the
-        // last-item look-ahead so the glued tag doesn't fold into the word's fit check.
-        let lookahead_rest: &[ArenaCommand] = if context.trailing_glued_tag() && is_final_segment {
-            &[]
-        } else {
-            rest_commands
-        };
         // `break_before_wide_flow`, Case-1 half: a GLUED text→element boundary (`… glued<a…>`) has
         // no trailing separator, so the glued last word is the fill's last item and the element
         // follows on the render stack — the whole-flat measurement lands here (the space-separated
@@ -91,12 +82,12 @@ pub(super) fn render_fill_iterative(
                 embed,
                 source,
             )
-        } else if is_final_segment && !lookahead_rest.is_empty() {
+        } else if is_final_segment && !rest_commands.is_empty() {
             arena_fits_with_lookahead(
                 arena,
                 content,
                 Mode::Flat,
-                lookahead_rest,
+                rest_commands,
                 remaining as isize,
                 embed,
                 source,
@@ -131,7 +122,7 @@ pub(super) fn render_fill_iterative(
         let content_fits = if offset + 1 < parts.len() && arena.is_collapsible_line(content) {
             let mut with_sep: SmallVec<[ArenaCommand; 8]> =
                 SmallVec::from_slice(if is_final_segment {
-                    lookahead_rest
+                    rest_commands
                 } else {
                     &[]
                 });
@@ -140,7 +131,7 @@ pub(super) fn render_fill_iterative(
                 mode: Mode::Flat,
                 doc: parts[offset + 1],
             });
-            let budget = if is_final_segment && !lookahead_rest.is_empty() {
+            let budget = if is_final_segment && !rest_commands.is_empty() {
                 remaining
             } else {
                 available

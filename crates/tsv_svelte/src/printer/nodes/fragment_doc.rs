@@ -1391,6 +1391,15 @@ impl<'a> Printer<'a> {
             //   Case-1 last item; the same flat measurement breaks at the whitespace boundary BEFORE
             //   the glued word so the whole glued run moves to a fresh line together, never splitting
             //   the glued boundary (which would inject a rendered space).
+            // A glued TAG joins on both shapes — as the smallest welded unit (`… glued{x}`, the
+            // word and its tag travel together) or welded onward through the run (`… glued{x}<a…>`,
+            // `… word {expr}.w<b>…`): which member of the welded unit crosses the width cannot
+            // matter, so the unit is measured through the tag and travels whole. There is no
+            // run-ending carve-out: prettier instead keeps a run-ending tag outside the fill and
+            // lets it ride past printWidth after the word it is welded to — tsv breaks at the
+            // whitespace boundary in front of the word, holding the hard limit (a cataloged
+            // divergence — conformance_prettier.md §Print Width Philosophy,
+            // fill_glued_tag_travel_long).
             //
             // Either way an inline element preceded by same-line content that must wrap starts on a
             // fresh line rather than dangling its opening tag at the text line's end (the
@@ -1400,22 +1409,39 @@ impl<'a> Printer<'a> {
             // must wrap by width still converges to the fresh-line form (a short run that fits is a
             // no-op).
             //
-            // `trailing_glued_tag` — the text's last word is welded to a following tag with no
-            // whitespace (`… tsv is ~{ratio}`). prettier keeps the tag outside the fill, so the fill
-            // never breaks before that word and the tag rides past printWidth after it. Measure the
-            // last word alone so tsv matches — otherwise the glued tag folds into the word's fit
-            // check and strands it on its own line.
-            let break_before_wide_flow = next_is_flow && (trailing_line || !has_trailing_ws);
-            let trailing_glued_tag = next_is_tag && !has_trailing_ws;
-            // A tag is never `next_is_flow` (disjoint node kinds), so the two trailing rules cannot
-            // both claim the boundary — asserted rather than left to the old chain's ordering.
-            debug_assert!(!(break_before_wide_flow && trailing_glued_tag));
-            let fill_doc = if break_before_wide_flow || trailing_glued_tag || glued_lead {
+            // On a GLUED text→tag boundary (`!has_trailing_ws`) the tag always joins the flow
+            // rule: the last word and the tag are one welded unit whatever follows, and the
+            // render walk (`flow_lookahead` — the tag doc forced Flat as the unit's head, or
+            // resolving via its `glued_atom` marker mid-run; its flat width is the formatted
+            // expression's) extends the measurement through whatever glue actually SURVIVES in
+            // the output and stops at the first non-glued entry — so the measured unit is exactly
+            // the weld, however far it runs.
+            //
+            // `tag_continues_welded` exists for the SPACED text→tag boundary (`… word
+            // {expr}.w<b>…`, `trailing_line`): there the tag enters the flow rule only when it
+            // heads a welded run — a spaced tag that ends the run keeps the ordinary Case-2
+            // measurement (the separated-tag divergence, fill_break_before_expr_long). Its
+            // follower set is "stays in the inline run", not "glued in the source": a BLOCK
+            // element follower detaches to its own line by its own layout (render-free at a block
+            // boundary), so a weld into it exists only in the source and measuring through it
+            // would grade a unit the output never has. A comment or control-flow follower is
+            // likewise not a member — conservative there, since the walk would end at it anyway.
+            let tag_continues_welded = next_is_tag
+                && i + 2 < trimmed_nodes.len()
+                && Self::byte_glued(&trimmed_nodes[i + 1], &trimmed_nodes[i + 2])
+                && match &trimmed_nodes[i + 2] {
+                    FragmentNode::Text(t) => Self::text_glued_before(t.raw(self.source)),
+                    n => self.is_inline_el_or_comp(n) || Self::is_tag_node(n),
+                };
+            let break_before_wide_flow = (next_is_flow
+                || tag_continues_welded
+                || (next_is_tag && !has_trailing_ws))
+                && (trailing_line || !has_trailing_ws);
+            let fill_doc = if break_before_wide_flow || glued_lead {
                 d.with_context(
                     fill_doc,
                     tsv_lang::doc::DocContext::default()
                         .with_break_before_wide_flow(break_before_wide_flow)
-                        .with_trailing_glued_tag(trailing_glued_tag)
                         .with_glued_lead(glued_lead),
                 )
             } else {

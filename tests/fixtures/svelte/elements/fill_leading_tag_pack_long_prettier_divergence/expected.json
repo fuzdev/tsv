@@ -1,0 +1,152 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1028,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 778,
+				"data": "\n\tText packing after a LEADING tag holds printWidth. The fill after a `{expr}` tag leads\n\twith a collapsible `line`, and tsv measures that separator TOGETHER with the word it\n\tstands before, so a word packs onto the tag's line only while the line stays <= 100.\n\tPrettier packs one word past the limit at these widths — see output_prettier.svelte.\n\tCases at the exact boundary of the pack decision: at 100 (tag line 94, the first word\n\tlands exactly at 100) tsv packs the word where prettier packs a second (106); at 101\n\t(tag line 95, the first word would land at 101) tsv breaks the leading line and packs\n\tnothing where prettier still packs the word (101). Contrast fill_leading_line, where\n\tthe tag line sits at exactly 100 and both formatters break the leading line.\n"
+			},
+			{
+				"type": "Text",
+				"start": 778,
+				"end": 779,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 779,
+				"end": 902,
+				"name": "li",
+				"name_loc": {
+					"start": {
+						"line": 12,
+						"column": 1,
+						"character": 780
+					},
+					"end": {
+						"line": 12,
+						"column": 3,
+						"character": 782
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 783,
+							"end": 785,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 785,
+							"end": 877,
+							"expression": {
+								"type": "Identifier",
+								"start": 786,
+								"end": 876,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 2
+									},
+									"end": {
+										"line": 13,
+										"column": 92
+									}
+								},
+								"name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 877,
+							"end": 897,
+							"raw": " ccccc\n\tccccc ccccc\n",
+							"data": " ccccc\n\tccccc ccccc\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 902,
+				"end": 903,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 903,
+				"end": 1027,
+				"name": "li",
+				"name_loc": {
+					"start": {
+						"line": 16,
+						"column": 1,
+						"character": 904
+					},
+					"end": {
+						"line": 16,
+						"column": 3,
+						"character": 906
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 907,
+							"end": 909,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ExpressionTag",
+							"start": 909,
+							"end": 1002,
+							"expression": {
+								"type": "Identifier",
+								"start": 910,
+								"end": 1001,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 93
+									}
+								},
+								"name": "xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx"
+							}
+						},
+						{
+							"type": "Text",
+							"start": 1002,
+							"end": 1022,
+							"raw": "\n\tccccc ccccc ccccc\n",
+							"data": "\n\tccccc ccccc ccccc\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
