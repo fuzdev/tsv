@@ -40,6 +40,9 @@ pub(super) fn render_fill_iterative(
         let content = parts[offset];
 
         let is_final_segment = offset + 2 >= parts.len();
+        // Final segment with following render-stack content — the boundary to whatever comes
+        // after the fill, where every look-ahead measurement below applies.
+        let final_with_rest = is_final_segment && !rest_commands.is_empty();
 
         let available = if is_final_segment {
             remaining.saturating_sub(context.trailing_reserve() as usize)
@@ -47,56 +50,47 @@ pub(super) fn render_fill_iterative(
             remaining
         };
 
-        // A text-run fill glued to a following tag (`… ~{ratio}`) measures its last word ALONE:
-        // prettier keeps the tag outside the fill, so the fill never breaks before the word it is
-        // glued to (the word stays put, the tag rides past printWidth after it). Suppress the
-        // last-item look-ahead so the glued tag doesn't fold into the word's fit check.
-        let lookahead_rest: &[ArenaCommand] = if context.trailing_glued_tag() && is_final_segment {
-            &[]
-        } else {
-            rest_commands
-        };
+        // Flow boundary, forced-break follower — ONE condition shared by Case 1's `content_fits`
+        // and Case 2's `sep_fits` (the same boundary rule, differing only in where the separator
+        // sits): the node after this fill is already multiline (wrapped attributes, a block-body
+        // handler), so the welded unit can't stay on the line — never "fits". Prettier's
+        // `group([line, element])` breaks on that forced break and drops the element; a flat
+        // measurement here would instead short-circuit at the follower's own hardline and
+        // wrongly report a fit, hugging it onto the text line.
+        let flow_forced_break = context.break_before_wide_flow()
+            && is_final_segment
+            && rest_commands
+                .last()
+                .is_some_and(|c| arena.will_break(c.doc));
+
         // `break_before_wide_flow`, Case-1 half: a GLUED text→element boundary (`… glued<a…>`) has
         // no trailing separator, so the glued last word is the fill's last item and the element
         // follows on the render stack — the whole-flat measurement lands here (the space-separated
         // half lands in Case 2's `sep_fits`). A ws-fill also reaches this at `is_final_segment`, but
         // its content there is a bare word whose `content_fits` only feeds `should_remeasure` (inert
-        // for a groupless leaf), so keying the block on the shared flag is contamination-free.
-        let content_fits = if context.break_before_wide_flow()
-            && is_final_segment
-            && rest_commands
-                .last()
-                .is_some_and(|c| arena.will_break(c.doc))
-        {
-            // Forced-break element: the following inline element glued to the last word is already
-            // multiline (wrapped attributes / block-body handler), so the glued run can't stay on
-            // the line — never "fits". Mirrors Case 2's forced-break short-circuit; a flat
-            // measurement would wrongly report a fit at the element's own hardline.
+        // for a groupless leaf), so keying the stack on the shared flag is contamination-free.
+        let content_fits = if flow_forced_break {
             false
-        } else if context.break_before_wide_flow() && is_final_segment && !rest_commands.is_empty()
-        {
-            // Measure the following element as a WHOLE flat unit so the fill breaks at the
-            // whitespace boundary BEFORE the glued last word when (word + element) don't fit. The
-            // element's inherited Break mode would otherwise let `arena_fits` short-circuit at its
-            // first internal line and wrongly report "fits", welding the word and breaking the
-            // element's own content in place. Pairwise like Case 2's `sep_fits` — the same
-            // boundary rule, only the separator differs — so it takes the same truncated stack
-            // (see [`flow_lookahead`]).
+        } else if final_with_rest {
+            let flow_stack;
+            let lookahead: &[ArenaCommand] = if context.break_before_wide_flow() {
+                // Measure the following element as a WHOLE flat unit so the fill breaks at the
+                // whitespace boundary BEFORE the glued last word when (word + element) don't fit.
+                // The element's inherited Break mode would otherwise let `arena_fits`
+                // short-circuit at its first internal line and wrongly report "fits", welding the
+                // word and breaking the element's own content in place. Pairwise like Case 2's
+                // `sep_fits` — the same boundary rule, only the separator differs — so it takes
+                // the same truncated stack (see [`flow_lookahead`]).
+                flow_stack = flow_lookahead(arena, rest_commands);
+                &flow_stack
+            } else {
+                rest_commands
+            };
             arena_fits_with_lookahead(
                 arena,
                 content,
                 Mode::Flat,
-                &flow_lookahead(arena, rest_commands),
-                remaining as isize,
-                embed,
-                source,
-            )
-        } else if is_final_segment && !lookahead_rest.is_empty() {
-            arena_fits_with_lookahead(
-                arena,
-                content,
-                Mode::Flat,
-                lookahead_rest,
+                lookahead,
                 remaining as isize,
                 embed,
                 source,
@@ -130,17 +124,13 @@ pub(super) fn render_fill_iterative(
         // `rest_commands` measurement already asks the right question.
         let content_fits = if offset + 1 < parts.len() && arena.is_collapsible_line(content) {
             let mut with_sep: SmallVec<[ArenaCommand; 8]> =
-                SmallVec::from_slice(if is_final_segment {
-                    lookahead_rest
-                } else {
-                    &[]
-                });
+                SmallVec::from_slice(if is_final_segment { rest_commands } else { &[] });
             with_sep.push(ArenaCommand {
                 indent,
                 mode: Mode::Flat,
                 doc: parts[offset + 1],
             });
-            let budget = if is_final_segment && !lookahead_rest.is_empty() {
+            let budget = if final_with_rest {
                 remaining
             } else {
                 available
@@ -252,24 +242,16 @@ pub(super) fn render_fill_iterative(
             // The separator (the last fill item) is rendered between `content` and whatever
             // follows the fill (`rest_commands`). The generic `content_fits` above measures
             // `content` + `rest_commands` but NOT this separator, so a trailing-`line` fill
-            // (the `next_node_is_flow` / after-element-fold boundary — the only fills that reach
+            // (the `next_is_flow` / after-element-fold boundary — the only fills that reach
             // Case 2, since they alone end in a separator) under-measures by the separator's
             // width and lets the following node overshoot printWidth by a column. Re-measure with
             // the separator counted just before the look-ahead so the boundary breaks (next node
             // to its own line) exactly when it should.
-            let sep_fits = if context.break_before_wide_flow()
-                && is_final_segment
-                && rest_commands
-                    .last()
-                    .is_some_and(|c| arena.will_break(c.doc))
-            {
-                // Flow boundary, forced-break element: the following inline element is already
-                // multiline (multiline attributes, a block-body event handler, …). Prettier's
-                // `group([line, element])` breaks on that forced break and drops the element, so the
-                // separator must break here too — a flat-width measurement would short-circuit at the
-                // element's hardline and wrongly report a fit (hugging it onto the text line).
+            // The forced-break short-circuit is [`flow_forced_break`], hoisted above Case 1 —
+            // the separator must break exactly where Case 1's content would.
+            let sep_fits = if flow_forced_break {
                 false
-            } else if is_final_segment && !rest_commands.is_empty() {
+            } else if final_with_rest {
                 // Inline-backed look-ahead stack plus the separator — matches the render
                 // work-list's `N = 8` so the common case stays off the heap (this rare Case-2
                 // flow boundary still cloned a `Vec`).

@@ -1,11 +1,15 @@
-<!-- fits: the leading `line` before `ccccc` renders flat, as a space -->
+<!--
+	fits: the leading `line` before `ccccc` renders flat, as a space
+-->
 <li>
 	aaaaa ~{xxxxxxxxxx} bbbbb ~{yyyyyyyyyy} ccccc ccccc ccccc
 </li>
-<!-- overflows: the glued `~{yyyyyyyyyy}` rides its line (prettier keeps it, tsv now matches), and
-     the leading `line` before `ccccc` becomes the newline itself — not a newline followed by the
-     space it stood for, which would strand a leading space at the head of the continuation line -->
+<!--
+	the leading `line` breaks: the tag line sits at exactly 100, so the first `ccccc` cannot
+	follow it — the leading `line` becomes the newline itself, NOT a newline plus the space it
+	stood for, which would strand a leading space at the head of the continuation line
+-->
 <li>
-	aaaaa aaaaa aaaaa aaaaa aaaaa ~{xxxxxxxxxx} bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb bbbbb ~{yyyyyyyyyy}
-	ccccc ccccc ccccc ccccc
+	{xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx}
+	ccccc ccccc ccccc
 </li>
