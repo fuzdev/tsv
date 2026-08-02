@@ -168,7 +168,7 @@ impl DocContext {
     /// expression's): on a **glued** boundary any tag joins — the welded word+tag pair is the
     /// smallest welded unit, travelling rather than riding past print width
     /// (conformance_prettier.md §Print Width Philosophy) — while on a **spaced** boundary only a
-    /// tag heading a welded run joins (the builder decides; `tag_continues_welded` in
+    /// tag heading a welded run joins (the builder decides; `tag_heads_welded_run` in
     /// `handle_text_child`). Off for every other fill, so a small element after text still packs
     /// and CSS/value-list fills are unaffected. It re-couples the width-driven drop decision to
     /// the boundary rule at render position so the space- and newline-authored forms converge to

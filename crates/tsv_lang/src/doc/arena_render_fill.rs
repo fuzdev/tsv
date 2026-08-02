@@ -40,6 +40,9 @@ pub(super) fn render_fill_iterative(
         let content = parts[offset];
 
         let is_final_segment = offset + 2 >= parts.len();
+        // Final segment with following render-stack content — the boundary to whatever comes
+        // after the fill, where every look-ahead measurement below applies.
+        let final_with_rest = is_final_segment && !rest_commands.is_empty();
 
         let available = if is_final_segment {
             remaining.saturating_sub(context.trailing_reserve() as usize)
@@ -65,33 +68,29 @@ pub(super) fn render_fill_iterative(
         // follows on the render stack — the whole-flat measurement lands here (the space-separated
         // half lands in Case 2's `sep_fits`). A ws-fill also reaches this at `is_final_segment`, but
         // its content there is a bare word whose `content_fits` only feeds `should_remeasure` (inert
-        // for a groupless leaf), so keying the block on the shared flag is contamination-free.
+        // for a groupless leaf), so keying the stack on the shared flag is contamination-free.
         let content_fits = if flow_forced_break {
             false
-        } else if context.break_before_wide_flow() && is_final_segment && !rest_commands.is_empty()
-        {
-            // Measure the following element as a WHOLE flat unit so the fill breaks at the
-            // whitespace boundary BEFORE the glued last word when (word + element) don't fit. The
-            // element's inherited Break mode would otherwise let `arena_fits` short-circuit at its
-            // first internal line and wrongly report "fits", welding the word and breaking the
-            // element's own content in place. Pairwise like Case 2's `sep_fits` — the same
-            // boundary rule, only the separator differs — so it takes the same truncated stack
-            // (see [`flow_lookahead`]).
+        } else if final_with_rest {
+            let flow_stack;
+            let lookahead: &[ArenaCommand] = if context.break_before_wide_flow() {
+                // Measure the following element as a WHOLE flat unit so the fill breaks at the
+                // whitespace boundary BEFORE the glued last word when (word + element) don't fit.
+                // The element's inherited Break mode would otherwise let `arena_fits`
+                // short-circuit at its first internal line and wrongly report "fits", welding the
+                // word and breaking the element's own content in place. Pairwise like Case 2's
+                // `sep_fits` — the same boundary rule, only the separator differs — so it takes
+                // the same truncated stack (see [`flow_lookahead`]).
+                flow_stack = flow_lookahead(arena, rest_commands);
+                &flow_stack
+            } else {
+                rest_commands
+            };
             arena_fits_with_lookahead(
                 arena,
                 content,
                 Mode::Flat,
-                &flow_lookahead(arena, rest_commands),
-                remaining as isize,
-                embed,
-                source,
-            )
-        } else if is_final_segment && !rest_commands.is_empty() {
-            arena_fits_with_lookahead(
-                arena,
-                content,
-                Mode::Flat,
-                rest_commands,
+                lookahead,
                 remaining as isize,
                 embed,
                 source,
@@ -131,7 +130,7 @@ pub(super) fn render_fill_iterative(
                 mode: Mode::Flat,
                 doc: parts[offset + 1],
             });
-            let budget = if is_final_segment && !rest_commands.is_empty() {
+            let budget = if final_with_rest {
                 remaining
             } else {
                 available
@@ -243,7 +242,7 @@ pub(super) fn render_fill_iterative(
             // The separator (the last fill item) is rendered between `content` and whatever
             // follows the fill (`rest_commands`). The generic `content_fits` above measures
             // `content` + `rest_commands` but NOT this separator, so a trailing-`line` fill
-            // (the `next_node_is_flow` / after-element-fold boundary — the only fills that reach
+            // (the `next_is_flow` / after-element-fold boundary — the only fills that reach
             // Case 2, since they alone end in a separator) under-measures by the separator's
             // width and lets the following node overshoot printWidth by a column. Re-measure with
             // the separator counted just before the look-ahead so the boundary breaks (next node
@@ -252,7 +251,7 @@ pub(super) fn render_fill_iterative(
             // the separator must break exactly where Case 1's content would.
             let sep_fits = if flow_forced_break {
                 false
-            } else if is_final_segment && !rest_commands.is_empty() {
+            } else if final_with_rest {
                 // Inline-backed look-ahead stack plus the separator — matches the render
                 // work-list's `N = 8` so the common case stays off the heap (this rare Case-2
                 // flow boundary still cloned a `Vec`).

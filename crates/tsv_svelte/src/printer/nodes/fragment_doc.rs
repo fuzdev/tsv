@@ -676,6 +676,30 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Whether the tag at `nodes[tag_idx]` **heads a welded run** — its follower is byte-glued
+    /// and stays in the inline run in the OUTPUT: glued content text, an inline
+    /// element/component, or another tag. The SPACED text→tag boundary's gate for
+    /// [`Self::handle_text_child`]'s `break_before_wide_flow`: a spaced tag enters the flow rule
+    /// only as the head of a welded run — one that ends the run keeps the ordinary Case-2
+    /// measurement (the separated-tag divergence, `fill_break_before_expr_long`).
+    ///
+    /// The member set is "stays in the inline run", not "glued in the source": a BLOCK element
+    /// follower detaches to its own line by its own layout (render-free at a block boundary), so
+    /// a weld into it exists only in the source and measuring through it would grade a unit the
+    /// output never has. A comment or control-flow follower is likewise not a member —
+    /// conservative there, since the render-side welded walk (`flow_lookahead` in
+    /// `arena_render_fill`, whose contract lives on
+    /// [`tsv_lang::doc::DocContext::break_before_wide_flow`]) would end at it anyway.
+    fn tag_heads_welded_run(&self, nodes: &[FragmentNode<'_>], tag_idx: usize) -> bool {
+        nodes.get(tag_idx + 1).is_some_and(|follower| {
+            Self::byte_glued(&nodes[tag_idx], follower)
+                && match follower {
+                    FragmentNode::Text(t) => Self::text_glued_before(t.raw(self.source)),
+                    n => self.is_inline_el_or_comp(n) || Self::is_tag_node(n),
+                }
+        })
+    }
+
     /// Whether the node at `i` is a **declaration that owns its own line** — `{@const}` /
     /// `{const …}` / `{let …}` / `{#snippet}`, unless it is glued to content on both sides.
     ///
@@ -871,11 +895,11 @@ impl<'a> Printer<'a> {
         // whitespace text is printed via `splitTextToDocs`, so a newline becomes a hardline.
         let next_is_inline_el = self.next_is_inline_element(trimmed_nodes, i);
         let next_is_block_el = next_node.is_some_and(|n| self.is_block_element_node(n));
-        // Whether the next sibling is a flowing inline element OR component — the path-1
-        // `next_node_is_flow` set (the Fill-idempotency boundary). Text before such a node
-        // ends its fill with a trailing `line` so the boundary breaks per width inside the
-        // fill (keeping the run idempotent), rather than a `group([line, node])` whose
-        // all-or-nothing break flip-flops across passes.
+        // Whether the next sibling is a flowing inline element OR component (the
+        // Fill-idempotency boundary). Text before such a node ends its fill with a trailing
+        // `line` so the boundary breaks per width inside the fill (keeping the run idempotent),
+        // rather than a `group([line, node])` whose all-or-nothing break flip-flops across
+        // passes.
         let next_is_flow =
             next_node.is_some_and(|n| self.is_inline_el_or_comp(n)) || comment_glued_next_flow;
         // Whether the *previous* sibling is a block element — prettier trims a boundary
@@ -1294,9 +1318,9 @@ impl<'a> Printer<'a> {
             } else if multiline && next_is_flow {
                 // Multiline middle child before a flowing inline element / component (space-only
                 // boundary): end the fill with a trailing `line` so the boundary breaks per width
-                // inside the fill — matching path 1's `next_node_is_flow` boundary, which keeps the
-                // run idempotent. A `group([line, node])` here breaks all-or-nothing and flip-flops
-                // across passes (the Fill-idempotency bug class).
+                // inside the fill — the `next_is_flow` boundary, which keeps the run idempotent.
+                // A `group([line, node])` here breaks all-or-nothing and flip-flops across passes
+                // (the Fill-idempotency bug class).
                 trim_right = true;
                 add_trailing_space = false;
                 trailing_line = true;
@@ -1409,33 +1433,17 @@ impl<'a> Printer<'a> {
             // must wrap by width still converges to the fresh-line form (a short run that fits is a
             // no-op).
             //
-            // `tag_continues_welded` — the SPACED text→tag boundary's gate (`… word
-            // {expr}.w<b>…`, `trailing_line`): there the tag enters the flow rule only when it
-            // heads a welded run — a spaced tag that ends the run keeps the ordinary Case-2
-            // measurement (the separated-tag divergence, fill_break_before_expr_long). Its
-            // follower set is "stays in the inline run", not "glued in the source": a BLOCK
-            // element follower detaches to its own line by its own layout (render-free at a block
-            // boundary), so a weld into it exists only in the source and measuring through it
-            // would grade a unit the output never has. A comment or control-flow follower is
-            // likewise not a member — conservative there, since the walk would end at it anyway.
-            // The leading `trailing_line &&` scopes the predicate to the one branch that reads
-            // it (`trailing_line ⟹ has_trailing_ws` — both assignments sit under that guard),
-            // so a glued boundary never pays for the lookahead.
-            let tag_continues_welded = trailing_line
-                && next_is_tag
-                && i + 2 < trimmed_nodes.len()
-                && Self::byte_glued(&trimmed_nodes[i + 1], &trimmed_nodes[i + 2])
-                && match &trimmed_nodes[i + 2] {
-                    FragmentNode::Text(t) => Self::text_glued_before(t.raw(self.source)),
-                    n => self.is_inline_el_or_comp(n) || Self::is_tag_node(n),
-                };
             // The boundary's two shapes, split as the flag's own contract describes them
             // ([`tsv_lang::doc::DocContext::break_before_wide_flow`] carries the render-side
             // mechanics — the whole-flat pairwise measurement and the welded walk):
             let break_before_wide_flow = if has_trailing_ws {
                 // SPACED half: the trailing `line` is the separator; a flowing element — or a
-                // tag heading a welded run — couples it to the whole-unit measurement.
-                trailing_line && (next_is_flow || tag_continues_welded)
+                // tag heading a welded run ([`Self::tag_heads_welded_run`], which carries the
+                // member set; a spaced tag that ENDS the run keeps the ordinary Case-2
+                // measurement) — couples it to the whole-unit measurement.
+                trailing_line
+                    && (next_is_flow
+                        || (next_is_tag && self.tag_heads_welded_run(trimmed_nodes, i + 1)))
             } else {
                 // GLUED half: no separator — the boundary in front of the last word is the
                 // break point, and ANY tag joins: the welded word+tag pair is the smallest
