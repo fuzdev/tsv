@@ -1,0 +1,715 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 510,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment between a named tuple member's label and its `:` stays after",
+			"start": 20,
+			"end": 98,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the label; the `: type` continuation indents one level.",
+			"start": 100,
+			"end": 158,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 175,
+			"end": 179,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 4
+				},
+				"end": {
+					"line": 5,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An optional member's `?` marker takes the same continuation.",
+			"start": 198,
+			"end": 261,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 279,
+			"end": 283,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 5
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " So does a rest member's label.",
+			"start": 302,
+			"end": 335,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 34
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 355,
+			"end": 359,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 7
+				},
+				"end": {
+					"line": 17,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A stacked run stays with the label; the tail continues below the run.",
+			"start": 380,
+			"end": 452,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 469,
+			"end": 474,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 4
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 478,
+			"end": 483,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 3
+				},
+				"end": {
+					"line": 24,
+					"column": 8
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 509,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 500,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 27,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 160,
+					"end": 195,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 165,
+						"end": 166,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 169,
+						"end": 194,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 10
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSNamedTupleMember",
+								"start": 173,
+								"end": 191,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 11
+									}
+								},
+								"optional": false,
+								"label": {
+									"type": "Identifier",
+									"start": 173,
+									"end": 174,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 2
+										},
+										"end": {
+											"line": 5,
+											"column": 3
+										}
+									},
+									"name": "b",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 175,
+											"end": 179
+										}
+									]
+								},
+								"elementType": {
+									"type": "TSStringKeyword",
+									"start": 185,
+									"end": 191,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 5
+										},
+										"end": {
+											"line": 6,
+											"column": 11
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment between a named tuple member's label and its `:` stays after",
+							"start": 20,
+							"end": 98
+						},
+						{
+							"type": "Line",
+							"value": " the label; the `: type` continuation indents one level.",
+							"start": 100,
+							"end": 158
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 263,
+					"end": 299,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 268,
+						"end": 269,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 272,
+						"end": 298,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 10
+							},
+							"end": {
+								"line": 13,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSNamedTupleMember",
+								"start": 276,
+								"end": 295,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 11
+									}
+								},
+								"optional": true,
+								"label": {
+									"type": "Identifier",
+									"start": 276,
+									"end": 277,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 3
+										}
+									},
+									"name": "b"
+								},
+								"elementType": {
+									"type": "TSStringKeyword",
+									"start": 289,
+									"end": 295,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 5
+										},
+										"end": {
+											"line": 12,
+											"column": 11
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 279,
+											"end": 283
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An optional member's `?` marker takes the same continuation.",
+							"start": 198,
+							"end": 261
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 337,
+					"end": 377,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 342,
+						"end": 343,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 6
+							},
+							"end": {
+								"line": 16,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 346,
+						"end": 376,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 10
+							},
+							"end": {
+								"line": 19,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSRestType",
+								"start": 350,
+								"end": 373,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 13
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSNamedTupleMember",
+									"start": 353,
+									"end": 373,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 5
+										},
+										"end": {
+											"line": 18,
+											"column": 13
+										}
+									},
+									"optional": false,
+									"label": {
+										"type": "Identifier",
+										"start": 353,
+										"end": 354,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 5
+											},
+											"end": {
+												"line": 17,
+												"column": 6
+											}
+										},
+										"name": "r",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 355,
+												"end": 359
+											}
+										]
+									},
+									"elementType": {
+										"type": "TSArrayType",
+										"start": 365,
+										"end": 373,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 5
+											},
+											"end": {
+												"line": 18,
+												"column": 13
+											}
+										},
+										"elementType": {
+											"type": "TSStringKeyword",
+											"start": 365,
+											"end": 371,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 5
+												},
+												"end": {
+													"line": 18,
+													"column": 11
+												}
+											}
+										}
+									}
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " So does a rest member's label.",
+							"start": 302,
+							"end": 335
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 454,
+					"end": 499,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 26,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 459,
+						"end": 460,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 6
+							},
+							"end": {
+								"line": 22,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSTupleType",
+						"start": 463,
+						"end": 498,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 10
+							},
+							"end": {
+								"line": 26,
+								"column": 2
+							}
+						},
+						"elementTypes": [
+							{
+								"type": "TSNamedTupleMember",
+								"start": 467,
+								"end": 495,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 11
+									}
+								},
+								"optional": false,
+								"label": {
+									"type": "Identifier",
+									"start": 467,
+									"end": 468,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 23,
+											"column": 3
+										}
+									},
+									"name": "b",
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 469,
+											"end": 474
+										}
+									]
+								},
+								"elementType": {
+									"type": "TSStringKeyword",
+									"start": 489,
+									"end": 495,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 5
+										},
+										"end": {
+											"line": 25,
+											"column": 11
+										}
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 478,
+											"end": 483
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A stacked run stays with the label; the tail continues below the run.",
+							"start": 380,
+							"end": 452
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

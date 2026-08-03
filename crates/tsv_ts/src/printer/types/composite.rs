@@ -858,6 +858,57 @@ impl<'a> Printer<'a> {
     // Mapped Types
     //
 
+    /// Push one of a mapped type's two keyword clauses — the key's `in <constraint>`
+    /// and the `as <name type>` rename — with the gaps on **both** sides of the
+    /// keyword. The two clauses are the same shape end to end, so they share one
+    /// emitter: locate the keyword outside comments, route the pre-keyword gap
+    /// ([`Printer::route_pre_keyword_gap`] — a line comment there keeps the comment
+    /// trailing the head and defers the whole `<keyword> <value>` tail to a
+    /// continuation line indented one level; a block trails the head in place), then
+    /// the keyword, the keyword→value gap's comments (hang-aware, so a `//` can't
+    /// swallow the value), and the value.
+    ///
+    /// `keyword` / `spaced_keyword` are the same literal with and without its leading
+    /// space: the continuation arm's leading space is `build_continuation_indent`'s, so
+    /// emitting a second one after the run's hardline would be a stray leading space on
+    /// the continuation line — while the inline arm keeps its single text node. The
+    /// keyword's own first byte and length drive the scan, so neither can drift from
+    /// the text actually emitted.
+    fn push_mapped_keyword_clause(
+        &self,
+        parts: &mut DocBuf,
+        head_end: u32,
+        keyword: &'static str,
+        spaced_keyword: &'static str,
+        value: &TSType<'_>,
+    ) {
+        let d = self.d();
+        let value_start = value.span().start;
+        // The keyword's first byte, skipping comments before it, so a matching byte
+        // inside a comment (`K /* in */ in T`) isn't read as the keyword.
+        let keyword_pos = find_char_skipping_comments(
+            self.source.as_bytes(),
+            head_end as usize,
+            value_start as usize,
+            keyword.as_bytes()[0],
+        );
+        let keyword_end = keyword_pos.map_or(head_end, |p| (p + keyword.trim_end().len()) as u32);
+        let keyword_pos = keyword_pos.map_or(head_end, |p| p as u32);
+        let gap = self.route_pre_keyword_gap(parts, head_end, keyword_pos);
+        let mut tail: DocBuf = smallvec![d.text(if gap.is_some() {
+            keyword
+        } else {
+            spaced_keyword
+        })];
+        tail.push(self.build_trailing_comments_hang_next(keyword_end, value_start));
+        tail.push(self.build_type_doc(value));
+        let tail = d.concat(&tail);
+        parts.push(match gap {
+            Some((start, end)) => self.build_continuation_indent(start, end, tail),
+            None => tail,
+        });
+    }
+
     /// Build doc for mapped type: `{ [K in T]: V }`
     ///
     /// Source-fidelity aware: preserves multi-line formatting when source is multi-line.
@@ -985,54 +1036,35 @@ impl<'a> Printer<'a> {
         } else {
             interior_parts
                 .push(self.ident_name_doc(m.type_parameter.name, m.type_parameter.span.start));
-            // Comments around `in` keyword: `key /* c1 */ in /* c2 */ Constraint`
+            // Comments around the `in` keyword: `key /* c1 */ in /* c2 */ Constraint`
             let name_len = self.with_ident_name_at(
                 m.type_parameter.name,
                 m.type_parameter.span.start,
                 str::len,
             );
             let name_end = m.type_parameter.span.start + name_len as u32;
-            let constraint_start = m.type_parameter.constraint.span().start;
-            // Find `i` of `in` keyword, skipping comments before it
-            let in_start = find_char_skipping_comments(
-                self.source.as_bytes(),
-                name_end as usize,
-                constraint_start as usize,
-                b'i',
+            self.push_mapped_keyword_clause(
+                &mut interior_parts,
+                name_end,
+                "in ",
+                " in ",
+                m.type_parameter.constraint,
             );
-            let in_end = in_start.map_or(name_end, |p| (p + "in".len()) as u32);
-            let in_start = in_start.map_or(name_end, |p| p as u32);
-            // Comments between key name and `in` keyword
-            // Comment gaps break a line comment onto its own line so it can't swallow the
-            // following `in`/constraint.
-            interior_parts.push(self.build_leading_comments_break_for_line(name_end, in_start));
-            interior_parts.push(d.text(" in "));
-            interior_parts.push(self.build_trailing_comments_hang_next(in_end, constraint_start));
-            interior_parts.push(self.build_type_doc(m.type_parameter.constraint));
         }
 
         // as clause: `as NewKeyType`
         // Track the end of the last element inside brackets (for bracket-close comments)
         let mut last_inner_end = m.type_parameter.constraint.span().end;
         if let Some(name_type) = &m.name_type {
-            // Comments around `as` keyword: `Constraint /* c1 */ as /* c2 */ NewKey`
-            let constraint_end = m.type_parameter.constraint.span().end;
-            let name_type_start = name_type.span().start;
-            // Find `a` of `as` keyword, skipping comments before it
-            let as_start = find_char_skipping_comments(
-                self.source.as_bytes(),
-                constraint_end as usize,
-                name_type_start as usize,
-                b'a',
+            // Comments around the `as` keyword: `Constraint /* c1 */ as /* c2 */ NewKey`
+            // — the same clause shape as key→`in` above, same emitter.
+            self.push_mapped_keyword_clause(
+                &mut interior_parts,
+                m.type_parameter.constraint.span().end,
+                "as ",
+                " as ",
+                name_type,
             );
-            let as_end = as_start.map_or(constraint_end, |p| (p + "as".len()) as u32);
-            let as_start = as_start.map_or(constraint_end, |p| p as u32);
-            // Comment gaps break a line comment so it can't swallow `as`/the name type.
-            interior_parts
-                .push(self.build_leading_comments_break_for_line(constraint_end, as_start));
-            interior_parts.push(d.text(" as "));
-            interior_parts.push(self.build_trailing_comments_hang_next(as_end, name_type_start));
-            interior_parts.push(self.build_type_doc(name_type));
             last_inner_end = name_type.span().end;
         }
 
