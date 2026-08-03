@@ -16,9 +16,10 @@ Prettier has **two destinations from this one gap, keyed on the authoring**:
   `divergent_variant_own_line.svelte`, one pass, prettier-stable). That landing
   is **not** tsv-stable — a destructuring pattern has no multiline preservation,
   so tsv re-collapses it keeping the comment in its relocated after-`:` slot,
-  trailing the `:` (`{ a: // c⏎b }`, a third stable form). Three stable forms
-  coexist, keyed on which side of the `:` the comment was authored; only
-  prettier moves a comment between them.
+  trailing the `:`, the local on a continuation line indented one level
+  (`{ a: // c⏎\t\tb }`, a third stable form). Three stable forms coexist,
+  keyed on which side of the `:` the comment was authored; only prettier moves
+  a comment between them.
 
 ```ts
 // tsv (preserve + continuation indent)   // prettier (hoist to leading)

@@ -256,9 +256,11 @@ impl<'a> Printer<'a> {
     /// (`push_keyword_value_or_continuation`, `types/type_params.rs`) — the
     /// name→marker gap and the dotted-name gap (`build_dot_gap_doc`), the
     /// object-property and import-attribute key→`:` gaps, the index-signature
-    /// `]`→value-`:` gap (`build_index_signature_member_doc`), and the callee→empty
-    /// argument list gap (`push_empty_args`). Adding a site means calling this, never
-    /// re-deriving `indent(" " + hang_next + tail)`. See conformance_prettier.md
+    /// `]`→value-`:` gap (`build_index_signature_member_doc`), the callee→empty
+    /// argument list gap (`push_empty_args`), and the switch-case head→`:` gap
+    /// (`build_switch_case_doc_inner`, where the tail is the bare `:` and the gate is
+    /// line-comments-only). Adding a site means calling this, never re-deriving
+    /// `indent(" " + hang_next + tail)`. See conformance_prettier.md
     /// §Uniform Forced-Continuation Indent.
     pub(crate) fn build_continuation_indent(&self, start: u32, end: u32, tail: DocId) -> DocId {
         let d = self.d();
@@ -335,6 +337,41 @@ impl<'a> Printer<'a> {
                 let tail = d.concat(&[d.text("= "), build_value()]);
                 self.build_continuation_indent(name_end, eq_pos, tail)
             })
+    }
+
+    /// Build the value side of a pattern's `=`/`:` gap that holds comments: the
+    /// gap's comments (hang-aware — `build_trailing_comments_hang_next`) followed by
+    /// the value, the whole indented one level when a comment hangs the value
+    /// (`comments_force_own_line_between`) so the continuation reads as this
+    /// binding's value, not a sibling element — the value-side mirror of
+    /// `build_continuation_indent`. A glued block collapses inline unindented
+    /// (`= /* c */ v`), so a breaking value never gains a spurious extra level.
+    ///
+    /// The pattern-family counterpart of `build_eq_comment_break_rhs`: a
+    /// destructuring pattern or parameter list has no multiline preservation, so an
+    /// own-line authoring collapses instead of holding its line, and prettier's
+    /// destinations differ per site (float past the value, hoist before the
+    /// binding — see conformance_prettier.md §Comment relocation). Callers — the
+    /// param/array default (`build_assignment_pattern_doc`), the shorthand default,
+    /// and the rename/computed-key after-`:` gap
+    /// (`build_object_pattern_property_doc`) — gate on `has_comments_to_emit_between`
+    /// first, so the no-comment path never reaches the run.
+    pub(crate) fn build_pattern_value_gap_doc(
+        &self,
+        start: u32,
+        end: u32,
+        value_doc: DocId,
+    ) -> DocId {
+        let d = self.d();
+        let doc = d.concat(&[
+            self.build_trailing_comments_hang_next(start, end),
+            value_doc,
+        ]);
+        if self.comments_force_own_line_between(start, end) {
+            d.indent(doc)
+        } else {
+            doc
+        }
     }
 
     /// Build a binding/identifier `: type` annotation including any before-`:`

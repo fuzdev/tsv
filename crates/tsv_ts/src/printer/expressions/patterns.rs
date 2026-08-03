@@ -775,17 +775,20 @@ impl<'a> Printer<'a> {
                         }
                         tail.push(d.text(if pre_eq_hangs { "= " } else { " = " }));
                         // A block comment after `=` inlines onto the value; a line
-                        // comment breaks before it. Matches the param-default rule in
-                        // `build_assignment_pattern_doc` (collapse an own-line block);
-                        // prettier moves a block before `=` instead.
+                        // comment hangs it, the value indented — the shared pattern
+                        // value-gap seam, same as the param default's.
+                        let rhs_doc = self.build_expression_doc(rhs);
                         if gap_has_comments
                             && self.has_comments_to_emit_between(eq_pos + 1, rhs_start)
                         {
-                            tail.push(
-                                self.build_trailing_comments_hang_next(eq_pos + 1, rhs_start),
-                            );
+                            tail.push(self.build_pattern_value_gap_doc(
+                                eq_pos + 1,
+                                rhs_start,
+                                rhs_doc,
+                            ));
+                        } else {
+                            tail.push(rhs_doc);
                         }
-                        tail.push(self.build_expression_doc(rhs));
                         let tail_doc = d.concat(&tail);
                         // A hanging pre-`=` comment left `= default` on its own line;
                         // the shared continuation seam emits the comment run and
@@ -827,6 +830,9 @@ impl<'a> Printer<'a> {
                     // Set when a pre-`:` comment hangs what follows: the whole
                     // `: local` tail then drops to a continuation line.
                     let mut hang_range: Option<(u32, u32)> = None;
+                    // Set when an after-`:` comment hangs the local: the value drops
+                    // to a continuation line indented one level.
+                    let mut value_hang: Option<(u32, u32)> = None;
                     if self.has_comments_to_emit_between(key_region_end, value_start) {
                         #[allow(clippy::expect_used)]
                         // Parser guarantees `:` exists in destructuring property
@@ -854,8 +860,14 @@ impl<'a> Printer<'a> {
                             parts.push(pre_colon_comments);
                         }
                         tail.push(d.text(": "));
-                        // Comments after `:`
-                        if let Some(after_colon_comments) = self
+                        // Comments after `:`: a glued block inlines onto the local; a
+                        // line comment — or an own-line multiline block — hangs it,
+                        // the local indented one level so it reads as this property's
+                        // value, not a sibling (the same rule as the `=`→value gaps
+                        // above).
+                        if self.comments_force_own_line_between(colon_pos + 1, value_start) {
+                            value_hang = Some((colon_pos + 1, value_start));
+                        } else if let Some(after_colon_comments) = self
                             .build_inline_comments_between_doc_trailing_space_opt(
                                 colon_pos + 1,
                                 value_start,
@@ -866,7 +878,13 @@ impl<'a> Printer<'a> {
                     } else {
                         tail.push(d.text(": "));
                     }
-                    tail.push(self.build_expression_doc(&p.value));
+                    let value_doc = self.build_expression_doc(&p.value);
+                    match value_hang {
+                        Some((start, end)) => {
+                            tail.push(self.build_pattern_value_gap_doc(start, end, value_doc));
+                        }
+                        None => tail.push(value_doc),
+                    }
                     let tail_doc = d.concat(&tail);
                     match hang_range {
                         Some((start, end)) => {
@@ -1224,14 +1242,12 @@ impl<'a> Printer<'a> {
             } else {
                 rhs_doc
             };
-            let value_doc = if gap_has_comments
-                && self.has_comments_to_emit_between(eq_pos + 1, rhs_start)
-            {
-                let comments_doc = self.build_trailing_comments_hang_next(eq_pos + 1, rhs_start);
-                d.concat(&[comments_doc, rhs_doc])
-            } else {
-                rhs_doc
-            };
+            let value_doc =
+                if gap_has_comments && self.has_comments_to_emit_between(eq_pos + 1, rhs_start) {
+                    self.build_pattern_value_gap_doc(eq_pos + 1, rhs_start, rhs_doc)
+                } else {
+                    rhs_doc
+                };
 
             tail.push(d.text(eq_text));
             tail.push(value_doc);
