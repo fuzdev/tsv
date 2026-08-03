@@ -25,4 +25,6 @@ result. tsv applies that same number normalization only to standard-CSS
 contexts — declaration values and `@media`/`@supports` preludes — leaving
 unrecognized directive preludes untouched. See
 [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules)
-(`SCSS directive numbers`, Design choice).
+(`SCSS directive preludes`, Design choice). The selector-branch half of the same
+divergence — whitespace, quotes and combinator spacing in an `@at-root` prelude
+— is [scss_directive_prelude_verbatim](../scss_directive_prelude_verbatim_prettier_divergence/).
