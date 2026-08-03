@@ -162,15 +162,12 @@ impl<'a> Printer<'a> {
         // parent is ConditionalExpression from continuation indent, UNLESS the
         // grandparent is ReturnStatement, ThrowStatement, CallExpression, or
         // NewExpression. In those cases, shouldNotIndent = false and the binary
-        // gets indent(rest) for its continuation lines.
-        //
-        // In embedded contexts (Svelte attributes), the grandparent is a template
-        // node (none of the above), so shouldNotIndent = true → no indent.
+        // gets indent(rest) for its continuation lines. The caller keys the axis
+        // (context-free: a template call arg indents its test the same as a
+        // `<script>` one; at a template expression ROOT the generic
+        // `build_conditional_doc` passes false, matching the plugin's flush test).
         let test = if let internal::Expression::BinaryExpression(binary) = cond.test {
-            if self.embed.is_embedded() {
-                // Embedded: shouldNotIndent = true (grandparent is Svelte template node)
-                self.build_binary_chain_doc(binary)
-            } else if indent_binary_test {
+            if indent_binary_test {
                 // Grandparent is return/throw/call/new: shouldNotIndent = false
                 self.build_binary_chain_doc_with_continuation_indent(binary)
             } else {

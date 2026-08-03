@@ -674,7 +674,7 @@ pub fn build_expression_doc_with_comments(
     embed: &EmbedContext,
 ) -> DocId {
     let printer = make_doc_printer(arena, inputs, *embed);
-    printer.build_expression_doc(expression)
+    printer.build_root_expression_doc(expression)
 }
 
 /// Build a DocId for a single comment (`/* … */` / `// …`) in the caller's arena,

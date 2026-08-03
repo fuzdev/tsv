@@ -327,8 +327,9 @@ impl<'a> Printer<'a> {
     ///
     /// - the **`EmbedContext`** — four distinct recipes (a block head's
     ///   `first_line_offset` is derived from its own opening literal; `{@const}`'s init
-    ///   takes `0` so binary chains stay Grouped under the assignment layout; an attribute
-    ///   value starts from [`EmbedContext::default`], not the host's).
+    ///   inherits the host's Standalone mode so a root binary stays Grouped under the
+    ///   assignment layout; an attribute value starts from [`EmbedContext::default`],
+    ///   not the host's).
     /// - the **post-processing** — `remove_lines` for an inline block head,
     ///   [`Self::indent_frozen_head`] for a prefixed head, the leading-line-comment
     ///   continuation indent for a block head, nothing for the rest.

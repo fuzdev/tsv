@@ -575,7 +575,8 @@ impl<'a> Printer<'a> {
     ///
     /// Builds the expression doc directly in the shared arena using
     /// `build_expression_doc_with_comments` with `LayoutMode::Embedded`
-    /// so binary chains use ContinuationIndent style. The surrounding Svelte doc tree
+    /// so a ROOT binary chain uses ContinuationIndent style (nested binaries
+    /// format as in `<script>`). The surrounding Svelte doc tree
     /// (e.g., the closing `}`) provides natural lookahead for fits checks — no
     /// `suffix_width` estimation needed.
     ///
@@ -598,8 +599,8 @@ impl<'a> Printer<'a> {
         let leading_docs = self.leading_comment_docs(span_start, expr_start);
 
         // Embed for embedded expression context. `mode` is the load-bearing field: the
-        // binary and conditional printers read `is_embedded()` to pick ContinuationIndent
-        // over Grouped style.
+        // expression-ROOT entry (`build_root_expression_doc`) reads `is_embedded()` to
+        // pick ContinuationIndent over Grouped style for a root binary.
         //
         // `first_line_offset` is a width estimate that reaches nothing on this path — it is
         // read only by `tsv_ts`'s own render entry (`write_arena_doc`, which a
@@ -652,7 +653,7 @@ impl<'a> Printer<'a> {
     ///
     /// - **Multiline context** (`in_multiline_context=true`): The condition is on its own line.
     ///   No `remove_lines()` is applied, allowing long chains to wrap naturally.
-    ///   Uses `LayoutMode::Embedded` for proper continuation indent on wrapped binary expressions.
+    ///   Uses `LayoutMode::Embedded` for continuation indent on a wrapped ROOT binary.
     ///
     /// # Parameters
     /// - `opening_offset` - Characters before the expression (e.g., 5 for `{#if `). Used to
@@ -679,8 +680,9 @@ impl<'a> Printer<'a> {
         // Build docs for leading comments
         let leading_docs = self.leading_comment_docs(span_start, expr_start);
 
-        // In multiline contexts, set up embedded expression context so binary chains
-        // use ContinuationIndent style. first_line_offset estimates the column position.
+        // In multiline contexts, set up embedded expression context so a ROOT binary
+        // chain uses ContinuationIndent style. first_line_offset estimates the column
+        // position.
         let embed = if in_multiline_context {
             let context_indent = TAB_WIDTH;
             let first_line_offset = context_indent + opening_offset;
