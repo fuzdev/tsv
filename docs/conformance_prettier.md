@@ -235,6 +235,29 @@ its tail:
   [Switch case head→`:` line comment](#comment-relocation). A labeled statement's
   name→`:` gap is not a site of this rule — both formatters hoist the comment to
   lead the whole statement there (a match).
+- **Svelte braced heads** — the head→value gap of every `{…}`, uniformly
+  (`{@html // c⏎\texpr}`), via the shared `leading_line_comment_hangs_value`: the
+  prefixed tags (`{@html}`, `{@render}`, `{@debug}`, `{...spread}`, `{@attach}`), the
+  `{expr}` tag and attribute values
+  ([expr_leading_line](../tests/fixtures/svelte/syntax/comments/expr_leading_line_prettier_divergence/),
+  the whole family in one sweep;
+  [expression_tag_line_comment](../tests/fixtures/svelte/syntax/comments/expression_tag_line_comment_prettier_divergence/)
+  and [expr_multibyte](../tests/fixtures/svelte/syntax/comments/expr_multibyte_prettier_divergence/)
+  are the `{expr}` tag's own pair, in ASCII and with multibyte comment text), a
+  directive value whose expression self-expands
+  ([on/line_comment](../tests/fixtures/svelte/directives/on/line_comment_prettier_divergence/)),
+  the `{@const}` init (through its break-after-operator layout), and the block heads
+  ([condition_breaking_comment](../tests/fixtures/svelte/blocks/if/condition_breaking_comment_prettier_divergence/)).
+  Prettier keeps the continuation flush at all of them, and strips the comment outright
+  at `{@debug}`. The **`}` column** moves with the indent and is the same question —
+  a run-final `//` supplies the break the closer reuses, so that break must be emitted
+  one level out or the closer lands at the *content's* column
+  ([expr_trailing_indented_content](../tests/fixtures/svelte/syntax/comments/expr_trailing_indented_content_prettier_divergence/)).
+  What differs across the family is only what each **host** does with its delimiters —
+  a block head dangles its `}` at base ([§Svelte: Blocks](#svelte-blocks)), a prefixed
+  tag hugs it, and a value that always block-wraps (`bind:`, and any directive whose
+  expression does not self-expand) reaches the same hang through the block's own
+  `indent`, with the comment on its own line inside the braces.
 
 **Two gaps are outside this rule, and the grammar is what excludes them**: an
 `as`/`satisfies` cast's operand→keyword gap and a postfix `++`/`--`'s

@@ -29,3 +29,15 @@
 		item && cond // c
 	}
 {/each}
+
+<!-- a prefixed tag hangs its content on the same leading comment, and hugs its `}` when the
+	run does not end in a line comment -->
+{@html // c1
+	expr // c2
+}
+{@html // c1
+	expr}
+
+<!-- the tag's control: no leading comment, nothing indents the content, same `}` column -->
+{@html expr // c2
+}

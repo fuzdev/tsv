@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 702,
+	"end": 997,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -414,6 +414,148 @@
 						}
 					}
 				}
+			},
+			{
+				"type": "Text",
+				"start": 701,
+				"end": 703,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 703,
+				"end": 835,
+				"data": " a prefixed tag hangs its content on the same leading comment, and hugs its `}` when the\n\trun does not end in a line comment "
+			},
+			{
+				"type": "Text",
+				"start": 835,
+				"end": 836,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 836,
+				"end": 862,
+				"expression": {
+					"type": "Identifier",
+					"start": 850,
+					"end": 854,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 5
+						}
+					},
+					"name": "expr",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 843,
+							"end": 848
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 855,
+							"end": 860
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 862,
+				"end": 863,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 863,
+				"end": 882,
+				"expression": {
+					"type": "Identifier",
+					"start": 877,
+					"end": 881,
+					"loc": {
+						"start": {
+							"line": 39,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 5
+						}
+					},
+					"name": "expr",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 870,
+							"end": 875
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 882,
+				"end": 884,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 884,
+				"end": 976,
+				"data": " the tag's control: no leading comment, nothing indents the content, same `}` column "
+			},
+			{
+				"type": "Text",
+				"start": 976,
+				"end": 977,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "HtmlTag",
+				"start": 977,
+				"end": 996,
+				"expression": {
+					"type": "Identifier",
+					"start": 984,
+					"end": 988,
+					"loc": {
+						"start": {
+							"line": 42,
+							"column": 7
+						},
+						"end": {
+							"line": 42,
+							"column": 11
+						}
+					},
+					"name": "expr",
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 989,
+							"end": 994
+						}
+					]
+				}
 			}
 		]
 	},
@@ -512,6 +654,70 @@
 				"end": {
 					"line": 29,
 					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 843,
+			"end": 848,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 7
+				},
+				"end": {
+					"line": 35,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 855,
+			"end": 860,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 6
+				},
+				"end": {
+					"line": 36,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 870,
+			"end": 875,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 7
+				},
+				"end": {
+					"line": 38,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 989,
+			"end": 994,
+			"loc": {
+				"start": {
+					"line": 42,
+					"column": 12
+				},
+				"end": {
+					"line": 42,
+					"column": 17
 				}
 			}
 		}

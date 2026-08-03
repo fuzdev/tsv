@@ -4,8 +4,7 @@
 // {@const} initializer break rules.
 
 use crate::ast::internal;
-use crate::printer::{CommentRun, HeadExpr, Printer};
-use smallvec::smallvec;
+use crate::printer::{HeadExpr, Printer};
 use tsv_lang::Span;
 use tsv_lang::comments_in_source_range;
 use tsv_lang::doc::arena::DocId;
@@ -277,11 +276,15 @@ impl<'a> Printer<'a> {
     pub(super) fn build_debug_tag_doc(&self, tag: &internal::DebugTag<'_>) -> DocId {
         let d = self.d();
 
-        // Comments within the tag's content (after "{@debug" and before "}").
-        let tag_comments: CommentRun<'_> =
-            comments_in_source_range(self.comments, tag.span.start, tag.span.end).collect();
-
-        if tag.identifiers.is_empty() && tag_comments.is_empty() {
+        // Every gap below is read with `comments_in_source_range` — the **in-source** axis
+        // named at each call site rather than filtered out of one collected run, so the
+        // axis this builder stands on cannot be mistaken for the to-emit one anywhere in it.
+        let tag_end = tag.span.end;
+        if tag.identifiers.is_empty()
+            && comments_in_source_range(self.comments, tag.span.start, tag_end)
+                .next()
+                .is_none()
+        {
             return d.text("{@debug}");
         }
 
@@ -301,25 +304,18 @@ impl<'a> Printer<'a> {
             && self.honored_directive_in_gap(last_end, first.span().start)
         {
             let list = Span::new(first.span().start, last.span().end);
-            let mut frozen_parts: DocBuf = tag_comments
-                .iter()
-                .filter(|c| c.span.end <= list.start)
-                .map(|c| self.build_leading_js_comment_doc(c))
-                .collect();
+            let mut frozen_parts: DocBuf =
+                comments_in_source_range(self.comments, last_end, list.start)
+                    .map(|c| self.build_leading_js_comment_doc(c))
+                    .collect();
             frozen_parts.push(self.verbatim_source_doc(list));
             // This builder emits its own trailing run, so it answers `ends_with_line_comment`
             // off that one run rather than from a second scan that could disagree with it.
-            let trailing: CommentRun<'_> = tag_comments
-                .iter()
-                .copied()
-                .filter(|c| c.span.start >= list.end)
-                .collect();
-            let ends_with_line_comment = trailing.last().is_some_and(|c| !c.is_block);
-            frozen_parts.extend(
-                trailing
-                    .iter()
-                    .map(|c| self.build_trailing_js_comment_doc(c, false)),
+            let (trailing_docs, ends_with_line_comment) = self.trailing_comment_run_docs(
+                comments_in_source_range(self.comments, list.end, tag_end),
+                false,
             );
+            frozen_parts.extend(trailing_docs);
             let doc = self.indent_frozen_head(d.concat(&frozen_parts));
             return self.build_prefixed_head_doc(
                 DEBUG_TAG_OPEN,
@@ -327,12 +323,24 @@ impl<'a> Printer<'a> {
                     doc,
                     frozen: true,
                     ends_with_line_comment,
+                    owes_continuation_indent: false,
                 },
                 "}",
             );
         }
 
-        let mut parts: DocBuf = smallvec![d.text("{@debug ")];
+        // The shared braced-head rule ([`Printer::leading_line_comment_hangs_value`]), over
+        // the keyword→first-identifier gap. Taken before the parts are assembled because it
+        // is also the dedent the trailing run below owes — `trailing_comment_docs`'
+        // `closer_owns_break`, spelled out by hand here since this builder emits its own run.
+        let hangs = tag.identifiers.first().is_some_and(|first| {
+            self.leading_line_comment_hangs_value(last_end, first.span().start, false)
+        });
+
+        // Content only — the prefix and the `}` are added below, so `hangs` can indent
+        // exactly what sits between them (the shape `indent_frozen_head` reaches on the
+        // frozen arm above, and `Printer::build_prefixed_head_doc` on every other tag).
+        let mut parts = DocBuf::new();
 
         for (i, id) in tag.identifiers.iter().enumerate() {
             let id_start = id.span().start;
@@ -354,34 +362,35 @@ impl<'a> Printer<'a> {
                 .map_or(id_start, |c| c as u32);
 
                 // Comments before the comma trail the previous identifier.
-                for comment in &tag_comments {
-                    if comment.span.start >= last_end && comment.span.end <= comma {
-                        parts.push(self.build_trailing_js_comment_doc(comment, false));
-                    }
-                }
+                parts.extend(
+                    comments_in_source_range(self.comments, last_end, comma)
+                        .map(|c| self.build_trailing_js_comment_doc(c, false)),
+                );
                 parts.push(d.text(", "));
                 last_end = comma.saturating_add(1);
             }
             // Comments after the comma (or after the keyword, for the first
             // identifier) lead this identifier.
-            for comment in &tag_comments {
-                if comment.span.start >= last_end && comment.span.end <= id_start {
-                    parts.push(self.build_leading_js_comment_doc(comment));
-                }
-            }
+            parts.extend(
+                comments_in_source_range(self.comments, last_end, id_start)
+                    .map(|c| self.build_leading_js_comment_doc(c)),
+            );
             parts.push(d.source_span(id.span(), self.source));
             last_end = id.span().end;
         }
 
-        // Trailing comments (after the last identifier).
-        for comment in &tag_comments {
-            if comment.span.start >= last_end {
-                parts.push(self.build_trailing_js_comment_doc(comment, false));
-            }
-        }
+        // Trailing comments (after the last identifier), through the shared pairing — only
+        // the run's LAST comment can supply the break the `}` reuses, so only it takes the
+        // dedent. [`Printer::trailing_comment_run_docs`] rather than its lookup-bearing
+        // wrapper: this builder stands on the in-source axis its doc comment above explains.
+        let (trailing_docs, _) = self.trailing_comment_run_docs(
+            comments_in_source_range(self.comments, last_end, tag_end),
+            hangs,
+        );
+        parts.extend(trailing_docs);
 
-        parts.push(d.text("}"));
-        d.concat(&parts)
+        let content = self.indent_head_content(d.concat(&parts), false, hangs);
+        d.concat(&[d.text("{@debug "), content, d.text("}")])
     }
 
     /// Build a doc for {@render snippet(args)}

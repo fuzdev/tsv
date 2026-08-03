@@ -165,7 +165,18 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// moves across the whole reproducible subset. The detector already explains it
 	// (`inline_sibling_newline_flow` + `svelte_boundary_ws_trim`), so it lands in `known`, not
 	// `unknown` — that count is unmoved.
-	svelte: 499,
+	//
+	// 499 → 498: one reproducible file,
+	// `prettier-plugin-svelte/test/printer/samples/event-handler-comments.html`, whose whole
+	// content is `on:click={// comment⏎() => {…}}` — a leading line comment in a braced head,
+	// which now hangs its value one level in per conformance_prettier.md §Uniform
+	// Forced-Continuation Indent (extended from the block heads to the whole braced family).
+	// It is the only file the change moves across the reproducible subset: the one other
+	// pinned `.svelte` carrying the shape, `svelte/.../parser-legacy/samples/javascript-comments`,
+	// already diverged on the trailing comments prettier strips there. The
+	// `forced_continuation_indent` detector was widened with the clause in the same change, so
+	// it lands in `known` — the `unknown` count is unmoved.
+	svelte: 498,
 	typescript: 2332,
 	css: 89
 };
