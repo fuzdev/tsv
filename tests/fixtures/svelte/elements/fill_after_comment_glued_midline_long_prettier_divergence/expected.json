@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 1419,
+	"end": 1702,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,31 +10,31 @@
 			{
 				"type": "Comment",
 				"start": 0,
-				"end": 939,
-				"data": "\n\tA text run byte-glued to a preceding HTML comment travels WITH it: that boundary carries no\n\twhitespace, so the only break point is the one in FRONT of the comment. Once the glued unit no\n\tlonger fits where it sits, the whole unit moves to a fresh line — the space ahead of it is\n\tinter-node whitespace that collapses to one rendered space, so tsv is free to spend it on the\n\tbreak. Cases below, in order: the unit still fits mid-line (control, no move); the unit\n\toverflows mid-line at 104 but fits at line start (it moves, and now fits at exactly 100); the\n\tunit is wider than a whole line at 101 (it moves anyway — the break is spent, the limit still\n\tis not met); the boundary in FRONT of the unit is itself glued, so the unit cannot move at all\n\tand the break travels further left, to the space inside the preceding run. Prettier welds the\n\tunit to the preceding word and lets the line run over — see output_prettier.svelte.\n"
+				"end": 1044,
+				"data": "\n\tA text run byte-glued to a preceding HTML comment travels WITH it: that boundary carries no\n\twhitespace, so the only break point is the one in FRONT of the comment. Once the glued unit no\n\tlonger fits where it sits, the whole unit moves to a fresh line — the space ahead of it is\n\tinter-node whitespace that collapses to one rendered space, so tsv is free to spend it on the\n\tbreak. Cases below, in order: the unit still fits mid-line (control, no move); the unit\n\toverflows mid-line at 104 but fits at line start (it moves, and now fits at exactly 100); the\n\tunit is wider than a whole line at 101 (it moves anyway — the break is spent, the limit still\n\tis not met); the boundary in FRONT of the unit is itself glued, so the unit cannot move at all\n\tand the break travels further left, to the space inside the preceding run; and the unit sits\n\tMID-RUN after a wide word with nothing after it, where the move DOES meet the limit.\n\tPrettier welds the unit to the preceding word and lets the line run over — see\n\toutput_prettier.svelte.\n"
 			},
 			{
 				"type": "Text",
-				"start": 939,
-				"end": 940,
+				"start": 1044,
+				"end": 1045,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 940,
-				"end": 1053,
+				"start": 1045,
+				"end": 1158,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 13,
+						"line": 15,
 						"column": 1,
-						"character": 941
+						"character": 1046
 					},
 					"end": {
-						"line": 13,
+						"line": 15,
 						"column": 2,
-						"character": 942
+						"character": 1047
 					}
 				},
 				"attributes": [],
@@ -43,21 +43,21 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 943,
-							"end": 949,
+							"start": 1048,
+							"end": 1054,
 							"raw": "\n\tfoo ",
 							"data": "\n\tfoo "
 						},
 						{
 							"type": "Comment",
-							"start": 949,
-							"end": 1036,
+							"start": 1054,
+							"end": 1141,
 							"data": "pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14 pad15"
 						},
 						{
 							"type": "Text",
-							"start": 1036,
-							"end": 1049,
+							"start": 1141,
+							"end": 1154,
 							"raw": "text1\n\ttext2\n",
 							"data": "text1\n\ttext2\n"
 						}
@@ -66,26 +66,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 1053,
-				"end": 1054,
+				"start": 1158,
+				"end": 1159,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1054,
-				"end": 1174,
+				"start": 1159,
+				"end": 1279,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 17,
+						"line": 19,
 						"column": 1,
-						"character": 1055
+						"character": 1160
 					},
 					"end": {
-						"line": 17,
+						"line": 19,
 						"column": 2,
-						"character": 1056
+						"character": 1161
 					}
 				},
 				"attributes": [],
@@ -94,21 +94,21 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1057,
-							"end": 1064,
+							"start": 1162,
+							"end": 1169,
 							"raw": "\n\tfoo\n\t",
 							"data": "\n\tfoo\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 1064,
-							"end": 1157,
+							"start": 1169,
+							"end": 1262,
 							"data": "pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14 pad15 pad16"
 						},
 						{
 							"type": "Text",
-							"start": 1157,
-							"end": 1170,
+							"start": 1262,
+							"end": 1275,
 							"raw": "text1\n\ttext2\n",
 							"data": "text1\n\ttext2\n"
 						}
@@ -117,26 +117,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 1174,
-				"end": 1175,
+				"start": 1279,
+				"end": 1280,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1175,
-				"end": 1296,
+				"start": 1280,
+				"end": 1401,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 22,
+						"line": 24,
 						"column": 1,
-						"character": 1176
+						"character": 1281
 					},
 					"end": {
-						"line": 22,
+						"line": 24,
 						"column": 2,
-						"character": 1177
+						"character": 1282
 					}
 				},
 				"attributes": [],
@@ -145,21 +145,21 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1178,
-							"end": 1185,
+							"start": 1283,
+							"end": 1290,
 							"raw": "\n\tfoo\n\t",
 							"data": "\n\tfoo\n\t"
 						},
 						{
 							"type": "Comment",
-							"start": 1185,
-							"end": 1279,
+							"start": 1290,
+							"end": 1384,
 							"data": "pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14 pad15 pad16x"
 						},
 						{
 							"type": "Text",
-							"start": 1279,
-							"end": 1292,
+							"start": 1384,
+							"end": 1397,
 							"raw": "text1\n\ttext2\n",
 							"data": "text1\n\ttext2\n"
 						}
@@ -168,26 +168,26 @@
 			},
 			{
 				"type": "Text",
-				"start": 1296,
-				"end": 1297,
+				"start": 1401,
+				"end": 1402,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 1297,
-				"end": 1418,
+				"start": 1402,
+				"end": 1523,
 				"name": "p",
 				"name_loc": {
 					"start": {
-						"line": 27,
+						"line": 29,
 						"column": 1,
-						"character": 1298
+						"character": 1403
 					},
 					"end": {
-						"line": 27,
+						"line": 29,
 						"column": 2,
-						"character": 1299
+						"character": 1404
 					}
 				},
 				"attributes": [],
@@ -196,23 +196,74 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 1300,
-							"end": 1308,
+							"start": 1405,
+							"end": 1413,
 							"raw": "\n\tfoo\n\t0",
 							"data": "\n\tfoo\n\t0"
 						},
 						{
 							"type": "Comment",
-							"start": 1308,
-							"end": 1401,
+							"start": 1413,
+							"end": 1506,
 							"data": "pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14 pad15 pad16"
 						},
 						{
 							"type": "Text",
-							"start": 1401,
-							"end": 1414,
+							"start": 1506,
+							"end": 1519,
 							"raw": "text1\n\ttext2\n",
 							"data": "text1\n\ttext2\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 1523,
+				"end": 1524,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1524,
+				"end": 1701,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 34,
+						"column": 1,
+						"character": 1525
+					},
+					"end": {
+						"line": 34,
+						"column": 2,
+						"character": 1526
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1527,
+							"end": 1640,
+							"raw": "\n\tword1 word2 word3 word4 word5 word6 word7 word8\n\txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\t",
+							"data": "\n\tword1 word2 word3 word4 word5 word6 word7 word8\n\txxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 1640,
+							"end": 1691,
+							"data": "pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9"
+						},
+						{
+							"type": "Text",
+							"start": 1691,
+							"end": 1697,
+							"raw": "text1\n",
+							"data": "text1\n"
 						}
 					]
 				}

@@ -548,17 +548,46 @@ impl<'a> Printer<'a> {
                     child_docs.push(joined);
                 }
             }
-        } else if multiline && has_leading_ws && !is_first {
-            // Same-line space boundary after a sibling none of the arms above claims — a comment or
-            // a control-flow block (an inline element, tag, block element and own-line declaration
-            // each have their own arm; the linebreak-authored boundary is arm 2). The boundary is
-            // inter-node whitespace, so it collapses to one rendered space and a break there is
-            // render-equivalent — but it must be the fill's OWN `line`, not a space baked into its
-            // first word. Baked in, the fresh-line drop carries the space to the head of the
-            // continuation line (`-->⏎\t text1`), which the next pass reads as indentation and drops:
-            // the format has no fixed point. `leading_line` is the same parity-shifted mechanism the
-            // after-a-tag boundary uses, and the fill renders it Flat (the space) or Break (the
-            // newline) by width.
+        } else if has_leading_ws && !is_first {
+            // ┌─ THE UNCLAIMED-BOUNDARY RULE (this arm is its leading half; the trailing half is
+            // │  the last arm of the `trailing_line` chain below, and the two are exact mirrors).
+            //
+            // A same-line space boundary next to a sibling none of the arms above claims — a
+            // comment, or a control-flow block. (An inline element, a tag, a block element and an
+            // own-line declaration each have their own arm; the linebreak-authored boundary is
+            // arm 2.) `position.next_is_inline()` / `prev_is_inline` are false for these:
+            // `is_inline_content` excludes a comment, and the glued-comment-run hop only reports a
+            // run ending in an inline ELEMENT.
+            //
+            // The boundary is inter-node whitespace, so it collapses to one rendered space and a
+            // break there is render-equivalent. It must become the fill's OWN `line`, never a space
+            // baked into the adjacent word. Baked, it is not a break point at all, and both halves
+            // go wrong in their own way:
+            // - LEADING: the fresh-line drop carries the space to the head of the continuation line
+            //   (`-->⏎\t text1`), which the next pass reads as indentation and drops — no fixed
+            //   point.
+            // - TRAILING: the space and the following comment ride one item, so the fill can never
+            //   break in front of the comment AND the preceding word's fit check is charged the
+            //   comment's width — a greedy column lost far under printWidth, and an over-width line
+            //   no break can reach when a word and a comment each fit alone but not together
+            //   (`fill_break_before_comment_spaced_long`,
+            //   `fill_after_comment_glued_midline_long`'s terminal case).
+            //
+            // ⚠️ NEITHER half is `multiline`-gated, and both were. `multiline` is the CONTAINER's
+            // `MultilineCause`, which is `None` for an inline container whose content is
+            // collapsible (`<span>`, a table cell) even when width forces the break — the exact
+            // confusion `inline_multi_element_pack_long` was about. Gated, each half fired for a
+            // block container and silently skipped the inline one, which kept the damage above. The
+            // question is per-BOUNDARY, not per-container-class, and a run that fits is a no-op
+            // either way: the flag renders Flat as the space it replaced.
+            //
+            // ⚠️ Nothing else in the gate sees the trailing half. Both layouts are idempotent, keep
+            // every comment, and reparse, so F1, the fuzzer, the ledger, the census and the
+            // round-trip are all blind; on the widest shape prettier's own output IS the over-width
+            // line, so the oracle cannot grade it either. Only a width measurement separates them.
+            // The leading half's damage does reach F1 — but only from a shape no fixture had.
+            //
+            // `leading_line` is the same parity-shifted mechanism the after-a-tag boundary uses.
             trim_left = true;
             add_leading_space = false;
             leading_line = true;
@@ -639,12 +668,21 @@ impl<'a> Printer<'a> {
                 // A first child's leading boundary is the parent's, already trimmed.
                 trim_right = !is_first;
             } else if !is_first {
-                // Remaining inline callers (a non-flow follower — e.g. a comment): wrap the
-                // next element with `group([line, element])`.
+                // Remaining inline callers: the follower is `is_inline_content` but neither
+                // `is_inline_el_or_comp` nor a tag, which leaves exactly a BLOCK element. Wrap it
+                // with `group([line, element])`. (Not a comment — see the arm below, which is
+                // where a comment follower actually lands.)
                 trim_right = true;
                 add_trailing_space = false;
                 *handle_whitespace_of_prev_text = true;
             }
+        } else if has_trailing_ws && !is_last {
+            // The trailing half of THE UNCLAIMED-BOUNDARY RULE — see the leading half's comment on
+            // the `leading_line` arm above, which states the rule, both failure modes, and why
+            // neither half is `multiline`-gated. This arm is its exact mirror.
+            trim_right = true;
+            add_trailing_space = false;
+            trailing_line = true;
         }
 
         // The run's LEADING boundary is byte-glued to the previous sibling — no whitespace there,
