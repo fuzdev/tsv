@@ -130,26 +130,19 @@ impl<'a> Printer<'a> {
 
         // Comments between the head (name + type params) and `=`. A single-line
         // block comment stays inline before `=` (`type A<X> /* c */ = B`); a line
-        // comment or multiline block can't share the `=` line, so it stays on its
-        // own line before `=` with the value pushed down. tsv keeps these on the
-        // head side; prettier relocates them after `=` (see conformance_prettier.md
-        // §Comment relocation). They were previously dropped entirely when type
-        // parameters were present (content loss).
+        // comment (or a multiline block the author broke after) trails the head on
+        // its line, then `= value` drops to a continuation line indented one level
+        // — the uniform forced-continuation indent, the same shape as the other
+        // before-`=` initializer sites (enum members, class properties, variable
+        // declarators). tsv keeps these on the head side; prettier relocates them
+        // after `=` (see conformance_prettier.md §Comment relocation). They were
+        // previously dropped entirely when type parameters were present (content
+        // loss).
         let pre_eq_forces_own_line = self.comments_force_own_line_between(header_end, eq_pos);
 
         if pre_eq_forces_own_line {
-            let mut indent_parts: DocBuf = smallvec![d.hardline()];
-            for comment in comments_to_emit_in_range(self.comments, header_end, eq_pos) {
-                indent_parts.push(self.build_comment_doc(comment));
-                indent_parts.push(d.hardline());
-            }
-            indent_parts.push(self.build_type_alias_eq_value_doc(
-                decl,
-                eq_pos,
-                has_complex_params,
-                false,
-            ));
-            parts.push(d.indent(d.concat(&indent_parts)));
+            let tail = self.build_type_alias_eq_value_doc(decl, eq_pos, has_complex_params, false);
+            parts.push(self.build_continuation_indent(header_end, eq_pos, tail));
         } else {
             // Single-line block comments before `=` stay inline: `<head> /* c */ =`
             if let Some(block_doc) = self.build_comments_between_filtered_opt(
@@ -188,7 +181,7 @@ impl<'a> Printer<'a> {
     /// Build the `=` token and the type-alias value, including any comments
     /// between `=` and the value. `lead_space` controls the leading space before
     /// `=` (true for the inline `... =` form, false when the caller has already
-    /// emitted a hardline, e.g. after an own-line pre-`=` comment).
+    /// broken the line, e.g. the pre-`=` comment continuation).
     /// A value whose own comment layout already breaks it internally, so the type-alias RHS
     /// keeps the value's head on the `=` line and lets the value hang its own tail — instead
     /// of *also* breaking after `=`, which would indent the whole thing a second level for
@@ -421,14 +414,16 @@ impl<'a> Printer<'a> {
                     // Normal unions: break after `=` with leading `| ` and a hanging indent.
                     parts.push(hang_after_operator(d, make_rhs(type_doc)));
                 } else {
-                    // Pre-`=` own-line comment path (`type A<X>⏎// c⏎= | a | b`): `lead_space`
-                    // is false ONLY here, and the caller already wrapped comment + `=` + value
-                    // in one `d.indent`. A break must therefore NOT add the hang's extra indent
-                    // — the members sit at the `=`'s level, not one deeper (else a double-indent).
-                    // Still grouped so a short union stays inline on the `=` line (`= A | B`),
-                    // matching the hang arm's flat case. A `_prettier_divergence`
-                    // (type_alias_line_pre_equals_break): prettier relocates the comment after
-                    // `=` and never emits this preserved-comment form.
+                    // Pre-`=` comment continuation path (`type A<X> // c⏎= | a | b`):
+                    // `lead_space` is false ONLY here, and the caller already wrapped the
+                    // comment run + `=` + value in one `d.indent`
+                    // (`build_continuation_indent`). A break must therefore NOT add the
+                    // hang's extra indent — the members sit at the `=`'s level, not one
+                    // deeper (else a double-indent). Still grouped so a short union stays
+                    // inline on the `=` line (`= A | B`), matching the hang arm's flat
+                    // case. A `_prettier_divergence` (type_alias_line_pre_equals_break):
+                    // prettier relocates the comment after `=` and never emits this
+                    // preserved-comment form.
                     parts.push(d.group(d.concat(&[d.line(), make_rhs(type_doc)])));
                 }
             } else if let TSType::Intersection(i) = value_type {

@@ -1151,11 +1151,11 @@ impl<'a> Printer<'a> {
 
                 let tail = self.build_mapped_value_tail_doc(&head, colon_pos, type_ann);
 
-                if self.has_line_comments_between(bracket_close, marker_pos) {
-                    // A line comment before the marker: the marker joins the `: V`
-                    // tail on the continuation line (the property-signature key→`?`
-                    // treatment), each comment ending its own line so the `//` can't
-                    // swallow what follows.
+                if self.comments_force_own_line_between(bracket_close, marker_pos) {
+                    // A line comment (or broke-after multiline block) before the
+                    // marker: the marker joins the `: V` tail on the continuation line
+                    // (the property-signature key→`?` treatment), each hanging comment
+                    // ending its own line so a `//` can't swallow what follows.
                     let tail_with_marker = match marker_text {
                         Some(marker) => d.concat(&[d.text(marker), tail]),
                         None => tail,
@@ -1177,11 +1177,11 @@ impl<'a> Printer<'a> {
                     if let Some(marker) = marker_text {
                         body_parts.push(d.text(marker));
                     }
-                    if self.has_line_comments_between(after_marker, colon_pos) {
-                        // A line comment between the `]`/marker and the `:`: the
-                        // comment trails in place, the `: V` tail drops to a
-                        // continuation line indented one level (uniform
-                        // forced-continuation indent).
+                    if self.comments_force_own_line_between(after_marker, colon_pos) {
+                        // A line comment (or broke-after multiline block) between the
+                        // `]`/marker and the `:`: the comment trails in place, the
+                        // `: V` tail drops to a continuation line indented one level
+                        // (uniform forced-continuation indent).
                         body_parts.push(self.build_continuation_indent(
                             after_marker,
                             colon_pos,

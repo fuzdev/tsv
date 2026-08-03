@@ -14,7 +14,7 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 688
+# shapes: 672
 DROPPED	!)⟨⟩!.	annotation,block,jsdoc_cast
 DROPPED	&&⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
@@ -515,7 +515,6 @@ DOUBLE-PRINTED	␣⟨⟩readonly	line
 DOUBLE-PRINTED	␣⟨⟩{	line
 DOUBLE-PRINTED	␣⟨⟩}]	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	␣⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
-SWALLOW	"⟨⟩:	line
 SWALLOW	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 SWALLOW	'⟨⟩:	line
 SWALLOW	'⟨⟩://	line
@@ -550,7 +549,6 @@ SWALLOW	*/(⟨⟩IDENT	line
 SWALLOW	*/*⟨⟩/*	line
 SWALLOW	*/*⟨⟩IDENT	line
 SWALLOW	*/,⟨⟩␣	line
-SWALLOW	*/]⟨⟩:	line
 SWALLOW	*/⟨⟩(	line
 SWALLOW	*/⟨⟩,	line
 SWALLOW	*/⟨⟩:	line
@@ -600,10 +598,6 @@ SWALLOW	IDENT⟨⟩/*	line
 SWALLOW	IDENT⟨⟩//	line
 SWALLOW	IDENT⟨⟩:	line
 SWALLOW	IDENT⟨⟩:(/	line
-SWALLOW	IDENT⟨⟩:/*	line
-SWALLOW	IDENT⟨⟩:[	line
-SWALLOW	IDENT⟨⟩:{	line
-SWALLOW	IDENT⟨⟩:{/	line
 SWALLOW	IDENT⟨⟩;	line
 SWALLOW	IDENT⟨⟩;//	line
 SWALLOW	IDENT⟨⟩?(/	line
@@ -627,37 +621,27 @@ SWALLOW	[⟨⟩␣	line
 SWALLOW	]:⟨⟩␣	line
 SWALLOW	]?:⟨⟩␣	line
 SWALLOW	]]:⟨⟩␣	line
-SWALLOW	]⟨⟩:	line
-SWALLOW	]⟨⟩␣	line
 SWALLOW	`,⟨⟩␣	line
 SWALLOW	`⟨⟩);	line
 SWALLOW	`⟨⟩,	line
 SWALLOW	abstract⟨⟩␣	line
 SWALLOW	async⟨⟩␣	line
-SWALLOW	as⟨⟩:	line
-SWALLOW	await⟨⟩:	line
 SWALLOW	break⟨⟩;	line
-SWALLOW	class⟨⟩:	line
 SWALLOW	declare⟨⟩␣	line
 SWALLOW	default⟨⟩:	line
 SWALLOW	default⟨⟩:{	line
 SWALLOW	default⟨⟩␣	line
-SWALLOW	else⟨⟩:	line
 SWALLOW	global⟨⟩{	line
 SWALLOW	global⟨⟩{}	line
 SWALLOW	global⟨⟩␣	line
-SWALLOW	if⟨⟩:	line
 SWALLOW	in⟨⟩//	line
 SWALLOW	in⟨⟩␣	line
-SWALLOW	let⟨⟩:	line
 SWALLOW	new⟨⟩␣	line
 SWALLOW	of⟨⟩//	line
 SWALLOW	of⟨⟩␣	line
-SWALLOW	satisfies⟨⟩:	line
 SWALLOW	static⟨⟩␣	line
 SWALLOW	void⟨⟩;	line
 SWALLOW	void⟨⟩;//	line
-SWALLOW	yield⟨⟩:	line
 SWALLOW	{*⟨⟩/*	line
 SWALLOW	{}*⟨⟩#	line
 SWALLOW	{}*⟨⟩IDENT	line

@@ -1,0 +1,336 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 247,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A line comment before `=` stays after `]`; `= value` indents one level.",
+			"start": 32,
+			"end": 106,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 2
+				},
+				"end": {
+					"line": 3,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 113,
+			"end": 117,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 6
+				},
+				"end": {
+					"line": 4,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Two comments around the member stay distinct (prettier merges them — loss).",
+			"start": 129,
+			"end": 207,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 214,
+			"end": 219,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 6
+				},
+				"end": {
+					"line": 8,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 228,
+			"end": 233,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 8
+				},
+				"end": {
+					"line": 9,
+					"column": 13
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 246,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 237,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 20,
+					"end": 236,
+					"loc": {
+						"start": {
+							"line": 2,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 26,
+						"end": 27,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 7
+							},
+							"end": {
+								"line": 2,
+								"column": 8
+							}
+						},
+						"name": "C"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 28,
+						"end": 236,
+						"loc": {
+							"start": {
+								"line": 2,
+								"column": 9
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 109,
+								"end": 125,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 7
+									}
+								},
+								"static": false,
+								"computed": true,
+								"key": {
+									"type": "Identifier",
+									"start": 110,
+									"end": 111,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 3
+										},
+										"end": {
+											"line": 4,
+											"column": 4
+										}
+									},
+									"name": "y"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 123,
+									"end": 124,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 5
+										},
+										"end": {
+											"line": 5,
+											"column": 6
+										}
+									},
+									"value": 2,
+									"raw": "2",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 113,
+											"end": 117
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " A line comment before `=` stays after `]`; `= value` indents one level.",
+										"start": 32,
+										"end": 106
+									}
+								]
+							},
+							{
+								"type": "PropertyDefinition",
+								"start": 210,
+								"end": 227,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 7
+									}
+								},
+								"static": false,
+								"computed": true,
+								"key": {
+									"type": "Identifier",
+									"start": 211,
+									"end": 212,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 3
+										},
+										"end": {
+											"line": 8,
+											"column": 4
+										}
+									},
+									"name": "z"
+								},
+								"value": {
+									"type": "Literal",
+									"start": 225,
+									"end": 226,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 5
+										},
+										"end": {
+											"line": 9,
+											"column": 6
+										}
+									},
+									"value": 3,
+									"raw": "3",
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 214,
+											"end": 219
+										}
+									]
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " Two comments around the member stay distinct (prettier merges them — loss).",
+										"start": 129,
+										"end": 207
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 228,
+										"end": 233
+									}
+								]
+							}
+						]
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

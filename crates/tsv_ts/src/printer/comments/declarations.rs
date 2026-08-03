@@ -269,19 +269,22 @@ impl<'a> Printer<'a> {
         ]))
     }
 
-    /// When a **line** comment sits in the marker→`:` gap of a key/binding's type
-    /// annotation, build the indented continuation: the first comment trails the
-    /// marker on its line, then any remaining comments and the `: type` (`type_doc`,
-    /// built by the caller) drop to a continuation line indented one level — the
-    /// uniform forced-continuation indent (`build_continuation_indent`), so the
+    /// When a **line** comment — or a multiline block the author broke after —
+    /// sits in the marker→`:` gap of a key/binding's type annotation, build the
+    /// indented continuation: the first comment trails the marker on its line,
+    /// then any remaining comments and the `: type` (`type_doc`, built by the
+    /// caller) drop to a continuation line indented one level — the uniform
+    /// forced-continuation indent (`build_continuation_indent`), so the
     /// annotation reads as part of its key/binding rather than a sibling. Returns
-    /// `None` when the gap has no line comment, leaving the caller's block /
-    /// no-comment handling in place.
+    /// `None` when no comment in the gap hangs what follows
+    /// (`comments_force_own_line_between`), leaving the caller's block /
+    /// no-comment handling in place — a glued single-line or glued multiline
+    /// block stays inline.
     ///
     /// `marker_end` is the offset just past the key (and any `?`/`!`); `colon_pos`
     /// is the type annotation's `:` (its span start). Callers gate on
     /// `has_comments_to_emit_between` first, so the common (no-comment) path never reaches
-    /// the `has_line_comments_between` probe here.
+    /// the hang probe here.
     ///
     /// Shared by the before-`:` sites: index/property signatures, class properties,
     /// variable bindings, and function parameters (`build_identifier_doc_inner`).
@@ -294,21 +297,24 @@ impl<'a> Printer<'a> {
         colon_pos: u32,
         type_doc: DocId,
     ) -> Option<DocId> {
-        self.has_line_comments_between(marker_end, colon_pos)
+        self.comments_force_own_line_between(marker_end, colon_pos)
             .then(|| self.build_continuation_indent(marker_end, colon_pos, type_doc))
     }
 
-    /// When a **line** comment sits in the name→`=` gap of an initializer, build the
-    /// indented continuation: the comment trails the name on its line, then the `=`
+    /// When a **line** comment — or a multiline block the author broke after —
+    /// sits in the name→`=` gap of an initializer, build the indented
+    /// continuation: the comment trails the name on its line, then the `=`
     /// and value (`value_doc`, built by the caller — the bare value, no leading
     /// `= `) drop to a continuation line indented one level (the uniform
-    /// forced-continuation indent, `build_continuation_indent`). Returns `None` when
-    /// the gap has no line comment, leaving the caller's block / no-comment /
+    /// forced-continuation indent, `build_continuation_indent`). Returns `None`
+    /// when no comment in the gap hangs what follows
+    /// (`comments_force_own_line_between`) — a glued single-line or glued
+    /// multiline block stays inline — leaving the caller's block / no-comment /
     /// assignment-layout handling in place.
     ///
     /// `name_end` is the offset just before the `=` gap (past the binding name and
     /// any `?`/`!`/type annotation); `eq_pos` is the `=`. `build_value` lazily builds
-    /// the bare value doc — only invoked on the (rare) line-comment path, so the
+    /// the bare value doc — only invoked on the (rare) hang path, so the
     /// common no-comment path never builds the value twice. Unlike the `:` twin
     /// (`build_marker_colon_line_continuation`, where prettier keeps the continuation
     /// flush), prettier here *relocates* the comment past the value to
@@ -324,10 +330,11 @@ impl<'a> Printer<'a> {
         build_value: impl FnOnce() -> DocId,
     ) -> Option<DocId> {
         let d = self.d();
-        self.has_line_comments_between(name_end, eq_pos).then(|| {
-            let tail = d.concat(&[d.text("= "), build_value()]);
-            self.build_continuation_indent(name_end, eq_pos, tail)
-        })
+        self.comments_force_own_line_between(name_end, eq_pos)
+            .then(|| {
+                let tail = d.concat(&[d.text("= "), build_value()]);
+                self.build_continuation_indent(name_end, eq_pos, tail)
+            })
     }
 
     /// Build a binding/identifier `: type` annotation including any before-`:`
