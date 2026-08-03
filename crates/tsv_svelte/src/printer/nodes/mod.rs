@@ -6,8 +6,9 @@
 // (root and nested) renders through these builders — there is no separate buffer
 // printer (the root-fragment renderer lives in `crate::printer::mod`).
 //
-// - **element.rs** - Element hug-mode helpers (shared by element_doc / special_doc)
-// - **fragment_doc.rs** - Core doc-based fragment formatting (text fill, node dispatch)
+// - **fragment_doc.rs** - Core doc-based fragment formatting (sibling walk, node dispatch)
+// - **fragment_glue_doc.rs** - Byte-glue predicates + glued/welded run docs (unbreakable units)
+// - **fragment_text_doc.rs** - Text-child handling + word-fill doc construction
 // - **blocks_doc.rs** - Doc-based formatting for control flow blocks ({#if}, {#each}, etc.)
 // - **tags_doc.rs** - Doc-based formatting for template tags ({@html}, {@const}, etc.)
 // - **element_doc.rs** - Doc-based formatting for regular HTML/component elements
@@ -21,6 +22,8 @@ mod element_analysis;
 mod element_doc;
 mod element_ws_sensitive_doc;
 mod fragment_doc;
+mod fragment_glue_doc;
+mod fragment_text_doc;
 mod helpers;
 mod special_doc;
 mod tags_doc;
