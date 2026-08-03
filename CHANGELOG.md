@@ -15,7 +15,9 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 - feat: more formatting choices to take advantage of Svelte 5 whitespace changes
   ([#558](https://github.com/fuzdev/tsv/pull/558), [#600](https://github.com/fuzdev/tsv/pull/600),
   [#601](https://github.com/fuzdev/tsv/pull/601), [#607](https://github.com/fuzdev/tsv/pull/607),
-  [#651](https://github.com/fuzdev/tsv/pull/651))
+  [#651](https://github.com/fuzdev/tsv/pull/651), [#651](https://github.com/fuzdev/tsv/pull/652),
+  [#651](https://github.com/fuzdev/tsv/pull/654), [#651](https://github.com/fuzdev/tsv/pull/657),
+  [#651](https://github.com/fuzdev/tsv/pull/659))
 
 ## 0.2.0
 

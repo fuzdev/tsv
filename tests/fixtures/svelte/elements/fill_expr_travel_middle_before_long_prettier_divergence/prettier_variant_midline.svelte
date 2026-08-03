@@ -1,6 +1,6 @@
-<!-- the first wide tag travels and collapses flat; the second, in a hard-width run after it
-     (plain-space boundary), stays welded to the line and breaks internally — both formatters
-     keep that second form -->
+<!-- the first wide tag travels and collapses flat; the second, mid-run after it, takes the
+     same boundary break — it travels whole and, too wide even for a fresh line, breaks
+     internally there -->
 <p>
 	aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq {'rrrr' +
 		'ssss'} tttt uuuu vvvv. {'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa' +
