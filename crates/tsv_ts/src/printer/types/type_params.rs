@@ -357,34 +357,6 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Route a type parameter's pre-keyword gap (name→`extends`, pre-`=`): a **line**
-    /// comment defers the whole `<keyword> <value>` tail to a continuation line
-    /// (return `Some(gap)`, nothing pushed — the caller routes through
-    /// [`Self::push_keyword_value_or_continuation`]), else the gap's inline block
-    /// comments trail the head here (`<T /* c */ extends A>`) and the keyword stays
-    /// inline (`None`). Pushing the keyword inline after a `//` run would swallow it
-    /// into the comment (content loss). See conformance_prettier.md §Uniform
-    /// Forced-Continuation Indent.
-    fn route_pre_keyword_gap(
-        &self,
-        parts: &mut DocBuf,
-        gap_start: u32,
-        keyword_pos: u32,
-    ) -> Option<(u32, u32)> {
-        if self.has_line_comments_between(gap_start, keyword_pos) {
-            return Some((gap_start, keyword_pos));
-        }
-        if let Some(pre) = self.build_comments_between_filtered_opt(
-            gap_start,
-            keyword_pos,
-            CommentSpacing::Leading,
-            CommentFilter::All,
-        ) {
-            parts.push(pre);
-        }
-        None
-    }
-
     /// Push ` <keyword>` and its value ([`Self::append_keyword_value`]) — or, when
     /// [`Self::route_pre_keyword_gap`] deferred a line-comment gap, the gap's comment
     /// run with the whole `<keyword> <value>` tail dropped to a continuation line one
