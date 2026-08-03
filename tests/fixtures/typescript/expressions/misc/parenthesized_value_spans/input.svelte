@@ -3,6 +3,7 @@
 	function fn1(a, b = (c, d)) {}
 	const fn2 = (a = (b = c)) => a;
 	const { e = (f, g) } = h;
+	const { i = (j = k) } = l;
 
 	// parenthesized class property values
 	class A {

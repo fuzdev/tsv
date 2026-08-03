@@ -944,7 +944,8 @@ impl<'a> Printer<'a> {
         let mut at_line_start = false;
         // The caller's token already supplied the run's first separator, if it had one.
         let mut owed_space = !preceded_by_space;
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
+        let mut comments = comments_to_emit_in_range(self.comments, start, end).peekable();
+        while let Some(comment) = comments.next() {
             let space_before = !at_line_start && owed_space;
             owed_space = true;
             // An HONORED format-ignore directive keeps the line the author gave it, in both
@@ -975,12 +976,19 @@ impl<'a> Printer<'a> {
                 at_line_start = false;
             } else {
                 // Line comment: leading space (unless already at line start) +
-                // hardline after — `class A // c\n<T> {}`
+                // hardline after — `class A // c\n<T> {}`. The break is forced, so an
+                // author blank line after the comment survives with it — the same
+                // answer the forced-continuation emitter
+                // (`build_trailing_comments_hang_next`) gives. Anchored on the
+                // physically next comment (`blank_scan_end`) so an owned comment
+                // between two emitted ones can't desync the measure.
                 if space_before {
                     parts.push(d.text(" "));
                 }
                 parts.push(self.build_comment_doc(comment));
-                parts.push(d.hardline());
+                let emit_next = comments.peek().map_or(end, |n| n.span.start);
+                let next = self.blank_scan_end(comment.span.end, emit_next);
+                self.push_blank_preserving_hardline(&mut parts, comment.span.end, next);
                 at_line_start = true;
             }
         }
@@ -1396,6 +1404,23 @@ impl<'a> Printer<'a> {
                 } else {
                     parts.push(self.build_trailing_line_comment_doc(comment));
                     on_own_line = true; // a line comment ends its line
+                    // That comment ended the keyword's line and `value_block` opens with
+                    // the hardline onto the next one, so an author blank between them has
+                    // no other emitter — it belongs to this seam. The break is forced (a
+                    // `//`), so the blank survives with it, as at every other forced
+                    // continuation.
+                    let next = self.blank_scan_end(
+                        comment.span.end,
+                        comments.get(i + 1).map_or(value_start, |c| c.span.start),
+                    );
+                    // Prepending is well-defined: this arm needs `!on_own_line`, which
+                    // only the arm itself clears, and the same-line *block* arm above
+                    // doesn't touch `value_block` — so it still holds nothing but its
+                    // seed hardline, and the blank belongs before that.
+                    debug_assert_eq!(value_block.len(), 1, "value_block is still its seed");
+                    if self.has_blank_line_between_strict(comment.span.end, next) {
+                        value_block.insert(0, d.literalline());
+                    }
                 }
             } else {
                 on_own_line = true;
