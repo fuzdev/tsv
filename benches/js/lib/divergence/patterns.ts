@@ -2187,6 +2187,192 @@ const inline_content_block_style: DivergencePattern = {
 };
 
 /**
+ * Index of the first `{` on `line` that no later `}` on the same line closes, or -1.
+ *
+ * Unmatched CLOSERS at the head (a continuation line inside a broken expression, `: ''}`)
+ * are ignored — only an open the line itself leaves dangling counts as a mid-line-opened
+ * or line-start-opened tag.
+ */
+const unmatched_open_brace = (line: string): number => {
+	const open_stack: number[] = [];
+	for (let i = 0; i < line.length; i++) {
+		const c = line[i];
+		if (c === '{') open_stack.push(i);
+		else if (c === '}' && open_stack.length > 0) open_stack.pop();
+	}
+	return open_stack.length > 0 ? open_stack[0] : -1;
+};
+
+/**
+ * Weld one diff side's lines into the flat spelling of its content. The join is
+ * expression-aware: a break after `(`/`[` or before `)`/`]` welds to nothing (the flat form
+ * of a broken call — `f(⏎'x'⏎)` is `f('x')`), every other line boundary to the one space it
+ * stands for. Strictly narrower than a strip-all-ws equality: intra-line spacing is
+ * preserved verbatim, so a dropped or added character — or an eaten space inside a line —
+ * still fails the comparison.
+ */
+const weld_expression_lines = (lines: string[]): string => {
+	let out = '';
+	for (const l of lines) {
+		const t = l.trim();
+		if (out.length === 0) {
+			out = t;
+			continue;
+		}
+		const glue =
+			out.endsWith('(') || out.endsWith('[') || t.startsWith(')') || t.startsWith(']') ? '' : ' ';
+		out += glue + t;
+	}
+	return out;
+};
+
+/**
+ * Whether the tag opening at `lines[at][brace]` is FORCED to break internally: its flat
+ * spelling (continuation lines welded back through the balancing `}`) cannot fit within
+ * print width even starting from the line's own indent — the best case any travel could
+ * buy it. That is the only sanctioned reason for tsv to leave a tag's `{` open at end of
+ * line (the travel rule's break-internally arm, and the hard-width second-tag context —
+ * see `fill_expr_travel_middle_before_long_prettier_divergence`); a tag torn open despite
+ * fitting flat is a formatter defect the caller must surface, never absorb. A tag that
+ * never balances inside the bounded window answers false (under-claims).
+ */
+const tag_break_is_forced = (lines: string[], at: number, brace: number): boolean => {
+	const first = lines[at];
+	let flat = '';
+	let depth = 0;
+	const limit = Math.min(lines.length, at + 40);
+	for (let k = at; k < limit; k++) {
+		const seg = k === at ? first.slice(brace) : lines[k].trim();
+		if (k > at) {
+			flat +=
+				flat.endsWith('(') || flat.endsWith('[') || seg.startsWith(')') || seg.startsWith(']')
+					? ''
+					: ' ';
+		}
+		for (const c of seg) {
+			flat += c;
+			if (c === '{') depth++;
+			else if (c === '}') {
+				depth--;
+				if (depth === 0) {
+					const indent = first.slice(0, first.length - first.trimStart().length);
+					return visual_width(indent) + visual_width(flat) > 100;
+				}
+			}
+		}
+	}
+	return false;
+};
+
+const spaced_tag_travel: DivergencePattern = {
+	id: 'spaced_tag_travel',
+	description:
+		'tsv travels a spaced {expr} tag whose expression cannot fit flat to a fresh line (collapsing flat there when it fits, breaking internally when not); prettier stops measuring at the first internal break, keeps the tag on the text line and opens it mid-line',
+	languages: ['svelte'],
+	conformance_sections: ['Svelte: Elements'],
+	fixtures: [
+		'svelte/elements/fill_spaced_tag_travel_long_prettier_divergence',
+		'svelte/elements/fill_expr_travel_continuation_long_prettier_divergence',
+		'svelte/elements/fill_expr_travel_middle_long_prettier_divergence',
+		'svelte/elements/fill_expr_travel_middle_before_long_prettier_divergence'
+	],
+	// NOT a char-frequency alterer: the rule respells line boundaries (newline ↔ space, plus
+	// the no-space joins at an expression's paren breaks) and never adds or drops a semantic
+	// character. Left at the default `false` so it can explain a hunk for bucketing but can
+	// never vouch for a SAFETY differential.
+	detect(ctx) {
+		if (ctx.language !== 'svelte') return null;
+		const ours_lines = ctx.ours_lines!;
+		const ours_regions = ctx.ours_code_regions ?? [];
+		const prettier_regions = ctx.prettier_code_regions ?? [];
+
+		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
+			// Template markup only — a brace inside <script>/<style> is program bytes.
+			if (
+				overlaps_code_region(hunk.ours_range, ours_regions) ||
+				overlaps_code_region(hunk.prettier_range, prettier_regions)
+			) {
+				return false;
+			}
+			if (hunk.added_lines.length === 0 || hunk.removed_lines.length === 0) return false;
+			// A blank line is an authored separator this rule never touches.
+			if (
+				hunk.added_lines.some((l) => l.trim().length === 0) ||
+				hunk.removed_lines.some((l) => l.trim().length === 0)
+			) {
+				return false;
+			}
+
+			// FAMILY SIGNATURE, prettier side: a tag OPENED mid-line after text and a SPACE —
+			// an unmatched `{` with content before it and whitespace immediately in front. The
+			// spacing is load-bearing twice over: a line-START unmatched `{` is the traveled
+			// form (ours' own shape, which prettier only ever keeps, never produces), and a
+			// GLUED mid-line open (`token{thread.token_count !==` — prettier's fill packing a
+			// welded word+tag pair past the width) belongs to the glued-pair rule, not this
+			// one, so neither may claim here.
+			const prettier_midline = hunk.removed_lines.some((l) => {
+				const i = unmatched_open_brace(l);
+				if (i <= 0) return false;
+				const before = l[i - 1];
+				return (before === ' ' || before === '\t') && l.slice(0, i).trim().length > 0;
+			});
+			if (!prettier_midline) return false;
+
+			// OURS side: the traveled layout never overruns print width…
+			if (hunk.added_lines.some((l) => visual_width(l) > 100)) return false;
+
+			// …and never tears open a tag that could have rendered flat. An unmatched `{` on
+			// an our-line is legitimate only where the expression is FORCED to break — wider
+			// than print width even from a fresh line (`tag_break_is_forced`). A tag torn open
+			// despite fitting is a formatter defect (zzz's DiskfileMetrics/ThreadListitem pin
+			// that shape) and must surface as partial/unknown, never be absorbed here.
+			let ours_has_unmatched = false; // among ADDED lines — the traveled side's own layout
+			if (hunk.ours_range) {
+				const in_range = ours_lines_in_hunk(ours_lines, hunk);
+				for (let k = 0; k < in_range.length; k++) {
+					const i = unmatched_open_brace(in_range[k]);
+					if (i < 0) continue;
+					if (hunk.added_lines.includes(in_range[k])) ours_has_unmatched = true;
+					if (!tag_break_is_forced(ours_lines, hunk.ours_range.start + k, i)) return false;
+				}
+			}
+
+			// WIDTH MOTIVE: travel exists only past print width. When the traveled tag broke
+			// internally, the forced check above already proved the overflow (the tag alone
+			// exceeds print width from its indent). Otherwise — travel-and-collapse-flat —
+			// the hunk's own flat spelling must overflow from the traveled side's indent
+			// (every committed travel fixture crosses 100 by construction). A short
+			// respelling is some other reflow and stays unclaimed.
+			if (!ours_has_unmatched) {
+				const first_added = hunk.added_lines[0];
+				const added_indent = first_added.slice(
+					0,
+					first_added.length - first_added.trimStart().length
+				);
+				if (
+					visual_width(added_indent) + visual_width(weld_expression_lines(hunk.added_lines)) <=
+					100
+				) {
+					return false;
+				}
+			}
+
+			// CONTENT-PRESERVATION PROOF: both sides weld to one flat spelling.
+			return weld_expression_lines(hunk.removed_lines) === weld_expression_lines(hunk.added_lines);
+		});
+
+		if (hunk_indices.length === 0) return null;
+		return {
+			pattern: 'spaced_tag_travel',
+			confidence: 'likely',
+			hunk_indices,
+			reason:
+				'spaced wide expression tag traveled to a fresh line (collapsing flat or breaking internally there); prettier keeps it on the text line and opens it mid-line'
+		};
+	}
+};
+
+/**
  * The whitespace class `svelte_boundary_ws_trim`'s collapse-equality erases: FRAGMENT-EDGE
  * runs only, mirroring the compiler's `clean_nodes` (which deletes every fragment-edge run
  * at compile). Inter-sibling runs are deliberately NOT erased — Svelte collapses those to
@@ -3175,6 +3361,7 @@ export const PATTERNS: DivergencePattern[] = [
 	inline_content_hug,
 	inline_sibling_newline_flow,
 	inline_content_block_style,
+	spaced_tag_travel,
 	svelte_boundary_ws_trim,
 	fill_after_inline,
 	comment_preserved,
