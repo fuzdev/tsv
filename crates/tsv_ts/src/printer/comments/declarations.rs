@@ -6,7 +6,7 @@
 // heritage clauses (`extends` / `implements`).
 
 use super::layout::hang_after_operator;
-use super::{CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer};
+use super::{CommentSpacing, CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_to_emit_in_range;
@@ -255,11 +255,13 @@ impl<'a> Printer<'a> {
     /// type-parameter pre-keyword gaps — name→`extends` and pre-`=`
     /// (`push_keyword_value_or_continuation`, `types/type_params.rs`) — the
     /// name→marker gap and the dotted-name gap (`build_dot_gap_doc`), the
-    /// object-property and import-attribute key→`:` gaps, the index-signature
-    /// `]`→value-`:` gap (`build_index_signature_member_doc`), the callee→empty
-    /// argument list gap (`push_empty_args`), and the switch-case head→`:` gap
-    /// (`build_switch_case_doc_inner`, where the tail is the bare `:` and the gate is
-    /// line-comments-only). Adding a site means calling this, never re-deriving
+    /// object-property and import-attribute key→`:` gaps, the pattern-family
+    /// pre-separator gaps — a pattern property's key→`:` and every binding default's
+    /// head→`=` ([`Self::route_pre_separator_gap`], `expressions/patterns.rs`) — the
+    /// index-signature `]`→value-`:` gap (`build_index_signature_member_doc`), the
+    /// callee→empty argument list gap (`push_empty_args`), and the switch-case
+    /// head→`:` gap (`build_switch_case_doc_inner`, where the tail is the bare `:` and
+    /// the gate is line-comments-only). Adding a site means calling this, never re-deriving
     /// `indent(" " + hang_next + tail)`. See conformance_prettier.md
     /// §Uniform Forced-Continuation Indent.
     pub(crate) fn build_continuation_indent(&self, start: u32, end: u32, tail: DocId) -> DocId {
@@ -302,12 +304,46 @@ impl<'a> Printer<'a> {
         if self.has_line_comments_between(gap_start, keyword_pos) {
             return Some((gap_start, keyword_pos));
         }
-        if let Some(pre) = self.build_comments_between_filtered_opt(
-            gap_start,
-            keyword_pos,
-            CommentSpacing::Leading,
-            CommentFilter::All,
-        ) {
+        if let Some(pre) = self.build_inline_comments_between_doc_opt(gap_start, keyword_pos) {
+            parts.push(pre);
+        }
+        None
+    }
+
+    /// Route a **pre-separator** gap — the head→separator half of a `<head><sep>
+    /// <value>` construct in a *flattening* container: a pattern property's key→`:`
+    /// and every binding default's head→`=` (`expressions/patterns.rs`). A comment
+    /// that hangs what follows defers the whole `<sep> <value>` tail to a
+    /// continuation line (returns `Some(gap)` having pushed nothing — the caller
+    /// wraps its tail in [`Self::build_continuation_indent`]), else the gap's
+    /// comments trail the head here (`{ a /* c */ = 1 }`) and the separator stays
+    /// inline (`None`). Pushing the separator inline after a `//` run would swallow
+    /// it into the comment (content loss).
+    ///
+    /// The pre-separator twin of [`Self::route_pre_keyword_gap`], and the gate is
+    /// the whole difference between them: [`Printer::comments_force_own_line_between`]
+    /// here, so a multiline block the author **broke after** hangs too. A separator
+    /// gap has a value on the far side whose own gap already honors that break, so
+    /// collapsing it on the head side alone would answer one question two ways
+    /// within a single construct; a keyword gap has no such counterpart and matches
+    /// prettier by gluing. See conformance_prettier.md §Uniform Forced-Continuation
+    /// Indent and the §Comment relocation "Pre-separator multiline block" entry.
+    ///
+    /// Callers hold a zero-comment fast gate over the whole `head <sep> value` span
+    /// and skip this call on the (overwhelmingly common) comment-free path, so the
+    /// two probes here never run there. A caller whose separator text carries its own
+    /// separating space must split it in two — `"= "`/`" = "` — since the
+    /// continuation arm's leading space is `build_continuation_indent`'s.
+    pub(crate) fn route_pre_separator_gap(
+        &self,
+        parts: &mut DocBuf,
+        gap_start: u32,
+        separator_pos: u32,
+    ) -> Option<(u32, u32)> {
+        if self.comments_force_own_line_between(gap_start, separator_pos) {
+            return Some((gap_start, separator_pos));
+        }
+        if let Some(pre) = self.build_inline_comments_between_doc_opt(gap_start, separator_pos) {
             parts.push(pre);
         }
         None
@@ -398,6 +434,13 @@ impl<'a> Printer<'a> {
     /// and the rename/computed-key after-`:` gap
     /// (`build_object_pattern_property_doc`) — gate on `has_comments_to_emit_between`
     /// first, so the no-comment path never reaches the run.
+    ///
+    /// That gate is the caller's *whole* question: this seam owns the hang-vs-inline
+    /// choice, so a caller must not re-ask [`Printer::comments_force_own_line_between`]
+    /// and hand-roll the inline branch. The two branches are not interchangeable by
+    /// accident — they coincide only because a non-hanging run is all glued blocks,
+    /// where `build_trailing_comments_hang_next` and the `Trailing`-spaced inline run
+    /// emit the same bytes.
     pub(crate) fn build_pattern_value_gap_doc(
         &self,
         start: u32,
