@@ -1,0 +1,89 @@
+{
+	"css": {
+		"type": "StyleSheet",
+		"start": 0,
+		"end": 738,
+		"attributes": [],
+		"children": [
+			{
+				"type": "Atrule",
+				"start": 415,
+				"end": 476,
+				"name": "at-root",
+				"prelude": "input[type=\"radio\"]   >   .class1",
+				"block": {
+					"type": "Block",
+					"start": 458,
+					"end": 476,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 462,
+							"end": 472,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 561,
+				"end": 596,
+				"name": "at-root",
+				"prelude": "foo\nbar",
+				"block": {
+					"type": "Block",
+					"start": 578,
+					"end": 596,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 582,
+							"end": 592,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				}
+			},
+			{
+				"type": "Atrule",
+				"start": 692,
+				"end": 729,
+				"name": "unknown",
+				"prelude": "foo   bar",
+				"block": {
+					"type": "Block",
+					"start": 711,
+					"end": 729,
+					"children": [
+						{
+							"type": "Declaration",
+							"start": 715,
+							"end": 725,
+							"property": "color",
+							"value": "red"
+						}
+					]
+				}
+			}
+		],
+		"content": {
+			"start": 7,
+			"end": 730,
+			"styles": "\n\t/* An unrecognized at-rule's prelude is an opaque token stream (CSS Syntax 3 §5.4.2), so tsv keeps it verbatim — whitespace runs, quote spelling and combinator spacing alike. Prettier re-parses the prelude of any at-rule on its hardcoded SCSS list; for @at-root that means parsing it as a SELECTOR (see README). */\n\t/* Whitespace run, quote spelling, combinator spacing — prettier normalizes all three */\n\t@at-root input[type=\"radio\"]   >   .class1 {\n\t\tcolor: red;\n\t}\n\t/* An authored newline inside the prelude — prettier collapses it to one space */\n\t@at-root foo\nbar {\n\t\tcolor: red;\n\t}\n\t/* Control: identical prelude under a name NOT on prettier's list — both keep it verbatim */\n\t@unknown foo   bar {\n\t\tcolor: red;\n\t}\n",
+			"comment": null
+		}
+	},
+	"js": [],
+	"start": 0,
+	"end": 739,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": []
+}
