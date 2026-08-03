@@ -32,4 +32,13 @@ counterpart (which stays inline) is documented per context in
 `types/type_members/modifier_after_comment_prettier_divergence`, and
 `declarations/class/optional_marker_comment_prettier_divergence`.
 
+The **own-line** authoring of the same line comment (`a?⏎// c1⏎: number`) pulls
+up to trail the `?` and reaches input under tsv — one pass, the same
+continuation form (`unformatted_ours_own_line.svelte`). Prettier instead
+crosses the `:` on its first pass (`a?: // c1⏎number`, the
+`prettier_intermediate_to_variant_own_line.svelte` form) and floats the comment
+to trailing on its second — `variant_own_line.svelte`, the same form as
+`output_prettier.svelte`, dual-stable. The own-line **block** sibling is
+[optional_marker_own_line_block_comment](../optional_marker_own_line_block_comment_prettier_divergence/).
+
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

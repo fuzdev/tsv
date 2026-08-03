@@ -19,6 +19,15 @@ member (`B // c1⏎= 2 // c2`), prettier's relocation **merges both onto one lin
 tsv keeps the two comments distinct. Trailing the before-`=` comment would re-import
 that loss, so tsv preserves position.
 
+The **own-line** authoring (`A⏎// c⏎= 1`) pulls up to trail the name and
+reaches input under tsv — one pass (`unformatted_ours_own_line.svelte`).
+Prettier gets to its end-of-line form in two: its first pass crosses the `=`
+and glues the comment to it (`A = // c⏎1,`, the
+`prettier_intermediate_to_variant_own_line.svelte` form), its second floats it
+to trailing — `variant_own_line.svelte`, the same form as
+`output_prettier.svelte`, dual-stable. The own-line **block** sibling is
+[member_before_eq_own_line_block_comment](../member_before_eq_own_line_block_comment_prettier_divergence/).
+
 The enum-member face of the cross-construct before-`=` initializer line comment
 (also class properties and variable declarators). Unlike the before-`:`
 [continuation indent](../../variable/binding_key_colon_line_comment_prettier_divergence/)

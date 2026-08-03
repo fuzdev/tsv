@@ -33,4 +33,13 @@ is documented in `syntax/comments/optional_marker_line_comment_prettier_divergen
 Both positions are dual-stable in our formatter. Per the comment-position
 policy, we preserve the user's original comment position.
 
+The **own-line** authoring of the same line comment (`a⏎// c1⏎: number`) pulls
+up to trail the key and reaches input under tsv — one pass, the same
+continuation form (`unformatted_ours_own_line.svelte`). Prettier instead
+crosses the `:` on its first pass (`a: // c1⏎number`, the
+`prettier_intermediate_to_variant_own_line.svelte` form) and floats the comment
+to trailing on its second — `variant_own_line.svelte`, the same form as
+`output_prettier.svelte`, dual-stable. The own-line **block** sibling is
+[key_colon_own_line_block_comment](../key_colon_own_line_block_comment_prettier_divergence/).
+
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
