@@ -13,7 +13,7 @@ use super::helpers::{
     type_needs_parens_for_array_element, type_needs_parens_for_conditional_check,
     type_needs_parens_for_conditional_extends, unwrap_parenthesized,
 };
-use super::{BlankRule, CommentSpacing, Printer};
+use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer};
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
@@ -1081,97 +1081,125 @@ impl<'a> Printer<'a> {
             body_parts.push(d.text("]"));
         }
 
-        // optional modifier: `?`, `+?`, or `-?`
-        if let Some(optional) = m.optional {
-            body_parts.push(d.text(match optional {
-                TSMappedTypeModifier::True => "?",
-                TSMappedTypeModifier::Plus => "+?",
-                TSMappedTypeModifier::Minus => "-?",
-            }));
-        }
+        // optional modifier text: `?`, `+?`, or `-?`. Emitted per arm below — the
+        // value path places the `]`→`:` region's comments around it; the frozen and
+        // no-value paths keep it glued to `]`.
+        let marker_text = m.optional.map(|optional| match optional {
+            TSMappedTypeModifier::True => "?",
+            TSMappedTypeModifier::Plus => "+?",
+            TSMappedTypeModifier::Minus => "-?",
+        });
 
         // Comments and value type
         if let Some(type_ann) = &m.type_annotation {
             let type_start = type_ann.span().start;
             let type_end = type_ann.span().end;
 
-            // Comments between `]` (or `?`/`+?`/`-?`) and value type
-            // Start from bracket_close to avoid double-counting pre-bracket comments
-            let comments_before_value: CommentVec<'_> =
-                comments_to_emit_in_range(self.comments, bracket_close, type_start).collect();
-
-            body_parts.push(d.text(":"));
-
-            // A redundant paren shell with a leading line-comment run (`]: (// c\n V)`)
-            // strips to the same hang as bare `]: // c\n V`; the shared keyword→value
-            // seam routes it so the paren form is idempotent (the outer paren would
-            // otherwise hide the comment from the gate). A mixed / trailing shell hoists
-            // losslessly too — the trailing comment via `build_hang_value_doc`.
-            //
-            // A format-ignore directive in the `]:`→value gap freezes a non-composite
+            // A format-ignore directive in the `]`→value gap freezes a non-composite
             // value verbatim (`single_child_frozen`; a union/intersection value
             // declines and freezes via its own walk). The frozen path keeps the
             // UNWIDENED window so an in-shell directive stays on the ordinary paths.
             let head = self.keyword_value_head(bracket_close, type_ann);
-            // A line comment after `:` stays trailing it, with the value type on
-            // the next line (preserve-in-place; prettier relocates the comment to
-            // trail the member `;`).
-            if self.has_line_comments_between(bracket_close, head.value_start) {
-                // Type position: a trailing block lifted from the shell trails the value
-                // inline before the member `;` (`defer = false`). A frozen value is the
-                // verbatim slice; the own-line directive keeps its own line here
-                // (`append_keyword_value_line_comments` preserves own-line comments).
-                let value_doc = self.build_keyword_value_doc(&head, false);
-                self.append_keyword_value_line_comments(
-                    &mut body_parts,
-                    bracket_close,
-                    head.value_start,
-                    value_doc,
-                );
-            } else {
-                for comment in &comments_before_value {
-                    body_parts.push(d.text(" "));
-                    body_parts.push(self.build_comment_doc(comment));
-                }
 
-                // A union/intersection value breaks after `:` and hangs (leading `| `
-                // for unions, indented continuations for intersections) instead of
-                // gluing to the colon when it exceeds print width — matching prettier's
-                // `shouldIndent` → `indent(parts)`. Redundant comment-free parens around
-                // the value are stripped first (prettier does the same). A hugging union
-                // (`{ ... } | null`) keeps its inline `: ` since the object owns its own
-                // expansion.
-                match self.unwrap_redundant_parens(type_ann) {
-                    TSType::Union(u) => {
-                        let type_doc = self.build_union_type_doc(u);
-                        // A hugging union (`{ ... } | null`) keeps its inline `: ` since the
-                        // object owns its own expansion; everything else hangs after `:` so
-                        // it breaks to leading `| ` instead of gluing. `union_prints_hugged`
-                        // owns that question whole — this site used to pair the bare
-                        // syntactic shape with its own NARROWER comment scan (line comments
-                        // between members only), which let a block comment between members,
-                        // or a line comment in the leading `|`→first-member gap, read as
-                        // "hug" while the printer expanded them.
-                        if self.union_prints_hugged(u) {
+            if head.frozen {
+                // Frozen: keep the unsplit emission — marker glued, `:`, then the
+                // whole gap's comments own-line-preserving
+                // (`append_keyword_value_line_comments`) so the directive keeps the
+                // line that earned the freeze; the value is the verbatim slice.
+                if let Some(marker) = marker_text {
+                    body_parts.push(d.text(marker));
+                }
+                body_parts.push(d.text(":"));
+                if self.has_line_comments_between(bracket_close, head.value_start) {
+                    let value_doc = self.build_keyword_value_doc(&head, false);
+                    self.append_keyword_value_line_comments(
+                        &mut body_parts,
+                        bracket_close,
+                        head.value_start,
+                        value_doc,
+                    );
+                } else {
+                    body_parts.push(self.build_comments_between(
+                        bracket_close,
+                        head.value_start,
+                        CommentSpacing::Leading,
+                    ));
+                    body_parts.push(d.text(" "));
+                    body_parts.push(self.build_frozen_single_child_doc(type_ann));
+                }
+            } else {
+                // The `]`→value region splits at the `:` (and the optional marker): a
+                // comment before the `:` trails the `]`/marker in its authored slot —
+                // the index-signature treatment (`[K in T] /* c */ : V`,
+                // `[K in T]? /* c */ : V`, `[K in T] /* c */?: V`) — never re-binding
+                // across the `:`; a comment after the `:` leads the value (the tail).
+                // Prettier relocates all of these into the brackets, trailing the key
+                // constraint (conformance_prettier.md §Comment relocation).
+                let colon_pos = self
+                    .find_char_outside_comments(bracket_close, type_start, b':')
+                    .unwrap_or(bracket_close);
+                // The marker's `?`; a comment between a `+`/`-` sign and its `?` sits
+                // before `marker_pos` and folds to before the whole marker.
+                let (marker_pos, after_marker) = if marker_text.is_some() {
+                    let q = self
+                        .find_char_outside_comments(bracket_close, colon_pos, b'?')
+                        .unwrap_or(colon_pos);
+                    (q, q + 1)
+                } else {
+                    (bracket_close, bracket_close)
+                };
+
+                let tail = self.build_mapped_value_tail_doc(&head, colon_pos, type_ann);
+
+                if self.has_line_comments_between(bracket_close, marker_pos) {
+                    // A line comment before the marker: the marker joins the `: V`
+                    // tail on the continuation line (the property-signature key→`?`
+                    // treatment), each comment ending its own line so the `//` can't
+                    // swallow what follows.
+                    let tail_with_marker = match marker_text {
+                        Some(marker) => d.concat(&[d.text(marker), tail]),
+                        None => tail,
+                    };
+                    body_parts.push(self.build_continuation_indent(
+                        bracket_close,
+                        colon_pos,
+                        tail_with_marker,
+                    ));
+                } else {
+                    // Before-marker comments stay before the marker, spaced off the
+                    // `]`, the marker glued after (`] /* c */?: V` — the
+                    // property-signature parity).
+                    body_parts.push(self.build_comments_between(
+                        bracket_close,
+                        marker_pos,
+                        CommentSpacing::Leading,
+                    ));
+                    if let Some(marker) = marker_text {
+                        body_parts.push(d.text(marker));
+                    }
+                    if self.has_line_comments_between(after_marker, colon_pos) {
+                        // A line comment between the `]`/marker and the `:`: the
+                        // comment trails in place, the `: V` tail drops to a
+                        // continuation line indented one level (uniform
+                        // forced-continuation indent).
+                        body_parts.push(self.build_continuation_indent(
+                            after_marker,
+                            colon_pos,
+                            tail,
+                        ));
+                    } else {
+                        // Block-only comments stay inline before the `:`, spaced
+                        // (`] /* c */ : V`); a comment-free gap keeps `:` glued.
+                        if let Some(doc) = self.build_comments_between_filtered_opt(
+                            after_marker,
+                            colon_pos,
+                            CommentSpacing::Leading,
+                            CommentFilter::All,
+                        ) {
+                            body_parts.push(doc);
                             body_parts.push(d.text(" "));
-                            body_parts.push(type_doc);
-                        } else {
-                            body_parts.push(hang_after_operator(d, type_doc));
                         }
-                    }
-                    TSType::Intersection(i) => {
-                        body_parts.push(d.text(" "));
-                        body_parts.push(self.intersection_hanging_with_indent(i));
-                    }
-                    _ => {
-                        body_parts.push(d.text(" "));
-                        // An alone-on-line BLOCK directive froze the value (the
-                        // line-comment branch above catches only `//` spellings).
-                        if head.frozen {
-                            body_parts.push(self.build_frozen_single_child_doc(type_ann));
-                        } else {
-                            body_parts.push(self.build_type_doc(type_ann));
-                        }
+                        body_parts.push(tail);
                     }
                 }
             }
@@ -1189,6 +1217,9 @@ impl<'a> Printer<'a> {
             // No value type (`{ [K in T] }`): comments after the `]` (or the
             // optional modifier) still trail the member the same way — dropping
             // through without collecting them would lose content.
+            if let Some(marker) = marker_text {
+                body_parts.push(d.text(marker));
+            }
             let body_end = m.span.end.saturating_sub(1); // before `}`
             for comment in comments_to_emit_in_range(self.comments, bracket_close, body_end) {
                 body_parts.push(self.build_trailing_comment_doc(comment));
@@ -1200,6 +1231,75 @@ impl<'a> Printer<'a> {
             &leading_comments[..leading_own_line_end],
             &body_parts,
         )
+    }
+
+    /// The mapped type's `: V` tail — the value `:` plus the `:`→value gap's comments
+    /// and the value itself; the caller owns everything before the `:` (the `]`, the
+    /// optional marker, and the pre-`:` comment slots).
+    ///
+    /// A line comment after the `:` stays trailing it, with the value type on the
+    /// next line (preserve-in-place; prettier relocates the comment to trail the
+    /// member `;`). A redundant paren shell with a leading line-comment run
+    /// (`]: (// c\n V)`) strips to the same hang as bare `]: // c\n V`; the shared
+    /// keyword→value seam routes it so the paren form is idempotent (the outer paren
+    /// would otherwise hide the comment from the gate). A mixed / trailing shell
+    /// hoists losslessly too — the trailing comment via `build_hang_value_doc`
+    /// (`defer = false`: a type position keeps a lifted trailing block inline before
+    /// the member `;`).
+    ///
+    /// A union/intersection value breaks after `:` and hangs (leading `| ` for
+    /// unions, indented continuations for intersections) instead of gluing to the
+    /// colon when it exceeds print width — matching prettier's `shouldIndent` →
+    /// `indent(parts)`. Redundant comment-free parens around the value are stripped
+    /// first (prettier does the same). A hugging union (`{ ... } | null`) keeps its
+    /// inline `: ` since the object owns its own expansion; `union_prints_hugged`
+    /// owns that question whole — this site used to pair the bare syntactic shape
+    /// with its own NARROWER comment scan (line comments between members only), which
+    /// let a block comment between members, or a line comment in the leading
+    /// `|`→first-member gap, read as "hug" while the printer expanded them.
+    fn build_mapped_value_tail_doc(
+        &self,
+        head: &KeywordValueHead<'_>,
+        colon_pos: u32,
+        type_ann: &TSType<'_>,
+    ) -> DocId {
+        let d = self.d();
+        let mut tail_parts: DocBuf = smallvec![d.text(":")];
+        if self.has_line_comments_between(colon_pos + 1, head.value_start) {
+            let value_doc = self.build_keyword_value_doc(head, false);
+            self.append_keyword_value_line_comments(
+                &mut tail_parts,
+                colon_pos + 1,
+                head.value_start,
+                value_doc,
+            );
+        } else {
+            tail_parts.push(self.build_comments_between(
+                colon_pos + 1,
+                type_ann.span().start,
+                CommentSpacing::Leading,
+            ));
+            match self.unwrap_redundant_parens(type_ann) {
+                TSType::Union(u) => {
+                    let type_doc = self.build_union_type_doc(u);
+                    if self.union_prints_hugged(u) {
+                        tail_parts.push(d.text(" "));
+                        tail_parts.push(type_doc);
+                    } else {
+                        tail_parts.push(hang_after_operator(d, type_doc));
+                    }
+                }
+                TSType::Intersection(i) => {
+                    tail_parts.push(d.text(" "));
+                    tail_parts.push(self.intersection_hanging_with_indent(i));
+                }
+                _ => {
+                    tail_parts.push(d.text(" "));
+                    tail_parts.push(self.build_type_doc(type_ann));
+                }
+            }
+        }
+        d.concat(&tail_parts)
     }
 
     /// The mapped type's brace shell around an already-built member body: own-line
