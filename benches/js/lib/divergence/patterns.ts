@@ -1519,40 +1519,58 @@ const non_null_paren_base: DivergencePattern = {
 
 // ─── Svelte-specific patterns ───────────────────────────────────────────────
 
-const menu_block: DivergencePattern = {
-	id: 'menu_block',
-	description: '<menu> treated as block element (spec-compliant)',
+/**
+ * The doc's own enumeration is the element set: prettier-plugin-svelte's blockElements
+ * list carries `ol`/`ul` and `details`/`li` but omits `menu` and `summary`, the two
+ * elements the HTML spec gives identical UA display (conformance_prettier.md
+ * §Svelte: Elements). tsv classifies both as block, so their content — and their
+ * FOLLOWING sibling, which as an inline element would hug the closing tag in the
+ * surrounding fill — lays out on its own line where prettier keeps the inline form.
+ */
+const spec_block_close = /<\/(?:menu|summary)/;
+const spec_block_close_own_line = /^\s*<\/(?:menu|summary)>/;
+const spec_block_open = /<(?:menu|summary)[\s>]/;
+const spec_block_hugs_close = />[^<\n]*<\/(?:menu|summary)/;
+
+const spec_block_elements: DivergencePattern = {
+	id: 'spec_block_elements',
+	description:
+		'<menu>/<summary> treated as block elements (spec-compliant; prettier-plugin-svelte omits both from its blockElements list)',
 	languages: ['svelte'],
 	conformance_sections: ['Svelte/HTML'],
-	fixtures: ['svelte/elements/menu_block_prettier_divergence'],
+	fixtures: [
+		'svelte/elements/menu_block_prettier_divergence',
+		'svelte/elements/summary_block_prettier_divergence'
+	],
 	detect(ctx) {
 		if (ctx.language !== 'svelte') return null;
 
-		// Look for hunks involving <menu> elements where prettier hugs content
+		// Look for hunks involving those elements where prettier hugs content
 		// (inline formatting) and we expand it (block formatting)
 		const ours_lines = ctx.ours_lines!;
 		const prettier_lines = ctx.prettier_lines!;
 
 		const hunk_indices = find_matching_hunks(ctx.hunks, (hunk) => {
-			// Check for </menu in removed lines (prettier hugs: content</menu on same line,
-			// with > possibly on next line)
-			const removed_has_menu_close = hunk.removed_lines.some((l) => /<\/menu/.test(l));
-			// Check for </menu> on added lines on its own line (we expand: block formatting)
-			const added_has_menu_close = hunk.added_lines.some((l) => /^\s*<\/menu>/.test(l));
+			// Check for a close tag in removed lines (prettier hugs: content</menu on the
+			// same line, with > possibly on next line — or a sibling glued after
+			// </summary> on the same line)
+			const removed_has_close = hunk.removed_lines.some((l) => spec_block_close.test(l));
+			// Check for a close tag on added lines on its own line (we expand: block formatting)
+			const added_has_close = hunk.added_lines.some((l) => spec_block_close_own_line.test(l));
 
-			if (removed_has_menu_close || added_has_menu_close) return true;
+			if (removed_has_close || added_has_close) return true;
 
-			// Also check context: <menu in surrounding lines
+			// Also check context: an open tag in surrounding lines
 			const o_lines = ours_lines_in_hunk(ours_lines, hunk);
 			const p_lines = prettier_lines_in_hunk(prettier_lines, hunk);
 			const context_lines = hunk.lines.filter((l) => l.type === 'same').map((l) => l.line);
 			const all_lines = [...o_lines, ...p_lines, ...context_lines];
-			const has_menu_element = all_lines.some((l) => /<menu[\s>]/.test(l));
+			const has_element = all_lines.some((l) => spec_block_open.test(l));
 
-			if (!has_menu_element) return false;
+			if (!has_element) return false;
 
 			// Prettier hugs: >{content} on same line as attribute
-			const removed_hugs = hunk.removed_lines.some((l) => />[^<\n]*<\/menu/.test(l));
+			const removed_hugs = hunk.removed_lines.some((l) => spec_block_hugs_close.test(l));
 			// We expand: > on own line
 			const added_breaks_gt = hunk.added_lines.some((l) => /^\t*>$/.test(l));
 
@@ -1561,10 +1579,10 @@ const menu_block: DivergencePattern = {
 
 		if (hunk_indices.length > 0) {
 			return {
-				pattern: 'menu_block',
+				pattern: 'spec_block_elements',
 				confidence: 'certain',
 				hunk_indices,
-				reason: '<menu> treated as block element (prettier treats as inline)'
+				reason: '<menu>/<summary> treated as block element (prettier treats as inline)'
 			};
 		}
 		return null;
@@ -1974,13 +1992,35 @@ const inline_sibling_newline_flow: DivergencePattern = {
 				return false;
 			}
 			if (hunk.added_lines.length === 0 || hunk.removed_lines.length === 0) return false;
-			// DIRECTIONAL: flowing collapses lines, so ours must be the shorter side. This
-			// pattern never claims a hunk where ours is the side that BROKE.
-			if (hunk.added_lines.length >= hunk.removed_lines.length) return false;
+			// DIRECTIONAL: flowing collapses lines — or, when the flowed run is over-width,
+			// re-breaks at a LATER boundary (the equal-count arm below). This pattern never
+			// claims a hunk where ours is the side that BROKE more.
+			if (hunk.added_lines.length > hunk.removed_lines.length) return false;
 			if (has_blank_line(hunk.removed_lines) || has_blank_line(hunk.added_lines)) return false;
 
 			const prettier_trimmed = trimmed_lines(hunk.removed_lines);
 			if (!has_sibling_seam(prettier_trimmed)) return false;
+
+			const ours_trimmed = trimmed_lines(hunk.added_lines);
+			const prettier_weld = prettier_trimmed.join(' ');
+			const ours_weld = ours_trimmed.join(' ');
+
+			// RE-PACK COMPOSITION (equal line counts): the flow rule respells the authored
+			// newline as the space it renders as, and the fill then re-breaks the
+			// over-width run at a later boundary — the line count doesn't drop, the break
+			// MOVES. Claimable only in the pack direction, keyed on content: ours' first
+			// line strictly EXTENDS prettier's (the break moved later), every ours line
+			// holds the hard print-width limit, and the strict weld equality below proves
+			// preservation. The mirror shape — ours breaking EARLIER than prettier though
+			// the packed form fits — is a formatter defect (the deep inline-container
+			// early break pins it) and fails the extension key, staying unclaimed.
+			if (hunk.added_lines.length === hunk.removed_lines.length) {
+				return (
+					ours_trimmed[0].startsWith(prettier_trimmed[0] + ' ') &&
+					hunk.added_lines.every((l) => visual_width(l) <= 100) &&
+					prettier_weld === ours_weld
+				);
+			}
 
 			// CONTENT-PRESERVATION PROOF: welding each side's trimmed lines with a single
 			// space yields the same string. The rule's whole effect is respelling a line
@@ -1992,8 +2032,6 @@ const inline_sibling_newline_flow: DivergencePattern = {
 			// (prettier `A⏎B` vs ours `AB`, no separator at all): that welds to `A B`
 			// against `AB`, so a formatter that ate an inter-sibling space is never
 			// absorbed here.
-			const prettier_weld = prettier_trimmed.join(' ');
-			const ours_weld = trimmed_lines(hunk.added_lines).join(' ');
 			if (prettier_weld === ours_weld) return true;
 
 			// COMPOSED WITH THE FRAGMENT-EDGE TRIM. One hunk can carry this respelling AND
@@ -2143,10 +2181,18 @@ const inline_content_block_style: DivergencePattern = {
 		//       (`…with the <TomeLink` at EOL) and `>`/`/>` lands on its own line.
 		// The leading `\S[ \t]` (text + one space before `<`) is what keeps this off the
 		// rejected broad "open-tag at line start" markers: an element that legitimately
-		// begins its own line is indent-only before `<` and never matches. `[A-Za-z]`
-		// after `<` excludes a closing `</tag`; the tag-name class admits `:`/`.` /`-`
-		// (`<svelte:element`, `<Foo.Bar`, custom elements) like the dangle markers above.
-		const dangle_open_tag_after_text = /\S[ \t]<[A-Za-z][\w.:-]*(?:[ \t][^<>]*>)?[ \t]*$/;
+		// begins its own line is indent-only before `<` and never matches. The element may
+		// carry a glued word PREFIX (`= var(<StyleVariableButton …>` — the word and its
+		// element are one welded unit, §Svelte: Inline content block-style; the unit
+		// travels whole in ours, and prettier opens it mid-line), so `[^<>{}\s]*` admits
+		// word bytes between the boundary space and the `<` — never tag/brace/space
+		// structure, so the anchoring space stays the unit's own leading boundary. This is
+		// the same weld `spaced_tag_travel`'s prefix scan-back walks for `{expr}` tags
+		// (its stop set `[ \t<>{}]` is this class's complement) — keep the two in step.
+		// `[A-Za-z]` after `<` excludes a closing `</tag`; the tag-name class admits
+		// `:`/`.` /`-` (`<svelte:element`, `<Foo.Bar`, custom elements) like the dangle
+		// markers above.
+		const dangle_open_tag_after_text = /\S[ \t][^<>{}\s]*<[A-Za-z][\w.:-]*(?:[ \t][^<>]*>)?[ \t]*$/;
 		const has_signature = (hunk: DiffHunk): boolean =>
 			hunk.removed_lines
 				.concat(hunk.added_lines)
@@ -2304,17 +2350,27 @@ const spaced_tag_travel: DivergencePattern = {
 			}
 
 			// FAMILY SIGNATURE, prettier side: a tag OPENED mid-line after text and a SPACE —
-			// an unmatched `{` with content before it and whitespace immediately in front. The
-			// spacing is load-bearing twice over: a line-START unmatched `{` is the traveled
-			// form (ours' own shape, which prettier only ever keeps, never produces), and a
-			// GLUED mid-line open (`token{thread.token_count !==` — prettier's fill packing a
-			// welded word+tag pair past the width) belongs to the glued-pair rule, not this
-			// one, so neither may claim here.
+			// an unmatched `{` with content before it and whitespace in front of the welded
+			// unit's HEAD. The tag may carry a glued word prefix (`opcodes ({expr…` — the
+			// word `(` and its tag are the smallest welded unit, §Print Width Philosophy),
+			// so the boundary asked about is the whitespace before the PREFIX, reached by
+			// scanning back over word bytes — never across tag/brace/space structure. The
+			// spacing is load-bearing twice over: a line-START unit (j === 0) is the
+			// traveled form (ours' own shape, which prettier only ever keeps, never
+			// produces), and a unit glued straight onto the previous WORD with no boundary
+			// at all (`token{thread.token_count !==` — prettier's fill packing a welded
+			// word+tag pair past the width) belongs to the glued-pair rule, not this one,
+			// so neither may claim here. (That glued-pair shape has no whitespace between
+			// the word and its OWN start — the scan-back reaches line start or indent —
+			// which is exactly what the j-checks refuse.)
 			const prettier_midline = hunk.removed_lines.some((l) => {
 				const i = unmatched_open_brace(l);
 				if (i <= 0) return false;
-				const before = l[i - 1];
-				return (before === ' ' || before === '\t') && l.slice(0, i).trim().length > 0;
+				let j = i;
+				while (j > 0 && !/[ \t<>{}]/.test(l[j - 1])) j--;
+				if (j === 0) return false;
+				const before = l[j - 1];
+				return (before === ' ' || before === '\t') && l.slice(0, j).trim().length > 0;
 			});
 			if (!prettier_midline) return false;
 
@@ -3357,7 +3413,7 @@ export const PATTERNS: DivergencePattern[] = [
 	forced_continuation_indent,
 
 	// 4. Svelte-specific patterns
-	menu_block,
+	spec_block_elements,
 	inline_content_hug,
 	inline_sibling_newline_flow,
 	inline_content_block_style,
