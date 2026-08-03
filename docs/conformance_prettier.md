@@ -102,6 +102,16 @@ comment position as semantic and preserves it wherever that distinction is real.
    element either way) — tsv trails like Prettier rather than manufacturing a divergence
    for a meaningless distinction.
 
+A corollary the before-`:`/`=` gaps make explicit: **own-line-ness is authoring
+signal for a leading position, not a trailing one.** A single-line block comment
+that trails a head token (a key before its `:`, a name before its `=`) has its
+unforced breaks collapsed — it stays in its authored gap, inline
+(`a /* c */: 1`) — while a comment that leads a value (after the `:`/`=`) keeps
+its authored own line. The author chooses the association by which side of the
+separator the comment sits on, and tsv preserves that; the line structure of the
+trailing side is layout. See the key→`:` own-line block entries in
+[§Comment relocation](#comment-relocation).
+
 **When reviewing comment-related fixes:** Default to preserving position. Match
 Prettier's repositioning only when the move is lossless *and* the position carries no
 authorship signal (a pure-separator trail), or when the original position is clearly
@@ -265,7 +275,11 @@ alike — where the blank is itself a break trigger because prettier breaks on i
 the break survives, so the blank does — consistent with the rule, by a gate that forces
 the break rather than an exception to it.
 
-The rule is scoped to **value gaps** (head→value: `=`, `:`, `as`, a keyword). A **list** gap
+The rule is scoped to **value gaps** (head→value: `=`, `:`, `as`, a keyword). The
+*pre*-separator gap (key→`:`, name→`=`) is governed by the trailing-position corollary in
+[§Comment Position Philosophy](#comment-position-philosophy) instead — its unforced breaks
+collapse the same way, because the comment there trails the head rather than leading the
+value. A **list** gap
 is governed by ordinary blank-line preservation instead — a blank between two list items is
 authoring tsv keeps, so an array element's leading comment preserves it
 ([arrays/end_of_line_block_comment](../tests/fixtures/typescript/expressions/arrays/end_of_line_block_comment_prettier_divergence/)).
@@ -1011,6 +1025,7 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Optional `?` to `:` line comment (all contexts) → Trailing the member `;` — [optional_marker_line_comment](../tests/fixtures/typescript/syntax/comments/optional_marker_line_comment_prettier_divergence/)
 - Member key to `:` line comment (non-optional) → Trailing the member `;` — [key_colon_line_comment](../tests/fixtures/typescript/syntax/comments/key_colon_line_comment_prettier_divergence/)
 - Member key to optional `?` line comment (iface/type-literal/class/method) → Trailing the member `;`; tsv keeps the comment after the key and drops `?` + the rest of the member to a continuation line — [key_optional_marker_line_comment](../tests/fixtures/typescript/syntax/comments/key_optional_marker_line_comment_prettier_divergence/)
+- Member key to `:` **own-line block** comment (iface/type-literal/class) → Prettier reaches tsv's fixed point non-idempotently over three passes (across the `:` leading the type — `a: /* c1 */⏎number` — then re-glued inline, then the class property's spacing); tsv collapses the unforced breaks in one pass, keeping the comment trailing the key in its authored gap (`a /* c1 */: number`, class `c /* c3 */ : number = 1` — the inline-authored form both formatters hold stable). A pass-count gap, not an end-state divergence; the chain (two intermediates) is README-recorded, one past what a `prettier_intermediate_*` pin can carry — [key_colon_own_line_block_comment](../tests/fixtures/typescript/syntax/comments/key_colon_own_line_block_comment_prettier_divergence/)
 - Initializer/value gap block comment with an **authored break** (`A = /* c */⏎1`) → Both formatters reflow the value onto the operator's line (the [§Authored breaks in value position](#authored-breaks-in-value-position) rule; the already-inline form is byte-identical in both, so the divergence rides the `unformatted_ours_break` variant), but prettier also **relocates** the comment — before the `=` for an enum member ([member_init_block_comment_break](../tests/fixtures/typescript/declarations/enum/member_init_block_comment_break_prettier_divergence/)), a class property ([property_init_block_comment_break](../tests/fixtures/typescript/declarations/class/property_init_block_comment_break_prettier_divergence/)), and a parameter default ([param_default_block_comment_break](../tests/fixtures/typescript/declarations/function/param_default_block_comment_break_prettier_divergence/)); hoisted onto its own line above the property for an object value ([value_block_comment_break](../tests/fixtures/typescript/expressions/objects/value_block_comment_break_prettier_divergence/)). tsv preserves the authored position in every case. A variable declarator agrees with prettier outright (no relocation there)
 - Value gap block comment with an authored **blank line** (`A = /* c */⏎⏎1`) → Prettier keeps the blank (its own fixed point); tsv reflows it, because the blank sits inside a break already judged unforced and a blank line is a property of a line break (the [§Authored breaks in value position](#authored-breaks-in-value-position) rule). The three initializer fixtures above carry it as their `unformatted_ours_blank` variant; the object value additionally pins prettier's blank-preserving hoist as `variant_hoisted_blank`. A *list* gap is excluded and keeps its blank — [arrays/end_of_line_block_comment](../tests/fixtures/typescript/expressions/arrays/end_of_line_block_comment_prettier_divergence/)
 - Enum member name to `=` line comment → After the value (`A = 1 // c`); tsv keeps it after the name + continuation indent. With a second trailing comment prettier merges both onto one line (info loss); tsv keeps them distinct — [member_before_eq_line_comment](../tests/fixtures/typescript/declarations/enum/member_before_eq_line_comment_prettier_divergence/)
@@ -1019,6 +1034,7 @@ Prettier moves comments between syntactic boundaries into adjacent blocks, paren
 - Type parameter name to `extends` line comment → After `extends`, leading the constraint (`T extends // c⏎A`), re-binding the comment from the name to the constraint; tsv keeps it trailing the name and drops the `extends A` tail to a continuation line at one indent level (inlining would swallow the tail — the constraint becomes comment text). Identical in Svelte `{#snippet}` generics (shared type-parameter printer) — [type_param_before_extends_line_comment](../tests/fixtures/typescript/types/comments/type_param_before_extends_line_comment_prettier_divergence/), [snippet/ts_generic_constraint_gap_line_comment](../tests/fixtures/svelte/blocks/snippet/ts_generic_constraint_gap_line_comment_prettier_divergence/)
 - Type parameter before-`=` default line comment → After `=`, leading the default (`T extends A = // c⏎B`); tsv keeps it in place + continuation indent — the type-parameter face of the before-`=` initializer family above (declarators, enum members, class properties) — [type_param_before_eq_line_comment](../tests/fixtures/typescript/types/comments/type_param_before_eq_line_comment_prettier_divergence/)
 - Object property key to `:` line comment → Hoisted to its own line before the key (`// c⏎a: 1`); tsv keeps it after the key and drops `: value` to a continuation line — [property_key_colon_line_comment](../tests/fixtures/typescript/expressions/objects/property_key_colon_line_comment_prettier_divergence/)
+- Object-property / import-attribute key to `:` **own-line block** comment → Across the `:`, hung leading the value (`a:⏎\t/* c */⏎\t1`), re-binding it from the key's gap to the value; tsv collapses the unforced breaks and keeps the comment inline in its authored gap (`a /* c */: 1`, `type /* c */: 'json'` — the inline-authored form both formatters hold stable), runs in order and each comment distinct. Own-line-ness is authoring signal for a *leading* position, not a *trailing* one (see [Comment Position Philosophy](#comment-position-philosophy)): the pre-`:` comment trails the key, while a comment authored after the `:` leads the value and keeps its own line in both formatters — prettier's landing form, pinned dual-stable as `variant_own_line` — [property_key_colon_own_line_block_comment](../tests/fixtures/typescript/expressions/objects/property_key_colon_own_line_block_comment_prettier_divergence/), [attributes_key_colon_own_line_block_comment](../tests/fixtures/typescript/modules/imports/attributes_key_colon_own_line_block_comment_prettier_divergence/)
 - Variable definite `!` → After `!` modifier — [definite_comment](../tests/fixtures/typescript/declarations/variable/definite_comment_prettier_divergence/)
 - Function param optional `?` → After `?` modifier — [param_optional_comment](../tests/fixtures/typescript/declarations/function/param_optional_comment_prettier_divergence/)
 - Computed key after `]` (object) → Inside brackets `[x /* c */]` — [computed_key_bracket_colon_comment](../tests/fixtures/typescript/expressions/objects/computed_key_bracket_colon_comment_prettier_divergence/)
