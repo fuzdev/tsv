@@ -18,13 +18,27 @@ Cases (in order):
    there as one fill, with no leading space.
 4. **Long run after the break** — the run wraps again on its fresh line, greedily and within
    printWidth.
+5. **The same boundary in an INLINE container** (`<span>`) — the container-class control. An
+   inline container's content is collapsible, so it carries no multiline cause even when width
+   forces the break; the boundary is the same question there and takes the same break.
+
+⚠️ Case 5 is not redundant with 1–4. The rule is per-**boundary**, but the nearby machinery is
+keyed on the *container's* `MultilineCause`, which is `None` for exactly this shape. Keyed on
+that cause, the boundary is skipped here and the space is baked into the run's first word
+instead — which then strands at the head of the continuation line (`-->⏎\t text1`) and shatters
+the rest of the run onto a third line. That output is **not idempotent**: pass 2 repairs it,
+because pass 1's output is newline-authored and hence multiline. So the damage shows up as a
+lost fixed point on a shape no earlier case had, not as a visibly wrong layout.
 
 tsv: as above, every line ≤100.
 
 Prettier: identical on cases 1, 3 and 4 — it keeps the run on its own line once the first word
 no longer fits, and is stable on that form. It differs on case 2, where it packs the whole run
 onto the comment line and lets it run to 106 columns; tsv treats printWidth as a hard limit and
-wraps. See `output_prettier.svelte`.
+wraps. See `output_prettier.svelte`. On case 5 it additionally **dangles** the inline container's
+tag delimiters (`<span⏎\t>…</span⏎>`) — its own cataloged divergence, not this fixture's subject,
+but unavoidable in any inline-container case; `prettier_variant_first_word.svelte` carries that
+form, which tsv normalizes to `input`.
 
 ## Reason
 
