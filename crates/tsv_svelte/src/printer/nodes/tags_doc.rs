@@ -83,23 +83,29 @@ impl<'a> Printer<'a> {
         // (`{@const { b = /* c */ 1 } = expr}`); the comment-less builder
         // silently dropped them.
         let id_doc = self.build_ts_expression_doc(id);
+
+        // The layout verdict is taken BEFORE the init is built, because it is also the
+        // [`Printer::trailing_comment_docs`] `closer_owns_break` answer: only the
+        // break-after-operator arm below puts the init inside an `indent(…)` with `}`
+        // outside it, so only there must a run-final `//`'s break be emitted one level out.
+        // The other two arms leave the init on the tag's own column, where the comment's own
+        // `hardline` is already the break the `}` needs.
+        let break_after_op = Self::const_should_break_after_op(init)
+            || self.gap_comment_hangs_value(id.span().end, init.span().start);
+
         // Build init with LayoutMode::Standalone so a ROOT binary init uses Grouped
         // style (not ContinuationIndent). The assignment layout handles indentation —
         // ContinuationIndent would double-indent continuation lines.
-        // Nothing indents the init, so a trailing line comment's own `hardline` is already
-        // the break this `}` needs, on the tag's own column — the closer adds none
-        // ([`Printer::trailing_comment_docs`]'s `closer_owns_break`, passed `false` there).
         let init_doc = self.build_const_init_doc(
             init,
             id.span().end, // scan from after the id so a comment between `=` and init survives
             span.end - 1,  // before "}"
+            break_after_op,
         );
         let close = d.text("}");
 
         // Choose layout matching prettier's assignment layout selection.
-        if Self::const_should_break_after_op(init)
-            || self.gap_comment_hangs_value(id.span().end, init.span().start)
-        {
+        if break_after_op {
             // Binary expressions, conditional with binary test, etc.
             // Break-after-operator: group with line at "=" so the doc printer
             // can break when the flat form exceeds print width. This takes
@@ -125,6 +131,12 @@ impl<'a> Printer<'a> {
             // independently — e.g., a ternary with identifier test stays
             // on the same line as `=` while its branches break below.
             // Prettier ref: "fluid" layout (assignment.js:59-67)
+            //
+            // `indent_if_break` is the one indent here, and it is CONDITIONAL, so a
+            // `closer_owns_break` dedent — which is not — could not serve it. It never has
+            // to: a run-final `//` ends `init_doc` with a `hardline`, so `will_break` above
+            // claims that init and this arm is unreachable for it. Only a trailing BLOCK
+            // comment reaches here, and a block asks the closer for no break at all.
             d.concat(&[
                 d.text(prefix),
                 id_doc,
@@ -204,7 +216,18 @@ impl<'a> Printer<'a> {
     /// the `=`, because this tag has no separate before-`=` emitter — `leading_docs`
     /// prints every comment in it directly above the value, and the directive that
     /// freezes a value is the one printed above it.
-    fn build_const_init_doc(&self, expr: &Expression<'_>, span_start: u32, span_end: u32) -> DocId {
+    ///
+    /// `closer_owns_break` is the caller's layout verdict, forwarded to
+    /// [`Printer::trailing_comment_docs`] — the init is inside an `indent(…)` with the tag's
+    /// `}` outside it in exactly one of `build_assignment_tag_doc`'s layouts, and this
+    /// builder runs before that choice is applied, so it cannot answer the question itself.
+    fn build_const_init_doc(
+        &self,
+        expr: &Expression<'_>,
+        span_start: u32,
+        span_end: u32,
+        closer_owns_break: bool,
+    ) -> DocId {
         let expr_start = expr.span().start;
         let expr_end = expr.span().end;
         let frozen = self.honored_directive_in_gap(span_start, expr_start);
@@ -223,11 +246,10 @@ impl<'a> Printer<'a> {
         // site's own unfrozen normalization, which is what the freeze must not contradict.
         let expr_doc = self.build_head_value_doc(expr, frozen, &embed);
 
-        // The run's last comment decides whether the tag's `}` owes itself a break —
-        // `build_assignment_tag_doc` places it in all three of its layouts.
-        // `closer_owns_break: false` — the tag's `}` sits on the init's own column, so the
-        // comment's own hardline is the break it needs.
-        let (trailing_docs, _) = self.trailing_comment_docs(expr_end, span_end, false);
+        // The run's last comment supplies the break the tag's `}` reuses —
+        // `build_assignment_tag_doc` places that `}` in all three of its layouts, and
+        // `closer_owns_break` says which of them indented the init out from under it.
+        let (trailing_docs, _) = self.trailing_comment_docs(expr_end, span_end, closer_owns_break);
 
         self.concat_with_surrounding_comments(leading_docs, expr_doc, trailing_docs)
     }

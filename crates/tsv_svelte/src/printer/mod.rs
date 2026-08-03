@@ -33,9 +33,9 @@ use tsv_lang::FxHashSet;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::{DocArena, DocId};
 use tsv_lang::{
-    Comment, EmbedContext, INDENT, OutputBuffer, Span, TAB_WIDTH, comments_in_source_range,
-    is_format_ignore_directive, is_format_ignore_range_end, is_format_ignore_range_start,
-    is_honored_format_ignore,
+    Comment, EmbedContext, INDENT, LayoutMode, OutputBuffer, Span, TAB_WIDTH,
+    comments_in_source_range, is_format_ignore_directive, is_format_ignore_range_end,
+    is_format_ignore_range_start, is_honored_format_ignore,
 };
 use tsv_ts::Expression;
 
@@ -325,11 +325,11 @@ impl<'a> Printer<'a> {
     /// What stays with the caller is what genuinely differs per head, and each difference
     /// is load-bearing, so the bodies around this call are deliberately NOT shared:
     ///
-    /// - the **`EmbedContext`** — four distinct recipes (a block head's
-    ///   `first_line_offset` is derived from its own opening literal; `{@const}`'s init
+    /// - the **`EmbedContext`** — three distinct recipes. The braced heads (block heads
+    ///   and prefixed tags alike) share one, [`Self::head_embed`]; `{@const}`'s init
     ///   inherits the host's Standalone mode so a root binary stays Grouped under the
     ///   assignment layout; an attribute value starts from [`EmbedContext::default`],
-    ///   not the host's).
+    ///   not the host's.
     /// - the **post-processing** — `remove_lines` for an inline block head,
     ///   [`Self::indent_frozen_head`] for a prefixed head, the leading-line-comment
     ///   continuation indent for a block head, nothing for the rest.
@@ -343,6 +343,31 @@ impl<'a> Printer<'a> {
             self.build_frozen_node_doc(expr.span())
         } else {
             tsv_ts::build_expression_doc_with_comments(self.d(), expr, &self.ts_inputs(), embed)
+        }
+    }
+
+    /// The [`EmbedContext`] every **braced head** builds its value under — a block head
+    /// (`{#if …}`, `{#each …}`, an `{#each}` key) and a prefixed tag (`{@html …}`,
+    /// `{@render …}`) alike. `opening_offset` is the width of the text before the
+    /// expression, derived from the emitted opening literal so the estimate and the text
+    /// cannot drift.
+    ///
+    /// `mode` is the load-bearing field: the expression-ROOT entry
+    /// (`build_root_expression_doc`) reads `is_embedded()` to pick ContinuationIndent over
+    /// Grouped style for a root binary.
+    ///
+    /// `first_line_offset` is a width estimate that reaches **nothing** on this path — it is
+    /// read only by `tsv_ts`'s own render entry (`write_arena_doc`, which a Svelte-embedded
+    /// expression never takes: this printer builds the doc and renders it with its OWN embed)
+    /// and by the renderer's `effective_suffix_width`, gated on a `suffix_width` that is 0
+    /// here. Perturbing it changes no byte of any fixture or of a 9k-file real corpus. It is
+    /// computed anyway so the two hosts cannot read as deliberately different — which is the
+    /// whole reason this recipe is one function rather than a copy each.
+    pub(in crate::printer) fn head_embed(&self, opening_offset: usize) -> EmbedContext {
+        EmbedContext {
+            first_line_offset: TAB_WIDTH + opening_offset,
+            mode: LayoutMode::Embedded,
+            ..self.embed
         }
     }
 
