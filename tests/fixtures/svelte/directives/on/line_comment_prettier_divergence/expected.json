@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 126,
+	"end": 129,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -10,7 +10,7 @@
 			{
 				"type": "RegularElement",
 				"start": 0,
-				"end": 68,
+				"end": 71,
 				"name": "button",
 				"name_loc": {
 					"start": {
@@ -27,7 +27,7 @@
 				"attributes": [
 					{
 						"start": 9,
-						"end": 50,
+						"end": 53,
 						"type": "OnDirective",
 						"name": "click",
 						"name_loc": {
@@ -44,16 +44,16 @@
 						},
 						"expression": {
 							"type": "ArrowFunctionExpression",
-							"start": 31,
-							"end": 49,
+							"start": 32,
+							"end": 52,
 							"loc": {
 								"start": {
 									"line": 3,
-									"column": 1
+									"column": 2
 								},
 								"end": {
 									"line": 5,
-									"column": 2
+									"column": 3
 								}
 							},
 							"id": null,
@@ -63,59 +63,59 @@
 							"params": [],
 							"body": {
 								"type": "BlockStatement",
-								"start": 37,
-								"end": 49,
+								"start": 38,
+								"end": 52,
 								"loc": {
 									"start": {
 										"line": 3,
-										"column": 7
+										"column": 8
 									},
 									"end": {
 										"line": 5,
-										"column": 2
+										"column": 3
 									}
 								},
 								"body": [
 									{
 										"type": "ExpressionStatement",
-										"start": 41,
-										"end": 46,
+										"start": 43,
+										"end": 48,
 										"loc": {
 											"start": {
 												"line": 4,
-												"column": 2
+												"column": 3
 											},
 											"end": {
 												"line": 4,
-												"column": 7
+												"column": 8
 											}
 										},
 										"expression": {
 											"type": "CallExpression",
-											"start": 41,
-											"end": 45,
+											"start": 43,
+											"end": 47,
 											"loc": {
 												"start": {
 													"line": 4,
-													"column": 2
+													"column": 3
 												},
 												"end": {
 													"line": 4,
-													"column": 6
+													"column": 7
 												}
 											},
 											"callee": {
 												"type": "Identifier",
-												"start": 41,
-												"end": 43,
+												"start": 43,
+												"end": 45,
 												"loc": {
 													"start": {
 														"line": 4,
-														"column": 2
+														"column": 3
 													},
 													"end": {
 														"line": 4,
-														"column": 4
+														"column": 5
 													}
 												},
 												"name": "fn"
@@ -143,8 +143,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 52,
-							"end": 59,
+							"start": 55,
+							"end": 62,
 							"raw": "\n\ttext\n",
 							"data": "\n\ttext\n"
 						}
@@ -153,50 +153,50 @@
 			},
 			{
 				"type": "Text",
-				"start": 68,
-				"end": 70,
+				"start": 71,
+				"end": 73,
 				"raw": "\n\n",
 				"data": "\n\n"
 			},
 			{
 				"type": "RegularElement",
-				"start": 70,
-				"end": 125,
+				"start": 73,
+				"end": 128,
 				"name": "button",
 				"name_loc": {
 					"start": {
 						"line": 10,
 						"column": 1,
-						"character": 71
+						"character": 74
 					},
 					"end": {
 						"line": 10,
 						"column": 7,
-						"character": 77
+						"character": 80
 					}
 				},
 				"attributes": [
 					{
-						"start": 78,
-						"end": 111,
+						"start": 81,
+						"end": 114,
 						"type": "OnDirective",
 						"name": "click",
 						"name_loc": {
 							"start": {
 								"line": 10,
 								"column": 8,
-								"character": 78
+								"character": 81
 							},
 							"end": {
 								"line": 10,
 								"column": 16,
-								"character": 86
+								"character": 89
 							}
 						},
 						"expression": {
 							"type": "Identifier",
-							"start": 108,
-							"end": 110,
+							"start": 111,
+							"end": 113,
 							"loc": {
 								"start": {
 									"line": 10,
@@ -212,8 +212,8 @@
 								{
 									"type": "Block",
 									"value": " block comment ",
-									"start": 88,
-									"end": 107
+									"start": 91,
+									"end": 110
 								}
 							]
 						},
@@ -225,8 +225,8 @@
 					"nodes": [
 						{
 							"type": "Text",
-							"start": 112,
-							"end": 116,
+							"start": 115,
+							"end": 119,
 							"raw": "text",
 							"data": "text"
 						}
@@ -256,8 +256,8 @@
 		{
 			"type": "Block",
 			"value": " block comment ",
-			"start": 88,
-			"end": 107,
+			"start": 91,
+			"end": 110,
 			"loc": {
 				"start": {
 					"line": 10,

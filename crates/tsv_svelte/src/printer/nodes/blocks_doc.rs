@@ -247,6 +247,9 @@ impl<'a> Printer<'a> {
             doc: expr_doc,
             frozen,
             ends_with_line_comment,
+            // A block head builds its own final shape (`build_expression_doc_for_block`
+            // applies the continuation indent in place), so there is never a debt here.
+            owes_continuation_indent: _,
         } = head;
         let hug = clause_hugs_expr(expr) && !frozen;
         let open_doc = self.head_open_doc(open, frozen);

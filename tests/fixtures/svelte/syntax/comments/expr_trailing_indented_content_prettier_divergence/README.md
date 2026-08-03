@@ -25,19 +25,24 @@ tsv:
 
 Prettier: `{#if // c1⏎cond}` (the trailing comment stripped, the continuation flush).
 
-Two things indent that content, and the control pins that they are the only difference:
+Two things indent that content, and the controls pin that they are the only difference:
 
-- **a leading line comment**, which breaks the head and hangs its continuation one level in
-  ([condition_breaking_comment](../../../blocks/if/condition_breaking_comment_prettier_divergence/)
-  is that shape's own fixture) — covered on `{#if}` at column zero and on `{#key}` one level
-  in, since the two share a head builder.
+- **a leading line comment**, which breaks the head and hangs its continuation one level in —
+  the same rule at *every* braced head
+  ([§Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent);
+  [expr_leading_line](./../expr_leading_line_prettier_divergence/) sweeps the family, and
+  [condition_breaking_comment](../../../blocks/if/condition_breaking_comment_prettier_divergence/)
+  is the block head's own fixture). Covered here on `{#if}` at column zero, on `{#key}` one
+  level in (the two share a head builder), and on `{@html}`, whose builder is the other one.
 - **the break-after-operator layout** of a `{@const}` init, which indents the value under
   the `=` while the tag's `}` stays outside it.
 
-The **control** is the same `{#if}` with the leading comment removed: nothing indents the
-content there, the comment's own break is already on the right column, and the `}` lands in
-the same place — so the fixture asserts one closer column reached two ways rather than two
-layouts.
+Each **control** is the same head with the leading comment removed — `{#if cond // c2}` and
+`{@html expr // c2}`: nothing indents the content there, the comment's own break is already on
+the right column, and the `}` lands in the same place. So the fixture asserts one closer column
+reached two ways rather than two layouts. The `{@html // c1⏎\texpr}` case is the third arm: the
+content hangs but the run does *not* end in a line comment, so there is no break for the `}` to
+reuse and it hugs the value — the indent and the dangle are separate questions.
 
 Prettier's `{@const}` output is additionally **corrupt** — it emits an unmatched paren and
 relocates the comment past the tag (`{@const a = item && cond)} // c`), then throws on its

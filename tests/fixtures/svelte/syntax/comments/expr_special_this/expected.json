@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 573,
+	"end": 462,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -608,114 +608,6 @@
 						}
 					]
 				}
-			},
-			{
-				"type": "Text",
-				"start": 461,
-				"end": 462,
-				"raw": "\n",
-				"data": "\n"
-			},
-			{
-				"type": "SvelteElement",
-				"start": 462,
-				"end": 514,
-				"name": "svelte:element",
-				"name_loc": {
-					"start": {
-						"line": 9,
-						"column": 1,
-						"character": 463
-					},
-					"end": {
-						"line": 9,
-						"column": 15,
-						"character": 477
-					}
-				},
-				"attributes": [],
-				"fragment": {
-					"type": "Fragment",
-					"nodes": []
-				},
-				"tag": {
-					"type": "Identifier",
-					"start": 491,
-					"end": 494,
-					"loc": {
-						"start": {
-							"line": 11,
-							"column": 1
-						},
-						"end": {
-							"line": 11,
-							"column": 4
-						}
-					},
-					"name": "tag",
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " c",
-							"start": 485,
-							"end": 489
-						}
-					]
-				}
-			},
-			{
-				"type": "Text",
-				"start": 514,
-				"end": 515,
-				"raw": "\n",
-				"data": "\n"
-			},
-			{
-				"type": "SvelteComponent",
-				"start": 515,
-				"end": 572,
-				"name": "svelte:component",
-				"name_loc": {
-					"start": {
-						"line": 13,
-						"column": 1,
-						"character": 516
-					},
-					"end": {
-						"line": 13,
-						"column": 17,
-						"character": 532
-					}
-				},
-				"attributes": [],
-				"fragment": {
-					"type": "Fragment",
-					"nodes": []
-				},
-				"expression": {
-					"type": "Identifier",
-					"start": 546,
-					"end": 550,
-					"loc": {
-						"start": {
-							"line": 15,
-							"column": 1
-						},
-						"end": {
-							"line": 15,
-							"column": 5
-						}
-					},
-					"name": "Comp",
-					"leadingComments": [
-						{
-							"type": "Line",
-							"value": " c",
-							"start": 540,
-							"end": 544
-						}
-					]
-				}
 			}
 		]
 	},
@@ -862,38 +754,6 @@
 				"end": {
 					"line": 8,
 					"column": 31
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " c",
-			"start": 485,
-			"end": 489,
-			"loc": {
-				"start": {
-					"line": 10,
-					"column": 7
-				},
-				"end": {
-					"line": 10,
-					"column": 11
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " c",
-			"start": 540,
-			"end": 544,
-			"loc": {
-				"start": {
-					"line": 14,
-					"column": 7
-				},
-				"end": {
-					"line": 14,
-					"column": 11
 				}
 			}
 		}

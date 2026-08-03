@@ -287,6 +287,9 @@ const KNOWN_PARTIAL: Record<string, string> = {
 	'svelte/blocks/if/long_prettier_divergence': '3 hunks',
 	'svelte/blocks/key/long_prettier_divergence': '2 hunks',
 	'svelte/syntax/comments/expr_trailing_line_prettier_divergence': '1 hunk',
+	// the braced-family sweep: forced_continuation_indent claims the tag/attribute heads,
+	// the rest are the block heads' `}` dangle + clause reflow, which is §Svelte: Blocks
+	'svelte/syntax/comments/expr_leading_line_prettier_divergence': '7 hunks',
 	// comment_position claims the comment hunk, not the reflow tail it sits in
 	'typescript/expressions/calls/chained/trailing_member_comment_prettier_divergence': '2 hunks',
 	'typescript/statements/switch/case_block_comment_prettier_divergence': '1 hunk',

@@ -6,11 +6,3 @@
 <svelte:element this={fn(/* c */ a)}></svelte:element>
 <svelte:element this={a && /* c */ b}></svelte:element>
 <svelte:component this={/* c */ Comp}></svelte:component>
-<svelte:element
-	this={// c
-	tag}
-></svelte:element>
-<svelte:component
-	this={// c
-	Comp}
-></svelte:component>

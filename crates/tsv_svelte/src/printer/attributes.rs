@@ -513,8 +513,6 @@ impl<'a> Printer<'a> {
         span_start: u32,
         span_end: u32,
     ) -> DocId {
-        let d = self.d();
-
         // The expression begins exactly `prefix.len()` bytes past the span start,
         // so the comment-scan anchor derives from the emitted prefix — the two
         // can't drift apart.
@@ -523,41 +521,20 @@ impl<'a> Printer<'a> {
         // The prefix→value head: an own-line directive there freezes the whole value, and
         // the head takes the broken prefixed form that keeps the directive on its own line
         // (flush against the prefix it would be inert, and the freeze gone next pass).
-        let expr_start = expr.span().start;
-        let frozen = self.honored_directive_in_gap(comment_start, expr_start);
-
-        // `parts` is the head's CONTENT only — the prefix and the `}` are the assembler's
-        // (`Printer::build_prefixed_head_doc`), which is what lets one shape serve both
-        // verdicts.
-        let mut parts: DocBuf = self.leading_comment_docs(comment_start, expr_start);
+        let frozen = self.honored_directive_in_gap(comment_start, expr.span().start);
 
         // Expression doc with any nested comments, under the host's own embed (this head
         // is measured where it sits, unlike an unprefixed `{…}` value), plus the clarity
         // parens an assignment owes (`{...(a = b)}`, `{@attach (a = b)}`).
         let value_doc = self.build_head_value_doc(expr, frozen, &self.embed);
-        parts.push(self.wrap_value_clarity_parens(expr, value_doc));
+        let value_doc = self.wrap_value_clarity_parens(expr, value_doc);
 
-        // Trailing comments (between expression and `}`). A line comment last in the run
-        // ends the content with its own hardline — see [`HeadExpr`].
-        let (trailing_docs, ends_with_line_comment) =
-            self.trailing_comment_docs(expr.span().end, span_end - 1, frozen);
-        parts.extend(trailing_docs);
-
-        let content = d.concat(&parts);
-        let doc = if frozen {
-            self.indent_frozen_head(content)
-        } else {
-            content
-        };
-        self.build_prefixed_head_doc(
-            prefix,
-            HeadExpr {
-                doc,
-                frozen,
-                ends_with_line_comment,
-            },
-            "}",
-        )
+        // The head's CONTENT only — the prefix and the `}` are the assembler's
+        // (`Printer::build_prefixed_head_doc`), which is what lets one shape serve both
+        // verdicts.
+        let head =
+            self.assemble_head_expr(value_doc, comment_start, expr.span(), span_end - 1, frozen);
+        self.build_prefixed_head_doc(prefix, head, "}")
     }
 
     //
@@ -819,8 +796,9 @@ impl<'a> Printer<'a> {
             // `build_leading_js_comment_doc`) breaks the group from inside.
             self.wrap_in_block_structure(head.doc, head.ends_with_line_comment)
         } else if is_hugged || head.ends_with_line_comment {
-            // Hugged: the expression's internal doc handles wrapping
-            d.braces(head.doc)
+            // Hugged: the expression's internal doc handles wrapping — and this arm supplies
+            // no indent of its own, so it is the one that owes the continuation indent.
+            d.braces(self.hug_head_content(head))
         } else {
             // Block structure for other expressions
             self.wrap_in_block_structure(head.doc, false)
@@ -847,6 +825,13 @@ impl<'a> Printer<'a> {
     /// block-wrapped anyway, so the two together are the
     /// [`Printer::trailing_comment_docs`] `closer_owns_break` question: an indented content's
     /// break cannot serve a closer sitting outside that indent.
+    ///
+    /// A leading line comment hangs the value the same way
+    /// ([`Printer::leading_line_comment_hangs_value`]) and so answers that question too — but
+    /// unlike the two above it cannot apply its own indent here, because which of this head's
+    /// callers-of-a-caller supplies one is decided *after* this returns (`is_hugged` and
+    /// `ends_with_line_comment` pick between hugged braces and block structure). It rides out
+    /// on [`HeadExpr::owes_continuation_indent`] for whichever arm hugs.
     fn build_expression_content_with_comments(
         &self,
         expr: &Expression<'_>,
@@ -858,16 +843,26 @@ impl<'a> Printer<'a> {
                 doc: self.build_unprefixed_value_doc(expr, false),
                 frozen: false,
                 ends_with_line_comment: false,
+                owes_continuation_indent: false,
             };
         };
         // The `{`→value gap: everything from just past the brace to the value's first byte.
         let value_start = expr.span().start;
-        let frozen = self.honored_directive_in_gap(span.start + 1, value_start);
+        let gap_start = span.start + 1;
+        let frozen = self.honored_directive_in_gap(gap_start, value_start);
 
-        let leading_comments = self.leading_comment_docs(span.start + 1, value_start);
+        let leading_comments = self.leading_comment_docs(gap_start, value_start);
         let expr_doc = self.build_unprefixed_value_doc(expr, frozen);
-        let (trailing_comments, ends_with_line_comment) =
-            self.trailing_comment_docs(expr.span().end, span.end - 1, frozen || always_block);
+        // Every arm the caller can pick indents the content when this is true — the
+        // block-wrapping ones by their own structure, the hugging ones by paying
+        // `owes_continuation_indent` — so the closer's answer is the same either way, and it
+        // is taken here, above the run.
+        let hangs = self.leading_line_comment_hangs_value(gap_start, value_start, frozen);
+        let (trailing_comments, ends_with_line_comment) = self.trailing_comment_docs(
+            expr.span().end,
+            span.end - 1,
+            frozen || always_block || hangs,
+        );
 
         HeadExpr {
             doc: self.concat_with_surrounding_comments(
@@ -877,6 +872,7 @@ impl<'a> Printer<'a> {
             ),
             frozen,
             ends_with_line_comment,
+            owes_continuation_indent: hangs && !always_block,
         }
     }
 
@@ -1183,7 +1179,7 @@ impl<'a> Printer<'a> {
             // the freeze would be lost on the second pass.
             return self.wrap_in_block_structure(head.doc, head.ends_with_line_comment);
         }
-        d.concat(&[d.text("{"), head.doc, d.text("}")])
+        d.concat(&[d.text("{"), self.hug_head_content(head), d.text("}")])
     }
 
     /// Check if an attribute is a shorthand: {name} where value is ExpressionTag(Identifier(name))
