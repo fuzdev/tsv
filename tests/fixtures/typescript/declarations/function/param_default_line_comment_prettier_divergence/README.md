@@ -3,12 +3,14 @@
 A line comment after a function parameter's `=` default, before the default
 value (`function fn(p = // c\n\tv) {}`).
 
-**tsv**: keeps the comment after `=`, with the value on the next line:
+**tsv**: keeps the comment after `=`, with the value on a continuation line
+indented one level (the uniform forced-continuation indent, matching the
+declarator's value hang):
 
 ```
 function fn(
 	p = // c
-	v
+		v
 ) {}
 ```
 
