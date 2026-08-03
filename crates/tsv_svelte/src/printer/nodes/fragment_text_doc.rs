@@ -206,6 +206,13 @@ impl<'a> Printer<'a> {
         // passes.
         let next_is_flow =
             next_node.is_some_and(|n| self.is_inline_el_or_comp(n)) || comment_glued_next_flow;
+        // The two flow-follower kinds answer every boundary question below identically — the
+        // trailing-`line` decision and both halves of `break_before_wide_flow` — so the union is
+        // named once. Which member of a welded unit crosses the width cannot matter, and how far
+        // the measured unit extends past the follower is the RENDER walk's question alone
+        // (`flow_lookahead`), so a build-side split between the two would be a distinction the
+        // walk cannot see.
+        let next_is_flow_or_tag = next_is_flow || next_is_tag;
         // Whether the *previous* sibling is a block element — prettier trims a boundary
         // whitespace adjacent to a block but does NOT then wrap the next inline element in
         // `group([line, el])` (`handleWhitespaceOfPrevTextNode = !isBlockElement(prevNode)`),
@@ -604,34 +611,33 @@ impl<'a> Printer<'a> {
             add_trailing_space = false;
             trailing_hardlines = if trailing_ws_newlines >= 2 { 2 } else { 1 };
         } else if has_trailing_ws && !is_last && position.next_is_inline() {
-            if is_first || next_is_tag {
-                // First child or middle child before tag: trailing line in fill. Unconditional —
-                // the `breakable_exprs` hard-width carve-out (plain trailing space when the run
-                // holds another break-capable tag) is deleted; see the leading branch.
-                add_trailing_space = false;
-                trailing_line = true;
-                if !is_first {
-                    trim_right = true;
-                }
-            } else if next_is_flow {
-                // Middle child before a flowing inline element / component (space-only
-                // boundary): end the fill with a trailing `line` so the boundary breaks per width
-                // inside the fill — the `next_is_flow` boundary, which keeps the run idempotent.
-                // A `group([line, node])` here breaks all-or-nothing and flip-flops across passes
-                // (the Fill-idempotency bug class).
+            if is_first || next_is_flow_or_tag {
+                // One boundary, one answer: a first child, and a middle child before a tag or
+                // before a flowing inline element / component, all end the fill with a trailing
+                // `line`, so the boundary breaks per width INSIDE the fill — which is what keeps
+                // the run idempotent. A `group([line, node])` here breaks all-or-nothing and
+                // flip-flops across passes (the Fill-idempotency bug class).
                 //
-                // Deliberately NOT `multiline`-gated: the boundary is the same pairwise fill
-                // question however the container's content came to lay out multiline. Gated, a
-                // width-broken inline container (span/td — content collapsible, so
-                // `MultilineCause::None`) routed this boundary to the `group([line, element])`
-                // wrap below, and when the element then folded with its terminal trailing text
-                // the group measured the ENTIRE fold flat — element plus every trailing word —
-                // so the run broke before the element far under printWidth
-                // (`inline_multi_element_pack_long`; a block container at the same width packed
-                // pairwise, the same-source-different-position tell).
-                trim_right = true;
+                // Two conditions that used to split these cases apart are deliberately gone, and
+                // both removals are load-bearing:
+                // - the `breakable_exprs` hard-width carve-out (a plain trailing space when the
+                //   run held another break-capable tag) — see the leading branch;
+                // - the `multiline` gate on the flow follower. `multiline` is the CONTAINER's
+                //   `MultilineCause`, so a width-broken inline container (span/td — content
+                //   collapsible, hence `None`) routed this boundary to the `group([line, element])`
+                //   wrap below, and when the element then folded with its terminal trailing text
+                //   the group measured the ENTIRE fold flat — element plus every trailing word —
+                //   so the run broke before the element far under printWidth
+                //   (`inline_multi_element_pack_long` / `…_boundary_long_prettier_divergence`; a
+                //   block container at the same width packed pairwise, the
+                //   same-source-different-position tell).
+                //
+                // The boundary is the same pairwise fill question however the container's content
+                // came to lay out multiline, and whatever flow node follows it.
                 add_trailing_space = false;
                 trailing_line = true;
+                // A first child's leading boundary is the parent's, already trimmed.
+                trim_right = !is_first;
             } else if !is_first {
                 // Remaining inline callers (a non-flow follower — e.g. a comment): wrap the
                 // next element with `group([line, element])`.
@@ -763,7 +769,7 @@ impl<'a> Printer<'a> {
                 // source-keyed follower set here was a two-pass hazard: a glued BLOCK follower
                 // detaches by its own layout, so its weld survives only in the source, and
                 // pass 2 re-classified the boundary pass 1 had measured.
-                trailing_line && (next_is_flow || next_is_tag)
+                trailing_line && next_is_flow_or_tag
             } else {
                 // GLUED half: no separator — the boundary in front of the last word is the
                 // break point, and ANY tag joins: the welded word+tag pair is the smallest
@@ -771,7 +777,7 @@ impl<'a> Printer<'a> {
                 // fill_glued_tag_travel_long), and the render walk extends the measurement
                 // through whatever glue actually SURVIVES in the output, stopping at the
                 // first non-glued entry.
-                next_is_flow || next_is_tag
+                next_is_flow_or_tag
             };
             let fill_doc = if break_before_wide_flow || glued_lead {
                 d.with_context(
