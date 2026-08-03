@@ -263,22 +263,44 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Emit a `hardline` after an own-line comment in a per-line comment list,
-    /// preserving an author blank line as a leading `literalline` when the source
-    /// left one between `comment_end` and `next` (the following own-line comment, or
-    /// the element the comments lead). The blank-preserving counterpart to a bare
-    /// `hardline` separator.
+    /// The separator after one comment in a per-line comment list, where an author
+    /// blank line between `comment_end` and `next` (the following own-line comment, or
+    /// the element the comments lead) **forces a `hardline`** and carries the blank as a
+    /// leading `literalline`; without one the caller's `sep` stands.
+    ///
+    /// The single statement of "does an author blank survive here?" — always asked with
+    /// [`Self::has_blank_line_between_strict`], never the table-only
+    /// [`Self::has_blank_line_between`], whose newline count can be met by a delimiter
+    /// the printer emits between two spans (see that method's rustdoc: reading one as a
+    /// blank is a one-shot non-idempotency). A site that re-derives this pays that bug.
+    pub(crate) fn push_blank_preserving_separator(
+        &self,
+        parts: &mut DocBuf,
+        comment_end: u32,
+        next: u32,
+        sep: DocId,
+    ) {
+        let d = self.d();
+        if self.has_blank_line_between_strict(comment_end, next) {
+            parts.push(d.literalline());
+            parts.push(d.hardline());
+        } else {
+            parts.push(sep);
+        }
+    }
+
+    /// [`Self::push_blank_preserving_separator`] with the `hardline` separator — the
+    /// blank-preserving counterpart to a bare `hardline`, for a run whose comments each
+    /// take their own line unconditionally. The common case; a run whose non-blank
+    /// separator is collapsible (a conditional branch's soft `line`) calls the general
+    /// form.
     pub(crate) fn push_blank_preserving_hardline(
         &self,
         parts: &mut DocBuf,
         comment_end: u32,
         next: u32,
     ) {
-        let d = self.d();
-        if self.has_blank_line_between_strict(comment_end, next) {
-            parts.push(d.literalline());
-        }
-        parts.push(d.hardline());
+        self.push_blank_preserving_separator(parts, comment_end, next, self.d().hardline());
     }
 
     /// Whether `[from, next)` holds a **truly blank line** — two newlines with nothing
@@ -620,7 +642,8 @@ impl<'a> Printer<'a> {
             // a body block's `{`"). Only meaningful where the separator is a `hardline`:
             // an inline run has no lines to separate.
             let blank_before = prev_was_line
-                && prev_end.is_some_and(|p| self.has_blank_line_between(p, comment.span.start));
+                && prev_end
+                    .is_some_and(|p| self.has_blank_line_between_strict(p, comment.span.start));
 
             match spacing {
                 CommentSpacing::Leading => {
@@ -701,9 +724,25 @@ impl<'a> Printer<'a> {
         let mut comments = comments_to_emit_in_range(self.comments, start, end).peekable();
         while let Some(comment) = comments.next() {
             parts.push(self.build_comment_doc(comment));
-            let next = comments.peek().map_or(end, |n| n.span.start);
+            let emit_next = comments.peek().map_or(end, |n| n.span.start);
+            // **in source**: both the hang question and the blank measure anchor on the
+            // physically next comment, not the next one *this* builder emits, so an
+            // owned comment sitting between two emitted ones can't desync them — and it
+            // is the same anchor the selecting gate uses
+            // (`comments_force_own_line_between` walks `comments_in_source_range`), so
+            // gate and emitter answer the one question identically.
+            let next = self.blank_scan_end(comment.span.end, emit_next);
             if self.comment_hangs_next(comment, next) {
-                parts.push(d.hardline());
+                // An authored blank line survives wherever the break it separates
+                // survives. Here the break is FORCED — a `//` runs to end-of-line, an
+                // own-line multiline block would reflow — so the blank is authoring
+                // intent, not layout this continuation gets to collapse. Same answer as
+                // the value side of these very constructs
+                // (`build_comments_between_filtered_opt`'s blank arm); the two emitters
+                // used to answer it two ways. See conformance_prettier.md §Authored
+                // breaks in value position. Only meaningful across a `hardline`: an
+                // inline run has no lines to separate.
+                self.push_blank_preserving_hardline(&mut parts, comment.span.end, next);
             } else {
                 parts.push(d.text(" "));
             }
@@ -750,19 +789,18 @@ impl<'a> Printer<'a> {
             let next = self.blank_scan_end(comment.span.end, emit_next);
             if self.comment_hugs_next(comment, next) {
                 parts.push(d.text(" "));
-            } else if self.has_blank_line_between(comment.span.end, next) {
+            } else {
                 // An author blank after the comment is itself a break trigger
                 // (prettier breaks the conditional on it too), so the break is
                 // forced and the blank survives — the conditional-branch
                 // carve-out in conformance_prettier.md §Authored breaks in
                 // value position. The expression printer routes blank gaps to
                 // its breaking layout before building a run
-                // (`comment_followed_by_blank`), so this arm serves the
-                // conditional-type branches.
-                parts.push(d.literalline());
-                parts.push(d.hardline());
-            } else {
-                parts.push(soft_sep);
+                // (`comment_followed_by_blank`), so that arm serves the
+                // conditional-type branches. Without a blank the caller's
+                // collapsible `soft_sep` stands — the one thing that makes this
+                // run differ from `push_leading_run_separator`.
+                self.push_blank_preserving_separator(&mut parts, comment.span.end, next, soft_sep);
             }
         }
         if parts.is_empty() {
@@ -1024,7 +1062,7 @@ impl<'a> Printer<'a> {
             } else if comment.is_block
                 && !self.is_own_line_comment(comment)
                 && !(glue.blank_forces_own_line()
-                    && self.has_blank_line_between(comment.span.end, next))
+                    && self.has_blank_line_between_strict(comment.span.end, next))
             {
                 // A block with a newline *after* its `*/` but none before its `/*`:
                 // prettier's `printLeadingComment` emits a soft `line` here, so what

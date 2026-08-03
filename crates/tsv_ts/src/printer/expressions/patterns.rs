@@ -728,76 +728,33 @@ impl<'a> Printer<'a> {
         match prop {
             ObjectPatternProperty::Property(p) => {
                 if p.shorthand {
-                    // Get the default value's right-hand side if present
-                    // Parser may produce AssignmentPattern or AssignmentExpression
-                    let default_rhs = match &p.value {
-                        Expression::AssignmentPattern(pat) => Some(&pat.right),
-                        Expression::AssignmentExpression(assign) => Some(&assign.right),
-                        _ => None,
-                    };
-
-                    if let Some(rhs) = default_rhs {
-                        // Shorthand with default: `{k /* c */ = 1}`
-                        let key_end = p.key.span().end;
-                        let rhs_start = rhs.span().start;
-                        // Zero-comment fast gate: one binary search over the whole
-                        // `key = default` gap. On the comment-free shorthand default
-                        // (the common case) the `=`-locating byte scan and both
-                        // per-side comment probes are skipped and it renders as
-                        // `key = default`. Canonical reference:
-                        // build_params_doc_with_comments.
-                        let gap_has_comments =
-                            self.has_comments_on_page_between(key_end, rhs_start);
-                        let eq_pos = if gap_has_comments {
-                            self.find_equals_position(key_end, rhs_start)
-                        } else {
-                            rhs_start
-                        };
-                        let key_doc = self.build_expression_doc(&p.key);
-                        let mut head: DocBuf = smallvec![key_doc];
-                        let mut tail: DocBuf = DocBuf::new();
-                        // Comment(s) before `=`: a glued block stays inline
-                        // (`k /* c */ = 1`); a line comment — or a multiline block the
-                        // author broke after — trails the key and drops `= default` to
-                        // a continuation line indented one level (uniform
-                        // forced-continuation indent), so the `=` can't be swallowed
-                        // (`k // c⏎= 1`). tsv preserves the authored position —
-                        // prettier relocates the comment to trail the whole `k = 1`
-                        // binding.
-                        let pre_eq_hang = gap_has_comments
-                            .then(|| self.route_pre_separator_gap(&mut head, key_end, eq_pos))
-                            .flatten();
-                        tail.push(d.text(if pre_eq_hang.is_some() { "= " } else { " = " }));
-                        // A block comment after `=` inlines onto the value; a line
-                        // comment hangs it, the value indented — the shared pattern
-                        // value-gap seam, same as the param default's.
-                        let rhs_doc = self.build_expression_doc(rhs);
-                        if gap_has_comments
-                            && self.has_comments_to_emit_between(eq_pos + 1, rhs_start)
-                        {
-                            tail.push(self.build_pattern_value_gap_doc(
-                                eq_pos + 1,
-                                rhs_start,
-                                rhs_doc,
-                            ));
-                        } else {
-                            tail.push(rhs_doc);
-                        }
-                        let tail_doc = d.concat(&tail);
-                        // A hanging pre-`=` comment left `= default` on its own line;
-                        // the shared continuation seam emits the comment run and
-                        // indents the tail so it reads as this binding's continuation,
-                        // not a sibling property.
-                        match pre_eq_hang {
-                            Some((start, end)) => {
-                                head.push(self.build_continuation_indent(start, end, tail_doc));
-                            }
-                            None => head.push(tail_doc),
-                        }
-                        d.concat(&head)
-                    } else {
-                        // Simple shorthand: `{k}`
-                        self.build_expression_doc(&p.key)
+                    // A shorthand default (`{ k = 1 }`) parses as
+                    // `Property{shorthand, key: k, value: AssignmentPattern{left: k,
+                    // right: 1}}`, so the *value* is already the whole `k = 1` binding
+                    // and prints through `build_assignment_pattern_doc` — the same
+                    // builder every other binding default uses (array element,
+                    // non-shorthand property, standalone parameter). Delegating rather
+                    // than re-deriving `key = default` here is load-bearing: this arm
+                    // used to reach into `pat.right` directly and so never acquired
+                    // that builder's `=`→value freeze (`value_head_frozen_span`) or its
+                    // `ParenContext::DefaultValue` wrap, making the shorthand the one
+                    // position where an own-line `prettier-ignore` was ignored and an
+                    // `AssignmentExpression` default lost its required parens
+                    // (`{ k = (a = 1) }`).
+                    //
+                    // `p.value` can never be a bare `AssignmentExpression` here:
+                    // `ObjectPatternProperty::Property` is built at exactly one site
+                    // (`object_property_to_pattern`), which routes the value through
+                    // `to_assignable`, and that converts every `AssignmentExpression`
+                    // into an `AssignmentPattern`.
+                    debug_assert!(
+                        !matches!(&p.value, Expression::AssignmentExpression(_)),
+                        "a pattern property's value is converted to an AssignmentPattern"
+                    );
+                    match &p.value {
+                        // Simple shorthand: `{k}` — the value repeats the key.
+                        Expression::Identifier(_) => self.build_expression_doc(&p.key),
+                        _ => self.build_expression_doc(&p.value),
                     }
                 } else {
                     // Handle computed keys: {[key]: value}

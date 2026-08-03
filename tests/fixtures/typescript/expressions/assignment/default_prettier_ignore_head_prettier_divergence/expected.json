@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 400,
+	"end": 514,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -105,24 +105,56 @@
 					"column": 21
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " an object-shorthand default is the same head",
+			"start": 392,
+			"end": 439,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 48
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 460,
+			"end": 478,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 3
+				},
+				"end": {
+					"line": 26,
+					"column": 21
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 399,
+		"end": 513,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 390,
+			"end": 504,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 22,
+					"line": 29,
 					"column": 9
 				}
 			},
@@ -628,6 +660,202 @@
 							"value": " an array-pattern default is the same head",
 							"start": 280,
 							"end": 324
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 441,
+					"end": 503,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 447,
+							"end": 502,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 7
+								},
+								"end": {
+									"line": 28,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 447,
+								"end": 496,
+								"loc": {
+									"start": {
+										"line": 24,
+										"column": 7
+									},
+									"end": {
+										"line": 28,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 451,
+										"end": 493,
+										"loc": {
+											"start": {
+												"line": 25,
+												"column": 2
+											},
+											"end": {
+												"line": 27,
+												"column": 14
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 451,
+											"end": 454,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 2
+												},
+												"end": {
+													"line": 25,
+													"column": 5
+												}
+											},
+											"name": "mmm"
+										},
+										"value": {
+											"type": "AssignmentPattern",
+											"start": 451,
+											"end": 493,
+											"loc": {
+												"start": {
+													"line": 25,
+													"column": 2
+												},
+												"end": {
+													"line": 27,
+													"column": 14
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 451,
+												"end": 454,
+												"loc": {
+													"start": {
+														"line": 25,
+														"column": 2
+													},
+													"end": {
+														"line": 25,
+														"column": 5
+													}
+												},
+												"name": "mmm"
+											},
+											"right": {
+												"type": "BinaryExpression",
+												"start": 482,
+												"end": 493,
+												"loc": {
+													"start": {
+														"line": 27,
+														"column": 3
+													},
+													"end": {
+														"line": 27,
+														"column": 14
+													}
+												},
+												"left": {
+													"type": "Identifier",
+													"start": 482,
+													"end": 485,
+													"loc": {
+														"start": {
+															"line": 27,
+															"column": 3
+														},
+														"end": {
+															"line": 27,
+															"column": 6
+														}
+													},
+													"name": "nnn"
+												},
+												"operator": "+",
+												"right": {
+													"type": "Identifier",
+													"start": 490,
+													"end": 493,
+													"loc": {
+														"start": {
+															"line": 27,
+															"column": 11
+														},
+														"end": {
+															"line": 27,
+															"column": 14
+														}
+													},
+													"name": "ooo"
+												},
+												"leadingComments": [
+													{
+														"type": "Line",
+														"value": " prettier-ignore",
+														"start": 460,
+														"end": 478
+													}
+												]
+											}
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 499,
+								"end": 502,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 5
+									},
+									"end": {
+										"line": 28,
+										"column": 8
+									}
+								},
+								"name": "ppp"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an object-shorthand default is the same head",
+							"start": 392,
+							"end": 439
 						}
 					]
 				}
