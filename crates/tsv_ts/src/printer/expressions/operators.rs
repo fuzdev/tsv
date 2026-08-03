@@ -37,8 +37,15 @@ enum BinaryChainStyle {
     /// Prettier's `isInsideParenthesis` is true. In these contexts, logical chain
     /// breaks must be controlled by the parent condition group, not a sub-group.
     UngroupedCondition,
-    /// First operand at base indent, continuation lines indented (for attribute contexts)
+    /// First operand at base indent, continuation lines indented — the positions
+    /// where prettier's shouldNotIndent chain yields false (nested binary
+    /// operands, an Embedded expression root, ternary tests under
+    /// return/throw/call/new).
     ContinuationIndent,
+    /// `ContinuationIndent` without the outer group wrapper, for contexts where
+    /// the caller controls grouping (the comment-aware twin for inline-paren
+    /// chains).
+    ContinuationIndentUngrouped,
 }
 
 /// How a `SequenceExpression`'s own grouping parens are emitted. One 3-valued mode
@@ -320,41 +327,16 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Build a Doc for a binary expression
-    ///
-    /// Implements prettier's "add parens for clarity" behavior where mixing certain
-    /// operators requires parentheses for readability:
-    /// - `a && b || c` → `(a && b) || c` (mixing && and ||)
-    /// - `a || b && c` → `a || (b && c)`
-    /// - `a == b == c` → `(a == b) == c` (chained equality)
-    /// - `x + (y + z)` → preserves right-side parens for same precedence
-    ///
-    /// Also supports line wrapping for long binary expressions:
-    /// ```text
-    /// a +
-    /// b +
-    /// c
-    /// ```
-    ///
-    /// In inline embedded contexts (e.g., Svelte template expressions `{...}`),
-    /// continuation lines get extra indentation to align with the outer context.
-    ///
-    /// See: prettier/src/language-js/print/binaryish.js
-    pub(in crate::printer) fn build_binary_doc(
-        &self,
-        binary: &internal::BinaryExpression<'_>,
-    ) -> DocId {
-        // Use continuation indent in embedded expression contexts (Svelte template expressions).
-        // This matches Prettier where JsExpressionRoot parent triggers the normal indent path
-        // (group([head, indent(rest)])) vs the shouldNotIndent path (group(parts)).
-        if self.embed.is_embedded() {
-            self.build_binary_chain_doc_with_continuation_indent(binary)
-        } else {
-            self.build_binary_chain_doc(binary)
-        }
-    }
-
     /// Build a doc for a chain of binary operators with line wrapping support
+    ///
+    /// The default binary layout — what a `BinaryExpression` gets from the generic
+    /// `build_expression_doc` dispatch, in every context (standalone and embedded
+    /// alike; the one root-position exception is `build_root_expression_doc`).
+    /// Contexts wanting a different style key it at the call site, mirroring
+    /// prettier's parent-keyed shouldNotIndent chain (binaryish.js:97): call args
+    /// and array elements take `build_binary_chain_doc_indented`, return/throw and
+    /// conditions the ungrouped variants, nested binary operands the continuation
+    /// style.
     ///
     /// When the chain exceeds print width, breaks after operators:
     /// ```text
@@ -363,6 +345,9 @@ impl<'a> Printer<'a> {
     /// c
     /// ```
     ///
+    /// Implements prettier's "add parens for clarity" behavior where mixing certain
+    /// operators requires parentheses for readability (`a && b || c` →
+    /// `(a && b) || c`, chained equality, right-side same-precedence parens).
     /// Flattens same-precedence operators that can be chained (e.g., a + b + c)
     /// but preserves parentheses where needed for clarity (e.g., a * b / c).
     ///
@@ -414,8 +399,11 @@ impl<'a> Printer<'a> {
     ///   third
     /// ```
     ///
-    /// This is used in attribute contexts (like Svelte's `={...}`) where prettier uses
-    /// this specific indentation style.
+    /// The style for the positions where prettier's shouldNotIndent chain yields
+    /// false: a nested binary operand (parenthesized or not,
+    /// `build_binary_operand_doc`), an Embedded expression root
+    /// (`build_root_expression_doc`), and a ternary test under
+    /// return/throw/call/new.
     pub(in crate::printer) fn build_binary_chain_doc_with_continuation_indent(
         &self,
         binary: &internal::BinaryExpression<'_>,
@@ -423,41 +411,24 @@ impl<'a> Printer<'a> {
         self.build_binary_chain_doc_core(binary, BinaryChainStyle::ContinuationIndent)
     }
 
-    /// Build binary chain with continuation indent WITHOUT group wrapper
+    /// Build binary chain with continuation indent WITHOUT the outer group wrapper
     ///
-    /// Use this when the caller controls grouping (e.g., chain printing context).
-    /// Handles comments between operands correctly.
+    /// Use this when the caller controls grouping: the one caller is
+    /// `build_binary_chain_parts_indented`'s comment-aware twin hand-off
+    /// (`prepare_binary_chain_layout`, inline-paren contexts).
     pub(in crate::printer) fn build_binary_chain_parts_with_continuation_indent(
         &self,
         binary: &internal::BinaryExpression<'_>,
     ) -> DocId {
-        // Collect all operands (with spans) and operators in the chain
-        let mut operands: OperandBuf = OperandBuf::new();
-        let mut operators: OperatorBuf = OperatorBuf::new();
-        self.collect_binary_chain_with_spans(binary, &mut operands, &mut operators);
-
-        if operands.len() <= 1 {
-            // Single operand, shouldn't happen but handle gracefully
-            return self.build_expression_doc(binary.left);
-        }
-
-        let should_inline_last = super::assignment::should_inline_logical_expression(binary);
-        let should_group = Self::should_group_binary_continuation(binary);
-        let chain = self.build_binary_chain_continuation_indent_parts(
-            &operands,
-            &operators,
-            should_inline_last,
-            should_group,
-        );
-        self.wrap_chain_with_paren_comments(binary, &operands, chain)
+        self.build_binary_chain_doc_core(binary, BinaryChainStyle::ContinuationIndentUngrouped)
     }
 
     /// Core implementation for binary chain doc building
     ///
-    /// Handles three styles:
-    /// - `Grouped`: Wrapped in a group, flat structure (standalone binary expressions)
-    /// - `Ungrouped`: No group wrapper, flat structure (conditions where parent controls breaking)
-    /// - `ContinuationIndent`: First operand at base, rest indented (attribute contexts)
+    /// One body for every `BinaryChainStyle` (the variants document themselves):
+    /// the flat styles route through `build_binary_chain_flat`, the
+    /// continuation-indent pair through
+    /// `build_binary_chain_continuation_indent{,_parts}`.
     fn build_binary_chain_doc_core(
         &self,
         binary: &internal::BinaryExpression<'_>,
@@ -502,7 +473,7 @@ impl<'a> Printer<'a> {
         // Prettier ref: binaryish.js:275, 361
         let should_inline_last = super::assignment::should_inline_logical_expression(binary);
 
-        // For ContinuationIndent, we separate first operand from the rest
+        // For the continuation-indent styles, we separate first operand from the rest
         // For other styles, we build a flat parts list
         let chain = match style {
             BinaryChainStyle::ContinuationIndent => self.build_binary_chain_continuation_indent(
@@ -511,6 +482,13 @@ impl<'a> Printer<'a> {
                 should_inline_last,
                 should_group,
             ),
+            BinaryChainStyle::ContinuationIndentUngrouped => self
+                .build_binary_chain_continuation_indent_parts(
+                    &operands,
+                    &operators,
+                    should_inline_last,
+                    should_group,
+                ),
             _ => self.build_binary_chain_flat(
                 &operands,
                 &operators,
@@ -1079,41 +1057,29 @@ impl<'a> Printer<'a> {
             ParenContext::BinaryLeft { parent_op }
         };
 
-        // For binary expressions that need parens, use continuation indent so that
-        // when the inner binary breaks, its continuation lines are indented.
-        // This gives: `(first &&\n\t\tsecond)` not `(first &&\n\tsecond)`
+        // A nested binary sub-expression uses continuation indent, parenthesized or
+        // not: prettier's shouldNotIndent (binaryish.js:96-115) evaluates to false
+        // when the parent is BinaryExpression (none of the conditions match), so the
+        // inner chain gets indent(rest) — when it breaks, its continuation lines are
+        // indented (`(first &&\n\t\tsecond)` not `(first &&\n\tsecond)`; likewise
+        // `0.5 * a(...) * b(...)` inside `... + 1.0` indents the `*` continuation
+        // lines relative to `0.5`).
         //
-        // Context-dependent behavior:
-        // - Script contexts (LayoutMode::Standalone): Use group with parens INSIDE
-        //   so the fit calculation includes `)`. This ensures `(A + B) *` at 101 chars
-        //   breaks inside the parens, not just at `*`.
-        // - Embedded expression contexts (LayoutMode::Embedded): Use the grouped
-        //   approach from build_binary_chain_doc_with_continuation_indent, which keeps
-        //   short 2-operand binaries flat (Prettier's behavior for template expressions).
-        if self.needs_parens(operand, ctx) {
-            if let Expression::BinaryExpression(inner_binary) = operand {
-                if self.embed.is_embedded() {
-                    // Embedded expression context: use grouped approach that keeps short binaries flat
-                    let inner_doc =
-                        self.build_binary_chain_doc_with_continuation_indent(inner_binary);
-                    return d.parens(inner_doc);
-                }
-                // Script context: include parens in group for proper line width calculation
-                let inner_parts =
-                    self.build_binary_chain_parts_with_continuation_indent(inner_binary);
-                return d.group(d.parens(inner_parts));
-            }
-            let operand_doc = self.build_chain_aware_operand_doc(operand);
-            d.parens(operand_doc)
-        } else if let Expression::BinaryExpression(inner_binary) = operand {
-            // Nested binary sub-expressions use continuation indent.
-            // Prettier's shouldNotIndent (binaryish.js:96-115) evaluates to false when
-            // parent is BinaryExpression (none of the conditions match), so the inner
-            // chain gets indent(rest). E.g., `0.5 * a(...) * b(...)` inside `... + 1.0`
-            // indents the `*` continuation lines relative to `0.5`.
+        // One shape for every context. A `group(parens(parts))` twin — parens inside
+        // the group so the fit reserved `)` — used to be the Standalone parenthesized
+        // arm; the renderer's lookahead fits (`rest_commands`) measures the `)`
+        // either way now, and the two shapes are output-identical over the full
+        // fixture corpus, so the mode split retired with the depth-blind
+        // `is_embedded()` keying.
+        let operand_doc = if let Expression::BinaryExpression(inner_binary) = operand {
             self.build_binary_chain_doc_with_continuation_indent(inner_binary)
         } else {
             self.build_chain_aware_operand_doc(operand)
+        };
+        if self.needs_parens(operand, ctx) {
+            d.parens(operand_doc)
+        } else {
+            operand_doc
         }
     }
 

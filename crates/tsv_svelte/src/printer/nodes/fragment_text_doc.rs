@@ -613,17 +613,28 @@ impl<'a> Printer<'a> {
                 if !is_first {
                     trim_right = true;
                 }
-            } else if multiline && next_is_flow {
-                // Multiline middle child before a flowing inline element / component (space-only
+            } else if next_is_flow {
+                // Middle child before a flowing inline element / component (space-only
                 // boundary): end the fill with a trailing `line` so the boundary breaks per width
                 // inside the fill — the `next_is_flow` boundary, which keeps the run idempotent.
                 // A `group([line, node])` here breaks all-or-nothing and flip-flops across passes
                 // (the Fill-idempotency bug class).
+                //
+                // Deliberately NOT `multiline`-gated: the boundary is the same pairwise fill
+                // question however the container's content came to lay out multiline. Gated, a
+                // width-broken inline container (span/td — content collapsible, so
+                // `MultilineCause::None`) routed this boundary to the `group([line, element])`
+                // wrap below, and when the element then folded with its terminal trailing text
+                // the group measured the ENTIRE fold flat — element plus every trailing word —
+                // so the run broke before the element far under printWidth
+                // (`inline_multi_element_pack_long`; a block container at the same width packed
+                // pairwise, the same-source-different-position tell).
                 trim_right = true;
                 add_trailing_space = false;
                 trailing_line = true;
             } else if !is_first {
-                // Non-multiline inline callers: wrap the next element with `group([line, element])`.
+                // Remaining inline callers (a non-flow follower — e.g. a comment): wrap the
+                // next element with `group([line, element])`.
                 trim_right = true;
                 add_trailing_space = false;
                 *handle_whitespace_of_prev_text = true;

@@ -53,9 +53,13 @@ enum BinaryChainLayout {
 }
 
 impl<'a> Printer<'a> {
-    /// Print an expression using doc-based formatting
+    /// Print an expression using doc-based formatting.
+    ///
+    /// The `format_expression` string entry — an expression ROOT under the caller's
+    /// embed, so it routes through the same root keying as the doc-building entry
+    /// (`build_expression_doc_with_comments`).
     pub(crate) fn print_expression(&mut self, expression: &Expression<'_>) {
-        let doc = self.build_expression_doc(expression);
+        let doc = self.build_root_expression_doc(expression);
         self.write_arena_doc(doc);
     }
 
@@ -102,6 +106,32 @@ impl<'a> Printer<'a> {
         self.prepend_owned_leading_comment(expr, doc)
     }
 
+    /// Build the doc for an embedding host's expression ROOT (a Svelte `{expr}` value).
+    ///
+    /// The single position where the host's `LayoutMode` decides binary chain style: an
+    /// Embedded root binary takes ContinuationIndent — the template `{…}` value indents
+    /// continuation lines one level past the first operand (prettier reaches the same
+    /// shape through its svelte expression-root wrapper). Every NESTED binary inside the
+    /// expression formats exactly as it would in a `<script>` — the parent position keys
+    /// the style (assignment layouts flush, call args and array elements indent),
+    /// mirroring prettier's parent-keyed shouldNotIndent chain (binaryish.js:97) — which
+    /// is what keeps TS formatting context-free below the root. A Standalone-mode root
+    /// (`{@const}`'s init, inheriting the host document's mode) stays Grouped: its
+    /// assignment layout owns the indent, and ContinuationIndent would stack on top.
+    ///
+    /// The chain builder does not prepend an owned leading comment (a JSDoc cast or
+    /// bundler annotation glued to the first operand) — `build_expression_doc` owns that
+    /// seam — so the direct-call arm replicates it.
+    pub(crate) fn build_root_expression_doc(&self, expr: &Expression<'_>) -> DocId {
+        if self.embed.is_embedded()
+            && let Expression::BinaryExpression(binary) = expr
+        {
+            let doc = self.build_binary_chain_doc_with_continuation_indent(binary);
+            return self.prepend_owned_leading_comment(expr, doc);
+        }
+        self.build_expression_doc(expr)
+    }
+
     fn build_expression_doc_dispatch(&self, expr: &Expression<'_>) -> DocId {
         let d = self.d();
 
@@ -140,7 +170,7 @@ impl<'a> Printer<'a> {
             Expression::ArrayExpression(arr) => self.build_array_doc(arr),
             Expression::UnaryExpression(unary) => self.build_unary_doc(unary),
             Expression::UpdateExpression(update) => self.build_update_doc(update),
-            Expression::BinaryExpression(binary) => self.build_binary_doc(binary),
+            Expression::BinaryExpression(binary) => self.build_binary_chain_doc(binary),
             Expression::CallExpression(call) => {
                 self.is_expression_statement.set(was_expr_stmt);
                 self.build_call_doc(call)
@@ -1152,7 +1182,7 @@ impl<'a> Printer<'a> {
 
         if operands.len() <= 1 {
             // Nothing chained after flattening — the ordinary binary doc says it better.
-            return BinaryChainLayout::Built(self.build_binary_doc(binary));
+            return BinaryChainLayout::Built(self.build_binary_chain_doc(binary));
         }
 
         BinaryChainLayout::Operands(operands, operators)

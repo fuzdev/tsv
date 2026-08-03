@@ -33,9 +33,12 @@ pub enum LayoutMode {
     #[default]
     Standalone,
     /// The doc tree is a fragment embedded inside another language's output
-    /// (e.g., a TS expression inside a Svelte `{...}` template tag). Binary
-    /// expressions use ContinuationIndent style here, matching Prettier's
-    /// `JsExpressionRoot` parent → `shouldNotIndent = true` semantics.
+    /// (e.g., a TS expression inside a Svelte `{...}` template tag). A binary
+    /// at the expression ROOT uses ContinuationIndent style here (the `{…}`
+    /// value indents its continuation lines) — root only, decided at the
+    /// embedding entry (`build_root_expression_doc`); every nested binary
+    /// formats identically to a `<script>`, keyed by its parent position the
+    /// way Prettier's `shouldNotIndent` parent chain does.
     Embedded,
 }
 
