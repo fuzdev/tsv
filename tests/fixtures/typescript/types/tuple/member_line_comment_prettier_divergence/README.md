@@ -17,6 +17,6 @@ type N = [
 Per Comment Position Philosophy, tsv preserves the comment's authored position.
 Emitting it inline (the previous behavior) let the `//` **swallow** the element
 type — non-idempotent content loss; the line comment now forces the break (the
-shared `build_trailing_comments_break_for_line` / `build_leading_comments_break_for_line`).
+shared `build_trailing_comments_hang_next`).
 
 See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).

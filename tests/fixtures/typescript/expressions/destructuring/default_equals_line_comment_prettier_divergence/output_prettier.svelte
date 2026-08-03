@@ -19,4 +19,15 @@
 	function g(
 		d = 1 // c
 	) {}
+
+	// Non-shorthand destructuring: the binding sits after the `:`.
+	const {
+		k: v = 1 // c
+	} = obj;
+
+	// A run whose last comment is a block: the block and the `=` still take the
+	// continuation line the first comment forced.
+	function h(
+		/* c2 */ e = 1 // c1
+	) {}
 </script>

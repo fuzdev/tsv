@@ -764,16 +764,10 @@ impl<'a> Printer<'a> {
                         // (`k // c⏎= 1`). tsv preserves the authored position —
                         // prettier relocates the comment to trail the whole `k = 1`
                         // binding.
-                        let pre_eq_hangs = gap_has_comments
-                            && self.comments_force_own_line_between(key_end, eq_pos);
-                        if !pre_eq_hangs
-                            && gap_has_comments
-                            && let Some(pre_eq_comments) =
-                                self.build_inline_comments_between_doc_opt(key_end, eq_pos)
-                        {
-                            head.push(pre_eq_comments);
-                        }
-                        tail.push(d.text(if pre_eq_hangs { "= " } else { " = " }));
+                        let pre_eq_hang = gap_has_comments
+                            .then(|| self.route_pre_separator_gap(&mut head, key_end, eq_pos))
+                            .flatten();
+                        tail.push(d.text(if pre_eq_hang.is_some() { "= " } else { " = " }));
                         // A block comment after `=` inlines onto the value; a line
                         // comment hangs it, the value indented — the shared pattern
                         // value-gap seam, same as the param default's.
@@ -794,10 +788,11 @@ impl<'a> Printer<'a> {
                         // the shared continuation seam emits the comment run and
                         // indents the tail so it reads as this binding's continuation,
                         // not a sibling property.
-                        if pre_eq_hangs {
-                            head.push(self.build_continuation_indent(key_end, eq_pos, tail_doc));
-                        } else {
-                            head.push(tail_doc);
+                        match pre_eq_hang {
+                            Some((start, end)) => {
+                                head.push(self.build_continuation_indent(start, end, tail_doc));
+                            }
+                            None => head.push(tail_doc),
                         }
                         d.concat(&head)
                     } else {
@@ -830,9 +825,9 @@ impl<'a> Printer<'a> {
                     // Set when a pre-`:` comment hangs what follows: the whole
                     // `: local` tail then drops to a continuation line.
                     let mut hang_range: Option<(u32, u32)> = None;
-                    // Set when an after-`:` comment hangs the local: the value drops
-                    // to a continuation line indented one level.
-                    let mut value_hang: Option<(u32, u32)> = None;
+                    // Set when the after-`:` gap holds comments: the shared value-gap
+                    // seam emits them and hangs the local when one forces a break.
+                    let mut value_gap: Option<(u32, u32)> = None;
                     if self.has_comments_to_emit_between(key_region_end, value_start) {
                         #[allow(clippy::expect_used)]
                         // Parser guarantees `:` exists in destructuring property
@@ -852,34 +847,23 @@ impl<'a> Printer<'a> {
                         // swallow `: b } = o` — content loss). tsv preserves the
                         // authored position — prettier hoists the comment to lead the
                         // whole property.
-                        if self.comments_force_own_line_between(key_region_end, colon_pos) {
-                            hang_range = Some((key_region_end, colon_pos));
-                        } else if let Some(pre_colon_comments) =
-                            self.build_inline_comments_between_doc_opt(key_region_end, colon_pos)
-                        {
-                            parts.push(pre_colon_comments);
-                        }
+                        hang_range =
+                            self.route_pre_separator_gap(&mut parts, key_region_end, colon_pos);
                         tail.push(d.text(": "));
                         // Comments after `:`: a glued block inlines onto the local; a
                         // line comment — or an own-line multiline block — hangs it,
                         // the local indented one level so it reads as this property's
                         // value, not a sibling (the same rule as the `=`→value gaps
-                        // above).
-                        if self.comments_force_own_line_between(colon_pos + 1, value_start) {
-                            value_hang = Some((colon_pos + 1, value_start));
-                        } else if let Some(after_colon_comments) = self
-                            .build_inline_comments_between_doc_trailing_space_opt(
-                                colon_pos + 1,
-                                value_start,
-                            )
-                        {
-                            tail.push(after_colon_comments);
+                        // above). The shared seam owns that choice — the caller only
+                        // says the gap holds comments.
+                        if self.has_comments_to_emit_between(colon_pos + 1, value_start) {
+                            value_gap = Some((colon_pos + 1, value_start));
                         }
                     } else {
                         tail.push(d.text(": "));
                     }
                     let value_doc = self.build_expression_doc(&p.value);
-                    match value_hang {
+                    match value_gap {
                         Some((start, end)) => {
                             tail.push(self.build_pattern_value_gap_doc(start, end, value_doc));
                         }
@@ -1194,21 +1178,18 @@ impl<'a> Printer<'a> {
             rhs_start
         };
 
-        // Comment(s) before `=` (e.g., `{a /* c */ = 1}`): a block comment stays
-        // glued; a line comment trails the left and breaks so the `=` drops to the
-        // next line and can't swallow it (`a // c⏎= 1`). tsv preserves the authored
-        // position — prettier relocates the comment to trail the whole binding.
+        // Comment(s) before `=` (e.g., `{a /* c */ = 1}`): a glued block stays inline;
+        // a line comment — or a multiline block the author broke after — trails the
+        // left and drops `= value` to a continuation line indented one level (uniform
+        // forced-continuation indent), so the `=` can't be swallowed (`a // c⏎= 1`).
+        // tsv preserves the authored position — prettier relocates the comment to
+        // trail the whole binding. The shorthand default's key→`=` gap is the same
+        // rule on the same seams (`build_object_pattern_property_doc`).
+        let mut head: DocBuf = smallvec![left_doc];
         let mut tail: DocBuf = DocBuf::new();
-        let mut pre_eq_line_break = false;
-        let eq_text = if gap_has_comments && self.has_comments_to_emit_between(left_end, eq_pos) {
-            tail.push(self.build_leading_comments_break_for_line(left_end, eq_pos));
-            pre_eq_line_break = comments_to_emit_in_range(self.comments, left_end, eq_pos)
-                .last()
-                .is_some_and(|c| !c.is_block);
-            if pre_eq_line_break { "= " } else { " = " }
-        } else {
-            " = "
-        };
+        let pre_eq_hang = gap_has_comments
+            .then(|| self.route_pre_separator_gap(&mut head, left_end, eq_pos))
+            .flatten();
 
         // The `=`→value head: an own-line directive there freezes the whole default.
         // The directive also keeps its own line, unlike the ordinary own-line comment
@@ -1228,7 +1209,7 @@ impl<'a> Printer<'a> {
                 Some(comments_doc) => d.concat(&[comments_doc, frozen_doc]),
                 None => frozen_doc,
             };
-            tail.push(d.text(if pre_eq_line_break { "=" } else { " =" }));
+            tail.push(d.text(if pre_eq_hang.is_some() { "=" } else { " =" }));
             tail.push(hang_after_operator(d, rhs));
         } else {
             // A block comment after `=` inlines onto the value (`a = /* c */ b`),
@@ -1249,17 +1230,18 @@ impl<'a> Printer<'a> {
                     rhs_doc
                 };
 
-            tail.push(d.text(eq_text));
+            tail.push(d.text(if pre_eq_hang.is_some() { "= " } else { " = " }));
             tail.push(value_doc);
         }
         let tail_doc = d.concat(&tail);
-        // A pre-`=` line comment broke `= value` onto its own line; indent it so it
-        // reads as this binding's continuation, not a sibling element.
-        if pre_eq_line_break {
-            d.concat(&[left_doc, d.indent(tail_doc)])
-        } else {
-            d.concat(&[left_doc, tail_doc])
+        // A hanging pre-`=` comment left `= value` on its own line; the shared
+        // continuation seam emits the comment run and indents the tail so it reads as
+        // this binding's continuation, not a sibling element.
+        match pre_eq_hang {
+            Some((start, end)) => head.push(self.build_continuation_indent(start, end, tail_doc)),
+            None => head.push(tail_doc),
         }
+        d.concat(&head)
     }
 
     /// Build a Doc for a rest element

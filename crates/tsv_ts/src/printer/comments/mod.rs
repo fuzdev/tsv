@@ -781,56 +781,6 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Leading-spacing counterpart of [`Self::build_trailing_comments_hang_next`]: a
-    /// leading space before each comment, and a line comment forces the *following*
-    /// content onto a new line (`hardline`) so it can't be swallowed. A block comment
-    /// glues to the following token (` /* c */X`), matching the inline `Leading` form.
-    /// Use where the comment leads the next token across a gap that would otherwise glue
-    /// it *and* the following token stays **flush** rather than taking the uniform
-    /// forced-continuation indent. Two callers, and only the first can reach the hardline
-    /// branch:
-    ///
-    /// - a pattern/parameter default's left→`=` gap (`{ a // c⏎= 1 }`,
-    ///   `build_assignment_pattern_doc`), whose caller pairs this with its own
-    ///   `pre_eq_line_break` spacing dance — the last flush member of the before-`=`
-    ///   family;
-    /// - the *type*-level indexed-access object→`[` gap, which can hold **only** a
-    ///   single-line block: a type's index suffix may not follow a line break, so a line
-    ///   comment or a multiline block there means the source never parsed as an indexed
-    ///   access at all (`type X = A // c⏎[K];` is `type X = A;` plus an
-    ///   `ArrayExpression` statement).
-    ///
-    /// The pre-keyword and pre-separator gaps that once shared this emitter — a mapped
-    /// type's key→`in` / constraint→`as`, a named tuple member's label→`:` — now take the
-    /// continuation indent instead ([`Printer::route_pre_keyword_gap`],
-    /// [`Printer::build_continuation_indent`]); prefer those at a new site, and reach for
-    /// this one only when the tail is deliberately flush.
-    ///
-    /// Deliberately **line-only**, unlike its trailing counterpart: this builder is called
-    /// unconditionally rather than behind
-    /// [`Printer::comments_force_own_line_between`], so there is no gate for it to
-    /// contradict, and an own-line multiline block collapsing here is idempotent.
-    pub(crate) fn build_leading_comments_break_for_line(&self, start: u32, end: u32) -> DocId {
-        let d = self.d();
-        let mut parts = DocBuf::new();
-        // The separating space belongs before a comment that continues a line — the
-        // first, or one following a block. A comment that follows a hardline starts
-        // its line at the indent, so a space there is a stray leading space.
-        let mut after_hardline = false;
-        for comment in comments_to_emit_in_range(self.comments, start, end) {
-            if !after_hardline {
-                parts.push(d.text(" "));
-            }
-            parts.push(self.build_comment_doc(comment));
-            after_hardline = !comment.is_block;
-            if after_hardline {
-                parts.push(d.hardline());
-            }
-        }
-        // `concat` short-circuits the no-comments-in-range case to `empty()`.
-        d.concat(&parts)
-    }
-
     /// Build a Doc for inline comments, returning None if no comments.
     ///
     /// Use this instead of `has_comments_to_emit_between` + `build_inline_comments_between_doc`
