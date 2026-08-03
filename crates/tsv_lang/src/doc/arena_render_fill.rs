@@ -613,7 +613,13 @@ fn flow_lookahead(arena: &DocArena, rest_commands: &[ArenaCommand]) -> SmallVec<
     let mut first = deeper.len();
     while first > 0 {
         match arena.welded_entry(deeper[first - 1].doc) {
-            WeldedEntry::NotGlued => break,
+            WeldedEntry::NotGlued => {
+                // Burial tripwire: a marker sitting as this entry's first structural child
+                // means a wrapping builder hid it from `welded_entry` (debug builds only).
+                #[cfg(debug_assertions)]
+                arena.debug_check_buried_welded_marker(deeper[first - 1].doc);
+                break;
+            }
             WeldedEntry::TextRun | WeldedEntry::Atom(_) => first -= 1,
         }
     }
