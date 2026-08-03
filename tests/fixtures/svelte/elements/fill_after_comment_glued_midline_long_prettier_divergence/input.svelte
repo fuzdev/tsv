@@ -7,8 +7,10 @@
 	overflows mid-line at 104 but fits at line start (it moves, and now fits at exactly 100); the
 	unit is wider than a whole line at 101 (it moves anyway — the break is spent, the limit still
 	is not met); the boundary in FRONT of the unit is itself glued, so the unit cannot move at all
-	and the break travels further left, to the space inside the preceding run. Prettier welds the
-	unit to the preceding word and lets the line run over — see output_prettier.svelte.
+	and the break travels further left, to the space inside the preceding run; and the unit sits
+	MID-RUN after a wide word with nothing after it, where the move DOES meet the limit.
+	Prettier welds the unit to the preceding word and lets the line run over — see
+	output_prettier.svelte.
 -->
 <p>
 	foo <!--pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14 pad15-->text1
@@ -28,4 +30,9 @@
 	foo
 	0<!--pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9 pad10 pad11 pad12 pad13 pad14 pad15 pad16-->text1
 	text2
+</p>
+<p>
+	word1 word2 word3 word4 word5 word6 word7 word8
+	xxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxxx
+	<!--pad1 pad2 pad3 pad4 pad5 pad6 pad7 pad8 pad9-->text1
 </p>
