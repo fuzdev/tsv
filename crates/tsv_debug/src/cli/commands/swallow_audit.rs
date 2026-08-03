@@ -2,13 +2,13 @@ use argh::FromArgs;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use crate::audit::sweep::check_formatted_min;
+use crate::audit::sweep::{
+    FIXTURES_FORMATTED_MIN, PristineSweep, check_formatted_min, sweep_pristine_armed,
+};
 use crate::cli::CliError;
-use tsv_cli::cli::format_source::format_source;
-use tsv_cli::cli::input::ParserType;
 use tsv_lang::doc::swallow::{self, SwallowReport};
 
-use super::profile::{is_input_invalid_fixture, resolve_seed_files};
+use super::profile::resolve_seed_files;
 
 /// Audit for line comments that swallow the following token.
 ///
@@ -16,6 +16,12 @@ use super::profile::{is_input_invalid_fixture, resolve_seed_files};
 /// each file, reporting every spot where a `//` line comment is followed by
 /// content on the same physical output line (silent content loss). Pure Rust —
 /// no Deno. Defaults to `tests/fixtures` when no paths are given.
+///
+/// The corpus walk is the shared [`sweep_pristine_armed`], so the skip buckets
+/// (and the vacuity pin they feed) mean the same thing here as in the other
+/// as-authored audits. Panics are counted, not gated — the panic gates own that
+/// class, and over this corpus `roundtrip:audit` formats the same tree without a
+/// `catch_unwind` at all.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "swallow_audit")]
 pub struct SwallowAuditCommand {
@@ -34,17 +40,6 @@ struct Violation {
     report: SwallowReport,
 }
 
-/// REGRESSION PIN (minimum, at the exact measured value): files formatted on a
-/// default (`tests/fixtures`) run — with an empty or all-parse-failing corpus
-/// the audit would pass vacuously ("0 swallows across 0 files"). A minimum,
-/// not a two-sided pin, because the fixtures tree is COMMITTED and grows with
-/// ordinary fixture PRs (`deno task check` must not fail per added fixture);
-/// shrinkage/collapse fails. Re-pin to current when it trips. Measured 5,742
-/// on 2026-07-06 (after the `index_signature_close_bracket_line_comment` F5
-/// reclassification deleted its two prettier-claim files); same ritual as
-/// `benches/js/lib/gate_counts.ts`.
-const FORMATTED_MIN: usize = 5_742;
-
 impl SwallowAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let default_paths = self.paths.is_empty();
@@ -56,43 +51,34 @@ impl SwallowAuditCommand {
         swallow::set_swallow_check(true);
 
         let mut violations: Vec<Violation> = Vec::new();
-        let mut formatted = 0usize;
-        let mut parse_errors = 0usize;
-
-        for path in &files {
-            // Skip fixtures expected to fail parsing.
-            if is_input_invalid_fixture(path) {
-                continue;
-            }
-            let Ok(source) = std::fs::read_to_string(path) else {
-                continue;
-            };
-            // Drain any stragglers, then format and collect.
-            let _ = swallow::take_swallow_reports();
-            if format_source(&source, ParserType::from_extension(&path.to_string_lossy())).is_err()
-            {
-                parse_errors += 1;
-                continue;
-            }
-            formatted += 1;
-            for report in swallow::take_swallow_reports() {
-                violations.push(Violation {
-                    path: path.clone(),
-                    report,
-                });
-            }
-        }
+        let sweep = sweep_pristine_armed(
+            &files,
+            // Drain before each format, so a report left behind by a seed the
+            // sweep skipped (rejected, panicked) can't be attributed to the
+            // next file.
+            || {
+                let _ = swallow::take_swallow_reports();
+            },
+            |path, _parser, _source, _output| {
+                for report in swallow::take_swallow_reports() {
+                    violations.push(Violation {
+                        path: path.to_path_buf(),
+                        report,
+                    });
+                }
+            },
+        );
 
         swallow::set_swallow_check(false);
 
         if self.json {
-            print_json(&violations, formatted, parse_errors);
+            print_json(&violations, &sweep);
         } else {
-            print_report(&violations, formatted, parse_errors);
+            print_report(&violations, &sweep);
         }
 
         if default_paths {
-            check_formatted_min(formatted, FORMATTED_MIN)?;
+            check_formatted_min(sweep.formatted, FIXTURES_FORMATTED_MIN)?;
         }
 
         if violations.is_empty() {
@@ -103,16 +89,16 @@ impl SwallowAuditCommand {
     }
 }
 
-fn print_report(violations: &[Violation], formatted: usize, parse_errors: usize) {
+fn print_report(violations: &[Violation], sweep: &PristineSweep) {
+    let formatted = sweep.formatted;
+    let skipped = sweep.skipped_note();
     if violations.is_empty() {
-        println!(
-            "✓ no line-comment swallows across {formatted} files ({parse_errors} parse-skipped)"
-        );
+        println!("✓ no line-comment swallows across {formatted} files ({skipped})");
         return;
     }
 
     println!(
-        "✗ {} swallow(s) across {} file(s) ({formatted} formatted, {parse_errors} parse-skipped)\n",
+        "✗ {} swallow(s) across {} file(s) ({formatted} formatted, {skipped})\n",
         violations.len(),
         violations
             .iter()
@@ -142,7 +128,7 @@ fn print_report(violations: &[Violation], formatted: usize, parse_errors: usize)
     }
 }
 
-fn print_json(violations: &[Violation], formatted: usize, parse_errors: usize) {
+fn print_json(violations: &[Violation], sweep: &PristineSweep) {
     let items: Vec<serde_json::Value> = violations
         .iter()
         .map(|v| {
@@ -155,8 +141,10 @@ fn print_json(violations: &[Violation], formatted: usize, parse_errors: usize) {
         })
         .collect();
     let output = serde_json::json!({
-        "formatted": formatted,
-        "parse_skipped": parse_errors,
+        "formatted": sweep.formatted,
+        "parse_skipped": sweep.parse_errors,
+        "read_skipped": sweep.read_errors,
+        "panicked": sweep.panics,
         "swallows": violations.len(),
         "violations": items,
     });

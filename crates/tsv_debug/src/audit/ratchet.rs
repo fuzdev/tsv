@@ -331,9 +331,10 @@ impl<K> GateDiff<K> {
 
 // ---------------------------------------------------------------------------
 // Consumer orchestration — the prose every ratchet-consuming audit was copying
-// into its `run()`. The three an always-compiled consumer reaches
-// (`fabrication_audit`, `width_audit`) are unconditional; the rest stay behind
-// `comment_check` with the injection audits that are their only callers.
+// into its `run()`. The ones an always-compiled consumer reaches
+// (`fabrication_audit`, `census_audit`, `width_audit`) are unconditional; the
+// rest stay behind `comment_check` with the injection audits that are their
+// only callers.
 // `compile_corpus_compare --ratchet` has its own path-keyed flow with different
 // semantics and keeps its own messages.
 // ---------------------------------------------------------------------------
@@ -372,13 +373,58 @@ pub(crate) fn refuse_narrowed_update(
 /// stale — findings are reported, never graded, and the run must not read as a passing gate.
 ///
 /// Not gated: `width_audit` is an ungated consumer (a narrowed run there is a *triage* run and
-/// always exits 0, which is exactly the shape that would otherwise read as a green gate).
+/// always exits 0, which is exactly the shape that would otherwise read as a green gate). An
+/// audit whose findings are bugs wherever they are found wants [`grade_narrowed_strictly`]
+/// instead — it still grades, just not against the snapshot.
 pub(crate) fn print_ratchet_skipped(narrowed: &[&'static str]) {
     eprintln!(
         "\n○ ratchet SKIPPED — {} narrows this run, and the snapshot pins the full default \
          one. Findings above are reported, NOT graded: this is not a passing gate.",
         narrowed.join(" / ")
     );
+}
+
+/// The verdict a narrowed (non-`--update`) run prints when the audit grades STRICTLY rather
+/// than consulting the snapshot — and the exit status that goes with it.
+///
+/// The sibling of [`print_ratchet_skipped`], and the wording is deliberately not shared with
+/// it. Both say the snapshot pins the full default run and was not read; they differ on what
+/// happens next, because the audits differ on what a finding MEANS off-corpus:
+///
+/// - `width_audit` has no zero to grade against — the sanctioned overruns are everywhere, so a
+///   narrowed run reports and exits 0. That is [`print_ratchet_skipped`]: a triage run, and its
+///   whole job is to say it is not a gate.
+/// - `fabrication_audit` / `census_audit` have a zero target wherever they are pointed (an
+///   invented blank, a lost comment — a bug in any subtree), so a narrowed run still GRADES.
+///   Strictly: against zero rather than against the snapshot, so a finding that is pinned on
+///   the default corpus fails here.
+///
+/// Which makes the notice load-bearing in both directions. A clean narrowed run proves less
+/// than the standing gate does (the snapshot went unread), and a failing one is not a ratchet
+/// regression — without the line, an exit-0 run that printed findings reads as a green gate,
+/// and an exit-1 run reads as a newly-broken pin.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] (after the verdict) when `findings` is non-zero.
+pub(crate) fn grade_narrowed_strictly(
+    narrowed: &[&'static str],
+    noun: &str,
+    findings: usize,
+) -> Result<(), CliError> {
+    let flags = narrowed.join(" / ");
+    if findings == 0 {
+        println!(
+            "\n✓ no {noun}s — {flags} narrows this run, so the snapshot was NOT consulted. \
+             Graded STRICTLY instead: here every {noun} fails, pinned or not."
+        );
+        return Ok(());
+    }
+    eprintln!(
+        "\n✗ {findings} file(s) with {noun}s — {flags} narrows this run, so the snapshot was \
+         NOT consulted. Graded STRICTLY instead: every {noun} above fails, pinned or not."
+    );
+    Err(CliError::Failed)
 }
 
 /// The `--update` epilogue for the never-pinnable class: a PANIC key is deliberately NOT
@@ -538,5 +584,20 @@ mod tests {
             "cmd",
         );
         assert_eq!(r.parse_known::<ToyKey>().err(), Some(CliError::Failed));
+    }
+
+    /// A narrowed run of a zero-target audit still GRADES — the notice is a verdict, not a
+    /// skip. The counterpart to [`print_ratchet_skipped`], which always exits 0.
+    #[test]
+    fn a_narrowed_strict_grade_fails_on_any_finding() {
+        assert_eq!(
+            grade_narrowed_strictly(&["explicit paths"], "toy", 0),
+            Ok(())
+        );
+        assert_eq!(
+            grade_narrowed_strictly(&["explicit paths"], "toy", 1).err(),
+            Some(CliError::Failed),
+            "a finding off the default corpus is news, snapshot or no snapshot"
+        );
     }
 }

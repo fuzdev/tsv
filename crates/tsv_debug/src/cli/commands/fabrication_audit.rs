@@ -2,9 +2,13 @@ use argh::FromArgs;
 use std::collections::BTreeSet;
 use std::path::PathBuf;
 
-use crate::audit::ratchet::{Ratchet, SnapshotKey, refuse_narrowed_update};
+use crate::audit::ratchet::{
+    Ratchet, SnapshotKey, grade_narrowed_strictly, refuse_narrowed_update,
+};
 use crate::audit::shape::markup_head;
-use crate::audit::sweep::{PristineSweep, check_formatted_min, sweep_pristine};
+use crate::audit::sweep::{
+    FIXTURES_FORMATTED_MIN, PristineSweep, check_formatted_min, sweep_pristine,
+};
 use crate::cli::CliError;
 
 use super::profile::resolve_seed_files;
@@ -45,14 +49,6 @@ pub struct FabricationAuditCommand {
     #[argh(positional)]
     paths: Vec<String>,
 }
-
-/// REGRESSION PIN (minimum, at the exact measured value): files formatted on a default
-/// (`tests/fixtures`) run — with an empty or all-parse-failing corpus the audit would pass
-/// vacuously ("0 fabrications across 0 files"). A minimum, not a two-sided pin, because the
-/// fixtures tree is COMMITTED and grows with ordinary fixture PRs (`deno task check` must not
-/// fail per added fixture); shrinkage/collapse fails. Same ritual as `swallow_audit`'s
-/// `FORMATTED_MIN` and `benches/js/lib/gate_counts.ts`.
-const FORMATTED_MIN: usize = 7_032;
 
 const SNAPSHOT_HEADER: &str = "\
 # Blank-fabrication ratchet — every line is a BUG, the file shrinking is the goal.
@@ -151,7 +147,7 @@ impl FabricationAuditCommand {
         }
 
         if default_paths {
-            check_formatted_min(sweep.pristine.formatted, FORMATTED_MIN)?;
+            check_formatted_min(sweep.pristine.formatted, FIXTURES_FORMATTED_MIN)?;
         }
 
         let ratchet = ratchet();
@@ -163,11 +159,7 @@ impl FabricationAuditCommand {
         // grading a narrowed one would call every unreached shape stale. Every fabrication is
         // news instead.
         if !default_paths {
-            return if sweep.fabrications.is_empty() {
-                Ok(())
-            } else {
-                Err(CliError::Failed)
-            };
+            return grade_narrowed_strictly(narrowed, "fabrication", sweep.fabrications.len());
         }
 
         ratchet.grade_and_report(
@@ -185,9 +177,9 @@ struct Sweep {
     fabrications: Vec<Fabrication>,
     /// Every fabrication shape seen, deduped — what the ratchet grades.
     shapes: BTreeSet<FabricationShape>,
-    /// The shared skip/format bookkeeping (the `FORMATTED_MIN` vacuity guard
-    /// reads `formatted`; panics are counted there, not gated here — the panic
-    /// gates own that class).
+    /// The shared skip/format bookkeeping (the [`check_formatted_min`] vacuity
+    /// guard reads `formatted`; panics are counted there, not gated here — the
+    /// panic gates own that class).
     pristine: PristineSweep,
 }
 

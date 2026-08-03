@@ -8,7 +8,9 @@ use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
 use crate::audit::ratchet::{Ratchet, SnapshotKey, print_ratchet_skipped, refuse_narrowed_update};
 use crate::audit::shape::{markup_head, name_run};
-use crate::audit::sweep::{PristineSweep, check_formatted_min, sweep_pristine};
+use crate::audit::sweep::{
+    FIXTURES_FORMATTED_MIN, PristineSweep, check_formatted_min, sweep_pristine,
+};
 use crate::cli::CliError;
 
 use super::profile::resolve_seed_files;
@@ -79,14 +81,6 @@ pub struct WidthAuditCommand {
     paths: Vec<String>,
 }
 
-/// REGRESSION PIN (minimum, at the exact measured value): files formatted on a default
-/// (`tests/fixtures`) run — with an empty or all-parse-failing corpus the audit would pass
-/// vacuously ("0 shapes across 0 files"). A minimum, not a two-sided pin, because the fixtures
-/// tree is COMMITTED and grows with ordinary fixture PRs (`deno task check` must not fail per
-/// added fixture); shrinkage/collapse fails. Same ritual (and the shared
-/// [`check_formatted_min`] guard) as `fabrication_audit`'s and `census_audit`'s.
-const FORMATTED_MIN: usize = 7_426;
-
 const SNAPSHOT_HEADER: &str = "\
 # Print-width ratchet — every line is a KIND of over-width output line that exists today.
 #
@@ -99,15 +93,25 @@ const SNAPSHOT_HEADER: &str = "\
 # over-width line fails, which is the shape a width bug takes.
 #
 # One line per shape, TAB-delimited: the language bucket, how the over-width line
-# OPENS, how it ENDS. Shapes rather than paths, so the snapshot is corpus-portable
-# and survives a fixture move. (The report renders the pair as `head…tail`; the
-# file keeps them as separate fields so a head that CONTAINS `…` — an elided prose
-# line — still round-trips.)
+# OPENS, whether a block/markup comment CLOSES inside it (`-` = no), how it ENDS.
+# Shapes rather than paths, so the snapshot is corpus-portable and survives a
+# fixture move. (The report renders the three as `head…tail`, or `head…inner…tail`
+# when a comment closes inside; the file keeps them as separate fields so a head
+# that CONTAINS `…` — an elided prose line — still round-trips.)
 #
 # The head/tail pair is the key because the head alone does NOT discriminate:
 # measured against the mid-run comment bug, a head-only key produced no new shape
 # at all while `head…tail` produced `IDENT…-->` — a long word running into a
 # comment, which is exactly what that bug emitted.
+#
+# `inner` is the third component, and it exists because the two ends alone let a
+# WELD hide in the fattest shapes. `<!--…-->` alone carries 45% of the over-width
+# lines, and every one of them is a SINGLE whole comment — a forced overrun, since
+# tsv never rewraps a comment interior. So the only bug that silhouette can hide is
+# two comments welded onto one line, and `inner` separates them: neither `-->` nor
+# `*/` can occur inside the comment it closes. Triage note: a `*/` inside a template
+# literal that BUILDS comment text reads as interior with no comment involved, so a
+# new `inner` shape is a question, not a verdict.
 #
 # A shape found but not pinned FAILS (a new kind of overrun — triage it against
 # §Print Width Philosophy before pinning). A pinned shape that no longer fires
@@ -118,7 +122,8 @@ const SNAPSHOT_HEADER: &str = "\
 
 const REPIN_HINT: &str = "deno task width:audit:update";
 
-/// One shape of over-width line: which language, and how the line opens and ends.
+/// One shape of over-width line: which language, how the line opens and ends, and whether a
+/// comment closes between the two.
 #[derive(Clone, Debug, PartialEq, Eq, PartialOrd, Ord)]
 struct WidthShape {
     /// The seed's language bucket — the same silhouette in TS and in Svelte markup comes from
@@ -126,37 +131,53 @@ struct WidthShape {
     lang: &'static str,
     /// How the line opens ([`head_shape`]).
     head: String,
+    /// What closes INSIDE the line ([`inner_shape`]) — `-` when nothing does.
+    inner: String,
     /// How the line ends ([`tail_shape`]).
     tail: String,
 }
 
 impl WidthShape {
-    /// The human rendering — the report's `head…tail` silhouette. Deliberately NOT the
-    /// snapshot line: `…` is a character a head can legitimately CONTAIN (a prose line opening
-    /// on an ellipsis), and a key that renders to a line it cannot parse back would fail the
-    /// gate as new-and-stale at once, with `--update` writing the same unparseable line
-    /// forever. So the display glues and the record keeps three fields.
+    /// The human rendering — the report's `head…tail` silhouette, with the interior spliced in
+    /// (`head…-->…tail`) when a comment closes inside. Deliberately NOT the snapshot line: `…`
+    /// is a character a head can legitimately CONTAIN (a prose line opening on an ellipsis),
+    /// and a key that renders to a line it cannot parse back would fail the gate as
+    /// new-and-stale at once, with `--update` writing the same unparseable line forever. So the
+    /// display glues and the record keeps four fields.
     fn render(&self) -> String {
-        format!("{}…{}", self.head, self.tail)
+        if self.inner == NO_INNER {
+            return format!("{}…{}", self.head, self.tail);
+        }
+        format!("{}…{}…{}", self.head, self.inner, self.tail)
     }
 }
 
 impl SnapshotKey for WidthShape {
     fn to_line(&self) -> String {
-        format!("{}\t{}\t{}", self.lang, self.head, self.tail)
+        format!(
+            "{}\t{}\t{}\t{}",
+            self.lang, self.head, self.inner, self.tail
+        )
     }
 
     fn from_line(line: &str) -> Option<Self> {
         let mut cols = line.split('\t');
         let lang = lang_from_bucket(cols.next()?)?;
         let head = cols.next()?.to_string();
+        let inner = cols.next()?.to_string();
         let tail = cols.next()?.to_string();
-        // A fourth column means the line is not this key's record — a head or tail can never
-        // hold a TAB (both come from a trimmed line), so an extra field is drift, not data.
+        // A fifth column means the line is not this key's record — no field can hold a TAB
+        // (they all come from a trimmed line), so an extra one is drift, not data. A line with
+        // three columns is the pre-`inner` spelling, and falls out above as a missing tail.
         if cols.next().is_some() {
             return None;
         }
-        Some(Self { lang, head, tail })
+        Some(Self {
+            lang,
+            head,
+            inner,
+            tail,
+        })
     }
 
     /// Every shape is pinnable — unlike the gap/blank audits' PANIC class there is no absolute
@@ -220,7 +241,7 @@ impl WidthAuditCommand {
 
         let full_run = narrowed.is_empty();
         if full_run {
-            check_formatted_min(sweep.pristine.formatted, FORMATTED_MIN)?;
+            check_formatted_min(sweep.pristine.formatted, FIXTURES_FORMATTED_MIN)?;
         }
 
         let ratchet = ratchet();
@@ -269,6 +290,7 @@ fn sweep_files(files: &[PathBuf]) -> Sweep {
             let shape = WidthShape {
                 lang: lang_bucket(parser),
                 head: head_shape(trimmed),
+                inner: inner_shape(trimmed),
                 tail: tail_shape(trimmed),
             };
             shapes.insert(shape.clone());
@@ -318,7 +340,9 @@ fn lang_from_bucket(s: &str) -> Option<&'static str> {
 /// keyword, then `IDENT` for any other name, then the raw character for a continuation line
 /// that opens on punctuation. Coarse on purpose, so the key survives an ordinary fixture edit.
 ///
-/// It is **half** of the key: on its own it does not discriminate (see the snapshot header).
+/// It is **one component** of the key: on its own it does not discriminate at all (see the
+/// snapshot header) — [`tail_shape`] is what makes the pair discriminate, and [`inner_shape`]
+/// is what keeps a weld out of the fattest pair.
 ///
 /// Note the comment arms come first: a `//`-opening line is not markup, so the order is a
 /// readability choice rather than a correctness one — but `<!--` IS both, and there the shared
@@ -344,6 +368,49 @@ fn head_shape(trimmed: &str) -> String {
         word
     } else {
         "IDENT".to_string()
+    }
+}
+
+/// The [`WidthShape::inner`] value for a line nothing closes inside — the overwhelming
+/// majority, and the one the report elides.
+const NO_INNER: &str = "-";
+
+/// What CLOSES inside an over-width line: `-->`, `*/`, both (`-->+*/`), or [`NO_INNER`].
+///
+/// The third component of the key, and the one that keeps a WELD from hiding behind the two
+/// ends. The ends alone put a whole-comment line and a two-comments-welded-onto-one-line in the
+/// same bucket — `<!-- a -->` and `<!-- a --><!-- b -->` both open `<!--` and end `-->`. That
+/// matters because the fattest shape by a wide margin is exactly that one, and every one of
+/// its lines is a single whole comment — so its members are FORCED overruns (tsv never rewraps
+/// a comment interior) and a weld is the only bug the silhouette could ever hide. Same for
+/// `/*…*/`, and the same weld class the trailing-run comment emitters have produced before.
+/// The distribution behind that claim is in
+/// [audits.md §Print-Width Audit](../../../../../docs/audits.md#print-width-audit-widthaudit).
+///
+/// A closer is interior when the line does not END on the FIRST one — enough on its own,
+/// because if the earliest closer sits at the end it is the only one.
+///
+/// Textual, like the rest of the key, and sound in the direction that matters: neither `-->`
+/// nor `*/` can occur inside the comment it closes, so a whole comment never reads as a weld.
+/// The residual is the mirror case — a `*/` or `-->` inside a string, template or regex, which
+/// this calls interior with no comment involved. There are none over `tests/fixtures`, the only
+/// corpus the ratchet grades; over real code they are a small minority, and even there a false
+/// one surfaces as a new shape to triage rather than a wrong verdict on a pinned one (a run
+/// pointed off the default corpus reports without grading). Rates measured, in the audits doc
+/// linked above.
+fn inner_shape(trimmed: &str) -> String {
+    let closes: Vec<&str> = ["-->", "*/"]
+        .into_iter()
+        .filter(|close| {
+            trimmed
+                .find(close)
+                .is_some_and(|i| i + close.len() < trimmed.len())
+        })
+        .collect();
+    if closes.is_empty() {
+        NO_INNER.to_string()
+    } else {
+        closes.join("+")
     }
 }
 
@@ -487,6 +554,7 @@ fn print_json(sweep: &Sweep) {
                 "width": o.width,
                 "lang": o.shape.lang,
                 "head": o.shape.head,
+                "inner": o.shape.inner,
                 "tail": o.shape.tail,
                 "excerpt": o.excerpt,
             })
@@ -510,7 +578,10 @@ fn print_json(sweep: &Sweep) {
 
 #[cfg(test)]
 mod tests {
-    use super::{WidthShape, excerpt, head_shape, lang_bucket, lang_from_bucket, tail_shape};
+    use super::{
+        NO_INNER, WidthShape, excerpt, head_shape, inner_shape, lang_bucket, lang_from_bucket,
+        tail_shape,
+    };
     use crate::audit::ratchet::SnapshotKey;
     use tsv_cli::cli::input::ParserType;
 
@@ -518,6 +589,7 @@ mod tests {
         WidthShape {
             lang,
             head: head.to_string(),
+            inner: NO_INNER.to_string(),
             tail: tail.to_string(),
         }
     }
@@ -525,16 +597,55 @@ mod tests {
     #[test]
     fn shape_round_trips_through_a_snapshot_line() {
         let s = shape("svelte", "IDENT", "-->");
-        assert_eq!(s.to_line(), "svelte\tIDENT\t-->");
+        assert_eq!(s.to_line(), "svelte\tIDENT\t-\t-->");
         assert_eq!(
             s.render(),
             "IDENT…-->",
-            "the report glues what the record splits"
+            "the report glues what the record splits, and elides an empty interior"
         );
-        let back = WidthShape::from_line("svelte\tIDENT\t-->").expect("parses");
+        let back = WidthShape::from_line("svelte\tIDENT\t-\t-->").expect("parses");
         assert_eq!(back.lang, "svelte");
         assert_eq!(back.head, "IDENT");
+        assert_eq!(back.inner, NO_INNER);
         assert_eq!(back.tail, "-->");
+    }
+
+    /// The weld the third component exists to separate: a whole comment and two comments
+    /// welded onto one line share both ends, so only the interior tells them apart.
+    #[test]
+    fn a_weld_is_a_different_shape_from_the_whole_comment_it_hid_behind() {
+        let whole = "<!-- one long comment that runs past the print width -->";
+        let weld = "<!-- one long comment --><!-- and a second welded onto it -->";
+        assert_eq!(head_shape(whole), head_shape(weld));
+        assert_eq!(tail_shape(whole), tail_shape(weld));
+        assert_eq!(inner_shape(whole), NO_INNER);
+        assert_eq!(inner_shape(weld), "-->");
+        // The block-comment twin, and a line holding both kinds.
+        assert_eq!(inner_shape("/* one long block comment */"), NO_INNER);
+        assert_eq!(inner_shape("/* one *//* and two */"), "*/");
+        assert_eq!(inner_shape("<!-- markup --> then /* block */"), "-->");
+        assert_eq!(
+            inner_shape("<!-- markup --> then /* block */ tail"),
+            "-->+*/"
+        );
+        // A comment that closes the line is not interior, however long the line.
+        assert_eq!(inner_shape("code(); // trailing"), NO_INNER);
+        assert_eq!(inner_shape(""), NO_INNER);
+    }
+
+    /// A round trip through the record with every field non-trivial — the interior is a field,
+    /// not a suffix on the tail, so a weld shape survives the snapshot unchanged.
+    #[test]
+    fn an_interior_closer_round_trips_and_renders_spliced() {
+        let s = WidthShape {
+            lang: "svelte",
+            head: "IDENT".to_string(),
+            inner: "-->".to_string(),
+            tail: "WORD".to_string(),
+        };
+        assert_eq!(s.to_line(), "svelte\tIDENT\t-->\tWORD");
+        assert_eq!(s.render(), "IDENT…-->…WORD");
+        assert_eq!(WidthShape::from_line(&s.to_line()).expect("parses"), s);
     }
 
     /// ⚠️ The reason the record is three fields rather than the report's `head…tail`: `…` is a
@@ -547,7 +658,7 @@ mod tests {
         let s = shape("svelte", "…", "WORD");
         let back = WidthShape::from_line(&s.to_line()).expect("parses");
         assert_eq!(back, s, "rendered by {:?}", s.to_line());
-        // Both halves at once — the shape a `…`-opened line ending in one takes.
+        // Both ends at once — the shape a `…`-opened line ending in one takes.
         let both = shape("svelte", "…", "…");
         assert_eq!(
             WidthShape::from_line(&both.to_line()).expect("parses"),
@@ -559,14 +670,17 @@ mod tests {
     /// grade as a live shape and mask a real one.
     #[test]
     fn a_malformed_snapshot_line_does_not_parse() {
-        assert!(WidthShape::from_line("rust\tIDENT\t-->").is_none());
+        assert!(WidthShape::from_line("rust\tIDENT\t-\t-->").is_none());
         assert!(WidthShape::from_line("svelte\tno-tail").is_none());
         assert!(WidthShape::from_line("no-tab-at-all").is_none());
         // The pre-3-field spelling: one TAB, the pair glued. Reading it as `head = "IDENT…-->"`
         // would pin a shape no run can ever produce.
         assert!(WidthShape::from_line("svelte\tIDENT…-->").is_none());
-        // A fourth field is drift too — neither half can hold a TAB.
-        assert!(WidthShape::from_line("svelte\tIDENT\t-->\textra").is_none());
+        // The pre-`inner` spelling: three fields, the interior missing. Reading it as
+        // `inner = "-->"` with no tail would pin a weld shape the run never produced.
+        assert!(WidthShape::from_line("svelte\tIDENT\t-->").is_none());
+        // A fifth field is drift too — no field can hold a TAB.
+        assert!(WidthShape::from_line("svelte\tIDENT\t-\t-->\textra").is_none());
     }
 
     /// Every bucket `lang_bucket` can emit must parse back, or a new language would write
