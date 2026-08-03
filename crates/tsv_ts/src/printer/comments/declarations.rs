@@ -6,7 +6,7 @@
 // heritage clauses (`extends` / `implements`).
 
 use super::layout::hang_after_operator;
-use super::{CommentSpacing, CommentVec, LeadingGlue, Printer};
+use super::{CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer};
 use crate::ast::internal;
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::comments_to_emit_in_range;
@@ -269,6 +269,48 @@ impl<'a> Printer<'a> {
             self.build_trailing_comments_hang_next(start, end),
             tail,
         ]))
+    }
+
+    /// Route a **pre-keyword** gap — the head→keyword half of a `<head> <keyword>
+    /// <value>` construct: a type parameter's name→`extends` / pre-`=`
+    /// (`types/type_params.rs`) and a mapped type's key→`in` / constraint→`as`
+    /// (`types/composite.rs`). A **line** comment defers the whole `<keyword> <value>`
+    /// tail to a continuation line (returns `Some(gap)` having pushed nothing — the
+    /// caller wraps its tail in [`Self::build_continuation_indent`]), else the gap's
+    /// inline block comments trail the head here (`<T /* c */ extends A>`,
+    /// `[K /* c */ in T]`) and the keyword stays inline (`None`). Pushing the keyword
+    /// inline after a `//` run would swallow it into the comment (content loss).
+    ///
+    /// Deliberately keyed on `has_line_comments_between` rather than
+    /// [`Printer::comments_force_own_line_between`]: at both sites prettier glues a
+    /// broke-after multiline block exactly as it glues a not-broke-after one, so —
+    /// unlike the pre-separator `:`/`=` gaps, where prettier distinguishes the two —
+    /// there is no authoring distinction to carry and tsv matches by gluing (the
+    /// switch-case head→`:` precedent). See conformance_prettier.md §Uniform
+    /// Forced-Continuation Indent.
+    ///
+    /// A caller whose keyword text carries its own separating space must split it in
+    /// two — `"in"`/`" in"` — since the continuation arm's leading space is
+    /// `build_continuation_indent`'s, and a second one after a hardline would be a
+    /// stray leading space on the continuation line.
+    pub(crate) fn route_pre_keyword_gap(
+        &self,
+        parts: &mut DocBuf,
+        gap_start: u32,
+        keyword_pos: u32,
+    ) -> Option<(u32, u32)> {
+        if self.has_line_comments_between(gap_start, keyword_pos) {
+            return Some((gap_start, keyword_pos));
+        }
+        if let Some(pre) = self.build_comments_between_filtered_opt(
+            gap_start,
+            keyword_pos,
+            CommentSpacing::Leading,
+            CommentFilter::All,
+        ) {
+            parts.push(pre);
+        }
+        None
     }
 
     /// When a **line** comment — or a multiline block the author broke after —

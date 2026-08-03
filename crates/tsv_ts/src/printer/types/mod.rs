@@ -545,15 +545,10 @@ impl<'a> Printer<'a> {
                     b':',
                 )
                 .map(|p| (p + 1) as u32); // +1 for after `:`
-                // Comments between label/`?` and `:` (e.g., `[b /* c */: T]`); a line
-                // comment breaks so it can't swallow the `:`.
-                if let Some(after_colon) = after_colon
-                    && self.has_comments_to_emit_between(after_modifier, after_colon - 1)
-                {
-                    parts.push(
-                        self.build_leading_comments_break_for_line(after_modifier, after_colon - 1),
-                    );
-                }
+                // The whole `: element` tail, built before the label/`?`→`:` gap is
+                // emitted so a line comment there can wrap it in the continuation
+                // indent below.
+                //
                 // A format-ignore directive in the `:`→element gap freezes a
                 // non-composite element type (`single_child_frozen`; a
                 // union/intersection element declines and freezes via its own walk —
@@ -561,44 +556,72 @@ impl<'a> Printer<'a> {
                 // directive — alone on its line by the placement floor — keeps its own
                 // line: the default emission below trails the first comment after `:`,
                 // a placement that reads as inert on the second pass.
-                if let Some(after_colon) = after_colon
-                    && self.single_child_frozen(after_colon, n.element_type)
-                {
-                    let frozen_doc = self.build_frozen_single_child_doc(n.element_type);
-                    parts.push(d.text(":"));
-                    self.append_keyword_value_line_comments(
-                        &mut parts,
-                        after_colon,
-                        type_start,
-                        frozen_doc,
+                let frozen_tail = after_colon.and_then(|after_colon| {
+                    self.single_child_frozen(after_colon, n.element_type)
+                        .then(|| {
+                            let frozen_doc = self.build_frozen_single_child_doc(n.element_type);
+                            let mut tail: DocBuf = smallvec![d.text(":")];
+                            self.append_keyword_value_line_comments(
+                                &mut tail,
+                                after_colon,
+                                type_start,
+                                frozen_doc,
+                            );
+                            d.concat(&tail)
+                        })
+                });
+                let tail = frozen_tail.unwrap_or_else(|| {
+                    // Comments between `:` and the element type; a line comment breaks so it
+                    // can't swallow the type.
+                    let comments_doc = after_colon.map_or_else(
+                        || d.empty(),
+                        |after_colon| {
+                            self.build_trailing_comments_hang_next(after_colon, type_start)
+                        },
                     );
-                    return d.concat(&parts);
+                    // A long union/intersection element hangs after `:` (redundant parens
+                    // stripped first); everything else stays inline after `: `.
+                    match self.unwrap_redundant_parens(n.element_type) {
+                        TSType::Union(u) => {
+                            let type_doc = self.build_union_type_doc(u);
+                            d.concat(&[
+                                d.text(":"),
+                                hang_after_operator(d, d.concat(&[comments_doc, type_doc])),
+                            ])
+                        }
+                        TSType::Intersection(i) => d.concat(&[
+                            d.text(": "),
+                            comments_doc,
+                            self.intersection_hanging_with_indent(i),
+                        ]),
+                        _ => d.concat(&[
+                            d.text(": "),
+                            comments_doc,
+                            self.build_type_doc(n.element_type),
+                        ]),
+                    }
+                });
+                // Comments between label/`?` and `:` (e.g., `[b /* c */: T]`). A **line**
+                // comment keeps the comment trailing the head and drops the whole
+                // `: element` tail to a continuation line indented one level (the uniform
+                // forced-continuation indent) — emitting the `:` inline after a `//` would
+                // swallow it. A block comment stays in its authored gap, glued to the `:`,
+                // which is prettier's form too. See conformance_prettier.md §Uniform
+                // Forced-Continuation Indent.
+                if let Some(colon_pos) = after_colon.map(|after_colon| after_colon - 1)
+                    && self.has_comments_to_emit_between(after_modifier, colon_pos)
+                {
+                    if self.has_line_comments_between(after_modifier, colon_pos) {
+                        parts.push(self.build_continuation_indent(after_modifier, colon_pos, tail));
+                        return d.concat(&parts);
+                    }
+                    parts.push(self.build_comments_between(
+                        after_modifier,
+                        colon_pos,
+                        CommentSpacing::Leading,
+                    ));
                 }
-                // Comments between `:` and the element type; a line comment breaks so it
-                // can't swallow the type.
-                let comments_doc = after_colon.map_or_else(
-                    || d.empty(),
-                    |after_colon| self.build_trailing_comments_hang_next(after_colon, type_start),
-                );
-                // A long union/intersection element hangs after `:` (redundant parens
-                // stripped first); everything else stays inline after `: `.
-                match self.unwrap_redundant_parens(n.element_type) {
-                    TSType::Union(u) => {
-                        let type_doc = self.build_union_type_doc(u);
-                        parts.push(d.text(":"));
-                        parts.push(hang_after_operator(d, d.concat(&[comments_doc, type_doc])));
-                    }
-                    TSType::Intersection(i) => {
-                        parts.push(d.text(": "));
-                        parts.push(comments_doc);
-                        parts.push(self.intersection_hanging_with_indent(i));
-                    }
-                    _ => {
-                        parts.push(d.text(": "));
-                        parts.push(comments_doc);
-                        parts.push(self.build_type_doc(n.element_type));
-                    }
-                }
+                parts.push(tail);
                 d.concat(&parts)
             }
             TSType::Infer(i) => {

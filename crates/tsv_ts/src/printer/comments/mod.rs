@@ -785,20 +785,31 @@ impl<'a> Printer<'a> {
     /// leading space before each comment, and a line comment forces the *following*
     /// content onto a new line (`hardline`) so it can't be swallowed. A block comment
     /// glues to the following token (` /* c */X`), matching the inline `Leading` form.
-    /// Use where the comment leads the next token across a gap that would otherwise
-    /// glue it (a mapped type's key-name→`in` gap, `[K // c⏎in B]`; a computed member's
-    /// object→`[` gap, `obj // c⏎[idx]`).
+    /// Use where the comment leads the next token across a gap that would otherwise glue
+    /// it *and* the following token stays **flush** rather than taking the uniform
+    /// forced-continuation indent. Two callers, and only the first can reach the hardline
+    /// branch:
+    ///
+    /// - a pattern/parameter default's left→`=` gap (`{ a // c⏎= 1 }`,
+    ///   `build_assignment_pattern_doc`), whose caller pairs this with its own
+    ///   `pre_eq_line_break` spacing dance — the last flush member of the before-`=`
+    ///   family;
+    /// - the *type*-level indexed-access object→`[` gap, which can hold **only** a
+    ///   single-line block: a type's index suffix may not follow a line break, so a line
+    ///   comment or a multiline block there means the source never parsed as an indexed
+    ///   access at all (`type X = A // c⏎[K];` is `type X = A;` plus an
+    ///   `ArrayExpression` statement).
+    ///
+    /// The pre-keyword and pre-separator gaps that once shared this emitter — a mapped
+    /// type's key→`in` / constraint→`as`, a named tuple member's label→`:` — now take the
+    /// continuation indent instead ([`Printer::route_pre_keyword_gap`],
+    /// [`Printer::build_continuation_indent`]); prefer those at a new site, and reach for
+    /// this one only when the tail is deliberately flush.
     ///
     /// Deliberately **line-only**, unlike its trailing counterpart: this builder is called
     /// unconditionally rather than behind
     /// [`Printer::comments_force_own_line_between`], so there is no gate for it to
     /// contradict, and an own-line multiline block collapsing here is idempotent.
-    ///
-    /// Note the *type*-level indexed-access object→`[` gap can hold **only** a single-line
-    /// block: a type's index suffix may not follow a line break, so a line comment or a
-    /// multiline block there means the source never parsed as an indexed access at all
-    /// (`type X = A // c⏎[K];` is `type X = A;` plus an `ArrayExpression` statement). The
-    /// hardline branch is live only at the gaps above, all of which permit the break.
     pub(crate) fn build_leading_comments_break_for_line(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
