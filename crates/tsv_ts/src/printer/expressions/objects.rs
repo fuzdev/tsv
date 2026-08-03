@@ -540,11 +540,12 @@ impl<'a> Printer<'a> {
             let colon_pos = self.find_colon_after(key_region_end);
             let value_start = prop.value.span().start;
 
-            // A line comment between the key and `:` keeps the comment after the key
-            // and drops `: value` to a continuation line indented one level (prettier
-            // relocates it to end-of-line — conformance_prettier.md §Comment
-            // relocation). Bypasses the assignment layout below.
-            if self.has_line_comments_between(key_region_end, colon_pos) {
+            // A line comment — or a multiline block the author broke after — between
+            // the key and `:` keeps the comment after the key and drops `: value` to
+            // a continuation line indented one level (prettier relocates it —
+            // conformance_prettier.md §Comment relocation), bypassing the assignment
+            // layout below; a glued block stays inline via the ordinary path.
+            if self.comments_force_own_line_between(key_region_end, colon_pos) {
                 let value_doc = {
                     let v = self.build_expression_doc(&prop.value);
                     let v = if self

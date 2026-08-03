@@ -754,29 +754,26 @@ impl<'a> Printer<'a> {
                             rhs_start
                         };
                         let key_doc = self.build_expression_doc(&p.key);
+                        let mut head: DocBuf = smallvec![key_doc];
                         let mut tail: DocBuf = DocBuf::new();
-                        // Comment(s) before `=`: a block comment stays glued
-                        // (`k /* c */ = 1`); a line comment trails the key and
-                        // breaks so the `=` drops to the next line and can't
-                        // swallow it (`k // c⏎= 1`). tsv preserves the authored
-                        // position — prettier relocates the comment to trail the
-                        // whole `k = 1` binding.
-                        let mut pre_eq_line_break = false;
-                        let eq_text = if gap_has_comments
-                            && self.has_comments_to_emit_between(key_end, eq_pos)
+                        // Comment(s) before `=`: a glued block stays inline
+                        // (`k /* c */ = 1`); a line comment — or a multiline block the
+                        // author broke after — trails the key and drops `= default` to
+                        // a continuation line indented one level (uniform
+                        // forced-continuation indent), so the `=` can't be swallowed
+                        // (`k // c⏎= 1`). tsv preserves the authored position —
+                        // prettier relocates the comment to trail the whole `k = 1`
+                        // binding.
+                        let pre_eq_hangs = gap_has_comments
+                            && self.comments_force_own_line_between(key_end, eq_pos);
+                        if !pre_eq_hangs
+                            && gap_has_comments
+                            && let Some(pre_eq_comments) =
+                                self.build_inline_comments_between_doc_opt(key_end, eq_pos)
                         {
-                            tail.push(self.build_leading_comments_break_for_line(key_end, eq_pos));
-                            // A trailing line comment left `=` at the start of a fresh
-                            // line (no leading space); a glued block keeps ` = `.
-                            pre_eq_line_break =
-                                comments_to_emit_in_range(self.comments, key_end, eq_pos)
-                                    .last()
-                                    .is_some_and(|c| !c.is_block);
-                            if pre_eq_line_break { "= " } else { " = " }
-                        } else {
-                            " = "
-                        };
-                        tail.push(d.text(eq_text));
+                            head.push(pre_eq_comments);
+                        }
+                        tail.push(d.text(if pre_eq_hangs { "= " } else { " = " }));
                         // A block comment after `=` inlines onto the value; a line
                         // comment breaks before it. Matches the param-default rule in
                         // `build_assignment_pattern_doc` (collapse an own-line block);
@@ -790,14 +787,16 @@ impl<'a> Printer<'a> {
                         }
                         tail.push(self.build_expression_doc(rhs));
                         let tail_doc = d.concat(&tail);
-                        // A pre-`=` line comment broke `= value` onto its own line;
-                        // indent it so it reads as this binding's continuation, not a
-                        // sibling property.
-                        if pre_eq_line_break {
-                            d.concat(&[key_doc, d.indent(tail_doc)])
+                        // A hanging pre-`=` comment left `= default` on its own line;
+                        // the shared continuation seam emits the comment run and
+                        // indents the tail so it reads as this binding's continuation,
+                        // not a sibling property.
+                        if pre_eq_hangs {
+                            head.push(self.build_continuation_indent(key_end, eq_pos, tail_doc));
                         } else {
-                            d.concat(&[key_doc, tail_doc])
+                            head.push(tail_doc);
                         }
+                        d.concat(&head)
                     } else {
                         // Simple shorthand: `{k}`
                         self.build_expression_doc(&p.key)
@@ -824,6 +823,10 @@ impl<'a> Printer<'a> {
                     // pushes an empty child.
                     let value_start = p.value.span().start;
                     let mut parts: DocBuf = smallvec![key_doc];
+                    let mut tail: DocBuf = DocBuf::new();
+                    // Set when a pre-`:` comment hangs what follows: the whole
+                    // `: local` tail then drops to a continuation line.
+                    let mut hang_range: Option<(u32, u32)> = None;
                     if self.has_comments_to_emit_between(key_region_end, value_start) {
                         #[allow(clippy::expect_used)]
                         // Parser guarantees `:` exists in destructuring property
@@ -835,12 +838,22 @@ impl<'a> Printer<'a> {
                         )
                         .expect(": not found in destructuring property")
                             as u32;
-                        if let Some(pre_colon_comments) =
+                        // Comment(s) before `:`: a glued block stays inline
+                        // (`a /* c */: b`); a line comment — or a multiline block the
+                        // author broke after — trails the key and drops `: local` to a
+                        // continuation line indented one level (uniform
+                        // forced-continuation indent; without the break a `//` would
+                        // swallow `: b } = o` — content loss). tsv preserves the
+                        // authored position — prettier hoists the comment to lead the
+                        // whole property.
+                        if self.comments_force_own_line_between(key_region_end, colon_pos) {
+                            hang_range = Some((key_region_end, colon_pos));
+                        } else if let Some(pre_colon_comments) =
                             self.build_inline_comments_between_doc_opt(key_region_end, colon_pos)
                         {
                             parts.push(pre_colon_comments);
                         }
-                        parts.push(d.text(": "));
+                        tail.push(d.text(": "));
                         // Comments after `:`
                         if let Some(after_colon_comments) = self
                             .build_inline_comments_between_doc_trailing_space_opt(
@@ -848,12 +861,19 @@ impl<'a> Printer<'a> {
                                 value_start,
                             )
                         {
-                            parts.push(after_colon_comments);
+                            tail.push(after_colon_comments);
                         }
                     } else {
-                        parts.push(d.text(": "));
+                        tail.push(d.text(": "));
                     }
-                    parts.push(self.build_expression_doc(&p.value));
+                    tail.push(self.build_expression_doc(&p.value));
+                    let tail_doc = d.concat(&tail);
+                    match hang_range {
+                        Some((start, end)) => {
+                            parts.push(self.build_continuation_indent(start, end, tail_doc));
+                        }
+                        None => parts.push(tail_doc),
+                    }
                     d.concat(&parts)
                 }
             }

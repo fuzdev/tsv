@@ -1,31 +1,34 @@
 # type_alias_line_pre_equals_prettier_divergence
 
 Line comment between a type alias head (name + optional type parameters) and the
-`=` (`type A<X>\n// c\n= B | C`).
+`=` (`type A<X> // c⏎= B | C`), with an **inline union** value.
 
-**Prettier**: relocates the comment to after `=`, associating it with the value:
-```
-type A<X> =
-	// c
-	B | C;
-```
+**tsv**: keeps the comment trailing the head and drops `= value` to a
+continuation line **indented one level** — the uniform forced-continuation
+indent, the same shape as the other before-`=` initializer sites (declarators,
+enum members, class properties):
 
-**tsv**: keeps the comment before `=`, associating it with the declaration head:
-```
-type A<X>
-	// c
+```ts
+type A<X> // c
 	= B | C;
 ```
 
-Per Comment Position Philosophy: the comment sits before `=`, so tsv keeps it on
-the head side rather than relocating it across the operator. The own-line
-placement is preserved on both sides. Both positions are dual-stable in our
-formatter.
+**Prettier**: with an inline union value it **relocates** the comment past the
+value to end-of-statement (`type A<X> = B | C; // c` — `output_prettier.svelte`,
+one pass; the merge-prone destination the declarator family pins). With a
+non-union value it instead hangs the comment leading the RHS — see
+[name_before_eq_line_comment](../../aliases/name_before_eq_line_comment_prettier_divergence/),
+which pins that chain.
 
-Previously tsv **dropped** this comment entirely when type parameters were
-present — a SAFETY/content-loss bug. Preserving it before `=` both fixes the loss
-and keeps the user's chosen association. A single-line block comment before `=`
-stays inline in both formatters (`type A<X> /* c */ = B | C`, see the regular
-[type_alias_block_pre_equals](../type_alias_block_pre_equals/) fixture).
+The **own-line** authoring (`type A<X>⏎// c⏎= B | C`) pulls up to trail the head
+and reaches input under tsv — one pass (`unformatted_ours_own_line.svelte`).
+Prettier instead crosses the `=` and hangs the comment leading the value
+(`type A<X> =⏎\t// c⏎\tB | C;` — `variant_own_line.svelte`, dual-stable: the
+comment then leads the value, a position both formatters preserve).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+This fixture keeps the with-type-params coverage (the comment here was once
+dropped entirely when type parameters were present — content loss); the
+break-forced union sibling is
+[type_alias_line_pre_equals_break](../type_alias_line_pre_equals_break_prettier_divergence/).
+See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+§Comment relocation and §Comment Position Philosophy.

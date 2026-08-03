@@ -1,11 +1,7 @@
 <script lang="ts">
 	// line comment before = with type params stays before =
-	type A<X> =
-		// c
-		B | C;
+	type A<X> = B | C; // c
 
 	// line comment before = without type params stays before =
-	type D =
-		// c
-		E | F;
+	type D = E | F; // c
 </script>

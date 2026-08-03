@@ -654,8 +654,8 @@ impl<'a> Printer<'a> {
             let val_colon_pos = type_annotation.span.start;
             let has_bracket_colon_comment = bracket_close_pos
                 .is_some_and(|cp| self.has_comments_to_emit_between(cp + 1, val_colon_pos));
-            let bracket_colon_has_line = bracket_close_pos
-                .is_some_and(|cp| self.has_line_comments_between(cp + 1, val_colon_pos));
+            let bracket_colon_hangs = bracket_close_pos
+                .is_some_and(|cp| self.comments_force_own_line_between(cp + 1, val_colon_pos));
 
             // Build the value type annotation. Both branches delegate to the shared
             // `build_type_annotation_doc`, which owns the value-`:`→type comment handling
@@ -675,13 +675,15 @@ impl<'a> Printer<'a> {
             } else {
                 let val_annotation = self.build_type_annotation_doc(type_annotation);
                 match bracket_close_pos {
-                    Some(close_pos) if has_bracket_colon_comment && bracket_colon_has_line => {
-                        // A line comment in this gap: the first comment trails `]` on its line,
-                        // then the remaining comments and the value `:` drop to continuation
-                        // lines indented one level (uniform forced-continuation indent, the
-                        // shared `build_continuation_indent` — each line comment ends its own
-                        // line so a `//` can't swallow the next comment or the `: V`). Mirrors
-                        // the `: Type` line-comment layout in `build_type_annotation_doc`.
+                    Some(close_pos) if has_bracket_colon_comment && bracket_colon_hangs => {
+                        // A line comment — or a multiline block the author broke after — in
+                        // this gap: the first comment trails `]` on its line, then the
+                        // remaining comments and the value `:` drop to continuation lines
+                        // indented one level (uniform forced-continuation indent, the
+                        // shared `build_continuation_indent` — each hanging comment ends its
+                        // own line so a `//` can't swallow the next comment or the `: V`).
+                        // Mirrors the `: Type` line-comment layout in
+                        // `build_type_annotation_doc`.
                         parts.push(self.build_continuation_indent(
                             close_pos + 1,
                             val_colon_pos,
@@ -689,8 +691,8 @@ impl<'a> Printer<'a> {
                         ));
                     }
                     Some(close_pos) if has_bracket_colon_comment => {
-                        // Block-only comment(s): stay inline before the value `:`, which keeps
-                        // its own line (`[k: T] /* c */ : V`).
+                        // Glued block comment(s) only (a line comment always hangs): stay
+                        // inline before the value `:` (`[k: T] /* c */ : V`).
                         for comment in
                             comments_to_emit_in_range(self.comments, close_pos + 1, val_colon_pos)
                         {
