@@ -1,0 +1,59 @@
+# Print-width ratchet — every line is a KIND of over-width output line that exists today.
+#
+# ⚠️ Read this before treating it like the gap/blank ratchets: those pin BUGS and
+# shrink toward empty. This one does NOT. Most over-width lines are the overruns
+# `conformance_prettier.md` §Print Width Philosophy sanctions — a comment or <pre>
+# body tsv never rewraps, an unbreakable token, a lone braced module list, a
+# template interpolation. Those are correct output, so "zero" is not the target
+# and a hard gate is not available. What this buys is that a new KIND of
+# over-width line fails, which is the shape a width bug takes.
+#
+# One line per shape, TAB-delimited: the language bucket, how the over-width line
+# OPENS, how it ENDS. Shapes rather than paths, so the snapshot is corpus-portable
+# and survives a fixture move. (The report renders the pair as `head…tail`; the
+# file keeps them as separate fields so a head that CONTAINS `…` — an elided prose
+# line — still round-trips.)
+#
+# The head/tail pair is the key because the head alone does NOT discriminate:
+# measured against the mid-run comment bug, a head-only key produced no new shape
+# at all while `head…tail` produced `IDENT…-->` — a long word running into a
+# comment, which is exactly what that bug emitted.
+#
+# A shape found but not pinned FAILS (a new kind of overrun — triage it against
+# §Print Width Philosophy before pinning). A pinned shape that no longer fires
+# FAILS (a fix landed, or the fixture that carried it moved — re-pin).
+#
+# Regenerate with `deno task width:audit:update`.
+# shapes: 32
+svelte	'	'
+svelte	)	;
+svelte	/*	*/
+svelte	//	)
+svelte	//	WORD
+svelte	<!--	-->
+svelte	<!--	WORD
+svelte	<pre	>
+svelte	?	WORD
+svelte	?	`
+svelte	@	;
+svelte	IDENT	"
+svelte	IDENT	'
+svelte	IDENT	(
+svelte	IDENT	,
+svelte	IDENT	;
+svelte	IDENT	WORD
+svelte	IDENT	[
+svelte	IDENT	{
+svelte	[	'
+svelte	`	;
+svelte	class	}
+svelte	const	;
+svelte	const	WORD
+svelte	declare	;
+svelte	export	;
+svelte	import	;
+svelte	let	WORD
+svelte	{	WORD
+svelte	{@debug	}
+svelte	|	WORD
+ts	//	)

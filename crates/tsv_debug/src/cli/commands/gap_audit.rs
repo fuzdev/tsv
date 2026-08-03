@@ -117,9 +117,7 @@ use argh::FromArgs;
 use std::collections::{BTreeMap, BTreeSet};
 
 use by_node::{by_node_json_sections, compute_by_node, report_by_node, report_rank, report_since};
-use snapshot::{
-    KnownKey, count_panics, count_swallows, is_pinnable, known_shapes_path, ratchet, snapshot_keys,
-};
+use snapshot::{KnownKey, count_panics, count_swallows, is_pinnable, ratchet, snapshot_keys};
 use verify::{verify_example, victim_seed_offset};
 
 use crate::audit::examples::{ExampleOrd, ExampleSet};
@@ -938,7 +936,7 @@ impl GapAuditCommand {
             // corrupt-but-present file: the yield line then reads every shape as `+added` — a
             // cosmetic degradation of a report line, never the gate, since `write` overwrites the
             // file on the next line regardless.
-            let previous: BTreeSet<KnownKey> = if known_shapes_path().exists() {
+            let previous: BTreeSet<KnownKey> = if ratchet().path().exists() {
                 ratchet().parse_known().unwrap_or_default()
             } else {
                 BTreeSet::new()
@@ -1062,7 +1060,7 @@ impl GapAuditCommand {
         }
     }
 
-    /// Report a [`GateDiff`] and turn it into an exit status. See [`known_shapes_path`] for
+    /// Report a [`GateDiff`] and turn it into an exit status. See [`ratchet`] for
     /// why the key is the shape and not the count.
     fn report_gate(&self, diff: &GateDiff<KnownKey>, total: &Tally) -> Result<(), CliError> {
         let GateDiff { new, stale, .. } = diff;

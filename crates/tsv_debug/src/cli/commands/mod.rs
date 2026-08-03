@@ -53,6 +53,7 @@ pub mod swallow_audit;
 pub mod test262;
 pub mod ts_fixture_audit;
 pub mod tsc_conformance;
+pub mod width_audit;
 
 use crate::cli::CliError;
 use crate::fixtures::Fixture;

@@ -47,10 +47,23 @@ text line and lets the line run to 106 / 101 / 114 / 101 / 114 / 118, keeping th
 
 ⚠️ The compact authoring is the pin, and it has to be. Prettier's packed form
 (`divergent_variant_packed.svelte`, which prettier keeps) puts a **newline** after the comment on
-every case it breaks, and an authored newline there is a structural boundary tsv preserves for
-every sibling kind, at any width. So tsv rewrites that form to a *third* stable one rather than to
-`input` — three stable forms coexist, and only the one-line authoring isolates the boundary this
-fixture is about. Feeding the packed form back would test the newline rule instead.
+every case it breaks, and a newline beside a comment is authorship tsv preserves at any width —
+the comment exclusion from the sibling-newline flow rule, held on each side independently
+([inline_separator_comment_newline](../inline_separator_comment_newline/) pins all four
+authorings, its null control included; prettier holds them too, so it is not a divergence). So tsv
+rewrites the packed form to a *second* fixed point — identical to `input` except that the run after
+the comment keeps its own line — and only the one-line authoring isolates the boundary this fixture
+is about. Feeding the packed form back would test the comment exclusion instead.
+
+⚠️ **That preservation is comment-specific — do not restate it as a general separator-newline
+rule.** An inline element or a tag in the same position *does* flow (`text1 <span>a</span>⏎text2`
+collapses), so the discriminating control swaps the comment for an element **at this same site**;
+it is already built, as
+[inline_sibling_newline_flow](../inline_sibling_newline_flow_prettier_divergence/)'s
+`prettier_variant_newline_after` / `prettier_variant_newline_before`, which converge on that
+fixture's input across all four sibling kinds. A control run where the flow rule's *other* gates
+already suppress it — a run holding no prose, or an element that went multiline because of these
+very newlines — keeps its lines for either sibling kind, and so "confirms" the wrong conclusion.
 
 ## Reason
 

@@ -191,6 +191,7 @@ deno task gaps:audit                 # gap-injection RATCHET, ~17 s (./docs/gap_
 deno task blanks:audit               # blank-line injection RATCHET, ~24 s (./docs/blank_audit.md; also :update)
 deno task fabrication:audit          # blank-FABRICATION on pristine seeds — the F1-blind counterpart to blanks (ratchet born EMPTY; also :update)
 deno task census:audit               # comment CENSUS: raw input-vs-output trivia multisets per language bucket (own scanners, never parse().comments) — catches parse-time drops/merges/rewrites the ledger can't see (also :update)
+deno task width:audit                # print-width RATCHET: a new KIND of over-width output line — the ONLY gate that measures a column. ⚠️ NOT a debt list (sanctioned overruns are real); also :update
 deno task ignore:audit               # `prettier-ignore` honoring RATCHET: honoring, second-pass stability, freeze scope, trailing inertness (also :update)
 deno task render:audit <paths>       # render-equivalence over REAL Svelte (sidecar — NOT in check; release-gated leg of `deno task conformance`)
 deno task idempotency:sweep          # F1 idempotency sweep over the real-code corpus (minutes — NOT in check; conformance cadence)

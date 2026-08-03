@@ -11,6 +11,7 @@ use commands::gap_audit::GapAuditCommand;
 use commands::ignore_audit::IgnoreAuditCommand;
 #[cfg(feature = "swallow_check")]
 use commands::swallow_audit::SwallowAuditCommand;
+use commands::width_audit::WidthAuditCommand;
 use commands::{
     arena_stats::ArenaStatsCommand, ast_diff::AstDiffCommand,
     authoring_audit::AuthoringAuditCommand, binding_audit::BindingAuditCommand,
@@ -151,6 +152,7 @@ pub enum Subcommand {
     Test262(Test262Command),
     TscConformance(TscConformanceCommand),
     TsFixtureAudit(TsFixtureAuditCommand),
+    WidthAudit(WidthAuditCommand),
 }
 
 impl TopLevel {
@@ -215,6 +217,7 @@ impl TopLevel {
             Subcommand::Test262(c) => c.run(),
             Subcommand::TscConformance(c) => c.run(),
             Subcommand::TsFixtureAudit(c) => c.run(),
+            Subcommand::WidthAudit(c) => c.run(),
         }
     }
 }

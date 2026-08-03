@@ -653,14 +653,14 @@ pub(crate) fn is_input_invalid_fixture(path: &Path) -> bool {
 /// Resolve an injection audit's seed corpus: the positional `paths` (defaulting to
 /// `tests/fixtures` when empty — the corpus the audits' snapshots describe), through
 /// [`resolve_files`], then `limit` (`0` = unlimited). An empty result is an error — a gate over
-/// zero files proves nothing. Shared by `gap_audit` / `blank_audit` / `ignore_audit` (hence the
-/// `comment_check` gate), the way [`is_input_invalid_fixture`] is shared above.
+/// zero files proves nothing. Shared by `gap_audit` / `blank_audit` / `ignore_audit` and by the
+/// ungated `width_audit`, the way [`is_input_invalid_fixture`] is shared above — which is why it
+/// carries no `comment_check` gate: seed resolution is corpus plumbing, not instrumentation.
 ///
 /// # Errors
 ///
 /// Returns [`CliError::Failed`] (after a user-facing message) when a path fails to resolve or
 /// no seed files are found.
-#[cfg(feature = "comment_check")]
 pub(crate) fn resolve_seed_files(
     arg_paths: &[String],
     limit: usize,

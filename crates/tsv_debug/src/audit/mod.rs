@@ -10,8 +10,12 @@
 //!   (`census_audit`): per-language extraction that never consults the parser's
 //!   own comment carrying, so parse-time drops are visible.
 //! - [`sweep`] — the pristine-format corpus loop the as-authored ratchet audits
-//!   (`fabrication_audit`, `census_audit`) share: skip/read/format bookkeeping
-//!   with a per-file visitor.
+//!   (`fabrication_audit`, `census_audit`, `width_audit`) share: skip/read/format
+//!   bookkeeping with a per-file visitor, plus the vacuity guard that refuses to
+//!   grade a collapsed corpus.
+//! - [`shape`] — the markup arm of the line-shape alphabet those snapshots key
+//!   on, shared so two ratchets cannot drift into meaning different things by
+//!   the same key.
 //! - [`examples`] — the bounded, `--jobs`-deterministic example set every audit's
 //!   per-shape aggregate keeps its reproducers in.
 //! - [`tally`] — run-level tally primitives (the capped skipped-path bucket).
@@ -48,8 +52,12 @@ pub(crate) mod census;
 pub(crate) mod ratchet;
 
 // The pristine-format sweep is NOT gated: its consumers (`fabrication_audit`,
-// `census_audit`) drive no instrumentation seam.
+// `census_audit`, `width_audit`) drive no instrumentation seam.
 pub(crate) mod sweep;
+
+// The line-shape alphabet is NOT gated, for the same reason and the same
+// consumers — it is pure text keying with no seam of its own.
+pub(crate) mod shape;
 
 // The injection machinery is only reachable through `gap_audit` / `blank_audit`,
 // both themselves behind the `comment_check` feature (they arm

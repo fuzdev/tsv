@@ -14,18 +14,23 @@
 //!   absolute it is never allowed into the list whose shrinking is the goal.
 //!
 //! `gap_audit` (`gap_audit_known.txt`), `blank_audit` (`blank_audit_known.txt`),
-//! `ignore_audit` (`ignore_audit_known.txt`), and `fabrication_audit`
-//! (`fabrication_audit_known.txt`) are the consumers. It is written
+//! `ignore_audit` (`ignore_audit_known.txt`), `fabrication_audit`
+//! (`fabrication_audit_known.txt`), `census_audit` and `width_audit`
+//! (`width_audit_known.txt`) are the consumers. It is written
 //! generic — parameterized on the snapshot **path**, the **key type**
 //! ([`SnapshotKey`], which owns its own line render/parse and its pinnability
 //! rule), and (via that trait) the **pinnable predicate** — so each later
 //! injection audit adopted it without copying the read/render/grade/refuse-narrow
 //! logic. It is deliberately *minimal*: no generality beyond what a second
 //! consumer would actually reuse. The consumer-side orchestration those audits
-//! were still copying — the narrowed-`--update` refusal, the write confirmation,
-//! the "ratchet SKIPPED" notice, the unpinned-PANIC epilogue — lives here too
-//! ([`refuse_narrowed_update`] / [`Ratchet::write_pinned`] /
-//! [`print_ratchet_skipped`] / [`report_unpinned_panics`]).
+//! were still copying — the snapshot's colocated path, the narrowed-`--update`
+//! refusal, the write confirmation, the grade→verdict→exit-status tail, the
+//! "ratchet SKIPPED" notice, the unpinned-PANIC epilogue — lives here too
+//! ([`Ratchet::colocated`] / [`refuse_narrowed_update`] /
+//! [`Ratchet::write_pinned`] / [`Ratchet::grade_and_report`] /
+//! [`print_ratchet_skipped`] / [`report_unpinned_panics`]). A consumer that
+//! needs its own tail (gap's yield line, blank's PANIC class) calls
+//! [`Ratchet::grade`] and prints its own; the rest hand the whole thing over.
 //!
 //! What the snapshot buys and does not: a shape not on the list fails the gate,
 //! so no *new* kind of bug lands silently; but a new instance at an **existing**
@@ -33,9 +38,14 @@
 //! whole reason a count can't be the key.
 
 use std::collections::BTreeSet;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 
 use crate::cli::CliError;
+
+/// Where every audit snapshot lives, relative to this crate's manifest. One constant so the
+/// convention ("colocated with the command that owns it") is stated once rather than spelled
+/// into each consumer's own path helper.
+const SNAPSHOT_DIR: &str = "src/cli/commands";
 
 /// One snapshot line: a key that renders to / parses from a single record, and
 /// knows whether it may be **pinned**.
@@ -87,6 +97,33 @@ impl Ratchet {
             header,
             repin_hint,
         }
+    }
+
+    /// A ratchet over `file_name` in [`SNAPSHOT_DIR`] — the form every real consumer wants,
+    /// since every snapshot is colocated with the command that owns it.
+    ///
+    /// Anchored on `CARGO_MANIFEST_DIR` rather than the cwd, so an audit finds its snapshot from
+    /// any working directory. The path is the only compile-time piece; the file itself is read at
+    /// runtime (see this module's docs for why not `include_str!`). `env!` expands where it is
+    /// written, and that is here — the same crate as every consumer — so the anchor is theirs.
+    pub(crate) fn colocated(
+        file_name: &str,
+        header: &'static str,
+        repin_hint: &'static str,
+    ) -> Self {
+        Self::new(
+            PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+                .join(SNAPSHOT_DIR)
+                .join(file_name),
+            header,
+            repin_hint,
+        )
+    }
+
+    /// The snapshot file, for the consumers that report on it directly (an existence probe
+    /// before a re-pin diff, a path in a header line) rather than through [`Self::grade`].
+    pub(crate) fn path(&self) -> &Path {
+        &self.path
     }
 
     /// Read the snapshot from disk and parse it into its key set.
@@ -211,6 +248,59 @@ impl Ratchet {
             unpinnable,
         })
     }
+
+    /// [`Self::grade`], then the verdict and the exit status — the tail every simple ratchet
+    /// consumer was copying. `noun` is the audit's own word for a key (gap / blank "shape",
+    /// census "key"), `scope` is the trailing parenthetical of the ✓ line ("7426 files"), and
+    /// `render` spells one key for a human.
+    ///
+    /// Total over [`GateDiff`]: the unpinnable class gets its own line rather than falling
+    /// through silently. No current consumer of this method has one (their `is_pinnable` is
+    /// always true), but a `holds()` that is false with nothing printed is the one way this
+    /// helper could exit non-zero without saying why, so it is stated rather than assumed. An
+    /// audit that owns a real never-pinnable class wants [`report_unpinned_panics`] and its own
+    /// tail instead — that class needs naming, not counting.
+    ///
+    /// # Errors
+    ///
+    /// Returns [`CliError::Failed`] when the snapshot cannot be read ([`Self::grade`]), or when
+    /// the ratchet does not hold.
+    pub(crate) fn grade_and_report<K: SnapshotKey>(
+        &self,
+        found: &BTreeSet<K>,
+        noun: &str,
+        scope: &str,
+        render: impl Fn(&K) -> String,
+    ) -> Result<(), CliError> {
+        let diff = self.grade(found)?;
+        if diff.holds() {
+            println!(
+                "\n✓ ratchet holds — {} known {noun}(s), no new ones ({scope})",
+                diff.known
+            );
+            return Ok(());
+        }
+        for key in &diff.new {
+            eprintln!("✗ NEW {noun} (not pinned): {}", render(key));
+        }
+        for key in &diff.stale {
+            eprintln!(
+                "✗ STALE pin (no longer fires — fix landed or fixture moved, re-pin): {}",
+                render(key)
+            );
+        }
+        if diff.unpinnable > 0 {
+            eprintln!(
+                "✗ {} unpinnable {noun}(s) — never written, always failing",
+                diff.unpinnable
+            );
+        }
+        eprintln!(
+            "\nRe-pin with `{}` once the change is deliberate.",
+            self.repin_hint
+        );
+        Err(CliError::Failed)
+    }
 }
 
 /// What a [`Ratchet::grade`] found, computed **before** anything prints.
@@ -241,11 +331,11 @@ impl<K> GateDiff<K> {
 
 // ---------------------------------------------------------------------------
 // Consumer orchestration — the prose every ratchet-consuming audit was copying
-// into its `run()`. The two an always-compiled consumer reaches
-// (`fabrication_audit`) are unconditional; the rest stay behind `comment_check`
-// with the injection audits that are their only callers. `compile_corpus_compare
-// --ratchet` has its own path-keyed flow with different semantics and keeps its
-// own messages.
+// into its `run()`. The three an always-compiled consumer reaches
+// (`fabrication_audit`, `width_audit`) are unconditional; the rest stay behind
+// `comment_check` with the injection audits that are their only callers.
+// `compile_corpus_compare --ratchet` has its own path-keyed flow with different
+// semantics and keeps its own messages.
 // ---------------------------------------------------------------------------
 
 /// Refuse `--update` on a narrowed run. The snapshot describes the FULL default run —
@@ -280,7 +370,9 @@ pub(crate) fn refuse_narrowed_update(
 /// The notice a narrowed (non-`--update`) default run prints INSTEAD of grading: it reaches
 /// only part of the snapshot's shape set, so grading would report every unreached shape as
 /// stale — findings are reported, never graded, and the run must not read as a passing gate.
-#[cfg(feature = "comment_check")]
+///
+/// Not gated: `width_audit` is an ungated consumer (a narrowed run there is a *triage* run and
+/// always exits 0, which is exactly the shape that would otherwise read as a green gate).
 pub(crate) fn print_ratchet_skipped(narrowed: &[&'static str]) {
     eprintln!(
         "\n○ ratchet SKIPPED — {} narrows this run, and the snapshot pins the full default \

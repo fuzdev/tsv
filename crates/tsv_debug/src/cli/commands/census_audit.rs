@@ -4,10 +4,10 @@ use std::path::PathBuf;
 
 use crate::audit::census::{CensusEntry, CensusMultiset, comment_census};
 use crate::audit::ratchet::{Ratchet, SnapshotKey, refuse_narrowed_update};
-use crate::audit::sweep::{PristineSweep, sweep_pristine};
+use crate::audit::sweep::{PristineSweep, check_formatted_min, sweep_pristine};
 use crate::cli::CliError;
 
-use super::profile::resolve_files;
+use super::profile::resolve_seed_files;
 
 /// The comment CENSUS: does every comment the author wrote survive formatting?
 ///
@@ -181,19 +181,7 @@ impl CensusAuditCommand {
             "the census keys over tests/fixtures",
             "SUBSET",
         )?;
-        let paths = if default_paths {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.paths
-        };
-        let files = match resolve_files(&paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
-
+        let files = resolve_seed_files(&self.paths, 0)?;
         let sweep = sweep_files(&files);
 
         if self.json {
@@ -202,13 +190,8 @@ impl CensusAuditCommand {
             print_report(&sweep);
         }
 
-        if default_paths && sweep.pristine.formatted < FORMATTED_MIN {
-            eprintln!(
-                "Error: pinned minimum — formatted {} files < pinned {FORMATTED_MIN}. \
-                 The fixtures walk shrank (or parsing collapsed); if deliberate, re-pin FORMATTED_MIN.",
-                sweep.pristine.formatted
-            );
-            return Err(CliError::Failed);
+        if default_paths {
+            check_formatted_min(sweep.pristine.formatted, FORMATTED_MIN)?;
         }
 
         let ratchet = ratchet();
@@ -227,32 +210,12 @@ impl CensusAuditCommand {
             };
         }
 
-        let diff = ratchet.grade(&sweep.keys)?;
-        if diff.holds() {
-            println!(
-                "\n✓ ratchet holds — {} known census key(s), no new ones ({} files)",
-                diff.known, sweep.pristine.formatted
-            );
-            return Ok(());
-        }
-        for key in &diff.new {
-            eprintln!(
-                "✗ NEW census key (not pinned): {} [{}] {}",
-                key.path,
-                key.bucket,
-                key.direction.name()
-            );
-        }
-        for key in &diff.stale {
-            eprintln!(
-                "✗ STALE pin (no longer fires — fix landed, re-pin): {} [{}] {}",
-                key.path,
-                key.bucket,
-                key.direction.name()
-            );
-        }
-        eprintln!("\nRe-pin with `{REPIN_HINT}` once the change is deliberate.");
-        Err(CliError::Failed)
+        ratchet.grade_and_report(
+            &sweep.keys,
+            "census key",
+            &format!("{} files", sweep.pristine.formatted),
+            |key| format!("{} [{}] {}", key.path, key.bucket, key.direction.name()),
+        )
     }
 }
 
@@ -324,16 +287,9 @@ fn diff_censuses(input: &CensusMultiset, output: &CensusMultiset) -> Vec<Delta> 
     deltas
 }
 
-/// The ratchet snapshot, colocated with this module and read at runtime by the [`Ratchet`]
-/// (see that module for why not `include_str!`). Anchored on `CARGO_MANIFEST_DIR` rather than
-/// the cwd, so the audit finds it from any working directory.
-fn known_keys_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/cli/commands/census_audit_known.txt")
-}
-
-/// The ratchet over [`known_keys_path`], carrying this audit's header + re-pin hint.
+/// The ratchet over this audit's colocated snapshot, carrying its header + re-pin hint.
 fn ratchet() -> Ratchet {
-    Ratchet::new(known_keys_path(), SNAPSHOT_HEADER, REPIN_HINT)
+    Ratchet::colocated("census_audit_known.txt", SNAPSHOT_HEADER, REPIN_HINT)
 }
 
 /// A one-line, escape-rendered preview of a comment interior, truncated on a char boundary.
