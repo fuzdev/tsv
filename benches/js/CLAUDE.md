@@ -543,10 +543,15 @@ every real move in a number is a deliberate, visible edit.
   svelte-rejects count — exact; svelte-styles block count — a live-corpus
   MINIMUM with a drift band, since its source is the perf-view dev repos: a
   small shrink warns and still writes, only a >10% collapse fails).
-- Rust-side counts are consts in their commands — grep `REGRESSION PIN`:
-  test262 (discovered + graded-manifest), `fixtures_validate` (total fixtures —
-  protects the primary gate against a discovery collapse), and `swallow_audit`
-  (formatted files — closes its vacuous-pass).
+- Rust-side counts are consts — grep `REGRESSION PIN`: test262 (discovered +
+  graded-manifest) and `fixtures_validate` (total fixtures — protects the
+  primary gate against a discovery collapse) live in their own commands, while
+  the as-authored audits (`swallow_audit`, `fabrication_audit`, `census_audit`,
+  `width_audit`) share `FIXTURES_FORMATTED_MIN` in
+  `crates/tsv_debug/src/audit/sweep.rs` — formatted files, closing their
+  vacuous-pass. One const because they walk one corpus under one skip policy;
+  four would drift apart in slack, which is the collapse the pin exists to
+  catch.
 - `tsc_conformance` (the largest set) splits its pins by what they mean, and
   gates the ON-DEMAND experimental-typechecker tasks, not a release leg. The
   drifting tsv-side counts (denominators, parse-divergence census, family
