@@ -4,11 +4,13 @@
 //! `catch_unwind`, bucket the skips identically, and hand each successfully
 //! formatted `(path, parser, source, output)` to the audit's own visitor.
 //!
-//! `fabrication_audit` and `census_audit` are the consumers — twins of each
-//! other in exactly this loop (the injection audits mutate per site and the
-//! armed sweeps drive instrumentation, so neither fits). Extracted when the
-//! census arrived as the loop's second verbatim copy; the conserved-content
-//! census v2 (decoded literal values) is the expected third.
+//! `fabrication_audit`, `census_audit`, `width_audit` and `swallow_audit` are
+//! the consumers — the injection audits mutate per site, so none of those fit.
+//! Extracted when the census arrived as the loop's second verbatim copy; the
+//! conserved-content census v2 (decoded literal values) is the expected next.
+//!
+//! Every consumer walks the same seed list and skips the same classes, so they
+//! all pin the same [`FIXTURES_FORMATTED_MIN`].
 
 use std::path::{Path, PathBuf};
 
@@ -54,6 +56,25 @@ impl PristineSweep {
     }
 }
 
+/// REGRESSION PIN (minimum, at the exact measured value): files a default
+/// (`tests/fixtures`) run formats. **One corpus, one pin** — every consumer
+/// resolves the same seed list (`resolve_seed_files`) and skips the same three
+/// classes (`input_invalid_*`, a parse rejection, a panic), so their counts are
+/// equal by construction, not by coincidence.
+///
+/// Shared rather than one const per audit because a private pin accumulates
+/// SLACK: each is re-pinned at a different time, and the gap between a stale pin
+/// and the live count is exactly the collapse [`check_formatted_min`] exists to
+/// catch — a per-audit spread of a few hundred to ~1,700 files silently absorbed
+/// a corpus collapse of that size.
+///
+/// The objection — "a future audit may legitimately skip differently" — argues
+/// FOR sharing rather than against it. A divergent audit formats fewer files, so
+/// it drops below this minimum and its gate FAILS, announcing the divergence at
+/// the moment it is introduced; the remedy is then a deliberate private const for
+/// that one audit. Private pins everywhere absorb the same divergence in silence.
+pub(crate) const FIXTURES_FORMATTED_MIN: usize = 7_429;
+
 /// The **vacuity guard** every corpus gate applies before grading: a default run
 /// that formatted fewer than `min` files is not a passing gate, it is a
 /// collapsed corpus — an empty walk or a parser that started rejecting
@@ -61,9 +82,8 @@ impl PristineSweep {
 ///
 /// A minimum rather than a two-sided pin because the fixtures tree is COMMITTED
 /// and grows with ordinary fixture PRs (`deno task check` must not fail per
-/// added fixture); only shrinkage fails. Each consumer owns its own
-/// `FORMATTED_MIN` const — they are pinned at different times over corpora that
-/// skip different files — and calls this only on a full default run.
+/// added fixture); only shrinkage fails. Consumers pass
+/// [`FIXTURES_FORMATTED_MIN`] and call this only on a full default run.
 ///
 /// # Errors
 ///
@@ -75,7 +95,8 @@ pub(crate) fn check_formatted_min(formatted: usize, min: usize) -> Result<(), Cl
     }
     eprintln!(
         "Error: pinned minimum — formatted {formatted} files < pinned {min}. \
-         The fixtures walk shrank (or parsing collapsed); if deliberate, re-pin FORMATTED_MIN."
+         The fixtures walk shrank (or parsing collapsed), or this audit started skipping a \
+         class the others do not; if deliberate, re-pin FIXTURES_FORMATTED_MIN."
     );
     Err(CliError::Failed)
 }
@@ -86,6 +107,28 @@ pub(crate) fn check_formatted_min(formatted: usize, min: usize) -> Result<(), Cl
 /// kills the process.
 pub(crate) fn sweep_pristine(
     files: &[PathBuf],
+    visit: impl FnMut(&Path, ParserType, &str, &str),
+) -> PristineSweep {
+    sweep_pristine_armed(files, || {}, visit)
+}
+
+/// [`sweep_pristine`] with a per-file **arming** hook, for a consumer whose
+/// instrumentation is a process-wide sink rather than a return value.
+///
+/// `arm` runs after the read succeeds and immediately before the format, which
+/// is the only point that works: a sink drained *after* the visitor still holds
+/// the reports of a seed the sweep skipped (a parse rejection and a panic never
+/// reach the visitor), and those would then be attributed to the next file.
+/// Draining ahead of every format makes what the visitor takes provably this
+/// file's.
+///
+/// The hook exists so the one audit that interleaves drain/collect around the
+/// format (`swallow_audit`) shares this loop's SKIP BUCKETING rather than
+/// hand-rolling a fourth copy of it — a copy that dropped read failures on the
+/// floor, so the file left every total it should have appeared in.
+pub(crate) fn sweep_pristine_armed(
+    files: &[PathBuf],
+    mut arm: impl FnMut(),
     mut visit: impl FnMut(&Path, ParserType, &str, &str),
 ) -> PristineSweep {
     let mut sweep = PristineSweep {
@@ -104,6 +147,7 @@ pub(crate) fn sweep_pristine(
             continue;
         };
         let parser = ParserType::from_extension(&path.to_string_lossy());
+        arm();
         let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
             format_source(&source, parser)
         }));

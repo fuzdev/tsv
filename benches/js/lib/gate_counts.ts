@@ -61,9 +61,11 @@
  * treating it as real. Never re-pin to absorb an unexplained move.
  *
  * The Rust-side pins (test262 discovery + graded manifest, `fixtures_validate`
- * fixture count, `swallow_audit` formatted-file count) live as consts in their
- * commands — grep `REGRESSION PIN`. See benches/js/CLAUDE.md §Pinned gate
- * counts.
+ * fixture count) live as consts in their commands — grep `REGRESSION PIN`. The
+ * as-authored audits' formatted-file count is one shared const,
+ * `FIXTURES_FORMATTED_MIN` in `crates/tsv_debug/src/audit/sweep.rs`: they walk
+ * one corpus under one skip policy, so a per-audit pin would only let their
+ * slack drift apart. See benches/js/CLAUDE.md §Pinned gate counts.
  */
 
 import type { Language } from './types.ts';

@@ -3,8 +3,12 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use crate::audit::census::{CensusEntry, CensusMultiset, comment_census};
-use crate::audit::ratchet::{Ratchet, SnapshotKey, refuse_narrowed_update};
-use crate::audit::sweep::{PristineSweep, check_formatted_min, sweep_pristine};
+use crate::audit::ratchet::{
+    Ratchet, SnapshotKey, grade_narrowed_strictly, refuse_narrowed_update,
+};
+use crate::audit::sweep::{
+    FIXTURES_FORMATTED_MIN, PristineSweep, check_formatted_min, sweep_pristine,
+};
 use crate::cli::CliError;
 
 use super::profile::resolve_seed_files;
@@ -50,13 +54,6 @@ pub struct CensusAuditCommand {
     #[argh(positional)]
     paths: Vec<String>,
 }
-
-/// REGRESSION PIN (minimum, at the exact measured value): files formatted on a default
-/// (`tests/fixtures`) run — with an empty or all-parse-failing corpus the audit would pass
-/// vacuously. A minimum, not a two-sided pin, because the fixtures tree is COMMITTED and grows
-/// with ordinary fixture PRs; shrinkage/collapse fails. Same ritual as `fabrication_audit`'s
-/// `FORMATTED_MIN`.
-const FORMATTED_MIN: usize = 7_123;
 
 const SNAPSHOT_HEADER: &str = "\
 # Comment-census ratchet — every line is a KNOWN BUG, the file shrinking is the goal.
@@ -191,7 +188,7 @@ impl CensusAuditCommand {
         }
 
         if default_paths {
-            check_formatted_min(sweep.pristine.formatted, FORMATTED_MIN)?;
+            check_formatted_min(sweep.pristine.formatted, FIXTURES_FORMATTED_MIN)?;
         }
 
         let ratchet = ratchet();
@@ -203,11 +200,7 @@ impl CensusAuditCommand {
         // so grading a narrowed one would call every unreached key stale. Every finding is
         // news instead.
         if !default_paths {
-            return if sweep.findings.is_empty() {
-                Ok(())
-            } else {
-                Err(CliError::Failed)
-            };
+            return grade_narrowed_strictly(narrowed, "census delta", sweep.findings.len());
         }
 
         ratchet.grade_and_report(
@@ -225,8 +218,8 @@ struct Sweep {
     findings: Vec<CensusFinding>,
     /// Every `(path, bucket, direction)` seen — what the ratchet grades.
     keys: BTreeSet<CensusKey>,
-    /// The shared skip/format bookkeeping (the `FORMATTED_MIN` vacuity guard
-    /// reads `formatted`; panics are counted there, not gated here).
+    /// The shared skip/format bookkeeping (the [`check_formatted_min`] vacuity
+    /// guard reads `formatted`; panics are counted there, not gated here).
     pristine: PristineSweep,
 }
 
