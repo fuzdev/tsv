@@ -21,4 +21,13 @@ which forces the break, diverges. The sibling
 [attributes_value_colon_line_comment](../attributes_value_colon_line_comment_prettier_divergence/)
 covers the `:`→value gap.
 
+The **own-line** authoring (`type⏎// c⏎: 'json'`) pulls up to trail the key and
+reaches input under tsv — one pass (`unformatted_ours_own_line.svelte`).
+Prettier instead crosses the `:` and hangs the comment leading the value
+(`type:⏎\t// c⏎\t'json'`) — stable in one pass, and dual-stable
+(`variant_own_line.svelte`), the same landing its own-line **block** sibling
+[attributes_key_colon_own_line_block_comment](../attributes_key_colon_own_line_block_comment_prettier_divergence/)
+pins — distinct from the trailing float it applies to input's authoring
+(`output_prettier.svelte`).
+
 See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.

@@ -17,6 +17,14 @@ indent). Prettier keeps the `: type` flush with the key.
 `interface B` shows two comments in the gap: each keeps its own line and the
 `: type` follows, all on the continuation indent.
 
+The **own-line** authoring (`key⏎// c⏎: string` inside the brackets) pulls up
+to trail the key and reaches input under tsv — one pass
+(`unformatted_ours_own_line.svelte`); prettier reaches its flush form
+(`output_prettier.svelte`) in one pass too — for the `interface B` run, only
+the first comment pulls up, the rest keep their own lines, matching input. The
+own-line **block** sibling is
+[index_signature_key_colon_own_line_block_comment](../index_signature_key_colon_own_line_block_comment_prettier_divergence/).
+
 This applies the same indent tsv already gives every other forced continuation —
 the after-`:` type (`x: // c⏎T`), the `]`→value-`:` gap, prefix operators — now
 also to the **before-`:`** comment, uniformly across the constructs that have it:
