@@ -597,6 +597,131 @@ Deno.test(
 	}
 );
 
+// ─── spaced_tag_travel ──────────────────────────────────────────────────────
+
+Deno.test('spaced_tag_travel: positive - traveled tag breaks internally on its fresh line', () => {
+	// The zzz CapabilityWebsocket shape: ours travels the wide spaced tag to a fresh
+	// line and breaks it internally there (the expression cannot fit flat anywhere);
+	// prettier keeps it on the text line and opens it mid-line.
+	const tail =
+		"\t\t? 'connected connected connected connected connected connected'\n" +
+		"\t\t: 'disconnected disconnected disconnected disconnected disconnected'}\n" +
+		'</span>';
+	const prettier = '<span>\n\twebsocket websocket websocket websocket {socket.connected\n' + tail;
+	const ours = '<span>\n\twebsocket websocket websocket websocket\n\t{socket.connected\n' + tail;
+	const ctx = make_context(ours, prettier, 'svelte');
+	const match = run_pattern('spaced_tag_travel', ctx);
+	assertNotEquals(match, null);
+});
+
+Deno.test(
+	'spaced_tag_travel: positive - traveled tag collapses flat, prettier breaks in parens',
+	() => {
+		// The tsv.fuz.dev BenchmarksConformance shape: ours travels the second tag and
+		// collapses it flat; prettier opens it mid-line and breaks inside the call parens.
+		// Exercises the expression-aware weld (a break after `(` / before `)` joins with
+		// no space).
+		const indent = '\t\t\t\t\t\t\t';
+		const prettier =
+			'<td>\n' +
+			indent +
+			"{row.files_processed.toLocaleString('en-US')} / {row.files_total.toLocaleString(\n" +
+			indent +
+			"\t'en-US'\n" +
+			indent +
+			')}\n' +
+			'</td>';
+		const ours =
+			'<td>\n' +
+			indent +
+			"{row.files_processed.toLocaleString('en-US')} /\n" +
+			indent +
+			"{row.files_total.toLocaleString('en-US')}\n" +
+			'</td>';
+		const ctx = make_context(ours, prettier, 'svelte');
+		const match = run_pattern('spaced_tag_travel', ctx);
+		assertNotEquals(match, null);
+	}
+);
+
+Deno.test('spaced_tag_travel: negative - not svelte', () => {
+	const prettier = '<span>\n\taaaa bbbb {cond\n\t\t? 1\n\t\t: 2}\n</span>';
+	const ours = '<span>\n\taaaa bbbb\n\t{cond ? 1 : 2}\n</span>';
+	const ctx = make_context(ours, prettier, 'typescript');
+	assertEquals(run_pattern('spaced_tag_travel', ctx), null);
+});
+
+Deno.test('spaced_tag_travel: negative - GLUED mid-line open on the prettier side', () => {
+	// The zzz ThreadListitem shape: prettier's unmatched `{` is glued to a word
+	// (`token{thread.token_count !==`) — the welded word+tag pair's territory, not the
+	// spaced rule's — and ours' own side tears a tag that FITS flat. Claiming this
+	// would mask a live formatter defect.
+	const prettier =
+		'<small>\n' +
+		"\t{turn_count} message{turn_count !== 1 ? 's' : ''}, {thread.token_count} token{thread.token_count !==\n" +
+		'\t1\n' +
+		"\t\t? 's'\n" +
+		"\t\t: ''}\n" +
+		'</small>';
+	const ours =
+		'<small>\n' +
+		'\t{turn_count} message{turn_count !== 1\n' +
+		"\t\t? 's'\n" +
+		"\t\t: ''}, {thread.token_count} token{thread.token_count !== 1 ? 's' : ''}\n" +
+		'</small>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('spaced_tag_travel', ctx), null);
+});
+
+Deno.test('spaced_tag_travel: negative - ours tears open a tag that fits flat', () => {
+	// Prettier carries the spaced mid-line marker, but ours' own side has an
+	// unmatched `{` whose flat spelling fits easily at its indent — an avoidable
+	// tear (the zzz DiskfileMetrics defect class), never a sanctioned travel.
+	const words =
+		'aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii jjjj kkkk llll mmmm nnnn oooo pppp qqqq rrrr ssss';
+	const prettier = `<p>\n\t${words} {cond\n\t\t? 'a'\n\t\t: 'b'} tail\n</p>`;
+	const ours = `<p>\n\t${words}\n\t{cond\n\t\t? 'a'\n\t\t: 'b'} tail\n</p>`;
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('spaced_tag_travel', ctx), null);
+});
+
+Deno.test('spaced_tag_travel: negative - prettier keeps a compact balanced form', () => {
+	// The zzz DiskfileMetrics hunk: prettier's side is the compact form (every `{`
+	// closed on its line — no mid-line-open marker), ours tears two tags open.
+	// No prettier marker → unclaimed, so the defect surfaces as unknown.
+	const prettier =
+		'<div>\n' + "\t{a > 0 ? '+' : ''}{diff} =\n" + "\t{a > 0 ? '+' : ''}{pct}%\n" + '</div>';
+	const ours =
+		'<div>\n' +
+		'\t{a > 0\n' +
+		"\t\t? '+'\n" +
+		"\t\t: ''}{diff} = {a > 0\n" +
+		"\t\t? '+'\n" +
+		"\t\t: ''}{pct}%\n" +
+		'</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('spaced_tag_travel', ctx), null);
+});
+
+Deno.test('spaced_tag_travel: negative - dropped content is never claimed', () => {
+	// The weld equality is the content-preservation proof: lose a word and it fails.
+	const prettier =
+		'<span>\n\twebsocket aaaa bbbb cccc dddd eeee ffff gggg hhhh iiii {socket.connected\n\t\t? 1\n\t\t: 2}\n</span>';
+	const ours =
+		'<span>\n\taaaa bbbb cccc dddd eeee ffff gggg hhhh iiii\n\t{socket.connected ? 1 : 2}\n</span>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('spaced_tag_travel', ctx), null);
+});
+
+Deno.test('spaced_tag_travel: negative - short respelling with no width motive', () => {
+	// Prettier mid-line marker + clean weld, but the flat content fits well under
+	// print width — travel never fires there, so this is some other reflow.
+	const prettier = '<span>\n\taa {cond\n\t\t? 1\n\t\t: 2}\n</span>';
+	const ours = '<span>\n\taa\n\t{cond ? 1 : 2}\n</span>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('spaced_tag_travel', ctx), null);
+});
+
 // ─── svelte_boundary_ws_trim ────────────────────────────────────────────────
 
 Deno.test('svelte_boundary_ws_trim: positive - fragment-edge run trimmed inside a tag', () => {
