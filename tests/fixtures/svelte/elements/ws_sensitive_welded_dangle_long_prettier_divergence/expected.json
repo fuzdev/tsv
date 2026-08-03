@@ -1,0 +1,185 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 693,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 376,
+				"data": "\n\tWhitespace-sensitive: inside <pre> every inter-tag byte is content, so tsv's layout\n\tvocabulary (whitespace-boundary breaks, block-style moves, tags intact) has no\n\trender-safe break point and the over-width welded run stands. Prettier instead\n\tdangles the closing tag's `>` (`</b⏎\\t>tail` — the break lands inside tag syntax,\n\trender-free) to duck under printWidth.\n"
+			},
+			{
+				"type": "Text",
+				"start": 376,
+				"end": 377,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 377,
+				"end": 490,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 8,
+						"column": 1,
+						"character": 378
+					},
+					"end": {
+						"line": 8,
+						"column": 4,
+						"character": 381
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 382,
+							"end": 438,
+							"raw": "\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+							"data": "\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "
+						},
+						{
+							"type": "RegularElement",
+							"start": 438,
+							"end": 451,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 9,
+									"column": 56,
+									"character": 439
+								},
+								"end": {
+									"line": 9,
+									"column": 57,
+									"character": 440
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 441,
+										"end": 447,
+										"raw": "welded",
+										"data": "welded"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 451,
+							"end": 484,
+							"raw": "tail stays intact at one hundred\n",
+							"data": "tail stays intact at one hundred\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 490,
+				"end": 492,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 492,
+				"end": 577,
+				"data": " One char over: prettier dangles the closing `>`, tsv leaves the line intact. "
+			},
+			{
+				"type": "Text",
+				"start": 577,
+				"end": 578,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 578,
+				"end": 692,
+				"name": "pre",
+				"name_loc": {
+					"start": {
+						"line": 13,
+						"column": 1,
+						"character": 579
+					},
+					"end": {
+						"line": 13,
+						"column": 4,
+						"character": 582
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 583,
+							"end": 636,
+							"raw": "\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa ",
+							"data": "\naaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa "
+						},
+						{
+							"type": "RegularElement",
+							"start": 636,
+							"end": 649,
+							"name": "b",
+							"name_loc": {
+								"start": {
+									"line": 14,
+									"column": 53,
+									"character": 637
+								},
+								"end": {
+									"line": 14,
+									"column": 54,
+									"character": 638
+								}
+							},
+							"attributes": [],
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 639,
+										"end": 645,
+										"raw": "welded",
+										"data": "welded"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 649,
+							"end": 686,
+							"raw": "tail stays intact at one hundred one\n",
+							"data": "tail stays intact at one hundred one\n"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}
