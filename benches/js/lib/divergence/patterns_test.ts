@@ -286,31 +286,46 @@ Deno.test('fill_101_boundary: negative - we have fewer lines (not a break)', () 
 	assertEquals(match, null);
 });
 
-// ─── menu_block ─────────────────────────────────────────────────────────────
+// ─── spec_block_elements ────────────────────────────────────────────────────
 
-Deno.test('menu_block: positive - prettier hugs menu content, we expand', () => {
+Deno.test('spec_block_elements: positive - prettier hugs menu content, we expand', () => {
 	const prettier = '<menu\n\tdata-attr1="value1"\n\tdata-attr2="value2">{@render fn()}</menu\n>';
 	const ours = '<menu\n\tdata-attr1="value1"\n\tdata-attr2="value2"\n>\n\t{@render fn()}\n</menu>';
 	const ctx = make_context(ours, prettier, 'svelte');
-	const match = run_pattern('menu_block', ctx);
+	const match = run_pattern('spec_block_elements', ctx);
 	assertNotEquals(match, null);
-	assertEquals(match!.pattern, 'menu_block');
+	assertEquals(match!.pattern, 'spec_block_elements');
 	assertEquals(match!.confidence, 'certain');
 });
 
-Deno.test('menu_block: negative - not svelte', () => {
+Deno.test(
+	'spec_block_elements: positive - glued sibling after </summary> detaches to its own line',
+	() => {
+		// prettier (summary inline in its blockElements-derived model) keeps the glued
+		// {@html} on the summary line; tsv (summary block, per the HTML spec's UA rules)
+		// gives the following sibling its own line.
+		const prettier = '<details>\n\t<summary>{title}</summary>{@html content}\n</details>';
+		const ours = '<details>\n\t<summary>{title}</summary>\n\t{@html content}\n</details>';
+		const ctx = make_context(ours, prettier, 'svelte');
+		const match = run_pattern('spec_block_elements', ctx);
+		assertNotEquals(match, null);
+		assertEquals(match!.pattern, 'spec_block_elements');
+	}
+);
+
+Deno.test('spec_block_elements: negative - not svelte', () => {
 	const prettier = '<menu\n\tclass="nav">{@render fn()}</menu\n>';
 	const ours = '<menu\n\tclass="nav"\n>\n\t{@render fn()}\n</menu>';
 	const ctx = make_context(ours, prettier, 'typescript');
-	const match = run_pattern('menu_block', ctx);
+	const match = run_pattern('spec_block_elements', ctx);
 	assertEquals(match, null);
 });
 
-Deno.test('menu_block: negative - not a menu element', () => {
+Deno.test('spec_block_elements: negative - not a menu/summary element', () => {
 	const prettier = '<div\n\tclass="nav">content</div>';
 	const ours = '<div\n\tclass="nav"\n>\n\tcontent\n</div>';
 	const ctx = make_context(ours, prettier, 'svelte');
-	const match = run_pattern('menu_block', ctx);
+	const match = run_pattern('spec_block_elements', ctx);
 	assertEquals(match, null);
 });
 
@@ -395,6 +410,42 @@ Deno.test('inline_sibling_newline_flow: negative - dropped content is never clai
 	// The weld equality is the content-preservation proof: lose a word and it fails.
 	const prettier = '<div>\n\tLorem ipsum,\n\t<strong>dolor</strong>.\n</div>';
 	const ours = '<div>\n\tLorem, <strong>dolor</strong>.\n</div>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
+});
+
+Deno.test(
+	'inline_sibling_newline_flow: positive - re-pack (equal counts, break moves later)',
+	() => {
+		// The flowed run is over-width, so the fill re-breaks at a later boundary: line
+		// counts match, ours' first line strictly extends prettier's, all ours lines ≤ 100.
+		const pad = 'lorem ipsum dolor sit amet consectetur adipiscing elit sed do eiusmod tempor';
+		const prettier = `<li>\n\t<a href={url}>${pad}</a>\n\t— {description} and a tail wide enough to overflow the flowed line\n</li>`;
+		const ours = `<li>\n\t<a href={url}>${pad}</a> —\n\t{description} and a tail wide enough to overflow the flowed line\n</li>`;
+		const ctx = make_context(ours, prettier, 'svelte');
+		const match = run_pattern('inline_sibling_newline_flow', ctx);
+		assertNotEquals(match, null);
+	}
+);
+
+Deno.test('inline_sibling_newline_flow: negative - re-pack refuses ours breaking EARLIER', () => {
+	// The mirror shape: ours' first line is a PREFIX of prettier's (the break moved
+	// earlier though the packed form fits) — the deep inline-container early-break
+	// defect. The extension key must refuse it so it surfaces as partial/unknown.
+	const prettier =
+		'<span>\n\tdispatch on duplicate names: <code>throw</code> | <code>warn</code>\n\t(default: emit diagnostic)\n</span>';
+	const ours =
+		'<span>\n\tdispatch on duplicate names: <code>throw</code> |\n\t<code>warn</code> (default: emit diagnostic)\n</span>';
+	const ctx = make_context(ours, prettier, 'svelte');
+	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
+});
+
+Deno.test('inline_sibling_newline_flow: negative - re-pack refuses an over-width ours line', () => {
+	// The hard-limit guard: an ours line past 100 is not the sanctioned re-pack, even
+	// with the weld equality and the extension key both holding.
+	const wide = 'w'.repeat(79);
+	const prettier = `<li>\n\t<a href={url}>${wide}</a>\n\t— {description}\n</li>`;
+	const ours = `<li>\n\t<a href={url}>${wide}</a> —\n\t{description}\n</li>`;
 	const ctx = make_context(ours, prettier, 'svelte');
 	assertEquals(run_pattern('inline_sibling_newline_flow', ctx), null);
 });
