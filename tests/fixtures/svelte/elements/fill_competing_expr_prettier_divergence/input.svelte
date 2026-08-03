@@ -1,14 +1,15 @@
 <!--
-	Two breakable expressions compete for the same line in a fill that overflows. Only one needs
-	to break, so the layout has a choice to make — and it must make the same one every pass.
+	Two breakable expressions share a fill that overflows. The run resolves at the render-free
+	whitespace boundary in front of the first welded unit that no longer fits — text2{…} travels
+	whole and NEITHER expression breaks — and every authoring of the content boundary (padded,
+	hugged, dangled) must converge to that same form instead of oscillating.
 -->
 <div>
 	<div>
 		<div>
 			<small>
-				{expr1abcdef} text1{expr1abcdef !== 1
-					? 's'
-					: ''}, {obj.expr2abcdef} text2{obj.expr2abcdef !== 1 ? 's' : ''}
+				{expr1abcdef} text1{expr1abcdef !== 1 ? 's' : ''}, {obj.expr2abcdef}
+				text2{obj.expr2abcdef !== 1 ? 's' : ''}
 			</small>
 		</div>
 	</div>

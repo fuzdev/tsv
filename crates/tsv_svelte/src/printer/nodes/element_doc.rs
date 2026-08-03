@@ -537,11 +537,8 @@ impl<'a> Printer<'a> {
         let ctx = self.analyze_element(&parts, &attr_docs);
         match self.compute_element_layout(&parts, &ctx) {
             ElementLayout::WithContent(BoundaryMode::Soft) => {
-                let children_doc = self.build_nodes_doc_trimmed(
-                    element.fragment.nodes,
-                    Self::nodes_have_breakable_expression(element.fragment.nodes),
-                    MultilineCause::None,
-                );
+                let children_doc =
+                    self.build_nodes_doc_trimmed(element.fragment.nodes, MultilineCause::None);
                 Some((parts, ctx, attr_docs, children_doc))
             }
             _ => None,
@@ -733,13 +730,6 @@ impl<'a> Printer<'a> {
         // every fragment edge at compile), so no element kind keeps it. Only the multiline-ness
         // varies — `Hard` is exactly the multiline case.
         //
-        // `breakable_exprs` (the fill-vs-hard-width divergence for long multi-expression runs,
-        // `fill_multiple_expr_long`) is a property of the CONTENT (does a child `{expr}` have
-        // internal break points?), not of the boundary, so it cannot depend on which boundary
-        // mode we landed in. Passing `false` strands a breakable expression group flat under a
-        // fits()-Break `line` — which, on a fill whose text and ternaries compete for the same
-        // line, oscillates between two layouts (a non-idempotent 2-cycle, `authoring_audit`'s
-        // hard bucket).
         // A whitespace-collapsing container lays its children out one-per-line with the
         // inter-sibling whitespace trimmed (render-free — the compiler removes it). Its multiline
         // decision is forced (see `analyze_element`), so `boundary` is always `Hard` here and this
@@ -757,7 +747,7 @@ impl<'a> Printer<'a> {
             } else {
                 MultilineCause::None
             };
-            self.build_nodes_doc_trimmed(nodes, Self::nodes_have_breakable_expression(nodes), cause)
+            self.build_nodes_doc_trimmed(nodes, cause)
         };
 
         // Soft boundaries: collapse when the element fits, break block-style when it doesn't.

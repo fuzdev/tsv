@@ -136,9 +136,11 @@ fn is_one_line_separator(t: &internal::Text, source: &str) -> bool {
 impl<'a> Printer<'a> {
     /// Check if an expression has internal break points (ternary, &&, ||, +, etc.)
     ///
-    /// When true, the expression can break internally before the containing element
-    /// needs to break its tags. This enables the "hug mode" divergence where we keep
-    /// `<tag>` together and let expressions break, reducing indentation drift.
+    /// Sole consumer: the whitespace-sensitive element builder's simple-content
+    /// check (`element_ws_sensitive_doc.rs`) — a `<pre>`/`<textarea>` whose only
+    /// child is a single expression tag WITHOUT break points takes the
+    /// `>`-dangle hug, while break-capable content uses normal flow so the
+    /// expression breaks internally first.
     pub(super) fn expression_has_break_points(expr: &Expression<'_>) -> bool {
         match expr {
             // Ternary always has break points
@@ -196,23 +198,6 @@ impl<'a> Printer<'a> {
             | Expression::ImportExpression(_)
             | Expression::MetaProperty(_) => false,
         }
-    }
-
-    /// Whether any direct child expression tag (`{expr}`) can break internally
-    /// (ternary, binary, call, …). Mirrors the collapsible wrapper's hard-width
-    /// divergence: when true, the children builder must keep those expression
-    /// groups breakable, so boundary text adjacent to them is emitted as plain
-    /// spaces rather than `fill` `line`s — otherwise a `line` in fits()-Break
-    /// mode short-circuits the preceding expression group's width check, leaving
-    /// it flat and overshooting printWidth (the `fill_multiple_expr_long` case).
-    pub(super) fn nodes_have_breakable_expression(nodes: &[FragmentNode<'_>]) -> bool {
-        nodes.iter().any(|n| {
-            if let FragmentNode::ExpressionTag(tag) = n {
-                Self::expression_has_break_points(&tag.expression)
-            } else {
-                false
-            }
-        })
     }
 
     /// Check if a fragment node is an HTML block element (not component, not control flow)
