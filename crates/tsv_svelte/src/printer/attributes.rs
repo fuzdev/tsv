@@ -733,7 +733,7 @@ impl<'a> Printer<'a> {
 
     /// The value stage of an **unprefixed** `{…}` — an attribute value or an expression tag:
     /// [`Printer::build_head_value_doc`] under this context's `EmbedContext`, which sets
-    /// `LayoutMode::Embedded` so binary expressions use ContinuationIndent style.
+    /// `LayoutMode::Embedded` so a ROOT binary expression uses ContinuationIndent style.
     ///
     /// The embed starts from [`tsv_lang::EmbedContext::default`], not the host's `self.embed`
     /// — such a value is measured from its own `{`, not from the enclosing embedding. That is

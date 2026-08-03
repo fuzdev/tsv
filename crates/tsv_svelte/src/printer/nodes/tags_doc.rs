@@ -83,8 +83,8 @@ impl<'a> Printer<'a> {
         // (`{@const { b = /* c */ 1 } = expr}`); the comment-less builder
         // silently dropped them.
         let id_doc = self.build_ts_expression_doc(id);
-        // Build init with LayoutMode::Standalone so binary chains use Grouped style
-        // (not ContinuationIndent). The assignment layout handles indentation —
+        // Build init with LayoutMode::Standalone so a ROOT binary init uses Grouped
+        // style (not ContinuationIndent). The assignment layout handles indentation —
         // ContinuationIndent would double-indent continuation lines.
         // Nothing indents the init, so a trailing line comment's own `hardline` is already
         // the break this `}` needs, on the tag's own column — the closer adds none
@@ -194,9 +194,10 @@ impl<'a> Printer<'a> {
     ///
     /// Like `build_expression_with_comments_doc` but **without** its
     /// `mode: LayoutMode::Embedded` — inheriting the host's Standalone mode is what keeps
-    /// binary chains on Grouped style rather than ContinuationIndent, since the printers
-    /// that choose between them read `EmbedContext::is_embedded()`. The @const assignment
-    /// layout handles indentation; ContinuationIndent would stack on top of it.
+    /// a ROOT binary init on Grouped style rather than ContinuationIndent, since the
+    /// expression-root entry (`build_root_expression_doc`) reads
+    /// `EmbedContext::is_embedded()`. The @const assignment layout handles indentation;
+    /// ContinuationIndent would stack on top of it.
     ///
     /// The `=`→value head: an own-line directive anywhere in the binding→value gap
     /// freezes the whole value. The window is the whole gap rather than the part past
@@ -210,7 +211,7 @@ impl<'a> Printer<'a> {
 
         let leading_docs = self.leading_comment_docs(span_start, expr_start);
 
-        // mode defaults to Standalone: binary chains use Grouped style, not ContinuationIndent
+        // mode defaults to Standalone: a root binary uses Grouped style, not ContinuationIndent
         let embed = tsv_lang::EmbedContext {
             first_line_offset: 0,
             ..self.embed
