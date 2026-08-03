@@ -412,11 +412,21 @@ impl<'a> Printer<'a> {
                 // Comments in the object→`[` gap (`A /* c */[K]`) trail the object
                 // in place; comments in the `[`→index gap (`A[/* c */ K]`) lead the
                 // index — both preserved where the user placed them.
-                // Both gaps break a line comment onto its own line so it can't
-                // swallow the following `[`/index (the comment-aware delimiter scan
-                // keeps a `[`/`]` glyph inside a comment from being read as the bracket).
-                let object_comments = bracket_open
-                    .map(|bp| self.build_leading_comments_break_for_line(bracket_area_start, bp));
+                //
+                // The object→`[` gap can hold only a single-line block: a type's index
+                // suffix may not follow a line break, so a `//` (or a multiline block)
+                // there means the source never parsed as an indexed access at all
+                // (`type X = A // c⏎[K];` is `type X = A;` plus an `ArrayExpression`
+                // statement). Hence the plain inline run — no break to keep a comment
+                // from swallowing the `[`. The `[`→index gap below, which *can* hold a
+                // line comment, takes the hanging emitter instead.
+                let object_comments = bracket_open.and_then(|bp| {
+                    debug_assert!(
+                        !self.has_line_comments_between(bracket_area_start, bp),
+                        "a line comment before `[` means this never parsed as an indexed access"
+                    );
+                    self.build_inline_comments_between_doc_opt(bracket_area_start, bp)
+                });
                 // An alone-on-line format-ignore directive in the `[`→index gap stays
                 // OWN-LINE inside the brackets — the trailing-hang emitter below would
                 // glue it to the `[` (`[// prettier-ignore`), an inert placement that

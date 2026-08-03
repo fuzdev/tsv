@@ -16,12 +16,12 @@ position (`type I = A[K]; // c`).
 Per Comment Position Philosophy, tsv preserves the comment's authored position.
 Emitting it inline (the previous behavior) let the `//` **swallow** the index
 type — non-idempotent content loss; the line comment now forces the break (the
-shared `build_trailing_comments_break_for_line`).
+shared `build_trailing_comments_hang_next`).
 
-The object→`[` gap (`A // c⏎[K]`) is also fixed at the printer (the
-`build_leading_comments_break_for_line` path), but isn't fixtured here: acorn
-parses `A⏎[K]` (a newline before the `[`) as two statements via ASI where tsv
-keeps the single `TSIndexedAccessType`, a pre-existing parser divergence the break
-would otherwise entangle with. The swallow itself is guarded by `swallow_audit`.
+The neighbouring object→`[` gap (`A // c⏎[K]`) has no counterpart fixture because
+the shape does not exist: a type's index suffix may not follow a line break, so
+both parsers read `A⏎[K]` as two statements (`type X = A;` plus an
+`ArrayExpression`), and a `//` there forces exactly that break. That gap can hold
+only a single-line block (`A /* c */[K]`), which stays glued.
 
 See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
