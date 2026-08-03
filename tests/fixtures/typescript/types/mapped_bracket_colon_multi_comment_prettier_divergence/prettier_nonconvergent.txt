@@ -1,0 +1,8 @@
+Prettier never reaches a fixed point on this input. With two line comments in the
+`]`→value-`:` gap of a mapped type it cannot settle where the second comment goes:
+it oscillates forever between `]: // c2⏎V` (second comment trailing the value `:`,
+first inside the broken brackets) and `// c2⏎]: V` (second comment pulled inside
+the brackets below the first), flipping on every pass. No prettier-anchored claim
+file (output_prettier.*, audit_signature.txt, variants) is expressible. The
+validator live-verifies this claim (rule F5). See README.md and
+docs/conformance_prettier.md §Comment relocation.
