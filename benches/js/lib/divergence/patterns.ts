@@ -1878,6 +1878,25 @@ function forced_continuation_site(prev_ours: string, first_added: string): strin
 	// comment above an indented line would match almost anything.
 	if (/\/\//.test(prev_ours) && /^[ \t]*:/.test(first_added)) return 'key→colon gap';
 
+	// Svelte braced heads — the head→value gap of every `{…}`, via the shared
+	// `leading_line_comment_hangs_value`. Three spellings, each of which the TS
+	// printer cannot produce, which is what keeps this clause from claiming an
+	// ordinary object/block indent bug (the defect class it most resembles):
+	//
+	//  - a prefixed tag or block head (`{@html // c`, `{...// c`, `{#if // c`) —
+	//    unambiguous markup;
+	//  - an attribute or directive value (`data-attr={// c`, `on:click={// c`) — the
+	//    space-less `={` is markup only, since a TS assignment prints ` = {`;
+	//  - the bare `{expr}` tag as the whole line (`{// c`) — tsv's TS printer never
+	//    glues a `//` to an opening brace, putting it on the next line instead.
+	if (
+		/\{(?:@(?:html|render|debug|attach)\b|\.\.\.|#\w+\b|:else if\b)[ \t]*\/\//.test(prev_ours) ||
+		/=\{[ \t]*\/\//.test(prev_ours) ||
+		/^[ \t]*\{\/\//.test(prev_ours)
+	) {
+		return 'Svelte braced head';
+	}
+
 	// No clause for an OWN-LINE comment leading the continuation: where the author
 	// wrote the comment on its own line, prettier relocates the comment itself, so
 	// the hunk carries that relocation and is not a pure re-indent at all —
@@ -1888,7 +1907,7 @@ function forced_continuation_site(prev_ours: string, first_added: string): strin
 const forced_continuation_indent: DivergencePattern = {
 	id: 'forced_continuation_indent',
 	description:
-		'tsv indents a comment-forced continuation one level (annotation, declaration/module header, prefix type operator, key→`:` gap); prettier keeps it flush',
+		'tsv indents a comment-forced continuation one level (annotation, declaration/module header, prefix type operator, key→`:` gap, Svelte braced head); prettier keeps it flush',
 	languages: ['typescript', 'svelte'],
 	conformance_sections: ['Uniform Forced-Continuation Indent', 'Comment Position Philosophy'],
 	fixtures: [
@@ -1904,7 +1923,14 @@ const forced_continuation_indent: DivergencePattern = {
 		// The declaration-header clause's only witness, so it is listed deliberately:
 		// if this fixture stops being claimed the clause is dead, and nothing else
 		// would say so.
-		'typescript/syntax/comments/keyword_name_line_comment_prettier_divergence'
+		'typescript/syntax/comments/keyword_name_line_comment_prettier_divergence',
+		// The Svelte-braced-head clause's witnesses, one per spelling: the family
+		// sweep covers the prefixed tags and the `={` attribute values, the `on:`
+		// sample covers a directive value whose expression self-expands, and the
+		// expression-tag pair covers the bare `{//` line.
+		'svelte/syntax/comments/expr_leading_line_prettier_divergence',
+		'svelte/directives/on/line_comment_prettier_divergence',
+		'svelte/syntax/comments/expression_tag_line_comment_prettier_divergence'
 	],
 	detect(ctx) {
 		if (ctx.language !== 'typescript' && ctx.language !== 'svelte') return null;
