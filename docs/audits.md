@@ -16,6 +16,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Blank injection](#blank-line-injection-audit-blanksaudit) | `blanks:audit` | blank-line handling: panic / idempotency / reparse / ledger / blank-run | `deno task check` (ratchet) |
 | [Blank fabrication](#blank-fabrication-audit-fabricationaudit) | `fabrication:audit` | a blank line the formatter INVENTS on a pristine seed (the author never wrote it) | `deno task check` (ratchet) |
 | [Comment census](#comment-census-audit-censusaudit) | `census:audit` | a comment interior lost, gained, or rewritten between raw input and raw output — parse-time drops included, which the ledger can't see | `deno task check` (ratchet) |
+| [Print width](#print-width-audit-widthaudit) | `width:audit` | a new KIND of over-width output line — the shape a hard-limit bug takes | `deno task check` (ratchet) |
 | [Ignore honoring](#ignore-directive-honoring-audit-ignoreaudit) | `ignore:audit` | `prettier-ignore` positions that silently reformat an ignored node, misbind a trailing directive, over-freeze, or lose the freeze on pass 2 | `deno task check` (ratchet) |
 | [Build fanout](#build-fanout-audit-fanoutaudit) | `fanout:audit` | exponential doc-node rebuild in nested layout candidates | `deno task check` |
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
@@ -250,6 +251,49 @@ cargo run --profile corpus -p tsv_debug --features audits census_audit ~/dev/zzz
 - **As-authored only.** Like every pristine audit, a drop in a gap no corpus file puts a comment in stays invisible — `gaps:audit` is the injection arm for that class (with the ledger, not the census, as its oracle).
 
 `deno task census:audit:update` regenerates the snapshot after fixing a pinned loss site (or pinning a newly found one); it refuses a narrowed run.
+
+## Print-Width Audit (`width:audit`)
+
+The only gate that measures a **column**. [conformance_prettier.md §Print Width Philosophy](./conformance_prettier.md#print-width-philosophy) says tsv treats `printWidth` as a **hard limit** where prettier treats it as a soft target — *a line tsv can break is a line tsv does break* — and nothing measured that claim until this audit. It formats each seed and measures every output line.
+
+Why it needs its own gate: **every other gate is blind to an over-width line, by construction.**
+
+- **F1 / fuzz / round-trip** — the over-width output is a *fixed point*; formatting it again reproduces it byte-for-byte, and it reparses.
+- **comment ledger / census** — nothing is dropped, merged, or rewritten.
+- **gaps / blanks / fabrication / swallow / ignore injection** — these perturb comment gaps, blank lines and directives; none measures a column.
+- **`corpus:compare:format`** — grades *against prettier*, and on the widest shape prettier emits the over-width line **itself**, so the oracle vouches for the bug.
+- **`authoring:audit`** — asks for one fixed point per document, not a good one.
+
+Two real bugs (the mid-run comment weld and its leading twin) shipped an over-width line — one of them also non-idempotent — with `deno task check` green throughout.
+
+```bash
+# width_audit - format each seed and report every output line over PRINT_WIDTH,
+# rolled up by shape. Pure Rust, no Deno, no instrumentation feature.
+cargo run --profile corpus -p tsv_debug --features audits width_audit
+cargo run --profile corpus -p tsv_debug --features audits width_audit ~/dev/zzz/src
+# Also: --json, --verbose (every line, not the per-shape rollup), --limit N, --update.
+# A narrowed run (explicit paths / --limit) reports and exits 0 without grading — the
+# snapshot pins the full default run — and says so, so it cannot read as a green gate.
+#
+# GATED as a RATCHET over `width_audit_known.txt` — a no-new-KINDS gate, NOT a debt
+# list. Unlike gaps/blanks, "zero" is not the target: most over-width lines are the
+# overruns §Print Width Philosophy sanctions. A shape found but not pinned FAILS; a
+# pinned shape that stops firing FAILS.
+```
+
+`deno task width:audit:update` regenerates the snapshot; it refuses a narrowed run.
+
+**Seeds are the whole tree, and that is load-bearing.** Measuring `input.*` alone would have caught neither motivating bug: tsv holds the *correct* form stable, so the overrun appears only when formatting an **alternate authoring**. The audit therefore sweeps every file under `tests/fixtures` — `unformatted_*` / `*_variant_*` / `output_prettier.*` siblings included — and **formats** each rather than measuring it as committed. Verified, not assumed: with the mid-run comment fix reverted, all seven extra over-width lines came from `unformatted_ours_compact.svelte` and `divergent_variant_packed.svelte`, and the `input.*` side did not move at all.
+
+**The key is `head…tail`, and the tail half is why it works.** A shape is the language bucket plus how the over-width line opens and ends. The head alone does **not** discriminate — measured against the reverted fix, a head-only key produced *no* new shape, while `head…tail` produced `IDENT…-->` (a long word running into a comment), which is exactly what that bug emitted. Identifiers collapse to `IDENT` so an ordinary rename does not churn the snapshot.
+
+⚠️ **A rejected design worth not re-deriving: the render-time hook.** The tempting version instruments the renderer — a break opportunity *is* a `Line` doc node, so "an over-width line that still held a flat `Line`" needs no lexing and no carve-out list, and forced overruns (a comment, a string, a `<pre>` body: all atoms with no `Line` inside) stay silent by construction. It was built, unit-tested, and **rejected on evidence**: it is blind to exactly the class it was built for. The mid-run comment bug *removed* the break point — it baked the boundary space into the preceding word — so there was no unspent seam to find, and reverting the fix left that check reporting **zero** while the output grew seven over-width lines. A missing seam is invisible to a check that looks for unspent seams. Re-test against a reverted fix before reviving it.
+
+**Blind spots.**
+
+- **Not a bug list.** A pinned shape is a *kind of line that exists*, not a defect. Triage a new one against §Print Width Philosophy before pinning it; the sanctioned overruns are real and numerous (~478 lines over `tests/fixtures`, dominated by fixture prose headers a formatter never rewraps).
+- **Shape collision.** A width bug whose line happens to open and end like an existing pinned shape passes. The key is a silhouette, not a proof; it catches new *kinds*, and a same-kind regression needs a fixture.
+- **Vacuous on a corpus with no wide lines.** `FORMATTED_MIN` guards the file count, not the line count.
 
 ## Ignore-Directive Honoring Audit (`ignore:audit`)
 

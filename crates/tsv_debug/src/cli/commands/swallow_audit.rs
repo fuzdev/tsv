@@ -2,12 +2,13 @@ use argh::FromArgs;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use crate::audit::sweep::check_formatted_min;
 use crate::cli::CliError;
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 use tsv_lang::doc::swallow::{self, SwallowReport};
 
-use super::profile::{is_input_invalid_fixture, resolve_files};
+use super::profile::{is_input_invalid_fixture, resolve_seed_files};
 
 /// Audit for line comments that swallow the following token.
 ///
@@ -47,18 +48,7 @@ const FORMATTED_MIN: usize = 5_742;
 impl SwallowAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let default_paths = self.paths.is_empty();
-        let paths = if default_paths {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.paths
-        };
-        let files = match resolve_files(&paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
+        let files = resolve_seed_files(&self.paths, 0)?;
 
         // Enable the check for the whole run; the builder records line-comment
         // ids and the renderer flags swallows. Single-threaded so the
@@ -101,12 +91,8 @@ impl SwallowAuditCommand {
             print_report(&violations, formatted, parse_errors);
         }
 
-        if default_paths && formatted < FORMATTED_MIN {
-            eprintln!(
-                "Error: pinned minimum — formatted {formatted} files < pinned {FORMATTED_MIN}. \
-                 The fixtures walk shrank (or parsing collapsed); if deliberate, re-pin FORMATTED_MIN."
-            );
-            return Err(CliError::Failed);
+        if default_paths {
+            check_formatted_min(formatted, FORMATTED_MIN)?;
         }
 
         if violations.is_empty() {

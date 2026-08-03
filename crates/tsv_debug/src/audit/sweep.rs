@@ -15,6 +15,7 @@ use std::path::{Path, PathBuf};
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
+use crate::cli::CliError;
 use crate::cli::commands::profile::is_input_invalid_fixture;
 
 /// The sweep's bookkeeping: how many files were formatted, and why the rest
@@ -51,6 +52,32 @@ impl PristineSweep {
         }
         parts.join(", ")
     }
+}
+
+/// The **vacuity guard** every corpus gate applies before grading: a default run
+/// that formatted fewer than `min` files is not a passing gate, it is a
+/// collapsed corpus — an empty walk or a parser that started rejecting
+/// everything would otherwise report "0 findings across 0 files" and exit 0.
+///
+/// A minimum rather than a two-sided pin because the fixtures tree is COMMITTED
+/// and grows with ordinary fixture PRs (`deno task check` must not fail per
+/// added fixture); only shrinkage fails. Each consumer owns its own
+/// `FORMATTED_MIN` const — they are pinned at different times over corpora that
+/// skip different files — and calls this only on a full default run.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] (after a user-facing message) when fewer than
+/// `min` files were formatted.
+pub(crate) fn check_formatted_min(formatted: usize, min: usize) -> Result<(), CliError> {
+    if formatted >= min {
+        return Ok(());
+    }
+    eprintln!(
+        "Error: pinned minimum — formatted {formatted} files < pinned {min}. \
+         The fixtures walk shrank (or parsing collapsed); if deliberate, re-pin FORMATTED_MIN."
+    );
+    Err(CliError::Failed)
 }
 
 /// Format every file as authored and hand each `(path, parser, source, output)`

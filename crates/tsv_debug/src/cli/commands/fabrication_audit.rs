@@ -3,10 +3,11 @@ use std::collections::BTreeSet;
 use std::path::PathBuf;
 
 use crate::audit::ratchet::{Ratchet, SnapshotKey, refuse_narrowed_update};
-use crate::audit::sweep::{PristineSweep, sweep_pristine};
+use crate::audit::shape::markup_head;
+use crate::audit::sweep::{PristineSweep, check_formatted_min, sweep_pristine};
 use crate::cli::CliError;
 
-use super::profile::resolve_files;
+use super::profile::resolve_seed_files;
 
 /// Audit for blank lines the formatter INVENTS.
 ///
@@ -140,19 +141,7 @@ impl FabricationAuditCommand {
             "the fabrication shapes over tests/fixtures",
             "SUBSET",
         )?;
-        let paths = if default_paths {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.paths
-        };
-        let files = match resolve_files(&paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
-
+        let files = resolve_seed_files(&self.paths, 0)?;
         let sweep = sweep_files(&files);
 
         if self.json {
@@ -161,13 +150,8 @@ impl FabricationAuditCommand {
             print_report(&sweep);
         }
 
-        if default_paths && sweep.pristine.formatted < FORMATTED_MIN {
-            eprintln!(
-                "Error: pinned minimum — formatted {} files < pinned {FORMATTED_MIN}. \
-                 The fixtures walk shrank (or parsing collapsed); if deliberate, re-pin FORMATTED_MIN.",
-                sweep.pristine.formatted
-            );
-            return Err(CliError::Failed);
+        if default_paths {
+            check_formatted_min(sweep.pristine.formatted, FORMATTED_MIN)?;
         }
 
         let ratchet = ratchet();
@@ -186,28 +170,12 @@ impl FabricationAuditCommand {
             };
         }
 
-        let diff = ratchet.grade(&sweep.shapes)?;
-        if diff.holds() {
-            println!(
-                "\n✓ ratchet holds — {} known fabrication shape(s), no new ones ({} files)",
-                diff.known, sweep.pristine.formatted
-            );
-            return Ok(());
-        }
-        for shape in &diff.new {
-            eprintln!(
-                "✗ NEW fabrication shape (not pinned): {:?} ⇢ blank ⇢ {:?}",
-                shape.before, shape.after
-            );
-        }
-        for shape in &diff.stale {
-            eprintln!(
-                "✗ STALE pin (no longer fires — fix landed, re-pin): {:?} ⇢ blank ⇢ {:?}",
-                shape.before, shape.after
-            );
-        }
-        eprintln!("\nRe-pin with `{REPIN_HINT}` once the change is deliberate.");
-        Err(CliError::Failed)
+        ratchet.grade_and_report(
+            &sweep.shapes,
+            "fabrication shape",
+            &format!("{} files", sweep.pristine.formatted),
+            |shape| format!("{:?} ⇢ blank ⇢ {:?}", shape.before, shape.after),
+        )
     }
 }
 
@@ -250,16 +218,9 @@ fn sweep_files(files: &[PathBuf]) -> Sweep {
     }
 }
 
-/// The ratchet snapshot, colocated with this module and read at runtime by the [`Ratchet`]
-/// (see that module for why not `include_str!`). Anchored on `CARGO_MANIFEST_DIR` rather than
-/// the cwd, so the audit finds it from any working directory.
-fn known_shapes_path() -> PathBuf {
-    PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("src/cli/commands/fabrication_audit_known.txt")
-}
-
-/// The ratchet over [`known_shapes_path`], carrying this audit's header + re-pin hint.
+/// The ratchet over this audit's colocated snapshot, carrying its header + re-pin hint.
 fn ratchet() -> Ratchet {
-    Ratchet::new(known_shapes_path(), SNAPSHOT_HEADER, REPIN_HINT)
+    Ratchet::colocated("fabrication_audit_known.txt", SNAPSHOT_HEADER, REPIN_HINT)
 }
 
 /// Whether `line` is blank — empty or horizontal whitespace only.
@@ -386,39 +347,16 @@ fn is_empty_block_body(prev: &str, next: &str) -> bool {
 ///
 /// The ratchet keys on shapes rather than file paths so the snapshot survives a corpus change
 /// and states the BUG (`{:catch` gains a blank before `{/await`) instead of a location. The
-/// alphabet is deliberately coarse: a tag name without its attributes, a block keyword without
-/// its expression, `text` for prose, `^` for the document edge.
+/// markup arm is [`markup_head`], shared with `width_audit` so one alphabet answers "how does
+/// this line open?" for both snapshots; everything else is prose as far as *this* question
+/// goes — a blank fabricated between two code lines is the same finding whatever the code is —
+/// so the fallback is a flat `text`, with `^` for the document edge.
 fn line_shape(line: &str) -> String {
     let t = line.trim();
     if t.is_empty() {
         return "^".to_string();
     }
-    if t.starts_with("<!--") {
-        return "<!--".to_string();
-    }
-    if let Some(rest) = t.strip_prefix("</") {
-        return format!("</{}", head_name(rest));
-    }
-    if let Some(rest) = t.strip_prefix('<') {
-        return format!("<{}", head_name(rest));
-    }
-    if let Some(rest) = t.strip_prefix('{') {
-        return match rest.chars().next() {
-            Some(sigil @ ('#' | ':' | '/' | '@')) => {
-                format!("{{{sigil}{}", head_name(&rest[sigil.len_utf8()..]))
-            }
-            // A plain `{expr}` interpolation — the expression itself is not part of the shape.
-            _ => "{".to_string(),
-        };
-    }
-    "text".to_string()
-}
-
-/// The leading name token of `s` — letters, digits, `:`, `-`, `_`.
-fn head_name(s: &str) -> String {
-    s.chars()
-        .take_while(|c| c.is_ascii_alphanumeric() || matches!(c, ':' | '-' | '_'))
-        .collect()
+    markup_head(t).unwrap_or_else(|| "text".to_string())
 }
 
 /// Per-output blank-run tally, split by whether a carve-out excuses the run.
