@@ -1,0 +1,519 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 702,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 179,
+				"data": " a leading line comment breaks the head and indents its continuation; the trailing\n\tcomment's own break is dedented, so the closing `}` still lands at the tag's own column "
+			},
+			{
+				"type": "Text",
+				"start": 179,
+				"end": 180,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 180,
+				"end": 216,
+				"test": {
+					"type": "Identifier",
+					"start": 192,
+					"end": 196,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 5
+						}
+					},
+					"name": "cond",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c1",
+							"start": 185,
+							"end": 190
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 197,
+							"end": 202
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 204,
+							"end": 211,
+							"raw": "\n\ttext\n",
+							"data": "\n\ttext\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 216,
+				"end": 218,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 218,
+				"end": 339,
+				"data": " the control: no leading comment, so nothing indents the content — the same `}` column,\n\treached without a dedent "
+			},
+			{
+				"type": "Text",
+				"start": 339,
+				"end": 340,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 340,
+				"end": 369,
+				"test": {
+					"type": "Identifier",
+					"start": 345,
+					"end": 349,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 5
+						},
+						"end": {
+							"line": 11,
+							"column": 9
+						}
+					},
+					"name": "cond",
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " c2",
+							"start": 350,
+							"end": 355
+						}
+					]
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 357,
+							"end": 364,
+							"raw": "\n\ttext\n",
+							"data": "\n\ttext\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 369,
+				"end": 371,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 371,
+				"end": 437,
+				"data": " the same closer rule one level in, on a second block kind "
+			},
+			{
+				"type": "Text",
+				"start": 437,
+				"end": 438,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "IfBlock",
+				"elseif": false,
+				"start": 438,
+				"end": 498,
+				"test": {
+					"type": "Identifier",
+					"start": 443,
+					"end": 447,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 5
+						},
+						"end": {
+							"line": 17,
+							"column": 9
+						}
+					},
+					"name": "cond"
+				},
+				"consequent": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 448,
+							"end": 450,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "KeyBlock",
+							"start": 450,
+							"end": 492,
+							"expression": {
+								"type": "Identifier",
+								"start": 464,
+								"end": 468,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 19,
+										"column": 6
+									}
+								},
+								"name": "expr",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " c1",
+										"start": 456,
+										"end": 461
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c2",
+										"start": 469,
+										"end": 474
+									}
+								]
+							},
+							"fragment": {
+								"type": "Fragment",
+								"nodes": [
+									{
+										"type": "Text",
+										"start": 477,
+										"end": 486,
+										"raw": "\n\t\ttext\n\t",
+										"data": "\n\t\ttext\n\t"
+									}
+								]
+							}
+						},
+						{
+							"type": "Text",
+							"start": 492,
+							"end": 493,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"alternate": null
+			},
+			{
+				"type": "Text",
+				"start": 498,
+				"end": 500,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 500,
+				"end": 635,
+				"data": " the break-after-operator layout indents a `{@const}` init the same way; its `}` lands at\n\tthe tag's own column, not the init's "
+			},
+			{
+				"type": "Text",
+				"start": 635,
+				"end": 636,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "EachBlock",
+				"start": 636,
+				"end": 701,
+				"expression": {
+					"type": "Identifier",
+					"start": 643,
+					"end": 648,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 7
+						},
+						"end": {
+							"line": 27,
+							"column": 12
+						}
+					},
+					"name": "items"
+				},
+				"body": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 657,
+							"end": 659,
+							"raw": "\n\t",
+							"data": "\n\t"
+						},
+						{
+							"type": "ConstTag",
+							"start": 659,
+							"end": 693,
+							"declaration": {
+								"type": "VariableDeclaration",
+								"kind": "const",
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"id": {
+											"type": "Identifier",
+											"name": "a",
+											"start": 667,
+											"end": 668,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 9,
+													"character": 667
+												},
+												"end": {
+													"line": 28,
+													"column": 10,
+													"character": 668
+												}
+											}
+										},
+										"init": {
+											"type": "LogicalExpression",
+											"start": 673,
+											"end": 685,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 2
+												},
+												"end": {
+													"line": 29,
+													"column": 14
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 673,
+												"end": 677,
+												"loc": {
+													"start": {
+														"line": 29,
+														"column": 2
+													},
+													"end": {
+														"line": 29,
+														"column": 6
+													}
+												},
+												"name": "item"
+											},
+											"operator": "&&",
+											"right": {
+												"type": "Identifier",
+												"start": 681,
+												"end": 685,
+												"loc": {
+													"start": {
+														"line": 29,
+														"column": 10
+													},
+													"end": {
+														"line": 29,
+														"column": 14
+													}
+												},
+												"name": "cond"
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " c",
+													"start": 686,
+													"end": 690
+												}
+											]
+										},
+										"start": 667,
+										"end": 690
+									}
+								],
+								"start": 661,
+								"end": 692
+							}
+						},
+						{
+							"type": "Text",
+							"start": 693,
+							"end": 694,
+							"raw": "\n",
+							"data": "\n"
+						}
+					]
+				},
+				"context": {
+					"type": "Identifier",
+					"name": "item",
+					"start": 652,
+					"end": 656,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 16,
+							"character": 652
+						},
+						"end": {
+							"line": 27,
+							"column": 20,
+							"character": 656
+						}
+					}
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 185,
+			"end": 190,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 5
+				},
+				"end": {
+					"line": 3,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 197,
+			"end": 202,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 6
+				},
+				"end": {
+					"line": 4,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 350,
+			"end": 355,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 10
+				},
+				"end": {
+					"line": 11,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 456,
+			"end": 461,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 7
+				},
+				"end": {
+					"line": 18,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 469,
+			"end": 474,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 7
+				},
+				"end": {
+					"line": 19,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 686,
+			"end": 690,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 15
+				},
+				"end": {
+					"line": 29,
+					"column": 19
+				}
+			}
+		}
+	]
+}
