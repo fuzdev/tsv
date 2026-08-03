@@ -802,10 +802,17 @@ impl<'a> Printer<'a> {
     pub(crate) fn build_leading_comments_break_for_line(&self, start: u32, end: u32) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
+        // The separating space belongs before a comment that continues a line — the
+        // first, or one following a block. A comment that follows a hardline starts
+        // its line at the indent, so a space there is a stray leading space.
+        let mut after_hardline = false;
         for comment in comments_to_emit_in_range(self.comments, start, end) {
-            parts.push(d.text(" "));
+            if !after_hardline {
+                parts.push(d.text(" "));
+            }
             parts.push(self.build_comment_doc(comment));
-            if !comment.is_block {
+            after_hardline = !comment.is_block;
+            if after_hardline {
                 parts.push(d.hardline());
             }
         }

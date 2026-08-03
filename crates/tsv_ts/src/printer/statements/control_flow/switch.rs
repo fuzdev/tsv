@@ -5,10 +5,10 @@
 use crate::ast::internal::{self, Statement};
 use crate::printer::{CommentVec, LeadingGlue, Printer, next_printed_stmt_start};
 use smallvec::smallvec;
-use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{TriviaProfile, find_char};
+use tsv_lang::{comments_to_emit_in_range, has_line_comments_in_range};
 
 impl<'a> Printer<'a> {
     /// Build a doc for a switch statement with proper line-width wrapping
@@ -233,12 +233,23 @@ impl<'a> Printer<'a> {
         // colon sits exactly one byte before the label end, which `get_case_label_end`
         // already located as colon+1, so no second scan is needed.
         let colon_pos = case_label_end - 1;
-        if let Some(comments) =
-            self.build_inline_comments_between_doc_opt(Self::case_head_end(case), colon_pos)
-        {
-            parts.push(comments);
+        let head_end = Self::case_head_end(case);
+        if has_line_comments_in_range(self.comments, head_end, colon_pos) {
+            // A `//` here runs to end-of-line, so emitting the gap inline would swallow
+            // the colon into the comment (`case x // c:`, which does not reparse). The
+            // uniform forced-continuation indent: the comments trail the head and the
+            // bare `:` drops one level. Gated on line comments only — a multiline block
+            // stays glued to the `:` whether or not the author broke after it (the
+            // broke-after continuation rule is scoped to value-separator gaps), so
+            // `comments_force_own_line_between` would be the wrong gate here.
+            parts.push(self.build_continuation_indent(head_end, colon_pos, d.text(":")));
+        } else {
+            if let Some(comments) = self.build_inline_comments_between_doc_opt(head_end, colon_pos)
+            {
+                parts.push(comments);
+            }
+            parts.push(d.text(":"));
         }
-        parts.push(d.text(":"));
 
         // Comments trailing the case label (`case 1: // comment`), on the shared same-line
         // trailing rule every statement list uses — which also walks a multiline block to
