@@ -1,0 +1,276 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1323,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": [
+			{
+				"type": "Comment",
+				"start": 0,
+				"end": 576,
+				"data": "\n\tA comment beside a text run keeps its authored line, and the two sides are INDEPENDENT: a\n\tnewline on one side alone is held on that side alone, so all four authorings below are fixed\n\tpoints. Both formatters hold all four, which is why this is not a divergence — it is the\n\tboundary of tsv's own sibling-newline flow rule, where an inline element or a tag in the\n\tidentical position DOES flow (inline_sibling_newline_flow_prettier_divergence, whose\n\tprettier_variant_newline_after / _before carry the element twins of the one-sided pair and\n\tconverge on its input).\n"
+			},
+			{
+				"type": "Text",
+				"start": 576,
+				"end": 578,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 578,
+				"end": 646,
+				"data": "\n\tcontrol: newline on BOTH sides — the comment owns its line\n"
+			},
+			{
+				"type": "Text",
+				"start": 646,
+				"end": 647,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 647,
+				"end": 681,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 14,
+						"column": 1,
+						"character": 648
+					},
+					"end": {
+						"line": 14,
+						"column": 2,
+						"character": 649
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 650,
+							"end": 659,
+							"raw": "\n\ttext1\n\t",
+							"data": "\n\ttext1\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 659,
+							"end": 669,
+							"data": " c "
+						},
+						{
+							"type": "Text",
+							"start": 669,
+							"end": 677,
+							"raw": "\n\ttext2\n",
+							"data": "\n\ttext2\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 681,
+				"end": 683,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 683,
+				"end": 769,
+				"data": "\n\tcontrol: newline AFTER only — the following run stays off the comment's line\n"
+			},
+			{
+				"type": "Text",
+				"start": 769,
+				"end": 770,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 770,
+				"end": 803,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 23,
+						"column": 1,
+						"character": 771
+					},
+					"end": {
+						"line": 23,
+						"column": 2,
+						"character": 772
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 773,
+							"end": 781,
+							"raw": "\n\ttext1 ",
+							"data": "\n\ttext1 "
+						},
+						{
+							"type": "Comment",
+							"start": 781,
+							"end": 791,
+							"data": " c "
+						},
+						{
+							"type": "Text",
+							"start": 791,
+							"end": 799,
+							"raw": "\n\ttext2\n",
+							"data": "\n\ttext2\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 803,
+				"end": 805,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 805,
+				"end": 892,
+				"data": "\n\tcontrol: newline BEFORE only — the comment stays off the preceding run's line\n"
+			},
+			{
+				"type": "Text",
+				"start": 892,
+				"end": 893,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 893,
+				"end": 926,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 31,
+						"column": 1,
+						"character": 894
+					},
+					"end": {
+						"line": 31,
+						"column": 2,
+						"character": 895
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 896,
+							"end": 905,
+							"raw": "\n\ttext1\n\t",
+							"data": "\n\ttext1\n\t"
+						},
+						{
+							"type": "Comment",
+							"start": 905,
+							"end": 915,
+							"data": " c "
+						},
+						{
+							"type": "Text",
+							"start": 915,
+							"end": 922,
+							"raw": " text2\n",
+							"data": " text2\n"
+						}
+					]
+				}
+			},
+			{
+				"type": "Text",
+				"start": 926,
+				"end": 928,
+				"raw": "\n\n",
+				"data": "\n\n"
+			},
+			{
+				"type": "Comment",
+				"start": 928,
+				"end": 1292,
+				"data": "\n\tcontrol: NEITHER side — the rule HOLDS what was authored, it does not FORCE a break around a\n\tcomment, so the hugged authoring stays hugged. This is the null control of the pair above,\n\tvarying the same dimension (is there a newline at this boundary?): without it, an\n\timplementation that always broke both sides of a comment would pass every case above.\n"
+			},
+			{
+				"type": "Text",
+				"start": 1292,
+				"end": 1293,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "RegularElement",
+				"start": 1293,
+				"end": 1322,
+				"name": "p",
+				"name_loc": {
+					"start": {
+						"line": 42,
+						"column": 1,
+						"character": 1294
+					},
+					"end": {
+						"line": 42,
+						"column": 2,
+						"character": 1295
+					}
+				},
+				"attributes": [],
+				"fragment": {
+					"type": "Fragment",
+					"nodes": [
+						{
+							"type": "Text",
+							"start": 1296,
+							"end": 1302,
+							"raw": "text1 ",
+							"data": "text1 "
+						},
+						{
+							"type": "Comment",
+							"start": 1302,
+							"end": 1312,
+							"data": " c "
+						},
+						{
+							"type": "Text",
+							"start": 1312,
+							"end": 1318,
+							"raw": " text2",
+							"data": " text2"
+						}
+					]
+				}
+			}
+		]
+	},
+	"options": null,
+	"comments": []
+}

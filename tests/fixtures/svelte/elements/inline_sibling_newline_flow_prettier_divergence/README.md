@@ -39,11 +39,27 @@ both) as `prettier_variant_*` files.
 - **A comment keeps its authored line.** A comment's position is authorship, so folding one into
   a text fill would relocate it across a semantic boundary — the one thing
   [§Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy)
-  exists to prevent.
+  exists to prevent. Each side of a comment is held independently, and the hugged authoring is
+  held too — [inline_separator_comment_newline](../inline_separator_comment_newline/) pins those
+  four authorings, where both formatters agree.
 - **A blank line still breaks.** Blank-line preservation is a Tier-2 authoring signal
   independent of render, uniform with every other boundary tsv produces.
 - **A block sibling still takes its own line**, while the inline run before it flows — blocks
   merely partition a fragment into inline runs, each of which flows on its own.
+
+## The boundary of those controls — bounding a run is not sterilizing it
+
+⚠️ A sibling that owns its own line **ends** the run; it does not stop the run's *other*
+boundaries from flowing. Stated only in prose, that half is invisible: a control whose run is
+already hugged in every file is a fixed point under either rule, so it cannot tell "the comment
+holds its own two boundaries" apart from "a run anywhere near a comment keeps every line" — and
+the second reading is a different rule that happens to satisfy the first control.
+
+So two controls carry an inline run **beside** the bounding sibling and re-author it in all three
+variants, which makes the flow a normalization the fixture actually observes: the comment control's
+twin holds a run on *each* side of the comment, and the block-sibling control's run before the
+block is isolated per variant. Both converge on `input` while prettier keeps each spelling —
+exactly the divergence the main cases pin, now measured across a run boundary.
 
 See
 [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
