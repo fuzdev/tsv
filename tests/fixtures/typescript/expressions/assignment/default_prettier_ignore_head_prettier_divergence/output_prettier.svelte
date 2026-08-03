@@ -13,4 +13,9 @@
 	const [iii =
 			// prettier-ignore
 			jjj  ||  kkk] = lll;
+
+	// an object-shorthand default is the same head
+	const { mmm =
+			// prettier-ignore
+			nnn  +  ooo } = ppp;
 </script>

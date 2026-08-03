@@ -296,6 +296,26 @@ The rule holds at every value gap whose own-line authoring **hangs** the comment
 initializer family: declarator, class property, object value, enum member, and the `=`/`:`
 gaps that share their emitters).
 
+**The converse holds in a forced continuation, on both sides of the separator.** Where the
+break *is* forced — every site of [§Uniform Forced-Continuation
+Indent](#uniform-forced-continuation-indent) — an authored blank inside the gap survives with
+it, whether it sits between two comments or between the last comment and the tail
+(`const e // c1⏎⏎\t// c2⏎\t= 1`). This is the same sentence as above read forwards rather than
+backwards: the blank survives exactly where the break survives, and a `//` can only end its
+line. It is one answer across the family's emitters — the forced-continuation run
+(`build_trailing_comments_hang_next`, via `build_continuation_indent`), the declaration-header
+run (`build_header_comment_run`), and the prefix-keyword operand seam
+(`append_keyword_value_line_comments`) — each reaching the shared
+`push_blank_preserving_hardline` off the physically-next-comment anchor (`blank_scan_end`), so
+gate and emitter cannot answer differently. Prettier **agrees** wherever it leaves the run in
+the gap (declaration header, `:`→type annotation, prefix type-operator operand, callee→empty
+argument list, type-parameter `extends`), differing only in the continuation indent already
+cataloged there; it drops the blank only where it **relocates** the run out of the gap
+entirely — past the `=` at a binding initializer or default, to end-of-line at a property
+signature — so the drop is incidental to the relocation rather than a considered answer.
+Cataloged at
+[continuation_blank_between_comments](../tests/fixtures/typescript/syntax/comments/continuation_blank_between_comments_prettier_divergence/).
+
 **Known residual.** Two gaps still keep the blank: `await`→operand and `new`→callee (inside a
 declarator; a bare expression statement has no group to collapse into, so it holds the break
 regardless of width). Those emitters **relocate** an own-line comment up onto the head line

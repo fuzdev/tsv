@@ -1,8 +1,8 @@
 # default_prettier_ignore_head_prettier_divergence
 
-A default value — a parameter default, a destructuring default, an array-pattern default —
-frozen by an own-line directive in its `=`→value gap. The slice is the value's own node span,
-so the binding and the enclosing list stay parent-owned:
+A default value — a parameter default, a destructuring default, an array-pattern default, an
+object-**shorthand** default — frozen by an own-line directive in its `=`→value gap. The slice
+is the value's own node span, so the binding and the enclosing list stay parent-owned:
 
 ```ts
 function fn(
