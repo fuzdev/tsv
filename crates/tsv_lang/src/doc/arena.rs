@@ -1295,6 +1295,52 @@ impl DocArena {
         }
     }
 
+    /// Debug tripwire for the marker-BURIAL hazard, called at the welded walk's `NotGlued` stop
+    /// (`flow_lookahead` in `arena_render_fill`): descend the stopped doc's first-structural-child
+    /// chain and panic if a [`DocContext::glued_lead`] marker sits inside.
+    ///
+    /// Every builder that WRAPS a marked doc is a burial hazard: [`Self::welded_entry`] reads only
+    /// the top node, so a marker inside a bare wrapper (`group([marked, line])` — the sibling-join
+    /// bug's exact shape, since fixed by [`Self::try_welded_sibling_join`] re-hoisting the flags)
+    /// is invisible, the walk stops one entry short, and the run stands and tears its last element
+    /// open instead of travelling. Burial keeps the marker as the wrapper's FIRST structural child;
+    /// a legitimately nested marker (a glued boundary in some deeper fill) sits behind a `Fill` or
+    /// other content node, where this descent stops — so a hit is a buried marker, not a false
+    /// positive. The descent mirrors that shape: a `WithContext` not itself marked → its doc, a
+    /// `Group` → its contents, a `Concat` → its first child; anything else ends the chain. The
+    /// entry doc itself was just classified `NotGlued`, so a depth-0 marker cannot occur.
+    ///
+    /// Debug builds only (the standing audits build `--profile corpus`, which compiles this out —
+    /// the armed sweep is the debug-mode fixture suite plus a debug-profile audit run).
+    #[cfg(debug_assertions)]
+    pub(crate) fn debug_check_buried_welded_marker(&self, id: DocId) {
+        let nodes = self.nodes.borrow();
+        let children = self.children.borrow();
+        let mut cur = id;
+        loop {
+            cur = match &nodes[cur.index()] {
+                DocNode::WithContext { doc, context } => {
+                    assert!(
+                        !context.glued_lead(),
+                        "buried welded-run marker: a glued_lead-marked doc is the first \
+                         structural child of a NotGlued welded-walk entry — a wrapping builder \
+                         hid the marker from welded_entry (re-hoist its flags onto the wrapper, \
+                         as DocArena::try_welded_sibling_join does)"
+                    );
+                    *doc
+                }
+                DocNode::Group { contents, .. } => *contents,
+                DocNode::Concat(range) => {
+                    let Some(&head) = range.resolve(&children).first() else {
+                        return;
+                    };
+                    head
+                }
+                _ => return,
+            };
+        }
+    }
+
     /// The **single** constructor of the inline-sibling wrap — `group(concat([line, x]))`, an
     /// inline child led by a collapsible boundary `line` (a space when the fill fits, a break when
     /// it wraps). Every producer routes through here (`push_inline_child_doc` in `tsv_svelte`), and
@@ -2993,5 +3039,40 @@ mod welded_sibling_join_tests {
             .try_welded_sibling_join(marker(&a))
             .expect("a marker must join");
         assert!(a.try_welded_sibling_join(joined).is_none());
+    }
+
+    /// The burial tripwire must FIRE on the historical bug shape — a marker wrapped in a bare
+    /// `group([marked, line])` with its flags NOT re-hoisted (the exact form
+    /// [`super::DocArena::try_welded_sibling_join`] exists to prevent).
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "buried welded-run marker")]
+    fn burial_tripwire_fires_on_a_bare_wrapping_join() {
+        let a = DocArena::new();
+        let buried = a.group(a.concat(&[marker(&a), a.line()]));
+        assert!(matches!(a.welded_entry(buried), WeldedEntry::NotGlued));
+        a.debug_check_buried_welded_marker(buried);
+    }
+
+    /// …and stay QUIET on the legitimate shapes: the hoisting join itself (never classified
+    /// `NotGlued`, but the descent must also not fire through it), a marker sitting behind a
+    /// `Fill`'s items (a glued boundary in some deeper fill — the descent stops at the `Fill`),
+    /// and plain markerless content.
+    #[cfg(debug_assertions)]
+    #[test]
+    fn burial_tripwire_quiet_on_legitimate_nesting() {
+        let a = DocArena::new();
+        // A marker deeper in a fill: first structural child chain ends at the Fill node.
+        let nested = a.group(a.fill(&[marker(&a), a.line(), a.text("word")]));
+        a.debug_check_buried_welded_marker(nested);
+        // Ordinary content, arbitrarily wrapped.
+        let plain = a.group(a.concat(&[a.indent(a.text("x")), a.line()]));
+        a.debug_check_buried_welded_marker(plain);
+        // A WithContext without the marker flag descends without firing.
+        let flagged = a.with_context(
+            a.text("y"),
+            DocContext::default().with_after_element_fold(true),
+        );
+        a.debug_check_buried_welded_marker(a.group(a.concat(&[flagged, a.line()])));
     }
 }
