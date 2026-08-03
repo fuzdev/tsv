@@ -21,5 +21,5 @@ text starts on a fresh line whole (expression intact) rather than opening mid-li
 class as `fill_spaced_tag_travel_long_prettier_divergence`.
 See [conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy).
 
-See also: `fill_expr_travel_middle_before_long_prettier_divergence/` (a second wide tag in
-the hard-width run after the traveled one).
+See also: `fill_expr_travel_middle_before_long_prettier_divergence/` (a second **wide** tag
+mid-run after the traveled one, which travels the same way).

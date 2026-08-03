@@ -119,12 +119,26 @@ pub(super) fn render_fill_iterative(
         // break lands one separator too late, which is also non-idempotent: the next pass
         // measures from a different column and moves it.
         //
+        // At a flow boundary the folded measurement must grade the SAME pairwise welded unit
+        // the primary `content_fits` above graded (`[line, word]` glued to a following tag —
+        // the word is the separator here, so the unit is word + tag): raw `rest_commands`
+        // would measure the tag in its inherited Break mode, short-circuit at its first
+        // internal line, report a false fit, and the tag would then break in place mid-line —
+        // the tear the welded walk exists to prevent (`fill_multi_expr_travel_long`).
+        //
         // Case 1 is deliberately excluded (`offset + 1 < parts.len()`): there the `line` is the
         // fill's last item, a boundary separator to whatever FOLLOWS the fill, and its existing
         // `rest_commands` measurement already asks the right question.
         let content_fits = if offset + 1 < parts.len() && arena.is_collapsible_line(content) {
-            let mut with_sep: SmallVec<[ArenaCommand; 8]> =
-                SmallVec::from_slice(if is_final_segment { rest_commands } else { &[] });
+            let mut with_sep: SmallVec<[ArenaCommand; 8]> = if is_final_segment {
+                if context.break_before_wide_flow() {
+                    flow_lookahead(arena, rest_commands)
+                } else {
+                    SmallVec::from_slice(rest_commands)
+                }
+            } else {
+                SmallVec::new()
+            };
             with_sep.push(ArenaCommand {
                 indent,
                 mode: Mode::Flat,
@@ -591,7 +605,11 @@ pub(super) fn render_fill_iterative(
 ///
 /// Both halves of the boundary rule share this, since they differ only in where the separator sits:
 /// the space-authored half measures it as Case 2's `sep_fits` (separator counted after this stack),
-/// the glued half as Case 1's `content_fits` (no separator at all).
+/// the glued half as Case 1's `content_fits` (no separator at all). The parity-shifted glued half —
+/// a `leading_line` fill whose last CONTENT is the `line` and whose word is the separator — reaches
+/// it through the collapsible-line `content_fits` correction, which folds that word on top of this
+/// stack; measuring the word against raw `rest_commands` instead would let the welded tag's
+/// inherited Break mode short-circuit the check and tear the tag mid-line.
 fn flow_lookahead(arena: &DocArena, rest_commands: &[ArenaCommand]) -> SmallVec<[ArenaCommand; 8]> {
     let mut out: SmallVec<[ArenaCommand; 8]> = SmallVec::new();
     let Some((&el_cmd, deeper)) = rest_commands.split_last() else {

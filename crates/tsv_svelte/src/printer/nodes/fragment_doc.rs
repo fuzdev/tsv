@@ -148,13 +148,6 @@ impl<'a> Printer<'a> {
     /// it — see conformance_prettier.md §Svelte: Inline content block-style.
     ///
     /// # Parameters
-    /// - `breakable_exprs`: If true, boundary text adjacent to expression/html/render tags is
-    ///   emitted as plain spaces instead of `fill` `line`s. Set when the fragment has a
-    ///   break-capable expression tag (the hard-width divergence): a `line` in
-    ///   fits()-Break mode short-circuits a preceding expression group's width check, stranding
-    ///   it flat and overshooting printWidth (`fill_multiple_expr_long`). Plain spaces keep the
-    ///   expression group's full `fits()` obligation so it breaks instead. Callers with no
-    ///   break-capable expression pass `false`.
     /// - `cause`: the convergence mode — [`MultilineCause::None`] is the legacy inline arm;
     ///   anything else is the element multiline arm (`compute_multiline_cause`). Multiline turns on
     ///   the ported prettier-plugin-svelte printChildren handling that the legacy inline callers
@@ -171,7 +164,6 @@ impl<'a> Printer<'a> {
     pub(super) fn build_nodes_doc_trimmed(
         &self,
         nodes: &[FragmentNode<'_>],
-        breakable_exprs: bool,
         cause: MultilineCause,
     ) -> DocId {
         let multiline = cause.is_multiline();
@@ -314,7 +306,6 @@ impl<'a> Printer<'a> {
                     trimmed_nodes,
                     i,
                     TextChildContext {
-                        breakable_exprs,
                         cause,
                         run_has_prose,
                         content_bounds,
@@ -935,15 +926,12 @@ impl<'a> Printer<'a> {
     /// delegates to the unified [`Self::build_nodes_doc_trimmed`] in `multiline` mode (trimmed
     /// boundaries; prettier's `printChildren` model — block-child softlines + `forceBreakContent`,
     /// `splitTextToDocs` boundary hardlines, the control-flow-block `in_multiline_context` /
-    /// root-inline-run dispatch, and the sibling-`>` dangle). `breakable_exprs` opts a fragment
-    /// carrying a break-capable expression tag into the hard-width multi-expression layout
-    /// (`fill_multiple_expr_long`).
+    /// root-inline-run dispatch, and the sibling-`>` dangle).
     pub(crate) fn build_nodes_doc_multiline(&self, nodes: &[FragmentNode<'_>]) -> DocId {
-        let breakable_exprs = Self::nodes_have_breakable_expression(nodes);
         // `Structural`: these callers are the root fragment, block bodies, and special elements —
         // none of them has an enclosing element whose multiline-ness the content's own newlines
         // could flip, so the sibling-newline flow rule stays in force here.
-        self.build_nodes_doc_trimmed(nodes, breakable_exprs, MultilineCause::Structural)
+        self.build_nodes_doc_trimmed(nodes, MultilineCause::Structural)
     }
 
     /// Build the content of a **whitespace-collapsing container** (`<table>`, `<select>`, … —

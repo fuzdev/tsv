@@ -66,10 +66,6 @@ impl SiblingPosition {
 /// each is decided by the *caller's* context rather than by the text node's own position.
 #[derive(Clone, Copy)]
 pub(super) struct TextChildContext {
-    /// A break-capable expression tag is present in the fragment, so boundary text adjacent to a
-    /// tag emits a plain space instead of a fill `line` (which would short-circuit an earlier
-    /// expression group's `fits()` lookahead).
-    pub(super) breakable_exprs: bool,
     /// Whether the fragment is built on the convergence path (the multiline element arm, the only
     /// caller that routes blocks and control-flow blocks through their own dispatch) — and, when
     /// it is, *why* the layout went multiline. The cause is read by the sibling-newline flow rule
@@ -145,7 +141,6 @@ impl<'a> Printer<'a> {
         handle_whitespace_of_prev_text: &mut bool,
     ) {
         let TextChildContext {
-            breakable_exprs,
             cause,
             run_has_prose,
             content_bounds,
@@ -459,25 +454,26 @@ impl<'a> Printer<'a> {
             add_leading_space = false;
         } else if has_leading_ws && !is_first && position.prev_is_inline() {
             if prev_is_tag && (is_last || !prev_will_break) {
-                // Text after expression/html/render tag.
+                // Text after expression/html/render tag: use leading_line in fill instead of
+                // wrapping the tag with group([tag, line()]). The group approach forces line()
+                // to break after multiline tags, pushing text to a new line. leading_line lets
+                // fill continue on the tag's continuation line (line() → space in flat, newline
+                // in break).
+                //
+                // Unconditional — a run holding OTHER break-capable expression tags used to take
+                // a plain leading space here instead (the `breakable_exprs` hard-width carve-out),
+                // on the theory that a fill `line` renders in fits()-Break mode and short-circuits
+                // an earlier expression group's lookahead. That carve-out removed every boundary
+                // break point from the run, so the earlier group's measurement ran across the
+                // plain spaces into the NEXT breakable tag's head and tore a welded unit that fit
+                // at its own position (`fill_multi_expr_travel_long`). The stop at the boundary
+                // `line` is the correct answer under the travel doctrine: the boundary itself is
+                // measured pairwise against the whole flat unit that follows
+                // ([`tsv_lang::doc::DocContext::break_before_wide_flow`]), so a unit that does
+                // not fit travels there and nothing is stranded flat past printWidth.
                 trim_left = true;
-                if breakable_exprs {
-                    // Hard-width context (a break-capable expression tag is present): emit a
-                    // plain leading space instead of a fill `line`. A `line` here renders in
-                    // fits()-Break mode and short-circuits the lookahead of an *earlier*
-                    // expression group (the `_ if Break => return true` arm), stranding it flat
-                    // and overshooting printWidth. A plain space keeps that group's full fits()
-                    // obligation so it breaks instead (the `fill_multiple_expr_long` divergence).
-                    add_leading_space = true;
-                } else {
-                    // Use leading_line in fill instead of wrapping the tag with
-                    // group([tag, line()]). The group approach forces line() to break after
-                    // multiline tags, pushing text to a new line. leading_line lets fill
-                    // continue on the tag's continuation line (line() → space in flat, newline
-                    // in break).
-                    add_leading_space = false;
-                    leading_line = true;
-                }
+                add_leading_space = false;
+                leading_line = true;
             } else if is_last && prev_will_break {
                 // Last child after breaking element (e.g. multiline attrs):
                 // skip wrapping because group([breaking_element, line()]) forces
@@ -609,20 +605,13 @@ impl<'a> Printer<'a> {
             trailing_hardlines = if trailing_ws_newlines >= 2 { 2 } else { 1 };
         } else if has_trailing_ws && !is_last && position.next_is_inline() {
             if is_first || next_is_tag {
-                if breakable_exprs && !is_first {
-                    // Hard-width context: plain trailing space before the tag instead of a fill
-                    // `line` (a `line` short-circuits this node's own preceding expression group;
-                    // see the leading branch). A first child has no preceding group, so it falls
-                    // through to the fill's own trailing space (matching the plain path-3 layout).
+                // First child or middle child before tag: trailing line in fill. Unconditional —
+                // the `breakable_exprs` hard-width carve-out (plain trailing space when the run
+                // holds another break-capable tag) is deleted; see the leading branch.
+                add_trailing_space = false;
+                trailing_line = true;
+                if !is_first {
                     trim_right = true;
-                    add_trailing_space = true;
-                } else {
-                    // First child or middle child before tag: trailing line in fill
-                    add_trailing_space = false;
-                    trailing_line = true;
-                    if !is_first {
-                        trim_right = true;
-                    }
                 }
             } else if multiline && next_is_flow {
                 // Multiline middle child before a flowing inline element / component (space-only
