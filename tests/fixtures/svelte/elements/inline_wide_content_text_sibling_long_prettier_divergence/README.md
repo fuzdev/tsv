@@ -24,4 +24,4 @@ and dangles); a *non-terminal* text run (one followed by another flowing element
 line, because hugging it onto the element's closing line is non-convergent. (The *terminal* case
 instead respects the author's space and hugs — see `inline_wide_content_trailing_long`.)
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

@@ -19,5 +19,5 @@ content is a comment (a truly empty `{}` has no content to space and stays tight
 in both). Bracket spacing is hardcoded in tsv, so this is a fixed design choice,
 not a configurable gap.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md)
 §Empty-object comment bracket spacing.

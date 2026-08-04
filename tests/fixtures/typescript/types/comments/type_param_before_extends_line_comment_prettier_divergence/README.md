@@ -28,5 +28,5 @@ and the before-`:` key/binding gap
 The same rule applies to Svelte `{#snippet}` generics
 ([ts_generic_constraint_gap_line_comment](../../../../svelte/blocks/snippet/ts_generic_constraint_gap_line_comment_prettier_divergence/)).
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation)
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
 and [§Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent).

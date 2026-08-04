@@ -15,4 +15,4 @@ the key-side counterpart of
 [mapped_value_line_comment](../mapped_value_line_comment_prettier_divergence/)
 (the comment after `:`).
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

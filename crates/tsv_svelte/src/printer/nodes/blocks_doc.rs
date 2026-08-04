@@ -154,7 +154,7 @@ enum AwaitShorthand {
 /// (`{#await p} {:then v}{/await}`, or the shorthand `{#await p then v}{/await}`) is dropped
 /// entirely — marker and binding — matching prettier, since the `value` binding is unused when
 /// nothing renders. (A `:catch` is *not* dropped when empty: an empty `{:catch}` still handles a
-/// rejection, so removing it would change semantics — see `conformance_prettier.md` §Svelte: Blocks.)
+/// rejection, so removing it would change semantics — see `conformance_prettier_svelte.md` §Svelte: Blocks.)
 fn then_has_content(block: &internal::AwaitBlock<'_>) -> bool {
     block
         .then
@@ -409,7 +409,7 @@ impl<'a> Printer<'a> {
     /// when the construct overflows — uniformly across text, expression, void, and
     /// element/component bodies (a deliberate divergence from prettier, which hugs the
     /// `}` and breaks an element body internally; see
-    /// `conformance_prettier.md` §Svelte: Blocks). The `conditional_group` fits-tests
+    /// `conformance_prettier_svelte.md` §Svelte: Blocks). The `conditional_group` fits-tests
     /// each candidate in flat mode, so an element body's inline candidate does not
     /// "fit by breaking internally" — it falls through to the expanded (drop) state.
     ///
@@ -888,7 +888,7 @@ impl<'a> Printer<'a> {
     /// `<pre>`/`<textarea>` are significant), so it neither survives inline nor selects
     /// the layout — the fast path trims it away (`build_section_body_doc`). Only a
     /// boundary whose whitespace run contains a newline keeps its meaning (the
-    /// construct stays multiline). See conformance_prettier.md §Svelte: Blocks.
+    /// construct stays multiline). See conformance_prettier_svelte.md §Svelte: Blocks.
     ///
     /// The verdict drives the whole construct, and the expansion it gates is
     /// **all-or-nothing**: on the non-fast paths every branch body + marker + close
@@ -898,7 +898,7 @@ impl<'a> Printer<'a> {
     /// branch that renders inline still breaks once any sibling branch went multiline
     /// (`{:else}` never welds its body while `{#if}` holds its own). The same
     /// invariant `ElementLayout::WithContent(BoundaryMode)` encodes for an element's
-    /// content boundary — see conformance_prettier.md §Svelte: Inline content
+    /// content boundary — see conformance_prettier_svelte.md §Svelte: Inline content
     /// block-style. `<pre>`/`<textarea>` never reach here — they are dispatched to
     /// the whitespace-sensitive builder, where the boundary is literal and the hug
     /// mandatory.
@@ -910,7 +910,7 @@ impl<'a> Printer<'a> {
 
     /// Build a block-section body for the inline/expanding fast path: boundary
     /// whitespace **trimmed** (a space-only section boundary is render-free, so it never
-    /// survives inline — see conformance_prettier.md §Svelte: Blocks), content otherwise
+    /// survives inline — see conformance_prettier_svelte.md §Svelte: Blocks), content otherwise
     /// the shared prettier-shaped builder. One builder for a glued and a space-only
     /// authoring of the same body, so both reach one fixed point by construction.
     ///

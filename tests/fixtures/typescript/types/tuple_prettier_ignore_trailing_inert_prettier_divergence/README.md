@@ -35,4 +35,4 @@ corpora, only in prettier's own test suite. The rule is placement-only and unifo
 across every member list (Rule A), so the tuple family behaves exactly like the
 union/intersection families.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

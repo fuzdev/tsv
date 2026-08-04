@@ -44,7 +44,7 @@
 // before a value) — is permanently inert: an ordinary comment. This is the same
 // semantics every honored site carries (a directive alone on its line between `{`
 // and the first class member freezes that member, not the body). See
-// docs/conformance_prettier.md §Format-ignore directive for the behavior contract.
+// docs/conformance_prettier_ignore.md §Format-ignore directive for the behavior contract.
 //
 // **Gating.** Every entry is gated on the document-level `has_format_ignore` flag, so
 // a document with no directive (≈ all of them) pays nothing. The leading-run walk is a

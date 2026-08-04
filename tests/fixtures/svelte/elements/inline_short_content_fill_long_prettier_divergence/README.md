@@ -39,4 +39,4 @@ Two deliberate choices, both shared with the wide-element sibling:
    fits after the preceding word it packs there. This matches prettier's greedy fill and is the same
    pairwise measurement `inline_wide_content_trailing_long` relies on. ◆design_choice.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

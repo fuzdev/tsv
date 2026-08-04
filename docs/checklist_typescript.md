@@ -789,7 +789,7 @@ lands, each early-error row gets an `input_invalid_*` fixture.
 
 # Compatibility
 
-Parse output matches acorn-typescript (the parser Svelte uses for `<script lang="ts">`) and formatting matches Prettier, except for the intentional divergences cataloged in [conformance_svelte.md](./conformance_svelte.md) and [conformance_prettier.md](./conformance_prettier.md).
+Parse output matches acorn-typescript (the parser Svelte uses for `<script lang="ts">`) and formatting matches Prettier, except for the intentional divergences cataloged in [conformance_svelte.md](./conformance_svelte.md) and the `conformance_prettier*.md` family — for TypeScript, [conformance_prettier_ts.md](./conformance_prettier_ts.md) and [conformance_prettier_ts_comments.md](./conformance_prettier_ts_comments.md), over the shared frame [conformance_prettier.md](./conformance_prettier.md).
 
 ## Svelte AST Integration
 

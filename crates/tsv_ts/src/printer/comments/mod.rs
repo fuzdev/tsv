@@ -460,7 +460,7 @@ impl<'a> Printer<'a> {
     /// from the next item — a **stranded** comment. It trails the comma,
     /// preserving the author's placement, rather than dropping to its own line;
     /// prettier relocates it *before* the comma. Mirrors the call-argument
-    /// stranded rule (`calls/arg_comments.rs`). See conformance_prettier.md
+    /// stranded rule (`calls/arg_comments.rs`). See conformance_prettier_ts_comments.md
     /// §Comment relocation. (A block that instead *hugs* the next item — no
     /// newline before it — leads that item and matches prettier, so it is not
     /// stranded.)
@@ -763,8 +763,8 @@ impl<'a> Printer<'a> {
 
             // An authored blank line between two comments that each occupy their own
             // line separates two distinct remarks, exactly as a blank between two
-            // statements does, so it survives (`conformance_prettier.md` §"No blank above
-            // a body block's `{`"). Only meaningful where the separator is a `hardline`:
+            // statements does, so it survives (`conformance_prettier_ts_comments.md` §"No
+            // blank above a body block's `{`"). Only meaningful where the separator is a `hardline`:
             // an inline run has no lines to separate.
             let blank_before = prev_was_line
                 && prev_end
@@ -1280,7 +1280,7 @@ impl<'a> Printer<'a> {
     ///   `=`'s line trails it inline; a comment on its own line leads the value on
     ///   its own line (author blank lines preserved). Diverges from prettier, which
     ///   relocates the line comment to trail the whole statement — tsv preserves the
-    ///   author's placement (see [`conformance_prettier.md` §Comment relocation]).
+    ///   author's placement (see [`conformance_prettier_ts_comments.md` §Comment relocation]).
     /// - **Own-line / multiline block** after `=`: break-after-operator hang, the
     ///   comment on its own line (matches prettier's `hasLeadingOwnLineComment`).
     /// - **Inline block** glued to `=`, or no comment: `None` — the caller keeps the

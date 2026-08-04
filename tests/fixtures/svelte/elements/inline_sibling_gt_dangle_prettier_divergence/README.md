@@ -32,7 +32,7 @@ The `>` token immediately preceding an expanding block's `{#…}` dangles onto t
 block-head line — the closing `>` of a preceding inline sibling exactly as the opening
 `>` of an enclosing inline element already does for a sole-content block. Gated on the
 block actually rendering multiline (a short inline block keeps the `>` hugged). See
-[conformance_prettier.md §Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

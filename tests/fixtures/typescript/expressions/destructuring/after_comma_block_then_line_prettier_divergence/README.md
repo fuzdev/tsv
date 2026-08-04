@@ -30,4 +30,4 @@ it has nothing to defer behind and keeps leading the next element. A block on th
 The same after-comma preservation applies at every comma-separated site — call arguments
 ([nonlast_arg_after_comma_block_then_line](../../calls/nonlast_arg_after_comma_block_then_line_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

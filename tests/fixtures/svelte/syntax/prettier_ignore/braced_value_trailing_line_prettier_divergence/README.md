@@ -30,7 +30,7 @@ a claim in prose.
 
 The freeze decides what the value's *bytes* are; it never decides how the delimiter around
 them is placed, so a frozen value's closer follows the same rule as an ordinary one. See
-[conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).
 
 ## Related
 

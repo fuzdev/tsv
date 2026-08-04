@@ -20,4 +20,4 @@ Whether the members of a glued run stay on one line is not part of the divergenc
 both formatters keep them together, since a comment the author glued to the previous
 one is one remark, not two.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

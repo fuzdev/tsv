@@ -12,4 +12,4 @@ records prettier's after-`!` form, which our formatter also keeps stable). Per
 comment placement policy, we preserve user intent when prettier moves comments
 to different positions.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

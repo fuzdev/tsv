@@ -34,4 +34,4 @@ A comment already written inside the parens stays a separate position from the s
 own — prettier lands both on one line (`type D`). A union whose parens already expand
 for width changes nothing (`type E`).
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

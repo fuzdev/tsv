@@ -23,4 +23,4 @@ declaration prints through a different path (never reaching this one), so the tw
 covered separately. tsv keeps comments where authored rather than relocating them across the
 assignment boundary; see [comment-position philosophy](../../../../../../../docs/conformance_prettier.md#comment-position-philosophy).
 
-See [conformance_prettier.md §Comment relocation](../../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

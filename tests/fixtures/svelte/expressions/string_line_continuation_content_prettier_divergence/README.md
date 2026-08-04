@@ -17,4 +17,4 @@ dangle) both normalize to `input.svelte` under tsv in one pass.
 
 Uniformity of the block-style stance: the content boundary carries no signal, and a content leaf
 that cannot render flat is just another way content goes multiline. See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

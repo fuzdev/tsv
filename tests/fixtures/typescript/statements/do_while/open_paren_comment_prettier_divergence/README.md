@@ -14,4 +14,4 @@ of comments before the `while` keyword
 and with if/else, try/catch, switch, for, while, labeled statements, and call
 chains.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -53,7 +53,7 @@ impl TsFixtureAuditCommand {
 const INTENTIONAL_TS: &[(&str, &str)] = &[
     (
         "typescript/syntax/comments/jsdoc_type_cast_ts_prettier_divergence",
-        "standalone-TS proof of the JSDoc-cast paren divergence: tsv preserves, prettier's oxc-ts strips. The JS-context match is jsdoc_type_cast_svelte (see conformance_prettier.md §JSDoc / paren semantics)",
+        "standalone-TS proof of the JSDoc-cast paren divergence: tsv preserves, prettier's oxc-ts strips. The JS-context match is jsdoc_type_cast_svelte (see conformance_prettier_ts_comments.md §JSDoc / paren semantics)",
     ),
     (
         "typescript/syntax/comments/jsdoc_type_cast_ts",

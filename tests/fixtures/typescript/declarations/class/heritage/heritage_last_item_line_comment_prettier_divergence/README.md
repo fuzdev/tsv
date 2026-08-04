@@ -16,4 +16,4 @@ tsv treats user comment placement as intentional — the comment annotates the h
 - `class extends C // c1\n// c2\n{}` — same for class **expressions**
 - `extends C // c1\n/* c2 */\n{}` — a block comment following a line comment stays on its own line
 
-See [conformance_prettier.md §Comment relocation](../../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

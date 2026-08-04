@@ -43,4 +43,4 @@ the same prettier separator bug, pinned in
 tsv never relocates a directive — the placement the author wrote is the placement that decides
 the freeze — and a formatter must not emit code that fails to parse; ◆comment_preservation
 ◆prettier_bug. See
-[conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

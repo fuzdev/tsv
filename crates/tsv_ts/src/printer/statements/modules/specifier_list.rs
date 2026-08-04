@@ -480,8 +480,8 @@ impl<'a> Printer<'a> {
         let item_span = |j: usize| get_span(&items[j]);
         // Block comment trailing the LAST item after its source comma — preserved past
         // where the comma was (no trailing comma; trailingComma: 'none') rather than
-        // relocated before it (prettier relocates before; see conformance_prettier.md
-        // §Comment relocation).
+        // relocated before it (prettier relocates before; see
+        // conformance_prettier_ts_comments.md §Comment relocation).
         let mut last_after_comma = DocBuf::new();
 
         for (i, item) in items.iter().enumerate() {
@@ -554,7 +554,7 @@ impl<'a> Printer<'a> {
     /// brace line — the open-brace divergence, shared by the import/export
     /// specifier brace and the `with {…}` import-attribute brace. `first_item_start`
     /// bounds the `{`→first-item gap the brace-line pull scans. See
-    /// conformance_prettier.md §Comment relocation.
+    /// conformance_prettier_ts_comments.md §Comment relocation.
     pub(super) fn build_braced_hardline_comma_list<T>(
         &self,
         items: &[T],

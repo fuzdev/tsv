@@ -15,4 +15,4 @@ This is the empty-`with` analog of the `with_keyword_comment` and
 Per Comment Position Philosophy, tsv keeps each comment where the author wrote it
 rather than relocating it to a canonical position.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

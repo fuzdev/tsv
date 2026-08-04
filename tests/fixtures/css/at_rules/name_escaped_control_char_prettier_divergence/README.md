@@ -32,4 +32,4 @@ serves as the separator before `{`, so tsv adds no second one (`@n\A {`, not
 `@n\A  {`) — the same absorption as
 [layer_escaped_whitespace](../layer_escaped_whitespace_prettier_divergence/).
 
-See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules).
+See [conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules).

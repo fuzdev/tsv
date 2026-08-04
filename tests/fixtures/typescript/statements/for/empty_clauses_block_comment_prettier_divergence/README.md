@@ -21,4 +21,4 @@ tsv's handling across if/else, try/catch, switch, for, while, do-while, labeled
 statements, and call chains, and with the sibling line-comment case
 ([empty_clauses_comment](../empty_clauses_comment_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

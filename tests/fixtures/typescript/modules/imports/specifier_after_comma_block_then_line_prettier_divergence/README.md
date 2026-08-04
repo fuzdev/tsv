@@ -30,4 +30,4 @@ The specifier list shares the object literal's element-comma emitter, so the two
 this identically — see
 [objects/after_comma_block_then_line](../../../expressions/objects/after_comma_block_then_line_prettier_divergence/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -16,6 +16,6 @@ A line comment can't trail inline before `)` (the `//` would swallow the
 `(x + y /* c */)!.foo`) it forces the operand onto its own line.
 
 Reason: comment preservation. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Non-null grouped operand) and §Comment Position
 Philosophy.

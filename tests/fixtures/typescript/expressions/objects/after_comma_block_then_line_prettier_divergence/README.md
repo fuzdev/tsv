@@ -34,4 +34,4 @@ and destructuring patterns
 ([after_comma_block_then_line](../../destructuring/after_comma_block_then_line_prettier_divergence/)),
 which shares this printer's element-comma emitter.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

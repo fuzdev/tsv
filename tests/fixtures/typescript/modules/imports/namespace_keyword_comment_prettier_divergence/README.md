@@ -44,4 +44,4 @@ relocates the former to after `type`, the latter to after `as`. The line comment
 Prettier keeps it flat. The block `import`→`*` (c1) and `type`→`*` (c3) positions are
 dual-stable (both formatters keep them). Per Comment Position Philosophy.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

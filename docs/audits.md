@@ -540,7 +540,8 @@ world the other `check` audits use, so it adds a short compile of its own.
 #     letting a render-free character pick the layout (the delimiter-dangle class).
 #     Fits-inline content is probed too — tsv trims a render-free boundary run even when
 #     the content fits (`<span> text </span>` → `<span>text</span>`, the Svelte-mirror
-#     trim; fixture `inline_boundary_whitespace_prettier_divergence`, conformance_prettier.md
+#     trim; fixture `inline_boundary_whitespace_prettier_divergence`,
+#     conformance_prettier_svelte.md
 #     §Svelte: Inline content block-style), so hug↔space↔newline reach ONE fixed point at
 #     every content boundary outside pre/textarea. Sanctioned residual: a BOTH-side
 #     newline-authored boundary around an ELEMENT child keeps its multiline layout
@@ -782,22 +783,48 @@ cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden          
 ## Conformance Audit (`conformance:audit`)
 
 ```bash
-# conformance_audit - doc/fixture integrity in one fixture walk. Four checks:
+# conformance_audit - doc/fixture integrity in one fixture walk. Five checks:
 #  (1) Orphans - every divergence-suffixed fixture must be linked in its conformance doc
-#      (_prettier_divergence → docs/conformance_prettier.md, _svelte_divergence →
-#      docs/conformance_svelte.md, _svelte_prettier_divergence in both).
-#  (2) Dead links - every Markdown link (relative path + #anchor) in every docs/*.md
-#      (enumerated at run time, so a new doc is gated by existing) and every fixture README
-#      must resolve on disk (catches renamed/deleted fixtures, wrong ../ depth, stale
-#      anchors). External URLs and targets that climb out of the repo (sibling checkouts,
+#      (_prettier_divergence → any docs/conformance_prettier*.md, _svelte_divergence →
+#      docs/conformance_svelte.md, _svelte_prettier_divergence in both). The glob is a
+#      hand-listed constant held to it by check 5.
+#  (2) Dead links - every Markdown link (relative path + #anchor) in every Markdown file
+#      in the repo (walked at run time, so a new doc is gated by existing) must resolve on
+#      disk (catches renamed/deleted fixtures, wrong ../ depth, stale anchors). That is
+#      docs/*.md, every fixture README, and the set that previously had no link gate at
+#      all: root CLAUDE.md / README.md, each crate's CLAUDE.md, the shipped
+#      crates/tsv_wasm/README_*.md, a container-directory README under tests/fixtures/.
+#      The walk shares `tsv format`'s prune policy — tsv_discover's safety nets
+#      (node_modules, .git, .sl, .hg, .svn, .jj) over tsv_ignore's IgnoreStack — so build
+#      output and the per-machine *.local.* / *.tmp conventions are pruned by the repo's
+#      own rules rather than a second copy of them, and a gate can't fail over content the
+#      repo doesn't have. It stops short of classify_dir: the build-output heuristic and
+#      the tsv layer are format-file policy, and .formatignore prunes tests/fixtures/ —
+#      the fixture READMEs are exactly what this must check. Symlinks are skipped
+#      (AGENTS.md points at CLAUDE.md; following both would report every finding twice).
+#      External URLs and targets that climb out of the repo (sibling checkouts,
 #      machine-dependent) are out of scope.
 #  (3) Missing back-links - every divergence fixture's README must contain a link resolving to
-#      its sanctioning doc. (A missing README entirely is the validator's D1 rule.)
+#      a doc that CATALOGS that fixture (check 1's per-doc attribution), not merely to some
+#      member of the family. With one conformance doc "cataloged in D" and "links D" were the
+#      same fact; across the six-doc prettier family they are independent, so a README could
+#      point at the shared frame while its entry lived in a language catalog. (A missing README
+#      entirely is the validator's D1 rule.)
 #  (4) Stray READMEs - a non-divergence fixture shouldn't carry a README; exceptions live in
 #      the in-code ALLOWED_NONDIVERGENCE_READMES allowlist.
+#  (5) Catalog-family drift - the docs/conformance_prettier*.md on disk must be exactly
+#      CONFORMANCE_PRETTIER, and the frame's §Catalogs table must index every member.
+#      Checks 1+3 read a hand-listed family while REPORTING the glob, so a catalog the list
+#      omits fails only as their findings — its entries as orphans, a README aiming at it as
+#      a missing back-link — with nothing naming the constant. (The reverse, a listed member
+#      absent from disk, was already a hard error: it would make both checks vacuous.) The
+#      index half covers the reader's route — CLAUDE.md sends divergence authors to the
+#      §Catalogs table, so an unindexed member is unreachable that way with every other
+#      check green. benches/js/lib/divergence/validation.ts reads the same glob off disk
+#      rather than keeping its own copy, so only the constant needs the manual add.
 # Pure Rust (no Deno). Exits non-zero on any finding. Gated in `deno task check`.
 cargo run -p tsv_debug conformance_audit
-# Also: --json (machine-readable: {orphans, dead_links, missing_backlinks, stray_readmes})
+# Also: --json (machine-readable: {orphans, family, dead_links, missing_backlinks, stray_readmes})
 ```
 
 ## Compiler Conformance Audit (`conformance:audit:compiler`)

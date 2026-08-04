@@ -33,5 +33,5 @@ Two contrast cases keep their parens in **both** formatters:
 They mark the boundary: Prettier preserves the single-arrow and
 conditional-constraint forms but still drops the nested-arrow form.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md)
 §TypeScript "Constrained infer extends-operand parens".

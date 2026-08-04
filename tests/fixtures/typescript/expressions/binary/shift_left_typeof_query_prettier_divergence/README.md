@@ -23,5 +23,5 @@ and
 prettier still rejects the input, failing loudly if tsc gains the split or the
 error morphs.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md)
 §Prettier rejects valid input.

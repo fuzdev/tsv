@@ -18,5 +18,5 @@ own lines. The fixture also covers three leading comments and a block comment
 followed by a line comment (`/* lead */ // trail`), which prettier likewise
 pushes to its own line.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
-§Uniform Forced-Continuation Indent.
+See [conformance_prettier.md §Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent);
+cataloged in [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

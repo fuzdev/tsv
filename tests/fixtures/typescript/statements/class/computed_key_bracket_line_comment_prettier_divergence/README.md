@@ -35,5 +35,5 @@ The computed-key face of the cross-construct before-`=` initializer line comment
 [property_before_eq_line_comment](../../../declarations/class/property_before_eq_line_comment_prettier_divergence/));
 the object `]`→`:` sibling is
 [computed_key_bracket_colon_line_comment](../../../expressions/objects/computed_key_bracket_colon_line_comment_prettier_divergence/).
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

@@ -58,4 +58,4 @@ Two deliberate choices:
    authoring, because hugging it shifts where that element lands and the result does not converge
    (`inline_wide_content_text_sibling_long`).
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

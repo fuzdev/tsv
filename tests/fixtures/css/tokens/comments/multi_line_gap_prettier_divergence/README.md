@@ -15,7 +15,7 @@ Stable quirk. The same single-space gap normalization as
 [selector_list](../selector_list_prettier_divergence/), extended to multi-line comments;
 the divergence is only in which stable layout each formatter picks — both preserve the
 comment interior byte-for-byte. See
-[conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
+[conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments).
 
 ## Related
 

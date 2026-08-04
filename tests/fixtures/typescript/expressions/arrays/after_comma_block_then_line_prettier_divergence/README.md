@@ -31,4 +31,4 @@ destructuring patterns and import/export specifiers answer this identically thro
 shared element-comma emitter — see
 [objects/after_comma_block_then_line](../../objects/after_comma_block_then_line_prettier_divergence/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

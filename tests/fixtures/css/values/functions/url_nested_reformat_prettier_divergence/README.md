@@ -21,4 +21,4 @@ tsv's verbatim form. Surfaced on prettier's own corpus by
 `url(--var(foo-bar, #dadce0))`) and `tests/format/css/loose/loose.css`
 (`url(var( x ))` → `url(var(x))`).
 
-See [conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values).
+See [conformance_prettier_css.md §CSS: Values](../../../../../../docs/conformance_prettier_css.md#css-values).

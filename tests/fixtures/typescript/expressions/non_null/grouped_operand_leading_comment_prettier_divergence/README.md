@@ -17,5 +17,5 @@ and stripped (a simple identifier `(/* b */ x)!`, a member `(/* b */ a.b)!`), th
 comment lands before the operand in both formatters — a match, not a divergence.
 
 Reason: comment preservation. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Non-null grouped operand) and §Comment Position Philosophy.

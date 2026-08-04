@@ -30,4 +30,4 @@ and dangles); its *terminal* trailing text respects the author's **space** bound
 closing tag, whether the element is a first child or sandwiched by a preceding sibling — the hug is
 convergent because nothing follows the tail.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

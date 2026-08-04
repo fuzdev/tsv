@@ -47,4 +47,4 @@ the first argument) used by the object/array literal, destructuring, block-body,
 specifier, and tuple-type cases. Type arguments in call/`new` _expression_
 position (`foo<A, B>()`) use a separate builder and still relocate.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

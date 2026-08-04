@@ -17,4 +17,4 @@ position in the chain; the divergence is purely the inline-vs-expanded chain
 layout. This is the member-access sibling of the computed-access
 `trailing_member_computed_comment` divergence.
 
-See [conformance_prettier.md §Comment normalization (stable quirks)](../../../../../../../docs/conformance_prettier.md#comment-normalization-stable-quirks).
+See [conformance_prettier_ts_comments.md §Comment normalization (stable quirks)](../../../../../../../docs/conformance_prettier_ts_comments.md#comment-normalization-stable-quirks).

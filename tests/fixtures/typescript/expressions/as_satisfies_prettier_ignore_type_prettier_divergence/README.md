@@ -21,4 +21,4 @@ holds the freeze.
 
 Hosts covered: `as` and `satisfies` — the same type position on each.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

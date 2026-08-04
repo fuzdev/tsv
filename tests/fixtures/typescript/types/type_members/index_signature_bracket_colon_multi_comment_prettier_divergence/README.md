@@ -36,6 +36,6 @@ stays inline in both formatters (covered by
 [index_signature_bracket_colon_comment](../index_signature_bracket_colon_comment/));
 only line comments differ — a `//` runs to EOL, so the value `:` must drop to its
 own line. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation, §Uniform Forced-Continuation Indent, and §Comment Position
 Philosophy.

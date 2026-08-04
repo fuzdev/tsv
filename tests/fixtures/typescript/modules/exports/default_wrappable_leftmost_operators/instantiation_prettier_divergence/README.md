@@ -18,4 +18,4 @@ broken parse)
 producing output that re-parses to a different AST. tsv keeps the parens — the same principle as
 the ternary/binary instantiation strip, adjudicated by `export_default_needs_parens`.
 
-See [conformance_prettier.md](../../../../../../../docs/conformance_prettier.md) §TypeScript (Instantiation expression parens).
+See [conformance_prettier_ts.md](../../../../../../../docs/conformance_prettier_ts.md) §TypeScript (Instantiation expression parens).

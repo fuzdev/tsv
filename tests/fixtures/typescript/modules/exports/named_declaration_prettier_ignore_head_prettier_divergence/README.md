@@ -23,4 +23,4 @@ placement floor, so following the relocation would lose the freeze on tsv's own 
 ## Reason
 
 Rule A binds a directive to the node that follows it; ◆comment_preservation. See
-[conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

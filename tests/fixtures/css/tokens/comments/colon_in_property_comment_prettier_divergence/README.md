@@ -18,4 +18,4 @@ declaration's `:` (doing so mangled the output to `color /* x : red;`, dropping
 
 Stable quirk. tsv normalizes comment spacing consistently, and locates the
 declaration colon with a comment-skipping scan. See
-[conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
+[conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments).

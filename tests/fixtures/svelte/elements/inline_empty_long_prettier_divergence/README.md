@@ -18,7 +18,7 @@ space as content, which forces `>` and `</span>` onto separate lines.
 
 Svelte-mirror whitespace: whenever tsv keeps content inline, every whitespace character in
 the output is one the compiler keeps — a whitespace-only fragment keeps none. See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
 
 ## Related
 

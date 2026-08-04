@@ -28,4 +28,4 @@ Design choice, render-free under Svelte 5 for the *whitespace* boundary before t
 render-significant for every *glued* boundary inside it, which is therefore never split. The
 whitespace boundary collapses to a single space at compile, so turning it into a line break is
 render-equivalent (confirmed by `ast_diff --render`).
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

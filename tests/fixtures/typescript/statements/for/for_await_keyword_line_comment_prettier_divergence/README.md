@@ -17,4 +17,4 @@ preserved. The uniform keyword→`(` line rule is
 [keyword_paren_line_comment](../../../syntax/comments/keyword_paren_line_comment_prettier_divergence/);
 this fixture pins the two extra keyword gaps `for await` adds.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md#comment-relocation) §Comment relocation.
+See [conformance_prettier_ts_comments.mdNone](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation) §Comment relocation.

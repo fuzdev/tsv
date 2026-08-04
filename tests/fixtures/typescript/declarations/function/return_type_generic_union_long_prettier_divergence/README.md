@@ -21,5 +21,5 @@ Each case has a 100-char control that stays inline in both formatters and a
 - `return_type_generic_union_long/` — non-diverging cases (with `B` instead of
   `null`, so prettier's `null`/`void` special-case doesn't fire)
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md)
 §TypeScript (Return type generic union) and §Print Width Philosophy.

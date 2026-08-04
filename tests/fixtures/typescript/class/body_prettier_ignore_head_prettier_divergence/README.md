@@ -31,4 +31,4 @@ pin the heritage-keyword gaps.
 tsv never relocates a directive: the placement the author wrote is the placement that
 decides the freeze, so the frozen node is the one that actually follows the directive;
 ◆comment_preservation. See
-[conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

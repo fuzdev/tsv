@@ -25,4 +25,4 @@ the same rule for its own run —
 [consecutive_branch_comment](../consecutive_branch_comment/).
 
 Reason: Comment relocation. See
-[conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+[conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

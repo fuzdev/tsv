@@ -28,4 +28,4 @@ agrees and does not relocate. `unformatted_ours_spaces.svelte` perturbs whitespa
 outside the frozen slices; tsv normalizes it to input (prettier does not — it
 relocates the non-union directive).
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

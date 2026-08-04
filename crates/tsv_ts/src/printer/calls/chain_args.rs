@@ -515,7 +515,7 @@ fn build_chain_args_force_expand(
             if has_paren_line {
                 // Comments trailing the `(` stay on the `(` line; the own-line set
                 // then leads the first arg (source order preserved — see
-                // conformance_prettier.md §Comment relocation, Call open paren `(`).
+                // conformance_prettier_ts_comments.md §Comment relocation, Call open paren `(`).
                 first_pc.emit_trailing_comments(&mut paren_line_prefix_parts, printer);
             }
             // The own-line leading comments (everything not on the `(` line): a block

@@ -159,7 +159,7 @@ impl<'a> Printer<'a> {
         // — the uniform forced-continuation indent, the same shape as the other
         // before-`=` initializer sites (enum members, class properties, variable
         // declarators). tsv keeps these on the head side; prettier relocates them
-        // after `=` (see conformance_prettier.md §Comment relocation). They were
+        // after `=` (see conformance_prettier_ts_comments.md §Comment relocation). They were
         // previously dropped entirely when type parameters were present (content
         // loss).
         let pre_eq_forces_own_line = self.comments_force_own_line_between(header_end, eq_pos);
@@ -738,7 +738,7 @@ impl<'a> Printer<'a> {
             // A comment trailing the opening `{` on its own line is kept on the
             // `{` line when the body expands (divergence from prettier, which
             // relocates it to its own line as the first member's leading
-            // comment). See conformance_prettier.md §Comment relocation
+            // comment). See conformance_prettier_ts_comments.md §Comment relocation
             // (Class/interface/enum body `{`).
             let first_member_start = decl.body.body[0].span().start;
             let (brace_line_prefix, delimiter_pull_pos) =
@@ -1075,7 +1075,7 @@ impl<'a> Printer<'a> {
             // A comment trailing the opening `{` on its own line is kept on the
             // `{` line when the body expands (divergence from prettier, which
             // relocates it to its own line as the first member's leading
-            // comment). See conformance_prettier.md §Comment relocation
+            // comment). See conformance_prettier_ts_comments.md §Comment relocation
             // (Class/interface/enum body `{`). `body_start - 1` is the `{`.
             let first_member_start = decl.members[0].span.start;
             let (brace_line_prefix, delimiter_pull_pos) =
@@ -1227,7 +1227,7 @@ impl<'a> Printer<'a> {
             // name and drops `= value` to a continuation line indented one level
             // (preserve position — lossless when a second comment also trails the
             // member; prettier relocates past the value and merges the two onto one
-            // line — see conformance_prettier.md §Comment relocation).
+            // line — see conformance_prettier_ts_comments.md §Comment relocation).
             if let Some(cont) =
                 self.build_initializer_line_continuation(id_end, eq_pos, || value_doc)
             {
@@ -1394,7 +1394,7 @@ impl<'a> Printer<'a> {
                     // the `{` line when the body expands (divergence from prettier,
                     // which relocates it to its own line as the body's leading
                     // comment). Same mechanism as block-statement bodies. See
-                    // conformance_prettier.md §Comment relocation (Namespace/module
+                    // conformance_prettier_ts_comments.md §Comment relocation (Namespace/module
                     // body `{`).
                     let first_stmt_start = block.body[0].span().start;
                     let (brace_line_prefix, delimiter_pull_pos) =

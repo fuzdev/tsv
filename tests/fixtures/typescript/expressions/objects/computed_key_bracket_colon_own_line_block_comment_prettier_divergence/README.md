@@ -23,5 +23,5 @@ Prettier has **two destinations from this one gap, keyed on the authoring**:
 The class-property `]`→`=` sibling is
 [computed_key_bracket_own_line_block_comment](../../../statements/class/computed_key_bracket_own_line_block_comment_prettier_divergence/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

@@ -21,4 +21,4 @@ type-literal members now split around `?` the same way.
 A comment written *before* `?` (`a /* c1 */?: number`) is a match in both
 formatters — see `types/type_literal/optional_marker_before_comment`.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

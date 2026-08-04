@@ -10,6 +10,6 @@ Prettier relocates the comment **outside** the parens, between `)` and
 `!` (`(x + y) /* c */!`).
 
 Reason: comment preservation. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Non-null grouped operand) and §Comment Position
 Philosophy.

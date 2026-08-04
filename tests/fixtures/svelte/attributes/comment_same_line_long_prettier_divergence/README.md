@@ -49,7 +49,7 @@ relocation to `/* */` while keeping the authored position for `//` would make th
 on the comment's spelling. See
 [conformance_prettier.md §Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy)
 and the catalog entry in
-[§Svelte: Attributes](../../../../../docs/conformance_prettier.md#svelte-attributes).
+[§Svelte: Attributes](../../../../../docs/conformance_prettier_svelte.md#svelte-attributes).
 
 ## Related
 

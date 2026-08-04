@@ -34,7 +34,7 @@ Two independent divergences meet in this fixture:
 - **Block-style layout** (pre-existing) — a block whose head/body renders multiline lays
   out block-style in tsv (head and tail intact, body indented), where prettier lets the
   boundary decide. See
-  [conformance_prettier.md §Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks).
+  [conformance_prettier_svelte.md §Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Reason
 

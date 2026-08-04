@@ -22,7 +22,7 @@ Content preservation — the same class as
 inter-item positions on both sides of the comma. A comment before the comma
 trails the previous identifier; a comment after the comma leads the next one.
 
-See [conformance_prettier.md §Svelte: Elements](../../../../../../docs/conformance_prettier.md#svelte-elements)
+See [conformance_prettier_svelte.md §Svelte: Elements](../../../../../../docs/conformance_prettier_svelte.md#svelte-elements)
 (the `@debug comments` catalog entry).
 
 ## Related

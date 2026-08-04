@@ -29,4 +29,4 @@ same rule an object property follows). A block comment can trail the `:` without
 swallowing anything, which is why its authored position survives either way and a
 `//`'s cannot.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

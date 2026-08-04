@@ -26,4 +26,4 @@ it relocates the directives).
 Hosts covered: variable annotation, function return type, interface property
 signature, and a multi-line frozen type (kept verbatim).
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

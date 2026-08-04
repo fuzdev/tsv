@@ -23,4 +23,4 @@ there tsv keeps the comment where the author wrote it rather than relocating it,
 per [Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy).
 Covers `keyof`, `typeof` (a `TypeQuery` node), and `readonly`.
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

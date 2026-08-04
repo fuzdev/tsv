@@ -26,4 +26,4 @@ property value, a class field value — are the ordinary siblings
 
 A frozen slice never changes how its container breaks — one rule at every freeze position, and
 the same layout a plain own-line comment in that gap already produces; ◆design_choice. See
-[conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

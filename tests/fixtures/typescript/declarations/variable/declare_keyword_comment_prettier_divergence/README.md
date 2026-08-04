@@ -20,5 +20,5 @@ then `const x: number;`) in both formatters, so there is no line-comment gap to 
 The `declare`→name gap of `function`/`class`/`enum` already preserves in both formatters
 ([declarations/function/declare_keyword_comment](../../function/declare_keyword_comment/)).
 
-See [conformance_prettier.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier.md#comments-inside-a-multi-word-keyword)
-and [§Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier_ts_comments.md#comments-inside-a-multi-word-keyword)
+and [§Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

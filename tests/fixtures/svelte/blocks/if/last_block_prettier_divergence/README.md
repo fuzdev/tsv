@@ -24,7 +24,7 @@ blocks — one canonical form wherever the block sits.
 
 Svelte-mirror whitespace + position-independence: the same document formats the same way
 wherever it appears in a file. See
-[conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

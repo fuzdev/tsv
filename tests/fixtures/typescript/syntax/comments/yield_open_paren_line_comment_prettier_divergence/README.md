@@ -44,6 +44,7 @@ here.
 ## Reason
 
 Comment placement is a deliberate authoring choice and tsv preserves it. See
-[conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy)
+[conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy),
+cataloged in [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation),
 and the return/throw sibling
 [keyword_open_paren_line_comment](../keyword_open_paren_line_comment_prettier_divergence/).

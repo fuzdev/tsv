@@ -94,7 +94,7 @@ impl<'a> Printer<'a> {
             // object expands — both a line comment and a block comment before a
             // first property on a later line (divergence from prettier, which
             // relocates it to its own line as the first property's leading
-            // comment). See conformance_prettier.md §Comment relocation (Object
+            // comment). See conformance_prettier_ts_comments.md §Comment relocation (Object
             // literal `{`).
             let (brace_line_prefix, brace_pull_pos) =
                 self.delimiter_line_comment_prefix_object(obj.span.start, first_prop_start);
@@ -527,7 +527,7 @@ impl<'a> Printer<'a> {
             // A line comment — or a multiline block the author broke after — between
             // the key and `:` keeps the comment after the key and drops `: value` to
             // a continuation line indented one level (prettier relocates it —
-            // conformance_prettier.md §Comment relocation), bypassing the assignment
+            // conformance_prettier_ts_comments.md §Comment relocation), bypassing the assignment
             // layout below; a glued block stays inline via the ordinary path.
             if self.comments_force_own_line_between(key_region_end, colon_pos) {
                 let value_doc = {
@@ -869,7 +869,7 @@ impl<'a> Printer<'a> {
     /// `delimiter_line_comment_prefix`, or on its own line) with the key dropped to
     /// an indented continuation. Prettier relocates such a comment (out to the
     /// member's leading line, or glued flush to the key) — a divergence
-    /// (conformance_prettier.md §Comment relocation, "Object/array/block
+    /// (conformance_prettier_ts_comments.md §Comment relocation, "Object/array/block
     /// open-delimiter trailing"). A computed key never breaks on width alone
     /// (prettier keeps a long key inline), so the flat, no-line-comment path stays
     /// verbatim — only a `[`→key line comment switches to the breaking layout.
@@ -913,7 +913,7 @@ impl<'a> Printer<'a> {
         // the shared open-delimiter leading-comment builder, hugging a same-line
         // block to the key). key→`]`: a same-line comment trails the key with a
         // space, an own-line comment keeps its own line. Prettier relocates instead
-        // (conformance_prettier.md §Comment relocation).
+        // (conformance_prettier_ts_comments.md §Comment relocation).
         // Build the body (key + any key→`]` trailing comments) into a buffer; the shared
         // bracket-break helper owns the `[`→key line-comment prefix and the break shell.
         let mut body_parts: DocBuf = smallvec![key_doc];

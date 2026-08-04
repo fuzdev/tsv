@@ -32,4 +32,4 @@ Per Comment Position Philosophy, the user's chosen position is preserved. Both
 positions are dual-stable in our formatter. The export sibling of
 `modules/imports/empty_type_keyword_comment_prettier_divergence`.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

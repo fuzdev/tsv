@@ -616,7 +616,7 @@ impl<'a> Printer<'a> {
         // A comment trailing the opening `{` on its own line is kept on the `{`
         // line when the pattern expands (divergence from prettier, which relocates
         // it to its own line as the first property's leading comment). See
-        // conformance_prettier.md §Comment relocation (Object destructuring `{`).
+        // conformance_prettier_ts_comments.md §Comment relocation (Object destructuring `{`).
         let first_prop_start = obj.properties[0].span().start;
         let (brace_line_prefix, brace_pull_pos) = if has_comments {
             self.delimiter_line_comment_prefix(obj.span.start, first_prop_start)
@@ -990,7 +990,7 @@ impl<'a> Printer<'a> {
         // A comment trailing the opening `[` on its own line is kept on the `[`
         // line when the pattern expands (divergence from prettier, which relocates
         // it to its own line as the first element's leading comment). See
-        // conformance_prettier.md §Comment relocation (Array destructuring `[`).
+        // conformance_prettier_ts_comments.md §Comment relocation (Array destructuring `[`).
         // Only applies when the first element is present (a leading hole has no
         // span to anchor the range); otherwise the existing path handles comments.
         let (bracket_line_prefix, bracket_pull_pos) =

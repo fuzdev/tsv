@@ -23,4 +23,4 @@ this seam either, since the freeze window opens only past the `=`.
 
 Rule A binds a directive to the node that follows it, and the placement floor makes a
 keyword-trailing directive inert; ◆comment_preservation. See
-[conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

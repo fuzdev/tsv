@@ -5,12 +5,12 @@
 // after the comma is preserved after it — on the last element (whose comma isn't
 // emitted) and ahead of a same-line line comment (`after_comma`, below) — and line
 // comments go after the comma via `line_suffix` (zero width). Prettier relocates
-// every one of those blocks before the comma; see conformance_prettier.md §Comment
-// relocation. Shared by the object-literal, object/array destructuring-pattern,
-// import/export specifier and enum-member loops so the ordering can't drift
-// between them. (The array literal answers the same rule through its own paired
-// trailing/leading predicate — holes and the fill path don't fit this collector's
-// shape — so a change here has to be mirrored there.)
+// every one of those blocks before the comma; see conformance_prettier_ts_comments.md
+// §Comment relocation. Shared by the object-literal, object/array
+// destructuring-pattern, import/export specifier and enum-member loops so the
+// ordering can't drift between them. (The array literal answers the same rule
+// through its own paired trailing/leading predicate — holes and the fill path don't
+// fit this collector's shape — so a change here has to be mirrored there.)
 //
 // This side is half of a partition: what it does NOT claim leads the next element,
 // and every caller resumes its own leading scan at `end_pos`. See
@@ -34,7 +34,7 @@ pub(in crate::printer) struct TrailingComments<'a> {
     /// element's after-comma block is included here too: with no trailing comma
     /// emitted (trailingComma: 'none') the last comma is `d.empty()`, so before- and
     /// after-comma blocks both trail the element in one run (prettier relocates an
-    /// after-comma block before the comma; see conformance_prettier.md).
+    /// after-comma block before the comma; see conformance_prettier_ts_comments.md).
     block: SmallVec<[&'a Comment; 2]>,
     /// Block comments the author wrote **after** the comma that stay with this element
     /// rather than leading the next one: the ones a same-line line comment follows
@@ -112,8 +112,8 @@ impl<'a> Printer<'a> {
 
         // A block comment after the comma normally belongs to the next element as
         // leading — except on the LAST element, where it is preserved after the comma
-        // (prettier relocates it before — see conformance_prettier.md §Comment
-        // relocation). With no trailing comma emitted, a last element's after-comma
+        // (prettier relocates it before — see conformance_prettier_ts_comments.md
+        // §Comment relocation). With no trailing comma emitted, a last element's after-comma
         // block trails the element in the same run as its before-comma blocks, so all
         // same-line blocks collect into one source-ordered `block` (the comma between
         // them is `d.empty()`).

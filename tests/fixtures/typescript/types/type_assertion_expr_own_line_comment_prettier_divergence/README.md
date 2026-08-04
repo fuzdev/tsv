@@ -17,5 +17,5 @@ pass moves it the rest of the way into the cast, trailing the type
 The fixed point is the same one prettier reaches for the trailing-`>` and
 own-line-before-`>` comments — it collapses all three to a comment trailing the
 type, while tsv keeps each at the author's position. See
-[conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Angle-bracket type assertion).

@@ -21,4 +21,4 @@ template uniformly, formatting the body as authored text rather than detecting a
 testing framework by identifier. The interpolations format identically in both;
 only the cell padding differs.
 
-See [conformance_prettier.md](../../../../../../../docs/conformance_prettier.md) §TypeScript: Template Literals.
+See [conformance_prettier_ts.md](../../../../../../../docs/conformance_prettier_ts.md) §TypeScript: Template Literals.

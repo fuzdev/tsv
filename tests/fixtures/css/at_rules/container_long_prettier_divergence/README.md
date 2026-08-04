@@ -14,7 +14,7 @@ Prettier has stable variants: the inline form, the wrapped form, and a spaces-pr
 
 ## Reason
 
-See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) (`@container line wrap`, Print width). tsv enforces printWidth consistently across all CSS at-rules; Prettier never implemented wrapping for `@container` queries.
+See [conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules) (`@container line wrap`, Print width). tsv enforces printWidth consistently across all CSS at-rules; Prettier never implemented wrapping for `@container` queries.
 
 ## Related
 

@@ -42,4 +42,4 @@ This is the block-comment face of the line-comment divergence pinned by
 Its type-level twin is
 [`branch_block_comment_relocation`](../../../types/conditional/branch_block_comment_relocation_prettier_divergence/).
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

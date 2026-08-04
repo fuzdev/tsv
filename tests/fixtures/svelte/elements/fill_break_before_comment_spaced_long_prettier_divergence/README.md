@@ -83,7 +83,7 @@ standing audits distinguish the two layouts: both are idempotent, both keep ever
 both reparse — only a width measurement separates them.
 
 The boundary itself is the one
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)
 already licenses for the mirror side: inter-node whitespace collapses to one rendered space, so
 tsv is free to spend it on the break. What it must not do is break there *and* re-emit the space,
 which strands a leading space at the head of the continuation line — a form the next pass reads as

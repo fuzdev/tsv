@@ -26,4 +26,4 @@ not the closing paren, so it must not be counted when locating the token boundar
 regression coverage for the value-parser paren tracking (`value/parser.rs` fast_scan
 and its `ValueCursor` / `classify_separators` twins).
 
-See [conformance_prettier.md §Prettier rejects valid input](../../../../../../docs/conformance_prettier.md#prettier-rejects-valid-input).
+See [conformance_prettier_ts.md §Prettier rejects valid input](../../../../../../docs/conformance_prettier_ts.md#prettier-rejects-valid-input).

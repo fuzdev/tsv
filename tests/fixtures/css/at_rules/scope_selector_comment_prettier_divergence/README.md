@@ -21,7 +21,7 @@ through `comments_in_range` — the identical selector-comment path `:is()` uses
 Prettier preserves the source whitespace instead. parseCss accepts the input and
 strips the comment from the wire `prelude` string (`( .a) to (.b )`), so this is
 a prettier-only divergence. See
-[conformance_prettier.md §CSS: Comments](../../../../../docs/conformance_prettier.md#css-comments).
+[conformance_prettier_css.md §CSS: Comments](../../../../../docs/conformance_prettier_css.md#css-comments).
 
 ## Related
 

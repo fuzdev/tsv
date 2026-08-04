@@ -20,5 +20,5 @@ The general statement of this rule across every block type and branch is
 one-sided-weld case is
 [if/hugged_boundary_convergence](../if/hugged_boundary_convergence_prettier_divergence/).
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)
-and [§Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)
+and [§Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).

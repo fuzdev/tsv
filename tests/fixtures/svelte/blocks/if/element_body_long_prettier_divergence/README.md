@@ -17,7 +17,7 @@ tsv expands a wrapped/overflowing block's body uniformly across all block heads 
 body shapes (one-pass `conditional_group`, no breakable special-case), which keeps
 the layout idempotent and consistent. Prettier's hug-and-break-internally is a body
 layout driven by authored boundary whitespace, not width. See
-[conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

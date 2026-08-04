@@ -6,4 +6,4 @@ comment back inside the cast on its own line), flipping on every pass. No
 prettier-anchored claim file (output_prettier.*, audit_signature.txt, variants) is
 expressible. The validator live-verifies this claim (rule F5). tsv keeps the comment
 where the author wrote it — on its own line before `>`, inside the cast. See
-README.md and docs/conformance_prettier.md §Comment relocation.
+README.md and docs/conformance_prettier_ts_comments.md §Comment relocation.

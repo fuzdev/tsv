@@ -34,4 +34,4 @@ prettier re-lays out the seam). Since a hoisted section renders nothing in place
 preserves the authored render exactly; a fabricated newline between inline siblings would
 change it.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

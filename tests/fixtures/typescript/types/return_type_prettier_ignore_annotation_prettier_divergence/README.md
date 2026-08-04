@@ -35,4 +35,4 @@ The `)`→`=>` twin — a function *type*'s return annotation — is
 the sibling gap after the `:` is
 [annotation_prettier_ignore_own_line](../annotation_prettier_ignore_own_line_prettier_divergence/).
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

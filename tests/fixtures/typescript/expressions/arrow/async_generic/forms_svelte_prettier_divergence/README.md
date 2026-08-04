@@ -39,7 +39,7 @@ records prettier's forced-comma output; `unformatted_ours_*` variants normalize
 to the bare input under tsv only.
 
 Reason: **Design choice** (formatter). See
-[conformance_prettier.md](../../../../../../../docs/conformance_prettier.md) §TypeScript.
+[conformance_prettier_ts.md](../../../../../../../docs/conformance_prettier_ts.md) §TypeScript.
 
 ## Siblings
 

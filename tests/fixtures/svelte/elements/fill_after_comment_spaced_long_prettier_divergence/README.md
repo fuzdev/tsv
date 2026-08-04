@@ -47,5 +47,5 @@ whitespace boundary before the run collapses to a single rendered space at compi
 free to spend it on the line break; what it must not do is break there *and* re-emit the space,
 which strands a leading space at the head of the continuation line — a form the next pass reads
 as indentation and drops, so the format would have no fixed point.
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)
 and [conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy).

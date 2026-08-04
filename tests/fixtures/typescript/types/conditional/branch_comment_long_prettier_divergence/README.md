@@ -28,4 +28,4 @@ The other five cases match prettier: a block comment on a short/long intersectio
 true branch stays glued (`? /* c */ A & B`), and line comments after `?`/`:` drop
 the branch to its own indented line in both formatters.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -45,7 +45,7 @@ always). Those are kept; see
 ## Reason
 
 **Spec precedence.** See
-[conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules)
+[conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules)
 (`Media query closing comma`).
 
 ## Related

@@ -23,5 +23,5 @@ and the `await`/`yield` grouped operand
 ([grouped_operand_comment](../../await_yield/grouped_operand_comment_prettier_divergence/)).
 
 Reason: comment preservation. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Ternary operand leading comment) and §Comment Position Philosophy.

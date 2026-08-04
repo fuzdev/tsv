@@ -25,5 +25,5 @@ Per Comment Position Philosophy, tsv keeps the comment where the author wrote it
 (after the `=`) and indents the intersection continuation rather than floating it
 to its own line.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

@@ -31,7 +31,8 @@ also preserved and match prettier (same sibling).
 User comments are valuable and shouldn't be silently removed; the comment is syntactically
 valid here. Reproducing prettier's parenthesized form would re-introduce the loss (and is
 non-idempotent), so tsv preserves the comment bare. See
-[conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy).
+[conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy);
+cataloged in [conformance_prettier_svelte.md §Svelte: Attributes](../../../../../../docs/conformance_prettier_svelte.md#svelte-attributes).
 
 ## Related
 

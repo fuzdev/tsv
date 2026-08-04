@@ -74,6 +74,6 @@ point — the `unformatted_ours_single_paren` / `unformatted_ours_double_parens`
 variants verify the paren form is idempotent too. A paren that is *required*
 (e.g. `keyof (A | B)`) is re-added around the hung operand rather than dropped.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation
 ("Prefix type-operator operand hang" — layout for the trailing form, relocation
 for the own-line form).

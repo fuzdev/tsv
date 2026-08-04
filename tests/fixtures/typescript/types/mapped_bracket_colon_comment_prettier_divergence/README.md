@@ -41,5 +41,5 @@ the optional-marker gaps are
 a comment *authored* trailing the key constraint inside the brackets is a plain
 match ([mapped_bracket_comment](../mapped_bracket_comment/)).
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

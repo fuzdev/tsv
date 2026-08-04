@@ -22,5 +22,5 @@ both formatters and are not the divergence.
 The own-line first-comment counterpart is a separate divergence
 ([type_param_keyword_own_line_comment](../type_param_keyword_own_line_comment_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

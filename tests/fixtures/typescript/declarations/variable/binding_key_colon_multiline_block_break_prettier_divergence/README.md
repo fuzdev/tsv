@@ -28,5 +28,5 @@ own-line-block sibling
 The binding face of the rule; property signatures, class properties, function
 parameters, and index-signature keys share the emitter
 (`build_marker_colon_line_continuation`). See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

@@ -1354,7 +1354,7 @@ impl<'a> Printer<'a> {
         // the first param's own line (function expression / arrow) or floats it
         // past the declaration (function declaration). The pull fires only for a
         // same-line comment forcing expansion, so it always forces the break path
-        // below. See conformance_prettier.md §Comment relocation and
+        // below. See conformance_prettier_ts_comments.md §Comment relocation and
         // open_paren_line_comment_prettier_divergence.
         let (paren_prefix, paren_pull_pos) = match params_start {
             Some(open) if comments_present => {
@@ -1533,7 +1533,7 @@ impl<'a> Printer<'a> {
                 // before the next param) trails the comma — preserving the author's
                 // placement, matching call args / declarators (prettier relocates it
                 // before the comma). A block hugging the next param leads it instead
-                // (as a leading comment). See conformance_prettier.md §Comment relocation.
+                // (as a leading comment). See conformance_prettier_ts_comments.md §Comment relocation.
                 if let Some(cp) = comma_pos {
                     let next_start = self.param_start_with_decorators(&params[i + 1]);
                     self.push_stranded_after_comma_blocks(&mut inner_parts, cp, next_start);

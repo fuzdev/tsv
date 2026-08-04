@@ -36,5 +36,5 @@ The operand hangs one level under the operator (the uniform keyword→value layo
 `unformatted_ours_single_paren` / `unformatted_ours_double_parens` variants verify
 the paren shells are idempotent under tsv.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation
 (Prefix type-operator operand hang).
