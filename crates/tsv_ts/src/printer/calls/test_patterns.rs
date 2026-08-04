@@ -186,6 +186,15 @@ fn test_call_gaps_have_comments(
 }
 
 /// Check if a call expression is a test function call that should stay on one line
+///
+// TODO: the params-flat rule is keyed on the FLAT LAYOUT, where prettier keys it on
+// `isTestCall` alone — its parameter printers ask the callback's parent, never which layout
+// the call took. So a test call that falls through to the expanded layout (a comment in an
+// argument gap — `test_call_flat_layout_applies` declines there) builds its callback's params
+// breakable, where prettier still holds them flat. Unfixtured, and benign at every width
+// tried: the expanded form re-indents the callback so the params fit anyway, and it takes a
+// parameter list wide enough to overflow its own line to separate the two. Wants a fixture
+// before a fix, per the repo's fixture-first rule.
 pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printer<'_>) -> bool {
     // Optional calls (`describe?.(...)`) are never test calls — they format like
     // a normal call (wrap when long), preserving the `?.`. Mirrors prettier's
@@ -212,16 +221,6 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
         return false;
     }
 
-    // Second argument must be a function expression (arrow or regular)
-    let second_is_function = matches!(
-        &call.arguments[1],
-        internal::Expression::ArrowFunctionExpression(_)
-            | internal::Expression::FunctionExpression(_)
-    );
-    if !second_is_function {
-        return false;
-    }
-
     // Third argument (if present) must be a number (timeout)
     if arg_count == 3 {
         let third_is_number = match &call.arguments[2] {
@@ -233,6 +232,29 @@ pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printe
         if !third_is_number {
             return false;
         }
+    }
+
+    // Second argument must be the test's callback — and the two arities ask for different
+    // callbacks, mirroring prettier's `isTestCall` (`utilities/test-libraries.js`). The
+    // 2-argument form takes any function or arrow; the **3-argument** form additionally
+    // requires a BLOCK body and at most ONE parameter (`isFunctionOrArrowExpressionWithBody`
+    // + `getFunctionParameters(args[1]).length <= 1`). A function expression always has a
+    // block body, so only the parameter count narrows it there.
+    //
+    // The narrowing is load-bearing, not decoration: without it a timeout call whose callback
+    // takes two parameters, or whose arrow returns an expression, takes the flat layout and
+    // runs past print width in a position where prettier breaks every argument out and holds
+    // 100 — tsv over-width exactly where prettier is not. Pinned by
+    // `tests/fixtures/typescript/expressions/calls/test_functions_timeout`.
+    let callback_ok = match &call.arguments[1] {
+        internal::Expression::FunctionExpression(func) => arg_count == 2 || func.params.len() <= 1,
+        internal::Expression::ArrowFunctionExpression(arrow) => {
+            arg_count == 2 || (!arrow.body.is_expression() && arrow.params.len() <= 1)
+        }
+        _ => false,
+    };
+    if !callback_ok {
+        return false;
     }
 
     // Check if the callee matches a known test pattern. Compare the resolved

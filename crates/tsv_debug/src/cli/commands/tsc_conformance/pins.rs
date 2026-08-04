@@ -175,7 +175,7 @@ const fn pin_section(
 /// The pin table — the single source of truth for the snapshot: its key set, file
 /// order, section shape, gate labels, AND which report value each key grades. Parsing
 /// ([`parse_pin_snapshot`]), rendering ([`render_pin_snapshot`]), measuring
-/// ([`measured_pins`]), and grading ([`snapshot_pin_failures`]) all iterate it, so a
+/// ([`measured_pins`]), and grading (`gates::snapshot_pin_failures`) all iterate it, so a
 /// new pinned count is exactly one row here plus its [`RunPins`] field — nothing else
 /// to remember, and no way to pin a count nothing measures.
 pub(super) const PIN_TABLE: [PinRow; 27] = [

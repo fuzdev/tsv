@@ -61,7 +61,7 @@
 //!
 //! ## The finding key — AST position, not a token shape
 //!
-//! Unlike `gap_audit` / `blank_audit` (which key by [`site_shape`], a flat token key), this audit
+//! Unlike `gap_audit` / `blank_audit` (which key by [`site_shape`](crate::audit::sites::site_shape), a flat token key), this audit
 //! keys by the node's **AST position** — `{enclosing-node-type}.{child-field}`, e.g.
 //! `TSUnionType.types`, `TSTupleType.elementTypes`, `Program.body`. Honoring is a per-*position*
 //! property (a position either has the printer opt-in or it doesn't), so the ledger is a ledger of
@@ -1242,23 +1242,8 @@ fn report_not_clean(total: &Tally, json: bool, show_paths: bool) {
             println!("{s}");
         }
     };
-    let paths = if show_paths && !total.not_clean.sample().is_empty() {
-        let sample: Vec<String> = total
-            .not_clean
-            .sample()
-            .iter()
-            .map(|p| format!("    {p}"))
-            .collect();
-        let more = total
-            .not_clean
-            .count()
-            .saturating_sub(total.not_clean.sample().len());
-        let tail = if more > 0 {
-            format!("\n    … and {more} more")
-        } else {
-            String::new()
-        };
-        format!(":\n{}{tail}", sample.join("\n"))
+    let paths = if show_paths {
+        format!(":\n{}", total.not_clean.sample_lines("    ").join("\n"))
     } else {
         String::new()
     };

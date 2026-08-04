@@ -54,12 +54,12 @@ mod ratchet;
 /// sub-buckets above are first-refusal-only and overstate any one class's parity
 /// yield. `--census` re-prices them: over the same oracle-accepted, tsv-refused
 /// files, it unions each file's real first-refusal with
-/// [`refusal_census`](tsv_svelte_compile::refusal_census)'s independently-detected blocker set,
+/// [`refusal_census`]'s independently-detected blocker set,
 /// then reports — per class — its **sole-blocker** count (files it is the *only*
 /// blocker of, so unlocking it yields exactly that many new parity files) and its
 /// **co-blocker** count. A mandatory **exposure** line counts candidates whose
 /// first-refusal is a class the census cannot detect independently
-/// ([`refusal_census_buckets`](tsv_svelte_compile::refusal_census_buckets)) —
+/// ([`refusal_census_buckets`]) —
 /// those files may hide an undetected co-blocker, so their sole counts could be
 /// over-promised. Diagnostic only: it exits 0 unless a harness error occurs (2).
 ///
@@ -127,7 +127,7 @@ enum Bucket {
     /// measurement and the contract cannot drift.
     ///
     /// `fence_contained` is the DIAGNOSTIC companion, computed only when `fenced`
-    /// is false: does [`refusal_census`](tsv_svelte_compile::refusal_census) independently find a
+    /// is false: does [`refusal_census`] independently find a
     /// fenced construct in a file whose FIRST refusal was something else? It sizes
     /// the gap between the fence-first count and the conceptually-right containment
     /// population — and it deliberately does **not** feed [`TargetSet`]. See
@@ -383,7 +383,7 @@ async fn classify_file(group: usize, path: PathBuf) -> FileOutcome {
 ///
 /// The diagnostic behind the fence-containment line. `compile` bails at the first
 /// refusal, so a file whose fence sits behind an earlier refusal is invisible to
-/// the fence-first count; [`refusal_census`](tsv_svelte_compile::refusal_census) enumerates every
+/// the fence-first count; [`refusal_census`] enumerates every
 /// refusal class it can detect independently, so it sees that fence.
 ///
 /// ⚠️ **It sees only ONE of the three fence sources**, which is why this feeds a
@@ -719,7 +719,7 @@ struct Stats {
 ///
 /// # Why the census does not supply this denominator
 ///
-/// [`refusal_census`](tsv_svelte_compile::refusal_census) enumerates refusal classes independently
+/// [`refusal_census`] enumerates refusal classes independently
 /// of first-refusal order, so it looks like the sound containment detector the list
 /// above says does not exist. It is not one, for two measured reasons — and the
 /// `fence_contained` line reports its finding precisely so the size of the gap is

@@ -8,6 +8,7 @@
 use std::num::NonZero;
 use std::path::{Path, PathBuf};
 
+use crate::audit::panic_hook::SuppressedPanicHook;
 use crate::cli::CliError;
 
 /// The process-global arming bracket every injection audit wraps around its [`run_pool`]
@@ -24,12 +25,12 @@ use crate::cli::CliError;
 /// stops formatting (gap's verify pass formats, so its window is wider), keeping each
 /// audit's disarm point deliberate rather than wherever scope happens to end.
 pub(crate) struct ArmedRun {
-    prev_hook: Option<PanicHook>,
+    /// The hook suppression itself, restored by its own `Drop` — shared with
+    /// the pristine sweep so there is one definition of "how a corpus walk
+    /// silences the per-panic backtrace" rather than two that can drift.
+    _hook: SuppressedPanicHook,
     swallow: bool,
 }
-
-/// The boxed hook `std::panic::take_hook` hands back — held for the restore on drop.
-type PanicHook = Box<dyn Fn(&std::panic::PanicHookInfo<'_>) + Sync + Send + 'static>;
 
 impl ArmedRun {
     pub(crate) fn arm(swallow: bool) -> Self {
@@ -37,10 +38,8 @@ impl ArmedRun {
         if swallow {
             tsv_lang::doc::swallow::set_swallow_check(true);
         }
-        let prev_hook = std::panic::take_hook();
-        std::panic::set_hook(Box::new(|_| {}));
         Self {
-            prev_hook: Some(prev_hook),
+            _hook: SuppressedPanicHook::install(),
             swallow,
         }
     }
@@ -48,9 +47,6 @@ impl ArmedRun {
 
 impl Drop for ArmedRun {
     fn drop(&mut self) {
-        if let Some(hook) = self.prev_hook.take() {
-            std::panic::set_hook(hook);
-        }
         tsv_lang::comment_ledger::set_comment_check(false);
         if self.swallow {
             tsv_lang::doc::swallow::set_swallow_check(false);
