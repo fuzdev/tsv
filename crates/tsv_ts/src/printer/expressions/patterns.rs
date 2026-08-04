@@ -632,15 +632,11 @@ impl<'a> Printer<'a> {
             // Handle leading comments before this property (with blank line preservation)
             let prop_start = prop.span().start;
             let leading_comments: CommentVec<'_> = if has_comments {
-                comments_to_emit_in_range(self.comments, prev_end, prop_start)
-                    .filter(|c| {
-                        // The brace-line comment pulled onto the `{` line above is emitted
-                        // as the prefix, not here (only relevant for the first property).
-                        !(i == 0
-                            && brace_pull_pos
-                                .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c)))
-                    })
-                    .collect()
+                self.collect_item_leading_comments(
+                    prev_end,
+                    prop_start,
+                    (i == 0).then_some(brace_pull_pos).flatten(),
+                )
             } else {
                 CommentVec::new()
             };
@@ -1011,16 +1007,11 @@ impl<'a> Printer<'a> {
             if let Some(e) = elem {
                 // Check for leading comments before this element (with blank line preservation)
                 let elem_start = e.span().start;
-                let leading_comments: CommentVec<'_> =
-                    comments_to_emit_in_range(self.comments, prev_end, elem_start)
-                        .filter(|c| {
-                            // The bracket-line comment pulled onto the `[` line above is
-                            // emitted as the prefix, not here (only the first element).
-                            !(i == 0
-                                && bracket_pull_pos
-                                    .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c)))
-                        })
-                        .collect();
+                let leading_comments = self.collect_item_leading_comments(
+                    prev_end,
+                    elem_start,
+                    (i == 0).then_some(bracket_pull_pos).flatten(),
+                );
                 // The element's leading run and the element form one group — see
                 // `build_list_element_group` for why (prettier routes `ArrayPattern`
                 // through the same `printArray` as an array literal). An own-line

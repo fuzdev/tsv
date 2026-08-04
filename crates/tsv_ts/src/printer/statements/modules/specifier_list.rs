@@ -6,7 +6,6 @@
 use super::header_comments::is_only_whitespace_and_comments;
 use super::{MODULE_KW_LEN, MODULE_TYPE_KW_LEN, Printer};
 use crate::ast::internal;
-use crate::printer::CommentVec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -610,21 +609,13 @@ impl<'a> Printer<'a> {
             let is_first = i == 0;
             let is_last = i == items.len() - 1;
 
-            let search_start = self.leading_comment_search_start(prev_end, is_first);
-            let comments: CommentVec<'_> =
-                comments_to_emit_in_range(self.comments, search_start, item_start)
-                    .filter(|c| {
-                        is_first || c.is_block || !self.is_same_line(prev_end, c.span.start)
-                    })
-                    .collect();
-            // First item: drop comments pulled onto the `{` line (emitted as the
-            // brace-line prefix by the caller). No-op when nothing was pulled
-            // (`delimiter_pull_pos` is `None`).
-            let comments = if is_first {
-                self.first_member_leading_comments(comments, delimiter_pull_pos)
-            } else {
-                comments
-            };
+            // The rest of the gap, resuming where the previous item's trailing run stopped
+            // — the element-comma partition (see `collect_item_leading_comments`).
+            let comments = self.collect_item_leading_comments(
+                prev_end,
+                item_start,
+                is_first.then_some(delimiter_pull_pos).flatten(),
+            );
 
             if !is_first {
                 let check_pos = if comments.is_empty() {
@@ -632,10 +623,7 @@ impl<'a> Printer<'a> {
                 } else {
                     comments[0].span.start
                 };
-                if self.has_blank_line_between(search_start, check_pos) {
-                    parts.push(d.literalline());
-                }
-                parts.push(d.hardline());
+                self.push_next_line_empty_hardline(&mut parts, prev_end, check_pos);
             }
 
             for comment in &comments {
@@ -650,27 +638,17 @@ impl<'a> Printer<'a> {
             parts
                 .push(self.build_span_item_doc(list_start, &item_span, i, || build_item_doc(item)));
 
-            // Comma with comment-boundary splitting
+            // Comma with comment-boundary splitting — the shared element-comma contract
+            // (`collect_trailing_comments` / `push_element_comma_trailing`), the same one
+            // the object-literal and destructuring-pattern element loops use, so the
+            // partition between this item's trailing run and the next item's leading run
+            // is decided in one place for all of them.
             let item_end = span.end;
             if !is_last {
                 let next_start = get_span(&items[i + 1]).start;
-                let comma_pos = self.find_list_comma(item_end, next_start);
-
-                let mut line_ref = item_end;
-                for comment in comments_to_emit_in_range(self.comments, item_end, comma_pos) {
-                    if comment.is_block && self.is_same_line(line_ref, comment.span.start) {
-                        parts.push(d.text(" "));
-                        parts.push(self.build_comment_doc(comment));
-                        // Follow multi-line block comments to their closing line
-                        if !self.is_same_line(comment.span.start, comment.span.end) {
-                            line_ref = comment.span.end;
-                        }
-                    }
-                }
-
-                parts.push(d.text(","));
-
-                parts.extend(self.build_trailing_same_line_comment_docs(comma_pos + 1, next_start));
+                let trailing = self.collect_trailing_comments(item_end, next_start, false);
+                self.push_element_comma_trailing(&mut parts, &trailing, d.text(","));
+                prev_end = trailing.end_pos;
             } else {
                 // Last item: no trailing comma (trailingComma: 'none'). Same-line block
                 // comments hug the item (`a /* c */`), same-line line comments follow
@@ -700,8 +678,6 @@ impl<'a> Printer<'a> {
                     prev_pos = comment.span.end;
                 }
             }
-
-            prev_end = item_end;
         }
 
         d.concat(&parts)

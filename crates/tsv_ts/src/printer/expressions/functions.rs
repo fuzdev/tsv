@@ -1460,10 +1460,11 @@ impl<'a> Printer<'a> {
                     } else {
                         param_start
                     };
-                    if self.is_next_line_empty(search_start, content_start) {
-                        inner_parts.push(d.literalline());
-                    }
-                    inner_parts.push(d.hardline());
+                    self.push_next_line_empty_hardline(
+                        &mut inner_parts,
+                        search_start,
+                        content_start,
+                    );
                 } else if flat_list {
                     inner_parts.push(d.text(" "));
                 } else {

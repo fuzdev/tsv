@@ -107,29 +107,13 @@ impl<'a> Printer<'a> {
                 let prop_start = prop.span().start;
                 let is_first = i == 0;
 
-                // Get comments between previous position and this property
-                // For non-first properties, start search after the comma (not after property value)
-                let search_start = self.leading_comment_search_start(prev_end, is_first);
-
-                // Collect leading comments (search starts after comma for non-first properties)
-                // Skip line comments that are on same line as previous property (those are trailing)
-                // Block comments after comma on same line are leading
-                let comments: CommentVec<'_> =
-                    comments_to_emit_in_range(self.comments, search_start, prop_start)
-                        .filter(|c| {
-                            // Brace-line comments pulled onto the `{` line above are emitted
-                            // as the prefix, not here (only relevant for the first property).
-                            if is_first
-                                && let Some(dpos) = brace_pull_pos
-                                && self.comment_on_delimiter_line(dpos, c)
-                            {
-                                return false;
-                            }
-                            is_first ||
-                        c.is_block || // Block comments after comma are always leading
-                        !self.is_same_line( prev_end, c.span.start) // Line comments must be on different line
-                        })
-                        .collect();
+                // The rest of the gap, resuming where the previous property's trailing run
+                // stopped — the element-comma partition (see `collect_item_leading_comments`).
+                let comments = self.collect_item_leading_comments(
+                    prev_end,
+                    prop_start,
+                    is_first.then_some(brace_pull_pos).flatten(),
+                );
 
                 // For non-first properties, add separator
                 if !is_first {
@@ -140,10 +124,7 @@ impl<'a> Printer<'a> {
                         } else {
                             comments[0].span.start
                         };
-                        if self.has_blank_line_between(search_start, check_pos) {
-                            parts.push(d.literalline());
-                        }
-                        parts.push(d.hardline());
+                        self.push_next_line_empty_hardline(&mut parts, prev_end, check_pos);
                     } else {
                         // May stay inline: use line() for group-based breaking
                         parts.push(d.line());
@@ -163,8 +144,11 @@ impl<'a> Printer<'a> {
                 self.push_leading_comments_before(&mut parts, &comments, prop_start);
 
                 // Build property doc — a preceding format-ignore directive keeps the
-                // property's source verbatim (trailing comment/comma handled normally)
-                let prop_doc = if self.member_gap_frozen(search_start, prop_start) {
+                // property's source verbatim (trailing comment/comma handled normally).
+                // Same window as the leading scan: a directive trailing the previous
+                // property is inert by the placement floor (`is_honored_directive`), not
+                // by where the window starts.
+                let prop_doc = if self.member_gap_frozen(prev_end, prop_start) {
                     self.raw_source_doc(prop.span())
                 } else {
                     self.build_object_property_doc(prop, has_comments)
@@ -188,7 +172,7 @@ impl<'a> Printer<'a> {
                 let comma = if is_last { d.empty() } else { d.text(",") };
                 self.push_element_comma_trailing(&mut parts, &trailing, comma);
 
-                prev_end = prop.value_end();
+                prev_end = trailing.end_pos;
             }
 
             // Handle trailing comments before closing brace

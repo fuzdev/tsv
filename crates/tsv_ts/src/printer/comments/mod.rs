@@ -303,6 +303,36 @@ impl<'a> Printer<'a> {
         self.push_blank_preserving_separator(parts, comment_end, next, self.d().hardline());
     }
 
+    /// The **list-element** sibling of [`Self::push_blank_preserving_hardline`]: same
+    /// emission (`literalline` + `hardline` for an author blank, a bare `hardline`
+    /// otherwise), different blank question.
+    ///
+    /// Here it is prettier's `isNextLineEmpty` ([`Self::is_next_line_empty`]), measured
+    /// from the **element's own end** — which is what makes the *separator* and the
+    /// element's same-line trailing comments trivia. Two consequences the range-based
+    /// question cannot express, and both are authored shapes: a blank the author left
+    /// before a comma they pushed onto its own line still counts (`a: 1⏎⏎// c⏎, b`), and
+    /// one *after* such a comma does not (`a: 1⏎,⏎⏎b` — the rule
+    /// `property_own_line_comma_blank` pins). Callers pass `content_start` = where this
+    /// element's printed content begins (its first leading comment, else the element), so
+    /// a blank ahead of that content is inside the measured range.
+    ///
+    /// The object-literal, import/export-specifier, enum-member and function-parameter
+    /// list loops share it; a fifth list that needs the same rule should call it rather
+    /// than re-derive the two-line emission around a bare `is_next_line_empty`.
+    pub(crate) fn push_next_line_empty_hardline(
+        &self,
+        parts: &mut DocBuf,
+        elem_end: u32,
+        content_start: u32,
+    ) {
+        let d = self.d();
+        if self.is_next_line_empty(elem_end, content_start) {
+            parts.push(d.literalline());
+        }
+        parts.push(d.hardline());
+    }
+
     /// Whether `[from, next)` holds a **truly blank line** — two newlines with nothing
     /// but horizontal whitespace between them.
     ///

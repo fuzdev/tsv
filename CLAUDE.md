@@ -849,6 +849,18 @@ are escaping. Only a **line** comment defers by construction; a block defers sol
 behind one, because deferring is what carries a comment out past the closer. Back-to-back
 emission welds the run, and an inline block mixed into a deferred one **reorders** it.
 
+⚠️ **A comma-separated list asks about one gap TWICE** — the previous element's trailing
+run and the next element's leading run — and the two must **partition** it: unclaimed is a
+DROP, doubly-claimed a DOUBLE-PRINT. `collect_trailing_comments` / `push_element_comma_trailing`
+state that split once (object literal, both patterns, specifier list, enum members; the array
+literal pairs its own predicate with its complement). Two standing rules: the leading scan resumes
+at the trailing run's **end**, never past the separator — a comment before a comma the
+author pushed onto its own line (`a: 1⏎// c⏎, b`) belongs to neither side otherwise, which
+was a live drop at four sites; and the claimed run must stay a **prefix** of the gap, so a
+same-line block ahead of a deferred line comment is claimed too — skipping it drops it, and
+leaving it to lead the next element **reorders** it past the `line_suffix`. Full text:
+[docs/comments.md](docs/comments.md) §The element-comma seam.
+
 Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/linter use
 cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — see
 [conformance_prettier.md §Comment relocation](docs/conformance_prettier.md#comment-relocation).

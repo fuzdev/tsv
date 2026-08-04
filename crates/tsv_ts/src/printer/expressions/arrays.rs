@@ -184,16 +184,42 @@ impl<'a> Printer<'a> {
     /// that exists (the sanctioned pure-separator trail) — a block comment renders fine either
     /// side, making the move unforced. See conformance_prettier.md §Comment relocation.
     ///
-    /// `comma_pos` is the separator after `prev_end`. An own-line comment (a newline *before*
-    /// it) forces the expanding path, so it never reaches here.
+    /// The separator rule has one exception, and it is the run's **order**: a same-line
+    /// LINE comment later in the gap (`A, /* c */ // x⏎B`) defers through `line_suffix`,
+    /// so a block left to lead `B` renders *after* it and the authored pair comes back
+    /// reversed across two lines. Such a block trails `A` instead — emitted past the
+    /// comma, in front of the suffix, exactly where it was written. Same rule, same
+    /// reason as `Printer::push_trailing_comments_in_range`'s deferred-run block, and as
+    /// the shared element-comma emitter's `after_comma` run.
+    ///
+    /// `comma_pos` is the separator after `prev_end`, and `gap_end` bounds the gap the
+    /// line comment is looked for in — the SAME range the caller classifies over, so the
+    /// trailing collection and the next element's leading filter (its complement) stay
+    /// two readings of one predicate. An own-line comment (a newline *before* it) forces
+    /// the expanding path, so it never reaches the non-expanding callers.
     fn block_comment_trails_prev_element(
         &self,
         prev_end: u32,
+        gap_end: u32,
         comment: &tsv_lang::Comment,
         comma_pos: Option<u32>,
     ) -> bool {
-        self.is_same_line(prev_end, comment.span.start)
-            && comma_pos.is_none_or(|pos| comment.span.start < pos)
+        if !self.is_same_line(prev_end, comment.span.start) {
+            return false;
+        }
+        comma_pos.is_none_or(|pos| comment.span.start < pos)
+            || self
+                .same_line_line_comment_start(prev_end, gap_end)
+                .is_some_and(|line_start| comment.span.start < line_start)
+    }
+
+    /// Where the gap's first same-line LINE comment starts, if it has one — the point a
+    /// same-line block before it must not be carried past (see
+    /// [`Self::block_comment_trails_prev_element`]).
+    fn same_line_line_comment_start(&self, prev_end: u32, gap_end: u32) -> Option<u32> {
+        comments_to_emit_in_range(self.comments, prev_end, gap_end)
+            .find(|c| !c.is_block && self.is_same_line(prev_end, c.span.start))
+            .map(|c| c.span.start)
     }
 
     /// Emit block comments in `[search_start, elem_start)` as inline-leading
@@ -263,7 +289,12 @@ impl<'a> Printer<'a> {
 
         for comment in comments_to_emit_in_range(self.comments, elem_end, next_boundary) {
             if comment.is_block
-                && self.block_comment_trails_prev_element(elem_end, comment, comma_pos)
+                && self.block_comment_trails_prev_element(
+                    elem_end,
+                    next_boundary,
+                    comment,
+                    comma_pos,
+                )
             {
                 parts.push(self.format_inline_block_comment(comment, false));
             }
@@ -735,6 +766,7 @@ impl<'a> Printer<'a> {
                             c.is_block
                                 && !self.block_comment_trails_prev_element(
                                     last_real_emit_end,
+                                    upper,
                                     c,
                                     prev_comma_pos,
                                 )
@@ -790,13 +822,21 @@ impl<'a> Printer<'a> {
             }
 
             // Same-line trailing comments (real elements only).
+            let trailing_comma_pos = elem
+                .is_some()
+                .then(|| self.find_comma_in_range(elem_end, next_boundary))
+                .flatten();
             let trailing: CommentVec<'_> = if elem.is_some() {
-                let comma_pos = self.find_comma_in_range(elem_end, next_boundary);
                 comments_to_emit_in_range(self.comments, elem_end, next_boundary)
                     .filter(|c| self.is_same_line(elem_end, c.span.start))
                     .filter(|c| {
                         if c.is_block {
-                            self.block_comment_trails_prev_element(elem_end, c, comma_pos)
+                            self.block_comment_trails_prev_element(
+                                elem_end,
+                                next_boundary,
+                                c,
+                                trailing_comma_pos,
+                            )
                         } else {
                             // A same-line line comment always trails: nothing can follow it
                             // on its line.
@@ -807,8 +847,14 @@ impl<'a> Printer<'a> {
             } else {
                 smallvec![]
             };
+            // Which side of the comma each trailing block keeps — the author's side. A
+            // block past the comma is here only because a line comment follows it (see
+            // `block_comment_trails_prev_element`), and it must render in front of that
+            // deferred suffix, so the run comes out in source order.
+            let past_comma =
+                |c: &tsv_lang::Comment| trailing_comma_pos.is_some_and(|pos| c.span.start > pos);
 
-            for comment in trailing.iter().filter(|c| c.is_block) {
+            for comment in trailing.iter().filter(|c| c.is_block && !past_comma(c)) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             }
@@ -819,6 +865,11 @@ impl<'a> Printer<'a> {
             let is_last = i + 1 == arr.elements.len();
             if !is_last || elem.is_none() {
                 parts.push(d.text(","));
+            }
+
+            for comment in trailing.iter().filter(|c| c.is_block && past_comma(c)) {
+                parts.push(d.text(" "));
+                parts.push(self.build_comment_doc(comment));
             }
 
             for comment in trailing.iter().filter(|c| !c.is_block) {
