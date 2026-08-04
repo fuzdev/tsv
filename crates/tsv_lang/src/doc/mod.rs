@@ -1223,6 +1223,78 @@ mod arena_tests {
         assert_flat_width(&a, ls, 4);
     }
 
+    // --- lineSuffixBoundary: the flush ends the line, and doesn't fit ---
+    //
+    // The two halves of one rule (Prettier's pushed `hardlineWithoutBreakParent` +
+    // its `fits` `hasLineSuffix`). Both are invisible to every output-diff gate
+    // when broken: the swallowed form is still *a* string, and the mismeasured one
+    // is still valid code — only the column moves. See `docs/comments.md`.
+
+    #[test]
+    fn test_line_suffix_boundary_flush_ends_the_line() {
+        let a = DocArena::new();
+        // `a` + a deferred `// c` + a boundary + `b`. Flushing the comment inline
+        // would put `b` INSIDE it — the swallow this node exists to prevent.
+        let doc = a.concat(&[
+            a.text("a"),
+            a.line_suffix(a.text(" // c")),
+            a.line_suffix_boundary(),
+            a.text("b"),
+        ]);
+        assert_eq!(render_default(&a, doc), "a // c\nb");
+    }
+
+    #[test]
+    fn test_line_suffix_boundary_without_pending_suffix_is_inert() {
+        let a = DocArena::new();
+        // No suffix queued → no flush, hence no break: the boundary is a no-op.
+        let doc = a.concat(&[a.text("a"), a.line_suffix_boundary(), a.text("b")]);
+        assert_eq!(render_default(&a, doc), "ab");
+    }
+
+    #[test]
+    fn test_line_suffix_boundary_group_breaks_rather_than_measuring_across_it() {
+        let a = DocArena::new();
+        // The assignment shape (`fluid_after_operator`): the marker group is
+        // measured with the boundary in its look-ahead. It fits on width alone, so
+        // only the pending suffix can break it — and it must, since the flush ends
+        // the line the group would otherwise have measured flat.
+        let group = a.group(a.indent(a.line()));
+        let doc = a.concat(&[
+            a.text("x ="),
+            a.line_suffix(a.text(" // c")),
+            group,
+            a.line_suffix_boundary(),
+            a.text("y"),
+        ]);
+        assert_eq!(render_pw(&a, doc, 100), "x = // c\n\ty");
+    }
+
+    #[test]
+    fn test_fits_stops_at_a_boundary_with_a_suffix_pending() {
+        let a = DocArena::new();
+        // Everything here is 3 columns wide flat, so width alone never decides.
+        let no_suffix = a.concat(&[a.text("a"), a.line_suffix_boundary(), a.text("bc")]);
+        assert!(fits_flat(&a, no_suffix, 3));
+        // With a suffix queued before it, the boundary ends the line: what follows
+        // is not on this line, so the fit is decided at the boundary and fails.
+        let with_suffix = a.concat(&[
+            a.text("a"),
+            a.line_suffix(a.text("XXXXX")),
+            a.line_suffix_boundary(),
+            a.text("bc"),
+        ]);
+        assert!(!fits_flat(&a, with_suffix, 3));
+        // …and the order matters: a suffix queued AFTER the boundary is irrelevant.
+        let suffix_after = a.concat(&[
+            a.text("a"),
+            a.line_suffix_boundary(),
+            a.line_suffix(a.text("XXXXX")),
+            a.text("bc"),
+        ]);
+        assert!(fits_flat(&a, suffix_after, 3));
+    }
+
     #[test]
     fn test_fits_flat_width_if_break_picks_flat_doc() {
         let a = DocArena::new();

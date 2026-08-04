@@ -88,8 +88,11 @@ pub(crate) fn print_node_inner<'a>(
                             printer.build_chain_leading_comments_doc(&classified.leading_line);
                         let trailing_block =
                             printer.build_trailing_block_doc(&classified.trailing_block);
+                        // No boundary: the layout's own `hardline` before `)` flushes
+                        // the suffix, and a boundary would end the line first, landing
+                        // a blank between the comment and the closer.
                         let trailing_line =
-                            printer.build_trailing_line_doc(&classified.trailing_line);
+                            printer.build_deferred_line_comments_doc(&classified.trailing_line);
                         return d.concat(&[
                             d.text("("),
                             d.indent(d.concat(&[
@@ -474,11 +477,8 @@ fn print_member_access(
 
     // Line comments (both trailing and leading) get moved to end of line via line_suffix.
     // This matches Prettier's behavior of hoisting mid-chain line comments.
-    // NOTE: We use build_line_comments_no_boundary here (not build_trailing_line_doc) because
-    // we don't want to flush the line_suffix immediately - it should stay deferred until
-    // the actual end of line.
-    let trailing_line = printer.build_line_comments_no_boundary(&classified.trailing_line);
-    let leading_line = printer.build_line_comments_no_boundary(&classified.leading_line);
+    let trailing_line = printer.build_deferred_line_comments_doc(&classified.trailing_line);
+    let leading_line = printer.build_deferred_line_comments_doc(&classified.leading_line);
 
     // Leading block comments on their own line - emit inline (rare case)
     let leading_block = printer.build_trailing_block_doc(&classified.leading_block);
@@ -587,8 +587,11 @@ pub(crate) fn push_gap_comments_and_break(
 
     // Trailing block comments (same line as previous element): `method() /* c */`
     parts.push(printer.build_trailing_block_doc(&classified.trailing_block));
-    // Trailing line comments (same line as previous element), via line_suffix
-    parts.push(printer.build_trailing_line_doc(&classified.trailing_line));
+    // Trailing line comments (same line as previous element), via line_suffix. No
+    // boundary: the break below always fires (`build_chain_line_break` is a hardline
+    // at minimum) and flushes the suffix itself. A boundary would flush AND end the
+    // line, so the break that follows would land a blank line after the comment.
+    parts.push(printer.build_deferred_line_comments_doc(&classified.trailing_line));
     // Line break with blank line preservation
     parts.push(build_chain_line_break(printer, object_end, property_start));
 

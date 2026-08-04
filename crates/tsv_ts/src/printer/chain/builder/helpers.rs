@@ -52,39 +52,33 @@ impl<'a, 'p, 'pr> ChainPartsBuilder<'a, 'p, 'pr> {
         self.add_group_doc(group);
     }
 
-    /// Add only trailing comments (no line break, no leading comments)
-    /// Used when the next element should stay on the same line as the previous.
+    /// Add only trailing **block** comments (no line break, no leading comments).
+    /// Used when the next element should stay on the same line as the previous —
+    /// `.map(x => x) /* comment */.length`.
     ///
-    /// Emits:
-    /// 1. Trailing block comments (same line as previous element)
-    /// 2. Trailing line comments (same line, via line_suffix)
+    /// Only a block comment can be emitted here, and that is a property of the
+    /// caller, not a limitation: [`build_rest_parts_with_comments`] routes a group
+    /// to [`Self::add_group_no_break`] **only** when its gap holds no trailing line
+    /// comment and no leading comment (its `last_has_break_forcing_comments`),
+    /// precisely because both need a break this path refuses to emit. A line comment
+    /// reaching an emitter that cannot break would swallow the member after it.
     ///
-    /// Skips leading comments and line breaks since we want the member to stay
-    /// on the same line. Leading comments that appear on their own line before
-    /// a trailing member are a complex case - Prettier moves them elsewhere
-    /// (e.g., after `=`), which requires structural transformation beyond what
-    /// this function handles.
+    /// Leading comments (on their own line before the member) are likewise not
+    /// emitted here; Prettier moves them elsewhere (e.g. after `=`), which needs a
+    /// structural transformation beyond this path.
     fn add_trailing_comments_only(&mut self, group: &ChainGroup<'_>) {
         if let Some((object_end, property_start)) = group_comment_gap(group, self.printer) {
             let classified = self.printer.classify_comments(object_end, property_start);
+            debug_assert!(
+                classified.trailing_line.is_empty() && classified.leading_line.is_empty(),
+                "a break-forcing comment reached the no-break chain path — \
+                 `last_has_break_forcing_comments` should have routed this group to `add_group`"
+            );
 
-            // Trailing block comments (same line as previous element)
-            // e.g., `.map(x => x) /* comment */.length`
             self.parts.push(
                 self.printer
                     .build_trailing_block_doc(&classified.trailing_block),
             );
-
-            // Trailing line comments (same line as previous element)
-            // e.g., `.map(x => x) // comment` - goes to end of line via line_suffix
-            self.parts.push(
-                self.printer
-                    .build_trailing_line_doc(&classified.trailing_line),
-            );
-
-            // Note: Leading comments (on their own line before the member) are
-            // intentionally not emitted here. They would need a line break, but
-            // we're explicitly avoiding breaks to keep the member on the same line.
         }
     }
 

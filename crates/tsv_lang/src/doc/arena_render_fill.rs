@@ -13,6 +13,11 @@ use super::arena_render::{
 use super::types::{DocContext, Mode};
 
 /// Render a fill doc using greedy line packing (iterative version).
+///
+/// `has_line_suffix` is the render loop's pending-suffix state at fill entry, threaded
+/// verbatim into every `fits` call below (Prettier passes `lineSuffix.length > 0` from
+/// its own fill arm): a `LineSuffixBoundary` reached with a comment pending doesn't
+/// fit, because the flush will end the line — see [`arena_fits_with_lookahead`].
 // Remaining args are the MUTABLE render state (`output`/`pos`/`should_remeasure`, plus the
 // work buffers). Deliberately not bundled: a struct would take their address and sink them out
 // of registers in the hot loop — see `RenderCtx`, which carries only the shared context.
@@ -25,6 +30,7 @@ pub(super) fn render_fill_iterative(
     indent: RenderIndent,
     context: &DocContext,
     rest_commands: &[ArenaCommand],
+    has_line_suffix: bool,
     should_remeasure: &mut bool,
 ) {
     let &RenderCtx {
@@ -92,7 +98,7 @@ pub(super) fn render_fill_iterative(
                 Mode::Flat,
                 lookahead,
                 remaining as isize,
-                embed,
+                has_line_suffix,
                 source,
             )
         } else {
@@ -102,7 +108,7 @@ pub(super) fn render_fill_iterative(
                 Mode::Flat,
                 &[],
                 available as isize,
-                embed,
+                has_line_suffix,
                 source,
             )
         };
@@ -155,7 +161,7 @@ pub(super) fn render_fill_iterative(
                 Mode::Flat,
                 &with_sep,
                 budget as isize,
-                embed,
+                has_line_suffix,
                 source,
             )
         } else {
@@ -291,7 +297,7 @@ pub(super) fn render_fill_iterative(
                     Mode::Flat,
                     &rest_with_sep,
                     remaining as isize,
-                    embed,
+                    has_line_suffix,
                     source,
                 )
             } else {
@@ -317,7 +323,7 @@ pub(super) fn render_fill_iterative(
             &[content, separator, next_content],
             available,
             Mode::Flat,
-            embed,
+            has_line_suffix,
             source,
         );
 
@@ -371,7 +377,7 @@ pub(super) fn render_fill_iterative(
                     Mode::Flat,
                     &[],
                     remaining_at_start as isize,
-                    embed,
+                    has_line_suffix,
                     source,
                 );
 
@@ -496,7 +502,8 @@ pub(super) fn render_fill_iterative(
                     // flows as one fill"), and the same-line-authored drop converges with the
                     // newline-authored one instead of one flowing and the other isolating (an F1
                     // break).
-                    let sep_mode = hug_terminal_sep_mode(ctx, context, next_content, *pos);
+                    let sep_mode =
+                        hug_terminal_sep_mode(ctx, context, next_content, *pos, has_line_suffix);
                     render_single_doc(
                         ctx,
                         separator,
@@ -545,7 +552,8 @@ pub(super) fn render_fill_iterative(
                 // when the tail fits there, else own line — see `hug_terminal_sep_mode`.
                 // `next_content` (= `parts[offset + 2]`) is in bounds here: this is the at-line-start
                 // arm of Case 3, which Case 2 (`offset + 2 >= parts.len()`) has already excluded.
-                let sep_mode = hug_terminal_sep_mode(ctx, context, next_content, *pos);
+                let sep_mode =
+                    hug_terminal_sep_mode(ctx, context, next_content, *pos, has_line_suffix);
                 render_single_doc(
                     ctx,
                     separator,
@@ -672,6 +680,7 @@ fn hug_terminal_sep_mode(
     context: &DocContext,
     next_content: DocId,
     pos: usize,
+    has_line_suffix: bool,
 ) -> Mode {
     if context.after_element_fold()
         && arena_fits_with_lookahead(
@@ -680,7 +689,7 @@ fn hug_terminal_sep_mode(
             Mode::Flat,
             &[],
             ctx.render.print_width.saturating_sub(pos + 1) as isize,
-            ctx.embed,
+            has_line_suffix,
             ctx.source,
         )
     {

@@ -224,6 +224,50 @@ fn render_line_break(
     }
 }
 
+/// Render a `Line` command whole: the remeasure obligation a hard line forced out
+/// in flat mode carries, the pending-suffix flush, and the break itself.
+///
+/// Two arms reach it. `DocNode::Line` is the obvious one. `DocNode::LineSuffixBoundary`
+/// is the other, and going through *this* function is what makes it a boundary rather
+/// than a bare flush: Prettier renders that node by pushing a
+/// `hardlineWithoutBreakParent` command and letting its own `Line` arm handle it
+/// (`printer.js` `DOC_TYPE_LINE_SUFFIX_BOUNDARY`), which is exactly this call with
+/// [`LineKind::Hard`]. tsv can't push the node — the arena is immutably borrowed for
+/// the whole render loop — so it calls the arm instead.
+// Remaining args are the mutable render state, deliberately unbundled — see
+// `render_doc_core`.
+#[allow(clippy::too_many_arguments)]
+#[inline]
+fn render_line_node<P: RenderPolicy>(
+    ctx: &RenderCtx<'_>,
+    kind: LineKind,
+    mode: Mode,
+    indent: RenderIndent,
+    output: &mut String,
+    pos: &mut usize,
+    policy: &mut P,
+    line_suffix: &mut LineSuffixBuf,
+    should_remeasure: &mut bool,
+) {
+    let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
+    // A hard line forced out in flat mode: the enclosing fits approval measured
+    // only up to here (a hard line ends a fits walk early), so positions beyond
+    // it are unmeasured — the next group must remeasure no matter what
+    // (Prettier's `shouldRemeasure`, printer.js `DOC_TYPE_LINE` flat arm).
+    if is_hard && mode == Mode::Flat {
+        *should_remeasure = true;
+    }
+    if policy.tracking_suffix() && (mode == Mode::Break || is_hard) {
+        flush_line_suffix(ctx, line_suffix, output, pos, should_remeasure);
+    }
+    // A real newline ends the comment's line → clears the pending swallow.
+    let emitted_newline = render_line_break(kind, mode, indent, output, pos, ctx.render, ctx.embed);
+    #[cfg(feature = "swallow_check")]
+    policy.swallow_on_newline(emitted_newline);
+    #[cfg(not(feature = "swallow_check"))]
+    let _ = emitted_newline;
+}
+
 /// Flush pending line suffix content, in the order it was queued.
 ///
 /// Prettier flushes by re-pushing the buffer onto its command *stack*
@@ -761,25 +805,17 @@ fn render_doc_core<P: RenderPolicy>(
 
             DocNode::Line(kind) => {
                 let kind = *kind;
-                let is_hard = matches!(kind, LineKind::Hard | LineKind::Literal);
-                // A hard line forced out in flat mode: the enclosing fits
-                // approval measured only up to here (a hard line ends a fits
-                // walk early), so positions beyond it are unmeasured — the next
-                // group must remeasure no matter what (Prettier's
-                // `shouldRemeasure`, printer.js `DOC_TYPE_LINE` flat arm).
-                if is_hard && cmd.mode == Mode::Flat {
-                    *should_remeasure = true;
-                }
-                if policy.tracking_suffix() && (cmd.mode == Mode::Break || is_hard) {
-                    flush_line_suffix(ctx, line_suffix, output, pos, should_remeasure);
-                }
-                // A real newline ends the comment's line → clears the pending swallow.
-                let emitted_newline =
-                    render_line_break(kind, cmd.mode, cmd.indent, output, pos, render, embed);
-                #[cfg(feature = "swallow_check")]
-                policy.swallow_on_newline(emitted_newline);
-                #[cfg(not(feature = "swallow_check"))]
-                let _ = emitted_newline;
+                render_line_node(
+                    ctx,
+                    kind,
+                    cmd.mode,
+                    cmd.indent,
+                    output,
+                    pos,
+                    policy,
+                    line_suffix,
+                    should_remeasure,
+                );
             }
 
             DocNode::Indent(inner) => {
@@ -850,7 +886,7 @@ fn render_doc_core<P: RenderPolicy>(
                             Mode::Flat,
                             commands,
                             remaining,
-                            embed,
+                            !line_suffix.is_empty(),
                             source,
                         );
 
@@ -871,7 +907,7 @@ fn render_doc_core<P: RenderPolicy>(
                                     Mode::Flat,
                                     commands,
                                     remaining,
-                                    embed,
+                                    !line_suffix.is_empty(),
                                     source,
                                 );
                                 if state_fits {
@@ -905,7 +941,7 @@ fn render_doc_core<P: RenderPolicy>(
                         Mode::Flat,
                         commands,
                         remaining_width(*pos, render, embed),
-                        embed,
+                        !line_suffix.is_empty(),
                         source,
                     );
                     if fits {
@@ -970,6 +1006,7 @@ fn render_doc_core<P: RenderPolicy>(
                     cmd.indent,
                     &DocContext::default(),
                     commands,
+                    !line_suffix.is_empty(),
                     should_remeasure,
                 );
             }
@@ -989,6 +1026,7 @@ fn render_doc_core<P: RenderPolicy>(
                             cmd.indent,
                             &context,
                             policy.with_context_fill_rest(commands),
+                            !line_suffix.is_empty(),
                             should_remeasure,
                         );
                     } else {
@@ -1014,8 +1052,23 @@ fn render_doc_core<P: RenderPolicy>(
             }
 
             DocNode::LineSuffixBoundary => {
-                if policy.tracking_suffix() {
-                    flush_line_suffix(ctx, line_suffix, output, pos, should_remeasure);
+                // A boundary with nothing pending is a no-op; with a suffix pending it
+                // is a HARD LINE — the flush must end the line, or the deferred `//`
+                // runs to end of line and swallows the code the boundary exists to
+                // protect (`const x: T[K] = // c` + `y;`, the initializer inside the
+                // comment). See `render_line_node` for why it is that node exactly.
+                if policy.tracking_suffix() && !line_suffix.is_empty() {
+                    render_line_node(
+                        ctx,
+                        LineKind::Hard,
+                        cmd.mode,
+                        cmd.indent,
+                        output,
+                        pos,
+                        policy,
+                        line_suffix,
+                        should_remeasure,
+                    );
                 }
             }
 

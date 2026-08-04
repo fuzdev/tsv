@@ -863,6 +863,14 @@ are escaping. Only a **line** comment defers by construction; a block defers sol
 behind one, because deferring is what carries a comment out past the closer. Back-to-back
 emission welds the run, and an inline block mixed into a deferred one **reorders** it.
 
+⚠️ **A deferred run's FLUSH must end the line, so a `lineSuffixBoundary` belongs only where
+nothing else does.** The renderer drains the buffer at a break-mode `line` or at a boundary,
+and both then emit the newline (prettier pushes `hardlineWithoutBreakParent` there) — a flush
+that ends inline lets the deferred `//` swallow the code after it, output that doesn't
+reparse. Because the boundary breaks on its own, planting one in front of a doc's own forced
+break renders a blank line instead. `arena_fits` answers the same question at measure time:
+a boundary reached with a suffix pending doesn't fit.
+
 Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/linter use
 cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — see
 [conformance_prettier_ts_comments.md §Comment relocation](docs/conformance_prettier_ts_comments.md#comment-relocation).
