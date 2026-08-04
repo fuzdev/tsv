@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 428,
+	"end": 585,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -92,9 +92,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " plain rest — no divergence",
+			"value": " a comment in the binding→`?` gap stays before the marker",
 			"start": 360,
-			"end": 389,
+			"end": 419,
 			"loc": {
 				"start": {
 					"line": 20,
@@ -102,6 +102,54 @@
 				},
 				"end": {
 					"line": 20,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 445,
+			"end": 452,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 25
+				},
+				"end": {
+					"line": 21,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 485,
+			"end": 492,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 24
+				},
+				"end": {
+					"line": 22,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " plain rest — no divergence",
+			"start": 517,
+			"end": 546,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
 					"column": 30
 				}
 			}
@@ -110,19 +158,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 427,
+		"end": 584,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 418,
+			"end": 575,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 22,
+					"line": 26,
 					"column": 9
 				}
 			},
@@ -785,8 +833,8 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 391,
-					"end": 417,
+					"start": 421,
+					"end": 460,
 					"loc": {
 						"start": {
 							"line": 21,
@@ -794,14 +842,14 @@
 						},
 						"end": {
 							"line": 21,
-							"column": 27
+							"column": 40
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 397,
-							"end": 416,
+							"start": 427,
+							"end": 459,
 							"loc": {
 								"start": {
 									"line": 21,
@@ -809,13 +857,13 @@
 								},
 								"end": {
 									"line": 21,
-									"column": 26
+									"column": 39
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 397,
-								"end": 402,
+								"start": 427,
+								"end": 436,
 								"loc": {
 									"start": {
 										"line": 21,
@@ -823,6 +871,304 @@
 									},
 									"end": {
 										"line": 21,
+										"column": 16
+									}
+								},
+								"name": "commented"
+							},
+							"init": {
+								"type": "ArrowFunctionExpression",
+								"start": 439,
+								"end": 459,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 19
+									},
+									"end": {
+										"line": 21,
+										"column": 39
+									}
+								},
+								"id": null,
+								"expression": true,
+								"generator": false,
+								"async": false,
+								"params": [
+									{
+										"type": "RestElement",
+										"start": 440,
+										"end": 453,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 20
+											},
+											"end": {
+												"line": 21,
+												"column": 33
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 443,
+											"end": 444,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 23
+												},
+												"end": {
+													"line": 21,
+													"column": 24
+												}
+											},
+											"name": "a",
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " c ",
+													"start": 445,
+													"end": 452
+												}
+											]
+										},
+										"optional": true
+									}
+								],
+								"body": {
+									"type": "Literal",
+									"start": 458,
+									"end": 459,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 38
+										},
+										"end": {
+											"line": 21,
+											"column": 39
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment in the binding→`?` gap stays before the marker",
+							"start": 360,
+							"end": 419
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 462,
+					"end": 514,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 53
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 467,
+						"end": 476,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 6
+							},
+							"end": {
+								"line": 22,
+								"column": 15
+							}
+						},
+						"name": "FnComment"
+					},
+					"typeAnnotation": {
+						"type": "TSFunctionType",
+						"start": 479,
+						"end": 513,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 18
+							},
+							"end": {
+								"line": 22,
+								"column": 52
+							}
+						},
+						"parameters": [
+							{
+								"type": "RestElement",
+								"start": 480,
+								"end": 504,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 19
+									},
+									"end": {
+										"line": 22,
+										"column": 43
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 483,
+									"end": 484,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 22
+										},
+										"end": {
+											"line": 22,
+											"column": 23
+										}
+									},
+									"name": "a",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 485,
+											"end": 492
+										}
+									]
+								},
+								"optional": true,
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 493,
+									"end": 504,
+									"loc": {
+										"start": {
+											"line": 22,
+											"column": 32
+										},
+										"end": {
+											"line": 22,
+											"column": 43
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSArrayType",
+										"start": 495,
+										"end": 504,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 34
+											},
+											"end": {
+												"line": 22,
+												"column": 43
+											}
+										},
+										"elementType": {
+											"type": "TSUnknownKeyword",
+											"start": 495,
+											"end": 502,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 34
+												},
+												"end": {
+													"line": 22,
+													"column": 41
+												}
+											}
+										}
+									}
+								}
+							}
+						],
+						"typeAnnotation": {
+							"type": "TSTypeAnnotation",
+							"start": 506,
+							"end": 513,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 45
+								},
+								"end": {
+									"line": 22,
+									"column": 52
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSVoidKeyword",
+								"start": 509,
+								"end": 513,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 48
+									},
+									"end": {
+										"line": 22,
+										"column": 52
+									}
+								}
+							}
+						}
+					}
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 548,
+					"end": 574,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 27
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 554,
+							"end": 573,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 7
+								},
+								"end": {
+									"line": 25,
+									"column": 26
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 554,
+								"end": 559,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 7
+									},
+									"end": {
+										"line": 25,
 										"column": 12
 									}
 								},
@@ -830,15 +1176,15 @@
 							},
 							"init": {
 								"type": "ArrowFunctionExpression",
-								"start": 405,
-								"end": 416,
+								"start": 562,
+								"end": 573,
 								"loc": {
 									"start": {
-										"line": 21,
+										"line": 25,
 										"column": 15
 									},
 									"end": {
-										"line": 21,
+										"line": 25,
 										"column": 26
 									}
 								},
@@ -849,29 +1195,29 @@
 								"params": [
 									{
 										"type": "RestElement",
-										"start": 406,
-										"end": 410,
+										"start": 563,
+										"end": 567,
 										"loc": {
 											"start": {
-												"line": 21,
+												"line": 25,
 												"column": 16
 											},
 											"end": {
-												"line": 21,
+												"line": 25,
 												"column": 20
 											}
 										},
 										"argument": {
 											"type": "Identifier",
-											"start": 409,
-											"end": 410,
+											"start": 566,
+											"end": 567,
 											"loc": {
 												"start": {
-													"line": 21,
+													"line": 25,
 													"column": 19
 												},
 												"end": {
-													"line": 21,
+													"line": 25,
 													"column": 20
 												}
 											},
@@ -881,15 +1227,15 @@
 								],
 								"body": {
 									"type": "Literal",
-									"start": 415,
-									"end": 416,
+									"start": 572,
+									"end": 573,
 									"loc": {
 										"start": {
-											"line": 21,
+											"line": 25,
 											"column": 25
 										},
 										"end": {
-											"line": 21,
+											"line": 25,
 											"column": 26
 										}
 									},
@@ -904,8 +1250,8 @@
 						{
 							"type": "Line",
 							"value": " plain rest — no divergence",
-							"start": 360,
-							"end": 389
+							"start": 517,
+							"end": 546
 						}
 					]
 				}

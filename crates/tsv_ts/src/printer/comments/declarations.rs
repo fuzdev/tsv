@@ -507,6 +507,40 @@ impl<'a> Printer<'a> {
         ])
     }
 
+    /// Emit a rest element's tail — its optional `?` marker and its `: type`
+    /// annotation — after the caller has pushed `...` and the binding.
+    ///
+    /// The `?` is carried on the `RestElement`, not on `argument` (see `RestElement`),
+    /// so both gaps it creates — binding→`?` and `?`→`:` — sit between two SIBLING
+    /// nodes: no other emitter can see either one, and without these landings a comment
+    /// in them is silently dropped (`(...a /* c */?: T[])`, the marker-less
+    /// `(...a /* c */: T[])`, and destructuring rest bindings `...[a] /* c */: T[]`
+    /// alike). They are the same landings the plain identifier parameter takes
+    /// ([`Self::push_modifier_marker_doc`] and
+    /// [`Self::build_binding_type_annotation_doc`]).
+    ///
+    /// `wrap` selects the width-aware annotation builder, matching the sibling
+    /// non-rest arm at each call site: `false` on the value side
+    /// (`build_rest_element_doc`, mirroring `build_identifier_doc_inner`), `true` on
+    /// the type side (`build_function_type_param_expression_doc`, whose `Identifier`
+    /// arm breaks its annotation's generic arguments at print width).
+    pub(crate) fn push_rest_element_tail_doc(
+        &self,
+        parts: &mut DocBuf,
+        rest: &internal::RestElement<'_>,
+        wrap: bool,
+    ) {
+        let binding_end = rest.argument.span().end;
+        let after_modifier = if rest.optional {
+            self.push_modifier_marker_doc(parts, binding_end, b'?')
+        } else {
+            binding_end
+        };
+        if let Some(ta) = &rest.type_annotation {
+            parts.push(self.build_binding_type_annotation_doc(after_modifier, ta, wrap));
+        }
+    }
+
     /// A whole multi-word header: the keyword (see
     /// [`build_keyword_words_doc`](Self::build_keyword_words_doc)) plus the
     /// keyword→`continuation` gap. The shape every caller wants that has no other use

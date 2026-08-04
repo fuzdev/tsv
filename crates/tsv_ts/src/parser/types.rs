@@ -190,6 +190,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// inserts the `;`), never an array/indexed-access suffix. `T⏎[K]` is thus `T`
     /// then a fresh `[K]`, not `T[K]`. Checked per bracket in the loop condition —
     /// every context, not just the `as`/`satisfies` expression position.
+    ///
+    /// tsc guards the postfix `?` of a tuple element on the same rule, in the same loop
+    /// — see [`Self::error_optional_marker_after_line_break`], where acorn's port drops
+    /// the guard and tsv keeps it.
     fn parse_array_type(&mut self) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
         let mut result = self.parse_primary_type()?;
@@ -758,7 +762,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// `parseTypeArgumentsOfTypeReference` / `tsParseTypeQuery`). So `B` ⏎ `<T>`
     /// is the type `B` followed by a separate `<T>`, not `B<T>` — in a type-member
     /// list this ASI-splits `a: B` ⏎ `<T>(): C` into two members. This mirrors the
-    /// `!had_line_terminator` guard the postfix-`[]` and `extends` sites also apply.
+    /// `!had_line_terminator` guard the postfix-`[]`, tuple-optional-`?` and `extends`
+    /// sites also apply.
     pub(in crate::parser) fn parse_optional_type_arguments_same_line(
         &mut self,
     ) -> Result<Option<TSTypeParameterInstantiation<'arena>>, ParseError> {
@@ -1407,6 +1412,35 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         self.parse_tuple_element_inner()
     }
 
+    /// The postfix optional `?` of a tuple element sits at a `[no LineTerminator here]`
+    /// position, so `[T⏎?]` is a syntax error rather than an optional element.
+    ///
+    /// tsc runs the whole postfix suffix loop — `?`, `!` and `[` alike — under
+    /// `while (!scanner.hasPrecedingLineBreak())` (`parsePostfixTypeOrHigher`), which is
+    /// the same rule [`Self::parse_array_type`] applies to the postfix `[`; this is the
+    /// remaining member of that family. oxc agrees. acorn-typescript and babel accept the
+    /// break: their `tsParseTupleElementType` bare-`eat`s the `?` while spelling the guard
+    /// for the array suffix one function below, so this is a slip in the port, not a
+    /// choice — tsv is deliberately stricter, cataloged in `docs/conformance_svelte.md`
+    /// §TypeScript Corrections.
+    ///
+    /// The **named**-member marker (`[a⏎?: T]`) is a different grammar position and takes
+    /// the break; tsc parses it through `parseOptionalToken`, outside that loop.
+    ///
+    /// Per ecma262 §sec-comments a block comment holding a line terminator *is* one, so
+    /// `[T /* c⏎ */?]` and `[T // c⏎?]` are rejected too — `had_line_terminator` already
+    /// folds both in.
+    ///
+    /// `marker_pos` is the `?` itself, which the named-member path has already advanced
+    /// past by the time it can tell the two markers apart — so both callers pass it
+    /// rather than letting the caret drift a token between them.
+    fn error_optional_marker_after_line_break(&self, marker_pos: usize) -> ParseError {
+        self.error_msg_at(
+            "Optional tuple element `?` cannot follow a line terminator",
+            marker_pos,
+        )
+    }
+
     /// Parse a tuple element (without leading `...`): `T`, `T?`, `label: T`, `label?: T`
     fn parse_tuple_element_inner(&mut self) -> Result<TSType<'arena>, ParseError> {
         let elem_start = self.current_pos().0;
@@ -1421,15 +1455,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             let label_name = self.current_ident_name();
             self.advance()?; // consume identifier
 
-            // Check for optional marker `?` followed by `:`
-            // This distinguishes `label?: T` (named optional) from `TypeRef?` (optional type ref)
+            // A `?` here is either the named-member marker (`label?: T`) or the postfix
+            // optional one (`TypeRef?`), and only the token AFTER it tells them apart —
+            // so consume it and decide, rather than backtracking (which this parser
+            // can't do cheaply).
             let optional = if self.check(&TokenKind::Question) {
-                // Peek ahead: if next is `:`, this is `label?: T`
-                // Otherwise, we misread - need to backtrack (but we can't easily)
-                // Simpler approach: check for `:` after consuming `?`
+                // Only the named marker may follow a line break; the postfix one is a
+                // `[no LineTerminator here]` position (see
+                // `error_optional_marker_after_line_break`). Read before the `advance`,
+                // which moves both the flag and the position onto the next token.
+                let after_line_break = self.had_line_terminator;
+                let marker_pos = self.current_pos().0;
                 self.advance()?; // consume `?`
                 if self.check(&TokenKind::Colon) {
                     true
+                } else if after_line_break {
+                    return Err(self.error_optional_marker_after_line_break(marker_pos));
                 } else {
                     // This was actually `TypeRef?` - we need to create the type reference
                     // and wrap it in optional
@@ -1469,8 +1510,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Parse as regular type, then check for trailing `?` (optional type)
         let inner_type = self.parse_type()?;
 
-        // Check for optional suffix: `T?`
-        if self.eat(TokenKind::Question) {
+        // Check for optional suffix: `T?` — a `[no LineTerminator here]` position, see
+        // `error_optional_marker_after_line_break`.
+        if self.check(&TokenKind::Question) {
+            if self.had_line_terminator {
+                return Err(self.error_optional_marker_after_line_break(self.current_pos().0));
+            }
+            self.advance()?; // consume `?`
             let end = self.prev_token_end();
             Ok(TSType::Optional(TSOptionalType {
                 type_annotation: self.alloc(inner_type),

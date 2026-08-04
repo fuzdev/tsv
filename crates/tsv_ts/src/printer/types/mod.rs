@@ -539,7 +539,18 @@ impl<'a> Printer<'a> {
                     o.type_annotation,
                     type_needs_parens_for_optional_element,
                 );
-                d.concat(&[inner, d.text("?")])
+                let mut parts: DocBuf = smallvec![inner];
+                // Comments in the element→`?` gap (`[T /* c */?]`) take the same
+                // landing the `NamedTupleMember` arm below gives the label→`?` gap
+                // (`[a /* c */?: T]`) — previously unclaimed by any emitter here, a
+                // silent drop. The element's span end is the gap's left edge: a
+                // parenthesized operand keeps its `TSType::Parenthesized` wrapper, so
+                // the scan starts after the `)`, and an in-paren comment stays inside.
+                // Only a *same-line block* comment can be here — the `?` is a
+                // `[no LineTerminator here]` position, so the emitter's line-comment
+                // branch is unreachable from this caller (`parse_tuple_element_inner`).
+                self.push_modifier_marker_doc(&mut parts, o.type_annotation.span().end, b'?');
+                d.concat(&parts)
             }
             TSType::NamedTupleMember(n) => {
                 let mut parts = smallvec![self.identifier_name_doc(&n.label)];
@@ -1096,39 +1107,21 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = DocBuf::new();
         let mut needs_break = false;
 
-        // Leading comments: between `(` and inner type
+        // Leading comments: between `(` and inner type. A line comment terminates at
+        // end-of-line, so it takes a `hardline` rather than `line_suffix` — deferring
+        // it would push it past the end of the enclosing construct and can produce
+        // invalid output (`[// leading a, b]`).
         if has_leading {
-            for comment in comments_to_emit_in_range(self.comments, paren_open, inner_start) {
-                if comment.is_block {
-                    parts.push(self.build_comment_doc(comment));
-                    parts.push(d.text(" "));
-                } else {
-                    // Line comment before inner type: emit inline + hardline.
-                    // A line comment must terminate at end-of-line; using line_suffix
-                    // here would defer it past the end of the enclosing construct
-                    // and can produce invalid output (e.g., `[// leading a, b]`).
-                    parts.push(self.build_comment_doc(comment));
-                    parts.push(d.hardline());
-                    needs_break = true;
-                }
-            }
+            needs_break |=
+                self.push_paren_shell_leading_run(&mut parts, paren_open, inner_start, true);
         }
 
         parts.push(self.build_type_doc(p.type_annotation));
 
-        // Trailing comments: between inner type and `)`
+        // Trailing comments: between inner type and `)`. A block stays inline; a line
+        // comment defers to end of line and forces the break.
         if has_trailing {
-            for comment in comments_to_emit_in_range(self.comments, inner_end, paren_close) {
-                if comment.is_block {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                } else {
-                    // Line comment after inner type: defer to end of line, force break
-                    let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
-                    parts.push(d.line_suffix(suffix));
-                    needs_break = true;
-                }
-            }
+            needs_break |= self.push_trailing_comments_in_range(&mut parts, inner_end, paren_close);
         }
 
         if needs_break {

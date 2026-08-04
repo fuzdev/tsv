@@ -465,10 +465,65 @@ impl<'a> Printer<'a> {
     /// the following token). For a gap whose comments all keep their position and need
     /// no per-comment routing; a caller that must split the run by position (around a
     /// separator, by own-line-ness) iterates itself.
-    pub(crate) fn push_trailing_comments_in_range(&self, parts: &mut DocBuf, start: u32, end: u32) {
+    ///
+    /// Returns whether the run held a **line** comment — i.e. whether the caller must
+    /// break. That is the same walk, so asking it here spares the caller a second
+    /// binary search over the range it just scanned, and keeps the break question
+    /// keyed on what was actually EMITTED (an owned comment is skipped by both).
+    /// Callers whose following token can't be swallowed ignore it.
+    pub(crate) fn push_trailing_comments_in_range(
+        &self,
+        parts: &mut DocBuf,
+        start: u32,
+        end: u32,
+    ) -> bool {
+        let mut has_line_comment = false;
         for comment in comments_to_emit_in_range(self.comments, start, end) {
             parts.push(self.build_trailing_comment_doc(comment));
+            has_line_comment |= !comment.is_block;
         }
+        has_line_comment
+    }
+
+    /// Emit a retained-paren SHELL's leading run — the comments in `[start, end)`
+    /// between the shell's `(` and the type it wraps — each followed by its own
+    /// separator: a space for a block (`(/* c */ a | b)`), a `hardline` for a line
+    /// comment, which must end its line or it would swallow the type after it.
+    /// Returns whether a line comment was emitted, i.e. whether the shell must break.
+    ///
+    /// `emit_line_comments` is false where an upstream emitter has already placed the
+    /// line comment (the later-member paren-union arms of
+    /// `build_union_type_doc_with_line_comments`), so emitting here would double-print
+    /// it; the block arm always emits.
+    ///
+    /// ⚠️ Deliberately NOT [`Self::push_leading_comment_run`], the canonical leading
+    /// emitter: that one keys each separator on what FOLLOWS the comment (the glue
+    /// test, blank-line preservation), while a shell's run keys on the comment's own
+    /// kind. Routing these through it is a behavior change (it would newly hug and
+    /// newly preserve blank lines at three paren shells), not a collapse — so the
+    /// divergence lives here, in one place, instead of hand-rolled at each shell.
+    /// TODO: converge the two, fixtures-first — the shells are the last leading-run
+    /// sites deciding a separator without asking what follows.
+    pub(crate) fn push_paren_shell_leading_run(
+        &self,
+        parts: &mut DocBuf,
+        start: u32,
+        end: u32,
+        emit_line_comments: bool,
+    ) -> bool {
+        let d = self.d();
+        let mut has_line_comment = false;
+        for comment in comments_to_emit_in_range(self.comments, start, end) {
+            if comment.is_block {
+                parts.push(self.build_comment_doc(comment));
+                parts.push(d.text(" "));
+            } else if emit_line_comments {
+                parts.push(self.build_comment_doc(comment));
+                parts.push(d.hardline());
+                has_line_comment = true;
+            }
+        }
+        has_line_comment
     }
 
     /// Emit the comment run in `[anchor, end)` PRESERVING each comment's own-line-ness —
