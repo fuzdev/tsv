@@ -16,8 +16,23 @@
 use std::borrow::Cow;
 use std::collections::VecDeque;
 
-use tsv_lang::{Comment, Span, printing, source_scan::skip_comment};
+use tsv_lang::{Comment, LocationTracker, Span, printing, source_scan::skip_comment};
 use tsv_ts::ast::convert::{AttachedComment, SkeletonTree, WriterComments};
+
+/// The inputs every template comment-attach builder (`ast/convert/special.rs`'s
+/// `build_*_writer_comments`) and every attach entry point below
+/// share: the template comments to place, the source text, and the byte-offset
+/// tracker its byte-space skeleton pass runs under. Bundled so the call sites —
+/// and `build_expression_list_writer_comments`, which would otherwise trip
+/// `too_many_arguments` — thread one value instead of the same three.
+/// (`build_script_writer_comments` is not in the set: it attaches the script's
+/// *own* comments, not the template set, and is schema-driven.)
+#[derive(Clone, Copy)]
+pub(super) struct AttachInputs<'a> {
+    pub(super) template_comments: &'a [&'a Comment],
+    pub(super) source: &'a str,
+    pub(super) tracker: &'a LocationTracker,
+}
 
 /// Context for the comment attachment process.
 ///
@@ -445,14 +460,43 @@ fn window_queue<'a>(
 pub(super) fn try_attach_comments_to_node(
     tree: &SkeletonTree,
     root: u32,
-    template_comments: &[&Comment],
-    source: &str,
+    attach: AttachInputs<'_>,
     container_start: u32,
     container_end: u32,
     out: &mut WriterComments,
 ) {
-    let expr_end = tree.end(root);
+    try_attach_comments_to_node_ending_at(
+        tree,
+        root,
+        tree.end(root),
+        attach,
+        container_start,
+        container_end,
+        out,
+    );
+}
 
+/// [`try_attach_comments_to_node`] with the parsed region's end given explicitly
+/// rather than read off the root node's span.
+///
+/// The two differ wherever the root's span **stops short of what the parse
+/// covered**. A Svelte block binding is the case that matters: its annotation is
+/// a sibling, not a tail, so an annotated `a1: T`'s root `Identifier` ends at
+/// `a1` while the parse ran through `T` (see `tsv_ts::pattern_binding_end`).
+/// Deriving the window from the root there collapses it to the bare name, and
+/// the trailing scan cannot recover it — the scan stops dead on the `:` — so
+/// every comment inside the annotation is filtered out before the walk and
+/// attaches nowhere.
+pub(super) fn try_attach_comments_to_node_ending_at(
+    tree: &SkeletonTree,
+    root: u32,
+    expr_end: u32,
+    attach: AttachInputs<'_>,
+    container_start: u32,
+    container_end: u32,
+    out: &mut WriterComments,
+) {
+    let source = attach.source;
     // Compute the effective end of the expression's parsing window.
     // Acorn scans ahead after the expression looking for the next token,
     // encountering (and collecting) any comments along the way.
@@ -461,7 +505,7 @@ pub(super) fn try_attach_comments_to_node(
     let effective_end = scan_past_trailing_comments(source, expr_end, container_end);
 
     // Filter comments within [container_start, effective_end)
-    let comment_queue = window_queue(template_comments, container_start, effective_end);
+    let comment_queue = window_queue(attach.template_comments, container_start, effective_end);
     if comment_queue.is_empty() {
         return;
     }

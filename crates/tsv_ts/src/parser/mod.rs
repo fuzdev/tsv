@@ -1767,11 +1767,6 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         matches!(self.current.kind, TokenKind::Colon)
     }
 
-    /// Get the current token's start position (absolute, with base_offset).
-    pub fn current_absolute_position(&self) -> usize {
-        self.current.start as usize + self.base_offset
-    }
-
     /// Convert an expression to a binding pattern.
     ///
     /// This converts ObjectExpression to ObjectPattern, ArrayExpression to ArrayPattern,

@@ -437,10 +437,22 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         }
         let ws_before_colon = trimmed.len() - end - after_pattern.len();
         let colon_offset = adjusted + end + ws_before_colon;
-        let (ta, type_end) =
-            tsv_ts::parse_type_annotation_partial(after_pattern, colon_offset, self.arena)?;
+        // The annotation is its own sub-parse of the host document, so its comments
+        // exist nowhere else — dropping them dropped the comment outright
+        // (`{#each xs as x: /* c */ T}`), and with no registration the print-once
+        // ledger could not see the loss either. `parse_ts_type_annotation` collects
+        // them the way every sibling sub-parse does; they keep their true columns,
+        // since the synthetic-`(` shift belongs to the destructure parse alone (see
+        // `parse_ts_pattern`).
+        let ta = self.parse_ts_type_annotation(after_pattern, colon_offset)?;
+        // The consumed extent is the ANNOTATION's own end. Reporting where the
+        // sub-parse's lexer stopped hands the tail back with a trailing comment
+        // silently eaten — canonical Svelte rejects one there
+        // (`{#each xs as x: T /* c */}` → `expected_token`), and tsv used to accept it
+        // and drop the comment.
+        let annotation_end = ta.span.end as usize;
         tsv_ts::attach_pattern_type_annotation(&mut expr, ta, self.arena)?;
-        Ok((expr, type_end))
+        Ok((expr, annotation_end))
     }
 
     /// Find the matching closing bracket for a string starting with `{` or `[`,
