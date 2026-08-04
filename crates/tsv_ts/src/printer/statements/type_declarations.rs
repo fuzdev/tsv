@@ -5,6 +5,7 @@ use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 use crate::ast::internal::{self, TSType};
 use crate::printer::ignore::is_freeze_target;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
+use crate::printer::types::ArraySuffixLayout;
 use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue};
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
@@ -31,7 +32,11 @@ fn should_break_before_conditional_type(conditional: &internal::TSConditionalTyp
 
 /// Returns true if the type has its own internal breaking mechanism
 /// (e.g., braces, brackets, parentheses) and should NOT break after `=`.
-fn type_has_internal_breaking(ts_type: &TSType<'_>) -> bool {
+///
+/// Takes `&Printer` for the one arm whose answer depends on comments — an array
+/// suffix owns a break point only once it prints one; see
+/// [`Printer::array_suffix_layout`].
+fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType<'_>) -> bool {
     match ts_type {
         TSType::TypeLiteral(_)
         | TSType::Mapped(_)
@@ -55,7 +60,15 @@ fn type_has_internal_breaking(ts_type: &TSType<'_>) -> bool {
         // is the disagreement `build_conditional_check_doc` names for its own union gate.
         // A narrow arm, not the recursion the wider enumeration wants (`Ref<…>[]`,
         // `keyof Ref<…>`, `Ref<…>['k']` are still missing) — that one needs a corpus A/B.
-        TSType::Array(a) => matches!(a.element_type, TSType::Parenthesized(_)),
+        // The bare suffix's own `[]` is the same argument once it holds a comment
+        // (`string[⏎↹// c⏎]`): the break is inside a delimiter the array owns, so it hugs
+        // `=` exactly as the empty tuple type `[…]` and the empty object `{…}` already do.
+        // Comment-free input answers `Fused` there, so this disjunct cannot move any input
+        // the old enumeration covered.
+        TSType::Array(a) => {
+            matches!(a.element_type, TSType::Parenthesized(_))
+                || matches!(printer.array_suffix_layout(a), ArraySuffixLayout::Split { .. })
+        }
         _ => false,
     }
 }
@@ -461,7 +474,7 @@ impl<'a> Printer<'a> {
                 } else {
                     parts.push(fluid(make_rhs(type_doc)));
                 }
-            } else if type_has_internal_breaking(value_type) {
+            } else if type_has_internal_breaking(self, value_type) {
                 // Types with internal breaking (braces, brackets, parens, angle brackets):
                 // prettier's `fluid`. The marker hugs the `=` line when the value's first
                 // break point is reachable within the width (`= {`, `= [`, `= Foo<`) — the
