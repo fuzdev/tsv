@@ -937,11 +937,15 @@ impl<'a> Printer<'a> {
 
                 let elem_end = e.span().end;
 
-                // Collect trailing comments (stop at next element)
+                // Collect trailing comments (stop at next element or type annotation).
+                // The annotation link is load-bearing: an `ArrayPattern`'s span swallows its
+                // `: T` tail, so without it the last element's trailing range runs past the
+                // `]` and claims a comment the annotation's own doc also prints.
                 let upper_bound = arr
                     .elements
                     .get(i + 1)
                     .and_then(|opt| opt.as_ref().map(|e| e.span().start))
+                    .or_else(|| arr.type_annotation.as_ref().map(|t| t.span.start))
                     .unwrap_or(arr.span.end);
                 let trailing = self.collect_trailing_comments(elem_end, upper_bound, is_last);
 
@@ -1036,11 +1040,15 @@ impl<'a> Printer<'a> {
 
                 let elem_end = e.span().end;
 
-                // Collect trailing comments (stop at next element)
+                // Collect trailing comments (stop at next element or type annotation).
+                // The annotation link is load-bearing: an `ArrayPattern`'s span swallows its
+                // `: T` tail, so without it the last element's trailing range runs past the
+                // `]` and claims a comment the annotation's own doc also prints.
                 let upper_bound = arr
                     .elements
                     .get(i + 1)
                     .and_then(|opt| opt.as_ref().map(|e| e.span().start))
+                    .or_else(|| arr.type_annotation.as_ref().map(|t| t.span.start))
                     .unwrap_or(arr.span.end);
                 let trailing = self.collect_trailing_comments(elem_end, upper_bound, is_last);
 

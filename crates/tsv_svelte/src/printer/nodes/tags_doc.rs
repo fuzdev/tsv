@@ -83,6 +83,10 @@ impl<'a> Printer<'a> {
         // silently dropped them.
         let id_doc = self.build_ts_expression_doc(id);
 
+        // Both questions below scan the `=` gap forward from the binding, so they anchor past
+        // its `: T` — which `id_doc` has already printed, and which the bare span excludes.
+        let binding_end = tsv_ts::pattern_binding_end(id);
+
         // The layout verdict is taken BEFORE the init is built, because it is also the
         // [`Printer::trailing_comment_docs`] `closer_owns_break` answer: only the
         // break-after-operator arm below puts the init inside an `indent(…)` with `}`
@@ -90,15 +94,15 @@ impl<'a> Printer<'a> {
         // The other two arms leave the init on the tag's own column, where the comment's own
         // `hardline` is already the break the `}` needs.
         let break_after_op = Self::const_should_break_after_op(init)
-            || self.gap_comment_hangs_value(id.span().end, init.span().start);
+            || self.gap_comment_hangs_value(binding_end, init.span().start);
 
         // Build init with LayoutMode::Standalone so a ROOT binary init uses Grouped
         // style (not ContinuationIndent). The assignment layout handles indentation —
         // ContinuationIndent would double-indent continuation lines.
         let init_doc = self.build_const_init_doc(
             init,
-            id.span().end, // scan from after the id so a comment between `=` and init survives
-            span.end - 1,  // before "}"
+            binding_end, // scan from after the binding so a comment between `=` and init survives
+            span.end - 1, // before "}"
             break_after_op,
         );
         let close = d.text("}");
@@ -311,9 +315,13 @@ impl<'a> Printer<'a> {
             frozen_parts.push(self.verbatim_source_doc(list));
             // This builder emits its own trailing run, so it answers `ends_with_line_comment`
             // off that one run rather than from a second scan that could disagree with it.
+            //
+            // `closer_owns_break: true` — `indent_frozen_head` below indents this content, and
+            // the freeze is the first of the four things that do, so a run-final `//` must
+            // break one level out or the `}` lands at the identifier list's column.
             let (trailing_docs, ends_with_line_comment) = self.trailing_comment_run_docs(
                 comments_in_source_range(self.comments, list.end, tag_end),
-                false,
+                true,
             );
             frozen_parts.extend(trailing_docs);
             let doc = self.indent_frozen_head(d.concat(&frozen_parts));

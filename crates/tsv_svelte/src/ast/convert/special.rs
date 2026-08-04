@@ -128,6 +128,11 @@ pub(super) fn build_const_tag_writer_comments(
     attach: AttachInputs<'_>,
 ) -> WriterComments {
     let id_span = tag.id.span();
+    // The two windows split at the end of the BINDING, past its `: T` — Svelte's
+    // `read_pattern` parses the annotation, so a comment inside it belongs to the pattern
+    // window and attaches within the annotation subtree. Splitting on the bare span hands
+    // the annotation to the init window instead.
+    let binding_end = tsv_ts::pattern_binding_end(&tag.id);
     let mut out = WriterComments::default();
     let id_tree = expression_skeleton(&tag.id, attach.source, attach.tracker);
     try_attach_comments_to_node(
@@ -136,7 +141,7 @@ pub(super) fn build_const_tag_writer_comments(
         attach.template_comments,
         attach.source,
         id_span.start,
-        id_span.end,
+        binding_end,
         &mut out,
     );
     let init_tree = expression_skeleton(&tag.init, attach.source, attach.tracker);
@@ -145,7 +150,7 @@ pub(super) fn build_const_tag_writer_comments(
         init_tree.roots()[0],
         attach.template_comments,
         attach.source,
-        id_span.end,
+        binding_end,
         tag.span.end,
         &mut out,
     );

@@ -597,6 +597,41 @@ pub fn attach_pattern_type_annotation<'arena>(
     Ok(())
 }
 
+/// The read counterpart of [`attach_pattern_type_annotation`] — the annotation a binding
+/// pattern carries, or `None`.
+///
+/// One definition of "where does this binding's annotation live", because the three kinds
+/// hold it in three different places (an `Identifier` behind its `extra`, the two
+/// destructuring patterns in a field of their own). Callers wanting the binding's **end**
+/// take [`pattern_binding_end`] rather than reading `span.end` themselves.
+pub fn pattern_type_annotation<'a, 'arena>(
+    pattern: &'a Expression<'arena>,
+) -> Option<&'a TSTypeAnnotation<'arena>> {
+    match pattern {
+        Expression::Identifier(id) => id.type_annotation(),
+        Expression::ObjectPattern(obj) => obj.type_annotation.as_ref(),
+        Expression::ArrayPattern(arr) => arr.type_annotation.as_ref(),
+        _ => None,
+    }
+}
+
+/// Where a binding pattern **ends** — past its `: T` when it has one.
+///
+/// Not the same as `pattern.span().end`: a block pattern's span stops at the bare pattern
+/// and the annotation hangs off as a sibling (see [`attach_pattern_type_annotation`] for
+/// why the span cannot encode both), so the bare end is the binding's end only in the
+/// un-annotated case. Anything scanning the gap *after* a binding — a printer looking for
+/// the init's leading comments, a comment-attach window splitting a declarator — must
+/// anchor here, or it starts inside the annotation and claims text some other emitter has
+/// already taken. That double claim is a real bug class, not a hypothetical: the printer
+/// and the wire attach each read the bare end, and each duplicated an annotation's comment
+/// (once onto a `{@const}` init, once inside an `ArrayPattern`'s brackets). One function so
+/// the two cannot answer it differently again.
+pub fn pattern_binding_end(pattern: &Expression<'_>) -> u32 {
+    let bare_end = pattern.span().end;
+    pattern_type_annotation(pattern).map_or(bare_end, |t| t.span.end)
+}
+
 /// Parse a type annotation (`: Type`) and return it with the position where parsing stopped.
 ///
 /// Used in Svelte block contexts where patterns may have type annotations
