@@ -476,6 +476,25 @@ items, which a default `cargo doc` never checks. This codebase puts its design r
 on private functions, so the private-items build is both the one maintainers read and the
 only one where the gate has teeth.
 
+**Why the whole crate has to reach it — two silent coverage holes.** `cargo doc` documents a
+crate's *targets*, and a bin target whose name collides with its lib's is skipped outright.
+`tsv_debug` had exactly that shape — a `[[bin]] name = "tsv_debug"` beside an implicit lib of the
+same name — with `audit/` and `cli/` declared only in `main.rs`. Those two trees are ~36k of the
+crate's ~56k lines, so the gate graded roughly a third of it and reported green; a deliberately
+broken link in either passed. The crate is now one lib, with `main.rs` a shim over `cli`, which
+also stops the nine shared modules compiling twice (they were declared in both roots). The second
+hole is `#[cfg(feature)]`: five `audit` submodules sit behind `comment_check`, so a default-feature
+build cannot resolve a link that names them — hence `--all-features`, which reaches gated code in
+every crate, not only this one. Both holes fail the same way, which is the thing to remember about
+this gate: **absent code is indistinguishable from clean code**, so its coverage is a claim about
+what got compiled, not about what is in the tree.
+
+⚠️ **A link in a module's `//!` docs resolves in the parent module's scope, not the module's own.**
+A `super::` path in an inner-doc block therefore means one level higher than the same path written
+in a `///` beside it, and a name a `use` brought into the module is not in scope. Write those as
+absolute `crate::` paths. A private item of a *sibling* module is nameable by no path at all — drop
+the link and leave plain backticks.
+
 **Lints, and one deliberate exemption.** `broken_intra_doc_links` (the staleness detector),
 plus three mechanical ones that keep it legible — `invalid_html_tags` (prose like
 `<script>` or `Vec<Doc>` that rustdoc reads as markup), `bare_urls`, and

@@ -1,16 +1,5 @@
-mod audit;
-mod cli;
-mod compile_fixtures;
-mod deno;
-mod diff;
-mod error;
-mod fixtures;
-mod render_browser;
-mod render_normalize;
-mod test262;
-mod tsc_conformance;
-
 use std::process::ExitCode;
+use tsv_debug::cli;
 
 /// The single exit point: dispatch the subcommand and map its outcome to a
 /// process exit code. Every command threads its decision back here as a

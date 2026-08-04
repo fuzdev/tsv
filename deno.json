@@ -47,7 +47,7 @@
 		"compile:validation": "cargo run -p tsv_debug --quiet compile_corpus_compare --ratchet",
 		"compile:validation:update": "cargo run -p tsv_debug --quiet compile_corpus_compare --ratchet --update",
 		"compile:corpus:compare": "cargo run -p tsv_debug --quiet compile_corpus_compare ../fuz_ui ../zzz ../mdz ../visionesdelcaribe.org ../fuz_app ../ryanatkn.com ../fuz_css ../fuz_gitops ../webdevladder.net ../fuz_docs ../mageguild ../fuz_code ../fuz_blog ../tsv.fuz.dev ../fuz_mastodon ../gro ../fuz_template ../fuz_util ../earbetter ../journal ../dealt ../cosmicplayground ../deadfelt ../svelte/packages/svelte/tests/runtime-runes ../svelte/packages/svelte/tests/snapshot ../svelte/packages/svelte/tests/server-side-rendering ../svelte/packages/svelte/tests/css",
-		"docs:audit": "RUSTDOCFLAGS='-D rustdoc::broken_intra_doc_links -D rustdoc::invalid_html_tags -D rustdoc::bare_urls -D rustdoc::redundant_explicit_links -A rustdoc::private_intra_doc_links' cargo doc --workspace --no-deps --document-private-items --quiet",
+		"docs:audit": "RUSTDOCFLAGS='-D rustdoc::broken_intra_doc_links -D rustdoc::invalid_html_tags -D rustdoc::bare_urls -D rustdoc::redundant_explicit_links -A rustdoc::private_intra_doc_links' cargo doc --workspace --no-deps --document-private-items --all-features --quiet",
 		"pins:audit": "deno run --allow-read scripts/check_canonical_pins.ts --pins",
 		"pins:audit:checkouts": "deno run --allow-read --allow-run=git scripts/check_canonical_pins.ts --checkouts",
 		"test:audits": "cargo test -p tsv_lang --features audits --quiet",

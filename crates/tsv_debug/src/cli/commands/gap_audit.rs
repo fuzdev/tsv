@@ -7,7 +7,8 @@
 //! built as `d.text("import.source(")` scans neither of its two dot gaps, so
 //! `import./* c */source(x)` loses the comment — no error, no diff, just gone.
 //!
-//! The print-once ledger ([`comment_ledger`]) would catch every one of these. It just
+//! The print-once ledger ([`comment_ledger`](tsv_lang::comment_ledger)) would catch every one of
+//! these. It just
 //! never sees them: [`comment_audit`](super::comment_audit) formats each file **as
 //! authored**, and a gap only becomes a finding once a comment is actually *in* it. Eight
 //! such sites were found BY HAND, and every one was green on every gate — `cargo test`,
@@ -41,7 +42,7 @@
 //! this class; and `/* … */` is not a comment in Svelte markup under any reading, so
 //! injecting one there tests nothing while burying the report in shapes like `IDENT⟨⟩␣`.
 //!
-//! So sites come from [`code_regions`](crate::audit::sites::code_regions) — the spans the
+//! So sites come from [`code_regions`] — the spans the
 //! AST says are JS or CSS — and inside those two existing layers filter for free:
 //!
 //! - **inside a word** (`fo/* c */o` → `fo o`) — the parser rejects it, so the site is
@@ -52,7 +53,7 @@
 //! One class those two miss is an offset **inside an existing comment** (`/* c1 ⟨⟩*/`): it
 //! parses, lexes, and *does* register — but injecting there mutilates the author's comment
 //! rather than probing a gap, and reads as a false drop. That one is not free;
-//! [`injection_sites`](crate::audit::sites::injection_sites) excludes it explicitly from
+//! [`injection_sites`] excludes it explicitly from
 //! the seed's own parsed comment spans, under every mode.
 //!
 //! And because the ledger asks only "was each comment printed exactly once?" — never "did
@@ -75,13 +76,14 @@
 //! The audit inherits **the ledger's scope** exactly. That scope now covers both the
 //! **detached** comments a format entry registers AND the **AST-node** comments — a Svelte
 //! `<!-- … -->` and a CSS in-block `CssBlockChild::Comment`, which the ledger registers by
-//! span (see [`comment_ledger`]'s module docs). A CSS declaration's *value* comments are
+//! span (see [`comment_ledger`](tsv_lang::comment_ledger)'s module docs). A CSS declaration's
+//! *value* comments are
 //! still never lexed as `Comment`s at all — outside the model by construction. So this
 //! speaks for both comment models — the detached class that bit us eight times and the
 //! tree-carried AST-node one — but not for CSS values. CSS also has no line comments, so the
 //! `line` payload is inert in a `.css` file (harmless: it simply never registers).
 //!
-//! It also inherits **[`code_regions`](crate::audit::sites::code_regions)' reach**: a gap
+//! It also inherits **[`code_regions`]' reach**: a gap
 //! the region walk doesn't name is a gap never probed. Today that means a `.svelte` file's
 //! `<style>` content is unprobed, so a Svelte file containing only a `<style>` block yields
 //! **zero sites** — now a yield/cost call rather than a scope one (the ledger guards CSS
@@ -297,7 +299,7 @@ enum Kind {
     /// existing format is what closes it — a second *detector* on one format, not a second
     /// format (the reason this is affordable where a full `f1_check` was not).
     ///
-    /// **Graded like the ledger kinds** ([`snapshot_keys`](snapshot::snapshot_keys)) — it was
+    /// **Graded like the ledger kinds** ([`snapshot_keys`]) — it was
     /// staged report-only only while the swallow check was armed on `tsv_ts`'s emitters alone,
     /// since a shape set half the printers could not produce is an artifact of the instrument,
     /// not of the formatter. Every `tsv_svelte` comment emitter now tags its whole span too, so
@@ -337,7 +339,7 @@ impl Kind {
 /// hand, and nothing else.
 ///
 /// Kept as a unit rather than as loose `example_*` fields on [`ShapeAgg`], because they are
-/// only meaningful together: [`Self::payload`] at [`Self::offset`] in [`Self::path`] is a
+/// only meaningful together: [`Self::payload`] at [`Self::injection_offset`] in [`Self::path`] is a
 /// *triple*, and mixing one shape's offset with another's payload reproduces nothing.
 #[derive(Clone)]
 struct Example {

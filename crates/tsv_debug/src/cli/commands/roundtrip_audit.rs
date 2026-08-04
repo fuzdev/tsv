@@ -48,7 +48,7 @@
 //! `structural_skeleton` erases every scalar leaf, so output that reparses to an
 //! **equal shape** but with a changed decode-invariant value (a mis-decoded string,
 //! a miscanonicalized number, a mangled multi-line comment) reads as Clean. The
-//! [`leaf_conservation_diff`](crate::audit::properties::leaf_conservation_diff)
+//! [`leaf_conservation_diff`]
 //! check compares the multiset of conserved leaves (values / names / cooked chunks
 //! / regex body+flags, never `raw`) input-vs-output and, **when the skeleton is
 //! otherwise equal**, files a `*_leaf_corruption` finding — gate-fatal like

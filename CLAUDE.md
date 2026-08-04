@@ -178,7 +178,7 @@ deno task canonicalize:audit         # canonicalize_js idempotence + output vali
 deno task pins:audit                 # canonical-oracle PIN AGREEMENT, a repo fact: sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical
 deno task pins:audit:checkouts       # checkout ALIGNMENT, an environment fact: a PRESENT ../svelte or ../acorn-typescript checkout must match its pin (absent → skipped); warn-only commit drift. Gates in `deno task conformance`, reported by doctor — deliberately NOT in check (nothing there reads the checkouts)
 deno task format:audit               # tsv formats its own TS/JS (`tsv format --check .`); fails on a would-change file (exit 1) OR a parse error (exit 2)
-deno task docs:audit                 # doc-comment `[link]`s resolve — rustdoc, doc lints DENIED, private items; a dead link is a STALE DOC
+deno task docs:audit                 # doc-comment `[link]`s resolve — rustdoc, doc lints DENIED, private items, `--all-features`; a dead link is a STALE DOC
 deno task scan:audit                 # no new raw find/rfind/match_indices substring scans over source
 deno task fanout:audit               # no super-linear doc-node rebuild fanout (per-layout-candidate blowup)
 deno task roundtrip:audit            # format(tests/fixtures) must reparse — pure-Rust tripwire, real yield on external corpora

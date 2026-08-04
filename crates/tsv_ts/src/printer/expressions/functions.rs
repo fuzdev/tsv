@@ -844,6 +844,18 @@ impl<'a> Printer<'a> {
         // every TS position, so the disambiguation is moot — see the
         // single_type_param_prettier_divergence fixture. The trailing comma added
         // here only appears when the group breaks across lines.
+        // A test call's callback inlines its type parameters too — prettier asks the same
+        // `isTestCall` question from its type-parameter printer (`print/type-parameters.js`
+        // `isParameterInTestCall` → `shouldInline`). PEEKED, not consumed: the signature builds
+        // type parameters before the value parameters, which are the ones that spend the flag.
+        if self.test_call_flat_params.get() {
+            return d.concat(&[
+                d.text("<"),
+                d.join_doc(param_docs, d.text(", ")),
+                d.text(">"),
+            ]);
+        }
+
         let inner_parts = d.join_doc(param_docs, d.comma_line());
 
         let brackets_doc = d.concat(&[
@@ -1257,6 +1269,14 @@ impl<'a> Printer<'a> {
         trailing_comments_end: Option<u32>,
     ) -> DocId {
         let d = self.d();
+        // A test call's callback keeps its parameter LIST flat at any width — prettier's
+        // `isParametersInTestCall` (`print/function-parameters.js`), which returns
+        // `["(", ...printed, ")"]`: `", "` separators, no indent, no softlines, and each
+        // parameter's OWN doc left breakable. Consumed here, at the top and before any child
+        // doc is built, so it reaches this list and nothing under it — a function nested in a
+        // parameter default keeps ordinary width-driven params. See the field doc on
+        // `Printer::test_call_flat_params`.
+        let test_call_flat = self.test_call_flat_params.replace(false);
         if params.is_empty() {
             // Search to the end of source rather than `trailing_comments_end` — that
             // boundary is clamped to the `)` position for non-empty params, which is
@@ -1368,11 +1388,16 @@ impl<'a> Printer<'a> {
 
         // Force multiline when comments, param-property modifiers, or an author blank
         // line require it.
+        // A test call's flat separator outranks the blank-line arm, as it does in prettier
+        // (`isParametersInTestCall` is checked BEFORE `isNextLineEmpty`), so an author blank
+        // inside the callback's parameter list does not open the list. It does NOT outrank the
+        // comment arms: a comment there breaks the list in both formatters.
         let force_break = has_trailing_line_comment
             || has_leading_own_line_comment
             || should_break_for_param_properties
-            || has_blank_line_between_params
+            || (has_blank_line_between_params && !test_call_flat)
             || paren_pull_pos.is_some();
+        let flat_list = test_call_flat && !force_break;
 
         let mut inner_parts = d.pooled_docbuf();
         // Block comment trailing the last param after its source comma — emitted past
@@ -1439,6 +1464,8 @@ impl<'a> Printer<'a> {
                         inner_parts.push(d.literalline());
                     }
                     inner_parts.push(d.hardline());
+                } else if flat_list {
+                    inner_parts.push(d.text(" "));
                 } else {
                     inner_parts.push(d.line());
                 }
@@ -1567,6 +1594,12 @@ impl<'a> Printer<'a> {
             inner_parts.append(&mut last_after_comma_docs);
             result.push(d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])));
             result.push(d.hardline());
+        } else if flat_list {
+            // No indent and no softlines: the list itself offers no break point, exactly as
+            // the single-pattern hug above already does. Each parameter's own doc is
+            // untouched, so a destructured pattern still expands on its own.
+            result.push(d.concat(&inner_parts));
+            result.append(&mut last_after_comma_docs);
         } else {
             result.push(d.indent_softline(d.concat(&inner_parts)));
             // No trailing comma (trailingComma: 'none').

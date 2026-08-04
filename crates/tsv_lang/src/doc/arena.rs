@@ -1478,7 +1478,7 @@ impl DocArena {
     /// comment's `Concat` (and, when dropping hard lines, a `MultilineText`). The renderer
     /// records a comment's emit when it reaches the *tagged* node, so a re-allocated comment
     /// doc whose tag stayed on the discarded original would read as **DROPPED** even though it
-    /// prints verbatim (the instrument false-positive [`tag_comment_doc`] can't see, because
+    /// prints verbatim (the instrument false-positive [`Self::tag_comment_doc`] can't see, because
     /// nothing walks the transform). This copies the tag across the rebuild.
     ///
     /// Sound for the binary-search invariant: the only nodes ever tagged are comment doc roots
@@ -1486,7 +1486,7 @@ impl DocArena {
     /// `MultilineText`, or a multi-child `Concat`), and both re-allocated kinds are replaced by
     /// a **fresh** allocation, never an interned/short-circuited id — so whenever this pushes,
     /// `new` is the highest id so far and `comment_docs` stays sorted ascending (see the field
-    /// doc + [`tag_comment_doc`]). Safe against double-counting: the transform returns the new
+    /// doc + [`Self::tag_comment_doc`]). Safe against double-counting: the transform returns the new
     /// tree and discards the old, and the renderer only records emits for nodes it actually
     /// reaches (a discarded/losing subtree never does), so the old tag left in place never
     /// fires. A no-op unless the ledger is enabled and `old` was tagged; compiled out entirely

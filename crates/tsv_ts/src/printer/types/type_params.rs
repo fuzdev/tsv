@@ -60,6 +60,16 @@ impl<'a> Printer<'a> {
         &self,
         decl: &TSTypeParameterDeclaration<'_>,
     ) -> DocId {
+        // A test call's callback inlines its type parameters at any width — the
+        // function-expression twin of the peek in `build_type_params_doc_for_arrow`
+        // (prettier's `isParameterInTestCall` asks `isTestCall` of the function's
+        // parent for both kinds). PEEKED, not consumed: the value parameters are the
+        // ones that spend the flag. Delegating to the always-inline builder keeps its
+        // gates, so an expanding comment (or a frozen multi-line param) still opens
+        // the list. See the field doc on `Printer::test_call_flat_params`.
+        if self.test_call_flat_params.get() {
+            return self.build_type_parameter_declaration_doc(decl);
+        }
         self.d()
             .group(self.build_type_parameter_declaration_doc_inner(decl))
     }
