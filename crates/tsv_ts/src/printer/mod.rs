@@ -578,14 +578,8 @@ impl<'a> Printer<'a> {
     ///
     /// Example: `Map<string, Array<number>>` - Map has 2 params, second has nested generic
     pub(crate) fn id_has_complex_type_annotation(&self, expr: &internal::Expression<'_>) -> bool {
-        let type_ann = match expr {
-            internal::Expression::Identifier(id) => id.type_annotation(),
-            internal::Expression::ObjectPattern(obj) => obj.type_annotation.as_ref(),
-            internal::Expression::ArrayPattern(arr) => arr.type_annotation.as_ref(),
-            _ => None,
-        };
-
-        type_ann.is_some_and(|ann| self.type_has_complex_annotation(ann.type_annotation))
+        crate::pattern_type_annotation(expr)
+            .is_some_and(|ann| self.type_has_complex_annotation(ann.type_annotation))
     }
 
     /// Check if a type has complex nested type parameters

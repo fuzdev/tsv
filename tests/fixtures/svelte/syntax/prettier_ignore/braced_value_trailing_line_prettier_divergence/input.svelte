@@ -21,8 +21,13 @@
 	}
 />
 
-<!-- the prefixed heads already drop the second break, so the parity is the assertion -->
+<!-- the prefixed heads already drop the second break, so the parity is the assertion —
+	`{@debug}` included, whose head freezes an identifier list and emits its own trailing run -->
 {@html
 	// prettier-ignore
 	ggg  +  hhh // c
+}
+{@debug
+	// prettier-ignore
+	iii ,  jjj // c
 }

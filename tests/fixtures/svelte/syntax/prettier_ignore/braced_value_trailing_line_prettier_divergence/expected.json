@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 495,
+	"end": 635,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -370,45 +370,45 @@
 			{
 				"type": "Comment",
 				"start": 358,
-				"end": 447,
-				"data": " the prefixed heads already drop the second break, so the parity is the assertion "
+				"end": 540,
+				"data": " the prefixed heads already drop the second break, so the parity is the assertion —\n\t`{@debug}` included, whose head freezes an identifier list and emits its own trailing run "
 			},
 			{
 				"type": "Text",
-				"start": 447,
-				"end": 448,
+				"start": 540,
+				"end": 541,
 				"raw": "\n",
 				"data": "\n"
 			},
 			{
 				"type": "HtmlTag",
-				"start": 448,
-				"end": 494,
+				"start": 541,
+				"end": 587,
 				"expression": {
 					"type": "BinaryExpression",
-					"start": 476,
-					"end": 487,
+					"start": 569,
+					"end": 580,
 					"loc": {
 						"start": {
-							"line": 27,
+							"line": 28,
 							"column": 1
 						},
 						"end": {
-							"line": 27,
+							"line": 28,
 							"column": 12
 						}
 					},
 					"left": {
 						"type": "Identifier",
-						"start": 476,
-						"end": 479,
+						"start": 569,
+						"end": 572,
 						"loc": {
 							"start": {
-								"line": 27,
+								"line": 28,
 								"column": 1
 							},
 							"end": {
-								"line": 27,
+								"line": 28,
 								"column": 4
 							}
 						},
@@ -417,15 +417,15 @@
 					"operator": "+",
 					"right": {
 						"type": "Identifier",
-						"start": 484,
-						"end": 487,
+						"start": 577,
+						"end": 580,
 						"loc": {
 							"start": {
-								"line": 27,
+								"line": 28,
 								"column": 9
 							},
 							"end": {
-								"line": 27,
+								"line": 28,
 								"column": 12
 							}
 						},
@@ -435,19 +435,65 @@
 						{
 							"type": "Line",
 							"value": " prettier-ignore",
-							"start": 456,
-							"end": 474
+							"start": 549,
+							"end": 567
 						}
 					],
 					"trailingComments": [
 						{
 							"type": "Line",
 							"value": " c",
-							"start": 488,
-							"end": 492
+							"start": 581,
+							"end": 585
 						}
 					]
 				}
+			},
+			{
+				"type": "Text",
+				"start": 587,
+				"end": 588,
+				"raw": "\n",
+				"data": "\n"
+			},
+			{
+				"type": "DebugTag",
+				"start": 588,
+				"end": 634,
+				"identifiers": [
+					{
+						"type": "Identifier",
+						"start": 617,
+						"end": 620,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 1
+							},
+							"end": {
+								"line": 32,
+								"column": 4
+							}
+						},
+						"name": "iii"
+					},
+					{
+						"type": "Identifier",
+						"start": 624,
+						"end": 627,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 8
+							},
+							"end": {
+								"line": 32,
+								"column": 11
+							}
+						},
+						"name": "jjj"
+					}
+				]
 			}
 		]
 	},
@@ -552,15 +598,15 @@
 		{
 			"type": "Line",
 			"value": " prettier-ignore",
-			"start": 456,
-			"end": 474,
+			"start": 549,
+			"end": 567,
 			"loc": {
 				"start": {
-					"line": 26,
+					"line": 27,
 					"column": 1
 				},
 				"end": {
-					"line": 26,
+					"line": 27,
 					"column": 19
 				}
 			}
@@ -568,16 +614,48 @@
 		{
 			"type": "Line",
 			"value": " c",
-			"start": 488,
-			"end": 492,
+			"start": 581,
+			"end": 585,
 			"loc": {
 				"start": {
-					"line": 27,
+					"line": 28,
 					"column": 13
 				},
 				"end": {
-					"line": 27,
+					"line": 28,
 					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 597,
+			"end": 615,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 628,
+			"end": 632,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 12
+				},
+				"end": {
+					"line": 32,
+					"column": 16
 				}
 			}
 		}

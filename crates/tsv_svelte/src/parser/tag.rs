@@ -5,7 +5,7 @@
 use crate::ast::internal::*;
 use crate::lexer::TokenKind;
 use crate::whitespace::is_svelte_ws;
-use tsv_lang::source_scan::TriviaProfile;
+use tsv_lang::source_scan::{TriviaProfile, skip_comment, skip_trivia};
 use tsv_lang::{ParseError, Span};
 use tsv_ts::Expression;
 
@@ -203,8 +203,12 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
     /// Split a declarator string on the top-level `=` at `eq_pos` into a parsed
     /// (id pattern, init expression). `decl_offset` is the byte offset of
-    /// `decl_str` in the source, used to recover each side's span. Shared by the
-    /// `{@const}` and the with-init `{const}`/`{let}` paths.
+    /// `decl_str` in the source, used to recover each side's span.
+    ///
+    /// `{@const}`-only. The `{const}`/`{let}` declaration tags hand their whole content to
+    /// `parse_ts_statement` instead, which is why the binding rule below is enforced here
+    /// rather than at the tag: acorn takes a comment at either binding gap and Svelte's
+    /// `read_pattern` does not, so the two tags genuinely disagree.
     fn parse_declarator(
         &mut self,
         decl_str: &'a str,
@@ -218,11 +222,98 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let init_offset =
             decl_offset + eq_pos + 1 + (decl_str[eq_pos + 1..].len() - init_str.len());
 
+        // Taken off the id side derived just above, so the rule and the parse cannot
+        // disagree about where the binding is.
+        self.reject_binding_comments(id_str, id_offset)?;
+
         // id is a pattern (identifier or destructuring — `parse_ts_pattern`
         // converts ObjectExpression/ArrayExpression to patterns), init an expression.
         let id = self.parse_ts_pattern(id_str, id_offset)?;
         let init = self.parse_ts_expression(init_str, init_offset)?;
         Ok((id, init))
+    }
+
+    /// Reject a comment in the `{@const}` **binding** — the gaps Svelte's reader cannot
+    /// cross. `read_pattern` starts at the first non-whitespace byte, so a comment before
+    /// the pattern is `expected_pattern`; it then reads an optional `: T` (TS only) and the
+    /// caller does `allow_whitespace()` + `eat('=')`, so a comment anywhere else outside the
+    /// annotation is `expected_token`. Only the annotation's **interior** is comment-bearing,
+    /// because acorn parses it: `y: A /* c */ | B` is legal, `y /* c */: T` and `y: T /* c */`
+    /// are not.
+    ///
+    /// ⚠️ Reached only from [`Self::parse_declarator`], the `{@const}`-only splitter — the
+    /// unprefixed `{const}`/`{let}` tags take a comment at either gap and must keep doing so.
+    ///
+    /// Without this the head over-accepts and the printer has no emitter for the gap: a line
+    /// comment is DROPPED, and one before the `=` is RELOCATED across it onto the init.
+    ///
+    /// `id_str` is the binding side of the declarator, whitespace-trimmed; `id_offset` its
+    /// byte offset in the source, for error positions.
+    fn reject_binding_comments(&self, id_str: &str, id_offset: usize) -> Result<(), ParseError> {
+        let bytes = id_str.as_bytes();
+        let end = bytes.len();
+
+        // Depth keeps a pattern's interior out of it — a comment inside `{ a }` or `[ a ]` is
+        // acorn's, not Svelte's. Deliberately NOT tracking `<`/`>`: a type argument's interior
+        // is already covered by the annotation rule below, while a relational `>` in a
+        // destructuring default (`{ a = b > c }`) would decrement a depth it never opened.
+        // `annot_colon` is the annotation opener
+        // (an object pattern's `:` is nested, so a top-level one can only be that), and
+        // `pending_annotation_comment` holds a comment that is legal *so far* and becomes a
+        // violation only if nothing significant follows it.
+        let mut depth = 0usize;
+        let mut annot_colon: Option<usize> = None;
+        let mut seen_significant = false;
+        let mut pending_annotation_comment: Option<usize> = None;
+        let mut i = 0;
+
+        while i < end {
+            if let Some(next) = skip_comment(bytes, i, end) {
+                if depth == 0 {
+                    if !seen_significant {
+                        return Err(self.error_msg_at(
+                            "Expected identifier or destructure pattern",
+                            id_offset + i,
+                        ));
+                    }
+                    match annot_colon {
+                        // Before the annotation opener (or with no annotation at all) the
+                        // comment sits in a gap Svelte crosses with `allow_whitespace`.
+                        None => return Err(self.error_msg_at("Expected token =", id_offset + i)),
+                        Some(_) => pending_annotation_comment = Some(i),
+                    }
+                }
+                i = next;
+                continue;
+            }
+            // Strings only — comments are handled above.
+            if let Some(next) = skip_trivia(bytes, i, end, TriviaProfile::JS) {
+                seen_significant = true;
+                pending_annotation_comment = None;
+                i = next;
+                continue;
+            }
+
+            let b = bytes[i];
+            match b {
+                b'(' | b'[' | b'{' => depth += 1,
+                b')' | b']' | b'}' => depth = depth.saturating_sub(1),
+                b':' if depth == 0 && annot_colon.is_none() => annot_colon = Some(i),
+                _ => {}
+            }
+            if !b.is_ascii_whitespace() {
+                seen_significant = true;
+                pending_annotation_comment = None;
+            }
+            i += 1;
+        }
+
+        // A comment the annotation opened for but never closed over — it trails the type,
+        // where Svelte is already looking for the `=`.
+        if let Some(pos) = pending_annotation_comment {
+            return Err(self.error_msg_at("Expected token =", id_offset + pos));
+        }
+        Ok(())
     }
 
     /// Find the top-level `=` in a declaration string (not inside brackets/braces,
