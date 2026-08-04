@@ -31,6 +31,10 @@ mod union_intersection;
 // Re-export public items from helpers
 pub use helpers::unwrap_parenthesized;
 
+// The array-suffix layout verdict, shared with the type-alias `=` gate
+// (`statements/type_declarations.rs`) so the emitter and the gate cannot disagree.
+pub(in crate::printer) use composite::ArraySuffixLayout;
+
 // Re-export for submodules to use `super::X` instead of `super::super::X`
 pub(super) use super::comments::BlankRule;
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};

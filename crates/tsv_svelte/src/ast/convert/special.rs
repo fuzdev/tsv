@@ -20,8 +20,8 @@ use tsv_ts::ast::convert::{
 };
 
 use super::comment_attachment::{
-    CommentAttachmentContext, attach_comments_recursively, attach_expression_list,
-    try_attach_comments_to_node,
+    AttachInputs, CommentAttachmentContext, attach_comments_recursively, attach_expression_list,
+    try_attach_comments_to_node, try_attach_comments_to_node_ending_at,
 };
 
 /// A throwaway skeleton-emit buffer, sized for the island's own span (the
@@ -69,20 +69,6 @@ fn expression_skeleton(
     recorder.finish()
 }
 
-/// The inputs every template comment-attach builder (`build_*_writer_comments`)
-/// shares: the template comments to place, the source text, and the byte-offset
-/// tracker its byte-space skeleton pass runs under. Bundled so the call sites —
-/// and `build_expression_list_writer_comments`, which would otherwise trip
-/// `too_many_arguments` — thread one value instead of the same three.
-/// (`build_script_writer_comments` is not in the set: it attaches the script's
-/// *own* comments, not the template set, and is schema-driven.)
-#[derive(Clone, Copy)]
-pub(super) struct AttachInputs<'a> {
-    pub(super) template_comments: &'a [&'a Comment],
-    pub(super) source: &'a str,
-    pub(super) tracker: &'a LocationTracker,
-}
-
 /// Build the per-node comment map for a comment-bearing template expression
 /// island (`{expr}`, block test, directive expression, `{@debug}` id, spread,
 /// `<svelte:element>` tag/`<svelte:component>` expression, snippet name).
@@ -103,8 +89,7 @@ pub(super) fn build_expression_writer_comments(
     try_attach_comments_to_node(
         &tree,
         tree.roots()[0],
-        attach.template_comments,
-        attach.source,
+        attach,
         container_start,
         range_end,
         &mut out,
@@ -135,11 +120,15 @@ pub(super) fn build_const_tag_writer_comments(
     let binding_end = tsv_ts::pattern_binding_end(&tag.id);
     let mut out = WriterComments::default();
     let id_tree = expression_skeleton(&tag.id, attach.source, attach.tracker);
-    try_attach_comments_to_node(
+    // The pattern window's parse ran through the annotation, but an annotated
+    // block binding's root span stops at the bare name, so the end is handed in
+    // rather than read off the root — otherwise the window collapses to the name
+    // and an annotation comment attaches nowhere.
+    try_attach_comments_to_node_ending_at(
         &id_tree,
         id_tree.roots()[0],
-        attach.template_comments,
-        attach.source,
+        binding_end,
+        attach,
         id_span.start,
         binding_end,
         &mut out,
@@ -148,8 +137,7 @@ pub(super) fn build_const_tag_writer_comments(
     try_attach_comments_to_node(
         &init_tree,
         init_tree.roots()[0],
-        attach.template_comments,
-        attach.source,
+        attach,
         binding_end,
         tag.span.end,
         &mut out,
@@ -177,15 +165,7 @@ pub(super) fn build_declaration_tag_writer_comments(
     );
     let tree = recorder.finish();
     let mut out = WriterComments::default();
-    try_attach_comments_to_node(
-        &tree,
-        tree.roots()[0],
-        attach.template_comments,
-        attach.source,
-        tag_start,
-        tag_end,
-        &mut out,
-    );
+    try_attach_comments_to_node(&tree, tree.roots()[0], attach, tag_start, tag_end, &mut out);
     out
 }
 

@@ -7,6 +7,7 @@ use bumpalo::Bump;
 use bumpalo::collections::Vec as BumpVec;
 use tsv_lang::{Comment, ParseError, Span};
 use tsv_ts::Expression;
+use tsv_ts::TSTypeAnnotation;
 
 /// Build an expression `Comment` from its already-shifted `span` / `content_span`.
 /// `content` is the comment body, read only to compute the `multiline` flag (whether
@@ -396,6 +397,28 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok((expr, end_pos))
     }
 
+    /// Parse a standalone type annotation (`: Type`) and collect any comments.
+    ///
+    /// The `{#each}` head is the one block reader that parses its binding's
+    /// annotation separately — its pattern slice must stop before the
+    /// `, index` / `(key)` tail — so it cannot ride `parse_ts_pattern`'s
+    /// single sub-parse the way `{:then}` / `{:catch}` do.
+    ///
+    /// Returns only the annotation: its `span.end` is the consumed extent, and
+    /// the sub-parser's own stop position is not offered because the lexer's
+    /// lookahead has already swallowed the trailing trivia by then (see
+    /// `tsv_ts::parse_type_annotation_partial`).
+    pub(crate) fn parse_ts_type_annotation(
+        &mut self,
+        source: &str,
+        base_offset: usize,
+    ) -> Result<TSTypeAnnotation<'arena>, ParseError> {
+        let (ta, comments) =
+            tsv_ts::parse_type_annotation_partial(source, base_offset, self.arena)?;
+        self.expression_comments.extend_from_slice(comments);
+        Ok(ta)
+    }
+
     /// Parse a TypeScript pattern (destructuring) and collect any comments.
     /// Also handles optional type annotations (`: Type`) after the pattern.
     pub(crate) fn parse_ts_pattern(
@@ -410,10 +433,19 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         // right when that line is `> 1` — the same quirk the pattern nodes get
         // (`adjust_read_pattern_columns`) also lands on comments collected on
         // that line, and the wire serializes them with the shifted columns.
+        //
+        // The shift stops at the **bare** pattern's end. Canonical's `read_pattern`
+        // hands the trailing `: T` to `read_type_annotation`, a separate parse that
+        // prefixes `_ as ` and so preserves every column — and a plain identifier
+        // binding never runs the synthetic parse at all, its only comment-bearing
+        // region being that annotation. So a comment at or past the bare end keeps
+        // its true column.
         let pattern_on_first_line = !self.source[..base_offset].contains('\n');
+        let bare_pattern_end = pattern.span().end;
         self.expression_comments
             .extend(comments.iter().copied().map(|mut c| {
                 if !pattern_on_first_line
+                    && c.span.start < bare_pattern_end
                     && !self.source[base_offset..c.span.start as usize].contains('\n')
                 {
                     c.bump_pattern_columns = true;

@@ -632,19 +632,31 @@ pub fn pattern_binding_end(pattern: &Expression<'_>) -> u32 {
     pattern_type_annotation(pattern).map_or(bare_end, |t| t.span.end)
 }
 
-/// Parse a type annotation (`: Type`) and return it with the position where parsing stopped.
+/// Parse a type annotation (`: Type`) and return it with the comments it collected.
 ///
 /// Used in Svelte block contexts where patterns may have type annotations
 /// after simple identifiers (e.g., `{#each items as x: number}`).
 /// The source must start with `:`.
+///
+/// The comments come back for the same reason [`parse_pattern_with_comments`]'s do: this is
+/// a **sub-parse of the host document**, so a comment it consumes exists nowhere else. A
+/// caller that drops them drops the comment outright — it never reaches the root `comments`
+/// array, so the print-once ledger cannot see it either (a comment that was never
+/// registered never existed, as far as the ledger knows).
+///
+/// ⚠️ No "where parsing stopped" position is returned, deliberately: the lexer's one-token
+/// lookahead has already skipped the trailing trivia by then, so that position is *past* a
+/// trailing comment and using it as a consumed extent silently eats one — which is exactly
+/// how `{#each xs as x: T /* c */}` came to be accepted where canonical Svelte rejects it.
+/// The annotation's own `span.end` is the consumed extent; take it from the returned node.
 pub fn parse_type_annotation_partial<'arena>(
     source: &str,
     base_offset: usize,
     arena: &'arena bumpalo::Bump,
-) -> Result<(TSTypeAnnotation<'arena>, usize)> {
+) -> Result<(TSTypeAnnotation<'arena>, &'arena [ast::Comment])> {
     with_embedding_parser(source, base_offset, arena, |parser| {
         let ta = parser.parse_type_annotation()?;
-        Ok((ta, parser.current_absolute_position()))
+        Ok((ta, parser.take_comments()))
     })
 }
 

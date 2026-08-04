@@ -71,12 +71,11 @@ use tsv_ts::ast::convert::{
     write_variable_declaration_embedded,
 };
 
-use super::comment_attachment::{get_comment_value, is_template_comment};
+use super::comment_attachment::{AttachInputs, get_comment_value, is_template_comment};
 use super::special::{
-    AttachInputs, bool_option, build_const_tag_writer_comments,
-    build_declaration_tag_writer_comments, build_expression_list_writer_comments,
-    build_expression_writer_comments, build_script_writer_comments, component_is_typescript,
-    find_option_values, text_value,
+    bool_option, build_const_tag_writer_comments, build_declaration_tag_writer_comments,
+    build_expression_list_writer_comments, build_expression_writer_comments,
+    build_script_writer_comments, component_is_typescript, find_option_values, text_value,
 };
 
 /// Convert an internal Svelte `Root` straight to its compact wire-JSON bytes.
