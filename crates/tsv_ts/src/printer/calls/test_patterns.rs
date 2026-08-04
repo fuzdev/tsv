@@ -186,15 +186,6 @@ fn test_call_gaps_have_comments(
 }
 
 /// Check if a call expression is a test function call that should stay on one line
-///
-// TODO: the params-flat rule is keyed on the FLAT LAYOUT, where prettier keys it on
-// `isTestCall` alone — its parameter printers ask the callback's parent, never which layout
-// the call took. So a test call that falls through to the expanded layout (a comment in an
-// argument gap — `test_call_flat_layout_applies` declines there) builds its callback's params
-// breakable, where prettier still holds them flat. Unfixtured, and benign at every width
-// tried: the expanded form re-indents the callback so the params fit anyway, and it takes a
-// parameter list wide enough to overflow its own line to separate the two. Wants a fixture
-// before a fix, per the repo's fixture-first rule.
 pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printer<'_>) -> bool {
     // Optional calls (`describe?.(...)`) are never test calls — they format like
     // a normal call (wrap when long), preserving the `?.`. Mirrors prettier's
