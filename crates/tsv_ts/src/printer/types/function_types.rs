@@ -862,14 +862,12 @@ impl<'a> Printer<'a> {
                     comments_doc,
                     self.build_function_type_param_expression_doc(rest.argument),
                 ];
-                // Optional rest parameter `...a?` — carried on the rest element, not
-                // `argument` (see `RestElement`), between the binding and any annotation.
-                if rest.optional {
-                    parts.push(d.text("?"));
-                }
-                if let Some(ta) = &rest.type_annotation {
-                    parts.push(self.build_type_annotation_doc(ta));
-                }
+                // The optional `?` marker and the `: type` annotation, with the comment
+                // landings both of their gaps need — `wrap` is true to match the
+                // `Identifier` arm above, which breaks its annotation's generic arguments
+                // at print width. See `push_rest_element_tail_doc`, shared with the
+                // value-side `build_rest_element_doc`.
+                self.push_rest_element_tail_doc(&mut parts, rest, true);
                 d.concat(&parts)
             }
             _ => self.build_expression_doc(expr),

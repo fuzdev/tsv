@@ -469,6 +469,33 @@ reverse direction as the reserved-keyword-qualified-head and arrow-as-operand
 entries. **Upstream candidate**: acorn-typescript — `tsParseTypeReference`
 consumes type arguments across a line break (no `hasPrecedingLineBreak` guard).
 
+**Line break before a tuple element's `?` (`[T` ⏎ `?]`, rejected)**: the postfix
+optional `?` of a tuple element is a `[no LineTerminator here]` position. tsc runs
+its whole postfix suffix loop — `?`, `!` and `[` alike — under
+`while (!scanner.hasPrecedingLineBreak())` (`parsePostfixTypeOrHigher`), so the
+element ends at `T` and the stray `?` fails (`',' expected`); oxc rejects it the
+same way. acorn-typescript accepts it: its `tsParseTupleElementType` bare-`eat`s
+the `?` while spelling the guard for the array suffix one function below
+(`tsParseArrayTypeOrHigher`), and babel — which it ports — has the same asymmetry,
+so this is a slip rather than a choice. tsv applies the guard at both, which is
+also what makes its own postfix family consistent (it already guards `B` ⏎ `[]`
+and the type-argument sites above). Per
+[ecma262 §sec-comments](https://tc39.es/ecma262/#sec-comments) a block comment
+holding a line terminator *is* one, so the comment-borne authorings `[T // c` ⏎
+`?]` and `[T /* c` ⏎ `*/?]` reject on the same rule. The **named**-member marker
+is a different grammar position and does take the break (`[a` ⏎ `?: T]` — tsc
+reads it through `parseOptionalToken`, outside that loop); tsv accepts it. Since
+acorn accepts, the rejection is pinned by the
+[tuple_optional_marker_line_break](../tests/fixtures/typescript/types/tuple_optional_marker_line_break_svelte_divergence/)
+`tsv_rejects.txt` fixture, with the comment-borne triggers and the two accept
+controls in
+[tuple_optional_marker_line_break.rs](../tests/tuple_optional_marker_line_break.rs)
+(one fixture carries one expected-error substring, and the accept rows have no
+divergence to record). This is deliberate tsc-over-acorn strictness, the same
+reverse direction as the two entries above. **Upstream candidate**:
+acorn-typescript — `tsParseTupleElementType` omits the `hasPrecedingLineBreak`
+guard on the optional `?`.
+
 **Arrow function as an operand (rejected)**: an `ArrowFunction` is a complete
 `AssignmentExpression` — a top-level alternative of that production
 ([ecma262 §13.15](https://tc39.es/ecma262/#prod-AssignmentExpression)), not a

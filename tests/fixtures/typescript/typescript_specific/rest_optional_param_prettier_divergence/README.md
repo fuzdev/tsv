@@ -21,4 +21,12 @@ already-deferred TS1051 (`set x(a?)`). Per tsv's permissive-parser stance, tsv
 accepts the syntax and preserves the author's `?` rather than dropping it. Plain
 rest (`...b`) is unaffected.
 
+A comment in the binding→`?` gap (`(...a /* c */?)`) stays before the marker in
+both formatters — the rest parameter takes the same landings the plain identifier
+parameter does — so the `?` remains the only difference. Prettier is non-idempotent
+on its own output here (the second pass respaces `/* c */:` to `/* c */ :`), which
+is what `audit_signature.txt` pins. The marker-**less** gap has no divergence at
+all and lives in
+[syntax/rest_element_comment](../../syntax/rest_element_comment/).
+
 See [conformance_prettier.md §TypeScript](../../../../../docs/conformance_prettier.md#typescript).

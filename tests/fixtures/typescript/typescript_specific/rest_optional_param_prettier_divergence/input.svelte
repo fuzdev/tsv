@@ -17,6 +17,10 @@
 	// function type
 	type Fn = (...a?: unknown[]) => void;
 
+	// a comment in the binding→`?` gap stays before the marker
+	const commented = (...a /* c */?) => 1;
+	type FnComment = (...a /* c */?: unknown[]) => void;
+
 	// plain rest — no divergence
 	const plain = (...b) => 1;
 </script>
