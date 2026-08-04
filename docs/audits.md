@@ -794,13 +794,16 @@ cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden          
 #      docs/*.md, every fixture README, and the set that previously had no link gate at
 #      all: root CLAUDE.md / README.md, each crate's CLAUDE.md, the shipped
 #      crates/tsv_wasm/README_*.md, a container-directory README under tests/fixtures/.
-#      The walk is .gitignore-aware (tsv_ignore's IgnoreStack, the matcher `tsv format`
-#      walks with), so build output, node_modules and the per-machine *.local.* / *.tmp
-#      conventions are pruned by the repo's own rules rather than a second copy of them —
-#      a gate can't fail over content the repo doesn't have. It also skips .git (git never
-#      lists its own store) and symlinks (AGENTS.md points at CLAUDE.md; following both
-#      would report every finding twice). External URLs and targets that climb out of the
-#      repo (sibling checkouts, machine-dependent) are out of scope.
+#      The walk shares `tsv format`'s prune policy — tsv_discover's safety nets
+#      (node_modules, .git, .sl, .hg, .svn, .jj) over tsv_ignore's IgnoreStack — so build
+#      output and the per-machine *.local.* / *.tmp conventions are pruned by the repo's
+#      own rules rather than a second copy of them, and a gate can't fail over content the
+#      repo doesn't have. It stops short of classify_dir: the build-output heuristic and
+#      the tsv layer are format-file policy, and .formatignore prunes tests/fixtures/ —
+#      the fixture READMEs are exactly what this must check. Symlinks are skipped
+#      (AGENTS.md points at CLAUDE.md; following both would report every finding twice).
+#      External URLs and targets that climb out of the repo (sibling checkouts,
+#      machine-dependent) are out of scope.
 #  (3) Missing back-links - every divergence fixture's README must contain a link resolving to
 #      a doc that CATALOGS that fixture (check 1's per-doc attribution), not merely to some
 #      member of the family. With one conformance doc "cataloged in D" and "links D" were the

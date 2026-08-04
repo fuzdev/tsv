@@ -664,7 +664,8 @@ cargo run -p tsv_debug ts_fixture_audit [pattern...]
 
 # conformance_audit - doc/fixture integrity in one fixture walk: divergence fixtures cataloged in
 # their conformance doc, every Markdown link in the repo resolves (docs/*.md, fixture READMEs, and
-# the CLAUDE.md / README.md set — a .gitignore-aware walk, skipping .git + symlinks),
+# the CLAUDE.md / README.md set — a walk sharing tsv_discover's safety nets + tsv_ignore's
+# .gitignore matcher, skipping symlinks),
 # divergence READMEs back-link their sanctioning doc, no stray READMEs (exceptions: the in-code
 # ALLOWED_NONDIVERGENCE_READMES allowlist), no catalog-family drift (the
 # docs/conformance_prettier*.md on disk are exactly CONFORMANCE_PRETTIER, each indexed by the

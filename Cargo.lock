@@ -694,6 +694,7 @@ dependencies = [
  "tsv_check",
  "tsv_cli",
  "tsv_css",
+ "tsv_discover",
  "tsv_html",
  "tsv_ignore",
  "tsv_lang",
