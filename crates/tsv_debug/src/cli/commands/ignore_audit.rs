@@ -61,7 +61,7 @@
 //!
 //! ## The finding key — AST position, not a token shape
 //!
-//! Unlike `gap_audit` / `blank_audit` (which key by [`site_shape`], a flat token key), this audit
+//! Unlike `gap_audit` / `blank_audit` (which key by [`site_shape`](crate::audit::sites::site_shape), a flat token key), this audit
 //! keys by the node's **AST position** — `{enclosing-node-type}.{child-field}`, e.g.
 //! `TSUnionType.types`, `TSTupleType.elementTypes`, `Program.body`. Honoring is a per-*position*
 //! property (a position either has the printer opt-in or it doesn't), so the ledger is a ledger of

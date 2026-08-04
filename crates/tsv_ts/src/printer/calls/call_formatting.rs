@@ -135,15 +135,31 @@ pub(super) fn build_call_doc_with_wrapping(
             unreachable!("a test call requires arguments");
         };
         let paren_close = call.span.end;
+
+        // The callback's own parameter list stays flat. Prettier reaches the same place from
+        // the other side — its parameter printers ask `isTestCall` of the function's PARENT
+        // (`isParametersInTestCall`) — and tsv's printer has no parent link, so the call sets
+        // a one-shot flag on the way down instead. `is_test_call` has already established
+        // that argument 1 is the callback; its type-parameter builders peek the flag and its
+        // value-parameter builder spends it before building anything nested, so nothing below
+        // the callback's own signature sees it.
+        // The `set` per argument (rather than only at index 1) keeps the flag from surviving
+        // an argument that never consumed it.
+        let arg_docs: DocBuf = call
+            .arguments
+            .iter()
+            .enumerate()
+            .map(|(i, arg)| {
+                printer.test_call_flat_params.set(i == 1);
+                printer.build_expression_doc(arg)
+            })
+            .collect();
+        printer.test_call_flat_params.set(false);
+
         let mut parts: DocBuf = smallvec![
             flat_callee,
             d.text("("),
-            d.join(
-                call.arguments
-                    .iter()
-                    .map(|arg| printer.build_expression_doc(arg)),
-                ", ",
-            ),
+            d.join_doc(arg_docs, d.text(", ")),
             d.text(")"),
         ];
 
