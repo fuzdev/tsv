@@ -351,18 +351,12 @@ impl<'a> Printer<'a> {
             // outer union, whose comment tsv keeps inside the parens leading the inner
             // union (for every member, not just the first). A line comment must end its
             // line, so it forces the paren group to break.
-            for comment in
-                comments_to_emit_in_range(self.comments, p.span.start + 1, union.span.start)
-            {
-                if comment.is_block {
-                    indented.push(self.build_comment_doc(comment));
-                    indented.push(d.text(" "));
-                } else if emit_inner_leading_line_comments {
-                    indented.push(self.build_comment_doc(comment));
-                    indented.push(d.hardline());
-                    needs_break = true;
-                }
-            }
+            needs_break |= self.push_paren_shell_leading_run(
+                &mut indented,
+                p.span.start + 1,
+                union.span.start,
+                emit_inner_leading_line_comments,
+            );
         }
         indented.push(union_doc);
         if let Some(p) = paren {
@@ -371,17 +365,8 @@ impl<'a> Printer<'a> {
             // forces the paren group to break. The inner union has its own group,
             // but the line comment's `break_parent` (below) propagates, expanding it
             // to one member per line.
-            for comment in comments_to_emit_in_range(self.comments, union.span.end, p.span.end - 1)
-            {
-                if comment.is_block {
-                    indented.push(d.text(" "));
-                    indented.push(self.build_comment_doc(comment));
-                } else {
-                    let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
-                    indented.push(d.line_suffix(suffix));
-                    needs_break = true;
-                }
-            }
+            needs_break |=
+                self.push_trailing_comments_in_range(&mut indented, union.span.end, p.span.end - 1);
         }
 
         let mut inner_parts: DocBuf = smallvec![d.indent(d.concat(&indented)), d.softline()];
@@ -434,18 +419,12 @@ impl<'a> Printer<'a> {
         // directly and never routes here — so there is no double-print to guard against.
         if let Some(p) = paren {
             let mut lead: DocBuf = DocBuf::new();
-            for comment in
-                comments_to_emit_in_range(self.comments, p.span.start + 1, intersection.span.start)
-            {
-                lead.push(self.build_comment_doc(comment));
-                if comment.is_block {
-                    lead.push(d.text(" "));
-                } else {
-                    // A `//` runs to end-of-line — without the break it would swallow the
-                    // intersection that follows it on the line.
-                    lead.push(d.hardline());
-                }
-            }
+            self.push_paren_shell_leading_run(
+                &mut lead,
+                p.span.start + 1,
+                intersection.span.start,
+                true,
+            );
             if !lead.is_empty() {
                 // `indent`, because that break places the intersection's own first line:
                 // it belongs one level in from the `(`, matching the default-paren path
@@ -493,16 +472,17 @@ impl<'a> Printer<'a> {
         // print flat.
         let mut closer = d.text(")");
         if let Some(p) = paren {
-            let gap_start = trailing_obj.span.end;
-            let gap_end = p.span.end - 1;
-            self.push_trailing_comments_in_range(&mut parts, gap_start, gap_end);
             // A `//` runs to end-of-line, so the `)` has to leave that line — inline it
             // would be swallowed. Matches the union sibling's expanded shell, which
             // likewise drops its `)` to its own line. The `align(2)` lands it under the
             // `(` — the column the object's OWN `})` closer takes when the object breaks
             // (`build_aligned_object_literal_doc`) — so the shell closes in one place
             // whether or not the object stayed flat.
-            if self.has_line_comments_between(gap_start, gap_end) {
+            if self.push_trailing_comments_in_range(
+                &mut parts,
+                trailing_obj.span.end,
+                p.span.end - 1,
+            ) {
                 closer = d.align(2, d.concat(&[d.hardline(), closer]));
             }
         }
