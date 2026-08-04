@@ -197,6 +197,27 @@ pub struct Printer<'a> {
     /// through to the all-args-broken-out layout. Set around the arrow-doc build
     /// in the expand-last-arg call-argument states.
     pub(crate) expand_last_arg_flat_params: Cell<bool>,
+    /// Whether the next parameter list built belongs to a **test call's callback**, and so
+    /// renders flat at any width — prettier's `isParametersInTestCall`
+    /// (`print/function-parameters.js`, and `print/type-parameters.js`'s
+    /// `isParameterInTestCall` for the type parameters), which both ask `isTestCall` of the
+    /// function's *parent*. tsv's printer has no parent link, so the call sets this on the way
+    /// down instead; the test-call flat layout in `calls/call_formatting.rs` is the sole
+    /// `.set` site, and it re-sets per argument so the flag cannot outlive one it never spent.
+    ///
+    /// ⚠️ **Three readers, and only one of them spends it.** The type-parameter builders PEEK
+    /// (`.get()`) — `build_type_params_doc_for_arrow` for an arrow,
+    /// `build_type_parameter_declaration_doc_wrapping` for a function expression — because a
+    /// signature builds `<…>` before `(…)`, so consuming there would starve the
+    /// value parameters. [`Self::build_params_doc_with_comments`] CONSUMES (`.replace(false)`)
+    /// at its top, before any child doc exists, which is what bounds the flag to the
+    /// callback's own list: a function in the body, or in a parameter default, is built after
+    /// the spend and keeps ordinary width-driven params. Left set for the whole argument
+    /// build, it would flatten those too.
+    ///
+    /// It is the *list* that goes flat, never a parameter's own doc — a destructured pattern
+    /// still expands on its own, which is why this is not a `remove_lines` over the signature.
+    pub(crate) test_call_flat_params: Cell<bool>,
     /// Span of the ObjectExpression at the leftmost position of an arrow body that must
     /// be wrapped in parens to avoid block ambiguity — `() => ({}) as Logger`,
     /// `() => ({}).prop`, `() => ({}) && a`, `() => ({}).b++`. Matches prettier's
@@ -313,6 +334,7 @@ impl<'a> Printer<'a> {
             in_curried_typed_arrow: Cell::new(false),
             skip_arrow_chain: Cell::new(false),
             expand_last_arg_flat_params: Cell::new(false),
+            test_call_flat_params: Cell::new(false),
             arrow_body_object_parens_target: Cell::new(None),
             expr_stmt_paren_target: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),

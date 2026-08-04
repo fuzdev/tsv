@@ -195,6 +195,9 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
+	// 114 held across the test-call params change by coincidence, not stasis: two files
+	// entered from `partial` exactly as earlier drift had taken two out — see the note on
+	// `CORPUS_FORMAT_PARTIAL_PIN`.
 	typescript: 114,
 	css: 23
 };
@@ -207,7 +210,18 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 1,
-	typescript: 38,
+	// 38 → 36: two reproducible files, `prettier/tests/format/js/test-declarations/
+	// test_declarations.js` and `prettier/tests/format/js/preserve-line/parameter-list.js`,
+	// both of which held a `fill_101_boundary` hunk because tsv broke a test call's callback
+	// parameters to chase print width. Keeping them flat (conformance_prettier.md §Print Width
+	// Philosophy, "A test call's name") removes that hunk from both — 26/33 → 12/24 and 18/16 →
+	// 13/15 diff lines. Neither reaches `match` (the match floor is untouched): what remains
+	// is unexplained, so both files move partial → `unknown` — a real +2 on that pin. Its
+	// value still reads 114 because the measured count had drifted to 112: earlier landed
+	// work fixed two unknowns without a re-pin, unnoticed at this gate's release cadence, and
+	// the +2 lands exactly back on the pinned value. No other reproducible file moves bucket
+	// with this change, in any tier.
+	typescript: 36,
 	css: 9
 };
 

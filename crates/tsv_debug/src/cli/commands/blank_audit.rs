@@ -430,7 +430,7 @@ impl Tally {
 /// and Svelte `<pre>` / `<textarea>` (whitespace-preserving elements), in byte space via `map`.
 /// A format-ignore region is NOT found here (locating its range from the output is fragile) — a
 /// format-ignore-bearing file is exempted whole (see
-/// [`source_has_ignore_directive`](crate::audit::sites::source_has_ignore_directive)).
+/// [`source_has_ignore_directive`]).
 ///
 /// A multi-line **string literal** is deliberately NOT a skip region here, even though it too can
 /// hold a verbatim blank run: that omission is safe because a base file already carrying such a run

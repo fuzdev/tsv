@@ -13,7 +13,8 @@
 //! nothing invalid in runes mode may compile).
 //!
 //! There are enough of those today that a green gate is not reachable, so the shape is a
-//! [`Ratchet`] rather than a pass/fail: every line is a known bug and the file shrinking
+//! [`Ratchet`](crate::audit::ratchet::Ratchet) rather than a pass/fail: every line is a known bug
+//! and the file shrinking
 //! is the goal. A *new* over-acceptance fails; a pinned one that stops firing fails
 //! (so fixing one forces removing its line, and the list cannot rot).
 //!
@@ -31,7 +32,7 @@
 //! - `MISMATCH` — **never pinnable**. Both sides compiled and the canonical code differs;
 //!   by the refusal contract that is always a bug, so it can never be laundered into the
 //!   list whose shrinking is the goal. It fails unconditionally, exactly as it does in
-//!   [`exit_verdict`](super::exit_verdict).
+//!   `exit_verdict`.
 //! - `HARNESS-ERROR` — **never pinnable**. Every harness failure that is not the oracle
 //!   itself rejecting-by-throwing: a tsv-side compiler bug (`tsv-corrupt-output`,
 //!   `tsv-type-erasure-leak`, `tsv-parse`), a canonicalizer bug (`canonicalize-ours`,
@@ -57,7 +58,7 @@
 //!   failure on this one, is a key the snapshot has never seen and FAILS.
 //!
 //!   ⚠️ The cost, stated plainly: an errored file gets no oracle verdict, so
-//!   [`classify`](super::classify) never probes tsv on it. A pinned `ORACLE-ERROR` file
+//!   `classify` never probes tsv on it. A pinned `ORACLE-ERROR` file
 //!   could therefore be hiding an over-acceptance of its own. That is inherent to "the
 //!   oracle cannot speak here", not something the ratchet chooses to ignore.
 //!
