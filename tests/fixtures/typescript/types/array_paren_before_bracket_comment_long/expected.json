@@ -1,0 +1,723 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 749,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " At exactly 100 the parenthesized intersection stays inline with the comment after `)`",
+			"start": 20,
+			"end": 108,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 198,
+			"end": 205,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 89
+				},
+				"end": {
+					"line": 3,
+					"column": 96
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " At 101 the intersection breaks inside its parens and the comment rides the closer line",
+			"start": 210,
+			"end": 299,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 392,
+			"end": 399,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 33
+				},
+				"end": {
+					"line": 6,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " At exactly 100 a `typeof` element stays inline",
+			"start": 404,
+			"end": 453,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 543,
+			"end": 550,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 89
+				},
+				"end": {
+					"line": 8,
+					"column": 96
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " At 101 it has no internal break point, so the whole alias drops below the `=`",
+			"start": 555,
+			"end": 635,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 728,
+			"end": 735,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 82
+				},
+				"end": {
+					"line": 11,
+					"column": 89
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 748,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 739,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 110,
+					"end": 208,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 99
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 115,
+						"end": 116,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 119,
+						"end": 207,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 98
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 119,
+							"end": 197,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 10
+								},
+								"end": {
+									"line": 3,
+									"column": 88
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSIntersectionType",
+								"start": 120,
+								"end": 196,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 87
+									}
+								},
+								"types": [
+									{
+										"type": "TSTypeReference",
+										"start": 120,
+										"end": 165,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 11
+											},
+											"end": {
+												"line": 3,
+												"column": 56
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 120,
+											"end": 165,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 11
+												},
+												"end": {
+													"line": 3,
+													"column": 56
+												}
+											},
+											"name": "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									},
+									{
+										"type": "TSTypeReference",
+										"start": 168,
+										"end": 196,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 59
+											},
+											"end": {
+												"line": 3,
+												"column": 87
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 168,
+											"end": 196,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 59
+												},
+												"end": {
+													"line": 3,
+													"column": 87
+												}
+											},
+											"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 198,
+										"end": 205
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At exactly 100 the parenthesized intersection stays inline with the comment after `)`",
+							"start": 20,
+							"end": 108
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 301,
+					"end": 402,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 43
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 306,
+						"end": 307,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 6
+							},
+							"end": {
+								"line": 5,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 310,
+						"end": 401,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 10
+							},
+							"end": {
+								"line": 6,
+								"column": 42
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 310,
+							"end": 391,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 10
+								},
+								"end": {
+									"line": 6,
+									"column": 32
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSIntersectionType",
+								"start": 311,
+								"end": 390,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 31
+									}
+								},
+								"types": [
+									{
+										"type": "TSTypeReference",
+										"start": 311,
+										"end": 356,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 11
+											},
+											"end": {
+												"line": 5,
+												"column": 56
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 311,
+											"end": 356,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 11
+												},
+												"end": {
+													"line": 5,
+													"column": 56
+												}
+											},
+											"name": "Aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										}
+									},
+									{
+										"type": "TSTypeReference",
+										"start": 361,
+										"end": 390,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 31
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 361,
+											"end": 390,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 2
+												},
+												"end": {
+													"line": 6,
+													"column": 31
+												}
+											},
+											"name": "Bbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 392,
+										"end": 399
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 101 the intersection breaks inside its parens and the comment rides the closer line",
+							"start": 210,
+							"end": 299
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 455,
+					"end": 553,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 99
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 460,
+						"end": 461,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 464,
+						"end": 552,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 10
+							},
+							"end": {
+								"line": 8,
+								"column": 98
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 464,
+							"end": 542,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 10
+								},
+								"end": {
+									"line": 8,
+									"column": 88
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeQuery",
+								"start": 465,
+								"end": 541,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 87
+									}
+								},
+								"exprName": {
+									"type": "Identifier",
+									"start": 472,
+									"end": 541,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 18
+										},
+										"end": {
+											"line": 8,
+											"column": 87
+										}
+									},
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 543,
+										"end": 550
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At exactly 100 a `typeof` element stays inline",
+							"start": 404,
+							"end": 453
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 637,
+					"end": 738,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 92
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 642,
+						"end": 643,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 648,
+						"end": 737,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 2
+							},
+							"end": {
+								"line": 11,
+								"column": 91
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 648,
+							"end": 727,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 81
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSTypeQuery",
+								"start": 649,
+								"end": 726,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 3
+									},
+									"end": {
+										"line": 11,
+										"column": 80
+									}
+								},
+								"exprName": {
+									"type": "Identifier",
+									"start": 656,
+									"end": 726,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 10
+										},
+										"end": {
+											"line": 11,
+											"column": 80
+										}
+									},
+									"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+								},
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 728,
+										"end": 735
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At 101 it has no internal break point, so the whole alias drops below the `=`",
+							"start": 555,
+							"end": 635
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

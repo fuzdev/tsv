@@ -1,0 +1,791 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 634,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " At exactly 100 the comment stays inline in the brackets",
+			"start": 20,
+			"end": 78,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 59
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 169,
+			"end": 176,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 90
+				},
+				"end": {
+					"line": 3,
+					"column": 97
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " At 101 the brackets break open - the suffix owns the break, the element stays put",
+			"start": 180,
+			"end": 264,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 359,
+			"end": 366,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 2
+				},
+				"end": {
+					"line": 6,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A union element flips at the same boundary",
+			"start": 372,
+			"end": 417,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 508,
+			"end": 515,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 90
+				},
+				"end": {
+					"line": 9,
+					"column": 97
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 612,
+			"end": 619,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 2
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 633,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 624,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 80,
+					"end": 178,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 99
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 85,
+						"end": 86,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 89,
+						"end": 177,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 98
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 89,
+							"end": 168,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 10
+								},
+								"end": {
+									"line": 3,
+									"column": 89
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSIntersectionType",
+								"start": 90,
+								"end": 167,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 88
+									}
+								},
+								"types": [
+									{
+										"type": "TSTypeReference",
+										"start": 90,
+										"end": 136,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 11
+											},
+											"end": {
+												"line": 3,
+												"column": 57
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 90,
+											"end": 136,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 11
+												},
+												"end": {
+													"line": 3,
+													"column": 57
+												}
+											},
+											"name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+										}
+									},
+									{
+										"type": "TSTypeReference",
+										"start": 139,
+										"end": 167,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 60
+											},
+											"end": {
+												"line": 3,
+												"column": 88
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 139,
+											"end": 167,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 60
+												},
+												"end": {
+													"line": 3,
+													"column": 88
+												}
+											},
+											"name": "BBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+										}
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " At exactly 100 the comment stays inline in the brackets",
+							"start": 20,
+							"end": 78
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 266,
+					"end": 370,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 271,
+						"end": 272,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 6
+							},
+							"end": {
+								"line": 5,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 275,
+						"end": 369,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 10
+							},
+							"end": {
+								"line": 7,
+								"column": 2
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 275,
+							"end": 355,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 10
+								},
+								"end": {
+									"line": 5,
+									"column": 90
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSIntersectionType",
+								"start": 276,
+								"end": 354,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 11
+									},
+									"end": {
+										"line": 5,
+										"column": 89
+									}
+								},
+								"types": [
+									{
+										"type": "TSTypeReference",
+										"start": 276,
+										"end": 323,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 11
+											},
+											"end": {
+												"line": 5,
+												"column": 58
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 276,
+											"end": 323,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 11
+												},
+												"end": {
+													"line": 5,
+													"column": 58
+												}
+											},
+											"name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+										}
+									},
+									{
+										"type": "TSTypeReference",
+										"start": 326,
+										"end": 354,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 61
+											},
+											"end": {
+												"line": 5,
+												"column": 89
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 326,
+											"end": 354,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 61
+												},
+												"end": {
+													"line": 5,
+													"column": 89
+												}
+											},
+											"name": "BBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+										}
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 169,
+							"end": 176
+						},
+						{
+							"type": "Line",
+							"value": " At 101 the brackets break open - the suffix owns the break, the element stays put",
+							"start": 180,
+							"end": 264
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 419,
+					"end": 517,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 99
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 424,
+						"end": 425,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 428,
+						"end": 516,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 10
+							},
+							"end": {
+								"line": 9,
+								"column": 98
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 428,
+							"end": 507,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 10
+								},
+								"end": {
+									"line": 9,
+									"column": 89
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSUnionType",
+								"start": 429,
+								"end": 506,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 11
+									},
+									"end": {
+										"line": 9,
+										"column": 88
+									}
+								},
+								"types": [
+									{
+										"type": "TSTypeReference",
+										"start": 429,
+										"end": 475,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 11
+											},
+											"end": {
+												"line": 9,
+												"column": 57
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 429,
+											"end": 475,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 11
+												},
+												"end": {
+													"line": 9,
+													"column": 57
+												}
+											},
+											"name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+										}
+									},
+									{
+										"type": "TSTypeReference",
+										"start": 478,
+										"end": 506,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 60
+											},
+											"end": {
+												"line": 9,
+												"column": 88
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 478,
+											"end": 506,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 60
+												},
+												"end": {
+													"line": 9,
+													"column": 88
+												}
+											},
+											"name": "BBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+										}
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 359,
+							"end": 366
+						},
+						{
+							"type": "Line",
+							"value": " A union element flips at the same boundary",
+							"start": 372,
+							"end": 417
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 519,
+					"end": 623,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 524,
+						"end": 525,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 528,
+						"end": 622,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 10
+							},
+							"end": {
+								"line": 12,
+								"column": 2
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 528,
+							"end": 608,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 10
+								},
+								"end": {
+									"line": 10,
+									"column": 90
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSUnionType",
+								"start": 529,
+								"end": 607,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 11
+									},
+									"end": {
+										"line": 10,
+										"column": 89
+									}
+								},
+								"types": [
+									{
+										"type": "TSTypeReference",
+										"start": 529,
+										"end": 576,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 11
+											},
+											"end": {
+												"line": 10,
+												"column": 58
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 529,
+											"end": 576,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 11
+												},
+												"end": {
+													"line": 10,
+													"column": 58
+												}
+											},
+											"name": "AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA"
+										}
+									},
+									{
+										"type": "TSTypeReference",
+										"start": 579,
+										"end": 607,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 61
+											},
+											"end": {
+												"line": 10,
+												"column": 89
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 579,
+											"end": 607,
+											"loc": {
+												"start": {
+													"line": 10,
+													"column": 61
+												},
+												"end": {
+													"line": 10,
+													"column": 89
+												}
+											},
+											"name": "BBBBBBBBBBBBBBBBBBBBBBBBBBBB"
+										}
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 508,
+							"end": 515
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 612,
+							"end": 619
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
