@@ -68,8 +68,16 @@ fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType<'_>) -> bo
         // the first disjunct misses — an element the author left bare that the printer
         // parenthesizes anyway (`typeof x /* c */[]`), where the AST holds no
         // `Parenthesized` node to match on.
+        // ⚠️ The first disjunct asks whether the parens BREAK, so a shell whose whole
+        // comment run is deferred to end of line is excluded: its parens are stripped and
+        // nothing breaks inside them (`(U // c)[]` prints flat as `U[]; // c`). Claiming
+        // the internal break there sent it to `fluid`, whose marker broke on the shell's
+        // `break_parent` and split the `=` — a split the reparse can't reproduce, the
+        // parens being gone (F1). A LEADING comment keeps its real `hardline`, so it still
+        // answers `true` here.
         TSType::Array(a) => {
-            matches!(a.element_type, TSType::Parenthesized(_))
+            (matches!(a.element_type, TSType::Parenthesized(_))
+                && !printer.paren_defers_its_whole_run(a.element_type))
                 || matches!(printer.array_suffix_layout(a), ArraySuffixLayout::Split { .. })
         }
         _ => false,
@@ -243,7 +251,17 @@ impl<'a> Printer<'a> {
             // (`= (⏎⇥// prettier-ignore⏎⇥T⏎)[]`) expands its own parens around the
             // run — the shell owns the break (`paren_interior_routed_inner` self-gates
             // on `has_format_ignore`).
-            TSType::Array(a) => self.paren_interior_routed_inner(a.element_type).is_some(),
+            TSType::Array(a) => {
+                self.paren_interior_routed_inner(a.element_type).is_some()
+                    || self.paren_defers_its_whole_run(a.element_type)
+            }
+            // A redundant paren shell whose comments are ALL in its trailing gap
+            // (`= (U // c)[]`, `= (A // c)`). The shell emits a `break_parent` so that a
+            // sibling member can't absorb the comment's line, but with nothing after the
+            // shell that break reaches only the `=` — where it renders a split the reparse
+            // cannot reproduce, the parens being gone by then. The run itself is deferred,
+            // so the value prints flat: the `=` must not break either.
+            TSType::Parenthesized(_) => self.paren_defers_its_whole_run(ty),
             TSType::Literal(internal::TSLiteralType::TemplateLiteral(t)) => {
                 self.template_literal_type_breaks_for_comment(t)
             }
@@ -523,23 +541,34 @@ impl<'a> Printer<'a> {
                     value_span.start,
                     value_span.end,
                 );
+                // The `will_break` is what makes "bearing a comment" mean "laid out by
+                // one": a value whose comments all ride `line_suffix` (a trailing run in
+                // the index→`]` or stripped-paren gap) renders exactly as the comment-free
+                // form, so it belongs on the `fluid` default below rather than on either
+                // comment arm. Both arms ask this same question, so it is asked once —
+                // they part only on whether the comment forces its own line.
+                let comment_driven_break = value_has_comments && d.will_break(type_doc);
                 let hug = self.value_owns_its_comment_break(value_type)
-                    || (d.will_break(type_doc)
-                        && value_has_comments
+                    || (comment_driven_break
                         && !self.comments_force_own_line_between(value_span.start, value_span.end));
                 if hug {
                     parts.push(d.text(" "));
                     parts.push(make_rhs(type_doc));
-                } else if value_has_comments
+                } else if comment_driven_break
                     || matches!(
                         value_type,
                         TSType::Literal(internal::TSLiteralType::TemplateLiteral(_))
                     )
                 {
                     // Break after `=` with a hanging indent, for two kinds:
-                    //   - a non-hugging comment-bearing value, preserving comment
-                    //     placement (e.g. a `[`→index own-line comment hangs the index —
-                    //     indexed_access_line_comment); and
+                    //   - a non-hugging value whose comment ACTUALLY lays it out
+                    //     (`comment_driven_break` above), preserving comment placement
+                    //     (e.g. a `[`→index own-line comment hangs the index —
+                    //     indexed_access_line_comment). Hanging a merely comment-BEARING
+                    //     value wrapped it in a structural `indent` that a deferred run's
+                    //     own break then inherited, printing the run one level too deep —
+                    //     and that is NOT a fixed point, since the reparse reads the
+                    //     comment at statement level (F1); and
                     //   - a template-literal type, whose `${…}` printer force-breaks: on
                     //     the `fluid` path the value would hug `= \`prefix_${` and break
                     //     the interpolation instead of breaking after `=` first (tsv's

@@ -471,6 +471,25 @@ impl<'a> Printer<'a> {
     /// binary search over the range it just scanned, and keeps the break question
     /// keyed on what was actually EMITTED (an owned comment is skipped by both).
     /// Callers whose following token can't be swallowed ignore it.
+    ///
+    /// ⚠️ **The separator goes BEFORE each comment, and it is asked of the SOURCE.**
+    /// A comment the author left on its own line takes
+    /// [`Self::build_trailing_comment_doc_own_line`] instead, so a run of them stays a
+    /// run. Emitting them back to back with nothing between welds the run into a single
+    /// comment — the second `//` becomes text of the first (`// c1 // c2`), so the
+    /// second comment stops existing — and a block following a line comment additionally
+    /// **reorders** ahead of it, the inline form jumping the deferred one. Both are
+    /// stable, lossless-looking outputs that reparse, which is why the ledger, F1, the
+    /// round-trip and the fuzzer are all blind to them; only the census and a prettier
+    /// `compare` see it. This is the trailing-gap face of the rule in
+    /// [`Self::build_trailing_body_comments_doc`] / [`Self::push_dangling_comment_run`]
+    /// — see [docs/comments.md](../../../../../docs/comments.md) §Trailing and dangling
+    /// runs.
+    ///
+    /// Asking the source ("did the author give this comment its own line?") rather than
+    /// the previous comment's kind is what keeps the two glued shapes intact: a run the
+    /// author wrote on one line (`/* c1 */ /* c2 */`) stays on one line, because a block
+    /// comment can share it. The kind test is the trap that formulation avoids.
     pub(crate) fn push_trailing_comments_in_range(
         &self,
         parts: &mut DocBuf,
@@ -478,9 +497,30 @@ impl<'a> Printer<'a> {
         end: u32,
     ) -> bool {
         let mut has_line_comment = false;
+        // Cursor over what physically precedes each comment — an **in-source** question
+        // (docs/comments.md §the three axes), so it advances over every comment emitted
+        // here, not just the ones that broke.
+        let mut prev_end = start;
         for comment in comments_to_emit_in_range(self.comments, start, end) {
-            parts.push(self.build_trailing_comment_doc(comment));
-            has_line_comment |= !comment.is_block;
+            // The *comment* line-break table, never the layout one: this decides whether
+            // a `//` is followed by a break, so it must stay real under the canonical
+            // reprint, where an erased read would re-weld the run.
+            let own_line = self.comment_has_newline_between(prev_end, comment.span.start);
+            let is_line = !comment.is_block;
+            // A **line** comment is deferred by construction (it runs to EOL). A **block**
+            // one is deferred only to stay BEHIND a line comment already in this run:
+            // deferring is what carries a comment out past the construct's closer, so a
+            // block that could simply sit inline must, or it leaves the parens it was
+            // written inside. Once the run is deferred, though, an inline block would
+            // render *before* the deferred text and the pair would come out reordered.
+            let deferred = is_line || has_line_comment;
+            parts.push(if deferred && own_line {
+                self.build_trailing_comment_doc_own_line(comment)
+            } else {
+                self.build_trailing_comment_doc(comment)
+            });
+            has_line_comment |= is_line;
+            prev_end = comment.span.end;
         }
         has_line_comment
     }

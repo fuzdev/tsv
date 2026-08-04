@@ -457,11 +457,20 @@ impl<'a> Printer<'a> {
                     // comment rides `line_suffix`, flushing before the `]`'s
                     // hardline) — this route claims the whole bracket interior, so
                     // nothing here may go unemitted.
+                    //
+                    // `indent`, because this route already expanded the brackets and put
+                    // the index one level in: a second comment in the run takes its own
+                    // line and belongs in that same interior column, not out at the `[`'s.
+                    // Inert for the run's first comment, which trails the index's line.
+                    let mut gap: DocBuf = DocBuf::new();
                     self.push_trailing_comments_in_range(
-                        &mut parts,
+                        &mut gap,
                         i.index_type.span().end,
                         i.span.end,
                     );
+                    if !gap.is_empty() {
+                        parts.push(d.indent(d.concat(&gap)));
+                    }
                     parts.push(d.hardline());
                     parts.push(d.text("]"));
                     return d.concat(&parts);
@@ -1066,6 +1075,31 @@ impl<'a> Printer<'a> {
         )
     }
 
+    /// Whether `ty` is a `TSParenthesizedType` whose comments are **entirely** in its
+    /// trailing gap — so [`Self::build_parenthesized_type_unwrap_doc`] emits the whole run
+    /// through `line_suffix` and the shell itself renders flat.
+    ///
+    /// The shell still emits a `break_parent` for that run (a sibling member must not
+    /// absorb the comment's line — see that function), which makes `will_break` report a
+    /// break the output does not actually contain. This is the predicate that tells an
+    /// enclosing layout to disbelieve it. A **leading** comment is the opposite case: it
+    /// takes a real `hardline`, so the shell genuinely breaks and the answer is `false`.
+    pub(in crate::printer) fn paren_defers_its_whole_run(&self, ty: &TSType<'_>) -> bool {
+        let TSType::Parenthesized(p) = ty else {
+            return false;
+        };
+        // A **line** comment is what makes the run deferred, and it is also the only thing
+        // that makes the shell emit its `break_parent`. A trailing run of blocks stays
+        // inline, breaks nothing, and needs no disbelieving — answering `true` for it
+        // collapsed a legitimately expanded shell (`array_paren_bracket_comment_long`).
+        // So the trailing question is asked as the line-comment one directly, not as a
+        // [`Self::paren_inner_comment_flags`] tuple: a line comment is never owned, so
+        // "has a trailing line comment" already implies "has a trailing comment to emit".
+        let inner = p.type_annotation.span();
+        !self.has_comments_to_emit_between(p.span.start, inner.start)
+            && self.has_line_comments_between(inner.end, p.span.end)
+    }
+
     /// Unwrap redundant, comment-free `TSParenthesizedType` layers to find the
     /// effective inner type for a layout decision. Parens around a union /
     /// intersection in type-alias-RHS, cast (`as` / `satisfies`), return-type,
@@ -1120,6 +1154,17 @@ impl<'a> Printer<'a> {
 
         // Trailing comments: between inner type and `)`. A block stays inline; a line
         // comment defers to end of line and forces the break.
+        //
+        // ⚠️ The break is load-bearing where the stripped shell has a SIBLING after it:
+        // `(a // c) | b` must break the enclosing union so the comment stays on `a`
+        // (`union_intersection_parens_line_comment`) — flat, the deferred comment flushes
+        // past `| b` and ends up documenting the whole statement instead of the member it
+        // was written on. Where there is no sibling the same `break_parent` escapes to the
+        // enclosing assignment and splits it after the `=` for nothing — and that split is
+        // NOT reproducible (the reparse has no parens left to re-break it), so it was
+        // non-idempotent. That case is absorbed at the assignment, by
+        // `value_owns_its_comment_break`, which is where the "does the value actually
+        // break?" question already lives.
         if has_trailing {
             needs_break |= self.push_trailing_comments_in_range(&mut parts, inner_end, paren_close);
         }
