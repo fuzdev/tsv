@@ -20,4 +20,4 @@ Only the `<`-line comment: tsv keeps `// force` on the `<` line, prettier reloca
 own line as the type's leading comment. The open-delimiter trailing-comment divergence, in the
 same family as the type-parameter list's `<` and the type-argument list's `<`.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

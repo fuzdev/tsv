@@ -39,4 +39,4 @@ diverges; where the braces break does not.
 The export sibling is
 [modules/exports/type_keyword_comment_long](../../exports/type_keyword_comment_long_prettier_divergence/).
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

@@ -17,4 +17,4 @@ them is what produces the blank line — a comment run ends in the newline that 
 and a width-driven break opens with a newline of its own, so a construct that applies both
 emits two.
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

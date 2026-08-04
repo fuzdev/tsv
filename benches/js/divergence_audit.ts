@@ -1,7 +1,7 @@
 /**
  * Divergence Detection Audit Script
  *
- * Cross-references detection patterns against conformance_prettier.md to verify:
+ * Cross-references detection patterns against the `conformance_prettier*.md` family to verify:
  * 1. Every documented divergence has a pattern that claims to detect it
  * 2. Every pattern fixture reference points to a documented divergence
  *

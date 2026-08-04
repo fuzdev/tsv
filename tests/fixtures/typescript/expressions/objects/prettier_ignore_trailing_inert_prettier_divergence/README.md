@@ -16,4 +16,4 @@ following construct only when it is alone on its line. Trailing usage does not
 appear in real corpora, and an inert trailing directive can never silently
 misbind to an adjacent member.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

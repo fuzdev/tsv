@@ -22,5 +22,5 @@ A **trailing** comment on the same operand is a separate, non-divergent case:
 fixture [operand_paren_comment](../operand_paren_comment/).
 
 Reason: comment preservation. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Ternary operand leading comment) and §Comment Position Philosophy.

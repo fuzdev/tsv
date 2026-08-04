@@ -21,5 +21,5 @@ that output again reads the newline it just injected as authored leading whitesp
 the multiline path, and settles on a different form — `format(format(x)) != format(x)`, an
 F1 break. Expanding the body is what makes the emitted form its own fixed point.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)
-and [§Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)
+and [§Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).

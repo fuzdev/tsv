@@ -39,7 +39,7 @@ impl<'a> Printer<'a> {
     /// run speaks for the boundary). Collapsible whitespace only: an NBSP or form feed is content.
     /// The single boundary-authoring question — the element boundary probes, the block
     /// section paths, and `is_inline_fragment` all route through it.
-    /// See conformance_prettier.md §Svelte: Blocks.
+    /// See conformance_prettier_svelte.md §Svelte: Blocks.
     pub(super) fn nodes_boundary_newline(
         &self,
         nodes: &[FragmentNode<'_>],

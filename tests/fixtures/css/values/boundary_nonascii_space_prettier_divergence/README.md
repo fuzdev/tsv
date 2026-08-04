@@ -47,4 +47,4 @@ This pins a former **content loss** — a boundary non-ASCII space was silently 
 
 `input.svelte` is tsv's inline form; `output_prettier.svelte` is prettier's split form.
 
-See [conformance_prettier.md §CSS: Values](../../../../../docs/conformance_prettier.md#css-values).
+See [conformance_prettier_css.md §CSS: Values](../../../../../docs/conformance_prettier_css.md#css-values).

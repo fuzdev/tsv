@@ -24,6 +24,7 @@ rewrites it to `input`. So the divergence is one of normalization.
 ## Reason
 
 Print width is a hard limit in tsv. See
-[conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy).
+[conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy);
+cataloged in [conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).
 The plain-ASCII form of this case is
 [fill_tail_after_expr_long](../fill_tail_after_expr_long_prettier_divergence/).

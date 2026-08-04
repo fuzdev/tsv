@@ -19,7 +19,7 @@ The empty/forgiving parse itself (accepting `@scope ()`, `@scope (.a, , .b)`,
 `@scope (.)`) is covered by
 [scope_forgiving_selector_list](../scope_forgiving_selector_list/) — those cases
 match prettier; only the empty-root **spacing** here diverges. See
-[conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules).
+[conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules).
 
 ## Related
 

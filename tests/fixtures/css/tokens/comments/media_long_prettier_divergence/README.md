@@ -16,5 +16,5 @@ the comment is incidental, the divergence is the unwrapped over-width line). tsv
 enforces printWidth consistently. See
 [at_rules/media_long](../../../at_rules/media_long_prettier_divergence/) for the
 comment-free base case and
-[conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments)
+[conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments)
 for the catalog entry.

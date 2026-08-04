@@ -18,4 +18,4 @@ Per comment placement policy, we preserve the user's original position.
 property signature with no annotation in a type literal — an unrelated parser
 gap.)
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

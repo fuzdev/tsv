@@ -20,9 +20,9 @@ a valid escape (§4.3.4) — the output would not re-parse at all.
 **Prettier silently drops the escape's payload**: `xxxxx\ yyyyy` → `xxxxx\yyyyy`.
 That re-parses, but as the ident `xxxxxyyyyy` — a different value. It also leaves
 the 101-char line over the print width (its usual print-width behavior; see
-[conformance_prettier.md §CSS: Layout](../../../../../docs/conformance_prettier.md#css-layout)),
+[conformance_prettier_css.md §CSS: Layout](../../../../../docs/conformance_prettier_css.md#css-layout)),
 so the two divergences stack in `output_prettier.svelte`.
 
 tsv preserves the escape and treats the print width as a hard limit.
 
-See [conformance_prettier.md §CSS: Values](../../../../../docs/conformance_prettier.md#css-values).
+See [conformance_prettier_css.md §CSS: Values](../../../../../docs/conformance_prettier_css.md#css-values).

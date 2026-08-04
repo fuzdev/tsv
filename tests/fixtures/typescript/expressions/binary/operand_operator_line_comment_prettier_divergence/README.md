@@ -52,5 +52,5 @@ operand** (`const a = 1 // c + 2;` — `+ 2` absorbed into the comment, a
 non-idempotent content loss); keeping the comment trailing the operand with the
 operator on the next line fixes the loss.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation
 ("Binary operand to operator line comment").

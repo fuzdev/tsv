@@ -18,5 +18,5 @@ redundant and both formatters strip them (`yield x + y /* c */`) — a match,
 not a divergence.
 
 Reason: comment preservation. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Await grouped operand) and §Comment Position Philosophy.

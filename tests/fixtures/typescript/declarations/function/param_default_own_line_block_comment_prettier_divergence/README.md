@@ -30,4 +30,4 @@ divergence — there prettier floats the comment out to *trail* the parameter
 [param_default_line_comment](../param_default_line_comment_prettier_divergence/).
 Covers function parameters and object/array destructuring binding defaults.
 
-See [conformance_prettier.md §Comment normalization (stable quirks)](../../../../../../docs/conformance_prettier.md#comment-normalization-stable-quirks).
+See [conformance_prettier_ts_comments.md §Comment normalization (stable quirks)](../../../../../../docs/conformance_prettier_ts_comments.md#comment-normalization-stable-quirks).

@@ -29,4 +29,4 @@ class field keys quoted, so an object property `{ 'x': 1 }` → `{ x: 1 }` yet a
 `'x' = 1` stays quoted under prettier; tsv removes that inconsistency. Unquoting is always
 meaning-preserving here — a valid-identifier field key names the same field either way.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §TypeScript.
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md) §TypeScript.

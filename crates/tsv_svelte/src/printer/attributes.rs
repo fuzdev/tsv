@@ -937,7 +937,7 @@ impl<'a> Printer<'a> {
             // one still took the comment-blind path and lost it — the rerouting inherits the
             // destination's blindness (docs/comments.md hazard 4). Prettier drops that comment,
             // but tsv preserves trailing comments at every other `{…}` value position
-            // (conformance_prettier.md §Svelte: Attributes), and matching the drop here made
+            // (conformance_prettier_svelte.md §Svelte: Attributes), and matching the drop here made
             // the sequence the one host that didn't.
             if let Some(span) = tag_span
                 && tsv_lang::has_comments_to_emit_in_range(

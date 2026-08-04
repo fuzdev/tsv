@@ -9,4 +9,4 @@ Comments between async and function keywords are preserved in place.
 Per comment placement policy, the user's chosen position is preserved.
 Both positions are dual-stable in our formatter.
 
-See [conformance_prettier.md](../../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

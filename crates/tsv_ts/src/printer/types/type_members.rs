@@ -557,7 +557,7 @@ impl<'a> Printer<'a> {
         // `[`→key comment placement: a line comment the author wrote *on the `[` line*
         // stays on that line (`[ // c\n\tk: string\n]`) and forces the bracket to
         // break — a divergence from prettier, which relocates it to its own line as
-        // the key's leading comment (conformance_prettier.md §Comment relocation,
+        // the key's leading comment (conformance_prettier_ts_comments.md §Comment relocation,
         // "Object/array/block open-delimiter trailing"). Every other comment in the
         // gap is the leading run below, which both formatters agree on. A comment in
         // the param→`]` gap (`[key: string /* c */]`) trails the contents.
@@ -600,7 +600,7 @@ impl<'a> Printer<'a> {
         // same-line comment trails the type (`[\n\tk: T // c\n]`), an own-line comment
         // keeps its own line (`[\n\tk: T\n\t// c\n]`). Prettier instead relocates an
         // own-line comment to after `]` (`[k: T] // c`); tsv preserves placement
-        // (conformance_prettier.md §Comment relocation), and a line comment swallowing
+        // (conformance_prettier_ts_comments.md §Comment relocation), and a line comment swallowing
         // the `]` would otherwise be content loss.
         let (trailing_comment, trailing_has_line) = match bracket_close_pos {
             Some(cp) if self.has_comments_to_emit_between(search_start, cp) => {

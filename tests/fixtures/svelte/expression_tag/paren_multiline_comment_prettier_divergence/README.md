@@ -39,4 +39,5 @@ break-propagated like the owned path).
 User comments are valuable and shouldn't be silently removed; the comment is
 syntactically valid here, and reproducing prettier's paren-stripped form would drop it.
 tsv preserves the comment and reaches its stable expanded form on the first pass. See
-[conformance_prettier.md §Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy).
+[conformance_prettier.md §Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy);
+cataloged in [conformance_prettier_svelte.md §Svelte: Attributes](../../../../../docs/conformance_prettier_svelte.md#svelte-attributes).

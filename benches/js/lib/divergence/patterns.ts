@@ -1,7 +1,7 @@
 /**
  * Divergence pattern detection - identify known intentional differences from Prettier.
  *
- * Each pattern corresponds to a documented divergence in conformance_prettier.md.
+ * Each pattern corresponds to a documented divergence in the `conformance_prettier*.md` family.
  * These are NOT bugs - they are design choices.
  *
  * Patterns are ordered from most specific to most broad, but that ordering is
@@ -40,7 +40,7 @@ export interface DetectionContext {
 }
 
 export interface DivergenceMatch {
-	/** Pattern ID (matches conformance_prettier.md) */
+	/** Pattern ID (matches the `conformance_prettier*.md` family) */
 	pattern: string;
 	/** Detection confidence */
 	confidence: 'certain' | 'likely' | 'possible';
@@ -57,7 +57,7 @@ export interface DivergencePattern {
 	description: string;
 	/** Languages this pattern applies to */
 	languages: Language[];
-	/** Section names from conformance_prettier.md this pattern covers */
+	/** Section names from the `conformance_prettier*.md` family this pattern covers */
 	conformance_sections: string[];
 	/** Fixture paths (relative to tests/fixtures/) this pattern should detect */
 	fixtures: string[];
@@ -1522,7 +1522,7 @@ const non_null_paren_base: DivergencePattern = {
 /**
  * The doc's own enumeration is the element set: prettier-plugin-svelte's blockElements
  * list carries `ol`/`ul` and `details`/`li` but omits `menu` and `summary`, the two
- * elements the HTML spec gives identical UA display (conformance_prettier.md
+ * elements the HTML spec gives identical UA display (conformance_prettier_svelte.md
  * §Svelte: Elements). tsv classifies both as block, so their content — and their
  * FOLLOWING sibling, which as an inline element would hug the closing tag in the
  * surrounding fill — lays out on its own line where prettier keeps the inline form.
@@ -3361,7 +3361,7 @@ const field_key_unquote: DivergencePattern = {
  * its union-fit layout and keeps it inline (`a | b // c`). The line comment forces
  * the parens open in both, so the only difference is the inner union's inline vs
  * exploded layout. Catalogued as **Retained paren union member line comment** in
- * conformance_prettier.md; the same shape is 18389's remaining unexplained hunk.
+ * conformance_prettier_ts_comments.md; the same shape is 18389's remaining unexplained hunk.
  *
  * Content-preservation proof: strip prettier's leading `| ` from each exploded
  * member and rejoin with ` | ` — a pure inline↔exploded reflow is byte-identical to

@@ -26,10 +26,13 @@ one-file-at-a-time loop below re-formats only files whose content changed.
 **ALWAYS start by reading the conformance documentation:**
 
 ```bash
-cat docs/conformance_prettier.md
+cat docs/conformance_prettier.md          # the frame: terminology, reason tags, decision framework
+cat docs/conformance_prettier_css.md      # and the catalog for the language you're triaging
 ```
 
-This document contains all intentional Prettier divergences with rationale and fixture references.
+The frame's §Catalogs table indexes the per-language catalogs (`_css`, `_svelte`, `_ts`,
+`_ts_comments`, `_ignore`); together they hold every intentional Prettier divergence with
+rationale and fixture references.
 
 **This workflow doc describes HOW to work. The conformance doc describes WHERE we intentionally differ.**
 
@@ -57,7 +60,8 @@ cargo run -p tsv_debug compare ~/dev/zzz/src/path/to/file.svelte
 deno task corpus:compare:format:run ~/dev/zzz --explain --exit-on-first
 ```
 
-Read `docs/conformance_prettier.md` and compare the diff against documented divergences.
+Read `docs/conformance_prettier.md` plus the catalog for the language you're triaging (its
+§Catalogs table indexes them) and compare the diff against documented divergences.
 
 **Step 3: Classify — one of three outcomes:**
 
@@ -71,7 +75,7 @@ The divergence detector already identifies this pattern. Nothing to do.
 
 **B) Known divergence but detector misses it** → Fix the detector
 
-The diff matches a documented pattern in `conformance_prettier.md`, but the detector in
+The diff matches a documented pattern in the `conformance_prettier*.md` family, but the detector in
 `benches/js/lib/divergence/patterns.ts` doesn't recognize this variant.
 
 1. Identify which existing pattern should match (e.g., `inline_content_hug`, `fill_101_boundary`)
@@ -87,7 +91,7 @@ The diff matches a documented pattern in `conformance_prettier.md`, but the dete
 
 **C) Genuine unknown difference (formatter bug)** → Create fixture, **GET APPROVAL**, implement fix
 
-The diff does NOT match any documented pattern in `conformance_prettier.md`. This is a real formatting bug.
+The diff does NOT match any documented pattern in the `conformance_prettier*.md` family. This is a real formatting bug.
 
 1. Read `./docs/fixture_naming.md` and check existing fixtures
 2. Create a minimal fixture that demonstrates the issue
@@ -244,8 +248,8 @@ This replaces manually running `cargo run -p tsv_debug compare <file>` on each u
 # Use --explain to also list known divergences with their patterns
 deno task corpus:compare:format ~/dev/zzz --explain
 
-# Check conformance_prettier.md for detailed rationale
-cat docs/conformance_prettier.md
+# Check the conformance docs for detailed rationale (frame + the language's catalog)
+cat docs/conformance_prettier.md docs/conformance_prettier_svelte.md
 
 # Search for existing _prettier_divergence fixtures
 find tests/fixtures -name "*prettier_divergence*" -type d
@@ -255,7 +259,7 @@ The default output shows unexplained diffs and which patterns explain the explai
 
 **If the difference is detected as "known":** Not a bug. Move to the next file.
 
-**If the difference is "unknown":** Likely a bug — proceed with fixture creation. Or it might be a NEW intentional divergence that needs documenting in `conformance_prettier.md` and a detector pattern added.
+**If the difference is "unknown":** Likely a bug — proceed with fixture creation. Or it might be a NEW intentional divergence that needs documenting in the language's `conformance_prettier*.md` catalog and a detector pattern added.
 
 ---
 
@@ -505,7 +509,7 @@ Options:
 ### Divergence Audit
 
 ```bash
-deno task divergence:audit        # Cross-reference patterns vs conformance_prettier.md
+deno task divergence:audit        # Cross-reference patterns vs conformance_prettier*.md
 deno task divergence:audit --json # Machine-readable JSON output
 ```
 
@@ -528,7 +532,7 @@ cargo run -p tsv_debug line_width FILE --line N
 - ./fixture_workflow.md - Complete fixture creation process
 - ./fixture_naming.md - Naming conventions (ALWAYS read before creating fixtures)
 - ./fixture_overview.md - Validation rules and patterns
-- ./conformance_prettier.md - **Intentional Prettier divergences** (check before fixing a "bug")
+- ./conformance_prettier.md - **Intentional Prettier divergences** — the frame; its §Catalogs table indexes the per-language catalogs (check before fixing a "bug")
 
 ---
 

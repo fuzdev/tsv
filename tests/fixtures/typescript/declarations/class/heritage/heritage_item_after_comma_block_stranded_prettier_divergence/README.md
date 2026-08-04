@@ -28,4 +28,4 @@ the stranded block a stable divergence (an inline clause collapses the newline a
 both formatters agree).
 
 See
-[conformance_prettier.md](../../../../../../../docs/conformance_prettier.md) §Comment relocation.
+[conformance_prettier_ts_comments.md](../../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

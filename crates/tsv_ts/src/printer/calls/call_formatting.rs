@@ -510,7 +510,7 @@ fn try_single_arg_comment_paths(
         // Multi-line format: fn( // comment\n\targ,\n)
         // Comments trailing the `(` on its own line stay there (a divergence from
         // prettier, which relocates them to their own line); own-line comments
-        // stay on their own lines before the arg. See conformance_prettier.md
+        // stay on their own lines before the arg. See conformance_prettier_ts_comments.md
         // §Comment relocation (Call open paren `(`).
         let gap_pc = PartitionedComments::new(
             printer.comments,

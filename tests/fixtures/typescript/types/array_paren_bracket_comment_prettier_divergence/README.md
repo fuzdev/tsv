@@ -40,4 +40,4 @@ answers the same brackets differently is an element whose union *expands*, where
 moves the comment into the parens instead —
 [array_paren_union_bracket_comment](../array_paren_union_bracket_comment_prettier_divergence/).
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -29,5 +29,5 @@ same-gap **line** comment (which forces the break) is the sibling
 [property_key_colon_line_comment](../property_key_colon_line_comment_prettier_divergence/);
 the inline-authored block is a plain match in both formatters.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

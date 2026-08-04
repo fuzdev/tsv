@@ -11,4 +11,4 @@ prettier's `output_prettier`).
 
 Affects: property (`=`), method (`()`), async method, generator (`*`), getter, setter.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

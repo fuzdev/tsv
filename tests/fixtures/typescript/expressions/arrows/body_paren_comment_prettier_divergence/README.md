@@ -26,6 +26,6 @@ A few cases go further:
   expression.
 
 Reason: comment preservation. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Arrow body stripped parens) and §Comment Position
 Philosophy.

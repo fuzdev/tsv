@@ -33,5 +33,5 @@ same-gap **line** comment (which forces the break) is the sibling
 the enum member takes the pass-count outcome instead
 ([member_before_eq_own_line_block_comment](../../enum/member_before_eq_own_line_block_comment_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

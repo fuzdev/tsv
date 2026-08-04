@@ -32,4 +32,4 @@ and the variable-declarator
 [after_comma_block_stranded](../../../declarations/variable/multiple/after_comma_block_stranded_prettier_divergence/).
 One rule (`is_stranded_after_comma_block`) across every comma-separated site.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

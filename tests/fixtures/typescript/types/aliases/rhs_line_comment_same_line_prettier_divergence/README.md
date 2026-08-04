@@ -37,7 +37,8 @@ Comment placement is a deliberate authoring choice and tsv preserves it. This is
 type-alias `=` analog of the attribute-list
 [comment_same_line](../../../../svelte/attributes/comment_same_line_prettier_divergence/)
 divergence. See
-[conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy).
+[conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy);
+cataloged in [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
 
 ## Related
 

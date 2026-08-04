@@ -23,5 +23,5 @@ cannot silently split it.
 
 Reason: content integrity — a formatting pass must not change what the code
 means. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Yield hanging comment) and §Comment Position Philosophy.

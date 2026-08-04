@@ -16,5 +16,5 @@ covers simple, union, and intersection value types and two stacked line comments
 divergence — only a line comment forces the value onto the next line, and the two
 formatters disagree on which line the comment lands.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
-§Uniform Forced-Continuation Indent.
+See [conformance_prettier.md §Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent);
+cataloged in [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

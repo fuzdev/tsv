@@ -14,5 +14,5 @@ tsv treats user comment placement as intentional, consistently across the inline
 and breaking for-in/for-of header layouts. A comment that merely contains the
 word `await` stays a comment — it is never promoted to a `for await` keyword (a
 for-in can never be `for await`). See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

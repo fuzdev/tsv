@@ -36,7 +36,7 @@ Prettier keeps the comma in the one place tsv also does — `var()`'s empty fall
 ## Reason
 
 **Spec precedence** (and content preservation). See
-[conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values)
+[conformance_prettier_css.md §CSS: Values](../../../../../../docs/conformance_prettier_css.md#css-values)
 ("Trailing empty comma-list element").
 
 ## Related

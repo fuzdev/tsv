@@ -23,5 +23,5 @@ prettier-plugin-svelte bug — it reproduces in plain prettier with
 prettier-plugin-svelte bump surfaced it because the plugin switched
 `lang="ts"` formatting from `babel-ts` to the real `typescript` parser.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md)
 §Prettier rejects valid input.

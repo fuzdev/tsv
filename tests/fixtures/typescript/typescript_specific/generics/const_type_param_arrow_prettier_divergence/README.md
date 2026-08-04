@@ -13,4 +13,4 @@ only the arrow diverges. The pure-TS sibling const_type_param/ is bare in both
 formatters (prettier knows the `.ts` filepath).
 
 Reason: **Design choice**. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §TypeScript.
+[conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md) §TypeScript.

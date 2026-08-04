@@ -30,4 +30,4 @@ An inline block comment that hugs the attribute (`with { /* c */ type: 'json' }`
 and an own-line block comment are unchanged and match Prettier; only a line
 comment trailing `{` diverges.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

@@ -29,5 +29,5 @@ keeps `{` inline on the selector line. The comment content and the
 compound-vs-descendant distinction are identical under both; only the brace
 position differs.
 
-See [conformance_prettier.md §CSS: Comments](../../../../../docs/conformance_prettier.md#css-comments)
+See [conformance_prettier_css.md §CSS: Comments](../../../../../docs/conformance_prettier_css.md#css-comments)
 and [conformance_svelte.md §CSS Corrections](../../../../../docs/conformance_svelte.md#css-corrections).

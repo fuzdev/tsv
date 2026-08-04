@@ -4,7 +4,7 @@
  * Three main functions:
  * - `check_safety_vs_prettier()` - Differential data-loss check (ours beyond prettier) - BUGS
  * - `detect_divergences()` - Identify known pattern matches - INTENTIONAL DIFFERENCES
- * - `generate_audit_report()` - Cross-reference patterns against conformance_prettier.md
+ * - `generate_audit_report()` - Cross-reference patterns against the `conformance_prettier*.md` family
  */
 
 export { check_safety_vs_prettier, type SafetyViolation } from './safety.ts';

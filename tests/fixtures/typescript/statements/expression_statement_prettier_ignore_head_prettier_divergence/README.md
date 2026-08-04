@@ -28,4 +28,4 @@ around the whole slice. Prettier drops them and emits `{ bbb:  2 }.ccc;`, which 
 
 Comment position is authorship signal, and a shell a verbatim slice needs must go around the
 whole slice; ◆comment_preservation, ◆prettier_bug. See
-[conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

@@ -22,4 +22,4 @@ diverge: the directive precedes the inner function type, not the enclosing array
 type, so tsv freezes the child it points at and keeps the authored in-paren
 own-line position per the comment-position doctrine.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

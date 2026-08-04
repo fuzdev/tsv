@@ -9,4 +9,4 @@ keeps every tag intact. The `unformatted_ours_compact` (single-line authoring) a
 `prettier_variant_compact` (prettier's stable double-pyramid) both normalize to `input.svelte` under
 tsv in one pass.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

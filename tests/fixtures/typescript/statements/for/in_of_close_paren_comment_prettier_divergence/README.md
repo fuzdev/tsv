@@ -13,4 +13,4 @@ with the body; tsv preserves it trailing `)`.
 tsv treats the author's same-line placement after `)` as intentional, consistent
 with its handling across if/else, try/catch, switch, for, while, do-while.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -25,4 +25,4 @@ prettier floats it past the statement `;`) or an **own-line multiline** block
 comment still hangs the cast type on its own line (a glued multiline block
 collapses inline).
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

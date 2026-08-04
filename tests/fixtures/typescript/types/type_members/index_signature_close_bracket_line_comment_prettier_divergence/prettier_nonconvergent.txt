@@ -6,4 +6,4 @@ the brackets, value `:` rejoined) and `] // d⏎: number` (comment relocated aft
 prettier-anchored claim file (output_prettier.*, audit_signature.txt, variants) is
 expressible. The validator live-verifies this claim (rule F5). tsv breaks the
 bracket and keeps the comment where the author wrote it — on its own line before
-`]`. See README.md and docs/conformance_prettier.md §Comment relocation.
+`]`. See README.md and docs/conformance_prettier_ts_comments.md §Comment relocation.

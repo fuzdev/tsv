@@ -42,5 +42,5 @@ beast — prettier's `typescript` parser *throws* on it, so it has no
 `output_prettier` oracle and lives in the sibling
 `with_keyword_comment_line_prettier_divergence` (rule F6).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

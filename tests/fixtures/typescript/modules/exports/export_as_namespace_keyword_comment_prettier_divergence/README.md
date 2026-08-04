@@ -22,5 +22,5 @@ that was plain content loss, not a difference of opinion.)
 The same shape as the export-all header ([all_keyword_comment](../all_keyword_comment_prettier_divergence/)),
 where prettier likewise relocates every header comment to one position and tsv preserves each.
 
-See [conformance_prettier.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier.md#comments-inside-a-multi-word-keyword)
-and [§Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier_ts_comments.md#comments-inside-a-multi-word-keyword)
+and [§Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

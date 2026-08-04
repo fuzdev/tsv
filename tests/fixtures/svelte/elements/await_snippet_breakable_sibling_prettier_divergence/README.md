@@ -29,7 +29,7 @@ body-drop / dangle / block-sibling separation all resolve in one pass — at the
 breaking the parent for the short case, where prettier stays inline. A **non-breakable**
 sibling (plain text, a comment) does not trigger this: tsv keeps `{#await}` inline, matching
 prettier (see [elements/await_nonbreakable_sibling_inline](../await_nonbreakable_sibling_inline/)).
-See [conformance_prettier.md §Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks).
+See [conformance_prettier_svelte.md §Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

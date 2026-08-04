@@ -12,7 +12,7 @@ an inline element (verified against the Svelte compiler); only `<pre>` /
 
 ## Reason
 
-See [conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks) for the full head-wrap + `}` dangle +
+See [conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks) for the full head-wrap + `}` dangle +
 body-expand model (uniform at block level and inside inline elements) and why tsv
 diverges.
 

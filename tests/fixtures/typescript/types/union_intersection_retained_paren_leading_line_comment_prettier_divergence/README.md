@@ -51,4 +51,4 @@ than inside a following member's parens) is a different case and stays trailing 
 both formatters — see
 [union_paren_member_long_line_comment](../comments/union_paren_member_long_line_comment/).
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -26,4 +26,4 @@ tsv treats printWidth as a hard limit and prefers block-style content over a dan
 over-width line. Content-boundary whitespace is render-free under Svelte 5, so it must
 not select the layout — otherwise the block-style form tsv emits would reflow on the
 next pass. See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

@@ -22,5 +22,5 @@ design choice, not a configurable gap. Same divergence as
 [literal_body_empty](../comments/literal_body_empty_prettier_divergence/),
 pinned here in union/intersection position.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts.md](../../../../../docs/conformance_prettier_ts.md)
 §Empty-object comment bracket spacing.

@@ -22,4 +22,4 @@ short-circuited — and both formatters keep them (see
 Design choice: strip parens that carry no meaning. Matches Biome; content is identical
 (ASTs match) — only the redundant parens differ.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §TypeScript.
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md) §TypeScript.

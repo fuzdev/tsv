@@ -24,4 +24,4 @@ is invisible; the case is carried to pin the directive's own line, which is a pl
 rather than a freeze one. The same rule at the declaration headers is
 [declarations_prettier_ignore_head](../../../declarations/variable/declarations_prettier_ignore_head_prettier_divergence/).
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

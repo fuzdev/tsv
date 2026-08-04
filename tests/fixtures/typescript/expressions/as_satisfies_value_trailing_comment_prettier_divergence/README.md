@@ -32,4 +32,4 @@ The `unformatted_ours_*` variants verify the paren shells are idempotent under
 tsv; the `variant_*` / `prettier_intermediate_to_variant_*` siblings pin
 prettier's two-pass float.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

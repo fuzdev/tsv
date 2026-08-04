@@ -31,4 +31,4 @@ in-declaration destination differs between them (before the `[` for the intersec
 inside the parens for the union) — the boundary belongs to the suffix, not to the
 element.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -11,7 +11,7 @@ Prettier is inconsistent with itself here rather than with the spec alone: its `
 
 ## Reason
 
-See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) for the spec basis. Prettier normalizes this for `@supports` but not `@media`, `@container`, or `@import`'s `supports()`:
+See [conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules) for the spec basis. Prettier normalizes this for `@supports` but not `@media`, `@container`, or `@import`'s `supports()`:
 
 | Position               | `and(...)` input                | Prettier output                 |
 | ---------------------- | ------------------------------- | ------------------------------- |

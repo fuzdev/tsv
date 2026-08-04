@@ -25,7 +25,7 @@ continuation nests inside that, not against the statement. The annotation and he
 the rule flat. Prettier isn't an oracle for any of it — it relocates the comment out of the name
 first, and on the heritage case leaves `.Base` sitting level with the `extends` it belongs to.
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation)
-and [§Comments inside a multi-word keyword](../../../../../docs/conformance_prettier.md#comments-inside-a-multi-word-keyword)
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
+and [§Comments inside a multi-word keyword](../../../../../docs/conformance_prettier_ts_comments.md#comments-inside-a-multi-word-keyword)
 (the punctuator-joined member of that class — the reason its usual detector, a `d.text` literal with
 an *interior* space, cannot see it: the joining literal is `"."`).

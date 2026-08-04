@@ -19,4 +19,4 @@ emitter (only the same-line trail did), which is what tsv used to do.
 A comment sharing the update's line trails it in both formatters — the third case is
 a control, not a divergence.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

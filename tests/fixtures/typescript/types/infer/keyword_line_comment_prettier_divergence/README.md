@@ -23,8 +23,8 @@ flush layout prettier uses here; the divergence is the one-level indent (and, fo
 the own-line form, keeping the comment on its own line). The block-comment sibling
 is [keyword_own_line_block_comment](../keyword_own_line_block_comment_prettier_divergence/).
 Per [§How tsv treats keyword→value block
-comments](../../../../../../docs/conformance_prettier.md#comment-relocation),
+comments](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation),
 tsv keeps the comment associated with `infer` and indents the continuation
 uniformly.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

@@ -1,8 +1,9 @@
 /**
- * Divergence detection validation - cross-reference patterns against conformance_prettier.md
+ * Divergence detection validation - cross-reference patterns against the
+ * `conformance_prettier*.md` family
  *
  * Provides auditability by:
- * 1. Parsing conformance_prettier.md to extract all documented divergences
+ * 1. Parsing the `conformance_prettier*.md` family to extract all documented divergences
  * 2. Mapping each documented fixture to its conformance section and reason
  * 3. Running every pattern against each documented fixture's committed prettier
  *    forms to find which are actually DETECTED
@@ -27,7 +28,7 @@
 import { detect_divergences, PATTERNS } from './patterns.ts';
 import { build_cases, build_context, fixture_dir_exists } from './fixture_cases.ts';
 
-/** A documented divergence from conformance_prettier.md */
+/** A documented divergence from the `conformance_prettier*.md` family */
 export interface DocumentedDivergence {
 	/** Section heading (e.g., "CSS: At-Rules", "TypeScript: Template Literals") */
 	section: string;
@@ -47,7 +48,7 @@ export interface PatternCoverage {
 	description: string;
 	documented_fixtures: string[];
 	claimed_fixtures: string[];
-	/** Claimed fixtures absent from `conformance_prettier.md` — orphans at pattern level. */
+	/** Claimed fixtures absent from `conformance_prettier*.md` — orphans at pattern level. */
 	undocumented_fixtures: string[];
 	/**
 	 * Documented fixtures this pattern actually DETECTS — measured by running
@@ -90,7 +91,7 @@ export interface FixtureDetection {
 
 /** Full audit report */
 export interface AuditReport {
-	/** All divergences documented in conformance_prettier.md */
+	/** All divergences documented in the `conformance_prettier*.md` family */
 	documented: DocumentedDivergence[];
 	/** Per-fixture detection result, measured by running the detectors */
 	detection: FixtureDetection[];
@@ -157,7 +158,7 @@ export interface AuditReport {
 const FIXTURE_LINK_RE = /\[([^\]|`]+)\]\(\.\.\/tests\/fixtures\/([^)]+?)\/?\)/g;
 
 /**
- * Parse conformance_prettier.md to extract all documented divergences.
+ * Parse one `conformance_prettier*.md` doc to extract all documented divergences.
  *
  * The doc anchors divergences with fixture links in three formats:
  *
@@ -181,8 +182,9 @@ export function parse_conformance_prettier_md(content: string): DocumentedDiverg
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 
-		// Track section headings (### and #### levels; most recent wins)
-		const heading_match = line.match(/^#{3,4}\s+(.+)/);
+		// Track section headings (##..#### levels; most recent wins). A catalog section
+		// is `##` in its own language doc and `###` when nested under one.
+		const heading_match = line.match(/^#{2,4}\s+(.+)/);
 		if (heading_match) {
 			current_section = heading_match[1].trim();
 			continue;
@@ -271,12 +273,41 @@ function split_table_row(row: string): string[] {
 }
 
 /**
- * Load and parse conformance_prettier.md from the repo.
+ * The Prettier-divergence catalog, split by language: the shared frame plus the
+ * per-language catalogs it indexes. Every one is parsed — a divergence is documented
+ * wherever in the family it is cataloged.
+ *
+ * Read off disk rather than listed, so adding a catalog cannot leave this consumer
+ * behind. `conformance_audit`'s family check holds the same glob against its own
+ * declared list, which is where the family is asserted; here it is only discovered.
+ */
+async function conformance_prettier_docs(): Promise<string[]> {
+	const docs_dir = new URL('../../../../docs/', import.meta.url).pathname;
+	const names: string[] = [];
+	for await (const entry of Deno.readDir(docs_dir)) {
+		if (
+			entry.isFile &&
+			entry.name.startsWith('conformance_prettier') &&
+			entry.name.endsWith('.md')
+		) {
+			names.push(entry.name);
+		}
+	}
+	// `readDir` order is unspecified; sort so a run's output does not depend on it.
+	return names.sort();
+}
+
+/**
+ * Load and parse the `conformance_prettier*.md` family from the repo.
  */
 export async function load_documented_divergences(): Promise<DocumentedDivergence[]> {
-	const doc_path = new URL('../../../../docs/conformance_prettier.md', import.meta.url).pathname;
-	const content = await Deno.readTextFile(doc_path);
-	return parse_conformance_prettier_md(content);
+	const docs_dir = new URL('../../../../docs/', import.meta.url).pathname;
+	const divergences: DocumentedDivergence[] = [];
+	for (const doc of await conformance_prettier_docs()) {
+		const content = await Deno.readTextFile(`${docs_dir}${doc}`);
+		divergences.push(...parse_conformance_prettier_md(content));
+	}
+	return divergences;
 }
 
 /**
@@ -381,7 +412,7 @@ export async function generate_audit_report(): Promise<AuditReport> {
 	// actually sees. Their difference is the pattern's listing drift.
 	const pattern_coverage: PatternCoverage[] = PATTERNS.map((pattern) => {
 		const claimed = pattern.fixtures || [];
-		// Fixtures the pattern claims that are documented in conformance_prettier.md
+		// Fixtures the pattern claims that are documented in the conformance_prettier*.md family
 		const documented_in_claimed = claimed.filter((f) => documented_paths.has(f));
 		// Fixtures the pattern claims that aren't documented (orphaned at pattern level)
 		const undocumented_in_claimed = claimed.filter((f) => !documented_paths.has(f));

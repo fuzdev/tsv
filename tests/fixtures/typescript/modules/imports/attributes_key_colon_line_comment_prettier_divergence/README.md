@@ -30,4 +30,4 @@ Prettier instead crosses the `:` and hangs the comment leading the value
 pins — distinct from the trailing float it applies to input's authoring
 (`output_prettier.svelte`).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

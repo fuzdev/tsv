@@ -41,4 +41,4 @@ half even though it is not the oracle for placement. In `B2` prettier likewise k
 run inside the parens on its own line; it differs only by exploding the inner union,
 the layout difference `union_intersection_retained_paren_line_comment` already records.
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

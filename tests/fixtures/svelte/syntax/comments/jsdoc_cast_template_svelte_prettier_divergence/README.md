@@ -11,7 +11,7 @@ through a path that **strips** the cast (see `output_prettier.svelte`: `{x}`,
 they are semantically required (without them the assertion is dropped). This is
 narrower than the `<script>` JS-vs-TS split: in a template prettier strips even a
 plain (JS) component. See
-[conformance_prettier.md §JSDoc / paren semantics](../../../../../../docs/conformance_prettier.md#jsdoc--paren-semantics).
+[conformance_prettier_ts_comments.md §JSDoc / paren semantics](../../../../../../docs/conformance_prettier_ts_comments.md#jsdoc--paren-semantics).
 
 **Parser (vs Svelte).** Svelte parses template expressions with
 `preserveParens: true`, then `remove_parens` discards the wrapper **and its

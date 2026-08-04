@@ -39,6 +39,6 @@ bare authoring.
 
 The comment is preserved and stable on the first pass; the block-style layout is tsv's
 standing choice for a block whose body renders multiline. See
-[conformance_prettier.md §Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks)
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks)
 and
 [conformance_prettier.md §Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy).

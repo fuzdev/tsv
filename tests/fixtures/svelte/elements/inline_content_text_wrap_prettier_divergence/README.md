@@ -20,4 +20,4 @@ the closing `>` — even for plain text; tsv keeps both tags intact and lays out
 readability. `unformatted_ours_compact` (a single-line authoring) normalizes to this form under tsv
 in one pass.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

@@ -31,5 +31,5 @@ The same-gap **block** comment is
 two line comments in this gap leave prettier with no fixed point at all
 ([mapped_bracket_colon_multi_comment](../mapped_bracket_colon_multi_comment_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Uniform Forced-Continuation Indent.

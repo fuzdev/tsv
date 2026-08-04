@@ -15,6 +15,6 @@ This is the member-followed sibling of
 (the bare `(x + y /* c */)!`, which goes through the non-chain path).
 
 Reason: comment preservation. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Non-null grouped operand) and §Comment Position
 Philosophy.

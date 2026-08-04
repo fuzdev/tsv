@@ -23,4 +23,4 @@ still hangs the operand on its own line — a **glued** multiline block collapse
 inline ([keyword_value_glued_multiline_block_comment](../keyword_value_glued_multiline_block_comment/)).
 Covers `keyof`, `typeof` (a `TypeQuery` node), and `readonly`.
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

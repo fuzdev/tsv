@@ -44,7 +44,8 @@ Comment placement is a deliberate authoring choice and tsv preserves it. This is
 and the attribute-list
 [comment_same_line](../../../../svelte/attributes/comment_same_line_prettier_divergence/)
 divergences — a same-line `//` stays trailing its token. See
-[conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy).
+[conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy);
+cataloged in [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
 
 ## Related
 

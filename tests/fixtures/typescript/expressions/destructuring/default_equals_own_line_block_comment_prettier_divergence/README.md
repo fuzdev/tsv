@@ -30,5 +30,5 @@ collapses to after the `=` under tsv, before it under prettier. The same-gap
 **line** comment (which forces the break → continuation indent) is
 [default_equals_line_comment](../default_equals_line_comment_prettier_divergence/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

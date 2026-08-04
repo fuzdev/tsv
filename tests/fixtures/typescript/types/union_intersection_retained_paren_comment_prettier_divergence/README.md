@@ -14,4 +14,4 @@ so tsv associates it with that member rather than hoisting it to the surrounding
 union/intersection. Contrast `union_intersection_parens_comment`, where the parens
 are redundant and stripped, so both formatters agree.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

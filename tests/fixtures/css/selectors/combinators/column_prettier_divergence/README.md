@@ -11,4 +11,4 @@ Parser compat. Svelte's CSS parser requires spaces around `||` — without them 
 fails with "Expected a valid CSS identifier". tsv prioritizes Svelte
 compatibility. CSS Selectors Level 4 marks the column combinator as "At Risk".
 See
-[conformance_prettier.md §CSS: Selectors](../../../../../../docs/conformance_prettier.md#css-selectors).
+[conformance_prettier_css.md §CSS: Selectors](../../../../../../docs/conformance_prettier_css.md#css-selectors).

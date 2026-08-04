@@ -31,7 +31,7 @@ as the other acorn comment-attachment divergences. See
 User comments are valuable and shouldn't be silently removed; they are syntactically valid
 in these positions. prettier-plugin-svelte prints these binding patterns from a
 comment-blind path and drops them. See
-[conformance_prettier.md §Svelte: destructuring binding-pattern comments](../../../../../../docs/conformance_prettier.md#svelte-destructuring-binding-pattern-comments).
+[conformance_prettier_svelte.md §Svelte: destructuring binding-pattern comments](../../../../../../docs/conformance_prettier_svelte.md#svelte-destructuring-binding-pattern-comments).
 
 ## Related
 

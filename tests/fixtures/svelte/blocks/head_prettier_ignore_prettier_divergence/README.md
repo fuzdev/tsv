@@ -20,11 +20,11 @@ under the placement floor, so following the relocation would lose the freeze on 
 pass. The geometry is the block head's existing broken form — the head expression indented on
 its own line, the `}` dangling below — which tsv already takes whenever a leading line comment
 breaks the head, and which prettier already diverges from independently (see
-[Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks)).
+[Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks)).
 
 A sibling block the freeze does not reach still normalizes.
 
 ## Reason
 
 Rule A binds a directive to the node that follows it; ◆comment_preservation. See
-[conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

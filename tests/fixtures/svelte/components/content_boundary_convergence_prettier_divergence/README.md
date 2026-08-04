@@ -16,4 +16,4 @@ own indented line — which is also the form prettier keeps stable when it is gi
 Supersedes the former `hug_start_only`, `hug_end_only`, and `hug_neither` fixtures, which pinned one
 tsv output per authoring.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

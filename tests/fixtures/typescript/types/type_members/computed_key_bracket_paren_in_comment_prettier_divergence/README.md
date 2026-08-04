@@ -11,4 +11,4 @@ the param list (a delimiter-scan robustness case). Both positions are dual-stabl
 
 ## Reason
 
-Comment relocation (comment position) — see [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+Comment relocation (comment position) — see [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

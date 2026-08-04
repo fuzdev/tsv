@@ -35,4 +35,4 @@ The divergent set is exactly this ASCII C0 pair. NBSP (U+00A0) and the other
 non-ASCII Unicode spaces are preserved by tsv (matching prettier), so they do not
 belong to this class.
 
-See [conformance_prettier.md §CSS: Selectors](../../../../../docs/conformance_prettier.md#css-selectors).
+See [conformance_prettier_css.md §CSS: Selectors](../../../../../docs/conformance_prettier_css.md#css-selectors).

@@ -29,5 +29,5 @@ The object face of the after-`]` separator gaps: the index-signature sibling is
 [computed_key_bracket_line_comment](../../../statements/class/computed_key_bracket_line_comment_prettier_divergence/),
 and the own-line **block** sibling is
 [computed_key_bracket_colon_own_line_block_comment](../computed_key_bracket_colon_own_line_block_comment_prettier_divergence/).
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

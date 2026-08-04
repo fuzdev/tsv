@@ -34,4 +34,4 @@ keeps the binding local and predictable; trailing usage does not appear in real
 corpora, only in prettier's own test suite. A trailing directive that reformats
 normally cannot silently freeze or misbind an adjacent member.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

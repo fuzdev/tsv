@@ -2,7 +2,7 @@
  * Behavioral fixture-coverage audit for divergence patterns.
  *
  * `validation.ts`'s bookkeeping half cross-references each pattern's
- * hand-maintained `fixtures: []` array against `conformance_prettier.md` — it
+ * hand-maintained `fixtures: []` array against the `conformance_prettier*.md` family — it
  * never runs `detect()` for THAT question. A pattern that silently stopped
  * matching its claimed fixture keeps that cross-reference green. This test
  * closes the drift gap by exercising every detector against its own committed

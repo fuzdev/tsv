@@ -277,7 +277,7 @@ impl<'a> Printer<'a> {
     /// **outside** the pair instead of between them. Printed from the enclosing gap
     /// instead (prettier's model, and its bug), that paren separates the two and the
     /// cast silently re-binds to the wider expression on reparse. See
-    /// `docs/conformance_prettier.md` §JSDoc / paren semantics.
+    /// `docs/conformance_prettier_ts_comments.md` §JSDoc / paren semantics.
     ///
     /// A **nested** cast's comment lands the same way — the inner `JsdocCast` prints
     /// its own (`/** @type {A} */ (/** @type {B} */ (expr))`) — so the interior gap
@@ -503,7 +503,7 @@ impl<'a> Printer<'a> {
         // inline (`</* c */ T>`, `<T /* c */>`, `<T>/* c */ expr`); a `//` runs to
         // end-of-line, so it forces the cast to break — and where prettier relocates
         // it across the `<`/`>` boundary, tsv preserves position. See
-        // conformance_prettier.md §Comment relocation (Angle-bracket type assertion)
+        // conformance_prettier_ts_comments.md §Comment relocation (Angle-bracket type assertion)
         // and the `type_assertion_line_comment` /
         // `type_assertion_close_own_line_comment` divergence fixtures.
         let cast_doc = if self.has_line_comments_between(angle_end, type_start)
@@ -611,7 +611,7 @@ impl<'a> Printer<'a> {
     /// relocates it to its own line); own-line comments after `<` sit on their own
     /// lines; a trailing-type `T // c` stays on the type line and an own-line
     /// comment before `>` keeps its own line (`build_trailing_comments_multiline`).
-    /// See conformance_prettier.md §Comment relocation (Angle-bracket type assertion).
+    /// See conformance_prettier_ts_comments.md §Comment relocation (Angle-bracket type assertion).
     ///
     /// Positions are the caller's already-computed cast boundaries, in source order:
     /// `open_pos` is the `<`, `type_start`/`type_end` bound the type, `close_angle`
@@ -1259,7 +1259,7 @@ impl<'a> Printer<'a> {
         //
         // Applies to every operator family. A logical operator used to be excluded here,
         // which left a parenthesized logical base breaking its operands where the
-        // arithmetic one held them together — see conformance_prettier.md §TypeScript
+        // arithmetic one held them together — see conformance_prettier_ts.md §TypeScript
         // (Parenthesized binary member base).
         if operands.len() == 2 {
             return d.group(d.concat(&[

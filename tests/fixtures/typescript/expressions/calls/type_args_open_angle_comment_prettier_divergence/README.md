@@ -52,4 +52,4 @@ Before this, the comment was dropped entirely (a content-loss bug — the
 expression path lacked the leading-`<` line-comment detection, so the comment
 fell through to the block-comment-only group path).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -18,4 +18,4 @@ star — the delimiter scan skips comment contents. The after-`*` position
 Per comment placement policy, the user's chosen position is preserved when
 prettier moves comments to different positions.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

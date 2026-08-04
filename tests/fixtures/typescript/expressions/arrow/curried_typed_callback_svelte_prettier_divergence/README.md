@@ -31,4 +31,4 @@ The `<T>` sits on its own line, above the body lines, so the comma does not affe
 wrapping. `output_prettier.svelte` records prettier's forced-comma output.
 
 Reason: **Design choice** (formatter). See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §TypeScript.
+[conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md) §TypeScript.

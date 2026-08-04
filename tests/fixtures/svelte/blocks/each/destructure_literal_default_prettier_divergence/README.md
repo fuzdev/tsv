@@ -24,4 +24,4 @@ Both formatters space the object braces; the divergence is solely the literal to
 so literal defaults get the same `singleQuote` + numeric normalization as every other
 literal tsv emits (matching `{@const}`). prettier-plugin-svelte prints the pattern from
 raw source, normalizing neither quotes nor numbers. See
-[conformance_prettier.md §Svelte: destructuring literal normalization](../../../../../../docs/conformance_prettier.md#svelte-destructuring-literal-normalization).
+[conformance_prettier_svelte.md §Svelte: destructuring literal normalization](../../../../../../docs/conformance_prettier_svelte.md#svelte-destructuring-literal-normalization).

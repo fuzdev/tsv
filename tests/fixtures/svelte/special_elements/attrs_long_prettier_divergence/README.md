@@ -16,4 +16,4 @@ as a regular one, so it converges on the same block-style form
 `prettier_variant_dangle` is prettier's stable form; the `unformatted_ours_*` variants are other
 authorings tsv converges on `input` and prettier does not.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

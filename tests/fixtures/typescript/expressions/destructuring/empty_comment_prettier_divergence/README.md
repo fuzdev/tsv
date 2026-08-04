@@ -22,5 +22,5 @@ and type-literal
 ([literal_body_empty](../../../types/comments/literal_body_empty_prettier_divergence/))
 forms.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md)
 §Empty-object comment bracket spacing.

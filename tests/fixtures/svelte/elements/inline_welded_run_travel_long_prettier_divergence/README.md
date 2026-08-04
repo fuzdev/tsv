@@ -59,4 +59,4 @@ only on the `real` corpus tier.
 Design choice: "unbreakable inside" is not "immovable" — the unit spends the render-free boundary
 in front of it rather than standing and overrunning, and tsv lays wrapping inline content out
 block-style where prettier dangles the tag delimiters.
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

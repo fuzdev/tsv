@@ -25,7 +25,7 @@ no operator respacing, which would otherwise corrupt comment content
 (`/* a-b */` must not become `/* a - b */`). Prettier likewise skips An+B
 normalization when a comment is present, so the verbatim forms match (this part
 is not a divergence). See
-[conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
+[conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments).
 
 ## Related
 

@@ -31,5 +31,5 @@ The variable-declarator face of the cross-construct before-`=` initializer line
 comment (also enum members and class properties). Unlike the before-`:`
 [continuation indent](../binding_key_colon_line_comment_prettier_divergence/)
 (where prettier keeps the continuation flush), prettier here moves the comment
-entirely. See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+entirely. See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.
