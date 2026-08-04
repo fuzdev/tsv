@@ -15,4 +15,4 @@ content loss — a line comment trailing `(` must be preserved, not dropped. Whe
 the author writes the comment on its own line, both formatters keep it there —
 the two positions are dual-stable.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation (Call open paren `(`).
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation (Call open paren `(`).

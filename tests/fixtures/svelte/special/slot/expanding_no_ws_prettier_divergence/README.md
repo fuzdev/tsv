@@ -14,4 +14,4 @@ to keep the content glued to the tags and, having nowhere to put the content, da
 delimiters — `<slot⏎\t>{#if cond}text{/if}</slot⏎>`. `prettier_variant_dangle` is that form, which
 prettier keeps stable and tsv normalizes to `input`.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

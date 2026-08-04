@@ -34,4 +34,4 @@ the bracket drops to the next line — otherwise the comment would swallow `[i]`
 Preserving also keeps two comments in the same gap **distinct and in order**;
 prettier's hoist reorders them (case `b`).
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

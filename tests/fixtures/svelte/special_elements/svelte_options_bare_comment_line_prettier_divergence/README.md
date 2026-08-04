@@ -30,7 +30,7 @@ keeps its own line.
 A comment is content; deleting it is content loss. See
 [conformance_prettier.md §Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy)
 and the catalog entry in
-[§Svelte: Attributes](../../../../../docs/conformance_prettier.md#svelte-attributes).
+[§Svelte: Attributes](../../../../../docs/conformance_prettier_svelte.md#svelte-attributes).
 
 ## Related
 

@@ -33,4 +33,4 @@ intersection. tsv previously **dropped** this comment (content loss — it
 collapsed the member inline, where a leading line comment cannot go); preserving
 it is the fix.
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

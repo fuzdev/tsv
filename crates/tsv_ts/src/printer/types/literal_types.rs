@@ -124,7 +124,7 @@ impl<'a> Printer<'a> {
                 // as a negative literal type only when the next token is a numeric/bigint
                 // literal, so prettier's comment-holding parens fail to re-parse. The
                 // in-place comment stays valid because that lookahead skips trivia.
-                // See docs/conformance_prettier.md §Comment relocation.
+                // See docs/conformance_prettier_ts_comments.md §Comment relocation.
                 //
                 // Glued, unlike the `Adjacent` its update-expression sibling uses
                 // (`build_update_doc`): that gap HAS a prettier oracle and prettier keeps

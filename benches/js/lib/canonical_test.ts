@@ -99,7 +99,7 @@ Deno.test(
 			// pins that canonical baseline behavior — the corpus comparison depends on it. tsv
 			// itself diverges here, emitting the bare `<T>` (it has no JSX, and Svelte's parser
 			// accepts the bare form); see the single_type_param_prettier_divergence fixture and
-			// docs/conformance_prettier.md §TypeScript.
+			// docs/conformance_prettier_ts.md §TypeScript.
 			const out = await impl.format_async(
 				'<script lang="ts">\n\tconst f = <T>(x: T) => x;\n</script>\n',
 				'svelte'

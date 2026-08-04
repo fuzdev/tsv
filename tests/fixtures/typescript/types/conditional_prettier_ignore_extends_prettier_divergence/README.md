@@ -21,4 +21,4 @@ second pass reformats the type and floats the directive to trail it
 classification, so the authored own-line placement is the only form that holds the
 freeze — for the author, and across tsv's second pass.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

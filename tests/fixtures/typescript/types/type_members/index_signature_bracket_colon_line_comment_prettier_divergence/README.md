@@ -29,5 +29,5 @@ EOL, so the value `:` must drop to its own line; otherwise it would swallow
 the sibling
 [index_signature_bracket_colon_own_line_block_comment](../index_signature_bracket_colon_own_line_block_comment_prettier_divergence/).
 Same preserve-comment-position rule as elsewhere —
-see [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+see [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

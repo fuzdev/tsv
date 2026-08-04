@@ -21,4 +21,4 @@ part of the value) and normalizes only the `A±B` interior spacing, uniform with
 dedicated `:nth-child()` path. A leading `-` does not diverge (both formatters keep
 `-n + 3` glued, since `-` is unambiguously the sign of a negative coefficient); only the
 `+` sign is read differently by prettier. See
-[conformance_prettier.md §CSS: Selectors](../../../../../../docs/conformance_prettier.md#css-selectors).
+[conformance_prettier_css.md §CSS: Selectors](../../../../../../docs/conformance_prettier_css.md#css-selectors).

@@ -43,5 +43,5 @@ Output stays valid CSS and is a fixed point in both formatters; the divergence
 is one of scope, not correctness.
 
 See
-[conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules)
+[conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules)
 (`SCSS directive preludes`, Design choice).

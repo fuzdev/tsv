@@ -19,5 +19,5 @@ pinned in call type-argument position. Prettier ≤3.9.4 additionally broke the
 whole `<…>` list onto its own indented lines for the line-comment body where tsv
 hugged; prettier 3.9.5 converged on the hug, leaving only the bracket spacing.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md)
 §Empty-object comment bracket spacing.

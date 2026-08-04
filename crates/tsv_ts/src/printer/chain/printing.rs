@@ -63,7 +63,7 @@ pub(crate) fn print_node_inner<'a>(
                         // logical base used to skip this wrapper and break at its own
                         // operators instead, welding the closing `).member` onto the last
                         // operand — a third layout matching neither tsv's arithmetic shape
-                        // nor prettier's. See conformance_prettier.md §TypeScript
+                        // nor prettier's. See conformance_prettier_ts.md §TypeScript
                         // (Parenthesized binary member base).
                         hang(printer.build_binary_chain_for_parens(binary))
                     }

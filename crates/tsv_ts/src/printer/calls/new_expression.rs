@@ -749,7 +749,7 @@ impl<'a> Printer<'a> {
         // the author's placement and source order (divergence from prettier,
         // which floats a line comment past the statement and relocates a block
         // before `(`). Also fixes content loss: a line comment trailing `(` was
-        // previously dropped. See conformance_prettier.md §Comment relocation.
+        // previously dropped. See conformance_prettier_ts_comments.md §Comment relocation.
         if has_leading_comments {
             let first_arg_start = new_expr.arguments[0].span().start;
             let gap_pc = PartitionedComments::new(

@@ -44,4 +44,4 @@ Two deliberate choices, both shared with the HTML-element sibling and the wide-e
    after the preceding word it packs there. This matches prettier's greedy fill and is the same
    pairwise measurement the HTML-element sibling relies on. ◆design_choice.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

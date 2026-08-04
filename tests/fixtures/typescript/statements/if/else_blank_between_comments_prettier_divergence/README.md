@@ -44,4 +44,4 @@ a blank above the first comment in the **header→body** gap is dropped by both 
 `variant_collapsed.svelte` (prettier's form) is dual-stable: tsv keeps it as-is, so an
 already-prettier-formatted file does not churn.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §"No blank above a body block's `{`".
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §"No blank above a body block's `{`".

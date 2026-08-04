@@ -59,5 +59,5 @@ the comment is its own fill item — is
 `fill_break_before_comment_spaced_long_prettier_divergence`. The two shapes share one boundary and
 one rule; only what sits on the comment's *far* side differs.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)
 for the render-free boundary rule the first paragraph rests on.

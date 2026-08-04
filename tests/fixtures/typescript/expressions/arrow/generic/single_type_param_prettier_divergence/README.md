@@ -24,4 +24,4 @@ are unaffected — prettier never forces the comma for those, and tsv matches.)
 accepted: bare `<T>` is the correct canonical form for a non-JSX formatter.
 
 Reason: **Design choice**. See
-[conformance_prettier.md](../../../../../../../docs/conformance_prettier.md) §TypeScript.
+[conformance_prettier_ts.md](../../../../../../../docs/conformance_prettier_ts.md) §TypeScript.

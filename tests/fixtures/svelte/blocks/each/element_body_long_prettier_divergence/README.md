@@ -16,7 +16,7 @@ prettier's hug back to `input.svelte` in one pass.
 
 tsv expands a wrapped/overflowing block's body uniformly across all block heads and body
 shapes (one-pass `conditional_group`, no breakable special-case). See
-[conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

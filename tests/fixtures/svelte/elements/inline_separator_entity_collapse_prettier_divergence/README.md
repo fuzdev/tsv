@@ -14,7 +14,7 @@ collapses that run to one space, and the result is byte-identical to the literal
 Letting the entity pick a different layout is a bug against rule 1 rather than a divergence from
 prettier — prettier converges neither authoring, so it is no oracle here and the bar is
 tsv-vs-tsv consistency. See
-[§Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[§Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
 
 **The entity's own bytes are never rewritten.** tsv converges the *layout*, not the source: `&#9;`
 stays `&#9;` in every form below, because respelling an entity is a content edit. That is the whole

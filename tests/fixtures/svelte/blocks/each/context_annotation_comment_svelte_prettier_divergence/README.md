@@ -44,7 +44,7 @@ destructure-pattern fixtures. See
 User comments are valuable and shouldn't be silently removed; they are
 syntactically valid here. prettier-plugin-svelte prints the block head from a
 comment-blind path and drops them. See
-[conformance_prettier.md §Svelte: destructuring binding-pattern comments](../../../../../../docs/conformance_prettier.md#svelte-destructuring-binding-pattern-comments).
+[conformance_prettier_svelte.md §Svelte: destructuring binding-pattern comments](../../../../../../docs/conformance_prettier_svelte.md#svelte-destructuring-binding-pattern-comments).
 
 ## Related
 

@@ -45,4 +45,4 @@ everywhere a value boundary is trimmed, so the non-ASCII space survives as conte
 `input.svelte` is tsv's inline form; `output_prettier.svelte` is prettier's split
 form.
 
-See [conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values).
+See [conformance_prettier_css.md §CSS: Values](../../../../../../docs/conformance_prettier_css.md#css-values).

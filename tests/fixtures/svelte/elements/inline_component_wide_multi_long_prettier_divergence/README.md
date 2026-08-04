@@ -17,4 +17,4 @@ Print width. tsv treats printWidth as a hard limit and keeps each component inta
 splitting its attributes/closing `>`, so an over-wide component goes to its own line.
 The boundary before each component is a collapsible space, so the word before it stays
 on the text line. See
-[conformance_prettier.md §Svelte: Elements (Wide inline child own-line)](../../../../../docs/conformance_prettier.md#svelte-elements).
+[conformance_prettier_svelte.md §Svelte: Elements (Wide inline child own-line)](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

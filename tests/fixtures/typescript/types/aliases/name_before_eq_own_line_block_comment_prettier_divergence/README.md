@@ -23,5 +23,5 @@ type-alias face of the before-`=` family
 [enum member](../../../declarations/enum/member_before_eq_own_line_block_comment_prettier_divergence/)),
 taking the same relocate-and-hang outcome as the declarator.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

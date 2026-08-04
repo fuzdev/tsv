@@ -29,4 +29,4 @@ pinned as `variant_promoted.svelte`, not the canonical input.
 Per Comment Position Philosophy, tsv keeps an own-line comment with the statement
 the author wrote it under rather than promoting it across the statement boundary.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

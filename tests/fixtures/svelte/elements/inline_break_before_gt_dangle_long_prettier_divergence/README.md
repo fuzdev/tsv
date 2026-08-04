@@ -22,4 +22,4 @@ authoring (tsv → `input.svelte`, prettier → a dangled form, never `input.sve
 Design choice. An opening tag never sits at a line end after a space; the closing-`>` dangle
 is the render-safe way to give the second element's opening tag its own line when the two are
 glued. Render-free under Svelte 5 (whitespace boundary) / tag-internal (the `>` move).
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

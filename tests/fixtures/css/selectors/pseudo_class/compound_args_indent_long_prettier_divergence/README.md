@@ -18,4 +18,4 @@ a flat node count, so a single compound's pseudo args sit one level in and the `
 aligns with the selector it closes. A combinator-bearing selector still indents its
 continuation (matching prettier) — see
 [combinators/pseudo_args_long](../../combinators/pseudo_args_long/). See
-[conformance_prettier.md §CSS: Selectors](../../../../../../docs/conformance_prettier.md#css-selectors).
+[conformance_prettier_css.md §CSS: Selectors](../../../../../../docs/conformance_prettier_css.md#css-selectors).

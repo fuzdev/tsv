@@ -28,4 +28,4 @@ This is the intersection analog of the whole-RHS
 the pure-line counterpart keeps the same trail-on-`=` canonical
 ([intersection_leading_line_comment](../intersection_leading_line_comment_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

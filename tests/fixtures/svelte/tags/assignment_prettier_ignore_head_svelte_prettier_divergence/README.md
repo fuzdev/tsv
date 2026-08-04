@@ -27,7 +27,7 @@ discards the wrapper's `leadingComments` (below) **deletes the directive
 outright**, so `output_prettier.svelte` carries neither the comment nor the freeze
 — content loss, not a layout difference. tsv keeps the directive on the line the
 author gave it, freezes the interior, and leaves the parens outside the slice. See
-[conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).
 
 **Parser (vs Svelte).** The parens make this the sanctioned paren-attachment
 case: Svelte parses template expressions with `preserveParens: true` and then

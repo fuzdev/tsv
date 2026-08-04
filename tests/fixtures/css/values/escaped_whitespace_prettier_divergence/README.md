@@ -57,4 +57,4 @@ spec-over-prettier where the two disagree.
 `output_prettier.svelte` pins prettier's corrupt output; `input.svelte` is tsv's
 stable form.
 
-See [conformance_prettier.md §CSS: Values](../../../../../docs/conformance_prettier.md#css-values).
+See [conformance_prettier_css.md §CSS: Values](../../../../../docs/conformance_prettier_css.md#css-values).

@@ -167,7 +167,7 @@ impl<'a> Printer<'a> {
         // line when the body expands (divergence from prettier, which relocates it
         // to its own line as the body's leading comment). Only when there's no
         // hoisted outer content (which would already occupy the first body line).
-        // See conformance_prettier.md §Comment relocation (Block body `{`).
+        // See conformance_prettier_ts_comments.md §Comment relocation (Block body `{`).
         let first_stmt_start = block.body[0].span().start;
         let (brace_line_prefix, delimiter_pull_pos) = if has_leading {
             (DocBuf::new(), None)

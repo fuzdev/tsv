@@ -36,4 +36,4 @@ splicing an already-reformatted member onto the last line of an opaque verbatim
 block. A single-line frozen member keeps the width-decided layout (matching prettier
 — see the ordinary `union_prettier_ignore_first_member` fixture).
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

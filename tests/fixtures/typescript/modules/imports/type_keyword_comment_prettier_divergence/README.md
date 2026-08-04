@@ -32,4 +32,4 @@ Per Comment Position Philosophy, the user's chosen position is preserved. The
 non-empty counterpart of `empty_type_keyword_comment_prettier_divergence` (empty
 `{}`, where prettier instead relocates after `from`).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

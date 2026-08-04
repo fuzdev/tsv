@@ -18,4 +18,4 @@ The comment's own interior lines are left flush — tsv never re-indents a comme
 Prettier keeps the break but relocates every export-all header comment to after `from`,
 before the source, and leaves the continuation flat.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

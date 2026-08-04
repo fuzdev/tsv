@@ -10,4 +10,4 @@ Per comment placement policy, the user's chosen position is preserved.
 Both positions are dual-stable in our formatter.
 
 Reason: Comment relocation (comment position). See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

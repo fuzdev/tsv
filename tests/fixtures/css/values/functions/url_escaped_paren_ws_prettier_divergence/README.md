@@ -20,4 +20,4 @@ divergence lives only in `prettier_variant_outer_ws` — a form prettier keeps s
 tsv normalizes to `input`. Surfaced on Prettier's own corpus by
 `tests/format/css/url/url.css` (its `content: url(  …\(\(.jpg  )` lines).
 
-See [conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values).
+See [conformance_prettier_css.md §CSS: Values](../../../../../../docs/conformance_prettier_css.md#css-values).

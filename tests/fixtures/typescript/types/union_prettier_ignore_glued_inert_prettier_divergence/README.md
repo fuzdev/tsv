@@ -20,4 +20,4 @@ following construct only when it is alone on its line. Glued placements do not
 appear in real corpora, and the one-sentence rule is more predictable than
 prettier's placement-dependent scope changes.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

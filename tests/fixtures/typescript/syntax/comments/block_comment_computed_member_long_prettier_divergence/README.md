@@ -35,4 +35,4 @@ Prettier is also not idempotent on this pattern — the first pass keeps the com
 brackets, the second pass hoists it. tsv is stable in one pass.
 
 Reason: Comment relocation (comment position). See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

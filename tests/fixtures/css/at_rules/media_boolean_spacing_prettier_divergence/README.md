@@ -9,7 +9,7 @@ CSS Media Queries Level 4 §3 requires whitespace between a boolean keyword and 
 
 ## Reason
 
-See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) for the spec basis. Prettier normalizes this for `@supports` but not `@media`:
+See [conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules) for the spec basis. Prettier normalizes this for `@supports` but not `@media`:
 
 | At-rule      | `and(...)` input      | Prettier output       |
 | ------------ | --------------------- | --------------------- |

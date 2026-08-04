@@ -21,4 +21,4 @@ at the keyword→binding position. The C-style `for` and standalone declarations
 *agree* with prettier at this position (both indent the declarator continuation),
 so only for-of/for-in diverges.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

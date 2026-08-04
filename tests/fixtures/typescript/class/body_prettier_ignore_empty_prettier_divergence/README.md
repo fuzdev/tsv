@@ -16,5 +16,6 @@ relocates the directive into the body there and freezes the first member.
 ## Reason
 
 ◆prettier_bug — prettier crashes on valid input that tsv formats stably. See
-[conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive)
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive)
+(cataloged in [conformance_prettier_ts.md §Prettier rejects valid input](../../../../../docs/conformance_prettier_ts.md#prettier-rejects-valid-input), where prettier's own assertion firing is the divergence)
 and §"Prettier rejects valid input".

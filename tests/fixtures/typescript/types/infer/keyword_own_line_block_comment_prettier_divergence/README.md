@@ -20,4 +20,4 @@ can't inline — [keyword_line_comment](../keyword_line_comment_prettier_diverge
 or an **own-line multiline** block comment still hangs the inferred name on its own line (a glued multiline block collapses inline).
 Covers the bare inferred name and the `extends`-constrained form.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

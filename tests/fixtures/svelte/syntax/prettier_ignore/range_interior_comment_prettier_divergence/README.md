@@ -43,5 +43,5 @@ lands: a **dual-stable** form, since tsv keeps it too once the comment is alread
 The ordinary hoist — a section inside a range, no comment — matches prettier and needs no
 divergence: see the sibling [range_section_hoist](../range_section_hoist/).
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive)
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive)
 and [§Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy).

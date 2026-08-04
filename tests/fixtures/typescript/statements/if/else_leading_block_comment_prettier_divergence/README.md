@@ -18,4 +18,4 @@ comment on its own line. Consistent with tsv's handling of own-line comments
 before `else` ([else_block_own_line_comment](../else_block_own_line_comment/)) and
 across other control flow statements (try/catch, while, do-while, switch).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

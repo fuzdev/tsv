@@ -39,5 +39,5 @@ the `=`: the value side already hangs a broke-after multiline block
 before the `=`. The declarator face is
 [declarator_before_eq_multiline_block_break](../../../declarations/variable/declarator_before_eq_multiline_block_break_prettier_divergence/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

@@ -20,4 +20,4 @@ Prettier instead relocates the comment into the braces (as the specifier's trail
 comment for `from`→source and specifiers→`from`, as a leading comment for
 keyword→`{`), expanding them.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

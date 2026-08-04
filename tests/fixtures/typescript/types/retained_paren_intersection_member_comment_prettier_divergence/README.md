@@ -40,4 +40,4 @@ closer when it breaks, and as the union shell's `)`, so the shell's closer sits
 in one place whether or not the object stayed flat. Every position is
 dual-stable in our formatter.
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

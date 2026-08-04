@@ -21,4 +21,4 @@ is covered by the sibling `.svelte` fixtures.
 
 ## Reason
 
-Prettier bug. See [conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values) ("Empty value + `!important`").
+Prettier bug. See [conformance_prettier_css.md §CSS: Values](../../../../../../docs/conformance_prettier_css.md#css-values) ("Empty value + `!important`").

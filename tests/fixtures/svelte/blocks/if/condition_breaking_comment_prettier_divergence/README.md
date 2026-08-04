@@ -31,7 +31,7 @@ Boundary shapes covered:
 
 ## Reason
 
-See [conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks)
+See [conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks)
 for the head-wrap + `}` dangle + body-expand model and why tsv diverges (consistent with its
 JS `if (⏎…⏎) {` and broken-element `>`; block-body whitespace is render-non-significant).
 

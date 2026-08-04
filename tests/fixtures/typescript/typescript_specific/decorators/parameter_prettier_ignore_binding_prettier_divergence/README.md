@@ -23,4 +23,4 @@ one it can reproduce: a name-trailing directive is inert under the placement
 classification, so prettier's relocated form would lose the freeze on tsv's second
 pass.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

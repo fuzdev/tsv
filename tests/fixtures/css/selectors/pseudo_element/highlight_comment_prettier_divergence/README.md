@@ -23,7 +23,7 @@ Stable quirk. tsv registers these gap comments at parse time and re-emits them
 through `comments_in_range`, so the spacing normalizes uniformly — the same doc
 path used for `::part()`/`::slotted()`/`:is()` argument comments. Prettier
 preserves the source whitespace instead. See
-[conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
+[conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments).
 
 ## Related
 

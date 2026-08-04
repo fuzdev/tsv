@@ -3,7 +3,7 @@
 // The single source of the `trailingComma: 'none'` comment-position contract for
 // inline (group-based) element lists: block comments before the comma stay before
 // it, a block comment after the comma on the last element is preserved in place
-// (prettier relocates it before — see conformance_prettier.md §Comment relocation),
+// (prettier relocates it before — see conformance_prettier_ts_comments.md §Comment relocation),
 // and line comments go after the comma via `line_suffix` (zero width). Shared by
 // the object/array destructuring-pattern builders and the object-literal builder
 // so the ordering can't drift between them.
@@ -26,7 +26,7 @@ pub(in crate::printer) struct TrailingComments<'a> {
     /// element's after-comma block is included here too: with no trailing comma
     /// emitted (trailingComma: 'none') the last comma is `d.empty()`, so before- and
     /// after-comma blocks both trail the element in one run (prettier relocates an
-    /// after-comma block before the comma; see conformance_prettier.md).
+    /// after-comma block before the comma; see conformance_prettier_ts_comments.md).
     block: SmallVec<[&'a Comment; 2]>,
     /// Line comments that go after the comma (in line_suffix)
     line: SmallVec<[&'a Comment; 2]>,
@@ -67,7 +67,7 @@ impl<'a> Printer<'a> {
         // Collect same-line trailing comments. A block comment after the comma
         // normally belongs to the next element as leading — except on the LAST
         // element, where it is preserved after the comma (prettier relocates it
-        // before — see conformance_prettier.md §Comment relocation). With no trailing
+        // before — see conformance_prettier_ts_comments.md §Comment relocation). With no trailing
         // comma emitted, a last element's after-comma block trails the element in the
         // same run as its before-comma blocks, so all same-line blocks collect into
         // one source-ordered `block` (the comma between them is `d.empty()`).

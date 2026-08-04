@@ -23,4 +23,4 @@ A redundant paren wrapping the value type with the line comment inside
 point — the `unformatted_ours_single_paren` / `unformatted_ours_double_parens`
 variants verify the paren form is idempotent too.
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

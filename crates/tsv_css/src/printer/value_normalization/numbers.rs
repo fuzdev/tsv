@@ -131,7 +131,7 @@ ascii_keyword_set! {
 /// `<frequency>` unit; `1Hz` serializes as `1hz`). This lowercases the frequency units
 /// `Hz`/`kHz` and the quarter-millimeter `Q` along with everything else (`10HZ`→`10hz`,
 /// `10Q`→`10q`), a deliberate divergence from prettier — which upcases those three to
-/// their prose spelling. See `docs/conformance_prettier.md` §"Unit serialization case"
+/// their prose spelling. See `docs/conformance_prettier_css.md` §"Unit serialization case"
 /// and the `units_serialize_case_prettier_divergence` fixture.
 ///
 /// An already-lowercase unit is canonical and borrows unchanged. An **unknown** unit

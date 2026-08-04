@@ -31,6 +31,6 @@ prettier relocates (A to its own line, D up to the key type) or keeps flush (C),
 tsv holds each comment where it was written and indents forced continuations one
 level. Prettier is non-idempotent on A and D (its first-pass `output_prettier.svelte`
 converges over two passes — pinned by `audit_signature.txt`). See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation, §Uniform forced-continuation indent, and §Comment Position
 Philosophy.

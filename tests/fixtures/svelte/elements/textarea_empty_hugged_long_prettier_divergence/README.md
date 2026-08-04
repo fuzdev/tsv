@@ -16,4 +16,4 @@ straddle a real boundary, just tsv's.
 
 `prettier_variant_label_dangle` is prettier's stable form (tsv normalizes it to `input`).
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

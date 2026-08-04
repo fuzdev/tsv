@@ -37,7 +37,7 @@ boundary run — extra spaces, tabs, newlines — to a single kept space.
 Svelte-mirror whitespace: whenever tsv keeps content inline, every whitespace character
 in the output is one the compiler keeps — a space belongs *between* sibling nodes, never
 inside a content boundary. See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
 
 ## Related
 

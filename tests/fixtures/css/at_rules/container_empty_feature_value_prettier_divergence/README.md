@@ -24,7 +24,7 @@ gained a space (`(a: )`) while `(a: )` had that space stripped back before the `
 `)`, so `(a: )` is a stable fixed point — matching how tsv normalizes the non-empty
 case (`(min-width:100px)` → `(min-width: 100px)`).
 
-See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules).
+See [conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules).
 
 ## Fixture Structure
 

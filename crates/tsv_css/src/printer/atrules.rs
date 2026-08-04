@@ -272,7 +272,7 @@ impl<'a> Printer<'a> {
                 // root `)` and `to`, between `to` and the limit `(`, and after the last `)`
                 // before the block `{` — re-emit their comments here too, normalized to a
                 // single space on each side (prettier freezes the source spacing; a
-                // cataloged divergence — see conformance_prettier.md §CSS: Comments).
+                // cataloged divergence — see conformance_prettier_css.md §CSS: Comments).
                 //
                 // Right bound of the pre-`{` gap. A block-less `@scope` isn't valid CSS,
                 // but fall back to the rule's `;` end so the range stays well-formed.
@@ -471,7 +471,7 @@ impl<'a> Printer<'a> {
     /// break at the `and`/`or` boundaries — the keyword stays on line 1, the
     /// condition wraps to line 2 — with the trailing ` {` reserved so the boundary
     /// breaks at print width. tsv wraps where prettier never does (a deliberate,
-    /// cataloged divergence — see conformance_prettier.md §CSS: At-Rules):
+    /// cataloged divergence — see conformance_prettier_css.md §CSS: At-Rules):
     /// ```css
     /// @supports (display: grid) and (transform: rotate(45deg)) and (filter: blur(5px)) and
     ///     (flex: 1aaa) {

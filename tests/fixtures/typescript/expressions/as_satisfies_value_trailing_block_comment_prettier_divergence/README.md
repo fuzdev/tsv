@@ -32,4 +32,4 @@ other prefix / hang sites (`keyof`, mapped, `: T`, `is`, type-param, conditional
 `extends`) keep a trailing block **inline** at a type position, so they are already
 idempotent — only the two value-position casts need this.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

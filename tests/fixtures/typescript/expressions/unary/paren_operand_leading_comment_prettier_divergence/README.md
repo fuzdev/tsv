@@ -22,6 +22,6 @@ prettier keeps the single pair too (`!(/* c */ x as T)`), so tsv matches — see
 regular fixture [type_assertion_operand_leading_comment](../type_assertion_operand_leading_comment/).
 
 Reason: comment preservation. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Unary conditional/arrow-operand leading comment) and
 §Comment Position Philosophy.

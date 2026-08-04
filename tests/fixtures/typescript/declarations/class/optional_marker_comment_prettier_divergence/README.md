@@ -21,4 +21,4 @@ formatters — see `declarations/class/optional_marker_before_comment`. A class
 is also a match (prettier preserves it) — see
 `statements/class/property_modifier_type_comment`.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

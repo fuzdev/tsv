@@ -37,4 +37,4 @@ directive is not, and honoring it would
 require the same backward/sideways binding ambiguity the trailing-member case
 (`union_prettier_ignore_trailing_inert`) already refuses.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

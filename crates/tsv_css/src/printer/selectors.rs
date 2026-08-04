@@ -27,7 +27,7 @@
 // on a flat `nodes.length > 2` count, which shoves a single compound's pseudo args
 // a gratuitous level deeper than the rule body with no combinator to align to.
 // tsv's uniform rule is cleaner and needs no node counting — the `+1` comes only
-// from a real combinator. See conformance_prettier.md §CSS: Selectors.
+// from a real combinator. See conformance_prettier_css.md §CSS: Selectors.
 
 use std::borrow::Cow;
 use std::fmt::Write;
@@ -95,8 +95,8 @@ impl<'a> Printer<'a> {
     /// keeps the whole list **inline** (matching prettier — a comment-bearing list is
     /// not subject to the always-break rule), with the comments interleaved at their
     /// boundaries and the surrounding whitespace normalized (the cataloged spacing
-    /// divergence — prettier preserves the source whitespace; see conformance_prettier.md
-    /// §CSS: Comments).
+    /// divergence — prettier preserves the source whitespace; see
+    /// conformance_prettier_css.md §CSS: Comments).
     pub(super) fn print_selector_list(&mut self, list: &internal::SelectorList<'_>) {
         if list.selectors.is_empty() {
             return;
@@ -295,7 +295,7 @@ impl<'a> Printer<'a> {
     /// at its combinator boundary with normalized single-space separation. This is the
     /// selector-comment normalization the rest of the CSS printer applies uniformly
     /// (`:is()`/`:nth-*()`/`::slotted()` args): tsv collapses the gap whitespace to one
-    /// space while prettier freezes the source layout — see conformance_prettier.md
+    /// space while prettier freezes the source layout — see conformance_prettier_css.md
     /// §CSS: Comments. A glued compound-internal comment (`.a/* c */.b`) is emitted
     /// glued (no spaces) so a compound never reads as a descendant `.a .b`. The selector
     /// renders inline (explicit spaces, no combinator break points), matching the

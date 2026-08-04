@@ -22,5 +22,5 @@ between them.
 `unformatted_ours_compact.svelte` is the glued spelling (`]?/* c */:V`): tsv
 normalizes it to input; prettier lands in-bracket.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

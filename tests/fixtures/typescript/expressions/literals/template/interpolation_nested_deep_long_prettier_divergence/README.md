@@ -40,4 +40,4 @@ position, whereas Prettier's alignment reset lets a 101–109-char line render
 inline. (Overflow on one line is fine only when the source has **no** newline —
 there both formatters atomize.)
 
-See [conformance_prettier.md](../../../../../../../docs/conformance_prettier.md) §TypeScript: Template Literals.
+See [conformance_prettier_ts.md](../../../../../../../docs/conformance_prettier_ts.md) §TypeScript: Template Literals.

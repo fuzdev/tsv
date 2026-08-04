@@ -33,7 +33,7 @@
 //!    family that catches a formatter letting a render-free character pick the layout.
 //!    Fits-inline content is probed too: tsv trims a render-free boundary run even when
 //!    the content fits (`<span> text </span>` → `<span>text</span>` — the Svelte-mirror
-//!    trim, conformance_prettier.md §Svelte: Inline content block-style), so hug ↔ space ↔
+//!    trim, conformance_prettier_svelte.md §Svelte: Inline content block-style), so hug ↔ space ↔
 //!    newline must reach one fixed point at every content boundary outside
 //!    `<pre>`/`<textarea>`. The one sanctioned residual: a base whose boundary is
 //!    newline-authored on BOTH sides keeps its multiline layout (newlines are authoring

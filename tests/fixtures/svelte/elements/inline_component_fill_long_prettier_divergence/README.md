@@ -11,4 +11,5 @@ At 100 chars both formatters match.
 
 tsv treats printWidth as a hard limit. The break falls at the collapsible whitespace between the
 element and the trailing word, so the closing `>` is never split off on its own. See
-[conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy).
+[conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy);
+cataloged in [conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

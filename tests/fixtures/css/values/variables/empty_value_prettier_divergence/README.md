@@ -11,7 +11,7 @@ An empty value is the same value regardless of spacing — CSS Syntax 3 §"Consu
 
 `<declaration-value>?` makes a custom property's value optional (CSS Variables 1 §"Custom Property Value Syntax"). tsv normalizes the empty value to the single-space form CSS Variables 1 §"Serializing Custom Properties" mandates: "an empty custom property … must serialize with a single space as its value." Non-empty custom properties (`--normal: red;`) are unaffected; non-custom empty declarations (`color:;`) remain a parse error — a value is required there.
 
-Catalogued under [CSS: Values](../../../../../../docs/conformance_prettier.md#css-values).
+Catalogued under [CSS: Values](../../../../../../docs/conformance_prettier_css.md#css-values).
 
 ## Fixture Structure
 

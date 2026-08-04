@@ -42,4 +42,4 @@ Hosts covered: function type, constructor type (`new () =>`), and abstract
 constructor type (`abstract new () =>`) — the same return-type position on each,
 plus the pre-arrow `)` gap on the function type.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

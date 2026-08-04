@@ -43,4 +43,4 @@ a break at a glued text boundary changes the compiled output (`<option>a</option
 `<option>a</option> text`, verified against `svelte/compiler`), and re-emitting an authored
 boundary space *beside* the break writes a space the next pass reads as indentation and drops —
 leaving the format with no fixed point.
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

@@ -17,4 +17,4 @@ block-comment sibling `union_intersection_retained_paren_comment` keeps the memb
 fully inline because a block comment can stay inline (`(b | c /* c */)`); a line
 comment cannot, so it forces the expanded parens.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

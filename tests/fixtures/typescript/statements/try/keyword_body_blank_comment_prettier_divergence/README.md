@@ -25,4 +25,4 @@ Bare `catch` is used rather than `catch (e)` deliberately — a parameterized `c
 into the catch *parens* instead of the block body, which is a different absorption target and would
 mix a second question into this fixture.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §"No blank above a body block's `{`".
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §"No blank above a body block's `{`".

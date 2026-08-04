@@ -39,5 +39,6 @@ path already did) fixes the swallow and gives the value type the proper union/in
 break layout for free. The all-match (no `:`→type comment) companion — simple and
 long-union values under a `]`→`:` comment — is the regular fixture
 [index_signature_bracket_colon_union_value](../index_signature_bracket_colon_union_value/).
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
-§Uniform Forced-Continuation Indent and §Comment Position Philosophy.
+See [conformance_prettier.md §Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent)
+and [§Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy); cataloged in
+[conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

@@ -431,8 +431,9 @@ impl<'a> Printer<'a> {
     /// They are the *printer's* parens, not the author's, which is why they are applied here
     /// rather than inside [`Self::build_head_value_doc`]: a frozen slice keeps its interior
     /// exactly as authored and the parens are **re-synthesized around it**, the same way the
-    /// prefix keyword and the closing `}` stay outside the freeze (docs/conformance_prettier.md
-    /// §Format-ignore directive). Skipping them on the frozen arm doesn't preserve more of the
+    /// prefix keyword and the closing `}` stay outside the freeze
+    /// (docs/conformance_prettier_ignore.md §Format-ignore directive). Skipping them on the
+    /// frozen arm doesn't preserve more of the
     /// author's text — it *deletes* the parens they wrote. They must also land inside the
     /// head's own break: applied after the head is assembled instead, a frozen `{@html`
     /// emitted `{@html(`.
@@ -777,7 +778,7 @@ impl<'a> Printer<'a> {
     /// directive takes the broken block form, so the emitter never pulls it flush against
     /// the `{`, where it would be inert and the freeze would be lost on the second pass
     /// (the `{…}` instance of the declaration-header rule; see
-    /// docs/conformance_prettier.md §Format-ignore directive).
+    /// docs/conformance_prettier_ignore.md §Format-ignore directive).
     ///
     /// **In-source axis** — a directive is never owned, so the axes coincide, but naming
     /// the physical one keeps directive recognition a single deliberate question (as

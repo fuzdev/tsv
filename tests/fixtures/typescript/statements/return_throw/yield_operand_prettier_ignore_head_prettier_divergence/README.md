@@ -13,7 +13,7 @@ yield (
 
 Prettier relocates the directive onto the **keyword's** line and strips the grouping parens
 (`yield // prettier-ignore⏎a  +  b;`) — the pre-existing `yield` comment relocation, cataloged
-at [§Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation)
+at [§Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
 ([yield_open_paren_line_comment](../../../syntax/comments/yield_open_paren_line_comment_prettier_divergence/)),
 here carrying the directive with it. The freeze rides on that divergence; it is not a second
 one, and the `return` / `throw` siblings match prettier exactly
@@ -28,4 +28,4 @@ why tsv never does.
 
 A directive's placement is what decides whether it is honored, so an emitter must not move it.
 See
-[conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

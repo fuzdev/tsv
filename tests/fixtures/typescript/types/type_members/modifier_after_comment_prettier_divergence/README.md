@@ -17,4 +17,4 @@ Per comment placement policy, we preserve the user's original comment position.
 Note: class properties with the same pattern (`d? /* c */: T = 1;`) are NOT
 relocated by prettier — they match our output with a space before `:`.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

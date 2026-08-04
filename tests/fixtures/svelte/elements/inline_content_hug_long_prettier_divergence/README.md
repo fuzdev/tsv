@@ -23,4 +23,4 @@ tsv treats printWidth as a hard limit and prefers block-style content over a dan
 expression: it keeps `<tag>` and `</tag>` intact and the expression visually whole on one indented
 line. In real-world cases this keeps lines well within printWidth where prettier's dangle pushes them
 over. See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

@@ -35,4 +35,4 @@ A comment written *before* the brackets stays before them in both formatters
 (`type C`), so only the interior position diverges. A chain of suffixes keeps
 each comment with its own pair (`type D`).
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

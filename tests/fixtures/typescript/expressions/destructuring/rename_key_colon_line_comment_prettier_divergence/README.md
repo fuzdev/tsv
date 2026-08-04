@@ -39,5 +39,5 @@ The pattern face of the object-property key→`:` line comment
 ([property_key_colon_line_comment](../../objects/property_key_colon_line_comment_prettier_divergence/));
 the own-line **block** sibling is
 [rename_key_colon_own_line_block_comment](../rename_key_colon_own_line_block_comment_prettier_divergence/).
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

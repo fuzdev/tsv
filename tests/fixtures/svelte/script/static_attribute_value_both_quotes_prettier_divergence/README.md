@@ -39,7 +39,7 @@ the single/double rule applies unchanged: `b='c"d'` keeps single quotes,
 
 A formatter must never emit output that changes the document's meaning or fails
 to re-parse. See
-[conformance_prettier.md §Svelte: Attributes](../../../../../docs/conformance_prettier.md#svelte-attributes).
+[conformance_prettier_svelte.md §Svelte: Attributes](../../../../../docs/conformance_prettier_svelte.md#svelte-attributes).
 
 ## Related
 

@@ -27,4 +27,4 @@ the input. That divergent-variant case is pinned by `divergent_variant_nonblock.
 Per Comment Position Philosophy: preserve user intent (the comment trailing the
 `else` keyword) rather than forcing it onto its own line.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

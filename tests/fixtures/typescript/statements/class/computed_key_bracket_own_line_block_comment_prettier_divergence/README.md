@@ -22,5 +22,5 @@ Prettier has **two destinations from this one gap, keyed on the authoring**:
   lands on. `unformatted_ours_own_line.svelte` pins tsv's side: the own-line
   authoring normalizes to input in one pass.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

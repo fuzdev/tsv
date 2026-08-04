@@ -13,7 +13,7 @@ compact/space-padded variants) back to `input.svelte`.
 tsv expands a wrapped/overflowing block's body uniformly across all block heads and body
 shapes — `{#snippet}` is not special-cased, so its body drops like every other block's
 (a one-pass `conditional_group`, no breakable hug path). See
-[conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

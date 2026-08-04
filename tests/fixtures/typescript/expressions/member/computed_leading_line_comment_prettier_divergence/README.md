@@ -17,7 +17,7 @@ const a = arr[             const a =
 
 A comment written on the `[` line itself (`arr[ // c`, not its own line) is kept
 trailing the `[` — the open-delimiter-trailing rule
-([conformance_prettier.md §Object/array/block open-delimiter trailing](../../../../../../docs/conformance_prettier.md)) —
+([conformance_prettier_ts_comments.md §Object/array/block open-delimiter trailing](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)) —
 while prettier relocates it to trail the object (`arr // c⏎[i]`).
 
 ## Reason
@@ -29,5 +29,5 @@ family uses (`[/* c */ key]`); prettier canonicalizes the position by relocating
 Optional chains (`obj?.[…]`) behave the same way. Without the break the `//`
 would swallow the index and `]` — a content-loss bug this fixture also guards.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

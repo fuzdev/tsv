@@ -15,7 +15,7 @@ and both are already sanctioned:
   [inline_sibling_newline_flow](../inline_sibling_newline_flow_prettier_divergence/).
 - **The content boundary does not select the layout.** Boundary whitespace is render-free, so the
   hugged, spaced and newline authorings of one document converge — see
-  [§Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+  [§Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
 
 The last four cases pin the second rule's own predicate. What makes the boundary inert is that
 the content is a **fill to reflow into** — asked of the RUN, never of the separator's shape or
@@ -57,4 +57,4 @@ boundary-newline authoring as `prettier_variant_boundary_newline.svelte` (pretti
 stable; tsv normalizes it to `input`).
 
 See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

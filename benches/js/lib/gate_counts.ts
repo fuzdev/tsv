@@ -163,7 +163,7 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// 500 → 499: one reproducible file, `svelte.dev/.../lib/components/PageControls.svelte`,
 	// where an inline element's content is a fill (`<Icon … /> Edit this page on GitHub`) and so
 	// stops letting its render-free content boundary select the layout — the deliberate rule in
-	// conformance_prettier.md §Svelte: Inline content block-style, and the only file the change
+	// conformance_prettier_svelte.md §Svelte: Inline content block-style, and the only file the change
 	// moves across the whole reproducible subset. The detector already explains it
 	// (`inline_sibling_newline_flow` + `svelte_boundary_ws_trim`), so it lands in `known`, not
 	// `unknown` — that count is unmoved.

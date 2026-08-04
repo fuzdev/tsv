@@ -25,5 +25,5 @@ the class property takes the same outcome
 while the enum member's chain converges back to the inline form
 ([member_before_eq_own_line_block_comment](../../enum/member_before_eq_own_line_block_comment_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

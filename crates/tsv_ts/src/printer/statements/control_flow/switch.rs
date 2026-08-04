@@ -410,8 +410,8 @@ impl<'a> Printer<'a> {
             // the shared rule with the block following it at consequent indent. Pulling
             // such a run up to keep the hug would relocate it — merging own-line comments
             // onto one line — for exactly the authorings a `//` in the same gap already
-            // keeps in place (`case 'b':⏎// c⏎{`, docs/conformance_prettier.md §Comment
-            // relocation), so comment kind stops deciding the layout. A frozen statement
+            // keeps in place (`case 'b':⏎// c⏎{`, docs/conformance_prettier_ts_comments.md
+            // §Comment relocation), so comment kind stops deciding the layout. A frozen statement
             // keeps its own line too: the hug would take away the directive's.
             if i == 0
                 && matches!(stmt, Statement::BlockStatement(_))

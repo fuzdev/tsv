@@ -26,4 +26,4 @@ The glued authoring of these same gaps lives in the regular
 with a continuation indent, live in
 [source_line_comment](../source_line_comment_prettier_divergence/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

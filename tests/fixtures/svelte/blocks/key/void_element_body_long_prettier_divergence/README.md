@@ -35,7 +35,7 @@ internal break point (it's atomic, like text), so dropping it to its own line is
 width-respecting layout; an attributed element *could* break internally, but tsv drops it
 the same way rather than hugging the `}` and breaking it (which prettier does, and which
 was non-idempotent for non-first body nodes). See
-[conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

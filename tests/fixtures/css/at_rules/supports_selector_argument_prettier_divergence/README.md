@@ -14,7 +14,7 @@ Prettier: `selector([data-attr='1.50'])`
 
 ## Reason
 
-See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) — "`selector()` argument".
+See [conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules) — "`selector()` argument".
 
 ## Related
 

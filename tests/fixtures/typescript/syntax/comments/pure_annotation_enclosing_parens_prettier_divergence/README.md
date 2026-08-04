@@ -36,7 +36,7 @@ term tsv failed to know would be a silent loss.
 `const m` is the boundary: with no enclosing paren to add, the annotation already sits
 against its call and tsv and prettier agree.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
 
 ## Contexts tested
 

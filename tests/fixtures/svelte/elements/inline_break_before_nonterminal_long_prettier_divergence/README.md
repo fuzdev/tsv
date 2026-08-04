@@ -14,4 +14,4 @@ Prettier: keeps the opening tag on the text line and dangles it — see
 The boundary before `<a>` is inter-node whitespace (render-free under Svelte 5), so the break is
 render-equivalent.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

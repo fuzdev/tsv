@@ -14,4 +14,4 @@ Emitting the comment inline (the previous behavior) let the `//` run to
 end-of-line and swallow the `(` — non-idempotent content loss that failed to
 reparse. Per comment placement policy, the authored position is preserved.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md#comment-relocation) §Comment relocation.
+See [conformance_prettier_ts_comments.mdNone](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation) §Comment relocation.

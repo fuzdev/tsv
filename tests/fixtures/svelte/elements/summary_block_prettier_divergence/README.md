@@ -15,4 +15,4 @@ The visible effect is on a `<summary>`'s following sibling: as an inline element
 
 This only manifests when compact input is formatted — both formatters preserve the block form if given it directly.
 
-See [conformance_prettier.md §Svelte: Elements](../../../../../docs/conformance_prettier.md#svelte-elements).
+See [conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

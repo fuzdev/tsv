@@ -21,7 +21,7 @@ prettier-plugin-svelte instead splits on `[\t\n\f\r ]`, so it treats a form feed
 prints a space in its place — a content change: the compiled component's text differs. Because both
 formatters shared that wider class, no corpus diff against prettier could surface it; the oracle
 here is the compiler, not prettier. See
-[conformance_prettier.md §Whitespace: Form feed](../../../../../docs/conformance_prettier.md#whitespace-form-feed)
+[conformance_prettier_svelte.md §Whitespace: Form feed](../../../../../docs/conformance_prettier_svelte.md#whitespace-form-feed)
 and [conformance_svelte.md §Template Whitespace](../../../../../docs/conformance_svelte.md#template-whitespace-clean_nodes).
 
 ## Cases

@@ -36,4 +36,4 @@ the multi-comment interaction rides the other before-`:` fixtures
 [property signature](../property_signature_prettier_ignore_annotation_prettier_divergence/),
 [return type](../return_type_prettier_ignore_annotation_prettier_divergence/)).
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

@@ -73,4 +73,4 @@ A **block** comment forces nothing (`x /* c11 */ as A` stays inline without pare
 matching prettier) — it is pinned here as the control for the line-comment rule.
 
 See
-[conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+[conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

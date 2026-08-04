@@ -17,5 +17,5 @@ the no-JSX design choice it drops the trailing comma. Because both differ, no
 single form is stable in both formatters — `unformatted_ours_compact.svelte`
 normalizes to the tsv form, and prettier reaches `output_prettier.svelte`.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §TypeScript.

@@ -36,7 +36,7 @@ are not a divergence — see the per-type `on/`, `transition/`, `style/` fixture
 A formatter must not silently delete source the user wrote — a `|modifier` is
 semantics-bearing text, not whitespace. Prettier dropping it is content loss; tsv
 preserves it (and matches Svelte's parser AST while doing so). See
-[conformance_prettier.md §Svelte: Attributes](../../../../../docs/conformance_prettier.md#svelte-attributes).
+[conformance_prettier_svelte.md §Svelte: Attributes](../../../../../docs/conformance_prettier_svelte.md#svelte-attributes).
 
 ## Related
 

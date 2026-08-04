@@ -19,7 +19,7 @@ keeps it on the `[` line and forces the bracket to break.
 This is the same preserve-in-place rule tsv applies to every other open
 delimiter (object `{`, array `[`, block `{`, type-param `<`, function-type `(`,
 …). See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation ("Object/array/block open-delimiter trailing") and §Comment
 Position Philosophy. A comment the author wrote on its own line, and a block
 comment hugging `[` (`[/* b */ key]`), are unchanged — both match prettier.

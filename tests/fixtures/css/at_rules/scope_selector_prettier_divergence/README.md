@@ -9,7 +9,7 @@ Prettier normalizes newlines in `:is()` and `:where()` selector lists but not `@
 
 ## Reason
 
-See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) (`@scope newlines`, Stable quirk). tsv normalizes all selector lists consistently, regardless of at-rule context.
+See [conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules) (`@scope newlines`, Stable quirk). tsv normalizes all selector lists consistently, regardless of at-rule context.
 
 ## Related
 

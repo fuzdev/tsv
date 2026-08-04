@@ -29,4 +29,4 @@ and call-argument
 [nonlast_arg](../../../expressions/calls/nonlast_arg_after_comma_block_stranded_prettier_divergence/)
 siblings.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

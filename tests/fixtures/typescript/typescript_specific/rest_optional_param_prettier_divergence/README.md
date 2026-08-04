@@ -29,4 +29,4 @@ is what `audit_signature.txt` pins. The marker-**less** gap has no divergence at
 all and lives in
 [syntax/rest_element_comment](../../syntax/rest_element_comment/).
 
-See [conformance_prettier.md §TypeScript](../../../../../docs/conformance_prettier.md#typescript).
+See [conformance_prettier_ts.md §TypeScript](../../../../../docs/conformance_prettier_ts.md#typescript).

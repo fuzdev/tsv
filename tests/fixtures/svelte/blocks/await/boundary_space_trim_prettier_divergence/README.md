@@ -20,7 +20,7 @@ without `breakParent`, so only await's boundary `line`s can collapse.)
 Svelte-mirror whitespace: in inline layout, every whitespace character tsv keeps is one the
 compiler keeps — a space belongs *between* sibling nodes (render-significant, collapses to one
 space), never inside a section boundary (render-free). See
-[conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

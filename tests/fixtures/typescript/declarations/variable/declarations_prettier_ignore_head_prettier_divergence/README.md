@@ -25,4 +25,4 @@ first item at the same keyword end. When the gap already holds another comment t
 agree, since that comment takes the keyword line and the directive is own-line either way (the
 ordinary `syntax/comments/variable_keyword_line_comment` fixture).
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

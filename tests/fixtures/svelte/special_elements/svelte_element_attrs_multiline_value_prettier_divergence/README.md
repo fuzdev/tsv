@@ -15,4 +15,4 @@ content breaks on its own — which is also what keeps this shape idempotent.
 `prettier_variant_dangle` is prettier's stable form (tsv normalizes it to `input`). The self-closing
 case above matches prettier.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

@@ -25,5 +25,5 @@ feature but not the others" behavior would mean matching a parser inconsistency.
 tsv instead treats a grouped condition as an opaque unit and leaves it verbatim, so
 its two nested features are handled identically. Grouped media conditions are rare
 (MQ4 grouping syntax) and an uppercase feature name inside one rarer still. See
-[conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules)
+[conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules)
 (`Media grouped feature case`, Parser compat).

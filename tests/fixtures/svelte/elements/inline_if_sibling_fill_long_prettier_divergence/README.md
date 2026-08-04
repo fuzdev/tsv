@@ -14,7 +14,7 @@ own line (`output_prettier.svelte`); on the compact one-liner prettier instead h
 tsv dangles the `>` token immediately preceding an expanding block's `{#…}` (a
 preceding inline sibling's closing `>` here) and expands the body uniformly across all
 block heads and body shapes. See
-[conformance_prettier.md §Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

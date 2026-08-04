@@ -14,4 +14,4 @@ non-divergence [accessor_computed_key_comment](../accessor_computed_key_comment/
 fixture, the regression guard for the in-bracket comment being emitted exactly
 once (not duplicated onto the keyword).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

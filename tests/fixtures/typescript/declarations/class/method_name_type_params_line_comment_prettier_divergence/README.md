@@ -7,4 +7,4 @@ We preserve the user's comment placement. The line comment forces a break, so ty
 
 Covers: class method, object method, interface method signature.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

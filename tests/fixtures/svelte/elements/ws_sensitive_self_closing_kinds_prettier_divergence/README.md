@@ -33,4 +33,4 @@ See [elements/pre_void_element](../pre_void_element/) for the void half of the s
 grounding — the HTML Standard's `non-void-html-element-start-tag-with-trailing-solidus` parse
 error, where "the parser behaves as if the U+002F (/) is not present".
 
-See [conformance_prettier.md §Svelte: Elements](../../../../../docs/conformance_prettier.md#svelte-elements).
+See [conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

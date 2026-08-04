@@ -186,8 +186,8 @@ impl<'a> Printer<'a> {
         // the name and drops the marker (and whatever the caller appends next — the
         // `: type` / `(params)`) to a continuation line indented one level
         // (`a // c⏎\t?: T`). Block stays inline (`a /* c */?`). Prettier relocates a
-        // such comment — a `_prettier_divergence` (conformance_prettier.md §Comment
-        // relocation). The marker is the continuation `tail`; later pushes continue
+        // such comment — a `_prettier_divergence` (conformance_prettier_ts_comments.md
+        // §Comment relocation). The marker is the continuation `tail`; later pushes continue
         // mid-line after it.
         if self.has_line_comments_between(after, pos) {
             parts.push(self.build_continuation_indent(after, pos, marker_doc));
@@ -209,7 +209,7 @@ impl<'a> Printer<'a> {
     /// text (`a? // c⏎: T`) — a content-loss / non-idempotency fix. Prettier
     /// instead relocates such comments (a block before `?`, a line after the
     /// member `;`), so the preserved forms are `_prettier_divergence`s
-    /// ([conformance_prettier.md](../../../../docs/conformance_prettier.md)
+    /// ([conformance_prettier_ts_comments.md](../../../../docs/conformance_prettier_ts_comments.md)
     /// §Comment relocation).
     ///
     /// Shared by the three type-element property arms (type-literal, interface,
@@ -401,8 +401,8 @@ impl<'a> Printer<'a> {
     /// end-of-statement — which is **lossy when a second comment already trails the
     /// construct** (prettier merges them onto one line, the second `//` becoming text;
     /// tsv keeps both comments distinct). Shared by the initializer `=` sites: enum
-    /// members, class properties, variable declarators. See conformance_prettier.md
-    /// §Comment relocation.
+    /// members, class properties, variable declarators. See
+    /// conformance_prettier_ts_comments.md §Comment relocation.
     pub(crate) fn build_initializer_line_continuation(
         &self,
         name_end: u32,
@@ -429,7 +429,7 @@ impl<'a> Printer<'a> {
     /// destructuring pattern or parameter list has no multiline preservation, so an
     /// own-line authoring collapses instead of holding its line, and prettier's
     /// destinations differ per site (float past the value, hoist before the
-    /// binding — see conformance_prettier.md §Comment relocation). Callers — the
+    /// binding — see conformance_prettier_ts_comments.md §Comment relocation). Callers — the
     /// param/array default (`build_assignment_pattern_doc`), the shorthand default,
     /// and the rename/computed-key after-`:` gap
     /// (`build_object_pattern_property_doc`) — gate on `has_comments_to_emit_between`

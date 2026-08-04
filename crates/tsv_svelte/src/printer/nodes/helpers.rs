@@ -488,12 +488,12 @@ impl<'a> Printer<'a> {
     /// block comments inline, line comments line-safely (`//` + `hardline`, so the tail
     /// drops to the next line without swallow). prettier-plugin-svelte prints these
     /// patterns from a comment-blind path and drops them, so this is a
-    /// `_svelte_prettier_divergence` (see conformance_prettier.md §Svelte: destructuring
+    /// `_svelte_prettier_divergence` (see conformance_prettier_svelte.md §Svelte: destructuring
     /// binding-pattern comments).
     ///
     /// Literal **default values** normalize through the TS printer (string quotes +
     /// numeric form), where prettier-plugin-svelte preserves the author's source
-    /// token — a separate deliberate divergence (see conformance_prettier.md §Svelte:
+    /// token — a separate deliberate divergence (see conformance_prettier_svelte.md §Svelte:
     /// destructuring literal normalization).
     /// Append a destructuring pattern's `: T` tail (`{#each xs as { a }: T}`).
     ///
@@ -578,8 +578,8 @@ impl<'a> Printer<'a> {
             // identical to `{@const}` and every other literal tsv emits.
             // prettier-plugin-svelte instead prints these binding patterns from raw
             // source, preserving the author's quote style and numeric form; tsv
-            // normalizes uniformly (a deliberate divergence — see conformance_prettier.md
-            // §Svelte: destructuring literal normalization).
+            // normalizes uniformly (a deliberate divergence — see
+            // conformance_prettier_svelte.md §Svelte: destructuring literal normalization).
             //
             // Comment-aware (not `_no_comments`) so an owned leading comment glued to the
             // leaf — a default value (`{ a = /* c */ 1 }`), a rename value (`{ g: /* c */ h }`),

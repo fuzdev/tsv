@@ -22,4 +22,4 @@ Note prettier is not self-consistent across the two cases: it hoists `c2` out in
 leaves both inside the brackets in `b` (`[/* c1 */⏎/* c2 */⏎key]`) — the same comments, the
 same position, differing only in whether the author glued them.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

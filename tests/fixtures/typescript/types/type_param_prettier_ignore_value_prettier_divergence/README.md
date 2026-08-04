@@ -27,4 +27,4 @@ formats normally — `unformatted_ours_perturbed.svelte` proves it by perturbing
 constraint's interior, which tsv normalizes); a **union** constraint freezes only its
 first member (Rule A), where prettier agrees and does not relocate.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

@@ -40,4 +40,4 @@ position in Prettier (mirroring `source_trailing_comment`), and the **named** co
 Philosophy. When a line comment forces `from` onto its own line, tsv indents that
 continuation one level (a single statement spanning lines).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -35,4 +35,4 @@ one matches, so the divergence is the minimum needed to preserve the author's pl
 The `=` keeps the backtick on its line in both (`value_owns_its_comment_break`), since the
 template already breaks itself.
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

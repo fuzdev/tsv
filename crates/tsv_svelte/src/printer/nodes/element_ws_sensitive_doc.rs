@@ -414,7 +414,7 @@ impl<'a> Printer<'a> {
         // no doc-hardlines so this never injects rendered whitespace into <pre> — it
         // only accumulates the depth that nested elements' wrapped attributes and
         // dangling `>` breaks resolve against. See nodes/element_ws_sensitive_doc.rs
-        // header + docs/conformance_prettier.md §Svelte.
+        // header + docs/conformance_prettier_svelte.md §Svelte: Elements.
         let d = self.d();
         d.indent(d.concat(&node_docs))
     }

@@ -8,4 +8,4 @@ delimiters instead. Content-boundary whitespace is render-free under Svelte 5.
 The `unformatted_ours_*` variant is a compact authoring that tsv normalizes to the block-style input;
 prettier does not (it dangles), so it carries the divergence.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

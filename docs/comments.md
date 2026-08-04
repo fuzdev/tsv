@@ -70,7 +70,7 @@ All four hazards are what the **print-once comment ledger** exists to catch — 
 
 But the ledger only sees a document **as authored**, so it cannot see a *wholly* comment-blind builder until some file happens to put a comment where that builder prints: hazard 4 stayed green on `comments:audit` across zzz / gro / fuz_app / fuz_ui, prettier's TS+JS suites, and svelte's own source, because the shape simply does not occur there. The **injection** audits are the discovery arm for that class — `gaps:audit` had it pinned as sixteen known DROPPED shapes all along. When you add or change an alternate-layout builder, the ledger passing is not evidence; put a comment in each of its gaps yourself.
 
-Prettier, oxfmt and biome all get the paren binding wrong — see [conformance_prettier.md §Comment relocation](./conformance_prettier.md#comment-relocation) and [§JSDoc / paren semantics](./conformance_prettier.md).
+Prettier, oxfmt and biome all get the paren binding wrong — see [conformance_prettier_ts_comments.md §Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation) and [§JSDoc / paren semantics](./conformance_prettier_ts_comments.md#jsdoc--paren-semantics).
 
 ## Content is a source slice, never owned
 

@@ -40,4 +40,4 @@ the declaration/function faces and
 [url_escaped_whitespace](../../values/functions/url_escaped_whitespace_prettier_divergence/)
 for `url()`.
 
-See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules).
+See [conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules).

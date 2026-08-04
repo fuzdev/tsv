@@ -19,4 +19,4 @@ unit lowercases in both formatters; this divergence is only the `Hz`/`kHz`/`Q` t
 tsv follows the spec's canonical form here (spec precedence over prettier), so the
 units stay lowercase.
 
-See [conformance_prettier.md §Unit serialization case](../../../../../docs/conformance_prettier.md#css-values).
+See [conformance_prettier_css.md §Unit serialization case](../../../../../docs/conformance_prettier_css.md#css-values).

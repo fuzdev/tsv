@@ -26,5 +26,5 @@ already specifies for the single-gap case; this keeps a multi-gap header saying 
 Only a three-word keyword can show the difference — `export as namespace` and the import-equals
 header are the only ones — so a one- or two-gap header renders identically either way.
 
-See [conformance_prettier.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier.md#comments-inside-a-multi-word-keyword)
-and [§Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier_ts_comments.md#comments-inside-a-multi-word-keyword)
+and [§Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

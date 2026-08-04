@@ -28,7 +28,7 @@ formatter unaffected. See
 
 User comments are valuable and shouldn't be silently removed; they are syntactically valid
 in these positions. See
-[conformance_prettier.md §Svelte: destructuring binding-pattern comments](../../../../../../docs/conformance_prettier.md#svelte-destructuring-binding-pattern-comments).
+[conformance_prettier_svelte.md §Svelte: destructuring binding-pattern comments](../../../../../../docs/conformance_prettier_svelte.md#svelte-destructuring-binding-pattern-comments).
 
 ## Related
 

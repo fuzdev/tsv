@@ -604,7 +604,7 @@ impl<'a> Printer<'a> {
         // it still breaks block-style when too wide. (This is the same layout the
         // type-reference type-argument path uses. Prettier instead breaks the
         // `<…>` onto its own lines for a comment-bearing mapped/empty type — a
-        // deliberate divergence; see docs/conformance_prettier.md.)
+        // deliberate divergence; see docs/conformance_prettier_ts_comments.md.)
         if inst.params.len() == 1
             && let Some(type_doc) = self.try_build_hugging_curly_type_doc(&inst.params[0])
         {

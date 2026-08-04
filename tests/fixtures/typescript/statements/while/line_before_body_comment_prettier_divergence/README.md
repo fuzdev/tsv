@@ -17,4 +17,4 @@ The one difference is a blank line *after* the comment, before `{`
 pins prettier's stable form; `unformatted_ours_spaces.svelte` is an extra-whitespace
 authoring only tsv normalizes back to input.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

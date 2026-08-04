@@ -30,4 +30,4 @@ the comments staying separate even though it is not the oracle for their placeme
 The shared rule across every trailing gap is cataloged with
 [retained_paren_shell_trailing_comment_run](../retained_paren_shell_trailing_comment_run_prettier_divergence/).
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

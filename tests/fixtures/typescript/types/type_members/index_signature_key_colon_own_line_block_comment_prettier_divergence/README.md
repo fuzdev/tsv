@@ -27,5 +27,5 @@ The same-gap **line** comment (which forces the break → continuation indent) i
 the `]`→value-`:` gap outside the brackets takes a different prettier outcome
 ([index_signature_bracket_colon_own_line_block_comment](../index_signature_bracket_colon_own_line_block_comment_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

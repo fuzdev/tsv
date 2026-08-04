@@ -123,7 +123,7 @@ impl<'a> Printer<'a> {
     /// type-parameter / type-argument / call-argument lists use a bare `join([",", line])`
     /// with **no** per-element group, so the identical soft `line` rides the broken outer
     /// group and breaks. That one fact predicts the layout at every one of those sites —
-    /// don't re-derive it. See conformance_prettier.md §Comment relocation.
+    /// don't re-derive it. See conformance_prettier_ts_comments.md §Comment relocation.
     ///
     /// A list with holes passes only its real elements here; a hole carries no comments and
     /// takes no group.
@@ -556,7 +556,7 @@ impl<'a> Printer<'a> {
     ///
     /// Gated on `should_force_expansion_for_comments`, so an inline block comment
     /// hugging the first element (`{ /* c */ a: 1 }`, `[/* c */ x]`) is left in
-    /// place and the result is `(empty, None)`. See conformance_prettier.md
+    /// place and the result is `(empty, None)`. See conformance_prettier_ts_comments.md
     /// §Comment relocation.
     pub(in crate::printer) fn delimiter_line_comment_prefix(
         &self,
@@ -743,7 +743,7 @@ impl<'a> Printer<'a> {
     /// tsv applies bracket spacing uniformly: object literals, destructuring
     /// patterns, enum bodies, and type literals all print a comment-only empty
     /// body as `{ /* c */ }`. Prettier tightens every one of these to
-    /// `{/* c */}`, so this is a divergence — see conformance_prettier.md
+    /// `{/* c */}`, so this is a divergence — see conformance_prettier_ts.md
     /// §Empty-object comment bracket spacing. A truly empty `{}` (no comment)
     /// has no content to space and stays tight in both. See
     /// [`Self::build_empty_inline_with_comments_doc`].
@@ -1150,7 +1150,7 @@ impl<'a> Printer<'a> {
     /// comma (in `elem_end..end_boundary`): comments before the comma go to `before`,
     /// comments after it to `after`. Callers emit `after` past where the comma was
     /// (no trailing comma; trailingComma: 'none') so the comment is preserved after it
-    /// rather than relocated before (see conformance_prettier.md §Comment relocation).
+    /// rather than relocated before (see conformance_prettier_ts_comments.md §Comment relocation).
     pub(crate) fn append_last_trailing_block_comments_split(
         &self,
         before: &mut DocBuf,

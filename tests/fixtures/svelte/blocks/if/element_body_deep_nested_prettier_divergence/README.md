@@ -20,7 +20,7 @@ dropped form stable, so the divergence shows only when normalizing the compact o
 tsv expands a wrapped/overflowing block's body uniformly across all block heads and body
 shapes (one-pass `conditional_group`, no breakable special-case) — at any nesting depth,
 and even when the dropped element itself still overflows and re-wraps. See
-[conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

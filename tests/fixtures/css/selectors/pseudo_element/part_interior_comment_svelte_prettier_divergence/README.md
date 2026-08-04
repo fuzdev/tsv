@@ -37,7 +37,7 @@ tsv registers these gap comments at parse time and re-emits them through
 identifiers, so the surrounding whitespace normalizes uniformly (the shared
 selector-comment doc path). The identifier run is otherwise unchanged.
 
-See [conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments)
+See [conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments)
 and [conformance_svelte.md §CSS Corrections](../../../../../../docs/conformance_svelte.md#css-corrections).
 
 ## Related

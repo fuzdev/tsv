@@ -24,4 +24,4 @@ rather than dangling. The tail's placement is **not** authoring-dependent: the b
 closing tag and a terminal text sibling is render-free under Svelte 5, so both authorings converge on
 the hug — the same rule the terminal sibling `inline_wide_content_trailing_long` follows, reached
 here through a different render branch (the wide child is itself multiline). See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

@@ -22,4 +22,4 @@ Keeping the `&` on a frozen leaf/object single-member intersection is the only w
 honor the directive idempotently without a bare-type freeze mechanism; the small
 divergence (a kept `&` prettier drops) is preferable to silently dropping the directive
 or a non-idempotent member-only freeze. Identical to the union sibling's rationale.
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

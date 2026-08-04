@@ -32,5 +32,5 @@ const { a /* c */: b } = o;    const {
 The object-property sibling is
 [property_key_colon_own_line_block_comment](../../objects/property_key_colon_own_line_block_comment_prettier_divergence/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

@@ -1179,7 +1179,7 @@ impl<'a> Printer<'a> {
                 // `[K in T]? /* c */ : V`, `[K in T] /* c */?: V`) — never re-binding
                 // across the `:`; a comment after the `:` leads the value (the tail).
                 // Prettier relocates all of these into the brackets, trailing the key
-                // constraint (conformance_prettier.md §Comment relocation).
+                // constraint (conformance_prettier_ts_comments.md §Comment relocation).
                 let colon_pos = self
                     .find_char_outside_comments(bracket_close, type_start, b':')
                     .unwrap_or(bracket_close);
@@ -1482,7 +1482,7 @@ impl<'a> Printer<'a> {
         let mut force_break = false;
         // Block comment trailing the last element after its source comma — preserved
         // past where the comma was (no trailing comma; prettier relocates before; see
-        // conformance_prettier.md §Comment relocation).
+        // conformance_prettier_ts_comments.md §Comment relocation).
         let mut last_after_comma = DocBuf::new();
         for (i, elem) in t.element_types.iter().enumerate() {
             if i > 0 {
@@ -1542,7 +1542,7 @@ impl<'a> Printer<'a> {
         // it to its own line as the first element's leading comment). A
         // line/own-line comment is itself what forces this path. Tuple types have
         // no elision, so the first element is always present. See
-        // conformance_prettier.md §Comment relocation (Tuple type `[`).
+        // conformance_prettier_ts_comments.md §Comment relocation (Tuple type `[`).
         let first_elem_start = t.element_types[0].span().start;
         let (bracket_line_prefix, delimiter_pull_pos) =
             self.delimiter_line_comment_prefix(t.span.start, first_elem_start);

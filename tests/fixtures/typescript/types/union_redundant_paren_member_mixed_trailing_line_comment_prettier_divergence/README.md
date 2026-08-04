@@ -35,4 +35,4 @@ The `unformatted_ours_*` variants are the paren shells; tsv normalizes them to
 Per Comment Position Philosophy, tsv associates the run with the member it
 documents (`B`) rather than hoisting it onto the previous member (`A`).
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

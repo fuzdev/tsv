@@ -25,5 +25,5 @@ Four positions, exercised across three casts:
 tsv treats the cast's `<` and `>` as semantic boundaries and preserves each
 comment where the author wrote it; prettier relocates the trailing-`<` and
 trailing-`>` comments (`output_prettier.svelte`). See
-[conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Angle-bracket type assertion).

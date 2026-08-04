@@ -27,7 +27,7 @@ tsv expands a wrapped/overflowing block's body uniformly across all block heads,
 shapes, and contexts (one-pass `conditional_group`, no breakable special-case), which
 keeps the layout idempotent — including the breadcrumb shape where the breakable
 element is not the first body node. See
-[conformance_prettier.md §Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

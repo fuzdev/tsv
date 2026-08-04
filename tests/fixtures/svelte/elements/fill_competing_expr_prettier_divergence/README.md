@@ -18,7 +18,7 @@ the content boundary converge to. The travel rule itself is
 - `prettier_variant_dangle.svelte` is that dangled form (prettier-stable, overshooting at
   102 with the second ternary opened mid-line); tsv likewise normalizes it to
   `input.svelte` — see
-  [§Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+  [§Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
 
 Historically this shape oscillated when the boundary authorings were handled by stranding
 expression groups flat under a fits()-Break `line` — each pass left a *different* expression

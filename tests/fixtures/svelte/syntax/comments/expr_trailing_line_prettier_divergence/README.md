@@ -41,7 +41,8 @@ verbatim, and prettier is at least stable on them).
 
 User comments are valuable and shouldn't be silently removed. The comments are
 syntactically valid in these positions. See
-[conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy).
+[conformance_prettier.md §Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy);
+cataloged in [conformance_prettier_svelte.md §Svelte: Attributes](../../../../../../docs/conformance_prettier_svelte.md#svelte-attributes).
 
 ## Related
 

@@ -22,4 +22,4 @@ Both positions are dual-stable; the divergence is in normalization —
 `unformatted_ours_infix.svelte` normalizes to input under tsv, to
 `variant_trailing.svelte` under prettier.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

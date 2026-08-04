@@ -21,4 +21,4 @@ Design choice, render-free under Svelte 5 — the same whitespace-collapsing-con
 [ws_collapsing_containers](../ws_collapsing_containers_prettier_divergence/). Verified against
 `svelte/compiler` `clean_nodes` and by compile-diff (the block-style and glued forms compile
 identically).
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

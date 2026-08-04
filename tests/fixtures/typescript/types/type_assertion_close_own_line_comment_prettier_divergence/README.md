@@ -17,5 +17,5 @@ live-verifies it (rule F5).
 tsv treats the cast's `>` as a semantic boundary and keeps the comment where the
 author wrote it: on its own line before `>`, inside the cast. The `input.svelte`
 form is idempotent under tsv. See
-[conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Angle-bracket type assertion).

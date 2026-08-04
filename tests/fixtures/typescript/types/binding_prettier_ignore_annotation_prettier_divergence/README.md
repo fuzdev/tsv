@@ -36,4 +36,4 @@ The sibling gap — a directive **after** the `:`, freezing the type alone — i
 a glued directive is inert
 ([type_heads_prettier_ignore_glued_inert](../type_heads_prettier_ignore_glued_inert_prettier_divergence/)).
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

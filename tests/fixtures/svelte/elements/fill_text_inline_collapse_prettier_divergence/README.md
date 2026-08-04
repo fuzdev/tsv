@@ -21,4 +21,4 @@ rule's own fixture, including the control-flow-block, comment, blank-line and bl
 controls.
 
 See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

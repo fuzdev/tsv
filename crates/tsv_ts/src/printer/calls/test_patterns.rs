@@ -145,7 +145,7 @@ fn get_member_chain_parts<'a>(
 ///
 /// Both routing sites ask this rather than [`is_test_call`] (`calls/mod.rs`'s
 /// chain-bypass and `call_formatting.rs`'s layout branch), so they cannot disagree about
-/// which calls take the flat form. See conformance_prettier.md §Comment relocation.
+/// which calls take the flat form. See conformance_prettier_ts_comments.md §Comment relocation.
 pub(super) fn test_call_flat_layout_applies(
     call: &internal::CallExpression<'_>,
     printer: &Printer<'_>,

@@ -5,4 +5,4 @@ first inside the broken brackets) and `// c2⏎]: V` (second comment pulled insi
 the brackets below the first), flipping on every pass. No prettier-anchored claim
 file (output_prettier.*, audit_signature.txt, variants) is expressible. The
 validator live-verifies this claim (rule F5). See README.md and
-docs/conformance_prettier.md §Comment relocation.
+docs/conformance_prettier_ts_comments.md §Comment relocation.

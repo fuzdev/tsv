@@ -33,4 +33,5 @@ The two gaps disagreed before this rule was stated: `export =` reflowed while
 `export default` preserved and indented, and no fixture covered `export =`, so nothing
 caught it.
 
-See [conformance_prettier.md §Authored breaks in value position](../../../../../../docs/conformance_prettier.md#authored-breaks-in-value-position).
+See [conformance_prettier.md §Authored breaks in value position](../../../../../../docs/conformance_prettier.md#authored-breaks-in-value-position);
+cataloged in [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

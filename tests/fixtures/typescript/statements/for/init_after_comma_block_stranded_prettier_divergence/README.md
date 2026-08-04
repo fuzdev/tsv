@@ -24,4 +24,4 @@ identifiers here force the declarators to wrap, making the stranded block a stab
 divergence.
 
 See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

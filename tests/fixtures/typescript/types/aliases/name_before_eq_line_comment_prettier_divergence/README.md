@@ -38,5 +38,5 @@ The type-alias face of the cross-construct before-`=` initializer line comment
 [class property](../../../declarations/class/property_before_eq_line_comment_prettier_divergence/)).
 The own-line **block** sibling is
 [name_before_eq_own_line_block_comment](../name_before_eq_own_line_block_comment_prettier_divergence/).
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

@@ -10,4 +10,4 @@ Same pattern as `imports/empty_keyword_comment_prettier_divergence`.
 
 Reason: Comment preservation — the user's chosen position is preserved.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

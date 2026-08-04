@@ -28,5 +28,5 @@ is honored by **both** tools, so its frozen `(c1&c2)` is unchanged in
 for drop-in compatibility). This is the union-member analog of the existing
 `format-ignore` fixtures under `tests/fixtures/svelte/syntax/format_ignore/`.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive)
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive)
 and [directives.md](../../../../../docs/directives.md).

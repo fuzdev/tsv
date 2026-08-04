@@ -61,4 +61,4 @@ Converging them is a behavior decision, not a bug fix, so this fixture records t
 split rather than assuming an answer. Both forms are stable and lossless.
 
 See
-[conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+[conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

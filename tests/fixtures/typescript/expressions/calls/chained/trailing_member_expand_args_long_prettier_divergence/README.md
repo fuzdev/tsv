@@ -20,4 +20,4 @@ Print width, and consistency. tsv wraps a call's arguments the same way regardle
 member — it expands the arguments rather than special-casing the chain — the same stance as its
 handling of module-path calls.
 
-See [conformance_prettier.md §TypeScript](../../../../../../../docs/conformance_prettier.md#typescript) (Trailing member after a call with an object argument) and [§Print Width Philosophy](../../../../../../../docs/conformance_prettier.md#print-width-philosophy).
+See [conformance_prettier_ts.md §TypeScript](../../../../../../../docs/conformance_prettier_ts.md#typescript) (Trailing member after a call with an object argument) and [§Print Width Philosophy](../../../../../../../docs/conformance_prettier.md#print-width-philosophy).

@@ -17,4 +17,4 @@ formatters. With a value type present (`{ [K in B]: V /* c */ }`) the comment
 trails the value in both formatters and there is no divergence; only the
 no-value form diverges.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

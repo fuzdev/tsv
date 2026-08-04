@@ -16,4 +16,4 @@ whitespace perturbations only tsv normalizes.
 The placement rule is total and exception-free: a directive freezes the
 following construct only when it is alone on its line.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

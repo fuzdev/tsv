@@ -19,4 +19,4 @@ Emitting it inline (the previous behavior) let the `//` **swallow** the element
 type — non-idempotent content loss; the line comment now forces the break (the
 shared `build_trailing_comments_hang_next`).
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

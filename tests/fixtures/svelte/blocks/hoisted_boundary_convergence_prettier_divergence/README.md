@@ -18,7 +18,7 @@ run is deleted:
 
 The two authorings of the first line are therefore one document, and a render-free run must not
 select a layout — the rule this whole section rests on
-([§Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)).
+([§Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)).
 Prettier holds a stable form for each authoring instead, so one document reaches two prettier
 forms and one tsv form, exactly as at an ordinary content boundary
 ([blocks/content_boundary_convergence](../content_boundary_convergence_prettier_divergence/)).

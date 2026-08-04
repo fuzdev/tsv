@@ -21,5 +21,5 @@ both (the contextual-keyword binding cases live in
 [await_svelte_divergence](../await_svelte_divergence/)). `prettier_rejects.txt`
 pins the error; rule F6 live-verifies that prettier still rejects the input.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md)
 §Prettier rejects valid input.

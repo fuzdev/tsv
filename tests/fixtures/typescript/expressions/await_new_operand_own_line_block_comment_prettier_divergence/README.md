@@ -22,4 +22,4 @@ output. Only a **line** comment or an **own-line multiline** block still hangs t
 operand (a glued multiline block collapses inline).
 
 See [conformance_prettier.md §Authored breaks in value position](../../../../../docs/conformance_prettier.md#authored-breaks-in-value-position)
-and [§Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+and [§Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

@@ -26,4 +26,4 @@ broken by tsv to respect printWidth at the true nested position; Prettier's
 alignment reset lets the 107-char line render inline. With no newline the same
 content stays on one line in both (see `variant_no_newline.svelte`).
 
-See [conformance_prettier.md](../../../../../../../docs/conformance_prettier.md) §TypeScript: Template Literals.
+See [conformance_prettier_ts.md](../../../../../../../docs/conformance_prettier_ts.md) §TypeScript: Template Literals.

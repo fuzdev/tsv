@@ -28,6 +28,6 @@ This is the same preserve-in-place rule tsv applies to every other open/close
 delimiter via the shared `build_computed_key_bracket_doc` — the sibling of the
 `[`→key gap ([computed_key_open_bracket_line_comment](../computed_key_open_bracket_line_comment_prettier_divergence/))
 and the index-signature key-type→`]` gap. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy. Without the break, a line
 comment here would swallow `]` and the value annotation (content loss).

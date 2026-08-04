@@ -29,7 +29,7 @@ one-lined, the >100 cases in their dangled forms; tsv normalizes them all to `in
 The break between the text and the snippet is render-free (the snippet hoists out of the
 fragment before the whitespace rules run), so the layout question is free and tsv answers it
 with the declaration's own line — uniform at every width, render-safe under Svelte 5. See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
 
 Note: when the snippet *name* alone overshoots printWidth (it is unbreakable), the snippet's own
 line overshoots regardless of layout; that body-drop convergence is folded into the deferred

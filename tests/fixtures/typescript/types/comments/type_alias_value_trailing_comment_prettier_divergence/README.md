@@ -16,4 +16,4 @@ the break; only a union/intersection value does.
 Chain: `unformatted_ours_before_semi` → prettier → `prettier_intermediate_before_semi`
 (unstable) → prettier → `input`. tsv reaches `input` in one pass.
 
-See [conformance_prettier.md §Comment normalization (stable quirks)](../../../../../../docs/conformance_prettier.md#comment-normalization-stable-quirks).
+See [conformance_prettier_ts_comments.md §Comment normalization (stable quirks)](../../../../../../docs/conformance_prettier_ts_comments.md#comment-normalization-stable-quirks).

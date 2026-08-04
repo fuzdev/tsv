@@ -8,7 +8,7 @@
 //! `unformatted_*` fixture rules can't pin them — the normalized fixed point is asserted
 //! here directly.
 //!
-//! The classification (docs/conformance_prettier.md §Format-ignore directive) is
+//! The classification (docs/conformance_prettier_ignore.md §Format-ignore directive) is
 //! exception-free: a directive alone on its line freezes the following member;
 //! any other placement — trailing, glued, after a delimiter or head — is inert.
 

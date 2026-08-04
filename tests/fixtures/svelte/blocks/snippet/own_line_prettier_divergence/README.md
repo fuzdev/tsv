@@ -20,7 +20,7 @@ therefore changes no render, and the layout question is free —
 — so tsv answers it with the snippet's own line, which is where authors already put snippet
 declarations and what keeps a declaration visually distinct from the content beside it. A
 render-free run must not select a layout, the rule this whole section rests on
-([§Svelte: Inline content block-style](../../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)),
+([§Svelte: Inline content block-style](../../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)),
 so the glued, spaced and newline authorings are one document and reach one form.
 
 ⚠️ **The one exception is a snippet GLUED to content on both sides**, where the break is *not*
@@ -74,4 +74,4 @@ files — it has one form, not one per authoring.
   (`{@debug}`, `<title>`)
 
 See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

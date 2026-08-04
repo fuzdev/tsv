@@ -19,7 +19,7 @@ under tsv; `prettier_variant_hug.svelte` is prettier-stable, and tsv normalizes 
 tsv expands a wrapped/overflowing block's body uniformly across all block heads and
 body shapes — keyed on whether the construct overflows, not on whether the head can
 dangle (which a preceding sibling suppresses). See
-[conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

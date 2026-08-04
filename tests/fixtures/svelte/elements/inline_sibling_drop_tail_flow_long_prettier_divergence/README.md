@@ -42,4 +42,4 @@ input's hug, and `variant_control_own_line` (the control with the comment on its
 freed room repacking the tail), which both formatters hold stable.
 
 See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

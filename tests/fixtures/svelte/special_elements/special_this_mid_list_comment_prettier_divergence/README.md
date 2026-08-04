@@ -48,7 +48,7 @@ Comment placement is a deliberate authoring choice and tsv preserves the comment
 binding when the attribute list is reordered around it. See
 [conformance_prettier.md §Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy)
 and the catalog entry in
-[§Svelte: Attributes](../../../../../docs/conformance_prettier.md#svelte-attributes).
+[§Svelte: Attributes](../../../../../docs/conformance_prettier_svelte.md#svelte-attributes).
 
 ## Related
 

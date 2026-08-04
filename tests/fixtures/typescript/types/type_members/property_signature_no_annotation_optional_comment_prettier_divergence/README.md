@@ -19,4 +19,4 @@ The non-optional and `readonly` no-annotation cases are a plain match (prettier
 keeps `a /* c */;` in place too) — see
 [property_signature_no_annotation_comment](../property_signature_no_annotation_comment/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

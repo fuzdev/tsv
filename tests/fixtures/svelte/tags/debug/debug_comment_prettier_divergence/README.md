@@ -11,7 +11,7 @@ Content preservation. Comments in debug statements often carry important
 context (expected values, why the variable is being debugged); stripping them
 is silent content loss of developer intent.
 
-See [conformance_prettier.md §Svelte: Elements](../../../../../../docs/conformance_prettier.md#svelte-elements)
+See [conformance_prettier_svelte.md §Svelte: Elements](../../../../../../docs/conformance_prettier_svelte.md#svelte-elements)
 (the `@debug comments` catalog entry).
 
 ## Related

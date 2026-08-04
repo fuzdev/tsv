@@ -31,7 +31,7 @@ punctuates. tsv's form is also what its own inline path already emits for the sh
 declining costs no extra rule — the hoist simply requires a member boundary with content
 on the far side of it, and here there is none.
 
-See [conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
+See [conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments).
 
 ## Related
 

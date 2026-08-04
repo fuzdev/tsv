@@ -20,8 +20,8 @@ the dot, and so does tsv — pinned by the regular sibling [dot_gap_comments](..
 
 **Why this fixture exists:** tsv **dropped** every comment in both gaps. `build_meta_property_doc`
 concatenated `meta` + `"."` + `property` and scanned neither gap — the same class as a comment
-inside a multi-word keyword ([§Comments inside a multi-word keyword](../../../../../../../docs/conformance_prettier.md#comments-inside-a-multi-word-keyword)),
+inside a multi-word keyword ([§Comments inside a multi-word keyword](../../../../../../../docs/conformance_prettier_ts_comments.md#comments-inside-a-multi-word-keyword)),
 and the case that shows why that class's detector (a `d.text` literal with an *interior* space) is
 only a proxy: a header joined by a punctuator has no space to find.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

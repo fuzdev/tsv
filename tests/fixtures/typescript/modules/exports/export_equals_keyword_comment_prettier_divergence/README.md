@@ -18,5 +18,5 @@ The operand-side gap already matches prettier (`export = /* c */ value` is stabl
 [export_equals_operand_paren_comment](../export_equals_operand_paren_comment/) and the plain
 [export_equals](../export_equals/).
 
-See [conformance_prettier.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier.md#comments-inside-a-multi-word-keyword)
-and [§Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier_ts_comments.md#comments-inside-a-multi-word-keyword)
+and [§Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

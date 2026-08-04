@@ -30,5 +30,5 @@ emitted flat and the whole tail — reference included — is wrapped once.
 Prettier is **non-idempotent** on its own output here: a second pass moves `// c` off the `require(`
 line onto its own line, which is why `output_prettier.svelte` carries an `audit_signature.txt`.
 
-See [conformance_prettier.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier.md#comments-inside-a-multi-word-keyword)
-and [§Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier_ts_comments.md#comments-inside-a-multi-word-keyword)
+and [§Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

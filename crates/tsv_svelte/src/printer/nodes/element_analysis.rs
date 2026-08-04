@@ -87,8 +87,8 @@ struct ContentBreaks {
 /// one whose whole content is whitespace the compiler collapses, spelled without a newline.
 ///
 /// An inter-sibling run renders as one whitespace however it is spelled, so a space and a tab
-/// there are the same document and neither may pick a layout ([conformance_prettier.md §Svelte:
-/// Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)
+/// there are the same document and neither may pick a layout ([conformance_prettier_svelte.md §Svelte:
+/// Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)
 /// states it as: the separator's *presence* carries signal, its *spelling* carries none — and
 /// records which of the compiler and the browser supplies that equality per sibling kind). A
 /// **newline** is excluded not because it renders differently — it does not — but because a run of
@@ -217,7 +217,7 @@ impl<'a> Printer<'a> {
     /// Whether the element's content is a **`fill` to reflow into** — the thing whose presence
     /// makes the render-free content boundary stop selecting the layout.
     ///
-    /// [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)
+    /// [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)
     /// states the rule as "the presence of a `fill` to reflow into, **not the shape of the
     /// separator node**". A fill needs two things, and both are load-bearing:
     ///
@@ -472,7 +472,7 @@ impl<'a> Printer<'a> {
                 // fill then reflowed that very newline away, and pass 2 — seeing no newline left —
                 // collapsed it inline. Two mechanisms reading one newline and answering
                 // differently, the same class [`MultilineCause`] closed at the separator-flow site
-                // (conformance_prettier.md §Svelte: Inline content block-style).
+                // (conformance_prettier_svelte.md §Svelte: Inline content block-style).
                 //
                 // The same argument reaches one step further inside a FILL, where the fill owns
                 // the text's interior too: a newline there is one the fill itself wrapped in on a
@@ -760,7 +760,7 @@ impl<'a> Printer<'a> {
         //
         // `<pre>`/`<textarea>` are dispatched to `build_whitespace_sensitive_element_doc` before
         // any of this — there boundary whitespace IS render-significant and the dangle is
-        // mandatory. See conformance_prettier.md §Svelte: Inline content block-style.
+        // mandatory. See conformance_prettier_svelte.md §Svelte: Inline content block-style.
         let mode = if ctx.multiline.is_multiline() {
             BoundaryMode::Hard
         } else {

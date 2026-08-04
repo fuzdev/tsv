@@ -12,4 +12,5 @@ Prettier: packs trailing text onto the line (109 chars, over printWidth)
 tsv treats printWidth as a hard limit, and the break falls at the collapsible whitespace around the
 element rather than splitting its closing `>`. Prettier's fill algorithm doesn't account for the
 accumulated width when packing text after inline element wrappers. See
-[conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy).
+[conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy);
+cataloged in [conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

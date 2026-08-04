@@ -32,4 +32,4 @@ declaration/function/selector faces, and
 [url_escaped_paren_ws](../url_escaped_paren_ws_prettier_divergence/) for the *outer*
 whitespace inside the parens (which tsv does trim, per §4.3.6).
 
-See [conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values).
+See [conformance_prettier_css.md §CSS: Values](../../../../../../docs/conformance_prettier_css.md#css-values).

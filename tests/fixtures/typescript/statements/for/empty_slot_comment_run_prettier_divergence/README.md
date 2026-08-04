@@ -21,4 +21,4 @@ The separator is the slot's, not the comments' own: a line comment in the slot f
 the header open and each comment takes a line, while blocks in a fitting header stay
 on the header line.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -21,4 +21,4 @@ A sibling tag the freeze does not reach still normalizes.
 ## Reason
 
 Rule A binds a directive to the node that follows it; ◆comment_preservation ◆prettier_bug. See
-[conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

@@ -43,4 +43,4 @@ Per Comment Position Philosophy, the user's chosen position is preserved. The
 export sibling of `modules/imports/type_keyword_comment_prettier_divergence`, and the
 non-empty counterpart of `empty_type_keyword_comment_prettier_divergence`.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

@@ -26,7 +26,7 @@ without its comma it is the *empty* list, which mediaqueries-4 evaluates to **tr
 ## Reason
 
 **Content preservation**, and in one case a **prettier bug**. See
-[conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules)
+[conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules)
 (`Empty media query`).
 
 Prettier is inconsistent with itself here as well as with the spec — it deletes an

@@ -20,4 +20,5 @@ expression whole — where prettier overshoots and tears a ternary open at the w
 The travel rule is `fill_multi_expr_travel_long_prettier_divergence`'s; this fixture pins it
 at an indent deep enough that prettier switches to the bracket dangle.
 
-See [conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy).
+See [conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy);
+cataloged in [conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

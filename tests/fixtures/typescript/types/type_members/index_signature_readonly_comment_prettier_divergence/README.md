@@ -10,4 +10,4 @@ for a type-literal member; the fixture uses an interface because a type-literal
 `readonly` index signature with this comment exposes an unrelated parser
 comment-attachment difference from acorn-typescript.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -18,4 +18,4 @@ Design choice. tsv lays out a parenthesized base the same way regardless of a tr
 
 - `member/paren_base_trailing_long/` — the no-`!` form, where tsv matches Prettier (single trailing member hugs the closing `)`).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §TypeScript.
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md) §TypeScript.

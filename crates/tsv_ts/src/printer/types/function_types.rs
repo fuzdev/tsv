@@ -1013,7 +1013,7 @@ impl<'a> Printer<'a> {
                 let mut param_parts = DocBuf::new();
                 // Block comment trailing the last param after its source comma — preserved
                 // past where the comma was (no trailing comma; prettier relocates before;
-                // see conformance_prettier.md §Comment relocation).
+                // see conformance_prettier_ts_comments.md §Comment relocation).
                 let mut last_after_comma = DocBuf::new();
                 let mut prev_end = paren_pos.map_or(0, |p| p + 1); // After `(`
                 for (i, p) in params.iter().enumerate() {
@@ -1021,7 +1021,7 @@ impl<'a> Printer<'a> {
                     // stranded after-comma block (on the comma's line, newline before
                     // this param) trails the comma instead of leading this param —
                     // matching function params / call args (prettier relocates it before
-                    // the comma). See conformance_prettier.md §Comment relocation.
+                    // the comma). See conformance_prettier_ts_comments.md §Comment relocation.
                     let mut leading_start = prev_end;
                     if i > 0 {
                         param_parts.push(d.text(","));
@@ -1105,7 +1105,7 @@ impl<'a> Printer<'a> {
 
         // A line comment trailing the opening `(` is kept on the `(` line (divergence
         // from prettier, which relocates it to its own line as the first param's
-        // leading comment). See conformance_prettier.md §Comment relocation
+        // leading comment). See conformance_prettier_ts_comments.md §Comment relocation
         // (Function/constructor-type `(` trailing). Same mechanism as the call-`(`
         // and object/array/block open-delimiter family.
         let (paren_prefix, paren_pull_pos) = paren_pos.map_or_else(

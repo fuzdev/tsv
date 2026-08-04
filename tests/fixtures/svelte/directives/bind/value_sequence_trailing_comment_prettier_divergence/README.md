@@ -26,7 +26,7 @@ states for every unprefixed value.
 ## Reason
 
 User comments are valuable and shouldn't be silently removed. See
-[conformance_prettier.md §Svelte: Attributes](../../../../../../docs/conformance_prettier.md#svelte-attributes).
+[conformance_prettier_svelte.md §Svelte: Attributes](../../../../../../docs/conformance_prettier_svelte.md#svelte-attributes).
 
 ## Related
 

@@ -40,4 +40,4 @@ the case test, and pulls a label line comment inside the block body. The chain i
 (`case 3: /* block1 */ /* block2 */ // line` moves the label's own comment behind the run, and
 at `default:` it emits the run backwards, `/* block2 */ /* block1 */`).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

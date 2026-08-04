@@ -11,7 +11,7 @@ collapses to a single whitespace, so a separator's *presence* carries signal whi
 carries none: space and tab render identically and are one document. Wherever tsv lets the spelling
 pick a layout instead, that is a bug against rule 1 rather than a divergence from prettier —
 prettier converges neither axis, so it is no oracle here and the bar is tsv-vs-tsv consistency. See
-[§Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[§Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
 
 ⚠️ **Two of the three cases get "renders identically" from the compiler; the tag pair gets it from
 the browser.** `clean_nodes` skips the collapse whenever a neighbor is an `ExpressionTag` ("in the
@@ -63,4 +63,4 @@ boundary was newline-authored, because that is the only case in which the bounda
 select in the first place.
 
 See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

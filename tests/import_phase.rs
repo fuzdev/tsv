@@ -11,7 +11,7 @@
 //! phase (`import defer`) or throws (`import source`) — so these can't be fixtures
 //! either. Each test asserts a single-pass stable round-trip plus idempotency.
 //!
-//! The prettier divergences are cataloged in `docs/conformance_prettier.md` and
+//! The prettier divergences are cataloged in `docs/conformance_prettier_ts.md` and
 //! `docs/conformance_svelte.md`. The `import source` form (prettier throws) is
 //! also live-pinned in `tests/prettier_error_bugs.rs`; the `import defer` form
 //! (prettier silently drops the phase) is documented-only — a live "prettier
@@ -135,8 +135,8 @@ fn static_import_source_keyword_binding_rejected() {
 /// `import.source` / `import.defer` are a dotted pair (`import` `.` `source`), so both
 /// gaps are positions an author can comment in. Emitting the pair as one fixed text
 /// (`"import.source("`) scans neither and drops what's there — the punctuator-joined
-/// member of the multi-word-keyword class (`docs/conformance_prettier.md` §Comments
-/// inside a multi-word keyword). Prettier preserves these, so the "no divergence on the
+/// member of the multi-word-keyword class (`docs/conformance_prettier_ts_comments.md`
+/// §Comments inside a multi-word keyword). Prettier preserves these, so the "no divergence on the
 /// dynamic forms" claim in that doc depends on tsv preserving them too; there is no
 /// fixture to pin it with, because acorn rejects the syntax outright.
 #[test]

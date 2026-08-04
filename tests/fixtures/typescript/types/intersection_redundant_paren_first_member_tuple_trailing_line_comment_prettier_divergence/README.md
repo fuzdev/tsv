@@ -25,4 +25,4 @@ non-idempotently: its unstable first pass breaks the intersection
 (`A /* t */ &⏎ B`) before converging back to the input, so the shells are
 `unformatted_ours` + `prettier_intermediate` (converges to input).
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

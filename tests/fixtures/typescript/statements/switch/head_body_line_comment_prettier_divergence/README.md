@@ -33,4 +33,4 @@ every other kind: authored trailing `)` it stays there with `{` hugged (the one 
 both formatters keep the brace hugged), authored on its own line it keeps that line and `{`
 drops below — where prettier absorbs it into the body, same as it does a `//`.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

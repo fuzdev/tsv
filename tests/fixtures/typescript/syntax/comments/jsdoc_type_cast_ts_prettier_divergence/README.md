@@ -15,7 +15,7 @@ see the sibling [`jsdoc_type_cast_svelte`](../jsdoc_type_cast_svelte/) fixture.
 tsv runs one context-free TypeScript formatter for both JS and TS, so "preserve"
 is uniform: it matches prettier in JS contexts and diverges in TS contexts.
 
-See [conformance_prettier.md §JSDoc / paren semantics](../../../../../../docs/conformance_prettier.md#jsdoc--paren-semantics).
+See [conformance_prettier_ts_comments.md §JSDoc / paren semantics](../../../../../../docs/conformance_prettier_ts_comments.md#jsdoc--paren-semantics).
 
 ## Contexts tested
 

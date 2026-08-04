@@ -21,4 +21,4 @@ and a comment is lost. That is the same information loss the bare-head fixture's
 README describes, reached by the same route.
 
 Reason: Comment relocation. See
-[conformance_prettier.md §Comment relocation](../../../../../../../docs/conformance_prettier.md#comment-relocation).
+[conformance_prettier_ts_comments.md §Comment relocation](../../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

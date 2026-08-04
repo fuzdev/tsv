@@ -479,4 +479,4 @@ positions are honored is decided by [placement](#placement), never by spelling.
 
 ## See also
 
-- [conformance_prettier.md §Format-ignore directive](./conformance_prettier.md#format-ignore-directive) — why the `format-ignore` spelling diverges from prettier
+- [conformance_prettier_ignore.md §Format-ignore directive](./conformance_prettier_ignore.md#format-ignore-directive) — why the `format-ignore` spelling diverges from prettier

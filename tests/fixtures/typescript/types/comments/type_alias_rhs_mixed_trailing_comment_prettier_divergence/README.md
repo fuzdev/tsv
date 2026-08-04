@@ -32,4 +32,4 @@ Per Comment Position Philosophy, tsv keeps the leading block on the `=` line whe
 the author wrote it. The `unformatted_ours_*` variants verify the paren shells are
 idempotent under tsv.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

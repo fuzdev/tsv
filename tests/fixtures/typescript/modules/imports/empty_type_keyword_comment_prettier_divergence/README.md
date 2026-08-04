@@ -34,4 +34,4 @@ indentation (tsv indents the continuation, Prettier keeps it flat). Both positio
 are dual-stable in our formatter. The type-only sibling of
 `empty_keyword_comment_prettier_divergence` (non-type `import {}`).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

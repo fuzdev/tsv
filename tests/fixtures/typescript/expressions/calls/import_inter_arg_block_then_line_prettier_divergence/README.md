@@ -19,4 +19,4 @@ This is the dynamic-`import()` instance of the call-argument
 divergence — `import()` shares the same comment-position rules across every argument path.
 
 Reason: Comment relocation. See
-[conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+[conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

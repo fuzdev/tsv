@@ -14,4 +14,4 @@ prettier over-wraps the params just to attach the body. This is the standalone c
 (the flush authoring) and `prettier_variant_compact` (prettier's params-wrapped form) both normalize
 to `input.svelte` under tsv in one pass.
 
-See [conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+See [conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).

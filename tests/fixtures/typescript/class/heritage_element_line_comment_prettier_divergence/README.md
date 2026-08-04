@@ -15,4 +15,4 @@ the heritage list was joined with a plain `", "`, so a per-element line comment
 swallowed the next element (`// c1, B` — non-reparseable content loss). The
 list now joins with the comma-baking-aware separators.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md#comment-relocation) §Comment relocation.
+See [conformance_prettier_ts_comments.mdNone](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation) §Comment relocation.

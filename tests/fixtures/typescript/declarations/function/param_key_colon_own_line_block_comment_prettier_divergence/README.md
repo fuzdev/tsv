@@ -25,5 +25,5 @@ the list expanded, the tail comments still own-line and `: type` flush.
 The same-gap **line** comment (which forces the break → continuation indent) is
 [param_key_colon_line_comment](../param_key_colon_line_comment_prettier_divergence/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

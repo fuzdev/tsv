@@ -30,4 +30,4 @@ for the full rationale.
 A formatter must never emit output that changes the document's meaning or fails to
 re-parse. Single-quote delimiters are the only spec-conformant quoted form for a
 value holding a literal `"` (HTML §13.1.2.3). See
-[conformance_prettier.md §Svelte: Attributes](../../../../../docs/conformance_prettier.md#svelte-attributes).
+[conformance_prettier_svelte.md §Svelte: Attributes](../../../../../docs/conformance_prettier_svelte.md#svelte-attributes).

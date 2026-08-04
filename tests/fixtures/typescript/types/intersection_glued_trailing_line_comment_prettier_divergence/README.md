@@ -50,5 +50,5 @@ diverges. When the comment instead lands at a neither-object boundary (the last
 member before a break), tsv matches Prettier — see the regular fixture
 [comments/intersection_object_adjacent_line](../comments/intersection_object_adjacent_line/).
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

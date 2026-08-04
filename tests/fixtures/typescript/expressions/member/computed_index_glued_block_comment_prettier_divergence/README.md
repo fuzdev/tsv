@@ -29,4 +29,4 @@ This is the open-delimiter trailing-comment divergence (the `[`-line comment) pl
 computed-member hoist, both sanctioned; the optional `?.[` form takes the same path and shows
 the same relocation.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

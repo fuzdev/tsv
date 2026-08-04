@@ -17,4 +17,4 @@ in both. tsv treats the author's in-header comment placement as intentional,
 consistent with its handling across if/else, try/catch, switch, for, while,
 do-while.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

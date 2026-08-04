@@ -11,7 +11,7 @@ Prettier: preserves whatever spacing the input has (`(min-width:700px)and(max-wi
 
 ## Reason
 
-See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) for the spec basis. CSS Media Queries Level 4 §3 requires whitespace between boolean operator keywords (`not`, `and`, `or`) and `(` — without it, `and(...)` tokenizes as a `<function-token>` (CSS Syntax 3 §4.3.4). Container Queries (CSS Conditional 5) use the same grammar. Prettier only normalizes this for `@supports`, not `@media` or `@container`:
+See [conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules) for the spec basis. CSS Media Queries Level 4 §3 requires whitespace between boolean operator keywords (`not`, `and`, `or`) and `(` — without it, `and(...)` tokenizes as a `<function-token>` (CSS Syntax 3 §4.3.4). Container Queries (CSS Conditional 5) use the same grammar. Prettier only normalizes this for `@supports`, not `@media` or `@container`:
 
 | At-rule      | `and(...)` input      | Prettier output       |
 | ------------ | --------------------- | --------------------- |

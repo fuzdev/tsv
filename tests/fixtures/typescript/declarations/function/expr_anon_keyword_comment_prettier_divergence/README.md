@@ -12,4 +12,4 @@ We preserve the comment in the user's original position between keyword and
 params. Per comment placement policy, user intent is preserved when prettier
 moves comments to different syntactic positions.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

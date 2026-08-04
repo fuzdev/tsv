@@ -32,4 +32,4 @@ gap collapses to one line when it fits (there the block hugs the next declarator
 both formatters agree) and diverges the same way only once the declarators wrap —
 see [for-init](../../../../statements/for/init_after_comma_block_stranded_prettier_divergence/).
 See
-[conformance_prettier.md](../../../../../../../docs/conformance_prettier.md) §Comment relocation.
+[conformance_prettier_ts_comments.md](../../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -14,4 +14,4 @@ Prettier: keeps the opening tag on the text line and wraps its attributes — se
 
 Design choice, render-free under Svelte 5 (the whitespace boundary before the element
 collapses to one space at compile, so the break is render-equivalent).
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

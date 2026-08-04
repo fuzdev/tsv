@@ -20,4 +20,4 @@ prettier now throws, the former `output_prettier` / `variant_before_bang` forms
 are no longer expressible and have been removed; `unformatted_ours_compact`
 still pins tsv's own normalization to the input.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

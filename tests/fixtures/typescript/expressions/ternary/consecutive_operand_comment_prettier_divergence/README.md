@@ -24,4 +24,4 @@ also the ternary face of prettier's information-destructive comment motion
 documented for property signatures (two leading line comments `merge and
 reverse`); tsv preserves each comment as its own node.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

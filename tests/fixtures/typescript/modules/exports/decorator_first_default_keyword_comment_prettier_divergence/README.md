@@ -26,5 +26,5 @@ Relocation here also **collapses a distinction**: `c1` and `c2` are authored on 
 recoverable. That is the same association loss catalogued for `await`/`using` and
 `export as namespace`.
 
-See [conformance_prettier.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier.md#comments-inside-a-multi-word-keyword)
-and [§Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier_ts_comments.md#comments-inside-a-multi-word-keyword)
+and [§Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

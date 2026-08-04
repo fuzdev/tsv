@@ -481,7 +481,7 @@ fn in_any_span(p: usize, spans: &[(usize, usize)]) -> bool {
 ///   `x is A | B` shape, where the wrapper starts at the union). Contrast the ordinary `: T`
 ///   annotation, whose span starts at the `:`: that one is a real candidate, since the
 ///   decided semantics freeze it whole — operators and all — rather than applying the member
-///   rules (`docs/conformance_prettier.md` §Format-ignore directive, "On annotation heads").
+///   rules (`docs/conformance_prettier_ignore.md` §Format-ignore directive, "On annotation heads").
 fn is_composite_type(node: &Value) -> bool {
     let mut cur = node;
     loop {

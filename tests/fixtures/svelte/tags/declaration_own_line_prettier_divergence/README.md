@@ -20,7 +20,7 @@ beside such a tag therefore changes no render, and the layout question is free �
 — so tsv answers it with the tag's own line, which is where authors already put these tags (41 of 41
 declaration tags across the corpus sit on their own line) and what makes a run of them read as the
 declarations they are. A render-free run must not select a layout, the rule this whole section rests
-on ([§Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)),
+on ([§Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)),
 so the glued, spaced and newline authorings are one document and reach one form.
 
 ⚠️ **The one exception is a tag GLUED on both sides**, where the break is *not* render-free:
@@ -86,4 +86,4 @@ converges to the welded `input` form through the hoist's *trim*
   in every host, where both formatters already agree
 
 See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

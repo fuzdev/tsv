@@ -25,4 +25,4 @@ Same class as
 [inline_boundary_whitespace](../inline_boundary_whitespace_prettier_divergence/) —
 pinned separately because prettier's `<title>` handling (metadata content,
 `display: none`) could change independently of ordinary inline elements. See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

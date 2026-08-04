@@ -52,4 +52,4 @@ it, which is the standing
 [§Comment Position Philosophy](../../../../../../docs/conformance_prettier.md#comment-position-philosophy)
 divergence.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

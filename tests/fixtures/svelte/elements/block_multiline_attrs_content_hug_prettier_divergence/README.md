@@ -15,4 +15,5 @@ The `>` immediately precedes `{expr}` with no whitespace, so no whitespace text 
 ## Reason
 
 Print width. tsv respects printWidth while maintaining whitespace semantics. See `block_multiline_attrs_content_hug/` for the matching 100-char case, and
-[conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy).
+[conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy);
+cataloged in [conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

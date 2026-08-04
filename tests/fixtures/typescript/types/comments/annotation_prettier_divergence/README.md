@@ -18,5 +18,5 @@ intersection **flush**
 ([annotation_continuation_indent](../annotation_continuation_indent_prettier_divergence/)),
 while tsv applies one continuation layout everywhere.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
-§Uniform Forced-Continuation Indent.
+See [conformance_prettier.md §Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent);
+cataloged in [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

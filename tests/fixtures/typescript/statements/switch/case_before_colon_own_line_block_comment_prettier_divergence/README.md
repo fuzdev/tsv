@@ -31,5 +31,5 @@ A **multiline** block in this gap stays glued to the `:` in both formatters —
 the broke-after continuation rule is scoped to value-separator gaps, and
 prettier does not distinguish the broke-after authoring here either.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

@@ -16,7 +16,7 @@ doc path it uses for the rest of the selector (registered at parse time, emitted
 preserves the source whitespace. This is the principled successor to the top-level
 [selector_list](../selector_list_prettier_divergence/) divergence — same rule, now applied
 inside `:is()`/attribute selectors and to before-comma comments. See
-[conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
+[conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments).
 
 ## Related
 

@@ -30,5 +30,5 @@ This fixture keeps the with-type-params coverage (the comment here was once
 dropped entirely when type parameters were present — content loss); the
 break-forced union sibling is
 [type_alias_line_pre_equals_break](../type_alias_line_pre_equals_break_prettier_divergence/).
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

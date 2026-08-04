@@ -20,4 +20,4 @@ a long trailing comment, so that case is a separate divergence — see
 [type_param_keyword_line_comment](../type_param_keyword_line_comment_prettier_divergence/).
 Only an own-line first comment diverges here.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

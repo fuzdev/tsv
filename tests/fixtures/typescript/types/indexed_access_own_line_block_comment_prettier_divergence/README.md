@@ -27,4 +27,4 @@ relocation is **content-corrupting** rather than dual-stable, because the commen
 newline breaks the index suffix off the type. That is why this fixture can pin Prettier's
 relocated form as a `variant_own_line` and the multiline one cannot.
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

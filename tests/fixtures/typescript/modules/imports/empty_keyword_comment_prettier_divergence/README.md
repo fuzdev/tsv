@@ -13,4 +13,4 @@ sibling of `empty_type_keyword_comment_prettier_divergence`.
 
 Reason: Comment position — the user's chosen placement is preserved.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

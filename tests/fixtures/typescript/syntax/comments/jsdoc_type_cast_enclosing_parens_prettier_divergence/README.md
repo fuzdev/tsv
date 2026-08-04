@@ -35,7 +35,7 @@ which is exactly why its own output doesn't survive a second pass.
 `const n` is the boundary: with no enclosing paren to add, the comment already sits
 against its own `(` and tsv and prettier agree.
 
-See [conformance_prettier.md §JSDoc / paren semantics](../../../../../../docs/conformance_prettier.md#jsdoc--paren-semantics).
+See [conformance_prettier_ts_comments.md §JSDoc / paren semantics](../../../../../../docs/conformance_prettier_ts_comments.md#jsdoc--paren-semantics).
 
 ## Contexts tested
 

@@ -24,4 +24,4 @@ inline in both formatters (not a divergence); a **multiline** block the author
 broke after keeps its break, at
 [default_equals_multiline_block_break](../default_equals_multiline_block_break_prettier_divergence/).
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

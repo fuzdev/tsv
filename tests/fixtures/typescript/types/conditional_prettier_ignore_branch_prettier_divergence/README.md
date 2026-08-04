@@ -37,4 +37,4 @@ prettier-side claim.)
 
 Branches covered: true (`?`) and false (`:`) — the same placement rule on each.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

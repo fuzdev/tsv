@@ -26,4 +26,4 @@ prettier relocates it to trail the extends-type) or an **own-line multiline** bl
 comment still hangs the extends-type on its own line and forces the conditional to
 break (a glued multiline block collapses inline).
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

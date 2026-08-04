@@ -15,5 +15,5 @@ The line form of [default_keyword_comment](../default_keyword_comment_prettier_d
 gap, same reason to preserve; only the forced break differs. Consistent with every other
 module-header line comment, which tsv indents uniformly.
 
-See [conformance_prettier.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier.md#comments-inside-a-multi-word-keyword)
+See [conformance_prettier_ts_comments.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier_ts_comments.md#comments-inside-a-multi-word-keyword)
 and [§Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent).

@@ -52,4 +52,4 @@ A format-ignore directive alone on its line in a gap freezes the following
 argument here as everywhere else (Rule A) — see
 [args_prettier_ignore_member](../args_prettier_ignore_member/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -28,5 +28,5 @@ dangle (`{#if cond⏎}`, keyed on head width) and the **sibling `>`** dangle
 (`</a⏎>{#each …}`, keyed on *inter-sibling* whitespace, which Svelte keeps). Neither is a
 content boundary.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)
-and [§Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)
+and [§Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).

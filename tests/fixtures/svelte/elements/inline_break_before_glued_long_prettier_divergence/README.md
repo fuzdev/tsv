@@ -56,4 +56,4 @@ compact authoring (tsv → `input.svelte`, prettier → `output_prettier.svelte`
 
 Design choice, render-free under Svelte 5 for the *whitespace* boundary; render-significant
 for the *glued* boundary, which is therefore never split.
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

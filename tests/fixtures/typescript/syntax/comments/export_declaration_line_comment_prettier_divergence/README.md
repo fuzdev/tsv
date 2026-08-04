@@ -15,4 +15,4 @@ construct (not a module header) and stays flat in both formatters — it lives i
 the regular [keyword_declaration_line_comment](../keyword_declaration_line_comment/)
 fixture.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

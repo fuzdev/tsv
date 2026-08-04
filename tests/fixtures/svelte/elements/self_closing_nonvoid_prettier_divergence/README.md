@@ -34,4 +34,4 @@ components, which are not HTML elements at all.
 See the HTML Standard §13.2 (parse errors,
 `non-void-html-element-start-tag-with-trailing-solidus`),
 https://svelte.dev/e/element_invalid_self_closing_tag, and
-[conformance_prettier.md §Svelte: Elements](../../../../../docs/conformance_prettier.md#svelte-elements).
+[conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

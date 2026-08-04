@@ -31,4 +31,4 @@ component intact rather than splitting its attributes, so an over-wide component
 line — the **sole divergence** from prettier's internal attribute break. The boundary before the
 component is a collapsible space, so the word before it stays on the text line; the short dropped
 component then packs its trailing text like every other fill word (the tail flows after `/>`). See
-[conformance_prettier.md §Svelte: Elements (Wide inline child own-line)](../../../../../docs/conformance_prettier.md#svelte-elements).
+[conformance_prettier_svelte.md §Svelte: Elements (Wide inline child own-line)](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

@@ -16,5 +16,5 @@ a decorator after `default` makes the class an *expression*, so it takes a separ
 (the decorators always print on their own line). Same gap, same reason to preserve; this fixture
 pins that the path claims the gap too.
 
-See [conformance_prettier.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier.md#comments-inside-a-multi-word-keyword)
-and [§Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comments inside a multi-word keyword](../../../../../../docs/conformance_prettier_ts_comments.md#comments-inside-a-multi-word-keyword)
+and [§Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

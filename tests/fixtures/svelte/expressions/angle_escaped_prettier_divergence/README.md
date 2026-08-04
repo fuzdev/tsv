@@ -54,4 +54,4 @@ pinned by
 [inline_content_spaced_tags_tail_long](../../elements/inline_content_spaced_tags_tail_long/).
 
 See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

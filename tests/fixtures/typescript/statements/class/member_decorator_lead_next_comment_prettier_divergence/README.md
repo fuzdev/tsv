@@ -25,4 +25,4 @@ is kept own-line, and the inline form (the input) is kept inline. Prettier colla
 the inline authoring onto the own-line form but keeps the own-line one — so tsv
 respects the author's inline placement where prettier discards it.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

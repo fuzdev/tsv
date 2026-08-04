@@ -25,5 +25,5 @@ Per Comment Position Philosophy, tsv keeps the directive where the author placed
 and freezes the member it precedes, rather than relocating the comment across the
 `&` (and, at prettier's fixed point, losing the freeze).
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive)
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive)
 and §Comment relocation.

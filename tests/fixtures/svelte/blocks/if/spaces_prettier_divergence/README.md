@@ -40,7 +40,7 @@ it would not be render-safe).
 Svelte-mirror whitespace: in inline layout, every whitespace character tsv keeps is one
 the compiler keeps — a space belongs *between* sibling nodes (render-significant), never
 inside a tag or a section boundary (render-free). See
-[conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

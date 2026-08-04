@@ -26,4 +26,4 @@ from: tsv normalizes it to `input.svelte`, prettier normalizes it to the dangle 
 Design choice, render-free under Svelte 5. The inter-sibling whitespace is trimmed because the
 compiler removes it; the blank line survives because blank-line preservation is an authoring
 concern independent of render, uniform with every other block-style boundary tsv produces.
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

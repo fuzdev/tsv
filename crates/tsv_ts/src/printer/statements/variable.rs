@@ -400,7 +400,7 @@ impl<'a> Printer<'a> {
                 // and drops `= value` to a continuation line indented one level (preserve
                 // — lossless when a second comment also trails the statement; prettier
                 // relocates it to end-of-statement and merges the two onto one line —
-                // conformance_prettier.md §Comment relocation). Bypasses the
+                // conformance_prettier_ts_comments.md §Comment relocation). Bypasses the
                 // assignment-layout selection below; value built lazily so the common
                 // no-comment path is unaffected. Init declarators always feed `parts`
                 // (the comma/separator is handled above, the `;` after the loop), so a

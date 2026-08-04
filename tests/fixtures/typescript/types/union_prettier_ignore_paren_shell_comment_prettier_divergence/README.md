@@ -23,4 +23,4 @@ first-member position (`type A`) and a between-members position (`type B`).
 
 Comment preservation outranks redundant-paren removal under a freeze: the paren-transparent
 freeze slices the inner node only when the shell is comment-free, and keeps the whole member
-otherwise. See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+otherwise. See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

@@ -16,4 +16,4 @@ stay in the regular [keyword_declaration_line_comment](../keyword_declaration_li
 [keyword_name_line_comment](../keyword_name_line_comment/), and
 [keyword_name_line_comment_2](../keyword_name_line_comment_2/) fixtures.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

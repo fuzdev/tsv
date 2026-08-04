@@ -28,7 +28,7 @@ a compound selector, where inserting a space turns `.a/* c */.b` into a descenda
 `.a .b` and the run therefore stays glued
 ([combinator_comment](../../../selectors/combinator_comment_svelte_prettier_divergence/)).
 
-See [conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
+See [conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments).
 
 ## Related
 

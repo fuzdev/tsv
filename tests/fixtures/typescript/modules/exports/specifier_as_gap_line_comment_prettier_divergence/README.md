@@ -19,5 +19,5 @@ Import and export named specifiers share one renamed-specifier printer
 continuation helpers — so a line comment can't swallow the `as` or the renamed binding (the
 before-`as` case was a **content-loss** bug). A same-line block comment trails inline in both.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation)
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
 and [§Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent).

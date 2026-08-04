@@ -19,4 +19,4 @@ preserve the after-comma position too.
 Reason: Comment relocation. See the plain-call sibling
 ([nonlast_arg_after_comma_block_then_line](../nonlast_arg_after_comma_block_then_line_prettier_divergence/))
 for the full rationale, and
-[conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+[conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

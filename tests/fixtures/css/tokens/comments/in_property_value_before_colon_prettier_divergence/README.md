@@ -9,7 +9,7 @@ Prettier also preserves compact (`color/* comment */:red;`) and extra-spaced (`c
 
 ## Reason
 
-Stable quirk. tsv normalizes comment spacing consistently. Consistent with tsv's handling across all CSS comment spacing contexts. See [conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
+Stable quirk. tsv normalizes comment spacing consistently. Consistent with tsv's handling across all CSS comment spacing contexts. See [conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments).
 
 ## Related
 

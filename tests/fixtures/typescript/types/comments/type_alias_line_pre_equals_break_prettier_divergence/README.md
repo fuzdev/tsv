@@ -38,5 +38,5 @@ line rather than hugging a first member; the members then hang at the `=` level,
 not one deeper. The same layout applies whether the union breaks from
 interleaved member comments (shown here) or from print width.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

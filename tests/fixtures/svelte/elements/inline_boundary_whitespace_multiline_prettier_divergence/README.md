@@ -19,4 +19,4 @@ does not.
 Preserving the space here is not merely a divergence but a defect: emitted at line-start it renders
 as nothing, re-parses as indentation, and is dropped on the next pass — a non-idempotent format.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

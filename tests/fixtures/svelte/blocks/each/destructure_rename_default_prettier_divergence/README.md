@@ -18,4 +18,4 @@ source and mishandles a non-shorthand property whose value is an `AssignmentPatt
 emitting only the value and discarding the key — so its output reads a different
 source property and is not semantically equivalent to its input. tsv preserves the
 key. Plain renames without a default (`{a: b}`) are printed correctly by both. See
-[conformance_prettier.md §Svelte: destructuring rename-with-default key drop](../../../../../../docs/conformance_prettier.md#svelte-destructuring-rename-with-default-key-drop).
+[conformance_prettier_svelte.md §Svelte: destructuring rename-with-default key drop](../../../../../../docs/conformance_prettier_svelte.md#svelte-destructuring-rename-with-default-key-drop).

@@ -16,4 +16,4 @@ Only the `[`-line comment, unchanged by this fixture's subject: tsv keeps `// fo
 open-delimiter trailing-comment divergence, sanctioned and cataloged for the mapped-type `[`
 among the rest of its family.
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

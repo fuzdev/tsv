@@ -28,4 +28,4 @@ A *line* comment in the same gap still hangs the `:` onto the next line — ther
 inlining would swallow the return type
 ([return_type_close_paren_line_comment](../return_type_close_paren_line_comment_prettier_divergence/)).
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

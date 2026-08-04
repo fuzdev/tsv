@@ -37,7 +37,7 @@ pub(crate) fn is_keyframes_atrule(name: &str) -> bool {
 /// so `AND`/`Or`/`NOT` are the same keyword as `and`/`or`/`not`. This drives
 /// argument/connector *recognition* only; the printer preserves the keyword's
 /// source case (matching prettier — see `connector_raw` and the boolean-operator
-/// case note in `docs/conformance_prettier.md`).
+/// case note in `docs/conformance_prettier_css.md`).
 pub(super) fn is_boolean_operator_keyword(ident: &str) -> bool {
     ident.eq_ignore_ascii_case("and")
         || ident.eq_ignore_ascii_case("or")

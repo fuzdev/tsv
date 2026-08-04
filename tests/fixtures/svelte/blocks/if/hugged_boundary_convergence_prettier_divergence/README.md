@@ -21,5 +21,5 @@ The cross-block-type statement of the same rule — `{#each}` / `{#key}` / `{#sn
 each `{#await}` phase — is
 [blocks/content_boundary_convergence](../../content_boundary_convergence_prettier_divergence/).
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)
-and [§Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)
+and [§Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).

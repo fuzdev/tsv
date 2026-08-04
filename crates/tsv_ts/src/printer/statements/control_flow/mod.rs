@@ -427,7 +427,7 @@ impl<'a> Printer<'a> {
     /// blank — every header→body gap, block body or not, so a body never sits below a
     /// blank. Every *subsequent* comment passes the previous comment's end, because a
     /// blank *between* two comments separates two distinct remarks and is always kept
-    /// (`conformance_prettier.md` §"No blank above a body block's `{`").
+    /// (`conformance_prettier_ts_comments.md` §"No blank above a body block's `{`").
     ///
     /// This is the rule for gap emitters that build their own comment run. A run emitted
     /// through the generic builder (`build_comments_between`) gets the same treatment

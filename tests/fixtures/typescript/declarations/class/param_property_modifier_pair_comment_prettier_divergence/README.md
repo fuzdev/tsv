@@ -14,4 +14,4 @@ identically by both formatters — see `../param_property_modifier_comment/`. Pe
 comment placement policy, we preserve user intent when prettier moves comments to
 different positions.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

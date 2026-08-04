@@ -41,5 +41,5 @@ form). This divergence is purely about which stable form to favor for
 unstable inputs.
 
 Reason: Comment normalization (stable quirks). See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment normalization (stable quirks).

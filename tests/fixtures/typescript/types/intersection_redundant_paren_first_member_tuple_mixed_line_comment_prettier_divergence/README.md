@@ -25,4 +25,4 @@ prettier is non-idempotent: its unstable first pass breaks the intersection
 (`A &⏎ B`) before converging to the glued variant, so the shells are
 `unformatted_ours` + `prettier_intermediate_to_variant`.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

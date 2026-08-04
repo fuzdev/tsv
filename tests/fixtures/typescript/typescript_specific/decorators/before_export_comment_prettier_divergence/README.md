@@ -26,4 +26,4 @@ Comment position is authorship signal; ◆comment_preservation. tsv previously *
 three comments here — the gap was scanned over an inverted range (the declaration's span starts
 at the decorator, *before* the `export` keyword the scan began at), so nothing found them;
 ◆content_preservation. See
-[conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

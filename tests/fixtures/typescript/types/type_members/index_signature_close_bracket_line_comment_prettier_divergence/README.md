@@ -24,6 +24,6 @@ A block comment in this gap (`[key: string /* c */]`) stays inline in both and
 is not a divergence. Same delimiter-gap comment class as every other open/close
 delimiter (and the same oscillation as the sibling
 `index_signature_bracket_colon_multi_comment_prettier_divergence`) — see
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy. Without the break, a line
 comment here would swallow `]` and the value annotation (content loss).

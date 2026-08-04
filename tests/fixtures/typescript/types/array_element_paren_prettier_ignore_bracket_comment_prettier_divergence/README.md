@@ -27,4 +27,4 @@ Prettier freezes the coarser `((…) => void)[]` unit and reaches its own fixed 
 two passes (pinned via `audit_signature.txt`), relocating both the directive and the
 comment along the way.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Format-ignore directive.
+See [conformance_prettier_ignore.md](../../../../../docs/conformance_prettier_ignore.md) §Format-ignore directive.

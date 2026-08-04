@@ -35,6 +35,6 @@ the first: emitting each comment with only a leading space renders `// c1` and
 `// c2` on one line (`// c1 // c2`) — the `// c2` becomes text inside `// c1`,
 content loss and non-idempotent. Each comment must be emitted on its own line.
 See
-[conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation, §Uniform Forced-Continuation Indent, and §Comment Position
 Philosophy.

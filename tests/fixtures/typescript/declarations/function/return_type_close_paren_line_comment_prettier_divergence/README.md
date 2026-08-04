@@ -38,4 +38,4 @@ methods, and type-member method signatures — all funnel through the one `)`→
 comment emission. A block comment in the same gap stays inline
 (`f(a: string) /* c */: string`), matching prettier.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

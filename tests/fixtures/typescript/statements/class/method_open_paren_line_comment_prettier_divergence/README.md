@@ -37,4 +37,4 @@ trailing `(` diverges.
 Before this, the comment ran to end-of-line and swallowed the following tokens
 (`method(// c a: number)` — invalid and non-idempotent); now it is preserved.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

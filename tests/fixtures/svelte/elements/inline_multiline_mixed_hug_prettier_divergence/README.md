@@ -14,4 +14,4 @@ are the same document. tsv therefore converges every authoring on one form, wher
 to the block-style input. `unformatted_ours_spaces.svelte` is a loose authoring tsv likewise
 normalizes to input (prettier dangles it instead).
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

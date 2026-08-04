@@ -15,4 +15,4 @@ Prettier: `{:then { b = 1 }}`, `{:catch { b = 1 }}` (key dropped — wrong prope
 destructuring property whose value is an `AssignmentPattern`, in every await binding
 position — so the output reads a different source property and is not semantically
 equivalent to its input. tsv preserves the key. See
-[conformance_prettier.md §Svelte: destructuring rename-with-default key drop](../../../../../../docs/conformance_prettier.md#svelte-destructuring-rename-with-default-key-drop).
+[conformance_prettier_svelte.md §Svelte: destructuring rename-with-default key drop](../../../../../../docs/conformance_prettier_svelte.md#svelte-destructuring-rename-with-default-key-drop).

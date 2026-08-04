@@ -32,5 +32,5 @@ The only valid definite form — annotation, no initializer (`c!: number;`) — 
 formatters agree on and is covered by
 [property_modifier_type_comment](../property_modifier_type_comment/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md)
 §Prettier rejects valid input.

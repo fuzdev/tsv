@@ -14,7 +14,7 @@ keeps it: `clean_nodes` classifies with `regex_not_whitespace` = `/[^ \t\r\n]/`,
 U+00A0, so the node is not whitespace-only and survives — `&nbsp;<div>block</div>` compiles to
 `<!---->&nbsp;<div>block</div>`. Deleting it is content loss, and the same class as
 [text_form_feed](../text_form_feed_prettier_divergence/), one level out. See
-[conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+[conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
 
 **The line break after it is render-free**, which is why `input.svelte` may carry one: whitespace
 at a block-level boundary is not rendered, so `&nbsp;<div>` and `&nbsp;⏎<div>` are the same render

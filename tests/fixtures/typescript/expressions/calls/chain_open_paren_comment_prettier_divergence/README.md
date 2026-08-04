@@ -30,5 +30,5 @@ on its own line, both formatters keep it there — the two positions are
 dual-stable.
 
 Reason: Comment relocation. See
-[conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation)
+[conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
 (Call open paren `(`).

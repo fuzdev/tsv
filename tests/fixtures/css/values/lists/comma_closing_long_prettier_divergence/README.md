@@ -34,7 +34,7 @@ the commas instead, so the variant is `_ours`.
 [comma_closing](../comma_closing_prettier_divergence/), seen at the width boundary.
 Deliberately **not** ◆print_width: neither formatter overruns here. Prettier deletes the
 comma and, a column shorter, never reaches the width at all. See
-[conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values)
+[conformance_prettier_css.md §CSS: Values](../../../../../../docs/conformance_prettier_css.md#css-values)
 ("Closing comma in a value").
 
 ## Related

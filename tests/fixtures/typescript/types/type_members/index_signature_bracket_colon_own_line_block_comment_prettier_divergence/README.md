@@ -30,5 +30,5 @@ The same-gap **line** comment (which forces the break → continuation indent) i
 the key→`:` gap inside the brackets keeps prettier in the gap instead
 ([index_signature_key_colon_own_line_block_comment](../index_signature_key_colon_own_line_block_comment_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

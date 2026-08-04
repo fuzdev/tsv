@@ -27,4 +27,4 @@ sibling [clauses_prettier_ignore_head](../clauses_prettier_ignore_head/).
 ## Reason
 
 A formatter must not emit code that fails to parse; ◆prettier_bug. See
-[conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

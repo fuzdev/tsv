@@ -165,7 +165,7 @@ pub(super) fn render_fill_iterative(
         // A short inline element (its own content fits flat) that dropped to its own line — whether
         // pushed there by a preceding break (already at line start) or dropped mid-fill below — no
         // longer isolates its trailing text: it packs like every other fill word so the run flows
-        // after it (conformance_prettier.md §Svelte: Inline content block-style, "a text run flows as
+        // after it (conformance_prettier_svelte.md §Svelte: Inline content block-style, "a text run flows as
         // one fill"). The at-line-start case falls through to Case 3's `both_fit` flow; the mid-fill
         // case flows via the `after_element_fold`-gated arm in Case 3. A *wide* element that wraps
         // still hugs the dangled `>` (the fold's terminal-tail hug) / owns its line.
@@ -492,7 +492,7 @@ pub(super) fn render_fill_iterative(
                     // The Svelte after-element fold's lead element dropped to its own line from
                     // mid-fill (a preceding word pushed it). It fits intact here, so let the trailing
                     // text flow greedily after it — the short inline element packs like any other fill
-                    // word (conformance_prettier.md §Svelte: Inline content block-style, "a text run
+                    // word (conformance_prettier_svelte.md §Svelte: Inline content block-style, "a text run
                     // flows as one fill"), and the same-line-authored drop converges with the
                     // newline-authored one instead of one flowing and the other isolating (an F1
                     // break).

@@ -87,7 +87,7 @@ Foundation for all CSS parsing. Spec: `css-syntax-3`
 - Escapes preserved verbatim in at-rule preludes (`@keyframes \@mymove`, `\31 23` — serialized raw, not decoded)
 - Escapes in strings
 - Surrogate pair handling
-- An escape's payload is content, not padding — a trailing escaped whitespace survives trimming and line-wrapping in every position (`width: 50px\ ;`, `url(x\ )`, `@layer a\ ;`, `.a\ , .b`), so the backslash never strands onto the following delimiter. Prettier corrupts these into forms that no longer parse; see [conformance_prettier.md §CSS: Values](conformance_prettier.md#css-values) and [§CSS: At-Rules](conformance_prettier.md#css-at-rules)
+- An escape's payload is content, not padding — a trailing escaped whitespace survives trimming and line-wrapping in every position (`width: 50px\ ;`, `url(x\ )`, `@layer a\ ;`, `.a\ , .b`), so the backslash never strands onto the following delimiter. Prettier corrupts these into forms that no longer parse; see [conformance_prettier_css.md §CSS: Values](conformance_prettier_css.md#css-values) and [§CSS: At-Rules](conformance_prettier_css.md#css-at-rules)
 - A hex escape's optional whitespace terminator belongs to the escape and is absorbed exactly once (`\41 2px` is the single ident `A2px`, never `A` + `2px`)
 - Non-CSS whitespace is value content, not separator — an NBSP or U+3000 in a value or selector survives verbatim (`.a<NBSP>, .b` keeps its class name)
 
@@ -326,7 +326,7 @@ Spec: `css-variables-1`
 - Custom property declaration (`--name: value`)
 - Empty custom property (`--name:;`) — value grammar is `<declaration-value>?`;
   every spacing variant trims to the same empty value, normalized to a single
-  space (`--name: ;`), a prettier divergence (see `conformance_prettier.md` →
+  space (`--name: ;`), a prettier divergence (see `conformance_prettier_css.md` →
   CSS: Values)
 - Empty custom property with `!important` (`--name: !important;`) — also
   normalizes to a single space; prettier is non-convergent here (grows a space
@@ -337,8 +337,8 @@ Spec: `css-variables-1`
   (substitutes nothing when unset, unlike `var(--a)`) and is preserved; so is the
   same **closing** comma anywhere else in a declaration value (`transition: a,`,
   `rgb(1, 2, 3,)`, `--x: a,`), one rule rather than a `var()` carve-out, a
-  prettier divergence (see `conformance_prettier.md` → CSS: Values, "Closing comma
-  in a value"). An *escaped* comma (`var(--b, x\,)`) is content and closes nothing
+  prettier divergence (see `conformance_prettier_css.md` → CSS: Values, "Closing
+  comma in a value"). An *escaped* comma (`var(--b, x\,)`) is content and closes nothing
 - Nested fallbacks (`var(--a, var(--b, red))`)
 - Composition with `calc()`
 

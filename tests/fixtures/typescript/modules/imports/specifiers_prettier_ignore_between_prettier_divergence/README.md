@@ -30,4 +30,4 @@ the ordinary fixtures `imports/specifiers_prettier_ignore_member` and
 
 Hosts covered: `import { … }` and `export { … } from`.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

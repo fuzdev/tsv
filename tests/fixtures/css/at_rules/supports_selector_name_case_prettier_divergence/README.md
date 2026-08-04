@@ -7,11 +7,11 @@ Prettier: `SELECTOR(div: hover)` (the argument is treated as a declaration)
 
 Prettier's output is not a stylistic difference — `div: hover` is not a selector, so the condition it produces is false where the author's was true. Once prettier has written that form, neither formatter can recover it: `div: hover` no longer parses as a selector, so tsv keeps it opaque too (see [supports_selector_argument](../supports_selector_argument_prettier_divergence/)).
 
-The name's own case is preserved by both formatters, matching how tsv preserves every function name (`URL(`, `RGB(`) — see [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) "CSS keyword case".
+The name's own case is preserved by both formatters, matching how tsv preserves every function name (`URL(`, `RGB(`) — see [conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules) "CSS keyword case".
 
 ## Reason
 
-See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) — "`selector()` argument".
+See [conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules) — "`selector()` argument".
 
 ## Related
 

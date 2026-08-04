@@ -40,4 +40,4 @@ by compile-diff — the block-style and inline forms compile identically), so ts
 boundary as render-free and lays the container out block-style, uniformly with every other
 render-free fragment boundary. This extends the whitespace-trim stance to the one inter-sibling
 position that is also render-free.
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

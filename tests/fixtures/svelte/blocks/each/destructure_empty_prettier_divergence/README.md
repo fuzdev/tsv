@@ -24,4 +24,4 @@ positions, which route through the same printer: prettier emits `{ }`, tsv `{}`
 separately fixtured here.
 
 See
-[conformance_prettier.md §Svelte: empty destructuring brace spacing](../../../../../../docs/conformance_prettier.md#svelte-empty-destructuring-brace-spacing).
+[conformance_prettier_svelte.md §Svelte: empty destructuring brace spacing](../../../../../../docs/conformance_prettier_svelte.md#svelte-empty-destructuring-brace-spacing).

@@ -145,7 +145,7 @@ impl<'a> Printer<'a> {
     /// Boundary whitespace is always trimmed — whitespace-only text at the fragment edges is
     /// skipped and the first/last text node's edge run is stripped. It is render-free under
     /// Svelte 5 (`clean_nodes` trims every fragment edge at compile), so no element kind keeps
-    /// it — see conformance_prettier.md §Svelte: Inline content block-style.
+    /// it — see conformance_prettier_svelte.md §Svelte: Inline content block-style.
     ///
     /// # Parameters
     /// - `cause`: the convergence mode — [`MultilineCause::None`] is the legacy inline arm;
@@ -497,7 +497,7 @@ impl<'a> Printer<'a> {
     /// declaration but a transient debugging aid, so it keeps the edge *trim* the same hoist
     /// licenses — see [`internal::FragmentNode::is_hoisted_from_fragment`].
     ///
-    /// See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+    /// See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
     pub(super) fn is_own_line_declaration(&self, nodes: &[FragmentNode<'_>], i: usize) -> bool {
         nodes[i].is_declaration()
             && !(self.glued_to_content(nodes, i, true) && self.glued_to_content(nodes, i, false))
@@ -731,7 +731,7 @@ impl<'a> Printer<'a> {
     /// Note this is orthogonal to whether the *element* lays out multiline, which an authored
     /// newline does still decide and which is preserved — so the convergence target is the
     /// multiline form, never a collapsed one-liner. See
-    /// [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+    /// [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
     pub(super) fn sibling_newline_flows(&self, node: &FragmentNode<'_>) -> bool {
         match node {
             // A tag has fixed width and no structure to protect — always flows.
@@ -939,7 +939,7 @@ impl<'a> Printer<'a> {
     /// line, with the inter-sibling whitespace **trimmed**. Svelte's compiler removes that
     /// whitespace entirely (`clean_nodes` `can_remove_entirely`), so this is render-equivalent to
     /// the inline form and reproduces the block-authored form both formatters already keep — see
-    /// [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+    /// [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
     ///
     /// ⚠️ **That licence stops at a TEXT child, and the boundary is where it stops.**
     /// `can_remove_entirely` removes a node only when its data is exactly `' '` — a whitespace-only
