@@ -186,6 +186,7 @@ impl CensusAuditCommand {
         } else {
             print_report(&sweep);
         }
+        sweep.pristine.print_panic_sample();
 
         if default_paths {
             check_formatted_min(sweep.pristine.formatted, FIXTURES_FORMATTED_MIN)?;
@@ -367,7 +368,8 @@ fn print_json(sweep: &Sweep) {
         "formatted": pristine.formatted,
         "parse_skipped": pristine.parse_errors,
         "read_skipped": pristine.read_errors,
-        "panicked": pristine.panics,
+        "panicked": pristine.panics.count(),
+        "panicked_sample": pristine.panics.sample(),
         "findings": findings.len(),
         "files": items,
     });
