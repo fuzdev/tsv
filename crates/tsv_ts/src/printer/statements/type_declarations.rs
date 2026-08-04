@@ -60,11 +60,14 @@ fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType<'_>) -> bo
         // is the disagreement `build_conditional_check_doc` names for its own union gate.
         // A narrow arm, not the recursion the wider enumeration wants (`Ref<…>[]`,
         // `keyof Ref<…>`, `Ref<…>['k']` are still missing) — that one needs a corpus A/B.
-        // The bare suffix's own `[]` is the same argument once it holds a comment
+        // The suffix's own `[]` is the same argument once it holds a comment
         // (`string[⏎↹// c⏎]`): the break is inside a delimiter the array owns, so it hugs
         // `=` exactly as the empty tuple type `[…]` and the empty object `{…}` already do.
         // Comment-free input answers `Fused` there, so this disjunct cannot move any input
-        // the old enumeration covered.
+        // the old enumeration covered. It reaches past the bare element to the one shape
+        // the first disjunct misses — an element the author left bare that the printer
+        // parenthesizes anyway (`typeof x /* c */[]`), where the AST holds no
+        // `Parenthesized` node to match on.
         TSType::Array(a) => {
             matches!(a.element_type, TSType::Parenthesized(_))
                 || matches!(printer.array_suffix_layout(a), ArraySuffixLayout::Split { .. })

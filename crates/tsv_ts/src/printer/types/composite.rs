@@ -31,12 +31,11 @@ use tsv_lang::source_scan::{find_char_skipping_comments, has_newline_after_posit
 /// type-alias `=` gate.
 #[derive(Clone, Copy)]
 pub(in crate::printer) enum ArraySuffixLayout {
-    /// One unsplit `text()` — `[]`, or `)[]` when the element takes synthesized
-    /// parens. The comment-free case, and every case the split routing still
-    /// excludes.
-    Fused { needs_parens: bool },
+    /// One unsplit `[]` `text()` — the comment-free case.
+    Fused,
     /// The `elementType → ]` region holds a comment, so the suffix splits at this
-    /// `[` and the bracket pair emits through the shared empty-brackets emitter.
+    /// `[`: the gap emits its comments and the bracket pair goes through the shared
+    /// empty-brackets emitter.
     Split { bracket_open: u32 },
 }
 
@@ -1613,7 +1612,7 @@ impl<'a> Printer<'a> {
         // parens and breaks internally (`(T extends X⏎\t? Y⏎\t: Z)[]`). See the shared
         // `build_expanded_parenthesized_union_opt`.
         if let Some(union_doc) = self.build_expanded_parenthesized_union_opt(arr.element_type) {
-            return d.concat(&[union_doc, d.text("[]")]);
+            return d.concat(&[union_doc, self.build_array_suffix_doc(arr)]);
         }
         // An alone-on-line format-ignore directive INSIDE a paren-shell element
         // (`(⏎⇥// prettier-ignore⏎⇥(a: T) => void⏎)[]`) freezes the fully-unwrapped
@@ -1636,29 +1635,49 @@ impl<'a> Printer<'a> {
                 value_doc,
             );
             parts.push(d.hardline());
-            parts.push(d.text(")[]"));
+            parts.push(d.text(")"));
+            parts.push(self.build_array_suffix_doc(arr));
             return d.concat(&parts);
         }
         let element_doc = self.build_type_doc(arr.element_type);
+        let suffix_doc = self.build_array_suffix_doc(arr);
+        if type_needs_parens_for_array_element(arr.element_type) {
+            d.concat(&[d.text("("), element_doc, d.text(")"), suffix_doc])
+        } else {
+            d.concat(&[element_doc, suffix_doc])
+        }
+    }
+
+    /// Everything after an array type's element: the element→`[` gap and the `[]`
+    /// pair.
+    ///
+    /// The single suffix emitter for all four routes through
+    /// [`Self::build_array_type_doc`] — bare element, synthesized parens, expanded
+    /// parenthesized union, and paren-interior freeze. Each supplies its own closing
+    /// `)`; what follows it is this one question, so a commented suffix can't survive
+    /// on one route and be dropped on another (it was dropped on three of them).
+    ///
+    /// The element→`[` gap can hold only a **single-line block** comment: a `//` or a
+    /// multiline block puts a line break in front of the `[`, and a type's array
+    /// suffix may not follow one, so the construct stops being an array type at all
+    /// (§Comment relocation's array-type entry carries the rule and its
+    /// indexed-access sibling). That is why `CommentSpacing::Leading`'s missing tail
+    /// separator cannot swallow the suffix here, the way it can at an ordinary
+    /// pre-token gap. The bracket pair routes through the shared empty-brackets
+    /// emitter the empty tuple type uses, so `[/* c */]` and a `//`-forced break are
+    /// decided in one place for both bracket forms.
+    ///
+    /// The gap is measured from the element's own span end, which for a
+    /// source-parenthesized element is already past its `)` — so a comment the author
+    /// wrote *inside* the parens belongs to the element's doc, and only what follows
+    /// the `)` lands here. An element the author left bare (`typeof x /* c */[]`)
+    /// has no source `)` in the region at all: the comment simply follows the one the
+    /// printer synthesizes.
+    fn build_array_suffix_doc(&self, arr: &TSArrayType<'_>) -> DocId {
+        let d = self.d();
         match self.array_suffix_layout(arr) {
-            ArraySuffixLayout::Fused { needs_parens: true } => {
-                d.concat(&[d.text("("), element_doc, d.text(")[]")])
-            }
-            ArraySuffixLayout::Fused {
-                needs_parens: false,
-            } => d.concat(&[element_doc, d.text("[]")]),
-            // The element→`[` gap can hold only a **single-line block** comment: a
-            // `//` or a multiline block puts a line break in front of the `[`, and a
-            // type's array suffix may not follow one, so the construct stops being an
-            // array type at all (§Comment relocation's array-type entry carries the
-            // rule and its indexed-access sibling). That is why
-            // `CommentSpacing::Leading`'s missing tail separator cannot swallow the
-            // suffix here, the way it can at an ordinary pre-token gap. The bracket
-            // pair routes through the shared empty-brackets emitter the empty tuple
-            // type uses, so `[/* c */]` and a `//`-forced break are decided in one
-            // place for both bracket forms.
+            ArraySuffixLayout::Fused => d.text("[]"),
             ArraySuffixLayout::Split { bracket_open } => d.concat(&[
-                element_doc,
                 self.build_inline_comments_between_doc(arr.element_type.span().end, bracket_open),
                 self.build_empty_brackets_inline_with_comments_doc_range(
                     bracket_open,
@@ -1684,22 +1703,17 @@ impl<'a> Printer<'a> {
     /// as [`Self::build_tuple_type_doc`]. Comment-free input answers `Fused`
     /// before the byte scan, so the suffix stays one unsplit `text()`.
     ///
-    /// TODO: three arms still fuse their suffix and drop a comment in it — the
-    /// `needs_parens` arm below (`)[]`), the expanded-parenthesized-union arm, and
-    /// the paren-interior freeze arm, the last of which returns before this is even
-    /// asked. Their bracket interior is the same geometry, but the element→`[` gap
-    /// is not: that region also holds the source `)`, and prettier answers it two
-    /// ways (into the parens for a union element, outside them for a
-    /// function/intersection one), so each wants its own placement verdict and
-    /// fixture before this routing extends to them.
+    /// Whether the element takes parens is a **separate** question, asked by the
+    /// builder alone (`type_needs_parens_for_array_element`): the suffix region
+    /// starts past the element's span either way, so folding paren-ness in here only
+    /// ever excluded routes from the split — which is how three of them came to drop
+    /// their comment.
     pub(in crate::printer) fn array_suffix_layout(
         &self,
         arr: &TSArrayType<'_>,
     ) -> ArraySuffixLayout {
-        let needs_parens = type_needs_parens_for_array_element(arr.element_type);
         let elem_end = arr.element_type.span().end;
-        if !needs_parens
-            && self.has_comments_on_page_between(elem_end, arr.span.end)
+        if self.has_comments_on_page_between(elem_end, arr.span.end)
             // The `[` is FOUND, never computed from `arr.span.end - 2`: the brackets
             // may hold a comment (`string[/* c */]`) and the gap before them
             // whitespace or another comment, so the arithmetic form lands mid-token
@@ -1715,7 +1729,7 @@ impl<'a> Printer<'a> {
                 bracket_open: bracket_open as u32,
             };
         }
-        ArraySuffixLayout::Fused { needs_parens }
+        ArraySuffixLayout::Fused
     }
 
     //
