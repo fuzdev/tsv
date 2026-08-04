@@ -25,9 +25,14 @@
 # lines, and every one of them is a SINGLE whole comment — a forced overrun, since
 # tsv never rewraps a comment interior. So the only bug that silhouette can hide is
 # two comments welded onto one line, and `inner` separates them: neither `-->` nor
-# `*/` can occur inside the comment it closes. Triage note: a `*/` inside a template
-# literal that BUILDS comment text reads as interior with no comment involved, so a
-# new `inner` shape is a question, not a verdict.
+# `*/` can occur inside the comment it closes.
+#
+# ⚠️ Triage note: a new `inner` shape is a QUESTION, not a verdict, and a weld is the
+# LEAST likely answer. Over real JS the usual one is an ordinary JSDoc cast
+# (`… /** @type {T} */ (expr) …`) — a real block comment closing mid-line, no bug.
+# The next is the mirror false positive: a `*/` or `-->` inside a string, template,
+# regex, or the text of a `//` comment, read as interior with no comment involved.
+# Neither occurs over tests/fixtures, the corpus this file pins.
 #
 # A shape found but not pinned FAILS (a new kind of overrun — triage it against
 # §Print Width Philosophy before pinning). A pinned shape that no longer fires

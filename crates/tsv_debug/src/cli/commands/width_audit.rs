@@ -109,9 +109,14 @@ const SNAPSHOT_HEADER: &str = "\
 # lines, and every one of them is a SINGLE whole comment — a forced overrun, since
 # tsv never rewraps a comment interior. So the only bug that silhouette can hide is
 # two comments welded onto one line, and `inner` separates them: neither `-->` nor
-# `*/` can occur inside the comment it closes. Triage note: a `*/` inside a template
-# literal that BUILDS comment text reads as interior with no comment involved, so a
-# new `inner` shape is a question, not a verdict.
+# `*/` can occur inside the comment it closes.
+#
+# ⚠️ Triage note: a new `inner` shape is a QUESTION, not a verdict, and a weld is the
+# LEAST likely answer. Over real JS the usual one is an ordinary JSDoc cast
+# (`… /** @type {T} */ (expr) …`) — a real block comment closing mid-line, no bug.
+# The next is the mirror false positive: a `*/` or `-->` inside a string, template,
+# regex, or the text of a `//` comment, read as interior with no comment involved.
+# Neither occurs over tests/fixtures, the corpus this file pins.
 #
 # A shape found but not pinned FAILS (a new kind of overrun — triage it against
 # §Print Width Philosophy before pinning). A pinned shape that no longer fires
@@ -238,6 +243,10 @@ impl WidthAuditCommand {
         } else {
             print_report(&sweep, self.verbose);
         }
+        // Always, and to stderr: the default panic hook is suppressed for the
+        // sweep, so this is the only place a crashing input is named. Ungated
+        // by `--json` (which writes stdout) so `2>/dev/null` still parses.
+        sweep.pristine.print_panic_sample();
 
         let full_run = narrowed.is_empty();
         if full_run {
@@ -392,12 +401,16 @@ const NO_INNER: &str = "-";
 ///
 /// Textual, like the rest of the key, and sound in the direction that matters: neither `-->`
 /// nor `*/` can occur inside the comment it closes, so a whole comment never reads as a weld.
-/// The residual is the mirror case — a `*/` or `-->` inside a string, template or regex, which
-/// this calls interior with no comment involved. There are none over `tests/fixtures`, the only
-/// corpus the ratchet grades; over real code they are a small minority, and even there a false
-/// one surfaces as a new shape to triage rather than a wrong verdict on a pinned one (a run
-/// pointed off the default corpus reports without grading). Rates measured, in the audits doc
-/// linked above.
+///
+/// ⚠️ A non-`-` `inner` is a QUESTION, not a verdict, and over real code the likeliest answer
+/// is neither "weld" nor "false positive": it is an ordinary **JSDoc cast**
+/// (`… /** @type {T} */ (expr) …`), a real block comment closing mid-line. Triaged over
+/// `../svelte/packages/svelte/src` + `~/dev/zzz/src`, 9 of the 13 interior shapes are that,
+/// and only 4 are the mirror case — a `*/` / `-->` inside a string, template, regex, or the
+/// text of a `//` comment, called interior with no comment involved. There are none of either
+/// over `tests/fixtures`, the only corpus the ratchet grades, and even off it a false one
+/// surfaces as a new shape to triage rather than a wrong verdict on a pinned one (a run
+/// pointed off the default corpus reports without grading). Counts in the audits doc above.
 fn inner_shape(trimmed: &str) -> String {
     let closes: Vec<&str> = ["-->", "*/"]
         .into_iter()
@@ -565,7 +578,8 @@ fn print_json(sweep: &Sweep) {
         "formatted": sweep.pristine.formatted,
         "parse_skipped": sweep.pristine.parse_errors,
         "read_skipped": sweep.pristine.read_errors,
-        "panicked": sweep.pristine.panics,
+        "panicked": sweep.pristine.panics.count(),
+        "panicked_sample": sweep.pristine.panics.sample(),
         "lines_measured": sweep.lines_measured,
         "overruns": sweep.overruns.len(),
         "shapes": sweep.shapes.len(),

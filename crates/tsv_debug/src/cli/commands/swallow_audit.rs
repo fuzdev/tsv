@@ -76,6 +76,7 @@ impl SwallowAuditCommand {
         } else {
             print_report(&violations, &sweep);
         }
+        sweep.print_panic_sample();
 
         if default_paths {
             check_formatted_min(sweep.formatted, FIXTURES_FORMATTED_MIN)?;
@@ -144,7 +145,8 @@ fn print_json(violations: &[Violation], sweep: &PristineSweep) {
         "formatted": sweep.formatted,
         "parse_skipped": sweep.parse_errors,
         "read_skipped": sweep.read_errors,
-        "panicked": sweep.panics,
+        "panicked": sweep.panics.count(),
+        "panicked_sample": sweep.panics.sample(),
         "swallows": violations.len(),
         "violations": items,
     });

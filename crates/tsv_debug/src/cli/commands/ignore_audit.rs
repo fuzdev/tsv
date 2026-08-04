@@ -1242,23 +1242,8 @@ fn report_not_clean(total: &Tally, json: bool, show_paths: bool) {
             println!("{s}");
         }
     };
-    let paths = if show_paths && !total.not_clean.sample().is_empty() {
-        let sample: Vec<String> = total
-            .not_clean
-            .sample()
-            .iter()
-            .map(|p| format!("    {p}"))
-            .collect();
-        let more = total
-            .not_clean
-            .count()
-            .saturating_sub(total.not_clean.sample().len());
-        let tail = if more > 0 {
-            format!("\n    … and {more} more")
-        } else {
-            String::new()
-        };
-        format!(":\n{}{tail}", sample.join("\n"))
+    let paths = if show_paths {
+        format!(":\n{}", total.not_clean.sample_lines("    ").join("\n"))
     } else {
         String::new()
     };
