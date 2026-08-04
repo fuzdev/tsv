@@ -145,6 +145,16 @@ pub(super) fn build_call_doc_with_wrapping(
         // the callback's own signature sees it.
         // The `set` per argument (rather than only at index 1) keeps the flag from surviving
         // an argument that never consumed it.
+        //
+        // Keyed on the flat LAYOUT — this branch — and not on `is_test_call`, deliberately: the
+        // flat-parameter licence is the overrunning line's, so a call that DECLINES the flat
+        // layout (an argument gap holds a comment) is an ordinary call, and its callback's
+        // parameters break on width like any other's. Prettier keys the same rule on the callee
+        // alone, but never reaches the expanded state to disagree — `printCallExpression` takes
+        // its test-call branch unconditionally, so its `isParametersInTestCall` holds exactly
+        // when the call already printed flat. Both boundaries are pinned by
+        // `tests/fixtures/typescript/expressions/calls/test_call_expanded_params_long_prettier_divergence`;
+        // reasoning in docs/conformance_prettier.md §Print Width Philosophy.
         let arg_docs: DocBuf = call
             .arguments
             .iter()
