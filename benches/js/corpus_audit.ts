@@ -27,8 +27,26 @@
  *   in place where prettier relocates), run report-only below so they don't fail the gate.
  * - `authoring_audit` — every render-equivalent authoring of a Svelte document reaches ONE tsv
  *   fixed point (boundary-whitespace idempotency). Real code only (Svelte).
+ * - `census_audit` — every comment interior the author wrote survives formatting, compared as raw
+ *   input-vs-output trivia multisets by the audit's own scanners. All dirs. This is the leg whose
+ *   yield is external corpora *by its own design* — over `tests/fixtures` it is a tripwire, and its
+ *   first sweep over the prettier suites is what found the `as const` code swallow and four
+ *   line-comment merges. Off the default corpus it grades STRICTLY against zero, which is exactly
+ *   the assertion this bundle wants and which the corpus currently holds.
+ * - `fabrication_audit` — no blank line the author did not write. All dirs; strict-zero for the
+ *   same reason.
  * - `fuzz --iterations 0` — the pristine F1 sweep: no panic + `format(format(x)) == format(x)` +
  *   structural reparse on every file as authored (the same leg as `idempotency:sweep`). Real code.
+ *
+ * NOT here, and structurally rather than by omission: `width_audit`. It is the third as-authored
+ * ratchet, but unlike the two above it has no zero to grade against — most over-width lines are the
+ * overruns `conformance_prettier.md` §Print Width Philosophy sanctions, so a strict-zero run is
+ * meaningless and the audit reports-and-exits-0 off its default corpus by design. Grading it here
+ * would need a SECOND snapshot pinned over this corpus, and that snapshot would sit on the LIVE dev
+ * repos: measured over `../svelte/packages/svelte/src` + `../zzz/src` alone, 83 of the 91 shapes are
+ * absent from the committed fixtures snapshot and 25 pinned shapes never fire, and every ordinary
+ * edit to a dev repo would move it — the re-pin treadmill the format count pins were moved to the
+ * reproducible subset to escape (see `lib/gate_counts.ts`).
  *
  * NOT here: `corpus:compare:format --all` SAFETY (content loss vs prettier) needs the FFI + prettier
  * sidecar and already gates every file in `conformance:all` (publish Step 3b) — this driver is the
@@ -125,6 +143,10 @@ const legs: Leg[] = [
 		note: 'report-only: a few known adversarial philosophy HARDs (plain comments tsv preserves in place)'
 	},
 	{ name: 'authoring_audit', args: ['authoring_audit'], dirs: real_dirs, gating: true },
+	// The two as-authored ratchets that CAN hold a zero off their default corpus: with explicit
+	// paths the snapshot is not consulted and every finding fails, pinned or not.
+	{ name: 'census_audit', args: ['census_audit'], dirs: all_dirs, gating: true },
+	{ name: 'fabrication_audit', args: ['fabrication_audit'], dirs: all_dirs, gating: true },
 	{
 		name: 'fuzz --iterations 0 (F1 sweep)',
 		args: ['fuzz', '--iterations', '0'],

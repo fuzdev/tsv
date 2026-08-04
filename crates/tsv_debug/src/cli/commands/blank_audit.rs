@@ -986,15 +986,8 @@ fn report_not_clean(total: &Tally, json: bool, show_paths: bool) {
     if !show_paths {
         return;
     }
-    for p in total.not_clean.sample() {
-        line(format!("    {p}"));
-    }
-    let shown = total.not_clean.sample().len();
-    if total.not_clean.count() > shown {
-        line(format!(
-            "    … and {} more",
-            total.not_clean.count() - shown
-        ));
+    for l in total.not_clean.sample_lines("    ") {
+        line(l);
     }
 }
 

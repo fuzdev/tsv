@@ -13,12 +13,16 @@
 //!   (`fabrication_audit`, `census_audit`, `width_audit`) share: skip/read/format
 //!   bookkeeping with a per-file visitor, plus the vacuity guard that refuses to
 //!   grade a collapsed corpus.
+//! - [`panic_hook`] — the suppressed-default-hook bracket every corpus walk that
+//!   formats under `catch_unwind` installs, so N crashing files do not print N
+//!   backtraces over the report.
 //! - [`shape`] — the markup arm of the line-shape alphabet those snapshots key
 //!   on, shared so two ratchets cannot drift into meaning different things by
 //!   the same key.
 //! - [`examples`] — the bounded, `--jobs`-deterministic example set every audit's
 //!   per-shape aggregate keeps its reproducers in.
-//! - [`tally`] — run-level tally primitives (the capped skipped-path bucket).
+//! - [`tally`] — run-level tally primitives (the capped path-sample bucket the
+//!   injection audits' skipped files and the sweep's panicking inputs share).
 //! - [`node_edge`] — the wire-tree walker keying an injection offset to its
 //!   enclosing AST node + child-role edge, the coarse companion to `sites`'
 //!   file-independent shape keying.
@@ -55,6 +59,15 @@ pub(crate) mod ratchet;
 // `census_audit`, `width_audit`) drive no instrumentation seam.
 pub(crate) mod sweep;
 
+// The panic-hook bracket is NOT gated: `sweep` installs one in a default build.
+// `ArmedRun` (gated, in `parallel`) holds one too — one definition, so the two
+// corpus-walk shapes cannot drift into silencing panics differently.
+pub(crate) mod panic_hook;
+
+// The capped path sample is NOT gated: `sweep`'s panic bucket is one, and that
+// bucket is what makes suppressing the hook lossless rather than silencing.
+pub(crate) mod tally;
+
 // The line-shape alphabet is NOT gated, for the same reason and the same
 // consumers — it is pure text keying with no seam of its own.
 pub(crate) mod shape;
@@ -73,5 +86,3 @@ pub(crate) mod parallel;
 pub(crate) mod report;
 #[cfg(feature = "comment_check")]
 pub(crate) mod sites;
-#[cfg(feature = "comment_check")]
-pub(crate) mod tally;

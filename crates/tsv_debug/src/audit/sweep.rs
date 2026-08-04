@@ -17,6 +17,8 @@ use std::path::{Path, PathBuf};
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
+use crate::audit::panic_hook::{SuppressedPanicHook, panic_message};
+use crate::audit::tally::CappedPaths;
 use crate::cli::CliError;
 use crate::cli::commands::profile::is_input_invalid_fixture;
 
@@ -32,12 +34,18 @@ pub(crate) struct PristineSweep {
     /// non-UTF-8) — never formatted, so outside every other bucket. Counted
     /// rather than silently skipped so the report's file totals add up.
     pub(crate) read_errors: usize,
-    /// Files whose format PANICKED. Reported separately rather than folded into
+    /// Files whose format PANICKED — an exact count plus a bounded
+    /// `path: message` sample. Reported separately rather than folded into
     /// `parse_errors`: a crash is not a rejection, and a bucket that calls it
     /// one would launder the loudest possible finding into a routine skip line.
     /// Not gated by these audits — the panic gates (`fuzz`, `blank_audit`) own
     /// that class.
-    pub(crate) panics: usize,
+    ///
+    /// The sample is what makes suppressing the default panic hook sound (see
+    /// [`sweep_pristine_armed`]): the hook's per-file backtrace was the ONLY
+    /// record of which input crashed, so dropping it without recording here
+    /// would trade noise for silence.
+    pub(crate) panics: CappedPaths,
 }
 
 impl PristineSweep {
@@ -49,10 +57,30 @@ impl PristineSweep {
         if self.read_errors > 0 {
             parts.push(format!("{} read-skipped", self.read_errors));
         }
-        if self.panics > 0 {
-            parts.push(format!("⚠ {} PANICKED", self.panics));
+        if !self.panics.is_empty() {
+            parts.push(format!("⚠ {} PANICKED", self.panics.count()));
         }
         parts.join(", ")
+    }
+
+    /// The panicking inputs, `path: message`, bounded at [`CappedPaths::CAP`] —
+    /// printed after the report so a crash names its reproducer even with the
+    /// default hook suppressed.
+    ///
+    /// Prints rather than returning a string, and always to STDERR, so a
+    /// `--json` run keeps a parseable stdout without each of the four consumers
+    /// having to remember that.
+    pub(crate) fn print_panic_sample(&self) {
+        if self.panics.is_empty() {
+            return;
+        }
+        eprintln!(
+            "⚠ {} file(s) PANICKED while formatting (not gated here — the panic gates own that class):",
+            self.panics.count()
+        );
+        for line in self.panics.sample_lines("    ") {
+            eprintln!("{line}");
+        }
     }
 }
 
@@ -126,16 +154,28 @@ pub(crate) fn sweep_pristine(
 /// format (`swallow_audit`) shares this loop's SKIP BUCKETING rather than
 /// hand-rolling a fourth copy of it — a copy that dropped read failures on the
 /// floor, so the file left every total it should have appeared in.
+///
+/// ⚠️ The DEFAULT PANIC HOOK IS SUPPRESSED for the whole walk, exactly as
+/// `ArmedRun` (`audit::parallel`, gated with the injection audits, hence no
+/// intra-doc link) does for those.  Catching a panic does not stop the hook from running first, so
+/// without this a corpus with N crashing files printed N full backtraces over
+/// the report — and here, unlike the injection audits, it stays latent until
+/// the sweep is pointed at real code. The panicking input is recorded in
+/// [`PristineSweep::panics`] instead, so the fix costs no information: it lives
+/// in this shared loop rather than in any one consumer, because all four
+/// (`fabrication_audit`, `census_audit`, `width_audit`, `swallow_audit`) format
+/// under the same `catch_unwind`.
 pub(crate) fn sweep_pristine_armed(
     files: &[PathBuf],
     mut arm: impl FnMut(),
     mut visit: impl FnMut(&Path, ParserType, &str, &str),
 ) -> PristineSweep {
+    let _hook = SuppressedPanicHook::install();
     let mut sweep = PristineSweep {
         formatted: 0,
         parse_errors: 0,
         read_errors: 0,
-        panics: 0,
+        panics: CappedPaths::default(),
     };
     for path in files {
         // Skip fixtures expected to fail parsing.
@@ -157,8 +197,12 @@ pub(crate) fn sweep_pristine_armed(
                 sweep.parse_errors += 1;
                 continue;
             }
-            Err(_) => {
-                sweep.panics += 1;
+            Err(payload) => {
+                sweep.panics.push(format!(
+                    "{}: {}",
+                    path.display(),
+                    panic_message(payload.as_ref())
+                ));
                 continue;
             }
         };

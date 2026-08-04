@@ -186,6 +186,25 @@ fn test_call_gaps_have_comments(
 }
 
 /// Check if a call expression is a test function call that should stay on one line
+///
+// TODO: two verified gaps against prettier's `isTestCall`, both of which produce an
+// over-width line where prettier holds 100 — found triaging `width_audit` over real code,
+// and NOT covered by any fixture (`test_functions` uses only parameterless callbacks, which
+// is exactly the slice where the two formatters agree). Neither is fixed here because each
+// needs a fixture first; the shapes they emit land on silhouettes the width ratchet already
+// pins (`svelte IDENT - (`), so nothing standing catches them.
+//
+//   1. The 3-argument form is under-restricted. Prettier additionally requires the callback
+//      to have a BLOCK body and at most ONE parameter (`isFunctionOrArrowExpressionWithBody`
+//      + `getFunctionParameters(args[1]).length <= 1`, `utilities/test-libraries.js`); the
+//      count/`number` checks below are the whole test here. So
+//      `test('<long>', (a, b) => { … }, 2500)` and `test('<long>', (a) => go(a), 2500)` take
+//      the flat layout, where prettier declines it and breaks every argument out.
+//   2. The flat layout does not keep the callback's PARAMETERS flat. It joins each argument's
+//      own doc (`call_formatting.rs`), so an over-wide head breaks the arrow's parameter
+//      group — `test('<long>', (a, b) => {` becomes `…, (⏎a,⏎b⏎) => {`. Prettier consults
+//      `isTestCall` from its parameter printer (`print/function-parameters.js`
+//      `isParametersInTestCall`) and keeps them on the line. Repro at any name ≥ ~92 chars.
 pub(super) fn is_test_call(call: &internal::CallExpression<'_>, printer: &Printer<'_>) -> bool {
     // Optional calls (`describe?.(...)`) are never test calls — they format like
     // a normal call (wrap when long), preserving the `?.`. Mirrors prettier's
