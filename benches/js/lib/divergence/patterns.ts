@@ -1522,7 +1522,7 @@ const non_null_paren_base: DivergencePattern = {
 /**
  * The doc's own enumeration is the element set: prettier-plugin-svelte's blockElements
  * list carries `ol`/`ul` and `details`/`li` but omits `menu` and `summary`, the two
- * elements the HTML spec gives identical UA display (conformance_prettier.md
+ * elements the HTML spec gives identical UA display (conformance_prettier_svelte.md
  * §Svelte: Elements). tsv classifies both as block, so their content — and their
  * FOLLOWING sibling, which as an inline element would hug the closing tag in the
  * surrounding fill — lays out on its own line where prettier keeps the inline form.

@@ -24,7 +24,7 @@ drop the catch instead, so it does not normalize to `input.svelte` — hence `un
 
 Correctness over conformance: an empty `:catch` is a rejection handler, so removing it changes
 runtime behavior. tsv keeps it where prettier drops it. See
-[conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

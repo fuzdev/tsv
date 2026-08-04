@@ -22,5 +22,5 @@ The key→`?` face of the optional-marker comment family (the `?`→`:` gap is t
 sibling [optional_marker_line_comment](../optional_marker_line_comment_prettier_divergence/)).
 Shared across property signatures (interface, type-literal), class properties, and
 method signatures via `push_modifier_marker_doc`. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

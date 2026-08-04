@@ -42,4 +42,4 @@ objects); the specialized union-member / parenthesized-intersection *alignment*
 rendering (`type T = | { // c } | B`) keeps relocating — a rarer sub-case that
 uses a different builder.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

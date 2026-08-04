@@ -24,4 +24,4 @@ rule: *a comment hugging the next arg leads it; a stranded comment stays on the 
 line.*
 
 Reason: Comment relocation. See
-[conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+[conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

@@ -45,4 +45,4 @@ Before this was pinned, tsv emitted the comment **after** the `| ` on the first
 pass (`| // c\n b`, the strip path's inline placement — correct only for the first
 member) and drifted it before the `| ` on the next — a non-idempotency.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

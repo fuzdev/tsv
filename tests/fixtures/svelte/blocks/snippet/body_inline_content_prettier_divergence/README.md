@@ -19,4 +19,4 @@ content layout, here hosted inside a snippet block. Prettier instead **dangles**
 block-style. The `unformatted_ours_compact` (single-line authoring) and `prettier_variant_compact`
 (prettier's stable dangle) both normalize to `input.svelte` under tsv in one pass.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

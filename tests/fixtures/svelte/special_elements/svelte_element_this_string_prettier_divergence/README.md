@@ -61,4 +61,4 @@ JS printer (the pre-modern-ast behavior). Once it releases and tsv's formatting
 oracle is re-pinned, prettier and tsv will agree again and this divergence can be
 retired.
 
-See [conformance_prettier.md §Svelte: Elements](../../../../../docs/conformance_prettier.md#svelte-elements).
+See [conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

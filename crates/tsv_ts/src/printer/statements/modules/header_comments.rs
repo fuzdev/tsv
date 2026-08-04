@@ -53,7 +53,7 @@ impl<'a> Printer<'a> {
     /// gap that matches prettier's freedom (it relocates the comment after `as`); in
     /// the `as`→binding gap it is a deliberate indent-only divergence (prettier keeps
     /// the comment in place but flattens the binding, `* as // c\nns`). See
-    /// conformance_prettier.md §Comment relocation.
+    /// conformance_prettier_ts_comments.md §Comment relocation.
     pub(super) fn append_namespace_as_binding(
         &self,
         parts: &mut DocBuf,
@@ -184,7 +184,7 @@ impl<'a> Printer<'a> {
     /// at the forced hardline within the returned group. Used for the import/export
     /// header gaps prettier relocates but tsv preserves where the preceding token
     /// has no trailing space: binding/specifiers→`from`, `from`→source,
-    /// source→`with`, `with`→`{`, and `*`→`as`. See conformance_prettier.md
+    /// source→`with`, `with`→`{`, and `*`→`as`. See conformance_prettier_ts_comments.md
     /// §Comment relocation and §"Import attributes header comments".
     ///
     /// Module-side twin of [`Self::build_keyword_to_name_continuation`] (comments.rs):

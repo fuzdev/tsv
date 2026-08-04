@@ -17,7 +17,7 @@ with tsv's treatment of every other malformed-dot form.
 tsv: `1..e-10` → `1..e-10` (verbatim)
 Prettier: `1..e-10` → `1.e-10` → `1e-10`
 
-See [conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values)
+See [conformance_prettier_css.md §CSS: Values](../../../../../../docs/conformance_prettier_css.md#css-values)
 (`Trailing double-dot`).
 
 ## Fixture Structure

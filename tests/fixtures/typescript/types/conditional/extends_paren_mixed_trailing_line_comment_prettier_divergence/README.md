@@ -42,4 +42,4 @@ The `unformatted_ours_*` variants are the paren shells; tsv normalizes them to
 trail-on-inner canonical (`extends_paren_leading_line_comment`) — only the
 mixed / trailing shapes hang.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

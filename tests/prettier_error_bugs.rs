@@ -34,7 +34,7 @@ async fn static_import_source_phase() {
     // (so it can't be a fixture), and prettier's `typescript` parser reads `source`
     // as a name and throws (`'=' expected`); ours parses + keeps it stable. The
     // parser is graded by test262; see `tests/import_phase.rs` for the printer's
-    // round-trip coverage and `docs/conformance_prettier.md` for the catalog.
+    // round-trip coverage and `docs/conformance_prettier_ts.md` for the catalog.
     assert_prettier_errors_ours_stable(
         "<script lang=\"ts\">\n\timport source x from 'x';\n</script>\n",
     )

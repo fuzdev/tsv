@@ -29,4 +29,4 @@ Design choice grounded in the spec. tsv's identifier check uses the Unicode
 is a well-formed `IdentifierName` prints unquoted as a `LiteralPropertyName` (§13.2.5).
 Prettier's ES5 table predates the Unicode-property definition and keeps these keys quoted.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §TypeScript.
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md) §TypeScript.

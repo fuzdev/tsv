@@ -134,7 +134,7 @@ impl<'a> Printer<'a> {
         // Prettier keeps a source→`with` block inline, relocates a `with`→`{` block
         // before `with`, floats a `with`→`{` line past `;`, and *throws* on a
         // source→`with` line — so it can't be the oracle here; see
-        // with_keyword_comment*_prettier_divergence and conformance_prettier.md.
+        // with_keyword_comment*_prettier_divergence and conformance_prettier_ts_comments.md.
         // A line comment forces its following token onto a new line, which the
         // shared helper indents one level (statement continuation).
         let with_clause = d.concat(&[

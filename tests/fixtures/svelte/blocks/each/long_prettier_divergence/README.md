@@ -13,7 +13,7 @@ the body when the construct overflows (head fits alone).
 
 ## Reason
 
-See [conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks) for the full head-wrap + `}` dangle +
+See [conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks) for the full head-wrap + `}` dangle +
 clause-hug + body-expand + middle-zone model and why tsv diverges (consistent with its
 JS `if (⏎…⏎) {` and broken-element `>`; block-body whitespace is render-non-significant).
 

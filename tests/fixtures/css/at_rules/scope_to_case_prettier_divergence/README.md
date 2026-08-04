@@ -25,5 +25,5 @@ carries no such signal, so it's canonicalized. (Separately,
 `media_grouped_feature_case` diverges on a feature *name*'s case, but that's a
 parser-compat consequence of leaving grouped conditions opaque, not a
 canonicalization choice.) See
-[conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules)
+[conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules)
 (`@scope to keyword case`, Design choice) for the full canonicalize/preserve line.

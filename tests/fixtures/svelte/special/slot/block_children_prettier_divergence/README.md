@@ -15,4 +15,4 @@ render-free under Svelte 5 — start/end-of-content whitespace is removed at com
 no signal and must not select the layout; `unformatted_ours_hug` is that hugged authoring, which
 tsv likewise converges on `input`.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

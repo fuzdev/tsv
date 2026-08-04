@@ -686,4 +686,4 @@ Category → pattern — example:
 
 - ./fixture_workflow.md - Step-by-step fixture creation process
 - ./fixture_overview.md - Validation rules, troubleshooting, divergence patterns
-- ./conformance_prettier.md - Full prettier quirk catalog
+- ./conformance_prettier.md - The prettier-divergence frame; its §Catalogs table indexes the per-language catalogs

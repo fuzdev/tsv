@@ -42,4 +42,4 @@ glued boundary produces output that is its own fixed point, so F1, the seeded fu
 Design choice: a glued boundary is never split (its presence is render-significant under Svelte 5),
 but the welded unit still spends the render-free boundary in front of it rather than standing and
 overrunning.
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

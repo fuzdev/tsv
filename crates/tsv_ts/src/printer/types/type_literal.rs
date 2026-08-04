@@ -816,7 +816,7 @@ impl<'a> Printer<'a> {
             // `{` line (divergence from prettier, which relocates it to its own
             // line as the first member's leading comment). A line/own-line
             // comment is itself what forces this multiline branch. See
-            // conformance_prettier.md §Comment relocation (Type literal `{`).
+            // conformance_prettier_ts_comments.md §Comment relocation (Type literal `{`).
             let first_member_start = t.members[0].span().start;
             let (brace_line_prefix, delimiter_pull_pos) = if comments_present {
                 self.delimiter_line_comment_prefix(t.span.start, first_member_start)

@@ -31,4 +31,4 @@ guards.
 A comment's-worth of leading whitespace after a block element is not semantic, and the block's own
 line break already separates it from the following text — so tsv trims it uniformly, in one pass,
 rather than reproducing prettier's authoring-dependent stray space. See
-[conformance_prettier.md §Svelte: Elements](../../../../../docs/conformance_prettier.md#svelte-elements).
+[conformance_prettier_svelte.md §Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

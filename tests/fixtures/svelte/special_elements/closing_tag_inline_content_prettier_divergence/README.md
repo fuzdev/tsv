@@ -19,4 +19,4 @@ appears only when the element actually breaks.
 `prettier_variant_dangle` is prettier's stable form; `unformatted_ours_compact` is a compact authoring
 tsv converges on `input` and prettier does not.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

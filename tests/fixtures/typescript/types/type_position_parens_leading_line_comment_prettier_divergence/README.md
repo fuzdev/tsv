@@ -16,5 +16,5 @@ other cases — a type-parameter constraint (`T extends // leading\n\ta`), a tup
 element, and a function-type return — match both formatters; only the single
 generic type-argument case diverges, where prettier expands the `<>`.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

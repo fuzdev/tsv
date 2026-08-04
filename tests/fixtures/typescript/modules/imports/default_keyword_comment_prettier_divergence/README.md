@@ -42,4 +42,4 @@ and `type`→binding (c3) positions are dual-stable (both formatters keep them).
 Comment Position Philosophy. Sibling of the empty/named
 `type_keyword_comment_prettier_divergence` fixtures.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

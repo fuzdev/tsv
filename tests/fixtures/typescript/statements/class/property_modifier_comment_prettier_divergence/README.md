@@ -27,4 +27,4 @@ When a type annotation is present (e.g. `a /* c */?: number;` or
 case is the regular `property_modifier_type_comment` fixture (no
 `_prettier_divergence`).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

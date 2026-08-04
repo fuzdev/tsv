@@ -1576,7 +1576,7 @@ impl<'a> Printer<'a> {
     /// (`{ c } // c⏎& D`, `B // c⏎& { c }`). Prettier instead `lineSuffix`-relocates
     /// that comment past the glued members to the end of the visual line (across a
     /// member boundary, even past `;`); tsv keeps it on its member's line. See
-    /// conformance_prettier.md §Comment relocation.
+    /// conformance_prettier_ts_comments.md §Comment relocation.
     ///
     /// The doc self-indents per member (mirroring `build_intersection_type_doc`), so
     /// the caller adds no outer indent.

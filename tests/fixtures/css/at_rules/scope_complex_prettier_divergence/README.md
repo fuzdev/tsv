@@ -9,7 +9,7 @@ Prettier normalizes whitespace inside parens for `@media` and `@supports` but no
 
 ## Reason
 
-See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) (`@scope whitespace`, Stable quirk). tsv normalizes all at-rule preludes consistently. CSS Cascade Level 6 defines the `@scope` prelude as selector lists with standard whitespace rules.
+See [conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules) (`@scope whitespace`, Stable quirk). tsv normalizes all at-rule preludes consistently. CSS Cascade Level 6 defines the `@scope` prelude as selector lists with standard whitespace rules.
 
 ## Related
 

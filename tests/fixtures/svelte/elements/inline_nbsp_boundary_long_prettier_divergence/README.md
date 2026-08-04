@@ -15,4 +15,4 @@ prettier's stable dangle form (which tsv also normalizes to input).
 The boundary before `<code>` is inter-node whitespace (render-free under Svelte 5); the NBSP is
 render-significant content and is never split — so the break is render-equivalent.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

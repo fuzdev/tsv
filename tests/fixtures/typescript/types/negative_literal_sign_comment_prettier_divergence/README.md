@@ -26,4 +26,4 @@ comment between the sign and the numeral does not break the lookahead the way a 
 does. Without preservation the comment was dropped entirely (content loss) — the
 position has no other emitter.
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

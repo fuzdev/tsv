@@ -335,7 +335,7 @@ deno task test:deno                          # unit + behavioral tests
 
 ## Adding New Patterns
 
-1. Document the divergence in `docs/conformance_prettier.md`
+1. Document the divergence in the language's `docs/conformance_prettier_*.md` catalog
 2. Create fixture in `tests/fixtures/.../..._prettier_divergence/`
 3. Add pattern to `benches/js/lib/divergence/patterns.ts`:
 
@@ -344,7 +344,7 @@ const new_pattern: DivergencePattern = {
 	id: 'pattern_id',
 	description: 'What this pattern detects',
 	languages: ['svelte', 'typescript'], // or ['css']
-	conformance_sections: ['Section Name'], // From conformance_prettier.md
+	conformance_sections: ['Section Name'], // From the conformance_prettier*.md family
 	fixtures: ['path/to/fixture_prettier_divergence'], // Relative to tests/fixtures/
 	detect(ctx) {
 		// Use find_matching_hunks to identify which hunks this pattern explains.

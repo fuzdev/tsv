@@ -18,7 +18,7 @@ divergence shows only when normalizing the compact one-liner
 tsv expands a wrapped/overflowing block's body uniformly across all block heads and body
 shapes (one-pass `conditional_group`, no breakable special-case) — including when the
 breakable element is not the first body node. See
-[conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

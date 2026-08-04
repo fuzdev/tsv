@@ -34,4 +34,4 @@ A *glued* run prettier freezes verbatim instead (`>>.a` stays `>>.a`);
 (`.a > > {}` — a run with no final compound), which both parsers reject.
 
 See [conformance_svelte.md §CSS Corrections](../../../../../docs/conformance_svelte.md#css-corrections)
-and [conformance_prettier.md §CSS: Selectors](../../../../../docs/conformance_prettier.md#css-selectors).
+and [conformance_prettier_css.md §CSS: Selectors](../../../../../docs/conformance_prettier_css.md#css-selectors).

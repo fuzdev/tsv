@@ -16,4 +16,4 @@ The own-line placement, which both tools honor, is the ordinary sibling
 
 The placement rule is total and exception-free: a directive freezes the following
 construct only when it is alone on its line. See
-[conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

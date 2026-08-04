@@ -16,4 +16,4 @@ tsv keys a complex selector's indent on combinator presence, not on a flat
 simple-selector count, so a single compound (here `:is():not():not()`, which has no
 combinator) does not push its pseudo args an extra level deeper than the rule body.
 See
-[conformance_prettier.md §CSS: Selectors](../../../../../../docs/conformance_prettier.md#css-selectors).
+[conformance_prettier_css.md §CSS: Selectors](../../../../../../docs/conformance_prettier_css.md#css-selectors).

@@ -15,4 +15,4 @@ form ([elements/inline_content_text_wrap](../../elements/inline_content_text_wra
 `prettier_variant_dangle` is prettier's stable form; the `unformatted_ours_*` variants are other
 authorings tsv converges on `input` and prettier does not.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

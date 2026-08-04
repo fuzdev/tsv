@@ -28,4 +28,4 @@ is the compact authoring (tsv → `input.svelte`, prettier → a dangled form, n
 Design choice. The "glued runs travel together" half of the break-before posture: an opening
 tag never sits at a line end after a space, and a glued run is one indivisible unit for the
 break-before decision. Render-free under Svelte 5 (whitespace boundary) / tag-internal (each
-`>` move). See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+`>` move). See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

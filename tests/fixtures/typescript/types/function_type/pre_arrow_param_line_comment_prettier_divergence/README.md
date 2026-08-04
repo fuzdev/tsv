@@ -34,4 +34,4 @@ Before this, the comment swallowed the following tokens (`(a: T) // c => void` �
 the `=> void` absorbed into the comment, invalid and non-idempotent); now it is
 preserved. Covers function types and constructor (`new (...)`) types.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

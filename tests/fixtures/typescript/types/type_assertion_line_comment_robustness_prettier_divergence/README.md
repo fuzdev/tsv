@@ -23,5 +23,5 @@ beyond the four core positions
 ## Formatter divergence (`_prettier`)
 
 `b` and `c` are recorded in `output_prettier.svelte`; `a` is byte-identical there.
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation (Angle-bracket type assertion).

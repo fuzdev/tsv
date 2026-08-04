@@ -41,4 +41,4 @@ to trailing on its second — `variant_own_line.svelte`, the same form as
 `output_prettier.svelte`, dual-stable. The own-line **block** sibling is
 [optional_marker_own_line_block_comment](../optional_marker_own_line_block_comment_prettier_divergence/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

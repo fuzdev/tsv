@@ -16,7 +16,7 @@ This applies only to a single query. A **comma-separated** query list is broken 
 
 ## Reason
 
-See [conformance_prettier.md §CSS: At-Rules](../../../../../docs/conformance_prettier.md#css-at-rules) (`@media line wrap`, Print width). tsv enforces printWidth consistently across all CSS at-rules; Prettier never implemented intra-query (`and`/`or`) wrapping for `@media`.
+See [conformance_prettier_css.md §CSS: At-Rules](../../../../../docs/conformance_prettier_css.md#css-at-rules) (`@media line wrap`, Print width). tsv enforces printWidth consistently across all CSS at-rules; Prettier never implemented intra-query (`and`/`or`) wrapping for `@media`.
 
 ## Related
 

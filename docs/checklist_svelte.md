@@ -135,10 +135,10 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - With key (`{#each items as item (item.id)}`)
 - With index and key (`{#each items as item, i (key)}`)
 - Each else (`{:else}`)
-- Destructuring - object (`{#each items as { a, b }}`) — spaced braces match prettier; the lone divergence is the empty pattern (`{}`), see [conformance_prettier.md](./conformance_prettier.md)
+- Destructuring - object (`{#each items as { a, b }}`) — spaced braces match prettier; the lone divergence is the empty pattern (`{}`), see [conformance_prettier_svelte.md](./conformance_prettier_svelte.md)
 - Destructuring - array (`{#each items as [a, b]}`)
 - Destructuring with rest (`{#each items as {a, ...rest}}`)
-- Destructuring with defaults (`{#each items as {a = 1}}`) — prettier divergences: literal defaults normalize (single quotes + numeric form), and a renamed property keeps its key where prettier drops it. See [conformance_prettier.md](./conformance_prettier.md)
+- Destructuring with defaults (`{#each items as {a = 1}}`) — prettier divergences: literal defaults normalize (single quotes + numeric form), and a renamed property keeps its key where prettier drops it. See [conformance_prettier_svelte.md](./conformance_prettier_svelte.md)
 - Typed context binding (`{#each items as item: number}`, lang="ts")
 - Typed destructured context binding (`{#each items as { a }: { a: number }}`, `{#each pairs as [n]: [number]}`) — the annotation attaches to the pattern; the wire `end` widens past it while `loc` does not, matching Svelte's `read_pattern`. See [conformance_svelte.md](./conformance_svelte.md)
 - Each without `as` (`{#each items}`, `{#each items, i}`, `{#each items, i (key)}`) — index/key are valid without a context binding; all route through the same index/key parser as the `as` form
@@ -193,7 +193,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Const with destructuring
 - Const in various contexts (if, each, await)
 - Own line in its fragment, except when glued to content on both sides (shared with the
-  declaration tag — see [conformance_prettier.md §Svelte: Inline content block-style](./conformance_prettier.md#svelte-inline-content-block-style))
+  declaration tag — see [conformance_prettier_svelte.md §Svelte: Inline content block-style](./conformance_prettier_svelte.md#svelte-inline-content-block-style))
 
 ### Declaration Tag
 
@@ -241,7 +241,7 @@ All Svelte 5.x template syntax features are supported, as enumerated below; pars
 - Nested snippets
 - Recursive snippets
 - Own line in its fragment, except when glued to content on both sides — the same rule as the
-  declaration tags (see [conformance_prettier.md §Svelte: Inline content block-style](./conformance_prettier.md#svelte-inline-content-block-style))
+  declaration tags (see [conformance_prettier_svelte.md §Svelte: Inline content block-style](./conformance_prettier_svelte.md#svelte-inline-content-block-style))
 
 ### TypeScript Snippets
 

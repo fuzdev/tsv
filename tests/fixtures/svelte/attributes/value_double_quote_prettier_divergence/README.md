@@ -39,7 +39,7 @@ regresses it.
 A formatter must never emit output that changes the document's meaning or fails to
 re-parse. Preserving the author's `"` by delimiting with single quotes is the
 minimal, lossless fix. See
-[conformance_prettier.md §Svelte: Attributes](../../../../../docs/conformance_prettier.md#svelte-attributes).
+[conformance_prettier_svelte.md §Svelte: Attributes](../../../../../docs/conformance_prettier_svelte.md#svelte-attributes).
 
 ## Related
 

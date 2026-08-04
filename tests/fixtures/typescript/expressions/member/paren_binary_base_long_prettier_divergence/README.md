@@ -47,4 +47,4 @@ boundary of the rule.
 - `member/non_null_paren_base_long_prettier_divergence/` — the same "layout is independent of `!`" stance for call/await bases.
 - `typescript_specific/non_null/long/` — the other non-null layouts, none of which diverge.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §TypeScript (Parenthesized binary member base) and [§Print Width Philosophy](../../../../../../docs/conformance_prettier.md#print-width-philosophy).
+See [conformance_prettier_ts.md](../../../../../../docs/conformance_prettier_ts.md) §TypeScript (Parenthesized binary member base) and [§Print Width Philosophy](../../../../../../docs/conformance_prettier.md#print-width-philosophy).

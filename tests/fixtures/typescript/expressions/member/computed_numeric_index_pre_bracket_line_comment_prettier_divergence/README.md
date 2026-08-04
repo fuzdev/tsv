@@ -29,4 +29,4 @@ such comments would **merge onto one line, where the first `//` swallows the sec
 (silent content loss). Prettier's own non-convergence here means there is no oracle to
 track even if tsv wanted to.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

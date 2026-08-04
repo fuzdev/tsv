@@ -6,4 +6,4 @@ the parentheses for interface method signatures and type literal method signatur
 We preserve the comment between `>` and `(`. Both positions are dual-stable
 (idempotent in both formatters). Per comment placement policy, we preserve user intent.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

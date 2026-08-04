@@ -41,4 +41,4 @@ The line-comment form of the `:` slot is pinned separately by
 [`comment_after_colon`](../comment_after_colon_prettier_divergence/) — same
 association change, different comment kind.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

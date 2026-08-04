@@ -61,7 +61,7 @@ the two agree).
 serialized form, it is emitting the authored one. Not ◆prettier_bug either: prettier is
 idempotent here and its output is valid CSS; a meaning change on its own is content
 preservation. See
-[conformance_prettier.md §CSS: Values](../../../../../../docs/conformance_prettier.md#css-values)
+[conformance_prettier_css.md §CSS: Values](../../../../../../docs/conformance_prettier_css.md#css-values)
 ("Closing comma in a value").
 
 ## Related

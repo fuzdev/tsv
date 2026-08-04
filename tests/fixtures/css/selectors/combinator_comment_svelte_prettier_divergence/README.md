@@ -45,5 +45,5 @@ registering it at parse time and re-emitting it through `comments_in_range` so t
 surrounding whitespace normalizes uniformly (the shared selector-comment doc path).
 The compound-vs-descendant distinction the whitespace carries is never altered.
 
-See [conformance_prettier.md §CSS: Comments](../../../../../docs/conformance_prettier.md#css-comments)
+See [conformance_prettier_css.md §CSS: Comments](../../../../../docs/conformance_prettier_css.md#css-comments)
 and [conformance_svelte.md §CSS Corrections](../../../../../docs/conformance_svelte.md#css-corrections).

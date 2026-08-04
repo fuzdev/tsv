@@ -50,4 +50,4 @@ sibling [bind/value_prettier_ignore_head](../../../directives/bind/value_prettie
 and [bind/value_sequence_prettier_ignore_head](../../../directives/bind/value_sequence_prettier_ignore_head_prettier_divergence/)
 for the sequence's freeze scope.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

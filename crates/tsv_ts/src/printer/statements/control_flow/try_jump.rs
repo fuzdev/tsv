@@ -35,7 +35,7 @@ impl<'a> Printer<'a> {
     /// the whole signal, and a blank line above an own-line comment is authoring intent
     /// ([`Self::push_block_to_keyword_gap`]). Prettier is no oracle here: it relocates these
     /// comments into the following block's body, which it does *not* do at `else`. See
-    /// `conformance_prettier.md` §Comment relocation.
+    /// `conformance_prettier_ts_comments.md` §Comment relocation.
     ///
     /// An own-line directive in the gap freezes the WHOLE clause — keyword, any binding and the
     /// body all ride inside the verbatim slice — and the return is then `true`, telling the
@@ -271,7 +271,7 @@ impl<'a> Printer<'a> {
             // emission below would trail the run on the label's line (`lll: // c`), an
             // inert placement that loses the freeze on the second pass, so route through
             // the own-line-preserving header→body emitter instead — the declaration-header
-            // rule of `conformance_prettier.md` §On module and declarator lists.
+            // rule of `conformance_prettier_ignore.md` §On module and declarator lists.
             tail_parts.push(d.text(":"));
             self.push_header_to_body_gap(&mut tail_parts, colon_end, body_start);
             tail_parts.push(self.build_frozen_node_doc(frozen));

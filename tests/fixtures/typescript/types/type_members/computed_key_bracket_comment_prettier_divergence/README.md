@@ -15,4 +15,4 @@ prettier's relocation target for setter is different (inside parens).
 
 Affects: property (`:` next), method (`()` next), getter, setter.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

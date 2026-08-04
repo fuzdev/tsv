@@ -757,7 +757,7 @@ impl<'a> Printer<'a> {
         // `<span>text</span>` — nor selects the layout. Prettier instead keeps the space
         // (`printLineBeforeChildren`'s `line` when hasLeadingSpaces && isLeadingSpaceSensitive,
         // the HTML/CSS inline whitespace model Svelte 5 broke from) — see
-        // conformance_prettier.md §Svelte: Inline content block-style and the
+        // conformance_prettier_svelte.md §Svelte: Inline content block-style and the
         // inline_boundary_whitespace fixture.
         if boundary == BoundaryMode::Soft {
             return self.build_collapsible_element_doc(
@@ -856,7 +856,7 @@ impl<'a> Printer<'a> {
     /// A whitespace-only fragment counts as empty for every element kind — `<b> </b>`
     /// collapses to `<b></b>` (Svelte renders nothing there: the boundary run is trimmed at
     /// compile, so the space is render-free; prettier preserves it — see
-    /// conformance_prettier.md §Svelte: Inline content block-style). When attrs force
+    /// conformance_prettier_svelte.md §Svelte: Inline content block-style). When attrs force
     /// multiline, `>` and `</tag>` go on separate lines (matching Prettier behavior).
     fn build_empty_element_doc(
         &self,

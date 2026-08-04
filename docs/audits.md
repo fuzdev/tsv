@@ -540,7 +540,8 @@ world the other `check` audits use, so it adds a short compile of its own.
 #     letting a render-free character pick the layout (the delimiter-dangle class).
 #     Fits-inline content is probed too — tsv trims a render-free boundary run even when
 #     the content fits (`<span> text </span>` → `<span>text</span>`, the Svelte-mirror
-#     trim; fixture `inline_boundary_whitespace_prettier_divergence`, conformance_prettier.md
+#     trim; fixture `inline_boundary_whitespace_prettier_divergence`,
+#     conformance_prettier_svelte.md
 #     §Svelte: Inline content block-style), so hug↔space↔newline reach ONE fixed point at
 #     every content boundary outside pre/textarea. Sanctioned residual: a BOTH-side
 #     newline-authored boundary around an ELEMENT child keeps its multiline layout
@@ -784,7 +785,7 @@ cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden          
 ```bash
 # conformance_audit - doc/fixture integrity in one fixture walk. Four checks:
 #  (1) Orphans - every divergence-suffixed fixture must be linked in its conformance doc
-#      (_prettier_divergence → docs/conformance_prettier.md, _svelte_divergence →
+#      (_prettier_divergence → any docs/conformance_prettier*.md, _svelte_divergence →
 #      docs/conformance_svelte.md, _svelte_prettier_divergence in both).
 #  (2) Dead links - every Markdown link (relative path + #anchor) in every docs/*.md
 #      (enumerated at run time, so a new doc is gated by existing) and every fixture README
@@ -792,7 +793,11 @@ cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden          
 #      anchors). External URLs and targets that climb out of the repo (sibling checkouts,
 #      machine-dependent) are out of scope.
 #  (3) Missing back-links - every divergence fixture's README must contain a link resolving to
-#      its sanctioning doc. (A missing README entirely is the validator's D1 rule.)
+#      a doc that CATALOGS that fixture (check 1's per-doc attribution), not merely to some
+#      member of the family. With one conformance doc "cataloged in D" and "links D" were the
+#      same fact; across the six-doc prettier family they are independent, so a README could
+#      point at the shared frame while its entry lived in a language catalog. (A missing README
+#      entirely is the validator's D1 rule.)
 #  (4) Stray READMEs - a non-divergence fixture shouldn't carry a README; exceptions live in
 #      the in-code ALLOWED_NONDIVERGENCE_READMES allowlist.
 # Pure Rust (no Deno). Exits non-zero on any finding. Gated in `deno task check`.

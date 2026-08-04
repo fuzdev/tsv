@@ -24,4 +24,4 @@ is the same divergence on its own layout path; when the paren is *redundant* tsv
 drops it and the comment leads the statement, matching prettier
 ([expression_statement_paren_comment](../expression_statement_paren_comment/)).
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

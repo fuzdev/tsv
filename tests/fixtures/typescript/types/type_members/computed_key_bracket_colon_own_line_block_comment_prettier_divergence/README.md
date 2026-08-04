@@ -40,5 +40,5 @@ in-bracket relocation like its index-signature and mapped-type neighbours
 ([index_signature_bracket_colon_own_line_block_comment](../index_signature_bracket_colon_own_line_block_comment_prettier_divergence/),
 [mapped_bracket_colon_comment](../../mapped_bracket_colon_comment_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

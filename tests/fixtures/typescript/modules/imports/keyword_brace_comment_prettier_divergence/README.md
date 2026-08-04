@@ -18,4 +18,4 @@ bug**: tsv previously *dropped* this comment entirely (`import /* c */ { a }` �
 named-specifier case. Sibling of the export `keyword_brace_comment` divergence and
 the `from_comment` divergence (the gap one token later).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

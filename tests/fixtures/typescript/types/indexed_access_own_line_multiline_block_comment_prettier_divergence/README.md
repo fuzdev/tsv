@@ -42,4 +42,4 @@ tsv keeps the comment after `[` and hangs the index, in one pass, stably. Per
 [Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy),
 tsv keeps the comment where the author wrote it relative to the index.
 
-See [conformance_prettier.md §Comment relocation](../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

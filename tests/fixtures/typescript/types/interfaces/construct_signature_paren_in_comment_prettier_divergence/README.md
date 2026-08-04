@@ -22,4 +22,4 @@ Same principle as `type_members/signature_paren_in_comment_prettier_divergence`
 `function_type/constructor_paren_comment_prettier_divergence` (constructor
 types).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation (`new` to `(`).
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation (`new` to `(`).

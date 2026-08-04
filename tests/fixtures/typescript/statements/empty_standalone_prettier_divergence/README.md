@@ -16,4 +16,4 @@ prettier removes them to reach `variant_standalone`.
 Design choice. Blank lines between comments indicate intentional visual
 grouping; collapsing them loses structural intent.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §TypeScript.
+See [conformance_prettier_ts.md](../../../../../docs/conformance_prettier_ts.md) §TypeScript.

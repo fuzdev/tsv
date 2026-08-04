@@ -157,7 +157,7 @@ export interface AuditReport {
 const FIXTURE_LINK_RE = /\[([^\]|`]+)\]\(\.\.\/tests\/fixtures\/([^)]+?)\/?\)/g;
 
 /**
- * Parse conformance_prettier.md to extract all documented divergences.
+ * Parse one `conformance_prettier*.md` doc to extract all documented divergences.
  *
  * The doc anchors divergences with fixture links in three formats:
  *
@@ -181,8 +181,9 @@ export function parse_conformance_prettier_md(content: string): DocumentedDiverg
 	for (let i = 0; i < lines.length; i++) {
 		const line = lines[i];
 
-		// Track section headings (### and #### levels; most recent wins)
-		const heading_match = line.match(/^#{3,4}\s+(.+)/);
+		// Track section headings (##..#### levels; most recent wins). A catalog section
+		// is `##` in its own language doc and `###` when nested under one.
+		const heading_match = line.match(/^#{2,4}\s+(.+)/);
 		if (heading_match) {
 			current_section = heading_match[1].trim();
 			continue;
@@ -271,12 +272,30 @@ function split_table_row(row: string): string[] {
 }
 
 /**
- * Load and parse conformance_prettier.md from the repo.
+ * The Prettier-divergence catalog, split by language: the shared frame plus the
+ * per-language catalogs it indexes. Every one is parsed — a divergence is documented
+ * wherever in the family it is cataloged.
+ */
+const CONFORMANCE_PRETTIER_DOCS = [
+	'conformance_prettier.md',
+	'conformance_prettier_css.md',
+	'conformance_prettier_svelte.md',
+	'conformance_prettier_ts.md',
+	'conformance_prettier_ts_comments.md',
+	'conformance_prettier_ignore.md'
+];
+
+/**
+ * Load and parse the `conformance_prettier*.md` family from the repo.
  */
 export async function load_documented_divergences(): Promise<DocumentedDivergence[]> {
-	const doc_path = new URL('../../../../docs/conformance_prettier.md', import.meta.url).pathname;
-	const content = await Deno.readTextFile(doc_path);
-	return parse_conformance_prettier_md(content);
+	const divergences: DocumentedDivergence[] = [];
+	for (const doc of CONFORMANCE_PRETTIER_DOCS) {
+		const doc_path = new URL(`../../../../docs/${doc}`, import.meta.url).pathname;
+		const content = await Deno.readTextFile(doc_path);
+		divergences.push(...parse_conformance_prettier_md(content));
+	}
+	return divergences;
 }
 
 /**

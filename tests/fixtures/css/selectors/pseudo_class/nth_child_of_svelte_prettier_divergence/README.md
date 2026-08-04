@@ -19,7 +19,7 @@ whitespace runs there but never inserts an absent space, so the glued
 gluing the other side, `2n of`/`of div`, would merge the idents, so only the
 `of.class` side can glue). Svelte's `parseCss` also rejects the glued form
 (`css_expected_identifier`), but only `input.svelte` is parse-checked. See
-[conformance_prettier.md §CSS: Selectors](../../../../../../docs/conformance_prettier.md#css-selectors).
+[conformance_prettier_css.md §CSS: Selectors](../../../../../../docs/conformance_prettier_css.md#css-selectors).
 
 ## Fixture Structure
 

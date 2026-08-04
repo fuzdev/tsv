@@ -20,4 +20,4 @@ assertion requires a type annotation). Prettier ≤3.9.5 accepted both and
 relocated the comment before `!`; Prettier 3.9.6 tightened its TypeScript parser
 to reject them at parse time, matching tsc.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

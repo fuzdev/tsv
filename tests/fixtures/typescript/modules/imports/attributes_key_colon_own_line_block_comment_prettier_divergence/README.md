@@ -22,5 +22,5 @@ The same-gap **line** comment (which forces the break) is
 the inline-authored block is a plain match in both formatters
 ([attributes_comma_comment](../attributes_comma_comment/)).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

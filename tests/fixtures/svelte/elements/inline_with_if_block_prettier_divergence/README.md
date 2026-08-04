@@ -14,4 +14,4 @@ compact authoring. Prettier instead expands the spaced if inside its dangle
 (`divergent_variant_expanded.svelte`, stable as such); tsv rewrites that to a third stable form,
 pinned dual-stable in `variant_expanded.svelte` (block-style span, if kept multiline).
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

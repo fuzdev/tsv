@@ -32,4 +32,4 @@ intact rather than splitting its attributes, so an over-wide element goes to its
 packs its trailing text like every other fill word (the tail flows after the intact `</a>`), mirroring
 how `<el>x</el> tail` already stays inline; the block-style layout is the divergence, not the tail
 placement. See
-[conformance_prettier.md §Svelte: Elements (Wide inline child own-line)](../../../../../docs/conformance_prettier.md#svelte-elements).
+[conformance_prettier_svelte.md §Svelte: Elements (Wide inline child own-line)](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

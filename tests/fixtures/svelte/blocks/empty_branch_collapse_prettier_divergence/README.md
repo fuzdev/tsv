@@ -14,8 +14,8 @@ one glued.
 That preservation is what tsv declines: an empty branch renders nothing, so the whitespace inside
 it is **render-free** and must not select the layout — the same principle behind the
 all-or-nothing body-expand decision (see
-[§Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks) and
-[§Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style)).
+[§Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks) and
+[§Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style)).
 
 Covered: `{#if}` empty `:else`, `{#if}` empty consequent, `{:else if}` empty branch, `{#each}` empty
 `:else` fallback, `{#each}` empty body. A branch that carries content is untouched.
@@ -39,7 +39,7 @@ rule, not two.
 
 Render-free boundary whitespace must not select the layout, and an empty branch is entirely
 whitespace, so tsv picks one canonical block-form shape instead of preserving the authored one. See
-[conformance_prettier.md §Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

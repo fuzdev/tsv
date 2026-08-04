@@ -39,4 +39,4 @@ Design choice, render-free under Svelte 5. The closing-`>` dangle onto glued fol
 space; past that bound tsv falls back to block-style (width-optimal — content on its own
 line handles any width) or a trailing-space wrap, rather than prettier's double-dangle or
 over-width line.
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

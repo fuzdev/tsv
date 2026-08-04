@@ -9,7 +9,7 @@ prettier-plugin-svelte routes to babel and **also preserves** the parens — tsv
 The divergence is JS-vs-TS: in TS contexts (`.ts`, `<script lang="ts">`) prettier's
 oxc-ts backend strips the parens, where tsv diverges — see the sibling
 [`jsdoc_type_cast_ts_prettier_divergence`](../jsdoc_type_cast_ts_prettier_divergence/)
-fixture and [conformance_prettier.md §JSDoc / paren semantics](../../../../../../docs/conformance_prettier.md#jsdoc--paren-semantics).
+fixture and [conformance_prettier_ts_comments.md §JSDoc / paren semantics](../../../../../../docs/conformance_prettier_ts_comments.md#jsdoc--paren-semantics).
 
 ## Contexts tested
 

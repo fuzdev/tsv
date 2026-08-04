@@ -37,4 +37,4 @@ an array and reflows them, so the author's newline after the comment does not su
 formatting — but the comment's position relative to the comma does. Deciding the durable fact
 from the ephemeral one is backwards.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

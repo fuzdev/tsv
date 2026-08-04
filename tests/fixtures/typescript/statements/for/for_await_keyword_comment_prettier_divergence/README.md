@@ -12,4 +12,4 @@ positions are dual-stable in tsv (the inside-parens form `output_prettier`
 round-trips unchanged here too); prettier keeps only the inside-parens form
 stable, relocating the between-keyword form into it.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

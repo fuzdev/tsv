@@ -14,4 +14,4 @@ tsv treats the author's same-line placement as intentional, keeping consecutive
 inline block comments cuddled on the `} … else` line. Consistent with tsv's
 handling across other control-flow statements.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -29,4 +29,4 @@ printer — and it is not even a stable contract there: the adjacent
 `intersection_prettier_ignore_between_members_prettier_divergence` fixture shows prettier
 losing the freeze entirely at its own fixed point (◆prettier_bug).
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

@@ -151,7 +151,10 @@ Use `expected_ours.json + expected_svelte.json` or `output_prettier.svelte` ONLY
 **Length guideline:** Keep READMEs under 50 lines. Move detailed analysis to ./conformance_svelte.md or ./conformance_prettier.md.
 
 **Back-link to the catalog:** End divergence READMEs with
-`See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §<section>.`
+`See [conformance_prettier_<lang>.md](../../../../../../docs/conformance_prettier_<lang>.md) §<section>.`
+(the catalog holding the section — `_css` / `_svelte` / `_ts` / `_ts_comments` / `_ignore`,
+or the frame `conformance_prettier.md` itself for a §Comment Position Philosophy /
+§Print Width Philosophy / §Authored breaks / §Uniform Forced-Continuation Indent claim)
 (adjust the `../` depth; name the specific catalog row in parens when the
 section is long, e.g. ``§Comment relocation (`new` to `(`)``). The
 conformance doc links forward to every divergence fixture; the back-link
@@ -791,7 +794,7 @@ deno task fixtures:update
 - Prettier moves comments to different position — Diverge — preserve user's comment placement
 - "I prefer our way" or "not implemented yet" — Adopt prettier
 
-The empty custom-property value divergence ([CSS: Values](./conformance_prettier.md#css-values)) is the canonical example of row 1: every spacing variant is valid CSS that prettier preserves verbatim, but the spec trims the whitespace and defines a single-space serialization, so tsv normalizes to that one form.
+The empty custom-property value divergence ([CSS: Values](./conformance_prettier_css.md#css-values)) is the canonical example of row 1: every spacing variant is valid CSS that prettier preserves verbatim, but the spec trims the whitespace and defines a single-space serialization, so tsv normalizes to that one form.
 
 **Worked example:**
 
@@ -841,7 +844,7 @@ Never use for in-progress features or temporary gaps — let the test fail norma
 
 ### Prettier Variant System
 
-> **For complete prettier quirk catalog and decision framework**, see ./conformance_prettier.md.
+> **For the decision framework**, see ./conformance_prettier.md; its §Catalogs table indexes the per-language quirk catalogs.
 
 #### Overview
 
@@ -1060,7 +1063,7 @@ See implementation in `crates/tsv_debug/src/cli/commands/fixtures_*.rs`
 
 ### Related Documentation
 
-- **./conformance_prettier.md** - Prettier quirk catalog and validation system
+- **./conformance_prettier.md** - Prettier-divergence frame + §Catalogs index (per-language catalogs alongside it)
 - **./conformance_svelte.md** - Svelte parser compatibility documentation
 - **./fixture_naming.md** - Fixture naming conventions
 - **[CLAUDE.md](../CLAUDE.md)** - High-level project and fixture concepts

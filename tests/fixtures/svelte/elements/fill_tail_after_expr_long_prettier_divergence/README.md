@@ -27,4 +27,4 @@ Print width is a hard limit in tsv. See
 [conformance_prettier.md §Print Width Philosophy](../../../../../docs/conformance_prettier.md#print-width-philosophy),
 which lists "fill algorithm edge cases (101-char boundaries)" among the constructs this
 governs, alongside the sibling fill-boundary entries in
-[§Svelte: Elements](../../../../../docs/conformance_prettier.md#svelte-elements).
+[§Svelte: Elements](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

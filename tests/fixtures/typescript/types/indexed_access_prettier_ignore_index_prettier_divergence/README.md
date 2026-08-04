@@ -20,4 +20,4 @@ pinned via `audit_signature.txt`). A directive sharing the `[`'s line is inert u
 tsv's placement classification, so the authored own-line placement is the only form
 that holds the freeze.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

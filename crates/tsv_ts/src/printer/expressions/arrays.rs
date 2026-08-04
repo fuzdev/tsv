@@ -182,7 +182,7 @@ impl<'a> Printer<'a> {
     /// preserves the authored position. The comma is what carries the association, and unlike a
     /// `//` — which runs to end-of-line, so trailing it past the comma is the only rendering
     /// that exists (the sanctioned pure-separator trail) — a block comment renders fine either
-    /// side, making the move unforced. See conformance_prettier.md §Comment relocation.
+    /// side, making the move unforced. See conformance_prettier_ts_comments.md §Comment relocation.
     ///
     /// `comma_pos` is the separator after `prev_end`. An own-line comment (a newline *before*
     /// it) forces the expanding path, so it never reaches here.
@@ -665,8 +665,8 @@ impl<'a> Printer<'a> {
 
         // A comment trailing the opening `[` on its own line is kept on the `[`
         // line (divergence from prettier, which relocates it to its own line as the
-        // first element's leading comment). See conformance_prettier.md §Comment
-        // relocation (Array literal `[`).
+        // first element's leading comment). See conformance_prettier_ts_comments.md
+        // §Comment relocation (Array literal `[`).
         let first_elem_start = arr
             .elements
             .iter()

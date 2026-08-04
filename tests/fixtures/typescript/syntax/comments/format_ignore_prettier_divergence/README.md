@@ -29,5 +29,5 @@ const e = {f:   3,   g:   4};   // tsv keeps; prettier keeps (recognized)
 
 `format-ignore` is a tsv-native directive (the `prettier-ignore` family is also
 honored for drop-in compatibility). See
-[conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive)
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive)
 and [directives.md](../../../../../../docs/directives.md).

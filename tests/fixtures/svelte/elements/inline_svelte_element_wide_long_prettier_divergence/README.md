@@ -20,4 +20,4 @@ components (`inline_component_wide_long`) — the shape is the same across all t
 Print width. tsv treats printWidth as a hard limit and keeps the element intact rather than
 splitting its attributes/closing `>`, so an over-wide element goes to its own line. The boundary
 before the element is a collapsible space, so the word before it stays on the text line.
-See [conformance_prettier.md §Svelte: Elements (Wide inline child own-line)](../../../../../docs/conformance_prettier.md#svelte-elements).
+See [conformance_prettier_svelte.md §Svelte: Elements (Wide inline child own-line)](../../../../../docs/conformance_prettier_svelte.md#svelte-elements).

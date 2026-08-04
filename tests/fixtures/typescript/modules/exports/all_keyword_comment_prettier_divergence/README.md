@@ -36,4 +36,4 @@ while tsv rewrites it to a third stable form — hence `divergent_variant_own_li
 The `export *`/`export type *` gaps are the ones where tsv used to preserve that break,
 making them the lone header gaps out of step with `import … from`.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

@@ -33,5 +33,5 @@ The same-gap **line** comment (which forces the break → continuation indent) i
 the plain key→`:` gap without the marker is
 [key_colon_own_line_block_comment](../key_colon_own_line_block_comment_prettier_divergence/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

@@ -21,5 +21,5 @@ comment — the same preserve + continuation rule as variable declarators
 ([declarator_before_eq_line_comment](../../../declarations/variable/declarator_before_eq_line_comment_prettier_divergence/)),
 enum members, and class properties.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation)
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation)
 and [§Uniform Forced-Continuation Indent](../../../../../../docs/conformance_prettier.md#uniform-forced-continuation-indent).

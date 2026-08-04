@@ -679,7 +679,7 @@ deno task corpus:compare:format --all --audit-patterns
 
 Output shows the measured detection rate and the real gaps (numbers
 illustrative — the live run prints current counts). "Documented" = every
-`*_prettier_divergence`-suffixed fixture linked from `conformance_prettier.md`
+`*_prettier_divergence`-suffixed fixture linked from the `conformance_prettier*.md` family
 in any of its three anchor formats (table rows, list items, prose paragraphs);
 non-divergence fixture links (match/contrast anchors) don't count. Coverage is
 partial by design — see `docs/divergence_detector.md` §Traceability.

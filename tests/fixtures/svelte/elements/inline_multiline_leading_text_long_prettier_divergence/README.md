@@ -16,4 +16,4 @@ This is the width-driven counterpart of
 (structural multiline). The 100-char case above it stays inline in both formatters, so the divergence
 appears only once the content actually breaks.
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

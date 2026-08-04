@@ -30,4 +30,4 @@ above it — so the two rules stay one rule.
 
 A directive's placement is the thing that decides what it freezes, so an emitter must never
 relocate one. See
-[conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

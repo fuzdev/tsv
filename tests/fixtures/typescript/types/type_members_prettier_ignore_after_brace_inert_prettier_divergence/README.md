@@ -18,4 +18,4 @@ The placement rule is total and exception-free: a directive freezes the
 following construct only when it is alone on its line — an author who wants the
 freeze writes the directive on its own line, where both tools agree.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

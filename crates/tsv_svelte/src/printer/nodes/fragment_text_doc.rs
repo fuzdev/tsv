@@ -298,7 +298,7 @@ impl<'a> Printer<'a> {
             // a vertical list of siblings — and collapsing them packs independent items onto one
             // line (and, for a short list, lets the collapse cascade into the parent element's own
             // hug decision, an F1 break). See the standalone-separator paragraph in
-            // [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+            // [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).
             // Both spellings of a *flowing* separator — an authored space and an authored single
             // newline — must land on the same doc, or the pair diverges (and, once the formatter
             // emits one of them, flip-flops). So the flow test is spelling-independent and the
@@ -750,7 +750,7 @@ impl<'a> Printer<'a> {
             // middle child: an inline element preceded by same-line content that must wrap starts on
             // a fresh line rather than dangling its opening tag at the end of the text line (the
             // `inline_break_before_*` divergences). tsv converges every authoring to that form where
-            // prettier keeps the opening tag on the text line — see conformance_prettier.md §Svelte:
+            // prettier keeps the opening tag on the text line — see conformance_prettier_svelte.md §Svelte:
             // Inline content block-style. A first-child element with NO preceding text is unaffected
             // (it never reaches this text handler; the fold's head hug still guards its idempotency).
             //
@@ -789,7 +789,7 @@ impl<'a> Printer<'a> {
             // Either way an inline element preceded by same-line content that must wrap starts on a
             // fresh line rather than dangling its opening tag at the text line's end (the
             // `inline_break_before_*` divergences) — tsv converges every authoring to that form where
-            // prettier keeps the opening tag on the text line (conformance_prettier.md §Svelte:
+            // prettier keeps the opening tag on the text line (conformance_prettier_svelte.md §Svelte:
             // Inline content block-style). Not `multiline`-gated: a single-line-authored run that
             // must wrap by width still converges to the fresh-line form (a short run that fits is a
             // no-op).

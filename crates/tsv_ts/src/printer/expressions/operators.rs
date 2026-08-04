@@ -794,7 +794,7 @@ impl<'a> Printer<'a> {
     /// hug its right operand (`1 // c⏎+ 2`). Returns `true` in that case so the caller
     /// hugs the following operand with a space rather than a breakable line (avoiding
     /// the `1 // c⏎+⏎2` over-break). Prettier instead relocates the comment past the
-    /// operator; see conformance_prettier.md §Comment relocation.
+    /// operator; see conformance_prettier_ts_comments.md §Comment relocation.
     fn push_operand_operator_gap(
         &self,
         parts: &mut DocBuf,
@@ -1180,7 +1180,7 @@ impl<'a> Printer<'a> {
         // the operand becomes a separate expression statement — the `yield` silently
         // loses its argument. Same gate and same layout as its `return`/`throw` siblings;
         // see `build_hanging_paren_doc` for the shared rule, and
-        // docs/conformance_prettier.md §Comment relocation for why prettier (whose own
+        // docs/conformance_prettier_ts_comments.md §Comment relocation for why prettier (whose own
         // retention is scoped to those two) diverges here.
         if self.argument_has_own_line_comment(yield_expr.span.start, arg) {
             // Shared with `return`/`throw` (`build_comment_paren_doc`), the three restricted

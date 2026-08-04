@@ -13,7 +13,7 @@ Prettier: preserves the source whitespace, newline included
 Stable quirk. tsv normalizes pre-`{` selector-comment whitespace consistently,
 and that normalization is the same at every nesting level — a rule nested
 directly in an at-rule prints through the same rule printer as a top-level
-rule. See [conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
+rule. See [conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments).
 
 ## Related
 

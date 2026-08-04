@@ -32,7 +32,7 @@ keeps attributes inline when the real line fits, injecting less whitespace into 
 the layout injects, not how a tag serializes. The close form is therefore decided by the same
 `can_self_close` rule as everywhere else — rewriting `<span … />` to `<span …></span>` adds no
 characters to the rendered `<pre>`.
-See [conformance_prettier.md §Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks).
+See [conformance_prettier_svelte.md §Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

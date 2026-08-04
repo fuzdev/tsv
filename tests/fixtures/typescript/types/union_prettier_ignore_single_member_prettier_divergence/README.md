@@ -20,4 +20,4 @@ through the union and reformats it. tsv resolves this by the sole member's shape
 Keeping the `|` on a frozen leaf/object single-member union is the only way to honor the
 directive idempotently without a bare-type freeze mechanism; the small divergence (a kept
 `|` prettier drops) is preferable to silently dropping the directive or a non-idempotent
-member-only freeze. See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+member-only freeze. See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

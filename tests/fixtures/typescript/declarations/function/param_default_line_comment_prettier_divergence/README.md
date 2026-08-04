@@ -31,4 +31,4 @@ zero-width, so it never forces the union to break). The same float applies to
 arrow-function and method parameters. A same-line block comment
 (`p = /* c */ v`) stays inline in both formatters and is not a divergence.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

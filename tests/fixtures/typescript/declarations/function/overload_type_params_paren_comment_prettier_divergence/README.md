@@ -11,4 +11,4 @@ placement policy, we preserve user intent. Function-likes with a body (where
 prettier also preserves the comment between `>` and `(`) are in
 `type_params_paren_comment`.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

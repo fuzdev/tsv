@@ -15,4 +15,4 @@ fixture, the regression guard for the in-bracket comment being emitted exactly
 once (not duplicated onto the `*`). Same family as the accessor-keyword case,
 [accessor_keyword_bracket_comment](../accessor_keyword_bracket_comment_prettier_divergence/).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

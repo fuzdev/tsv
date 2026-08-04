@@ -26,4 +26,4 @@ paying off
 moves a comment *up* either) but re-indents to its own continuation hang — a third stable
 form, and the pre-existing keyword→value hang divergence, not a new one.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

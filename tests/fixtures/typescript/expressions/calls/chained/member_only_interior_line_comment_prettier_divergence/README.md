@@ -24,4 +24,4 @@ philosophy](../../../../../../../docs/conformance_prettier.md#comment-position-p
 this (they format inline on the fill path), so only line comments route here.
 
 Reason: Comment relocation. See
-[conformance_prettier.md §Comment relocation](../../../../../../../docs/conformance_prettier.md#comment-relocation).
+[conformance_prettier_ts_comments.md §Comment relocation](../../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

@@ -33,5 +33,5 @@ form (input) it hoists *before the key*; from the own-line authoring it hangs
 
 The object-property face of the cross-construct before-`:`/`=` line comment. tsv
 preserves the comment at its authored position rather than relocating it. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

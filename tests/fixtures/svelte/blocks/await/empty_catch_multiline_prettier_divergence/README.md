@@ -36,13 +36,13 @@ Prettier deletes the catch in every case, so neither normalizes to `input.svelte
 deletes the catch **and** hugs the body to the opening tag (`{#await promise}<p>a</p>⏎\t<p>b</p>{/await}`),
 prettier's boundary-whitespace-driven block-body layout. tsv rewrites that form to its uniform
 body-drop (a distinct third stable form) — see
-[§Svelte: Blocks — uniform body drop](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+[§Svelte: Blocks — uniform body drop](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Reason
 
 Correctness over conformance: an empty `:catch` is a rejection handler, so removing it changes
 runtime behavior. tsv keeps it — inline or block-style. See
-[conformance_prettier.md §Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks).
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).
 
 ## Related
 

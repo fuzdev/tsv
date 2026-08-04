@@ -16,7 +16,7 @@ is the same document — the layout is being selected by a character the compile
 to two forms (inline, or block-style with both tags intact) and never dangles *at a content
 boundary*. (It does dangle at a **sibling** boundary — the `>` handoff to a following block — but
 that one is keyed on inter-sibling whitespace, which Svelte 5 *keeps*. See
-[conformance_prettier.md §Svelte: Blocks](../../../../../docs/conformance_prettier.md#svelte-blocks).)
+[conformance_prettier_svelte.md §Svelte: Blocks](../../../../../docs/conformance_prettier_svelte.md#svelte-blocks).)
 
 `prettier_variant_opening_newline` is prettier's stable dangle form (tsv normalizes it to `input`);
 the `unformatted_ours_*` variants are other authorings of the same document that tsv likewise
@@ -28,4 +28,4 @@ the same. Prettier reads that space as a second broken boundary and **expands** 
 dangling — `variant_expanded` pins that expanded both-side-newline form, dual-stable (a
 newline-authored boundary on both sides keeps its layout meaning under both formatters).
 
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

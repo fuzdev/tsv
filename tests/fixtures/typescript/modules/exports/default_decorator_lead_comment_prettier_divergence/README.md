@@ -33,4 +33,4 @@ it — but the decorated-`export default` path builds the class expression direc
 owned comment nothing prints is a dropped comment*. The fix claims it on this seam
 (`prepend_owned_leading_comment_at`), exactly as the arrow-reassembly paths do.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

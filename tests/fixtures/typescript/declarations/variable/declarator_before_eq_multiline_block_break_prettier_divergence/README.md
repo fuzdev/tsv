@@ -27,5 +27,5 @@ own-line-block sibling
 
 The declarator face of the rule; the enum-member and class-property `=` gaps
 share the emitter. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

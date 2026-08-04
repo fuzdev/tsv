@@ -32,7 +32,7 @@ siblings.
 
 User comments are valuable and shouldn't be silently removed, and reproducing prettier's
 parenthesized form would both re-introduce the loss and change what Svelte reads. See
-[conformance_prettier.md §Format-ignore directive](../../../../../../docs/conformance_prettier.md#format-ignore-directive).
+[conformance_prettier_ignore.md §Format-ignore directive](../../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).
 
 ## Related
 

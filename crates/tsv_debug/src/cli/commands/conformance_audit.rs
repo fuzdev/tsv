@@ -9,7 +9,7 @@ use std::path::{Path, PathBuf};
 /// Runs four checks over one fixture walk, reading each file at most once:
 ///
 /// 1. **Orphans** — every `_*_divergence`-suffixed fixture must be linked in the doc
-///    that sanctions its claim (`_prettier_divergence` → `docs/conformance_prettier.md`,
+///    that sanctions its claim (`_prettier_divergence` → any `docs/conformance_prettier*.md`,
 ///    `_svelte_divergence` → `docs/conformance_svelte.md`, both for the combined suffix).
 ///    A divergence suffix asserts a deliberate difference; that claim must be cataloged
 ///    so it is discoverable and reviewable.
@@ -23,13 +23,17 @@ use std::path::{Path, PathBuf};
 ///    machine-dependent, so they are out of scope like external URLs — the audit
 ///    gates repo-internal integrity only.
 /// 3. **Missing back-links** — every `_*_divergence` fixture's README must *contain* a
-///    link that resolves to the doc that sanctions its claim (`_prettier_divergence` →
-///    `docs/conformance_prettier.md`, `_svelte_divergence` → `docs/conformance_svelte.md`,
-///    both for the combined suffix). Checks 1+2 prove the doc catalogs the fixture and
-///    that any link present resolves, but neither requires the back-link to *exist* — a
-///    README that simply omits it passes both. This closes that gap: the README→doc link
-///    is mandatory, not just well-formed-if-present. (A divergence fixture with no README
-///    at all is the fixture validator's `D1` rule, run separately in `fixtures_validate`.)
+///    link that resolves to a doc which actually **catalogs that fixture** (check 1's
+///    per-doc attribution), not merely to some member of the sanctioning family. Checks
+///    1+2 prove the doc catalogs the fixture and that any link present resolves, but
+///    neither requires the back-link to *exist* — a README that simply omits it passes
+///    both. This closes that gap, and a second one the doc split opened: with a single
+///    conformance doc, "cataloged in D" and "links D" were the same fact, so the two
+///    checks agreed for free; across a six-doc family they are independent, and a README
+///    could link the frame while its entry lived in a language catalog. A fixture no
+///    member catalogs falls back to the whole family here, so it reports once (as check
+///    1's orphan) rather than twice. (A divergence fixture with no README at all is the
+///    fixture validator's `D1` rule, run separately in `fixtures_validate`.)
 /// 4. **Stray READMEs** — a non-divergence fixture (matches both Prettier and Svelte)
 ///    should not carry a README; there is no divergence to sanction, and any conformance
 ///    back-link it holds rots unaudited. A small allowlist (`ALLOWED_NONDIVERGENCE_READMES`)
@@ -44,8 +48,26 @@ pub struct ConformanceAuditCommand {
     json: bool,
 }
 
-const CONFORMANCE_PRETTIER: &str = "docs/conformance_prettier.md";
-const CONFORMANCE_SVELTE: &str = "docs/conformance_svelte.md";
+/// The Prettier-divergence catalog is split by language: a shared frame (terminology,
+/// `◆reason` tags, decision framework) plus the per-language catalogs it indexes. Any
+/// one of them can catalog a `_prettier_divergence` fixture — the orphan check accepts
+/// the union — but a back-link must aim at a member that catalogs *that* fixture, so the
+/// family is read per-doc ([`catalog_owners`]) rather than joined into one document.
+const CONFORMANCE_PRETTIER: &[&str] = &[
+    "docs/conformance_prettier.md",
+    "docs/conformance_prettier_css.md",
+    "docs/conformance_prettier_svelte.md",
+    "docs/conformance_prettier_ts.md",
+    "docs/conformance_prettier_ts_comments.md",
+    "docs/conformance_prettier_ignore.md",
+];
+const CONFORMANCE_PRETTIER_LABEL: &str = "docs/conformance_prettier*.md";
+const CONFORMANCE_SVELTE: &[&str] = &["docs/conformance_svelte.md"];
+const CONFORMANCE_SVELTE_LABEL: &str = "docs/conformance_svelte.md";
+
+/// Fixture path (`normalize_fixture_path` form) → the family docs that catalog it, in
+/// family order. Built by [`catalog_owners`].
+type CatalogOwners = HashMap<String, Vec<&'static str>>;
 
 /// Non-divergence fixtures that deliberately keep a README because it documents a
 /// real parser/spec/contrast fact that cannot live as an `input.*` comment. Every
@@ -72,39 +94,38 @@ impl ConformanceAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let all = super::walk_fixtures_or_fail()?;
 
-        // Every repo doc is link-checked; the two conformance docs additionally
-        // drive the orphan and back-link checks. Read each doc once, priming the
-        // cache so anchors into it resolve for free.
+        // Every repo doc is link-checked; the conformance docs additionally drive the
+        // orphan and back-link checks. Read each doc once, priming the cache so anchors
+        // into it resolve for free.
         let docs = enumerate_docs()?;
         let mut cache = DocCache::new();
-        let mut prettier_src = None;
-        let mut svelte_src = None;
+        let mut family_src: HashMap<PathBuf, String> = HashMap::new();
         for doc in &docs {
             let src = read_doc(doc)?;
             cache.prime(doc, &src);
-            if doc.as_path() == Path::new(CONFORMANCE_PRETTIER) {
-                prettier_src = Some(src);
-            } else if doc.as_path() == Path::new(CONFORMANCE_SVELTE) {
-                svelte_src = Some(src);
+            if CONFORMANCE_PRETTIER
+                .iter()
+                .chain(CONFORMANCE_SVELTE)
+                .any(|d| doc.as_path() == Path::new(d))
+            {
+                family_src.insert(doc.clone(), src);
             }
         }
-        let (Some(prettier_src), Some(svelte_src)) = (prettier_src, svelte_src) else {
-            eprintln!("Error: docs/ is missing {CONFORMANCE_PRETTIER} or {CONFORMANCE_SVELTE}");
-            return Err(CliError::Failed);
-        };
+        let prettier_owners = catalog_owners(CONFORMANCE_PRETTIER, &family_src)?;
+        let svelte_owners = catalog_owners(CONFORMANCE_SVELTE, &family_src)?;
 
         let orphans = [
             run_orphan_audit(
                 &all,
-                CONFORMANCE_PRETTIER,
-                &prettier_src,
+                CONFORMANCE_PRETTIER_LABEL,
+                &prettier_owners,
                 "_prettier_divergence",
                 fixtures::Fixture::is_prettier_divergence,
             ),
             run_orphan_audit(
                 &all,
-                CONFORMANCE_SVELTE,
-                &svelte_src,
+                CONFORMANCE_SVELTE_LABEL,
+                &svelte_owners,
                 "_svelte_divergence",
                 fixtures::Fixture::is_svelte_divergence,
             ),
@@ -120,7 +141,8 @@ impl ConformanceAuditCommand {
             .collect();
 
         let (dead_links, links_checked) = run_link_audit(&docs, &readmes, &mut cache);
-        let missing_backlinks = run_backlink_audit(&readmes, &mut cache);
+        let missing_backlinks =
+            run_backlink_audit(&readmes, &prettier_owners, &svelte_owners, &mut cache);
         let stray_readmes = run_readme_audit(&readmes);
 
         let report = Report {
@@ -145,6 +167,31 @@ impl ConformanceAuditCommand {
             Err(CliError::Failed)
         }
     }
+}
+
+/// Which member(s) of a conformance family catalog each fixture, in family order.
+///
+/// The two checks that consume this ask different questions of it, and joining the
+/// family into one document (as this once did) can only answer the first: the orphan
+/// check wants the **union** — a fixture cataloged anywhere in the family is covered —
+/// while the back-link check wants the **attribution**, since a README must aim at a doc
+/// that actually lists that fixture. A member missing from `docs/` is a mis-wired audit —
+/// the check would silently lose whatever that doc catalogs — not a clean run.
+fn catalog_owners(
+    family: &[&'static str],
+    sources: &HashMap<PathBuf, String>,
+) -> Result<CatalogOwners, CliError> {
+    let mut owners: CatalogOwners = HashMap::new();
+    for doc in family {
+        let Some(part) = sources.get(Path::new(doc)) else {
+            eprintln!("Error: docs/ is missing {doc}");
+            return Err(CliError::Failed);
+        };
+        for fixture in extract_linked_fixtures(part) {
+            owners.entry(fixture).or_default().push(doc);
+        }
+    }
+    Ok(owners)
 }
 
 /// Read a doc file, returning [`CliError::Failed`] (after a message) on failure.
@@ -191,11 +238,10 @@ struct OrphanAudit {
 fn run_orphan_audit(
     all: &[fixtures::Fixture],
     doc_path: &'static str,
-    doc: &str,
+    owners: &CatalogOwners,
     suffix_label: &'static str,
     is_in_class: impl Fn(&fixtures::Fixture) -> bool,
 ) -> OrphanAudit {
-    let linked = extract_linked_fixtures(doc);
     let divergence: BTreeSet<String> = all
         .iter()
         .filter(|f| is_in_class(f))
@@ -204,7 +250,7 @@ fn run_orphan_audit(
     let total = divergence.len();
     let unlinked: Vec<String> = divergence
         .into_iter()
-        .filter(|p| !linked.contains(p))
+        .filter(|p| !owners.contains_key(p))
         .collect();
     OrphanAudit {
         doc_path,
@@ -396,28 +442,58 @@ fn resolve_anchor(md_path: &Path, anchor: &str, cache: &mut DocCache) -> Result<
 
 struct MissingBacklink {
     fixture: String,
-    doc_path: &'static str,
+    /// The doc(s) that catalog this fixture — what the README must link. Falls back to
+    /// the whole family label when no member catalogs it (an orphan, reported by check 1).
+    doc_path: String,
 }
 
 /// Every divergence README must link to the doc that sanctions its claim. For each
-/// fixture that *has* a README, check the suffix class against the required doc(s):
-/// a `_prettier_divergence` must link `conformance_prettier.md`, a `_svelte_divergence`
-/// must link `conformance_svelte.md`, and the combined suffix (both predicates true)
-/// must link both. A missing README is out of scope here — that's the validator's `D1`.
+/// fixture that *has* a README, check the suffix class against the required family:
+/// a `_prettier_divergence` must link one of the `conformance_prettier*.md` docs, a
+/// `_svelte_divergence` must link `conformance_svelte.md`, and the combined suffix
+/// (both predicates true) must link one of each. Any member of the prettier family
+/// satisfies the claim — which one is right is the language question the doc's own
+/// §Catalogs table answers, not something a path check can decide. A missing README is
+/// out of scope here — that's the validator's `D1`.
 fn run_backlink_audit(
     readmes: &[(&fixtures::Fixture, PathBuf)],
+    prettier_owners: &CatalogOwners,
+    svelte_owners: &CatalogOwners,
     cache: &mut DocCache,
 ) -> Vec<MissingBacklink> {
     let mut missing = Vec::new();
     for (f, readme_path) in readmes {
-        for (doc_path, in_class) in [
-            (CONFORMANCE_PRETTIER, f.is_prettier_divergence()),
-            (CONFORMANCE_SVELTE, f.is_svelte_divergence()),
+        let fixture = normalize_fixture_path(&f.relative_path);
+        for (family, label, owners, in_class) in [
+            (
+                CONFORMANCE_PRETTIER,
+                CONFORMANCE_PRETTIER_LABEL,
+                prettier_owners,
+                f.is_prettier_divergence(),
+            ),
+            (
+                CONFORMANCE_SVELTE,
+                CONFORMANCE_SVELTE_LABEL,
+                svelte_owners,
+                f.is_svelte_divergence(),
+            ),
         ] {
-            if in_class && !readme_links_to_doc(readme_path, doc_path, cache) {
+            if !in_class {
+                continue;
+            }
+            // The docs that actually catalog this fixture are the ones its README must
+            // aim at — the frame satisfying a claim cataloged in a language doc is the
+            // gap the split opened. A fixture no member catalogs is check 1's orphan, so
+            // fall back to the whole family rather than reporting the same hole twice.
+            let sanctioning: &[&str] = owners.get(&fixture).map_or(family, |docs| docs.as_slice());
+            if !readme_links_to_doc(readme_path, sanctioning, cache) {
                 missing.push(MissingBacklink {
-                    fixture: normalize_fixture_path(&f.relative_path),
-                    doc_path,
+                    fixture: fixture.clone(),
+                    doc_path: if owners.contains_key(&fixture) {
+                        sanctioning.join(" or ")
+                    } else {
+                        label.to_string()
+                    },
                 });
             }
         }
@@ -426,11 +502,12 @@ fn run_backlink_audit(
 }
 
 /// Does the README at `readme_path` hold a Markdown link whose *path part* resolves
-/// (on disk, canonicalized) to `doc_path`? Anchor validity is the dead-link check's
-/// job — here we only assert the back-link is present and aimed at the right doc, so a
-/// broken link won't match (canonicalize fails → the joined path can't equal the doc's).
-fn readme_links_to_doc(readme_path: &Path, doc_path: &str, cache: &mut DocCache) -> bool {
-    let doc_key = canonical_key(Path::new(doc_path));
+/// (on disk, canonicalized) to any doc in `docs`? Callers pass the docs that catalog
+/// *this* fixture, not the whole family. Anchor validity is the dead-link check's job —
+/// here we only assert the back-link is present and aimed at the right doc, so a broken
+/// link won't match (canonicalize fails → the joined path can't equal the doc's).
+fn readme_links_to_doc(readme_path: &Path, docs: &[&str], cache: &mut DocCache) -> bool {
+    let keys: Vec<PathBuf> = docs.iter().map(|d| canonical_key(Path::new(d))).collect();
     let links = match cache.get(readme_path) {
         Some(doc) => doc.links.clone(),
         None => return false,
@@ -442,7 +519,7 @@ fn readme_links_to_doc(readme_path: &Path, doc_path: &str, cache: &mut DocCache)
             .split_once('#')
             .map_or(link.target.as_str(), |(p, _)| p);
         // A pure `#anchor` points within the README itself, not at the doc.
-        !path_part.is_empty() && canonical_key(&base.join(path_part)) == doc_key
+        !path_part.is_empty() && keys.contains(&canonical_key(&base.join(path_part)))
     })
 }
 
@@ -684,11 +761,12 @@ impl Report {
         }
 
         if self.missing_backlinks.is_empty() {
-            println!("✓ every divergence README links to its sanctioning conformance doc");
+            println!("✓ every divergence README links the conformance doc that catalogs it");
         } else {
             eprintln!(
-                "✗ {} divergence README(s) missing a back-link to their sanctioning doc \
-                 (add `See [conformance_*.md §…](…)`):",
+                "✗ {} divergence README(s) missing a back-link to the doc that CATALOGS them \
+                 (add `See [conformance_*.md §…](…)` — the doc holding the entry, not merely \
+                 the shared frame):",
                 self.missing_backlinks.len()
             );
             for m in &self.missing_backlinks {
@@ -767,6 +845,51 @@ mod tests {
     }
 
     #[test]
+    fn catalog_owners_attributes_each_fixture_to_the_docs_that_link_it() {
+        let mut sources = HashMap::new();
+        sources.insert(
+            PathBuf::from("docs/conformance_prettier.md"),
+            "frame lists ../tests/fixtures/shared/both\n".to_string(),
+        );
+        sources.insert(
+            PathBuf::from("docs/conformance_prettier_css.md"),
+            "css lists ../tests/fixtures/css/only and ../tests/fixtures/shared/both\n".to_string(),
+        );
+        let owners = catalog_owners(
+            &[
+                "docs/conformance_prettier.md",
+                "docs/conformance_prettier_css.md",
+            ],
+            &sources,
+        )
+        .expect("both members present");
+
+        // The attribution the joined form could not express: only the CSS catalog
+        // sanctions this fixture, so a back-link at the frame must NOT satisfy it.
+        assert_eq!(
+            owners.get("css/only"),
+            Some(&vec!["docs/conformance_prettier_css.md"])
+        );
+        // Cataloged in two members → either satisfies, in family order.
+        assert_eq!(
+            owners.get("shared/both"),
+            Some(&vec![
+                "docs/conformance_prettier.md",
+                "docs/conformance_prettier_css.md",
+            ])
+        );
+        assert!(!owners.contains_key("never/mentioned"));
+    }
+
+    #[test]
+    fn catalog_owners_fails_on_a_missing_family_member() {
+        // A member absent from `docs/` would silently drop whatever it catalogs, turning
+        // both checks vacuous for those fixtures — that is a mis-wired audit, not a pass.
+        let sources = HashMap::new();
+        assert!(catalog_owners(&["docs/conformance_prettier.md"], &sources).is_err());
+    }
+
+    #[test]
     fn normalize_fixture_path_strips_prefix_and_trailing_slash() {
         assert_eq!(normalize_fixture_path("./tests/fixtures/x/y/"), "x/y");
         assert_eq!(
@@ -817,34 +940,46 @@ mod tests {
     }
 
     #[test]
-    fn readme_links_to_doc_matches_only_the_sanctioning_doc() {
-        // A divergence README in a deep fixture dir, plus the two conformance docs,
-        // laid out under a tempdir so canonicalization has real paths to resolve.
+    fn readme_links_to_doc_matches_only_the_sanctioning_family() {
+        // A divergence README in a deep fixture dir, plus the conformance docs, laid out
+        // under a tempdir so canonicalization has real paths to resolve. The README aims
+        // at the *CSS catalog*, not the frame — any member of the prettier family
+        // satisfies the claim, and no member of the svelte family does.
         let root =
             std::env::temp_dir().join(format!("tsv_conf_audit_backlink_{}", std::process::id()));
         let docs = root.join("docs");
         let fixture = root.join("tests/fixtures/css/x_prettier_divergence");
         std::fs::create_dir_all(&docs).unwrap();
         std::fs::create_dir_all(&fixture).unwrap();
-        std::fs::write(docs.join("conformance_prettier.md"), "# CSS: Layout\n").unwrap();
+        std::fs::write(docs.join("conformance_prettier.md"), "# Frame\n").unwrap();
+        std::fs::write(docs.join("conformance_prettier_css.md"), "# CSS: Layout\n").unwrap();
         std::fs::write(docs.join("conformance_svelte.md"), "# Svelte\n").unwrap();
         let readme = fixture.join("README.md");
         std::fs::write(
             &readme,
-            "See [conformance_prettier.md §CSS: Layout]\
-             (../../../../docs/conformance_prettier.md#css-layout).\n",
+            "See [conformance_prettier_css.md §CSS: Layout]\
+             (../../../../docs/conformance_prettier_css.md#css-layout).\n",
         )
         .unwrap();
 
         let mut cache = DocCache::new();
-        let prettier = docs.join("conformance_prettier.md");
+        let frame = docs.join("conformance_prettier.md");
+        let css = docs.join("conformance_prettier_css.md");
         let svelte = docs.join("conformance_svelte.md");
         assert!(
-            readme_links_to_doc(&readme, prettier.to_str().unwrap(), &mut cache),
-            "back-link to conformance_prettier.md resolves"
+            readme_links_to_doc(
+                &readme,
+                &[frame.to_str().unwrap(), css.to_str().unwrap()],
+                &mut cache
+            ),
+            "back-link to a prettier-family catalog resolves"
         );
         assert!(
-            !readme_links_to_doc(&readme, svelte.to_str().unwrap(), &mut cache),
+            !readme_links_to_doc(&readme, &[frame.to_str().unwrap()], &mut cache),
+            "the frame alone is not what this README links"
+        );
+        assert!(
+            !readme_links_to_doc(&readme, &[svelte.to_str().unwrap()], &mut cache),
             "no link to conformance_svelte.md"
         );
 

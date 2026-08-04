@@ -19,4 +19,4 @@ relocates the *line* comment out past the `;`. Per Comment Position Philosophy, 
 treats the authored position as intentional and does not relocate the comment across the
 `)`/`;`.
 
-See [conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+See [conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).

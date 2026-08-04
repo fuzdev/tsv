@@ -22,4 +22,4 @@ comment stays put. This is consistent with the regular
 where prettier relocates a block comment; `as <literal>` (`x as /* c */ 5`) and
 `satisfies const` (`x satisfies /* c */ const`) stay put in both.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

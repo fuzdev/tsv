@@ -44,7 +44,8 @@ own-line comments are preserved as-written by both.
 ## Reason
 
 Comment placement is a deliberate authoring choice and tsv preserves it. See
-[conformance_prettier.md §Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy).
+[conformance_prettier.md §Comment Position Philosophy](../../../../../docs/conformance_prettier.md#comment-position-philosophy);
+cataloged in [conformance_prettier_svelte.md §Svelte: Attributes](../../../../../docs/conformance_prettier_svelte.md#svelte-attributes).
 
 ## Related
 

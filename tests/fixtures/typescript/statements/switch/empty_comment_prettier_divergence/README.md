@@ -11,4 +11,4 @@ tsv treats user comment placement as intentional. A comment in the switch body r
 
 The discriminant form (`variant_compact.svelte`, `switch (\n\tx // comment\n) {}`) is dual-stable: both formatters keep it as-is, so it is a `variant_*`, not the canonical input.
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -268,7 +268,7 @@ impl<'a> Printer<'a> {
         // A comment trailing the opening `{` on its own line is kept on the `{`
         // line when the body expands (divergence from prettier, which relocates
         // it to its own line as the first member's leading comment). Same
-        // mechanism as block/namespace bodies. See conformance_prettier.md
+        // mechanism as block/namespace bodies. See conformance_prettier_ts_comments.md
         // §Comment relocation (Class/interface/enum body `{`).
         let first_member_start = body.body[0].span().start;
         let (brace_line_prefix, delimiter_pull_pos) =
@@ -585,8 +585,8 @@ impl<'a> Printer<'a> {
             // A line comment between the LHS and `=` keeps the comment in place and
             // drops `= value` to a continuation line indented one level (preserve —
             // lossless when a second comment also trails the member; prettier relocates
-            // it to end-of-line and merges the two — conformance_prettier.md §Comment
-            // relocation). Bypasses the assignment layout; value built lazily so the
+            // it to end-of-line and merges the two — conformance_prettier_ts_comments.md
+            // §Comment relocation). Bypasses the assignment layout; value built lazily so the
             // common no-comment path is unaffected.
             let preserve = self.build_initializer_line_continuation(before_eq, eq_pos, || {
                 let value_doc = if self.needs_parens(value, super::ParenContext::DefaultValue) {

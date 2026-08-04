@@ -29,7 +29,7 @@ positions swallow vs. keep the markers raw) is cataloged as a Svelte compat beha
 
 ## Reason
 
-See [conformance_prettier.md §CSS: HTML comments (CDO/CDC)](../../../../../docs/conformance_prettier.md#css-html-comments-cdocdc).
+See [conformance_prettier_css.md §CSS: HTML comments (CDO/CDC)](../../../../../docs/conformance_prettier_css.md#css-html-comments-cdocdc).
 Prettier emits invalid CSS on the CDO/CDC markers (no oracle); tsv follows Svelte's `parseCss`,
 which swallows the `<!-- … -->` span.
 

@@ -31,4 +31,4 @@ line break is render-equivalent (confirmed by `ast_diff --render`). tsv treats a
 inline element uniformly with block elements — it starts a fresh line rather than leaving an
 opening tag stranded at the end of the preceding text line — where prettier lets the
 authored boundary decide and dangles the tag delimiters.
-See [conformance_prettier.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier.md#svelte-inline-content-block-style).
+See [conformance_prettier_svelte.md §Svelte: Inline content block-style](../../../../../docs/conformance_prettier_svelte.md#svelte-inline-content-block-style).

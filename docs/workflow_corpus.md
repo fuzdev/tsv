@@ -26,10 +26,13 @@ one-file-at-a-time loop below re-formats only files whose content changed.
 **ALWAYS start by reading the conformance documentation:**
 
 ```bash
-cat docs/conformance_prettier.md
+cat docs/conformance_prettier.md          # the frame: terminology, reason tags, decision framework
+cat docs/conformance_prettier_css.md      # and the catalog for the language you're triaging
 ```
 
-This document contains all intentional Prettier divergences with rationale and fixture references.
+The frame's §Catalogs table indexes the per-language catalogs (`_css`, `_svelte`, `_ts`,
+`_ts_comments`, `_ignore`); together they hold every intentional Prettier divergence with
+rationale and fixture references.
 
 **This workflow doc describes HOW to work. The conformance doc describes WHERE we intentionally differ.**
 
@@ -244,8 +247,8 @@ This replaces manually running `cargo run -p tsv_debug compare <file>` on each u
 # Use --explain to also list known divergences with their patterns
 deno task corpus:compare:format ~/dev/zzz --explain
 
-# Check conformance_prettier.md for detailed rationale
-cat docs/conformance_prettier.md
+# Check the conformance docs for detailed rationale (frame + the language's catalog)
+cat docs/conformance_prettier.md docs/conformance_prettier_svelte.md
 
 # Search for existing _prettier_divergence fixtures
 find tests/fixtures -name "*prettier_divergence*" -type d
@@ -528,7 +531,7 @@ cargo run -p tsv_debug line_width FILE --line N
 - ./fixture_workflow.md - Complete fixture creation process
 - ./fixture_naming.md - Naming conventions (ALWAYS read before creating fixtures)
 - ./fixture_overview.md - Validation rules and patterns
-- ./conformance_prettier.md - **Intentional Prettier divergences** (check before fixing a "bug")
+- ./conformance_prettier.md - **Intentional Prettier divergences** — the frame; its §Catalogs table indexes the per-language catalogs (check before fixing a "bug")
 
 ---
 

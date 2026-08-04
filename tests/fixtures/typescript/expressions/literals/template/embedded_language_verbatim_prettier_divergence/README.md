@@ -20,7 +20,7 @@ yet format faithfully). Prettier's `embeddedLanguageFormatting` reformats bodies
 recognizes (`html`, `css`, `graphql`, …); tsv keeps them as authored text **until embedded
 support lands** (see below).
 
-See [conformance_prettier.md](../../../../../../../docs/conformance_prettier.md) §TypeScript: Template Literals.
+See [conformance_prettier_ts.md](../../../../../../../docs/conformance_prettier_ts.md) §TypeScript: Template Literals.
 
 ## Planned: embedded-language formatting
 

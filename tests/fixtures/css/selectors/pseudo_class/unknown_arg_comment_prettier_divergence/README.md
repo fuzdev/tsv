@@ -19,7 +19,7 @@ normalizes both to `input.svelte`.
 Stable quirk. tsv registers these gap comments at parse time and re-emits them
 through `comments_in_range` — the identical selector-list doc path `:is()` uses,
 so the fix is parser-only. Prettier preserves the source whitespace instead. See
-[conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
+[conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments).
 
 ## Related
 

@@ -24,4 +24,4 @@ The pure-line counterpart (`(// c⏎ A) & B`) keeps the same trail-on-`=` canoni
 Only the addition of the trailing block makes tsv normalize the paren shell in one
 pass where prettier takes two.
 
-See [conformance_prettier.md](../../../../../docs/conformance_prettier.md) §Comment relocation.
+See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

@@ -19,7 +19,7 @@ rest (`color /* a */ : red;`, losing `/* b */`).
 
 Stable quirk. tsv normalizes comment spacing consistently and reconstructs
 **all** property→colon-gap comments, joined single-spaced. See
-[conformance_prettier.md §CSS: Comments](../../../../../../docs/conformance_prettier.md#css-comments).
+[conformance_prettier_css.md §CSS: Comments](../../../../../../docs/conformance_prettier_css.md#css-comments).
 
 ## Related
 

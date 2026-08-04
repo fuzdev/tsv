@@ -26,5 +26,5 @@ single-line block's breaks stay unforced and collapse either way (the
 own-line-block sibling
 [property_key_colon_own_line_block_comment](../property_key_colon_own_line_block_comment_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.

@@ -32,4 +32,4 @@ it **precedes**. Freezing the whole mapped type from inside the bracket would fr
 content *before* the directive. Prettier's whole-node redirect is a special-cased
 handler tsv deliberately does not copy.
 
-See [conformance_prettier.md §Format-ignore directive](../../../../../docs/conformance_prettier.md#format-ignore-directive).
+See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

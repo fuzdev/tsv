@@ -46,7 +46,7 @@ the regular [update_operator_comment](../update_operator_comment/) fixture, whic
 covers the block-comment cases on both sides.
 
 See
-[conformance_prettier.md §Comment relocation](../../../../../../docs/conformance_prettier.md#comment-relocation).
+[conformance_prettier_ts_comments.md §Comment relocation](../../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
 
 The retained shell **expands** — the operand takes its own indented line rather
 than gluing to the `(` — for every comment that makes the shell span lines, so a

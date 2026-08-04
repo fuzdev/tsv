@@ -15,4 +15,4 @@ matched the inner colon and **dropped** the comment).
 
 Per the comment-position philosophy, tsv keeps comments where the author wrote
 them. See
-[conformance_prettier.md](../../../../../../docs/conformance_prettier.md) §Comment relocation.
+[conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.

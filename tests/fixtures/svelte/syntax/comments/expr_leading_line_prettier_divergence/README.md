@@ -29,7 +29,7 @@ delimiters, never in whether the value hangs:
 - **continuation indent, hugged `}`** — the prefixed tags (`{@html}`, `{@render}`,
   `{@debug}`, `{...}`, `{@attach}`), the `{expr}` tag, and attribute values.
 - **continuation indent, dangling `}`** — the block heads, whose `}` drops to base whatever
-  broke the head ([§Svelte: Blocks](../../../../../../docs/conformance_prettier.md#svelte-blocks);
+  broke the head ([§Svelte: Blocks](../../../../../../docs/conformance_prettier_svelte.md#svelte-blocks);
   [condition_breaking_comment](../../../blocks/if/condition_breaking_comment_prettier_divergence/)
   is that shape's own fixture).
 - **block form** — a directive value that block-wraps (`bind:` always; `class:`, `use:` and

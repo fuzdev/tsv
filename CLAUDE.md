@@ -27,12 +27,19 @@ marker). The user stamps it at release time.
 **ALWAYS use TDD when implementing features or fixing bugs:**
 
 0. **Load context FIRST** - Read BOTH ./docs/fixture_workflow.md AND ./docs/fixture_naming.md into context.
-   For ANY `_prettier_divergence` fixture, ALSO read ./docs/conformance_prettier.md first — every
+   For ANY `_prettier_divergence` fixture, ALSO read ./docs/conformance_prettier.md (the shared
+   frame — terminology, `◆reason` tags, decision framework) **plus the catalog for the language
+   you're touching**, listed in its §Catalogs table: ./docs/conformance_prettier_css.md,
+   ./docs/conformance_prettier_svelte.md, ./docs/conformance_prettier_ts.md,
+   ./docs/conformance_prettier_ts_comments.md, ./docs/conformance_prettier_ignore.md. Every
    divergence (not just comment ones) must be sanctioned and **cataloged in the relevant section**
-   there (comment divergences: §Comment Position Philosophy + §Comment relocation catalog; others:
-   the matching feature section), AND the fixture's `README.md` MUST link back to that section
-   (`See [conformance_prettier.md §…](…)`) — the README and catalog entry must agree. Study 2-3
-   existing fixtures in the target category (match their README shape).
+   (comment divergences: §Comment Position Philosophy in the frame + the §Comment relocation
+   catalog; others: the matching feature section), AND the fixture's `README.md` MUST link back to
+   that section (`See [conformance_prettier_<lang>.md §…](…)`) — the README and catalog entry must
+   agree, and `conformance:audit` gates that agreement: linking the shared frame does **not**
+   satisfy a divergence whose entry lives in a language catalog (link both — the frame for the
+   principle, the catalog for the entry). Study 2-3 existing fixtures in the target category
+   (match their README shape).
 1. **Create the fixture FIRST** - `fixture_init` creates `input.svelte` (prettier-formatted) and `expected.json` in one step.
    Use `.svelte` unless the feature is file-level (byte 0: hashbang, BOM). See ./docs/fixture_workflow.md#11-create-directory-and-draft.
 2. **Review the input** - Read the generated `input.svelte` to verify structure (formatting is guaranteed correct).
@@ -308,7 +315,7 @@ deno task corpus:stats             # corpus/candidate-dir sizes + language + deg
 
 The corpus comparison builds with `--profile corpus` (optimized + `panic = "unwind"`, no LTO — panics in our code are caught and reported; also the single build world every `deno task check` audit shares, trading LTO for build time, measurably free at runtime per the profile's comment in `Cargo.toml`). Benchmarks use `--release` (panic=abort, LTO) for maximum performance.
 
-Divergence detection identifies known differences documented in `conformance_prettier.md` (safety checks, pattern detection, traceability). See ./benches/js/CLAUDE.md and ./docs/divergence_detector.md.
+Divergence detection identifies known differences documented in the `conformance_prettier*.md` family (safety checks, pattern detection, traceability). See ./benches/js/CLAUDE.md and ./docs/divergence_detector.md.
 
 ### Benchmarks
 
@@ -440,9 +447,12 @@ tsv/
 
 The line tsv draws: **preserve when the position carries authorship signal, or when relocating would lose information** (the common case). But tsv will **deliberately trail** a same-line line comment past a *pure separator* when doing so is **lossless and the position carries no signal** — e.g. a comment between a list element and its comma (`A // c⏎, B` → `A, // c`): the comma is structure, the comment trails the element either way, and per-element line breaks keep even multiple comments distinct, so tsv matches Prettier. That carve-out is a deliberate choice, **not** a gap to close. (Contrast the name→`=`/`:`/`?` binding cases, where two comments *would* collide on one trailing line — there tsv preserves + continuation-indents to stay lossless, diverging from Prettier's merge.)
 
-The union-member / parenthesized-intersection alignment rendering (`type T = | { // c } | B`) is the one remaining spot where tsv still matches a Prettier relocation across a semantic boundary — an un-converted implementation gap coupled to the intersection-printer convergence. When a fix changes comment handling, default to preserving position; matching Prettier is fine only when trailing is lossless and the position carries no signal — otherwise add a `_prettier_divergence` fixture. Full principles + the divergence catalog: ./docs/conformance_prettier.md §Comment Position Philosophy.
+The union-member / parenthesized-intersection alignment rendering (`type T = | { // c } | B`) is the one remaining spot where tsv still matches a Prettier relocation across a semantic boundary — an un-converted implementation gap coupled to the intersection-printer convergence. When a fix changes comment handling, default to preserving position; matching Prettier is fine only when trailing is lossless and the position carries no signal — otherwise add a `_prettier_divergence` fixture. Full principles: ./docs/conformance_prettier.md §Comment Position Philosophy; the divergence catalog: ./docs/conformance_prettier_ts_comments.md §Comment relocation.
 
-- ./docs/conformance_prettier.md - Where we differ from Prettier (and why)
+- ./docs/conformance_prettier.md - Where we differ from Prettier (and why) — the shared frame;
+  the per-language catalogs are ./docs/conformance_prettier_css.md,
+  ./docs/conformance_prettier_svelte.md, ./docs/conformance_prettier_ts.md,
+  ./docs/conformance_prettier_ts_comments.md, and ./docs/conformance_prettier_ignore.md
 - ./docs/conformance_svelte.md - Where we differ from Svelte (and why)
 - ./docs/conformance_svelte_compiler.md - Where we differ from Svelte's compiler (expected to stay empty — a safety valve, not a budget)
 
@@ -474,7 +484,7 @@ See [Development Philosophy](#development-philosophy-test-driven-development-wit
 - Spec precedence: when the spec defines a canonical form prettier doesn't emit, follow the spec — document with spec refs
 - Comment position: when prettier moves comments, preserve the user's placement. See ./docs/conformance_prettier.md#comment-position-philosophy
 - Other defensible tsv-native choices (print width as a hard limit, a clearly better layout) are legitimate too — sanction them deliberately, never to hide a bug
-- `_prettier_divergence` suffix: deliberate, documented differences only. Requires a README that **links back to its `conformance_prettier.md` section** and a matching catalog entry there
+- `_prettier_divergence` suffix: deliberate, documented differences only. Requires a README that **links back to its `conformance_prettier*.md` section** and a matching catalog entry there
 
 ---
 
@@ -842,7 +852,7 @@ why the rule lives in one emitter per question rather than at each container.
 
 Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/linter use
 cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — see
-[conformance_prettier.md §Comment relocation](docs/conformance_prettier.md#comment-relocation).
+[conformance_prettier_ts_comments.md §Comment relocation](docs/conformance_prettier_ts_comments.md#comment-relocation).
 
 ## Dependencies
 

@@ -36,5 +36,5 @@ the same-gap **line** comment is
 the iface/type-literal host converges on the in-bracket relocation instead
 ([computed_key_bracket_colon_own_line_block_comment](../../../types/type_members/computed_key_bracket_colon_own_line_block_comment_prettier_divergence/)).
 
-See [conformance_prettier.md](../../../../../../docs/conformance_prettier.md)
+See [conformance_prettier_ts_comments.md](../../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation and §Comment Position Philosophy.
