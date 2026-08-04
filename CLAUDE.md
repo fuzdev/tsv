@@ -179,7 +179,7 @@ deno task compile:fixtures:validate  # compile fixtures: oracle freshness + expe
 **Standing audit gates** — full reference ./docs/audits.md: what each proves, blind spots, flags, and where it gates (its overview table maps every task). Read the relevant section before running or modifying an audit. RATCHET audits grade against a committed known-bug snapshot (`*_known.txt`); each has an `:update` task that re-pins after a fix and refuses a narrowed run. Everything below gates in `deno task check` unless noted.
 
 ```bash
-deno task conformance:audit          # doc/fixture integrity: divergences cataloged, all docs/README links resolve, divergence READMEs back-link
+deno task conformance:audit          # doc/fixture integrity: divergences cataloged, every Markdown link in the repo resolves, divergence READMEs back-link, no catalog-family drift
 deno task conformance:audit:compiler # compile-fixture divergence integrity + checklist ↔ `Refusal` drift
 deno task canonicalize:audit         # canonicalize_js idempotence + output validity + comment preservation
 deno task pins:audit                 # canonical-oracle PIN AGREEMENT, a repo fact: sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical
@@ -663,9 +663,12 @@ cargo run -p tsv_debug fixtures_audit [pattern...]
 cargo run -p tsv_debug ts_fixture_audit [pattern...]
 
 # conformance_audit - doc/fixture integrity in one fixture walk: divergence fixtures cataloged in
-# their conformance doc, every docs/*.md + fixture-README link resolves, divergence READMEs
-# back-link their sanctioning doc, no stray READMEs (exceptions: the in-code
-# ALLOWED_NONDIVERGENCE_READMES allowlist). Pure Rust; gated in `deno task check`. --json.
+# their conformance doc, every Markdown link in the repo resolves (docs/*.md, fixture READMEs, and
+# the CLAUDE.md / README.md set — a .gitignore-aware walk, skipping .git + symlinks),
+# divergence READMEs back-link their sanctioning doc, no stray READMEs (exceptions: the in-code
+# ALLOWED_NONDIVERGENCE_READMES allowlist), no catalog-family drift (the
+# docs/conformance_prettier*.md on disk are exactly CONFORMANCE_PRETTIER, each indexed by the
+# frame's §Catalogs table). Pure Rust; gated in `deno task check`. --json.
 cargo run -p tsv_debug conformance_audit
 
 # compile_conformance_audit - the compiler analog, deliberately minimal: _compiled_divergence

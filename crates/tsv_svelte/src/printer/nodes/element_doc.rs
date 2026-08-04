@@ -817,7 +817,7 @@ impl<'a> Printer<'a> {
         // hugs the last attr when attrs fit and dedents to its own line when they wrap. The attr
         // group and the content group stay SEPARATE, so attr-wrapping and content-wrapping
         // decouple — the decoupling that makes the with-attrs case idempotent now that content no
-        // longer flows on the tag lines. See conformance_prettier.md.
+        // longer flows on the tag lines. See conformance_prettier_svelte.md.
         //
         // `gt_prefix` (Some) is a preceding glued element's shed `>`, threaded into this tag's
         // attrs group as a leading `if_break` (the G2 sibling-`>` dangle) — see

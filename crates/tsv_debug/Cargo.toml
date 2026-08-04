@@ -52,6 +52,7 @@ tsv_ts = { workspace = true, features = ["convert", "debug_lex"] }
 tsv_css = { workspace = true, features = ["convert", "debug_lex"] }
 tsv_svelte_compile = { workspace = true }
 tsv_html = { workspace = true }
+tsv_ignore = { workspace = true }
 argh.workspace = true
 serde.workspace = true
 serde_json.workspace = true

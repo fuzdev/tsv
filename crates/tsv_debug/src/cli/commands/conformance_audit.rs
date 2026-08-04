@@ -3,10 +3,11 @@ use crate::fixtures;
 use argh::FromArgs;
 use std::collections::{BTreeSet, HashMap};
 use std::path::{Path, PathBuf};
+use tsv_ignore::IgnoreStack;
 
 /// Audit doc/fixture integrity: divergence cataloging, link resolution, README hygiene.
 ///
-/// Runs four checks over one fixture walk, reading each file at most once:
+/// Runs five checks over one fixture walk, reading each file at most once:
 ///
 /// 1. **Orphans** — every `_*_divergence`-suffixed fixture must be linked in the doc
 ///    that sanctions its claim (`_prettier_divergence` → any `docs/conformance_prettier*.md`,
@@ -14,8 +15,10 @@ use std::path::{Path, PathBuf};
 ///    A divergence suffix asserts a deliberate difference; that claim must be cataloged
 ///    so it is discoverable and reviewable.
 /// 2. **Dead links** — every Markdown link (relative path and `#anchor`) in every
-///    `docs/*.md` (enumerated at run time, so a new doc is gated by existing) and in
-///    every fixture README must resolve on disk. The orphan check only proves
+///    Markdown file in the repo (walked at run time, so a new doc is gated by existing)
+///    must resolve on disk: `docs/*.md`, every fixture README, and the files that once
+///    had no link gate at all — root `CLAUDE.md` / `README.md`, each crate's `CLAUDE.md`,
+///    the shipped `crates/tsv_wasm/README_*.md`. The orphan check only proves
 ///    *forward* coverage (live fixture → mentioned in doc); this is the *reverse*
 ///    direction — a link to a renamed/demoted/deleted fixture, or a back-link with
 ///    the wrong `../` depth or a stale anchor, is otherwise invisible. Targets that
@@ -38,6 +41,14 @@ use std::path::{Path, PathBuf};
 ///    should not carry a README; there is no divergence to sanction, and any conformance
 ///    back-link it holds rots unaudited. A small allowlist (`ALLOWED_NONDIVERGENCE_READMES`)
 ///    holds the deliberate exceptions that document a real parser/spec/contrast fact.
+/// 5. **Catalog-family drift** — the `docs/conformance_prettier*.md` on disk must be
+///    exactly [`CONFORMANCE_PRETTIER`], and the frame's §Catalogs table must index every
+///    member. Checks 1 and 3 read a hand-listed family while reporting the glob, so a
+///    catalog the list omits fails only as *their* findings — its entries as orphans, a
+///    README aiming at it as a missing back-link — with nothing naming the constant. The
+///    index half covers the reader's route: `CLAUDE.md` sends divergence authors to "the
+///    catalog for the language you're touching, listed in its §Catalogs table", so an
+///    unindexed member is unreachable that way even with every other check green.
 ///
 /// Exits non-zero on any finding. Part of `deno task check`.
 #[derive(FromArgs, Debug)]
@@ -53,6 +64,13 @@ pub struct ConformanceAuditCommand {
 /// one of them can catalog a `_prettier_divergence` fixture — the orphan check accepts
 /// the union — but a back-link must aim at a member that catalogs *that* fixture, so the
 /// family is read per-doc ([`catalog_owners`]) rather than joined into one document.
+///
+/// Hand-listed rather than globbed so the family is a **declared** expectation, but
+/// [`run_family_audit`] holds it to the glob its label advertises: a
+/// `docs/conformance_prettier*.md` on disk that this list omits is a finding, not a
+/// silent non-member. Without that check the omission surfaces only as a downstream
+/// misdiagnosis — its fixtures reported as orphans, a README aimed at it reported as
+/// missing a back-link — with nothing naming the real cause.
 const CONFORMANCE_PRETTIER: &[&str] = &[
     "docs/conformance_prettier.md",
     "docs/conformance_prettier_css.md",
@@ -97,10 +115,10 @@ impl ConformanceAuditCommand {
         // Every repo doc is link-checked; the conformance docs additionally drive the
         // orphan and back-link checks. Read each doc once, priming the cache so anchors
         // into it resolve for free.
-        let docs = enumerate_docs()?;
+        let markdown = enumerate_markdown()?;
         let mut cache = DocCache::new();
         let mut family_src: HashMap<PathBuf, String> = HashMap::new();
-        for doc in &docs {
+        for doc in &markdown {
             let src = read_doc(doc)?;
             cache.prime(doc, &src);
             if CONFORMANCE_PRETTIER
@@ -111,6 +129,10 @@ impl ConformanceAuditCommand {
                 family_src.insert(doc.clone(), src);
             }
         }
+        let family = run_family_audit(
+            &markdown,
+            family_src.get(Path::new(CONFORMANCE_PRETTIER_FRAME)),
+        );
         let prettier_owners = catalog_owners(CONFORMANCE_PRETTIER, &family_src)?;
         let svelte_owners = catalog_owners(CONFORMANCE_SVELTE, &family_src)?;
 
@@ -140,16 +162,26 @@ impl ConformanceAuditCommand {
             })
             .collect();
 
-        let (dead_links, links_checked) = run_link_audit(&docs, &readmes, &mut cache);
+        let (dead_links, links_checked) = run_link_audit(&markdown, &mut cache);
         let missing_backlinks =
             run_backlink_audit(&readmes, &prettier_owners, &svelte_owners, &mut cache);
         let stray_readmes = run_readme_audit(&readmes);
 
+        // The link check's own coverage, split the way a reader asks about it: the
+        // curated doc surface, the fixture READMEs, and everything else the walk reaches.
+        let docs_checked = markdown.iter().filter(|p| p.starts_with("docs")).count();
+        let fixture_docs_checked = markdown
+            .iter()
+            .filter(|p| p.starts_with("tests/fixtures"))
+            .count();
+
         let report = Report {
             orphans,
+            family,
             dead_links,
-            docs_checked: docs.len(),
-            readmes_checked: readmes.len(),
+            docs_checked,
+            fixture_docs_checked,
+            other_docs_checked: markdown.len() - docs_checked - fixture_docs_checked,
             links_checked,
             missing_backlinks,
             stray_readmes,
@@ -202,26 +234,105 @@ fn read_doc(path: &Path) -> Result<String, CliError> {
     })
 }
 
-/// Enumerate every `docs/*.md` (sorted). Computed rather than hand-listed so a new
-/// doc is link-checked by existing; an empty result is a failure (wrong cwd), not a
-/// vacuous pass.
-fn enumerate_docs() -> Result<Vec<PathBuf>, CliError> {
-    let entries = std::fs::read_dir("docs").map_err(|e| {
-        eprintln!("Error reading docs/: {e}");
-        CliError::Failed
-    })?;
-    let mut docs: Vec<PathBuf> = entries
-        .filter_map(|entry| {
-            let path = entry.ok()?.path();
-            (path.extension().is_some_and(|ext| ext == "md") && path.is_file()).then_some(path)
-        })
-        .collect();
-    docs.sort();
-    if docs.is_empty() {
-        eprintln!("Error: docs/ holds no .md files — running from the repo root?");
+/// The one directory the walk prunes by name. Everything else it skips is
+/// `.gitignore`'s decision — but git never lists its own store, so this is not
+/// expressible there.
+const WALK_SKIP_DIR: &str = ".git";
+
+/// Enumerate every `.md` file the repo tracks (sorted, repo-relative).
+///
+/// Computed rather than hand-listed, precisely so a new doc — a new crate's
+/// `CLAUDE.md`, a doc in a directory that does not exist yet — is gated by existing.
+/// Two exclusions keep "the repo's own Markdown" honest:
+///
+/// - **`.gitignore`**, via [`tsv_ignore::IgnoreStack`] — the same matcher `tsv format`
+///   walks with. Build output (`target/`, `crates/tsv_wasm/pkg/`), vendored deps
+///   (`node_modules/`), and the per-machine `*.local.*` / `*.tmp` conventions are all
+///   ignored there, so none of them can fail a gate over content the repo does not have.
+///   Hand-listing those would be a second copy of `.gitignore`, drifting from it.
+/// - **Symlinks**, because the target is enumerated on its own: `AGENTS.md` points at
+///   `CLAUDE.md`, and following both would check one file twice and report every
+///   finding in it twice.
+///
+/// An empty result is a failure (wrong cwd), not a vacuous pass.
+fn enumerate_markdown() -> Result<Vec<PathBuf>, CliError> {
+    let mut found = Vec::new();
+    let mut stack = IgnoreStack::new();
+    walk_markdown(Path::new("."), "", &mut stack, &mut found)?;
+    found.sort();
+    if found.is_empty() {
+        eprintln!("Error: no .md files found — running from the repo root?");
         return Err(CliError::Failed);
     }
-    Ok(docs)
+    Ok(found)
+}
+
+/// Recursive worker for [`enumerate_markdown`]. `dir_rel` is `dir` relative to the repo
+/// root (`/`-separated, empty at the root) — the form both the ignore matcher and the
+/// emitted paths want, so a finding reads as a repo-relative path.
+fn walk_markdown(
+    dir: &Path,
+    dir_rel: &str,
+    stack: &mut IgnoreStack,
+    out: &mut Vec<PathBuf>,
+) -> Result<(), CliError> {
+    // This directory's own `.gitignore` classifies its children, not itself, so it is
+    // pushed before the loop and popped after it. An unreadable one is a mis-wired
+    // audit — silently walking a tree we would have pruned is worse than failing.
+    let gitignore = dir.join(".gitignore");
+    let pushed = match std::fs::read_to_string(&gitignore) {
+        Ok(content) => {
+            stack.push_gitignore(dir_rel, &content);
+            true
+        }
+        Err(e) if e.kind() == std::io::ErrorKind::NotFound => false,
+        Err(e) => {
+            eprintln!("Error reading {}: {e}", gitignore.display());
+            return Err(CliError::Failed);
+        }
+    };
+
+    let entries = std::fs::read_dir(dir).map_err(|e| {
+        eprintln!("Error reading {}: {e}", dir.display());
+        CliError::Failed
+    })?;
+    for entry in entries {
+        let entry = entry.map_err(|e| {
+            eprintln!("Error reading an entry of {}: {e}", dir.display());
+            CliError::Failed
+        })?;
+        // `file_type` does not follow symlinks, which is what the skip below needs.
+        let file_type = entry.file_type().map_err(|e| {
+            eprintln!("Error stat-ing {}: {e}", entry.path().display());
+            CliError::Failed
+        })?;
+        if file_type.is_symlink() {
+            continue;
+        }
+        let name = entry.file_name();
+        let name = name.to_string_lossy();
+        let child_rel = if dir_rel.is_empty() {
+            name.to_string()
+        } else {
+            format!("{dir_rel}/{name}")
+        };
+        if stack.is_ignored(&child_rel, file_type.is_dir()) {
+            continue;
+        }
+        if file_type.is_dir() {
+            if name == WALK_SKIP_DIR {
+                continue;
+            }
+            walk_markdown(&entry.path(), &child_rel, stack, out)?;
+        } else if file_type.is_file() && name.ends_with(".md") {
+            out.push(PathBuf::from(&child_rel));
+        }
+    }
+
+    if pushed {
+        stack.pop_gitignore();
+    }
+    Ok(())
 }
 
 //
@@ -313,35 +424,30 @@ struct DeadLink {
     reason: String,
 }
 
-/// Sources to link-check: every `docs/*.md` plus every fixture README. Returns the
-/// dead links and the total link count checked (so a green pass reports its own
-/// coverage instead of reading identically to a vacuous one).
-fn run_link_audit(
-    docs: &[PathBuf],
-    readmes: &[(&fixtures::Fixture, PathBuf)],
-    cache: &mut DocCache,
-) -> (Vec<DeadLink>, usize) {
-    let mut sources: Vec<PathBuf> = docs.to_vec();
-    sources.extend(readmes.iter().map(|(_, p)| p.clone()));
-
+/// Sources to link-check: every Markdown file the walk found. That is `docs/*.md`, every
+/// fixture README, and everything else we author — root `CLAUDE.md` / `README.md`, each
+/// crate's `CLAUDE.md`, the shipped `crates/tsv_wasm/README_*.md`, a container-directory
+/// README under `tests/fixtures/`. A stale `../` depth or dead anchor is the same defect
+/// wherever it sits, and before the walk those files had no link gate at all.
+///
+/// Returns the dead links and the total link count checked (so a green pass reports its
+/// own coverage instead of reading identically to a vacuous one).
+fn run_link_audit(sources: &[PathBuf], cache: &mut DocCache) -> (Vec<DeadLink>, usize) {
     let mut dead = Vec::new();
     let mut checked = 0usize;
-    for source in &sources {
+    for source in sources {
         // Clone the parsed links so we can borrow the cache mutably while resolving.
         let links = match cache.get(source) {
             Some(doc) => doc.links.clone(),
-            // A README that vanished between the walk and here is a race we ignore,
-            // but an enumerated doc that can't be read is a mis-wired audit, not a
-            // clean run — report it rather than silently checking nothing.
+            // The walk just stat-ed this file, so an unreadable one is a mis-wired
+            // audit, not a clean run — report it rather than silently checking nothing.
             None => {
-                if docs.iter().any(|d| d == source) {
-                    dead.push(DeadLink {
-                        source: source.display().to_string(),
-                        line: 0,
-                        target: String::new(),
-                        reason: "link-checked doc could not be read".to_string(),
-                    });
-                }
+                dead.push(DeadLink {
+                    source: source.display().to_string(),
+                    line: 0,
+                    target: String::new(),
+                    reason: "link-checked doc could not be read".to_string(),
+                });
                 continue;
             }
         };
@@ -521,6 +627,132 @@ fn readme_links_to_doc(readme_path: &Path, docs: &[&str], cache: &mut DocCache) 
         // A pure `#anchor` points within the README itself, not at the doc.
         !path_part.is_empty() && keys.contains(&canonical_key(&base.join(path_part)))
     })
+}
+
+//
+// Check 5 — catalog-family drift (a member on disk the family list or its index omits)
+//
+
+/// The frame doc: the family's first member, and the one that carries the §Catalogs index.
+const CONFORMANCE_PRETTIER_FRAME: &str = "docs/conformance_prettier.md";
+
+/// The `docs/` file-name prefix every prettier-family member shares.
+const CONFORMANCE_PRETTIER_PREFIX: &str = "conformance_prettier";
+
+struct FamilyAudit {
+    /// `docs/conformance_prettier*.md` on disk that [`CONFORMANCE_PRETTIER`] omits.
+    unlisted: Vec<String>,
+    /// Members the frame's §Catalogs table does not index.
+    unindexed: Vec<String>,
+}
+
+impl FamilyAudit {
+    fn is_clean(&self) -> bool {
+        self.unlisted.is_empty() && self.unindexed.is_empty()
+    }
+}
+
+/// Hold the prettier family to the glob its label advertises, in both directions a
+/// reader depends on.
+///
+/// The **list** direction is the one nothing else covers. A member absent from disk is
+/// already a hard error ([`catalog_owners`]) because it would make checks 1 and 3 vacuous;
+/// the reverse — a catalog on disk the list omits — fails only *downstream*, as an orphan
+/// or a missing back-link, never naming the constant that caused it.
+///
+/// The **index** direction is what a reader follows. `CLAUDE.md` sends every divergence
+/// author to "the catalog for the language you're touching, listed in its §Catalogs
+/// table", so a member missing from that table is unreachable by the route the docs
+/// prescribe even though every check here would pass.
+fn run_family_audit(markdown: &[PathBuf], frame_src: Option<&String>) -> FamilyAudit {
+    let on_disk: BTreeSet<&Path> = markdown
+        .iter()
+        .filter(|p| {
+            p.parent() == Some(Path::new("docs"))
+                && p.file_name().is_some_and(|n| {
+                    n.to_str()
+                        .is_some_and(|n| n.starts_with(CONFORMANCE_PRETTIER_PREFIX))
+                })
+        })
+        .map(PathBuf::as_path)
+        .collect();
+    let listed: BTreeSet<&Path> = CONFORMANCE_PRETTIER.iter().map(Path::new).collect();
+
+    let unlisted = on_disk
+        .difference(&listed)
+        .map(|p| p.display().to_string())
+        .collect();
+
+    // An unreadable frame is `catalog_owners`' hard error a few lines later; reporting
+    // every catalog as unindexed here would just bury it.
+    let unindexed = frame_src.map_or_else(Vec::new, |src| {
+        let indexed = catalogs_table_entries(src);
+        listed
+            .iter()
+            .filter(|p| {
+                p.to_str() != Some(CONFORMANCE_PRETTIER_FRAME)
+                    && !p
+                        .file_name()
+                        .and_then(|n| n.to_str())
+                        .is_some_and(|n| indexed.contains(n))
+            })
+            .map(|p| p.display().to_string())
+            .collect()
+    });
+
+    FamilyAudit {
+        unlisted,
+        unindexed,
+    }
+}
+
+/// The family members the frame's §Catalogs section links, by file name.
+///
+/// Scoped to that one section rather than the whole frame: the frame cross-links the
+/// catalogs freely in prose, and a passing mention is not the index a reader is sent to.
+fn catalogs_table_entries(frame_src: &str) -> BTreeSet<String> {
+    let mut entries = BTreeSet::new();
+    let mut in_section = false;
+    let mut in_fence = false;
+    for (i, line) in frame_src.lines().enumerate() {
+        let trimmed = line.trim_start();
+        if is_fence_marker(trimmed) {
+            in_fence = !in_fence;
+            continue;
+        }
+        if in_fence {
+            continue;
+        }
+        if let Some(text) = heading_text(trimmed) {
+            // `## Catalogs` opens the section; the next heading at that level or higher
+            // closes it. A deeper one (`###`) is still inside, so it must not close it.
+            let level = trimmed.bytes().take_while(|&b| b == b'#').count();
+            if text == "Catalogs" {
+                in_section = true;
+            } else if level <= 2 {
+                in_section = false;
+            }
+            continue;
+        }
+        if !in_section {
+            continue;
+        }
+        let mut links = Vec::new();
+        extract_inline_links(line, i + 1, &mut links);
+        for link in links {
+            let target = link
+                .target
+                .split_once('#')
+                .map_or(link.target.as_str(), |(p, _)| p);
+            if let Some(name) = Path::new(target).file_name().and_then(|n| n.to_str())
+                && name.starts_with(CONFORMANCE_PRETTIER_PREFIX)
+                && name.ends_with(".md")
+            {
+                entries.insert(name.to_string());
+            }
+        }
+    }
+    entries
 }
 
 //
@@ -708,9 +940,11 @@ fn canonical_key(path: &Path) -> PathBuf {
 
 struct Report {
     orphans: [OrphanAudit; 2],
+    family: FamilyAudit,
     dead_links: Vec<DeadLink>,
     docs_checked: usize,
-    readmes_checked: usize,
+    fixture_docs_checked: usize,
+    other_docs_checked: usize,
     links_checked: usize,
     missing_backlinks: Vec<MissingBacklink>,
     stray_readmes: Vec<String>,
@@ -719,6 +953,7 @@ struct Report {
 impl Report {
     fn is_clean(&self) -> bool {
         self.orphans.iter().all(|a| a.unlinked.is_empty())
+            && self.family.is_clean()
             && self.dead_links.is_empty()
             && self.missing_backlinks.is_empty()
             && self.stray_readmes.is_empty()
@@ -745,10 +980,34 @@ impl Report {
             }
         }
 
+        if self.family.is_clean() {
+            println!(
+                "✓ the {} catalogs on disk are the declared family, each indexed by §Catalogs",
+                CONFORMANCE_PRETTIER.len()
+            );
+        } else {
+            for p in &self.family.unlisted {
+                eprintln!(
+                    "✗ {p} is a docs/{CONFORMANCE_PRETTIER_PREFIX}*.md on disk that \
+                     CONFORMANCE_PRETTIER does not list — add it there, or its entries \
+                     read as orphans and a README aiming at it as missing a back-link"
+                );
+            }
+            for p in &self.family.unindexed {
+                eprintln!(
+                    "✗ {p} is not linked from {CONFORMANCE_PRETTIER_FRAME} §Catalogs — \
+                     the index every divergence author is sent to"
+                );
+            }
+        }
+
         if self.dead_links.is_empty() {
             println!(
-                "✓ all {} Markdown links resolve ({} docs/*.md + {} fixture READMEs)",
-                self.links_checked, self.docs_checked, self.readmes_checked
+                "✓ all {} Markdown links resolve ({} docs/*.md + {} under tests/fixtures/ + {} other)",
+                self.links_checked,
+                self.docs_checked,
+                self.fixture_docs_checked,
+                self.other_docs_checked
             );
         } else {
             eprintln!("✗ {} dead link(s):", self.dead_links.len());
@@ -796,6 +1055,10 @@ impl Report {
                 "total": a.total,
                 "unlinked": a.unlinked,
             })).collect::<Vec<_>>(),
+            "family": {
+                "unlisted": self.family.unlisted,
+                "unindexed": self.family.unindexed,
+            },
             "dead_links": self.dead_links.iter().map(|d| serde_json::json!({
                 "source": d.source,
                 "line": d.line,
@@ -984,6 +1247,100 @@ mod tests {
         );
 
         std::fs::remove_dir_all(&root).ok();
+    }
+
+    #[test]
+    fn catalogs_table_entries_reads_only_the_catalogs_section() {
+        let frame = "# Frame\n\
+                     \n\
+                     Prose linking [css](./conformance_prettier_css.md) before the index.\n\
+                     \n\
+                     ## Catalogs\n\
+                     \n\
+                     | doc | covers |\n\
+                     | --- | --- |\n\
+                     | [conformance_prettier_svelte.md](./conformance_prettier_svelte.md) | x |\n\
+                     | [ts](./conformance_prettier_ts.md#typescript) | y |\n\
+                     \n\
+                     ### A deeper heading is still inside\n\
+                     \n\
+                     | [ignore](./conformance_prettier_ignore.md) | z |\n\
+                     \n\
+                     ## Tooling\n\
+                     \n\
+                     [comments](./conformance_prettier_ts_comments.md) is out of section.\n";
+        let entries = catalogs_table_entries(frame);
+        let expected: BTreeSet<String> = [
+            "conformance_prettier_svelte.md",
+            "conformance_prettier_ts.md",
+            "conformance_prettier_ignore.md",
+        ]
+        .into_iter()
+        .map(String::from)
+        .collect();
+        assert_eq!(entries, expected);
+    }
+
+    /// A frame doc whose §Catalogs section indexes exactly `members`.
+    fn frame_indexing(members: &[&str]) -> String {
+        let rows: Vec<String> = members
+            .iter()
+            .map(|d| {
+                format!(
+                    "- [x](./{})\n",
+                    Path::new(d).file_name().unwrap().to_str().unwrap()
+                )
+            })
+            .collect();
+        format!("# Frame\n\n## Catalogs\n\n{}", rows.concat())
+    }
+
+    /// Every family member but the frame, which is never expected to index itself.
+    fn indexable_members() -> Vec<&'static str> {
+        CONFORMANCE_PRETTIER
+            .iter()
+            .copied()
+            .filter(|d| *d != CONFORMANCE_PRETTIER_FRAME)
+            .collect()
+    }
+
+    #[test]
+    fn family_audit_reports_a_catalog_the_declared_list_omits() {
+        // The direction nothing else covers: a member on disk that `CONFORMANCE_PRETTIER`
+        // does not name. Without this it fails only downstream — its fixtures as orphans,
+        // a README aimed at it as a missing back-link — never naming the constant.
+        let mut markdown: Vec<PathBuf> = CONFORMANCE_PRETTIER.iter().map(PathBuf::from).collect();
+        markdown.push(PathBuf::from("docs/conformance_prettier_html.md"));
+        // Neither a doc outside `docs/` nor an unrelated `docs/` file is a family member.
+        markdown.push(PathBuf::from("crates/tsv_ts/CLAUDE.md"));
+        markdown.push(PathBuf::from("docs/conformance_svelte.md"));
+
+        let frame = frame_indexing(&indexable_members());
+        let audit = run_family_audit(&markdown, Some(&frame));
+        assert_eq!(audit.unlisted, vec!["docs/conformance_prettier_html.md"]);
+        assert!(audit.unindexed.is_empty(), "every listed member is indexed");
+        assert!(!audit.is_clean());
+    }
+
+    #[test]
+    fn family_audit_reports_a_member_the_catalogs_index_omits() {
+        let markdown: Vec<PathBuf> = CONFORMANCE_PRETTIER.iter().map(PathBuf::from).collect();
+        // An index holding every member but one.
+        let mut members = indexable_members();
+        let dropped = members.pop().expect("the family has non-frame members");
+
+        let audit = run_family_audit(&markdown, Some(&frame_indexing(&members)));
+        assert!(audit.unlisted.is_empty(), "nothing on disk is unlisted");
+        assert_eq!(audit.unindexed, vec![dropped.to_string()]);
+        assert!(!audit.is_clean());
+    }
+
+    #[test]
+    fn family_audit_is_clean_on_the_repos_own_family() {
+        // The frame is never expected to index itself.
+        let markdown: Vec<PathBuf> = CONFORMANCE_PRETTIER.iter().map(PathBuf::from).collect();
+        let frame = frame_indexing(&indexable_members());
+        assert!(run_family_audit(&markdown, Some(&frame)).is_clean());
     }
 
     #[test]

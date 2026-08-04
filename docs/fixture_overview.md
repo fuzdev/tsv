@@ -3,7 +3,8 @@
 > Validation rules, pattern selection, troubleshooting, and divergence patterns.
 > For step-by-step workflow, see ./fixture_workflow.md.
 > For naming conventions, see ./fixture_naming.md.
-> For divergence catalogs, see ./conformance_prettier.md and ./conformance_svelte.md.
+> For divergence catalogs, see ./conformance_prettier.md (its §Catalogs table indexes the
+> per-language catalogs) and ./conformance_svelte.md.
 
 **Terminology**: `prettier_variant_*` = prettier-stable, our formatter normalizes to input. `variant_*` = both formatters keep stable, NOT input. `divergent_variant_*` = prettier-stable, our formatter rewrites to a distinct third stable form (NOT input, NOT the form).
 
@@ -148,7 +149,7 @@ Use `expected_ours.json + expected_svelte.json` or `output_prettier.svelte` ONLY
 - Edge case explanations (when fixture alone isn't self-documenting)
 - Trade-offs in compatibility (intentional choices)
 
-**Length guideline:** Keep READMEs under 50 lines. Move detailed analysis to ./conformance_svelte.md or ./conformance_prettier.md.
+**Length guideline:** Keep READMEs under 50 lines. Move detailed analysis to ./conformance_svelte.md or the language's `conformance_prettier*.md` catalog.
 
 **Back-link to the catalog:** End divergence READMEs with
 `See [conformance_prettier_<lang>.md](../../../../../../docs/conformance_prettier_<lang>.md) §<section>.`

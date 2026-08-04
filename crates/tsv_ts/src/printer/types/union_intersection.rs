@@ -213,7 +213,8 @@ impl<'a> Printer<'a> {
     /// Build a union member's type doc with Prettier's per-member `align(2, …)`
     /// offset (`union-type.js`), rendered as a sub-tab alignment — literal spaces
     /// at a trailing closing delimiter, rounding up to a whole tab wherever a
-    /// member's own internal indent stacks on it (`docs/conformance_prettier.md`).
+    /// member's own internal indent stacks on it
+    /// (`docs/conformance_prettier_ts_comments.md`).
     ///
     /// The offset applies to bare members (plain types, generics whose args wrap)
     /// and to pure paren-unions (`| (A | B)`), whose `build_parenthesized_union_doc`

@@ -234,8 +234,9 @@ precede:
   `audit_signature.txt`) —
   [required paren interior](../tests/fixtures/typescript/types/array_element_paren_prettier_ignore_interior_prettier_divergence/).
   The re-synthesized `[]` is ordinary printed output, so a comment in it follows the
-  ordinary suffix rule (inside the brackets, per §Comment relocation's parenthesized
-  array-suffix entry) rather than riding the freeze; prettier hoists that one before
+  ordinary suffix rule (inside the brackets, per
+  [§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)'s
+  parenthesized array-suffix entry) rather than riding the freeze; prettier hoists that one before
   the `[` as it relocates the directive —
   [required paren interior, bracket comment](../tests/fixtures/typescript/types/array_element_paren_prettier_ignore_bracket_comment_prettier_divergence/)
 
@@ -333,8 +334,9 @@ directive inside a JSDoc cast's own parens, which freezes the cast's inner), and
 `expressions/call_args_prettier_ignore_member` (the embedded-TS route, where the frozen
 slice is a raw range in host coordinates) all **match** prettier — no divergence in this
 family. The one place the two tools part is the flat **test-call** layout, and that is a
-comment-position question rather than a freeze one: see §Comment relocation's test-call
-entry.
+comment-position question rather than a freeze one: see
+[§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)'s
+test-call entry.
 
 **On module and declarator lists.** Rule A once more, over the remaining comma lists: an
 own-line directive in the `{`→first-item gap or between two items freezes the **following
@@ -432,15 +434,17 @@ tsv diverges at six places:
 - Directive written in an **empty `for` clause slot** — ◆comment_preservation — it stays in
   that slot, so it freezes nothing: the clause it would freeze is on the other side of the
   `;`. Prettier moves it across into the next clause and freezes there. This is the freeze
-  consequence of the already-sanctioned empty-slot rule (§Comment relocation), and it follows
+  consequence of the already-sanctioned empty-slot rule
+  ([§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation)), and it follows
   from the general one — the directive that freezes a value is the one printed above it. The
   relocated authoring is dual-stable (`variant_relocated`): there the directive really does
   lead the test clause, and tsv freezes it too —
   [empty slot inert](../tests/fixtures/typescript/statements/for/empty_slot_prettier_ignore_inert_prettier_divergence/)
 - `yield` / `yield*` operand — ◆comment_preservation ◆prettier_bug — tsv freezes and keeps the
   hanging-paren layout the own-line comment forces; prettier relocates the directive onto the
-  keyword's line and strips the parens (the pre-existing `yield` relocation in §Comment
-  relocation, here carrying the directive). Its relocated form is **not a fixed point** — the
+  keyword's line and strips the parens (the pre-existing `yield` relocation in
+  [§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation), here
+  carrying the directive). Its relocated form is **not a fixed point** — the
   next pass reformats the plain-`yield` operand and **loses the freeze**, pinned in
   `audit_signature.txt`. `return` / `throw` match prettier —
   [yield operand](../tests/fixtures/typescript/statements/return_throw/yield_operand_prettier_ignore_head_prettier_divergence/)
@@ -507,7 +511,8 @@ and `svelte/tags/const/value_prettier_ignore_head` **match**.
 The clarity parens rule carries over unchanged — an initializer that is an assignment prints as
 `const a = (b = c)`, and those parens are the printer's, so the frozen inner keeps them around
 it. So does the placement rule: the pattern-family gaps trail an ordinary own-line comment onto
-the operator's line (`aaa = // c`, a relocation §Comment relocation already sanctions at
+the operator's line (`aaa = // c`, a relocation
+[§Comment relocation](./conformance_prettier_ts_comments.md#comment-relocation) already sanctions at
 `param_default_*_comment_prettier_divergence`), but an **honored directive keeps its own line**
 there, since the trailing placement is inert under the floor and following it would lose the
 freeze on tsv's own second pass. That is the declaration-header rule of §On module and declarator
@@ -641,7 +646,7 @@ only the directive's own line is new there. Inside a whitespace-significant elem
   [`{@html}` / `{@render}` / `{@attach}`](../tests/fixtures/svelte/tags/prefixed_value_prettier_ignore_head_prettier_divergence/),
   [`{...}` spread](../tests/fixtures/svelte/attributes/spread_prettier_ignore_head_prettier_divergence/)
 - **Block heads** — ◆comment_preservation — the `}` dangle is the block layout tsv already
-  takes for a broken head (§Svelte: Blocks) —
+  takes for a broken head ([§Svelte: Blocks](./conformance_prettier_svelte.md#svelte-blocks)) —
   [block heads](../tests/fixtures/svelte/blocks/head_prettier_ignore_prettier_divergence/)
 - **A frozen head whose value takes clarity parens** — ◆comment_preservation ◆prettier_bug —
   an assignment value is parenthesized by the printer (`{@html (a = b)}`), and those parens

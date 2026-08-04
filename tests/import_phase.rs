@@ -11,7 +11,7 @@
 //! phase (`import defer`) or throws (`import source`) — so these can't be fixtures
 //! either. Each test asserts a single-pass stable round-trip plus idempotency.
 //!
-//! The prettier divergences are cataloged in `docs/conformance_prettier.md` and
+//! The prettier divergences are cataloged in `docs/conformance_prettier_ts.md` and
 //! `docs/conformance_svelte.md`. The `import source` form (prettier throws) is
 //! also live-pinned in `tests/prettier_error_bugs.rs`; the `import defer` form
 //! (prettier silently drops the phase) is documented-only — a live "prettier

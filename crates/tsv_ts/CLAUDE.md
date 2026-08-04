@@ -47,4 +47,4 @@ Standard `ast/` (internal + convert), `lexer/`, `parser/`, `printer/` layout —
 ## Reference
 
 - [`docs/checklist_typescript.md`](../../docs/checklist_typescript.md) — feature coverage matrix
-- [`docs/conformance_prettier.md`](../../docs/conformance_prettier.md), [`docs/conformance_svelte.md`](../../docs/conformance_svelte.md) — documented divergences
+- [`docs/conformance_prettier_ts.md`](../../docs/conformance_prettier_ts.md), [`docs/conformance_prettier_ts_comments.md`](../../docs/conformance_prettier_ts_comments.md) — documented Prettier divergences (the shared frame is [`docs/conformance_prettier.md`](../../docs/conformance_prettier.md)), [`docs/conformance_svelte.md`](../../docs/conformance_svelte.md) — documented Svelte-parser divergences

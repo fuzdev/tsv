@@ -26,7 +26,7 @@ pub(in crate::printer) struct TrailingComments<'a> {
     /// element's after-comma block is included here too: with no trailing comma
     /// emitted (trailingComma: 'none') the last comma is `d.empty()`, so before- and
     /// after-comma blocks both trail the element in one run (prettier relocates an
-    /// after-comma block before the comma; see conformance_prettier.md).
+    /// after-comma block before the comma; see conformance_prettier_ts_comments.md).
     block: SmallVec<[&'a Comment; 2]>,
     /// Line comments that go after the comma (in line_suffix)
     line: SmallVec<[&'a Comment; 2]>,

@@ -2,7 +2,7 @@
 
 > Programmatic detection of known formatting divergences
 
-The divergence detector is integrated into `corpus_compare_format.ts` and automatically identifies known differences documented in `conformance_prettier.md`.
+The divergence detector is integrated into `corpus_compare_format.ts` and automatically identifies known differences documented in the `conformance_prettier*.md` family (the frame plus its per-language catalogs).
 
 ## Architecture
 
@@ -21,7 +21,7 @@ benches/js/
 │       ├── safety.ts          # Safety check (differential char-frequency vs prettier)
 │       ├── patterns.ts        # Hunk-aware pattern detectors (PATTERNS), with traceability
 │       ├── expected_errors.ts # Expected-error fixtures (parse-rejection cases)
-│       └── validation.ts      # Audit: cross-ref patterns vs conformance_prettier.md
+│       └── validation.ts      # Audit: cross-ref patterns vs conformance_prettier*.md
 ```
 
 ## Hunk-Aware Detection
@@ -106,7 +106,7 @@ deno task test:deno
 
 Every pattern in `patterns.ts` includes:
 
-- `conformance_sections` - Which sections of `conformance_prettier.md` it covers
+- `conformance_sections` - Which sections of the `conformance_prettier*.md` family it covers
 - `fixtures` - An **explicit assertion** that this pattern detects these
   `*_prettier_divergence` fixtures. **Enforced**: the behavioral fixture-coverage audit
   (`fixture_coverage_test.ts`, in `deno task check`) drives each pattern against the

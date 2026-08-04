@@ -635,7 +635,7 @@ drift within a version window.
 
 ## Divergence Detection
 
-Automatically detects known divergence patterns from `conformance_prettier.md`:
+Automatically detects known divergence patterns from the `conformance_prettier*.md` family:
 
 - **Safety checks**: Differential character-frequency comparison vs prettier detects data loss — reports only the semantic chars our output drops/adds **beyond** what prettier does (shared normalizations cancel)
 - **Pattern detection**: Hunk-aware detection - patterns must explain specific diff hunks, not just match global file properties
@@ -967,7 +967,7 @@ Things the published numbers measure that aren't quite what they look like:
   `prettier` is the reference; `oxfmt` also targets prettier conformance, so
   `prettier` vs `oxfmt` is the closest to a same-output, same-work race. `tsv`
   tracks prettier closely but _intentionally diverges_ in documented cases (the
-  `_prettier_divergence` fixtures / `conformance_prettier.md`; ~92%
+  `_prettier_divergence` fixtures / `conformance_prettier*.md`; ~92%
   `corpus:compare:format` match, measured separately — not here). `biome` formats to
   its own style. Because residual layout decisions still differ, a format ratio
   is partly an
@@ -1430,7 +1430,7 @@ benches/js/
 │       ├── safety.ts      # Safety check (differential char-frequency vs prettier)
 │       ├── patterns.ts    # Known divergence pattern detectors (with traceability)
 │       ├── expected_errors.ts  # Expected-error fixtures (parse-rejection cases)
-│       └── validation.ts  # Audit: cross-ref patterns vs conformance_prettier.md
+│       └── validation.ts  # Audit: cross-ref patterns vs conformance_prettier*.md
 ```
 
 ## Implementations

@@ -60,7 +60,8 @@ cargo run -p tsv_debug compare ~/dev/zzz/src/path/to/file.svelte
 deno task corpus:compare:format:run ~/dev/zzz --explain --exit-on-first
 ```
 
-Read `docs/conformance_prettier.md` and compare the diff against documented divergences.
+Read `docs/conformance_prettier.md` plus the catalog for the language you're triaging (its
+§Catalogs table indexes them) and compare the diff against documented divergences.
 
 **Step 3: Classify — one of three outcomes:**
 
@@ -74,7 +75,7 @@ The divergence detector already identifies this pattern. Nothing to do.
 
 **B) Known divergence but detector misses it** → Fix the detector
 
-The diff matches a documented pattern in `conformance_prettier.md`, but the detector in
+The diff matches a documented pattern in the `conformance_prettier*.md` family, but the detector in
 `benches/js/lib/divergence/patterns.ts` doesn't recognize this variant.
 
 1. Identify which existing pattern should match (e.g., `inline_content_hug`, `fill_101_boundary`)
@@ -90,7 +91,7 @@ The diff matches a documented pattern in `conformance_prettier.md`, but the dete
 
 **C) Genuine unknown difference (formatter bug)** → Create fixture, **GET APPROVAL**, implement fix
 
-The diff does NOT match any documented pattern in `conformance_prettier.md`. This is a real formatting bug.
+The diff does NOT match any documented pattern in the `conformance_prettier*.md` family. This is a real formatting bug.
 
 1. Read `./docs/fixture_naming.md` and check existing fixtures
 2. Create a minimal fixture that demonstrates the issue
@@ -258,7 +259,7 @@ The default output shows unexplained diffs and which patterns explain the explai
 
 **If the difference is detected as "known":** Not a bug. Move to the next file.
 
-**If the difference is "unknown":** Likely a bug — proceed with fixture creation. Or it might be a NEW intentional divergence that needs documenting in `conformance_prettier.md` and a detector pattern added.
+**If the difference is "unknown":** Likely a bug — proceed with fixture creation. Or it might be a NEW intentional divergence that needs documenting in the language's `conformance_prettier*.md` catalog and a detector pattern added.
 
 ---
 
@@ -508,7 +509,7 @@ Options:
 ### Divergence Audit
 
 ```bash
-deno task divergence:audit        # Cross-reference patterns vs conformance_prettier.md
+deno task divergence:audit        # Cross-reference patterns vs conformance_prettier*.md
 deno task divergence:audit --json # Machine-readable JSON output
 ```
 

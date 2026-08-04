@@ -56,9 +56,9 @@ Every `◆prettier_bug` — cases where Prettier produces output that is non-ide
 
 **Prose-only** (no `output_prettier.*` oracle — Prettier drops or throws, so the bug can't be pinned as a fixture):
 
-- `import defer * as ns from 'm'` — silently deletes the `defer` phase (information loss) — §Import-phase proposals
-- `import source x from 'm'` — Prettier's TS printer throws (`'=' expected`) — §Import-phase proposals
-- `{@const y = /** @type {T} */ (z)}` — Prettier emits invalid `(z}` then throws on its own output — §JSDoc / paren semantics
+- `import defer * as ns from 'm'` — silently deletes the `defer` phase (information loss) — [§Import-phase proposals](./conformance_prettier_ts.md#import-phase-proposals)
+- `import source x from 'm'` — Prettier's TS printer throws (`'=' expected`) — [§Import-phase proposals](./conformance_prettier_ts.md#import-phase-proposals)
+- `{@const y = /** @type {T} */ (z)}` — Prettier emits invalid `(z}` then throws on its own output — [§JSDoc / paren semantics](./conformance_prettier_ts_comments.md#jsdoc--paren-semantics)
 
 ## Decision Framework
 
