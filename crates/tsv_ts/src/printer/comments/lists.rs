@@ -860,7 +860,7 @@ impl<'a> Printer<'a> {
 
     /// Like [`Self::build_empty_inline_with_comments_doc`] but with an arbitrary
     /// `opening` doc (which may carry a prefix, e.g. a parenthesized-intersection
-    /// `(A & {`) and a static `closing` string (`}`, `]`, `})`). The empty body
+    /// `(A & {`) and a static `closing` string (`}`, `]`, `)`). The empty body
     /// stays delimiter-tight when comment-free (`{}` not `{ }`), so a union-member
     /// or paren-intersection object type that reaches the alignment path prints
     /// with no spurious bracket space and preserves any interior comment.

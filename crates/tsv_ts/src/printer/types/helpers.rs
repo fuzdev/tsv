@@ -117,10 +117,10 @@ pub(super) fn union_has_brace_member(union: &TSUnionType<'_>) -> bool {
         .any(|t| matches!(t, TSType::TypeLiteral(_) | TSType::Mapped(_)))
 }
 
-/// Find the `TSParenthesizedType` that directly wraps `ts_type`'s underlying type,
-/// walking through any redundant nested parens. Returns `None` when `ts_type` is not
-/// parenthesized in source (the parens are synthetic, added by the printer for
-/// precedence — there is no author gap, so no comments to preserve).
+/// The retained-paren shell around `ts_type` — its **outermost** `TSParenthesizedType`
+/// node. Returns `None` when `ts_type` is not parenthesized in source (the parens are
+/// synthetic, added by the printer for precedence — there is no author gap, so no
+/// comments to preserve).
 ///
 /// Used to recover the paren span so the paren-retaining member printers can emit
 /// comments the user wrote inside retained parens — `build_parenthesized_union_doc`
@@ -128,14 +128,16 @@ pub(super) fn union_has_brace_member(union: &TSUnionType<'_>) -> bool {
 /// `build_parenthesized_intersection_trailing_object_doc` (`(// c⏎a & { … })`). Both are
 /// handed their already-unwrapped inner type, so the paren's own gap is invisible to them
 /// otherwise, and a comment in it would be silently dropped.
-pub(super) fn immediate_paren<'a>(
+///
+/// **Outermost, never an inner layer.** Redundant nested parens collapse into the single
+/// pair those builders emit, so the whole `(`…`)` region is one author gap. Bounding a
+/// gap scan by an inner layer's span stops it short and drops everything between the two
+/// closers (`((A | B) /* c */)[]`, `[((A | B) /* c */)?]`).
+pub(super) fn outermost_paren<'a>(
     ts_type: &'a TSType<'a>,
 ) -> Option<&'a internal::TSParenthesizedType<'a>> {
     match ts_type {
-        TSType::Parenthesized(p) => match p.type_annotation {
-            inner @ TSType::Parenthesized(_) => immediate_paren(inner),
-            _ => Some(p),
-        },
+        TSType::Parenthesized(p) => Some(p),
         _ => None,
     }
 }

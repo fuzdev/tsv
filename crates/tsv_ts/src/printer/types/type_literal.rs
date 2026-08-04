@@ -9,7 +9,7 @@
 use super::super::CommentVec;
 use super::super::comments_to_emit_in_range;
 use super::Printer;
-use super::helpers::{immediate_paren, unwrap_parenthesized};
+use super::helpers::{outermost_paren, unwrap_parenthesized};
 use crate::ast::internal::{
     TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
 };
@@ -245,13 +245,13 @@ impl<'a> Printer<'a> {
                 return self.build_parenthesized_intersection_trailing_object_doc(
                     intersection,
                     obj,
-                    immediate_paren(ts_type),
+                    outermost_paren(ts_type),
                 );
             }
 
             // Special case: parenthesized union type
             if let TSType::Union(union) = unwrap_parenthesized(ts_type) {
-                return self.build_parenthesized_union_doc(union, immediate_paren(ts_type), false);
+                return self.build_parenthesized_union_doc(union, outermost_paren(ts_type), false);
             }
 
             // Default case: parenthesize the inner type. The inner `d.indent`
@@ -302,15 +302,9 @@ impl<'a> Printer<'a> {
             // and merged with whatever else flushed on that line. A comment-free shell is
             // unaffected: both gap scans find nothing.
             //
-            // The **outermost** paren, not `immediate_paren`'s innermost: the builder
-            // bounds its gap scans by this node's span, and only one pair is emitted for
-            // the whole shell, so the innermost `)` would stop the trailing scan short and
-            // drop everything between the two closers (`((A | B) /* c */)[]`).
-            let shell = match ty {
-                TSType::Parenthesized(p) => Some(p),
-                _ => None,
-            };
-            Some(self.build_parenthesized_union_doc(u, shell, true))
+            // `outermost_paren`, whose doc carries why an inner layer would truncate the
+            // gap scan (`((A | B) /* c */)[]`).
+            Some(self.build_parenthesized_union_doc(u, outermost_paren(ty), true))
         } else {
             None
         }
@@ -463,6 +457,14 @@ impl<'a> Printer<'a> {
         }
 
         // Build intersection types except the last one (the object)
+        //
+        // TODO: every `&` gap in this opening is fused text with no scan, so a comment
+        // in one is DROPPED — `(a & /* c */ { p: T })`, `(a /* c */ & b & { p: T })`,
+        // and the same with an empty object — where the bare (paren-free) intersection
+        // preserves it and prettier preserves every one. Hazard 4 in this builder's
+        // opening, the mirror of the shell gaps fixed below; the ordinary intersection
+        // printer's inter-member emitter is the landing. Pinned in the gap ratchet as
+        // `␣⟨⟩{` / `␣⟨⟩{}` / `␣⟨⟩{})`.
         let types_before_object = &intersection.types[..intersection.types.len() - 1];
         for (i, t) in types_before_object.iter().enumerate() {
             if i > 0 {
@@ -474,7 +476,38 @@ impl<'a> Printer<'a> {
         // Add ` & {`
         opening_parts.push(d.text(" & {"));
 
-        self.build_aligned_object_literal_doc(trailing_obj, d.concat(&opening_parts), "})")
+        let mut parts: DocBuf = smallvec![
+            self.build_aligned_object_literal_doc(trailing_obj, d.concat(&opening_parts))
+        ];
+
+        // Comments in the shell's TRAILING gap, between the object's `}` and the `)`
+        // (`(a & { x: X } /* c */)`) — kept in place, as the union sibling
+        // `build_parenthesized_union_doc` keeps its own. The `)` is this builder's, so
+        // like the leading gap above this one is invisible to every other emitter and a
+        // comment there would be silently DROPPED — in a union member and an optional
+        // tuple element alike, and whether or not the object has members.
+        //
+        // Emitted OUTSIDE the object literal's group: a line comment has to break the
+        // line it ends, and that break belongs to the enclosing union (which must expand
+        // for the comment to keep its line), not to the object, which stays free to
+        // print flat.
+        let mut closer = d.text(")");
+        if let Some(p) = paren {
+            let gap_start = trailing_obj.span.end;
+            let gap_end = p.span.end - 1;
+            self.push_trailing_comments_in_range(&mut parts, gap_start, gap_end);
+            // A `//` runs to end-of-line, so the `)` has to leave that line — inline it
+            // would be swallowed. Matches the union sibling's expanded shell, which
+            // likewise drops its `)` to its own line. The `align(2)` lands it under the
+            // `(` — the column the object's OWN `})` closer takes when the object breaks
+            // (`build_aligned_object_literal_doc`) — so the shell closes in one place
+            // whether or not the object stayed flat.
+            if self.has_line_comments_between(gap_start, gap_end) {
+                closer = d.align(2, d.concat(&[d.hardline(), closer]));
+            }
+        }
+        parts.push(closer);
+        d.concat(&parts)
     }
 
     /// Build just the member content of a TypeLiteral, without `{` or `}`.
@@ -689,32 +722,31 @@ impl<'a> Printer<'a> {
             })
     }
 
-    /// Build aligned object literal doc with custom opening/closing.
+    /// Build aligned object literal doc with a custom opening.
     ///
     /// Used for object literals in union types and parenthesized intersections.
     /// Members are double-indented in whole tabs (aligning with the content after
-    /// `{`), and the closing delimiter takes the member's `align(2)` sub-tab offset —
+    /// `{`), and the closing `}` takes the member's `align(2)` sub-tab offset —
     /// 2 literal spaces under `{`, tab-width independent — matching Prettier's
     /// `align(2, …)`.
-    fn build_aligned_object_literal_doc(
-        &self,
-        obj: &TSTypeLiteral<'_>,
-        opening: DocId,
-        closing: &'static str,
-    ) -> DocId {
+    ///
+    /// The doc ends at the object's own `}`. A caller whose shell continues past it
+    /// (the parenthesized intersection's `)`) appends that itself rather than fusing
+    /// it into the closing text, so the gap between the two stays an emittable seam.
+    fn build_aligned_object_literal_doc(&self, obj: &TSTypeLiteral<'_>, opening: DocId) -> DocId {
         let d = self.d();
         // Empty object type: keep the braces delimiter-tight (`{}` not `{ }`) and
         // preserve any interior comment. The members-only alignment path returns an
         // empty doc for zero members, so the `d.line()` boundary below would render
         // as a spurious space and the comment would be dropped — mirror the plain
         // type-literal empty path (`build_empty_braces_inline_with_comments_doc`),
-        // threading this path's (possibly prefixed) `opening`/`closing`.
+        // threading this path's (possibly prefixed) `opening`.
         if obj.members.is_empty() {
             return self.build_empty_bracketed_with_comments_doc(
                 obj.span.start,
                 obj.span.end,
                 opening,
-                closing,
+                "}",
                 d.line(),
             );
         }
@@ -745,7 +777,7 @@ impl<'a> Printer<'a> {
             // width — matching Prettier's `align(2, …)`. The members keep whole
             // tabs (`align(2)` + `indent` rounds up), so only the closing line's
             // representation changes.
-            d.align(2, d.concat(&[line_doc, d.text(closing)])),
+            d.align(2, d.concat(&[line_doc, d.text("}")])),
         ]))
     }
 
@@ -760,7 +792,7 @@ impl<'a> Printer<'a> {
     ///   | B;
     /// ```
     pub(super) fn build_union_member_object_literal_doc(&self, obj: &TSTypeLiteral<'_>) -> DocId {
-        self.build_aligned_object_literal_doc(obj, self.d().text("{"), "}")
+        self.build_aligned_object_literal_doc(obj, self.d().text("{"))
     }
 
     //

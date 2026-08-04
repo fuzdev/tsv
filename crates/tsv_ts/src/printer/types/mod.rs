@@ -539,7 +539,18 @@ impl<'a> Printer<'a> {
                     o.type_annotation,
                     type_needs_parens_for_optional_element,
                 );
-                d.concat(&[inner, d.text("?")])
+                let mut parts: DocBuf = smallvec![inner];
+                // Comments in the element→`?` gap (`[T /* c */?]`) take the same
+                // landing the `NamedTupleMember` arm below gives the label→`?` gap
+                // (`[a /* c */?: T]`) — previously unclaimed by any emitter here, a
+                // silent drop. The element's span end is the gap's left edge: a
+                // parenthesized operand keeps its `TSType::Parenthesized` wrapper, so
+                // the scan starts after the `)`, and an in-paren comment stays inside.
+                // Only a *same-line block* comment can be here — the `?` is a
+                // `[no LineTerminator here]` position, so the emitter's line-comment
+                // branch is unreachable from this caller (`parse_tuple_element_inner`).
+                self.push_modifier_marker_doc(&mut parts, o.type_annotation.span().end, b'?');
+                d.concat(&parts)
             }
             TSType::NamedTupleMember(n) => {
                 let mut parts = smallvec![self.identifier_name_doc(&n.label)];
