@@ -840,6 +840,15 @@ is false as soon as another comment follows, welding that comment onto the block
 fuzzer, and round-trip are all blind to it; only a prettier `compare` finds it — which is
 why the rule lives in one emitter per question rather than at each container.
 
+⚠️ **A trailing GAP inside a construct is the third emitter of that same rule** —
+`Printer::push_trailing_comments_in_range` (a paren shell's `)`, an indexed access's `]`).
+It asks the separator question of the **source** ("did the author give this comment its own
+line?"), since these comments may be legitimately glued, and the break rides **inside** the
+`line_suffix` — a real break between two deferred comments splits the very construct they
+are escaping. Only a **line** comment defers by construction; a block defers solely to stay
+behind one, because deferring is what carries a comment out past the closer. Back-to-back
+emission welds the run, and an inline block mixed into a deferred one **reorders** it.
+
 Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/linter use
 cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — see
 [conformance_prettier.md §Comment relocation](docs/conformance_prettier.md#comment-relocation).
