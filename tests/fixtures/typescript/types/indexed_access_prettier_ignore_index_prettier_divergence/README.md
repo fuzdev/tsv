@@ -20,4 +20,14 @@ pinned via `audit_signature.txt`). A directive sharing the `[`'s line is inert u
 tsv's placement classification, so the authored own-line placement is the only form
 that holds the freeze.
 
+`B` adds the frozen route's **own** index-to-`]` gap. That route claims the whole
+bracket interior, so a comment run there is emitted by it and nothing else — and a
+run emitted with nothing between its comments welds into one, the second `//`
+becoming text of the first. Each comment after a line comment takes a break, landing
+at the bracket interior indent the expanded form already uses. Prettier keeps the run
+distinct too (floating it past `]` to trail the statement), so it is the oracle for
+the comments staying separate even though it is not the oracle for their placement.
+The shared rule across every trailing gap is cataloged with
+[retained_paren_shell_trailing_comment_run](../retained_paren_shell_trailing_comment_run_prettier_divergence/).
+
 See [conformance_prettier_ignore.md §Format-ignore directive](../../../../../docs/conformance_prettier_ignore.md#format-ignore-directive).

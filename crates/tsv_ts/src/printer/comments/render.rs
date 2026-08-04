@@ -192,4 +192,27 @@ impl<'a> Printer<'a> {
             self.build_trailing_line_comment_doc(comment)
         }
     }
+
+    /// The **own-line** variant of [`Self::build_trailing_comment_doc`]: the author
+    /// put this comment on a line of its own rather than trailing the previous token,
+    /// so it takes a break instead of a space — and the break travels **inside** the
+    /// `line_suffix` (prettier's `printTrailingComment`, the
+    /// `hasNewline(…, { backwards: true })` branch).
+    ///
+    /// Inside is the load-bearing part, and it is why this cannot be a `hardline`
+    /// pushed between two `build_trailing_comment_doc`s. A trailing gap's comments are
+    /// deferred to end of line; a real break emitted between them would land in the
+    /// *enclosing construct* — splitting the brackets of `T[K // c1⏎// c2]`, which the
+    /// comments are supposed to escape — while a break buffered with them replays at
+    /// flush time, after the construct has closed (`T[K]; // c1⏎// c2`). A shell that
+    /// *does* want the construct broken gets that from the run's line comments, via
+    /// [`Self::push_trailing_comments_in_range`]'s return.
+    ///
+    /// Applies to a block comment as well as a line one: what is being preserved is the
+    /// author's line, not an end-of-line hazard. The `line_suffix` is inert for a block
+    /// that trails on the same line — that one keeps the inline form above.
+    pub(crate) fn build_trailing_comment_doc_own_line(&self, comment: &internal::Comment) -> DocId {
+        let d = self.d();
+        d.line_suffix(d.concat(&[d.hardline(), self.build_comment_doc(comment)]))
+    }
 }

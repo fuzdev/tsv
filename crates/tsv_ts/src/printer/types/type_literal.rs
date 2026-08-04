@@ -470,23 +470,29 @@ impl<'a> Printer<'a> {
         // line it ends, and that break belongs to the enclosing union (which must expand
         // for the comment to keep its line), not to the object, which stays free to
         // print flat.
-        let mut closer = d.text(")");
-        if let Some(p) = paren {
-            // A `//` runs to end-of-line, so the `)` has to leave that line — inline it
-            // would be swallowed. Matches the union sibling's expanded shell, which
-            // likewise drops its `)` to its own line. The `align(2)` lands it under the
-            // `(` — the column the object's OWN `})` closer takes when the object breaks
-            // (`build_aligned_object_literal_doc`) — so the shell closes in one place
-            // whether or not the object stayed flat.
-            if self.push_trailing_comments_in_range(
-                &mut parts,
-                trailing_obj.span.end,
-                p.span.end - 1,
-            ) {
-                closer = d.align(2, d.concat(&[d.hardline(), closer]));
-            }
+        // A `//` runs to end-of-line, so the `)` has to leave that line — inline it
+        // would be swallowed. Matches the union sibling's expanded shell, which
+        // likewise drops its `)` to its own line. The `align(2)` lands it under the
+        // `(` — the column the object's OWN `})` closer takes when the object breaks
+        // (`build_aligned_object_literal_doc`) — so the shell closes in one place
+        // whether or not the object stayed flat. The run rides in the SAME `align(2)`,
+        // because it shares that column: every line this shell drops below its `(` sits
+        // under it, and a run emitted outside the align lands an align-step LEFT of the
+        // `)` it precedes — the un-fused closer's lesson, re-asked for the comments that
+        // now travel with it.
+        let mut tail: DocBuf = DocBuf::new();
+        let broke = paren.is_some_and(|p| {
+            self.push_trailing_comments_in_range(&mut tail, trailing_obj.span.end, p.span.end - 1)
+        });
+        if broke {
+            tail.push(d.hardline());
+            tail.push(d.text(")"));
+            parts.push(d.align(2, d.concat(&tail)));
+        } else {
+            // The comment-free path stays flat and node-for-node as it was.
+            parts.extend(tail);
+            parts.push(d.text(")"));
         }
-        parts.push(closer);
         d.concat(&parts)
     }
 
