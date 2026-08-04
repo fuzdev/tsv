@@ -70,7 +70,9 @@ impl<'a, 'p, 'pr> ChainPartsBuilder<'a, 'p, 'pr> {
         if let Some((object_end, property_start)) = group_comment_gap(group, self.printer) {
             let classified = self.printer.classify_comments(object_end, property_start);
             debug_assert!(
-                classified.trailing_line.is_empty() && classified.leading_line.is_empty(),
+                classified.trailing_line.is_empty()
+                    && classified.leading_line.is_empty()
+                    && classified.leading_block.is_empty(),
                 "a break-forcing comment reached the no-break chain path — \
                  `last_has_break_forcing_comments` should have routed this group to `add_group`"
             );

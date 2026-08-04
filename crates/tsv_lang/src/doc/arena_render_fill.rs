@@ -18,6 +18,10 @@ use super::types::{DocContext, Mode};
 /// verbatim into every `fits` call below (Prettier passes `lineSuffix.length > 0` from
 /// its own fill arm): a `LineSuffixBoundary` reached with a comment pending doesn't
 /// fit, because the flush will end the line — see [`arena_fits_with_lookahead`].
+/// The entry snapshot stays exact for the whole fill, not merely close: this loop never
+/// queues a suffix itself, and every item renders through [`render_single_doc`], whose
+/// local suffix buffer is flushed before it returns — the caller's buffer can't change
+/// mid-fill.
 // Remaining args are the MUTABLE render state (`output`/`pos`/`should_remeasure`, plus the
 // work buffers). Deliberately not bundled: a struct would take their address and sink them out
 // of registers in the hot loop — see `RenderCtx`, which carries only the shared context.

@@ -227,9 +227,10 @@ fn render_line_break(
 /// Render a `Line` command whole: the remeasure obligation a hard line forced out
 /// in flat mode carries, the pending-suffix flush, and the break itself.
 ///
-/// Two arms reach it. `DocNode::Line` is the obvious one. `DocNode::LineSuffixBoundary`
-/// is the other, and going through *this* function is what makes it a boundary rather
-/// than a bare flush: Prettier renders that node by pushing a
+/// Three arms reach it. `DocNode::Line` is the obvious one, and `DocNode::MultilineText`
+/// takes it with [`LineKind::Hard`] for each interior newline of its body.
+/// `DocNode::LineSuffixBoundary` is the third, and going through *this* function is
+/// what makes it a boundary rather than a bare flush: Prettier renders that node by pushing a
 /// `hardlineWithoutBreakParent` command and letting its own `Line` arm handle it
 /// (`printer.js` `DOC_TYPE_LINE_SUFFIX_BOUNDARY`), which is exactly this call with
 /// [`LineKind::Hard`]. tsv can't push the node — the arena is immutably borrowed for
@@ -759,8 +760,8 @@ fn render_doc_core<P: RenderPolicy>(
             DocNode::MultilineText { span, .. } => {
                 // Render `[text(line0), hardline, text(line1), hardline, …]` from
                 // one pool-stored body: the first line at the current column, each
-                // subsequent line preceded by the hardline path (flush pending
-                // line suffix, trim, newline, context indent). Byte- and
+                // subsequent line preceded by the hardline arm (`render_line_node`
+                // with `Hard`: remeasure arming, suffix flush, break). Byte- and
                 // position-identical to the per-line concat it replaces.
                 let mut lines = span.slice(pool).split('\n');
                 if let Some(first) = lines.next() {
@@ -773,30 +774,20 @@ fn render_doc_core<P: RenderPolicy>(
                     update_pos_for_text(pos, first);
                 }
                 for line in lines {
-                    // Hardline (breaks in either mode): flush suffix, then break.
-                    // Forced out in flat mode, it invalidates the enclosing fits
-                    // approval — arm the remeasure flag (see the `Line` arm).
-                    if cmd.mode == Mode::Flat {
-                        *should_remeasure = true;
-                    }
-                    if policy.tracking_suffix() {
-                        flush_line_suffix(ctx, line_suffix, output, pos, should_remeasure);
-                    }
-                    render_line_break(
+                    render_line_node(
+                        ctx,
                         LineKind::Hard,
                         cmd.mode,
                         cmd.indent,
                         output,
                         pos,
-                        render,
-                        embed,
+                        policy,
+                        line_suffix,
+                        should_remeasure,
                     );
                     #[cfg(feature = "swallow_check")]
-                    {
-                        policy.swallow_on_newline(true);
-                        if policy.swallow_enabled() {
-                            policy.swallow_on_text(false, line, output);
-                        }
+                    if policy.swallow_enabled() {
+                        policy.swallow_on_text(false, line, output);
                     }
                     output.push_str(line);
                     update_pos_for_text(pos, line);
