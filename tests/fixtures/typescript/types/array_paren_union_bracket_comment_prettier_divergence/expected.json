@@ -1,0 +1,1035 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 697,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment inside the brackets of a parenthesized union element stays inside them.",
+			"start": 20,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 133,
+			"end": 140,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 22
+				},
+				"end": {
+					"line": 3,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A comment between the parens and the brackets stays between them.",
+			"start": 145,
+			"end": 213,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 236,
+			"end": 243,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 22
+				},
+				"end": {
+					"line": 6,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A line comment inside the brackets breaks them open, like an empty tuple type.",
+			"start": 249,
+			"end": 330,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 356,
+			"end": 360,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A comment already inside the parens stays distinct from the suffix's own.",
+			"start": 367,
+			"end": 443,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 465,
+			"end": 472,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 21
+				},
+				"end": {
+					"line": 14,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 474,
+			"end": 481,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 30
+				},
+				"end": {
+					"line": 14,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The union's own parens expanding changes nothing about where the comment sits.",
+			"start": 486,
+			"end": 567,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 1
+				},
+				"end": {
+					"line": 16,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 677,
+			"end": 684,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 3
+				},
+				"end": {
+					"line": 19,
+					"column": 10
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 696,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 687,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 20,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 112,
+					"end": 142,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 31
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 117,
+						"end": 118,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 7
+							}
+						},
+						"name": "A"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 121,
+						"end": 141,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 10
+							},
+							"end": {
+								"line": 3,
+								"column": 30
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 121,
+							"end": 132,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 10
+								},
+								"end": {
+									"line": 3,
+									"column": 21
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSUnionType",
+								"start": 122,
+								"end": 131,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 20
+									}
+								},
+								"types": [
+									{
+										"type": "TSLiteralType",
+										"start": 122,
+										"end": 125,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 11
+											},
+											"end": {
+												"line": 3,
+												"column": 14
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 122,
+											"end": 125,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 11
+												},
+												"end": {
+													"line": 3,
+													"column": 14
+												}
+											},
+											"value": "a",
+											"raw": "'a'"
+										}
+									},
+									{
+										"type": "TSLiteralType",
+										"start": 128,
+										"end": 131,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 17
+											},
+											"end": {
+												"line": 3,
+												"column": 20
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 128,
+											"end": 131,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 17
+												},
+												"end": {
+													"line": 3,
+													"column": 20
+												}
+											},
+											"value": "b",
+											"raw": "'b'"
+										}
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment inside the brackets of a parenthesized union element stays inside them.",
+							"start": 20,
+							"end": 110
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 215,
+					"end": 246,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 32
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 220,
+						"end": 221,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 6
+							},
+							"end": {
+								"line": 6,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 224,
+						"end": 245,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 10
+							},
+							"end": {
+								"line": 6,
+								"column": 31
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 224,
+							"end": 235,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 10
+								},
+								"end": {
+									"line": 6,
+									"column": 21
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSUnionType",
+								"start": 225,
+								"end": 234,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 20
+									}
+								},
+								"types": [
+									{
+										"type": "TSLiteralType",
+										"start": 225,
+										"end": 228,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 11
+											},
+											"end": {
+												"line": 6,
+												"column": 14
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 225,
+											"end": 228,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 11
+												},
+												"end": {
+													"line": 6,
+													"column": 14
+												}
+											},
+											"value": "a",
+											"raw": "'a'"
+										}
+									},
+									{
+										"type": "TSLiteralType",
+										"start": 231,
+										"end": 234,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 17
+											},
+											"end": {
+												"line": 6,
+												"column": 20
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 231,
+											"end": 234,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 17
+												},
+												"end": {
+													"line": 6,
+													"column": 20
+												}
+											},
+											"value": "b",
+											"raw": "'b'"
+										}
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 236,
+										"end": 243
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 133,
+							"end": 140
+						},
+						{
+							"type": "Line",
+							"value": " A comment between the parens and the brackets stays between them.",
+							"start": 145,
+							"end": 213
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 332,
+					"end": 364,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 337,
+						"end": 338,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 341,
+						"end": 363,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 10
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 341,
+							"end": 352,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 10
+								},
+								"end": {
+									"line": 9,
+									"column": 21
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSUnionType",
+								"start": 342,
+								"end": 351,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 11
+									},
+									"end": {
+										"line": 9,
+										"column": 20
+									}
+								},
+								"types": [
+									{
+										"type": "TSLiteralType",
+										"start": 342,
+										"end": 345,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 11
+											},
+											"end": {
+												"line": 9,
+												"column": 14
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 342,
+											"end": 345,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 11
+												},
+												"end": {
+													"line": 9,
+													"column": 14
+												}
+											},
+											"value": "a",
+											"raw": "'a'"
+										}
+									},
+									{
+										"type": "TSLiteralType",
+										"start": 348,
+										"end": 351,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 17
+											},
+											"end": {
+												"line": 9,
+												"column": 20
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 348,
+											"end": 351,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 17
+												},
+												"end": {
+													"line": 9,
+													"column": 20
+												}
+											},
+											"value": "b",
+											"raw": "'b'"
+										}
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment inside the brackets breaks them open, like an empty tuple type.",
+							"start": 249,
+							"end": 330
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 445,
+					"end": 483,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 39
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 450,
+						"end": 451,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 6
+							},
+							"end": {
+								"line": 14,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 454,
+						"end": 482,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 10
+							},
+							"end": {
+								"line": 14,
+								"column": 38
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 454,
+							"end": 473,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 10
+								},
+								"end": {
+									"line": 14,
+									"column": 29
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSUnionType",
+								"start": 455,
+								"end": 464,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 11
+									},
+									"end": {
+										"line": 14,
+										"column": 20
+									}
+								},
+								"types": [
+									{
+										"type": "TSLiteralType",
+										"start": 455,
+										"end": 458,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 11
+											},
+											"end": {
+												"line": 14,
+												"column": 14
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 455,
+											"end": 458,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 11
+												},
+												"end": {
+													"line": 14,
+													"column": 14
+												}
+											},
+											"value": "a",
+											"raw": "'a'"
+										}
+									},
+									{
+										"type": "TSLiteralType",
+										"start": 461,
+										"end": 464,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 17
+											},
+											"end": {
+												"line": 14,
+												"column": 20
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 461,
+											"end": 464,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 17
+												},
+												"end": {
+													"line": 14,
+													"column": 20
+												}
+											},
+											"value": "b",
+											"raw": "'b'"
+										}
+									}
+								],
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " i ",
+										"start": 465,
+										"end": 472
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 356,
+							"end": 360
+						},
+						{
+							"type": "Line",
+							"value": " A comment already inside the parens stays distinct from the suffix's own.",
+							"start": 367,
+							"end": 443
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 569,
+					"end": 686,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 12
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 574,
+						"end": 575,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 6
+							},
+							"end": {
+								"line": 17,
+								"column": 7
+							}
+						},
+						"name": "E"
+					},
+					"typeAnnotation": {
+						"type": "TSArrayType",
+						"start": 578,
+						"end": 685,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 10
+							},
+							"end": {
+								"line": 19,
+								"column": 11
+							}
+						},
+						"elementType": {
+							"type": "TSParenthesizedType",
+							"start": 578,
+							"end": 676,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 10
+								},
+								"end": {
+									"line": 19,
+									"column": 2
+								}
+							},
+							"typeAnnotation": {
+								"type": "TSUnionType",
+								"start": 582,
+								"end": 673,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 93
+									}
+								},
+								"types": [
+									{
+										"type": "TSLiteralType",
+										"start": 582,
+										"end": 626,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 46
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 582,
+											"end": 626,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 2
+												},
+												"end": {
+													"line": 18,
+													"column": 46
+												}
+											},
+											"value": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+											"raw": "'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa'"
+										}
+									},
+									{
+										"type": "TSLiteralType",
+										"start": 629,
+										"end": 673,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 49
+											},
+											"end": {
+												"line": 18,
+												"column": 93
+											}
+										},
+										"literal": {
+											"type": "Literal",
+											"start": 629,
+											"end": 673,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 49
+												},
+												"end": {
+													"line": 18,
+													"column": 93
+												}
+											},
+											"value": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+											"raw": "'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'"
+										}
+									}
+								]
+							}
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 474,
+							"end": 481
+						},
+						{
+							"type": "Line",
+							"value": " The union's own parens expanding changes nothing about where the comment sits.",
+							"start": 486,
+							"end": 567
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 677,
+							"end": 684
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
