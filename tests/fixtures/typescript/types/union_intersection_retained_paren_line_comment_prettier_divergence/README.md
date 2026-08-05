@@ -17,4 +17,16 @@ block-comment sibling `union_intersection_retained_paren_comment` keeps the memb
 fully inline because a block comment can stay inline (`(b | c /* c */)`); a line
 comment cannot, so it forces the expanded parens.
 
+`A3` shows the same union-fit layout when the retained paren-union is an
+**intersection** member (`a & (b | c // c⏎) & d`): the comment trails the last
+inner member, the parens expand, the inner union re-fits inline — one question,
+one answer across both outer-composite kinds. `A4` is the control: a comment
+BETWEEN inner members forces the one-member-per-line layout in both formatters
+(it cannot render inline), so only the trailing position re-collapses.
+
+`unformatted_ours_flat.svelte` carries the flat authorings, including the
+trailing comment written inside a redundant shell on the last inner member
+(`a & (b | (c // c⏎)) & d` — the shell strips, its deferred comment flushing
+before the retained `)`), all reaching `input` in one pass under tsv only.
+
 See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md) §Comment relocation.
