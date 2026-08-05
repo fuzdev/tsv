@@ -711,21 +711,13 @@ impl<'a> Printer<'a> {
                     );
                 }
 
-                // Different types: if last arg has forced breaks, use inline-or-expand-all
-                // TODO: call_formatting.rs's twin dropped this screen — its 3-state
-                // conditional_group lands a forced-break last arg on the hug; converging
-                // needs a `new`-expression fixture pinning that layout first.
-                if d.has_forced_break(last_arg_doc) {
-                    return build_inline_or_expand_all(
-                        d,
-                        callee_with_types,
-                        &head_parts,
-                        last_arg_doc,
-                        all_args_broken,
-                    );
-                }
-
-                // No forced breaks: 3-state (inline → hug → expand all)
+                // Different types: 3-state (inline → hug → expand all), exactly as
+                // call_formatting.rs's twin does. Prettier's printCallArguments is shared
+                // by `new` (its header comment lists NewExpression), and for a breaking
+                // last arg it keeps the hug: `[breakParent, conditionalGroup([hug,
+                // allArgsBrokenOut])]` — there is no forced-break → inline-or-expand-all
+                // form. A last arg carrying its own forced break falls out of state 0 and
+                // lands on the hug, the same layout for both break kinds.
                 let state_inline =
                     build_inline_args(d, callee_with_types, &head_parts, last_arg_doc);
                 let state_hug = d.concat(&[

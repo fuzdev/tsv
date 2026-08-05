@@ -23,7 +23,7 @@ use super::arg_wrapping::{
     build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
     last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, try_hug_multiline_template_arg,
-    wrap_call_with_hard_breaks, wrap_call_with_soft_breaks,
+    wrap_call_with_hard_breaks, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
 use super::call_paren_open;
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
@@ -460,15 +460,26 @@ pub(super) fn build_call_doc_with_wrapping(
     );
 
     // Prettier: group(contents, { shouldBreak: printedArguments.some(willBreak) }).
-    // The explicit shouldBreak is redundant here: a forced break anywhere in
-    // `arg_parts` (a non-empty block body's hardlines, a source-multiline object's
-    // group_break) already breaks this group at render, so the plain group is the
-    // same layout. This still handles block functions before the last arg
-    // (`fn((x) => { body }, aaa)`) without the old has_block_function_before_last
-    // check, which was too aggressive — it forced hardlines for empty block bodies
-    // like `async () => {}`, preventing calls like `fn([], 3, async () => {}, aaa)`
-    // from staying on one line.
-    wrap_call_with_soft_breaks(d, callee, arg_parts)
+    //
+    // The explicit shouldBreak is NOT redundant, though it looks it: a forced break in
+    // `arg_parts` does break this group at *render* (the plain-group arm keys on
+    // `should_break || will_break(contents)`), but `arena_fits`' Group arm keys only on
+    // `should_break` — tsv has no propagateBreaks. So inside an outer FLAT fits walk a
+    // plain group is measured flat to its first hardline, where a `group_break` is
+    // entered in Break mode and ends the line at its first softline. Prettier's
+    // propagateBreaks makes its own fits see such a group broken, i.e. like the
+    // `group_break` side. The two shapes therefore differ wherever an outer flat fits
+    // measures this call — a `conditional_group` state, a fill part — and the angle-bracket
+    // cast ladder is a live observer: without the guard, `<A>fn(a, (y) => { … }, c)` is
+    // measured short enough to select the parenthesized state, printing `<A>(⏎fn(…)⏎)`
+    // where prettier keeps the cast attached. See
+    // `expressions/type_assertion_call_block_arg_long`.
+    //
+    // This still handles block functions before the last arg (`fn((x) => { body }, aaa)`)
+    // without the old has_block_function_before_last check, which was too aggressive — it
+    // forced hardlines for empty block bodies like `async () => {}`, preventing calls like
+    // `fn([], 3, async () => {}, aaa)` from staying on one line.
+    wrap_call_with_will_break_guard(d, callee, arg_parts)
 }
 
 /// Single-argument comment paths: leading line comments (multi-line expansion)
