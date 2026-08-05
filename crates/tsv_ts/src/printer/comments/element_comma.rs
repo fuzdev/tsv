@@ -31,11 +31,11 @@ use tsv_lang::doc::arena::DocId;
 /// Trailing comments collected for a list element (property or array element)
 pub(in crate::printer) struct TrailingComments<'a> {
     /// Block comments emitted in source order, before the emitted comma. A last
-    /// element's after-comma block is included here too: with no trailing comma
-    /// emitted (trailingComma: 'none') the last comma is `d.empty()`, so before- and
-    /// after-comma blocks both trail the element in one run (prettier relocates an
+    /// element's after-comma block is included here too — its comma is `d.empty()`
+    /// (trailingComma: 'none'), so "before the comma" and "after the comma" are the same
+    /// position and the whole run trails the element together (prettier relocates an
     /// after-comma block before the comma; see conformance_prettier_ts_comments.md).
-    block: SmallVec<[&'a Comment; 2]>,
+    before_comma: SmallVec<[&'a Comment; 2]>,
     /// Block comments the author wrote **after** the comma that stay with this element
     /// rather than leading the next one: the ones a same-line line comment follows
     /// (`a, /* c1 */ // c2`). The line comment defers through `line_suffix`, so a block
@@ -74,7 +74,7 @@ impl<'a> Printer<'a> {
         // comma scan entirely.
         if !self.has_comments_to_emit_between(elem_end, upper_bound) {
             return TrailingComments {
-                block: SmallVec::new(),
+                before_comma: SmallVec::new(),
                 after_comma: SmallVec::new(),
                 line: SmallVec::new(),
                 end_pos: elem_end,
@@ -115,20 +115,20 @@ impl<'a> Printer<'a> {
         // (prettier relocates it before — see conformance_prettier_ts_comments.md
         // §Comment relocation). With no trailing comma emitted, a last element's after-comma
         // block trails the element in the same run as its before-comma blocks, so all
-        // same-line blocks collect into one source-ordered `block` (the comma between
-        // them is `d.empty()`).
-        let before_comma =
+        // same-line blocks collect into one source-ordered `before_comma` (the comma
+        // between them is `d.empty()`).
+        let is_before_comma =
             |c: &Comment| is_last || comma_pos.is_none_or(|comma| c.span.start < comma);
 
-        let mut block = SmallVec::new();
+        let mut before_comma = SmallVec::new();
         let mut after_comma = SmallVec::new();
         let mut line = SmallVec::new();
         let mut end_pos = elem_end;
         for c in same_line {
             if !c.is_block {
                 line.push(c);
-            } else if before_comma(c) {
-                block.push(c);
+            } else if is_before_comma(c) {
+                before_comma.push(c);
             } else if line_comment_start.is_some_and(|start| c.span.start < start) {
                 after_comma.push(c);
             } else {
@@ -140,7 +140,7 @@ impl<'a> Printer<'a> {
         }
 
         TrailingComments {
-            block,
+            before_comma,
             after_comma,
             line,
             end_pos,
@@ -188,8 +188,8 @@ impl<'a> Printer<'a> {
         // in the enclosing list concat (which render + every fits pass would still walk).
         // Byte-identical: an empty comment run builds `concat(&[]) == empty()`, so pushing
         // it vs not is the same rendered output.
-        if !trailing.block.is_empty() {
-            parts.push(self.build_block_comments_doc(&trailing.block));
+        if !trailing.before_comma.is_empty() {
+            parts.push(self.build_block_comments_doc(&trailing.before_comma));
         }
         parts.push(comma);
         if !trailing.after_comma.is_empty() {

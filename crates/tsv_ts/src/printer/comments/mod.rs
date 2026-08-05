@@ -317,10 +317,11 @@ impl<'a> Printer<'a> {
     /// element's printed content begins (its first leading comment, else the element), so
     /// a blank ahead of that content is inside the measured range.
     ///
-    /// The object-literal, object-**pattern**, import/export-specifier, enum-member and
-    /// function-parameter list loops share it; a further list that needs the same rule
-    /// should call it rather than re-derive the two-line emission around a bare
-    /// `is_next_line_empty`.
+    /// The function-parameter list calls it directly, deriving its own `content_start`
+    /// (decorators, the `(`-line pull); every other list goes through
+    /// [`Self::push_item_blank_separator`], which derives that position once. A further
+    /// list that needs the same rule should call one of the two rather than re-derive the
+    /// two-line emission around a bare `is_next_line_empty`.
     ///
     /// The literal and the pattern are one entry, not two: prettier prints
     /// `ObjectExpression` and `ObjectPattern` through the same `printObject`, so a site
@@ -340,6 +341,35 @@ impl<'a> Printer<'a> {
             parts.push(d.literalline());
         }
         parts.push(d.hardline());
+    }
+
+    /// [`Self::push_next_line_empty_hardline`] with the `content_start` derived here: the
+    /// separator between two list items, asked once for every list that shares the
+    /// element-comma contract (object literal, object pattern, import/export specifiers,
+    /// enum members).
+    ///
+    /// `prev_end` is the previous item's trailing-run end, `item_start` this item's node
+    /// start; the content between them is this item's leading comment run, so the scan
+    /// stops at the first comment.
+    ///
+    /// ⚠️ **in source** — the first comment *physically* in the gap, not the first one
+    /// this caller will emit. A blank-line scan reads bytes, so an OWNED comment (glued
+    /// to the item's first token and printed from inside its doc) bounds it just the
+    /// same: the author's blank sits *before* that comment, and a bound past it would put
+    /// the blank outside the measured range. Deriving this per site is how the literal
+    /// and the pattern came to ask it on two different axes — the one thing `printObject`
+    /// printing both through one path says they must not do.
+    pub(crate) fn push_item_blank_separator(
+        &self,
+        parts: &mut DocBuf,
+        prev_end: u32,
+        item_start: u32,
+    ) {
+        let content_start = self
+            .comments_in_source_between(prev_end, item_start)
+            .next()
+            .map_or(item_start, |c| c.span.start);
+        self.push_next_line_empty_hardline(parts, prev_end, content_start);
     }
 
     /// Whether `[from, next)` holds a **truly blank line** — two newlines with nothing

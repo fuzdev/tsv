@@ -119,12 +119,7 @@ impl<'a> Printer<'a> {
                 if !is_first {
                     if must_break {
                         // Must break: check for blank line preservation
-                        let check_pos = if comments.is_empty() {
-                            prop_start
-                        } else {
-                            comments[0].span.start
-                        };
-                        self.push_next_line_empty_hardline(&mut parts, prev_end, check_pos);
+                        self.push_item_blank_separator(&mut parts, prev_end, prop_start);
                     } else {
                         // May stay inline: use line() for group-based breaking
                         parts.push(d.line());

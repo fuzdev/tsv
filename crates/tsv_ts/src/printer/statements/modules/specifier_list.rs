@@ -618,12 +618,7 @@ impl<'a> Printer<'a> {
             );
 
             if !is_first {
-                let check_pos = if comments.is_empty() {
-                    item_start
-                } else {
-                    comments[0].span.start
-                };
-                self.push_next_line_empty_hardline(&mut parts, prev_end, check_pos);
+                self.push_item_blank_separator(&mut parts, prev_end, item_start);
             }
 
             for comment in &comments {
@@ -650,31 +645,22 @@ impl<'a> Printer<'a> {
                 self.push_element_comma_trailing(&mut parts, &trailing, d.text(","));
                 prev_end = trailing.end_pos;
             } else {
-                // Last item: no trailing comma (trailingComma: 'none'). Same-line block
-                // comments hug the item (`a /* c */`), same-line line comments follow
-                // (`a // comment`), and own-line comments get hardlines (`a\n// comment`).
-                let mut prev_pos = item_end;
-                // Track line reference for multi-line block comments
-                let mut line_ref = item_end;
-                for comment in comments_to_emit_in_range(self.comments, item_end, end_boundary) {
-                    if self.is_same_line(line_ref, comment.span.start) {
-                        if comment.is_block {
-                            parts.push(d.text(" "));
-                            parts.push(self.build_comment_doc(comment));
-                            // Follow multi-line block comments to their closing line
-                            if !self.is_same_line(comment.span.start, comment.span.end) {
-                                line_ref = comment.span.end;
-                            }
-                        } else {
-                            parts.push(self.build_trailing_line_comment_doc(comment));
-                        }
-                    } else {
-                        if self.has_blank_line_between(prev_pos, comment.span.start) {
-                            parts.push(d.literalline());
-                        }
-                        parts.push(d.hardline());
-                        parts.push(self.build_comment_doc(comment));
-                    }
+                // Last item: the same contract with an EMPTY separator, since no trailing
+                // comma is emitted (trailingComma: 'none') — so same-line block comments
+                // hug the item (`a /* c */`) and same-line line comments defer after it
+                // (`a // comment`), both through the shared emitter rather than a second
+                // spelling of the same-line walk.
+                let trailing = self.collect_trailing_comments(item_end, end_boundary, true);
+                self.push_element_comma_trailing(&mut parts, &trailing, d.empty());
+
+                // What the run did not claim is own-line, and is this container's trailing
+                // comment run (`a⏎// comment`), blank lines preserved.
+                let mut prev_pos = trailing.end_pos;
+                for comment in
+                    comments_to_emit_in_range(self.comments, trailing.end_pos, end_boundary)
+                {
+                    self.push_blank_preserving_hardline(&mut parts, prev_pos, comment.span.start);
+                    parts.push(self.build_comment_doc(comment));
                     prev_pos = comment.span.end;
                 }
             }

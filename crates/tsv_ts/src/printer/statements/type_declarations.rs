@@ -1123,12 +1123,7 @@ impl<'a> Printer<'a> {
 
                 // Check for blank lines
                 if !is_first {
-                    let check_pos = if comments.is_empty() {
-                        member_start
-                    } else {
-                        comments[0].span.start
-                    };
-                    self.push_next_line_empty_hardline(&mut member_parts, prev_end, check_pos);
+                    self.push_item_blank_separator(&mut member_parts, prev_end, member_start);
                 }
 
                 // Process leading comments
