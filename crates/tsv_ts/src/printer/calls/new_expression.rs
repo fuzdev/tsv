@@ -22,7 +22,7 @@ use crate::printer::calls::{
     could_expand_arrow_chain, emit_first_arg_leading_comments, has_inter_argument_comments_slice,
     has_trailing_comments_slice, has_trailing_line_comments_slice, last_two_args_same_type,
     prebuild_expand_last_break_body, prepend_arrow_body_comments,
-    should_force_expansion_for_comments, wrap_call_with_hard_breaks,
+    should_force_expansion_for_comments, wrap_call_with_hard_breaks_paren_line,
     wrap_call_with_will_break_guard,
 };
 use crate::printer::{
@@ -344,6 +344,7 @@ impl<'a> Printer<'a> {
                 callee_with_types,
                 new_expr.arguments,
                 paren_open,
+                new_expr.span.end,
                 ArgItem::ArgContext,
             );
         }
@@ -374,6 +375,7 @@ impl<'a> Printer<'a> {
                 callee_with_types,
                 new_expr.arguments,
                 paren_open,
+                new_expr.span.end,
                 ArgItem::ArgContext,
             );
         }
@@ -388,8 +390,23 @@ impl<'a> Printer<'a> {
             .any(|window| self.is_next_line_empty(window[0].span().end, window[1].span().start));
 
         if has_blank_lines {
-            let arg_doc = build_args_with_blank_lines(self, new_expr.arguments, paren_open);
-            return wrap_call_with_hard_breaks(d, callee_with_types, arg_doc);
+            // Unlike the plain call's twin, no comment path preempts this one, so both
+            // edge gaps are live here: a `(`-line run lands in `paren_line`, and the
+            // last argument's trailing comments come back inside `arg_doc`.
+            let mut paren_line = DocBuf::new();
+            let arg_doc = build_args_with_blank_lines(
+                self,
+                new_expr.arguments,
+                paren_open,
+                new_expr.span.end,
+                &mut paren_line,
+            );
+            return wrap_call_with_hard_breaks_paren_line(
+                d,
+                callee_with_types,
+                &paren_line,
+                arg_doc,
+            );
         }
 
         // "Expand first arg" pattern: callback first, short/empty container last
@@ -436,6 +453,7 @@ impl<'a> Printer<'a> {
             && has_trailing_line_comments_slice(new_expr.arguments, new_expr.span.end, self)
         {
             let mut arg_parts = DocBuf::new();
+            let mut paren_line = DocBuf::new();
 
             for (i, arg) in new_expr.arguments.iter().enumerate() {
                 // Leading comments before the first argument (e.g. `new Foo(/* c */ a, // t)`).
@@ -445,6 +463,7 @@ impl<'a> Printer<'a> {
                 if i == 0 {
                     emit_first_arg_leading_comments(
                         self,
+                        &mut paren_line,
                         &mut arg_parts,
                         paren_open,
                         arg.span().start,
@@ -484,12 +503,25 @@ impl<'a> Printer<'a> {
                     // `b /* c */` — the tsv divergence; a line comment follows via
                     // `line_suffix`), then own-line dangling comments. No trailing comma
                     // (trailingComma: 'none'). Matches the call/member-chain last-arg paths.
+                    //
+                    // TODO: this is `emit_last_arg_trailing_comments` off the WRONG anchor —
+                    // `arg_end`, not `last_arg_comment_scan_start`, so a spread's stripped
+                    // parens hide their comments past the argument's own end and the scan
+                    // starts beyond them. Live drop, verified against prettier:
+                    // `new Foo(a, ...(b⏎/* i */⏎) // t)` loses `/* i */`. Route this site
+                    // through the shared emitter — needs a fixture first, since it changes
+                    // output.
                     pc.emit_last_arg_comments(&mut arg_parts, self);
                 }
             }
 
             let arg_doc = d.concat(&arg_parts);
-            return wrap_call_with_hard_breaks(d, callee_with_types, arg_doc);
+            return wrap_call_with_hard_breaks_paren_line(
+                d,
+                callee_with_types,
+                &paren_line,
+                arg_doc,
+            );
         }
 
         // Check for trailing BLOCK comments only (no line comments)
@@ -512,10 +544,14 @@ impl<'a> Printer<'a> {
 
             // Prepend leading comments before the first arg (e.g. `new Foo(/* c */ a /* t */)`);
             // this path otherwise emits only trailing comments, dropping the leading one.
+            // A `(`-line run goes to `paren_line` instead, which then forces the hard-broken
+            // wrap below — it ends in a `//`, so nothing may share its line.
+            let mut paren_line = DocBuf::new();
             if let Some(first_arg) = new_expr.arguments.first() {
                 let mut lead = DocBuf::new();
                 emit_first_arg_leading_comments(
                     self,
+                    &mut paren_line,
                     &mut lead,
                     paren_open,
                     first_arg.span().start,
@@ -566,7 +602,12 @@ impl<'a> Printer<'a> {
                 } else {
                     d.concat(&arg_docs)
                 };
-                return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
+                return wrap_call_with_hard_breaks_paren_line(
+                    d,
+                    callee_with_types,
+                    &paren_line,
+                    arg_parts,
+                );
             }
 
             if let Some(last_doc) = arg_docs.pop() {
@@ -583,10 +624,16 @@ impl<'a> Printer<'a> {
                 arg_docs.push(d.concat(&last_with_comment));
 
                 // For function composition (multiple callbacks), use hardlines
-                // For simple args, use soft breaks (can stay inline)
-                if is_function_composition_args(new_expr.arguments) {
+                // For simple args, use soft breaks (can stay inline) — unless a comment
+                // sits on the `(` line, whose `//` ends that line and forces the break.
+                if is_function_composition_args(new_expr.arguments) || !paren_line.is_empty() {
                     let arg_parts = d.join_doc(arg_docs, d.comma_hardline());
-                    return wrap_call_with_hard_breaks(d, callee_with_types, arg_parts);
+                    return wrap_call_with_hard_breaks_paren_line(
+                        d,
+                        callee_with_types,
+                        &paren_line,
+                        arg_parts,
+                    );
                 }
                 let arg_parts = d.join_doc(arg_docs, d.comma_line());
                 return wrap_call_with_soft_breaks(d, callee_with_types, arg_parts);
@@ -768,14 +815,19 @@ impl<'a> Printer<'a> {
                     inner.push(d.hardline());
                 }
                 // The `(`→first-argument gap is emitted above (the paren-line prefix and
-                // the leading run), so the builder must not print it a second time.
+                // the leading run), so the builder must not print it a second time — hence
+                // its `paren_line` out-param stays unused here and must come back empty.
+                let mut unused_paren_line = DocBuf::new();
                 inner.push(build_args_joined_with_comments(
                     self,
                     new_expr.arguments,
                     paren_open,
+                    new_expr.span.end,
                     ArgsJoin::HardlineLeadingGapEmitted,
                     ArgItem::ArgContext,
+                    &mut unused_paren_line,
                 ));
+                debug_assert!(unused_paren_line.is_empty());
 
                 return d.concat(&[
                     callee_with_types,
@@ -789,13 +841,27 @@ impl<'a> Printer<'a> {
         }
 
         if has_leading_comments || has_inter_arg_comments {
+            let mut paren_line = DocBuf::new();
             let arg_parts = build_args_joined_with_comments(
                 self,
                 new_expr.arguments,
                 paren_open,
+                new_expr.span.end,
                 ArgsJoin::SoftLine,
                 ArgItem::ArgContext,
+                &mut paren_line,
             );
+            // Both trailing-comment arms above return before this one, so the last
+            // argument's gap is empty here and the soft wrap can still collapse. A
+            // `(`-line run can't: its `//` ends the line.
+            if !paren_line.is_empty() {
+                return wrap_call_with_hard_breaks_paren_line(
+                    d,
+                    callee_with_types,
+                    &paren_line,
+                    arg_parts,
+                );
+            }
             return wrap_call_with_will_break_guard(d, callee_with_types, arg_parts);
         }
 

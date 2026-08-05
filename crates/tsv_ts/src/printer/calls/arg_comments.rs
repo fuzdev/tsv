@@ -534,14 +534,33 @@ pub(crate) fn has_trailing_line_comments_slice(
     })
 }
 
-/// Emit the leading comments between `(` and the first argument into `parts`.
+/// Emit the leading comments between `(` and the first argument, split across the
+/// two lines they can land on: `paren_line` rides the `(` line, `parts` leads the
+/// first argument.
 ///
-/// Same-line trailing block comments are emitted inline (`/* c */ arg`); own-line
-/// comments stay on their own line. Several per-argument printer loops only emit
-/// leading comments for args `1..n` (via the previous arg's gap), so the first
-/// arg's leading comment must be emitted explicitly or it's dropped.
+/// Own-line comments always lead the first argument. A same-line run trailing `(`
+/// goes one of two ways, and the split is the run's *kind*, not each comment's:
+///
+/// - **Block-only** (`fn(/* c */ a)`) — emitted inline ahead of the first argument, so
+///   a call that fits stays on one line (matching prettier).
+/// - **Any line comment in the run** — the whole run stays on the `(` line, in source
+///   order. A `//` runs to EOL, so it cannot ride the argument's line; keeping it where
+///   the author put it is tsv's sanctioned divergence (prettier relocates it to its own
+///   line) — see `docs/conformance_prettier_ts_comments.md` §Comment relocation (Call
+///   open paren `(`). Taking the run whole is what keeps a preceding block from jumping
+///   past it: emitting the block inline and the line comment on the `(` line would
+///   REVERSE the authored pair.
+///
+/// A non-empty `paren_line` obliges the caller to hard-break the call —
+/// [`wrap_call_with_hard_breaks_paren_line`](super::arg_wrapping::wrap_call_with_hard_breaks_paren_line)
+/// is that wrap. Otherwise the `(` line's `//` swallows the arguments that follow it.
+///
+/// Several per-argument printer loops only emit leading comments for args `1..n` (via
+/// the previous arg's gap), so the first arg's leading comment must be emitted
+/// explicitly or it's dropped.
 pub(crate) fn emit_first_arg_leading_comments(
     printer: &Printer<'_>,
+    paren_line: &mut DocBuf,
     parts: &mut DocBuf,
     paren_open: u32,
     first_arg_start: u32,
@@ -556,11 +575,38 @@ pub(crate) fn emit_first_arg_leading_comments(
         paren_open,
         first_arg_start,
     );
-    for comment in &pc.trailing_block {
-        parts.push(printer.build_comment_doc(comment));
-        parts.push(d.text(" "));
+    if pc.has_trailing_line() {
+        pc.emit_trailing_comments(paren_line, printer);
+    } else {
+        for comment in &pc.trailing_block {
+            parts.push(printer.build_comment_doc(comment));
+            parts.push(d.text(" "));
+        }
     }
     pc.emit_leading_comments_inline_aware(parts, printer);
+}
+
+/// Emit the comments between the LAST argument and `)` — the closing counterpart to
+/// [`emit_first_arg_leading_comments`], and the other half of what a per-argument loop
+/// owes beyond its interior gaps (see `docs/comments.md` §The element-comma seam).
+///
+/// A loop whose gap lookup is guarded by `i < len - 1` has no emitter for this region at
+/// all, so everything an author parked after the last argument is DROPPED. Anchored at
+/// [`Printer::last_arg_comment_scan_start`] so a spread's stripped parens can't hide a
+/// comment past the argument's own end.
+pub(crate) fn emit_last_arg_trailing_comments(
+    printer: &Printer<'_>,
+    parts: &mut DocBuf,
+    last_arg: &internal::Expression<'_>,
+    paren_close: u32,
+) {
+    let pc = PartitionedComments::new(
+        printer.comments,
+        printer.comment_line_breaks,
+        printer.last_arg_comment_scan_start(last_arg),
+        paren_close,
+    );
+    pc.emit_last_arg_comments(parts, printer);
 }
 
 /// Check if there are trailing comments (line OR block) on any arguments
