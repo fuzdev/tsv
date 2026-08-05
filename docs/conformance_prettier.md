@@ -232,6 +232,11 @@ its tail:
   an optional call, and a member-chain callee. Inlining here is content loss, not a
   layout choice — the `//` swallows the call's own parens and the `;`. See
   [Callee→empty argument list](./conformance_prettier_ts_comments.md#comment-relocation).
+- **Function/constructor-type `=>`→return type** — the arrow's operand hang
+  (`() => // c⏎\tT`), the same seam this gap's *frozen* arm already reached through
+  the shared `append_keyword_value_line_comments`. A union return keeps its own
+  break-after-arrow layout. See [Fn/ctor-type `=>`→return-type line
+  comment](./conformance_prettier_ts_comments.md#comment-relocation).
 - **Switch case head→`:`** — the case/`default` label's separator
   (`case x // c⏎\t\t\t:`), where the tail is the bare `:` itself; inlining would
   swallow the colon into the comment (content loss). See

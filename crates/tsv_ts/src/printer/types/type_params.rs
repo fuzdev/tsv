@@ -115,8 +115,6 @@ impl<'a> Printer<'a> {
 
     /// Build doc for type parameter declaration with expanding comments.
     ///
-    /// A single-param leading line comment does NOT hug here (unlike the
-    /// type-argument builders): `function f<// c⏎T>()` fully expands.
     pub(in crate::printer) fn build_type_parameter_declaration_doc_with_line_comments(
         &self,
         decl: &TSTypeParameterDeclaration<'_>,
@@ -126,7 +124,6 @@ impl<'a> Printer<'a> {
             decl.params.len(),
             |i| decl.params[i].span,
             |i, frozen| self.build_type_parameter_item_doc(&decl.params[i], frozen),
-            false,
         )
     }
 
@@ -661,19 +658,20 @@ impl<'a> Printer<'a> {
         inst: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
         // Call/`new`-expression type arguments render each argument with
-        // `build_type_doc`; the layout is shared with type-position arguments.
+        // `build_type_doc`; the layout is shared with type-position arguments, down to
+        // the leading-only paren unwrap (see `leading_paren_unwrapped`).
         self.build_angle_list_with_line_comments(
             inst.span,
             inst.params.len(),
-            |i| inst.params[i].span(),
+            |i| self.leading_paren_unwrapped(&inst.params[i]).span(),
             |i, frozen| {
+                let param = self.leading_paren_unwrapped(&inst.params[i]);
                 if frozen {
-                    self.build_frozen_list_member_doc(&inst.params[i])
+                    self.build_frozen_list_member_doc(param)
                 } else {
-                    self.build_type_doc(&inst.params[i])
+                    self.build_type_doc(param)
                 }
             },
-            true,
         )
     }
 
@@ -784,58 +782,25 @@ impl<'a> Printer<'a> {
     /// ([`Self::build_type_parameter_declaration_doc_with_line_comments`]) printers.
     /// `item_span`/`item_doc` select the family's item type and per-item printer.
     ///
-    /// With `hug_single_leading_line`, a single argument with a leading *line*
-    /// comment hugs `<`/`>` (`foo<// c\n A>`) — a deliberate divergence (prettier
-    /// expands; see `type_position_parens_leading_line_comment`). The declaration
-    /// family passes `false` (it fully expands that shape). Every other
-    /// comment-bearing form — a single-argument own-line *block* comment, or any
-    /// multi-argument list — fully expands the list, matching prettier. The
-    /// own-line block must NOT hug, or the emitted `</* c */⏎T>` re-collapses on
-    /// the next pass (non-idempotent). A block trailing/glued to the argument never
-    /// reaches here (it doesn't trip `has_own_line_block_comments_in_bracket_list`)
-    /// and collapses inline.
+    /// **Argument count changes nothing here.** A single argument is the N=1 form of
+    /// the list and takes the list's layout — delimiter-line comment on the `<` line,
+    /// body indented, `>` dangling — exactly as a multi-argument list does. A
+    /// single-argument leading *line* comment used to hug `<`/`>` instead
+    /// (`foo<// c⏎A>`); that hug was the one shape in the family answering the layout
+    /// question by count, and it is retired. The surviving divergence is the
+    /// delimiter-line placement itself, which is the multi-argument entry's
+    /// (`type_args_open_angle_comment`) — prettier drops the comment to its own line
+    /// at every count. See `type_position_parens_leading_line_comment`.
     pub(in crate::printer) fn build_angle_list_with_line_comments(
         &self,
         span: Span,
         count: usize,
         item_span: impl Fn(usize) -> Span,
         item_doc: impl Fn(usize, bool) -> DocId,
-        hug_single_leading_line: bool,
     ) -> DocId {
         let d = self.d();
 
-        // Single-arg leading *line* comment hugs `<`/`>`.
-        if hug_single_leading_line && count == 1 {
-            let param_start = item_span(0).start;
-            let has_line = self.has_line_comments_between(span.start + 1, param_start);
-            let before_close = span.end - 1;
-            let has_trailing = tsv_lang::has_comments_to_emit_in_range(
-                self.comments,
-                item_span(0).end,
-                before_close,
-            );
-            // A FROZEN argument must not hug: the hug pulls the leading run onto the
-            // `<` line, which would relocate an own-line directive to a trailing-`<`
-            // placement the classification reads as inert — the freeze would be lost
-            // on the second pass. Fall through to the full expansion instead, where
-            // an own-line directive stays own-line (the same keep-own-line rule the
-            // union in-span freeze carries).
-            if has_line && !has_trailing && !self.list_item_frozen(span.start + 1, &item_span, 0) {
-                let leading =
-                    // `None`: this hug path emits no delimiter-line prefix, so nothing
-                    // was pulled onto the `<` line to exclude here.
-                    self.build_leading_comments_multiline(span.start + 1, param_start, None);
-                if !leading.is_empty() {
-                    let mut parts: DocBuf = smallvec![d.text("<")];
-                    parts.extend(leading);
-                    parts.push(item_doc(0, false));
-                    parts.push(d.text(">"));
-                    return d.concat(&parts);
-                }
-            }
-        }
-
-        // Full multiline expansion (multi-arg, or single-arg own-line block). A
+        // Full multiline expansion (every count). A
         // comment trailing `<` on its own line is kept on the `<` line (divergence —
         // prettier relocates it to lead the first argument).
         let first_param_start = item_span(0).start;

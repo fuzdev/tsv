@@ -17,9 +17,13 @@ second pass — keeping the authored own-line placement is both the comment-posi
 doctrine and the idempotent fixed point.
 
 The `type D` control pins that a **plain** comment keeps the trailing relocation
-(`() => // c` — a fixed point for both tools): only a directive earns own-line
-preservation. `unformatted_ours_own_line_control.svelte` authors that control
-comment own-line; tsv normalizes it to input's trailing form.
+(`() => // c`): only a directive earns own-line preservation. What follows the
+comment takes the same continuation indent the directive cases above take — one
+level in — so the freeze changes *which* placement is kept, never the layout
+below it; prettier leaves that continuation flush, the divergence cataloged at
+[Fn/ctor-type `=>`→return-type line comment](../../../../../docs/conformance_prettier_ts_comments.md#comment-relocation).
+`unformatted_ours_own_line_control.svelte` authors that control comment own-line;
+tsv normalizes it to input's trailing form.
 
 `type E` moves the directive one gap earlier — between the `)` and the `=>` — and
 spells it as a **block** comment. Placement, not spelling, keys honoring, so the
