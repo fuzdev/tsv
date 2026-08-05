@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 474,
+	"end": 425,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " a comment in an indexed-access index-to-`]` gap escapes the brackets and trails the",
+			"value": " a run at the end of an indexed access's brackets stays inside them, distinct,",
 			"start": 20,
-			"end": 106,
+			"end": 100,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 87
+					"column": 81
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " statement; a run of them stays distinct, one per line",
-			"start": 108,
-			"end": 164,
+			"value": " one comment per line (unformatted_ours_flat carries the flat authoring)",
+			"start": 102,
+			"end": 176,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -38,70 +38,54 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 57
-				}
-			}
-		},
-		{
-			"type": "Line",
-			"value": " (unformatted_inside_suffix carries the authored placement)",
-			"start": 166,
-			"end": 227,
-			"loc": {
-				"start": {
-					"line": 4,
-					"column": 1
-				},
-				"end": {
-					"line": 4,
-					"column": 62
+					"column": 75
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 245,
-			"end": 250,
+			"start": 195,
+			"end": 200,
 			"loc": {
 				"start": {
 					"line": 5,
-					"column": 17
+					"column": 4
 				},
 				"end": {
 					"line": 5,
-					"column": 22
+					"column": 9
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 252,
-			"end": 257,
+			"start": 203,
+			"end": 208,
 			"loc": {
 				"start": {
 					"line": 6,
-					"column": 1
+					"column": 2
 				},
 				"end": {
 					"line": 6,
-					"column": 6
+					"column": 7
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " the same gap holding a single comment",
-			"start": 260,
-			"end": 300,
+			"start": 215,
+			"end": 255,
 			"loc": {
 				"start": {
-					"line": 8,
+					"line": 9,
 					"column": 1
 				},
 				"end": {
-					"line": 8,
+					"line": 9,
 					"column": 41
 				}
 			}
@@ -109,80 +93,80 @@
 		{
 			"type": "Line",
 			"value": " c3",
-			"start": 318,
-			"end": 323,
+			"start": 274,
+			"end": 279,
 			"loc": {
 				"start": {
-					"line": 9,
-					"column": 17
+					"line": 11,
+					"column": 4
 				},
 				"end": {
-					"line": 9,
-					"column": 22
+					"line": 11,
+					"column": 9
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " a redundant paren's trailing gap escapes the same way once the parens are stripped",
-			"start": 326,
-			"end": 411,
+			"value": " a retained paren shell's trailing gap behaves the same way",
+			"start": 286,
+			"end": 347,
 			"loc": {
 				"start": {
-					"line": 11,
+					"line": 14,
 					"column": 1
 				},
 				"end": {
-					"line": 11,
-					"column": 86
+					"line": 14,
+					"column": 62
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c4",
-			"start": 428,
-			"end": 433,
+			"start": 365,
+			"end": 370,
 			"loc": {
 				"start": {
-					"line": 12,
-					"column": 16
+					"line": 16,
+					"column": 4
 				},
 				"end": {
-					"line": 12,
-					"column": 21
+					"line": 16,
+					"column": 9
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c5",
-			"start": 435,
-			"end": 440,
+			"start": 373,
+			"end": 378,
 			"loc": {
 				"start": {
-					"line": 13,
-					"column": 1
+					"line": 17,
+					"column": 2
 				},
 				"end": {
-					"line": 13,
-					"column": 6
+					"line": 17,
+					"column": 7
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c6",
-			"start": 458,
-			"end": 463,
+			"start": 403,
+			"end": 408,
 			"loc": {
 				"start": {
-					"line": 15,
-					"column": 16
+					"line": 21,
+					"column": 4
 				},
 				"end": {
-					"line": 15,
-					"column": 21
+					"line": 21,
+					"column": 9
 				}
 			}
 		}
@@ -190,48 +174,48 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 473,
+		"end": 424,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 464,
+			"end": 415,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 16,
+					"line": 23,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 229,
-					"end": 244,
+					"start": 178,
+					"end": 212,
 					"loc": {
 						"start": {
-							"line": 5,
+							"line": 4,
 							"column": 1
 						},
 						"end": {
-							"line": 5,
-							"column": 16
+							"line": 7,
+							"column": 3
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 234,
-						"end": 236,
+						"start": 183,
+						"end": 185,
 						"loc": {
 							"start": {
-								"line": 5,
+								"line": 4,
 								"column": 6
 							},
 							"end": {
-								"line": 5,
+								"line": 4,
 								"column": 8
 							}
 						},
@@ -239,43 +223,43 @@
 					},
 					"typeAnnotation": {
 						"type": "TSIndexedAccessType",
-						"start": 239,
-						"end": 243,
+						"start": 188,
+						"end": 211,
 						"loc": {
 							"start": {
-								"line": 5,
+								"line": 4,
 								"column": 11
 							},
 							"end": {
-								"line": 5,
-								"column": 15
+								"line": 7,
+								"column": 2
 							}
 						},
 						"objectType": {
 							"type": "TSTypeReference",
-							"start": 239,
-							"end": 240,
+							"start": 188,
+							"end": 189,
 							"loc": {
 								"start": {
-									"line": 5,
+									"line": 4,
 									"column": 11
 								},
 								"end": {
-									"line": 5,
+									"line": 4,
 									"column": 12
 								}
 							},
 							"typeName": {
 								"type": "Identifier",
-								"start": 239,
-								"end": 240,
+								"start": 188,
+								"end": 189,
 								"loc": {
 									"start": {
-										"line": 5,
+										"line": 4,
 										"column": 11
 									},
 									"end": {
-										"line": 5,
+										"line": 4,
 										"column": 12
 									}
 								},
@@ -284,90 +268,84 @@
 						},
 						"indexType": {
 							"type": "TSTypeReference",
-							"start": 241,
-							"end": 242,
+							"start": 193,
+							"end": 194,
 							"loc": {
 								"start": {
 									"line": 5,
-									"column": 13
+									"column": 2
 								},
 								"end": {
 									"line": 5,
-									"column": 14
+									"column": 3
 								}
 							},
 							"typeName": {
 								"type": "Identifier",
-								"start": 241,
-								"end": 242,
+								"start": 193,
+								"end": 194,
 								"loc": {
 									"start": {
 										"line": 5,
-										"column": 13
+										"column": 2
 									},
 									"end": {
 										"line": 5,
-										"column": 14
+										"column": 3
 									}
 								},
 								"name": "K"
-							}
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c1",
+									"start": 195,
+									"end": 200
+								}
+							]
 						}
 					},
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " a comment in an indexed-access index-to-`]` gap escapes the brackets and trails the",
+							"value": " a run at the end of an indexed access's brackets stays inside them, distinct,",
 							"start": 20,
-							"end": 106
+							"end": 100
 						},
 						{
 							"type": "Line",
-							"value": " statement; a run of them stays distinct, one per line",
-							"start": 108,
-							"end": 164
-						},
-						{
-							"type": "Line",
-							"value": " (unformatted_inside_suffix carries the authored placement)",
-							"start": 166,
-							"end": 227
-						}
-					],
-					"trailingComments": [
-						{
-							"type": "Line",
-							"value": " c1",
-							"start": 245,
-							"end": 250
+							"value": " one comment per line (unformatted_ours_flat carries the flat authoring)",
+							"start": 102,
+							"end": 176
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 302,
-					"end": 317,
+					"start": 257,
+					"end": 283,
 					"loc": {
 						"start": {
-							"line": 9,
+							"line": 10,
 							"column": 1
 						},
 						"end": {
-							"line": 9,
-							"column": 16
+							"line": 12,
+							"column": 3
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 307,
-						"end": 309,
+						"start": 262,
+						"end": 264,
 						"loc": {
 							"start": {
-								"line": 9,
+								"line": 10,
 								"column": 6
 							},
 							"end": {
-								"line": 9,
+								"line": 10,
 								"column": 8
 							}
 						},
@@ -375,43 +353,43 @@
 					},
 					"typeAnnotation": {
 						"type": "TSIndexedAccessType",
-						"start": 312,
-						"end": 316,
+						"start": 267,
+						"end": 282,
 						"loc": {
 							"start": {
-								"line": 9,
+								"line": 10,
 								"column": 11
 							},
 							"end": {
-								"line": 9,
-								"column": 15
+								"line": 12,
+								"column": 2
 							}
 						},
 						"objectType": {
 							"type": "TSTypeReference",
-							"start": 312,
-							"end": 313,
+							"start": 267,
+							"end": 268,
 							"loc": {
 								"start": {
-									"line": 9,
+									"line": 10,
 									"column": 11
 								},
 								"end": {
-									"line": 9,
+									"line": 10,
 									"column": 12
 								}
 							},
 							"typeName": {
 								"type": "Identifier",
-								"start": 312,
-								"end": 313,
+								"start": 267,
+								"end": 268,
 								"loc": {
 									"start": {
-										"line": 9,
+										"line": 10,
 										"column": 11
 									},
 									"end": {
-										"line": 9,
+										"line": 10,
 										"column": 12
 									}
 								},
@@ -420,84 +398,84 @@
 						},
 						"indexType": {
 							"type": "TSTypeReference",
-							"start": 314,
-							"end": 315,
+							"start": 272,
+							"end": 273,
 							"loc": {
 								"start": {
-									"line": 9,
-									"column": 13
+									"line": 11,
+									"column": 2
 								},
 								"end": {
-									"line": 9,
-									"column": 14
+									"line": 11,
+									"column": 3
 								}
 							},
 							"typeName": {
 								"type": "Identifier",
-								"start": 314,
-								"end": 315,
+								"start": 272,
+								"end": 273,
 								"loc": {
 									"start": {
-										"line": 9,
-										"column": 13
+										"line": 11,
+										"column": 2
 									},
 									"end": {
-										"line": 9,
-										"column": 14
+										"line": 11,
+										"column": 3
 									}
 								},
 								"name": "K"
-							}
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c3",
+									"start": 274,
+									"end": 279
+								}
+							]
 						}
 					},
 					"leadingComments": [
 						{
 							"type": "Line",
 							"value": " c2",
-							"start": 252,
-							"end": 257
+							"start": 203,
+							"end": 208
 						},
 						{
 							"type": "Line",
 							"value": " the same gap holding a single comment",
-							"start": 260,
-							"end": 300
-						}
-					],
-					"trailingComments": [
-						{
-							"type": "Line",
-							"value": " c3",
-							"start": 318,
-							"end": 323
+							"start": 215,
+							"end": 255
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 413,
-					"end": 427,
+					"start": 349,
+					"end": 384,
 					"loc": {
 						"start": {
-							"line": 12,
+							"line": 15,
 							"column": 1
 						},
 						"end": {
-							"line": 12,
-							"column": 15
+							"line": 18,
+							"column": 5
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 418,
-						"end": 420,
+						"start": 354,
+						"end": 356,
 						"loc": {
 							"start": {
-								"line": 12,
+								"line": 15,
 								"column": 6
 							},
 							"end": {
-								"line": 12,
+								"line": 15,
 								"column": 8
 							}
 						},
@@ -505,92 +483,107 @@
 					},
 					"typeAnnotation": {
 						"type": "TSArrayType",
-						"start": 423,
-						"end": 426,
+						"start": 359,
+						"end": 383,
 						"loc": {
 							"start": {
-								"line": 12,
+								"line": 15,
 								"column": 11
 							},
 							"end": {
-								"line": 12,
-								"column": 14
+								"line": 18,
+								"column": 4
 							}
 						},
 						"elementType": {
-							"type": "TSTypeReference",
-							"start": 423,
-							"end": 424,
+							"type": "TSParenthesizedType",
+							"start": 359,
+							"end": 381,
 							"loc": {
 								"start": {
-									"line": 12,
+									"line": 15,
 									"column": 11
 								},
 								"end": {
-									"line": 12,
-									"column": 12
+									"line": 18,
+									"column": 2
 								}
 							},
-							"typeName": {
-								"type": "Identifier",
-								"start": 423,
-								"end": 424,
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 363,
+								"end": 364,
 								"loc": {
 									"start": {
-										"line": 12,
-										"column": 11
+										"line": 16,
+										"column": 2
 									},
 									"end": {
-										"line": 12,
-										"column": 12
+										"line": 16,
+										"column": 3
 									}
 								},
-								"name": "U"
+								"typeName": {
+									"type": "Identifier",
+									"start": 363,
+									"end": 364,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 3
+										}
+									},
+									"name": "U"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c4",
+										"start": 365,
+										"end": 370
+									}
+								]
 							}
 						}
 					},
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " a redundant paren's trailing gap escapes the same way once the parens are stripped",
-							"start": 326,
-							"end": 411
-						}
-					],
-					"trailingComments": [
-						{
-							"type": "Line",
-							"value": " c4",
-							"start": 428,
-							"end": 433
+							"value": " a retained paren shell's trailing gap behaves the same way",
+							"start": 286,
+							"end": 347
 						}
 					]
 				},
 				{
 					"type": "TSTypeAliasDeclaration",
-					"start": 443,
-					"end": 457,
+					"start": 387,
+					"end": 414,
 					"loc": {
 						"start": {
-							"line": 15,
+							"line": 20,
 							"column": 1
 						},
 						"end": {
-							"line": 15,
-							"column": 15
+							"line": 22,
+							"column": 5
 						}
 					},
 					"id": {
 						"type": "Identifier",
-						"start": 448,
-						"end": 450,
+						"start": 392,
+						"end": 394,
 						"loc": {
 							"start": {
-								"line": 15,
+								"line": 20,
 								"column": 6
 							},
 							"end": {
-								"line": 15,
+								"line": 20,
 								"column": 8
 							}
 						},
@@ -598,47 +591,70 @@
 					},
 					"typeAnnotation": {
 						"type": "TSArrayType",
-						"start": 453,
-						"end": 456,
+						"start": 397,
+						"end": 413,
 						"loc": {
 							"start": {
-								"line": 15,
+								"line": 20,
 								"column": 11
 							},
 							"end": {
-								"line": 15,
-								"column": 14
+								"line": 22,
+								"column": 4
 							}
 						},
 						"elementType": {
-							"type": "TSTypeReference",
-							"start": 453,
-							"end": 454,
+							"type": "TSParenthesizedType",
+							"start": 397,
+							"end": 411,
 							"loc": {
 								"start": {
-									"line": 15,
+									"line": 20,
 									"column": 11
 								},
 								"end": {
-									"line": 15,
-									"column": 12
+									"line": 22,
+									"column": 2
 								}
 							},
-							"typeName": {
-								"type": "Identifier",
-								"start": 453,
-								"end": 454,
+							"typeAnnotation": {
+								"type": "TSTypeReference",
+								"start": 401,
+								"end": 402,
 								"loc": {
 									"start": {
-										"line": 15,
-										"column": 11
+										"line": 21,
+										"column": 2
 									},
 									"end": {
-										"line": 15,
-										"column": 12
+										"line": 21,
+										"column": 3
 									}
 								},
-								"name": "U"
+								"typeName": {
+									"type": "Identifier",
+									"start": 401,
+									"end": 402,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 2
+										},
+										"end": {
+											"line": 21,
+											"column": 3
+										}
+									},
+									"name": "U"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c6",
+										"start": 403,
+										"end": 408
+									}
+								]
 							}
 						}
 					},
@@ -646,16 +662,8 @@
 						{
 							"type": "Line",
 							"value": " c5",
-							"start": 435,
-							"end": 440
-						}
-					],
-					"trailingComments": [
-						{
-							"type": "Line",
-							"value": " c6",
-							"start": 458,
-							"end": 463
+							"start": 373,
+							"end": 378
 						}
 					]
 				}

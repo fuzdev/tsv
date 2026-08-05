@@ -1,0 +1,784 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 592,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an indexed access as a union member keeps a trailing line comment inside",
+			"start": 20,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " its brackets, like every bracketed type region",
+			"start": 97,
+			"end": 146,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 171,
+			"end": 176,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 6
+				},
+				"end": {
+					"line": 6,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the LAST member's redundant paren shell is retained: no separator follows",
+			"start": 192,
+			"end": 268,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " it, so a stripped shell's comment would escape past the `;`",
+			"start": 270,
+			"end": 332,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 362,
+			"end": 367,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 6
+				},
+				"end": {
+					"line": 15,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 400,
+			"end": 405,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 5
+				},
+				"end": {
+					"line": 20,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a sole parenthesized member is retained the same way (the one-member",
+			"start": 413,
+			"end": 484,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 72
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " union's `|` drops — unformatted_ours_flat carries that authoring)",
+			"start": 486,
+			"end": 554,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 572,
+			"end": 577,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 4
+				},
+				"end": {
+					"line": 26,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 591,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 582,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 148,
+					"end": 189,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 153,
+						"end": 155,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 8
+							}
+						},
+						"name": "A1"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 160,
+						"end": 188,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 8,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSIndexedAccessType",
+								"start": 162,
+								"end": 182,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 4
+									},
+									"end": {
+										"line": 7,
+										"column": 5
+									}
+								},
+								"objectType": {
+									"type": "TSTypeReference",
+									"start": 162,
+									"end": 163,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 4
+										},
+										"end": {
+											"line": 5,
+											"column": 5
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 162,
+										"end": 163,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 4
+											},
+											"end": {
+												"line": 5,
+												"column": 5
+											}
+										},
+										"name": "T"
+									}
+								},
+								"indexType": {
+									"type": "TSTypeReference",
+									"start": 169,
+									"end": 170,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 4
+										},
+										"end": {
+											"line": 6,
+											"column": 5
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 169,
+										"end": 170,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 4
+											},
+											"end": {
+												"line": 6,
+												"column": 5
+											}
+										},
+										"name": "K"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 171,
+											"end": 176
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 187,
+								"end": 188,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 4
+									},
+									"end": {
+										"line": 8,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 187,
+									"end": 188,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 4
+										},
+										"end": {
+											"line": 8,
+											"column": 5
+										}
+									},
+									"name": "B"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an indexed access as a union member keeps a trailing line comment inside",
+							"start": 20,
+							"end": 95
+						},
+						{
+							"type": "Line",
+							"value": " its brackets, like every bracketed type region",
+							"start": 97,
+							"end": 146
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 334,
+					"end": 374,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 339,
+						"end": 341,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 8
+							}
+						},
+						"name": "A2"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 346,
+						"end": 373,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 2
+							},
+							"end": {
+								"line": 16,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 348,
+								"end": 349,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 4
+									},
+									"end": {
+										"line": 13,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 348,
+									"end": 349,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 4
+										},
+										"end": {
+											"line": 13,
+											"column": 5
+										}
+									},
+									"name": "B"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 354,
+								"end": 373,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 4
+									},
+									"end": {
+										"line": 16,
+										"column": 5
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 360,
+									"end": 361,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 4
+										},
+										"end": {
+											"line": 15,
+											"column": 5
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 360,
+										"end": 361,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 4
+											},
+											"end": {
+												"line": 15,
+												"column": 5
+											}
+										},
+										"name": "A"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 362,
+											"end": 367
+										}
+									]
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the LAST member's redundant paren shell is retained: no separator follows",
+							"start": 192,
+							"end": 268
+						},
+						{
+							"type": "Line",
+							"value": " it, so a stripped shell's comment would escape past the `;`",
+							"start": 270,
+							"end": 332
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 377,
+					"end": 410,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 382,
+						"end": 384,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 6
+							},
+							"end": {
+								"line": 18,
+								"column": 8
+							}
+						},
+						"name": "A3"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 387,
+						"end": 409,
+						"loc": {
+							"start": {
+								"line": 18,
+								"column": 11
+							},
+							"end": {
+								"line": 21,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 387,
+								"end": 388,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 11
+									},
+									"end": {
+										"line": 18,
+										"column": 12
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 387,
+									"end": 388,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 11
+										},
+										"end": {
+											"line": 18,
+											"column": 12
+										}
+									},
+									"name": "B"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 393,
+								"end": 409,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 3
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 398,
+									"end": 399,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 3
+										},
+										"end": {
+											"line": 20,
+											"column": 4
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 398,
+										"end": 399,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 3
+											},
+											"end": {
+												"line": 20,
+												"column": 4
+											}
+										},
+										"name": "A"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c3",
+											"start": 400,
+											"end": 405
+										}
+									]
+								}
+							}
+						]
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 556,
+					"end": 581,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 561,
+						"end": 563,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 6
+							},
+							"end": {
+								"line": 25,
+								"column": 8
+							}
+						},
+						"name": "A4"
+					},
+					"typeAnnotation": {
+						"type": "TSParenthesizedType",
+						"start": 566,
+						"end": 580,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 11
+							},
+							"end": {
+								"line": 27,
+								"column": 2
+							}
+						},
+						"typeAnnotation": {
+							"type": "TSTypeReference",
+							"start": 570,
+							"end": 571,
+							"loc": {
+								"start": {
+									"line": 26,
+									"column": 2
+								},
+								"end": {
+									"line": 26,
+									"column": 3
+								}
+							},
+							"typeName": {
+								"type": "Identifier",
+								"start": 570,
+								"end": 571,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 26,
+										"column": 3
+									}
+								},
+								"name": "A"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c4",
+									"start": 572,
+									"end": 577
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a sole parenthesized member is retained the same way (the one-member",
+							"start": 413,
+							"end": 484
+						},
+						{
+							"type": "Line",
+							"value": " union's `|` drops — unformatted_ours_flat carries that authoring)",
+							"start": 486,
+							"end": 554
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

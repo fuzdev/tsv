@@ -50,7 +50,7 @@ use smallvec::smallvec;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::find_char_skipping_comments;
+use tsv_lang::source_scan::{find_char_skipping_comments, skip_comment};
 
 /// A resolved keyword→value head — see [`Printer::keyword_value_head`].
 pub(in crate::printer) struct KeywordValueHead<'t> {
@@ -516,18 +516,37 @@ impl<'a> Printer<'a> {
                     parts.push(c);
                 }
                 parts.push(d.text("["));
-                if let Some(c) = index_comments {
-                    parts.push(c);
+                // Comments in the index→`]` gap trail the index and STAY INSIDE the
+                // brackets — the treatment every other bracketed type region already
+                // gives its own trailing gap (a type literal's `}`, a type-argument
+                // list's `>`, a tuple's `]`, a function type's `)`, and the retained
+                // paren shell), so the construct answers the question one way. A
+                // **line** comment there runs to end of line, so the `]` cannot follow
+                // it: the brackets open, the index sits one level in, and the run
+                // takes that same interior column. Letting the comment ride out to
+                // end-of-line instead re-bound it from the index to the whole
+                // statement and landed it on a line that may already hold one, where
+                // the two weld irreversibly — see
+                // [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
+                // §Comment relocation. The expanding-union index layout is
+                // comment-gated, so it never carries one of these.
+                let gap_start = i.index_type.span().end;
+                if self.has_line_comments_between(gap_start, i.span.end) {
+                    let mut inner: DocBuf = DocBuf::new();
+                    if let Some(c) = index_comments {
+                        inner.push(c);
+                    }
+                    inner.push(index_doc);
+                    self.push_trailing_comments_in_range(&mut inner, gap_start, i.span.end);
+                    parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&inner)])));
+                    parts.push(d.hardline());
+                } else {
+                    if let Some(c) = index_comments {
+                        parts.push(c);
+                    }
+                    parts.push(index_doc);
+                    self.push_trailing_comments_in_range(&mut parts, gap_start, i.span.end);
                 }
-                parts.push(index_doc);
-                // Comments in the index→`]` gap trail the index — previously unclaimed
-                // by any emitter here, a silent drop. The expanding-union index layout
-                // is comment-gated, so it never carries one of these.
-                self.push_trailing_comments_in_range(
-                    &mut parts,
-                    i.index_type.span().end,
-                    i.span.end,
-                );
                 parts.push(d.text("]"));
                 d.concat(&parts)
             }
@@ -1075,29 +1094,68 @@ impl<'a> Printer<'a> {
         )
     }
 
-    /// Whether `ty` is a `TSParenthesizedType` whose comments are **entirely** in its
-    /// trailing gap — so [`Self::build_parenthesized_type_unwrap_doc`] emits the whole run
-    /// through `line_suffix` and the shell itself renders flat.
+    /// Whether `ty` is a `TSParenthesizedType` that [`Self::build_parenthesized_type_unwrap_doc`]
+    /// **retains** for a trailing line comment — the shell keeps its parens and opens over
+    /// real hardlines, so the value owns its own break.
     ///
-    /// The shell still emits a `break_parent` for that run (a sibling member must not
-    /// absorb the comment's line — see that function), which makes `will_break` report a
-    /// break the output does not actually contain. This is the predicate that tells an
-    /// enclosing layout to disbelieve it. A **leading** comment is the opposite case: it
-    /// takes a real `hardline`, so the shell genuinely breaks and the answer is `false`.
-    pub(in crate::printer) fn paren_defers_its_whole_run(&self, ty: &TSType<'_>) -> bool {
+    /// The retention is what keeps the comment inside the parens the author wrote it in
+    /// rather than deferring it past the closer (see that function). An enclosing layout
+    /// reads this to know the value breaks *internally* and should therefore hug its `=`,
+    /// exactly as a tuple or type literal does. The single predicate for the retain/strip
+    /// question — that function consults this too, so an enclosing layout and the shell's
+    /// own emission cannot disagree.
+    pub(in crate::printer) fn paren_retains_for_trailing_run(&self, ty: &TSType<'_>) -> bool {
         let TSType::Parenthesized(p) = ty else {
             return false;
         };
-        // A **line** comment is what makes the run deferred, and it is also the only thing
-        // that makes the shell emit its `break_parent`. A trailing run of blocks stays
-        // inline, breaks nothing, and needs no disbelieving — answering `true` for it
-        // collapsed a legitimately expanded shell (`array_paren_bracket_comment_long`).
-        // So the trailing question is asked as the line-comment one directly, not as a
-        // [`Self::paren_inner_comment_flags`] tuple: a line comment is never owned, so
-        // "has a trailing line comment" already implies "has a trailing comment to emit".
+        self.paren_shell_retains_for_trailing_run(p)
+    }
+
+    /// The [`Self::paren_retains_for_trailing_run`] answer for an already-matched shell.
+    fn paren_shell_retains_for_trailing_run(&self, p: &TSParenthesizedType<'_>) -> bool {
+        // A **line** comment is the only thing that retains the shell: a trailing run of
+        // blocks stays inline and the shell still strips. The question is asked as the
+        // line-comment one directly, not as a [`Self::paren_inner_comment_flags`] tuple —
+        // a line comment is never owned, so "has a trailing line comment" already implies
+        // "has a trailing comment to emit". The leading gap is deliberately NOT consulted:
+        // a leading comment takes its own real `hardline` either way, so it neither adds
+        // to nor cancels the retention.
         let inner = p.type_annotation.span();
-        !self.has_comments_to_emit_between(p.span.start, inner.start)
-            && self.has_line_comments_between(inner.end, p.span.end)
+        self.has_line_comments_between(inner.end, p.span.end)
+            && !self.type_member_separator_follows(p.span.end)
+    }
+
+    /// Whether a union / intersection member separator (`|` / `&`) immediately follows
+    /// `pos` in source — looking through trivia and through the `)` closers of any
+    /// enclosing redundant paren layers, which strip along with the shell being asked
+    /// about and so cannot separate it from the member break.
+    ///
+    /// This is the one carve-out from the retain rule above, scoped to exactly its
+    /// argument: a separator means a per-member break ends the output line right after
+    /// this construct, so a deferred trailing comment flushes where it was written —
+    /// lossless, the position carrying no signal (the `union_intersection_parens_line_comment`
+    /// form, matching prettier). Where nothing but the statement's own tail follows, the
+    /// deferred run would escape past the `;` onto a line the reparse cannot re-break —
+    /// non-idempotent — so the shell is retained instead
+    /// (`type_suffix_trailing_comment_union_member`). A `|`/`&` after a type occurs only
+    /// as a member separator, so the byte answers the structural question directly.
+    fn type_member_separator_follows(&self, pos: u32) -> bool {
+        let bytes = self.source.as_bytes();
+        let end = bytes.len();
+        let mut i = pos as usize;
+        while i < end {
+            let b = bytes[i];
+            if b.is_ascii_whitespace() || b == b')' {
+                i += 1;
+                continue;
+            }
+            if let Some(next) = skip_comment(bytes, i, end) {
+                i = next;
+                continue;
+            }
+            return b == b'|' || b == b'&';
+        }
+        false
     }
 
     /// Unwrap redundant, comment-free `TSParenthesizedType` layers to find the
@@ -1138,6 +1196,40 @@ impl<'a> Printer<'a> {
             return self.build_type_doc(p.type_annotation);
         }
 
+        // A **line** comment in the trailing gap keeps its place INSIDE the parens, so
+        // the shell is retained and opens rather than being stripped: the comment runs
+        // to end of line, so `)` cannot follow it. This is the treatment every other
+        // bracketed type region gives its own trailing gap, the value-position paren
+        // already gives its own (`const e = (⏎x // c⏎);`), and the already-retained
+        // union / intersection shells give theirs — so the question is answered one way.
+        // Stripping instead carried the comment out to end-of-line, re-binding it from
+        // the parenthesized type to the whole statement and landing it on a line that
+        // may already hold one, where the two weld irreversibly; it also emitted a
+        // `break_parent` for a break the reparse could not reproduce, the parens being
+        // gone (F1). See
+        // [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
+        // §Comment relocation.
+        // The one exception, folded into the predicate: a member a `|`/`&` separator
+        // immediately follows, whose per-member break ends the line right after it — the
+        // stripped comment still trails the member it was written on, lossless, the
+        // carve-out §Comment Position Philosophy names
+        // (`union_intersection_parens_line_comment`; the last member has no separator
+        // and retains — `type_suffix_trailing_comment_union_member`).
+        if self.paren_shell_retains_for_trailing_run(p) {
+            let mut inner: DocBuf = DocBuf::new();
+            if has_leading {
+                self.push_paren_shell_leading_run(&mut inner, paren_open, inner_start, true);
+            }
+            inner.push(self.build_type_doc(p.type_annotation));
+            self.push_trailing_comments_in_range(&mut inner, inner_end, paren_close);
+            return d.concat(&[
+                d.text("("),
+                d.indent(d.concat(&[d.hardline(), d.concat(&inner)])),
+                d.hardline(),
+                d.text(")"),
+            ]);
+        }
+
         let mut parts: DocBuf = DocBuf::new();
         let mut needs_break = false;
 
@@ -1165,6 +1257,14 @@ impl<'a> Printer<'a> {
         // non-idempotent. That case is absorbed at the assignment, by
         // `value_owns_its_comment_break`, which is where the "does the value actually
         // break?" question already lives.
+        //
+        // TODO: `break_parent` breaks EVERY enclosing group, so a shell nested one
+        // composite deep (`B & (A // c) | C` — the shell ends the intersection inside a
+        // union member) also breaks that intermediate group, and THAT break the reparse
+        // cannot reproduce: the flush lands in the union's member gap, which re-breaks
+        // the union but reprints the intersection flat — a 2-pass convergence. Needs a
+        // break scoped to the group the deferred run actually flushes in, which the doc
+        // IR's unscoped `break_parent` cannot express today.
         if has_trailing {
             needs_break |= self.push_trailing_comments_in_range(&mut parts, inner_end, paren_close);
         }
