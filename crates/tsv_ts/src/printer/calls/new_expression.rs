@@ -104,6 +104,7 @@ impl<'a> Printer<'a> {
                 d.concat(&[d.text("new "), callee_with_types_base]),
                 paren_open,
                 new_expr.span.end,
+                false,
             );
         }
 
@@ -711,6 +712,9 @@ impl<'a> Printer<'a> {
                 }
 
                 // Different types: if last arg has forced breaks, use inline-or-expand-all
+                // TODO: call_formatting.rs's twin dropped this screen — its 3-state
+                // conditional_group lands a forced-break last arg on the hug; converging
+                // needs a `new`-expression fixture pinning that layout first.
                 if d.has_forced_break(last_arg_doc) {
                     return build_inline_or_expand_all(
                         d,

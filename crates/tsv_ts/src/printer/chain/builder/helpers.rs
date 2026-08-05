@@ -9,7 +9,18 @@ use super::super::printing::{
 };
 use super::super::types::ChainGroup;
 use crate::printer::Printer;
+use tsv_lang::ClassifiedComments;
 use tsv_lang::doc::{DocBuf, arena::DocId};
+
+/// Whether a gap's comments force a line break: a line comment (trailing or
+/// leading) consumes the rest of its line, and a leading comment needs its own
+/// line — only a same-line trailing **block** comment can stay inline with the
+/// code around it.
+pub(super) fn gap_has_break_forcing_comments(classified: &ClassifiedComments<'_>) -> bool {
+    !classified.trailing_line.is_empty()
+        || !classified.leading_block.is_empty()
+        || !classified.leading_line.is_empty()
+}
 
 /// Builder for constructing chain parts with proper comment handling.
 ///
@@ -125,21 +136,14 @@ pub(crate) fn build_rest_parts_with_comments<'a>(
         g.nodes.len() == 1 && g.nodes.iter().all(|n| n.is_member() && !n.is_call())
     });
 
-    // Check if last group has comments that force a line break.
-    // Line comments (`// ...`) consume the rest of the line, so we can't emit them
-    // and then print more code on the same line. Leading comments also need their
-    // own line. Only trailing block comments can stay inline.
+    // Check if last group has comments that force a line break — those can't ride
+    // the no-break path (`add_group_no_break` emits only trailing block comments).
     let last_has_break_forcing_comments = last_is_simple_member
         && rest_groups.last().is_some_and(|g| {
-            if let Some((object_end, property_start)) = group_comment_gap(g, printer) {
+            group_comment_gap(g, printer).is_some_and(|(object_end, property_start)| {
                 let classified = printer.classify_comments(object_end, property_start);
-                // Any line comments or leading comments force a break
-                !classified.trailing_line.is_empty()
-                    || !classified.leading_block.is_empty()
-                    || !classified.leading_line.is_empty()
-            } else {
-                false
-            }
+                gap_has_break_forcing_comments(&classified)
+            })
         });
 
     let mut builder = ChainPartsBuilder::new(parts, printer, use_expanded, rest_groups.len());
