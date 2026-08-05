@@ -1460,10 +1460,11 @@ impl<'a> Printer<'a> {
                     } else {
                         param_start
                     };
-                    if self.is_next_line_empty(search_start, content_start) {
-                        inner_parts.push(d.literalline());
-                    }
-                    inner_parts.push(d.hardline());
+                    self.push_next_line_empty_hardline(
+                        &mut inner_parts,
+                        search_start,
+                        content_start,
+                    );
                 } else if flat_list {
                     inner_parts.push(d.text(" "));
                 } else {
@@ -1491,19 +1492,16 @@ impl<'a> Printer<'a> {
                 params[i + 1].span().start
             };
 
-            // Find comma position. For the last param, locate a source trailing
-            // comma (within the trailing range) so an after-comma block comment is
-            // preserved after the comma rather than relocated before it — bounded at
-            // that range, since a last param usually has NO comma and an unbounded
-            // scan would run to the next comma anywhere later in the file.
+            // Find this param's separator comma, bounded by `search_end` — the next param's
+            // start, or (last param) the end of its trailing range. The bound is what makes
+            // one arm serve both: a last param usually has NO comma, and an unbounded scan
+            // would run to the next comma anywhere later in the file and read it as this
+            // param's separator, relocating an after-comma block comment across it. Same
+            // hazard the element-comma collector names (`collect_trailing_comments`).
             // Consumed only by comment placement, so the zero-comment gate skips the scan.
-            let comma_pos = if !comments_present {
-                None
-            } else if is_last {
-                self.find_comma_in_range(param.span().end, search_end)
-            } else {
-                self.find_comma_after(param.span().end)
-            };
+            let comma_pos = comments_present
+                .then(|| self.find_comma_in_range(param.span().end, search_end))
+                .flatten();
 
             // Collect same-line comments
             let same_line_comments: CommentVec<'_> = if comments_present {

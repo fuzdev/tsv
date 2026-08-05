@@ -1085,17 +1085,22 @@ impl<'a> Printer<'a> {
             parts.push(d.concat(&brace_line_prefix));
             // Build member docs with comment handling
             let mut member_parts = DocBuf::new();
+            // Where the next member's LEADING scan resumes: the end of the previous
+            // member's trailing run, NOT past its comma. A comment the author wrote before
+            // a comma they pushed onto its own line (`A⏎// c1⏎, B`) is claimed by no
+            // trailing run — they take the member's own line only — so a scan starting
+            // past the comma left it with no emitter at all, a DROPPED comment. The run's
+            // claim is a prefix of the gap, so resuming at its end also can't re-print it.
             let mut prev_end = body_start;
 
             // Zero-comment fast gate: one binary search over the whole
             // enum-body span short-circuits every per-member comment sub-query
-            // (leading collect, format-ignore lookup, both trailing-comment
-            // scans, the trailing-end walk, and the trailing-body comments).
-            // Sound because comments are disjoint + start-sorted and every
-            // sub-range lies within `body_span`, so when none sit inside the
-            // body all sub-queries are provably empty/false. The comma scan
-            // stays — it feeds `prev_end` for blank-line preservation, not
-            // comment placement.
+            // (leading collect, format-ignore lookup, and the trailing-body
+            // comments). Sound because comments are disjoint + start-sorted and
+            // every sub-range lies within `body_span`, so when none sit inside
+            // the body all sub-queries are provably empty/false. The trailing run
+            // carries its own zero-comment gate (`collect_trailing_comments`), so
+            // it needs no arm here.
             let body_has_comments =
                 self.has_comments_to_emit_between(body_span.start, body_span.end);
 
@@ -1104,32 +1109,21 @@ impl<'a> Printer<'a> {
                 let is_first = i == 0;
                 let is_last = i == decl.members.len() - 1;
 
-                // Check for comments between previous position and this member.
-                // First member: drop comments pulled onto the `{` line (emitted
-                // as the brace-line prefix above).
+                // The rest of the gap since the previous member's trailing run — the
+                // element-comma partition (see `collect_item_leading_comments`).
                 let comments: CommentVec<'_> = if body_has_comments {
-                    comments_to_emit_in_range(self.comments, prev_end, member_start)
-                        .filter(|c| {
-                            if is_first {
-                                !delimiter_pull_pos
-                                    .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c))
-                            } else {
-                                !self.is_same_line(prev_end, c.span.start)
-                            }
-                        })
-                        .collect()
+                    self.collect_item_leading_comments(
+                        prev_end,
+                        member_start,
+                        is_first.then_some(delimiter_pull_pos).flatten(),
+                    )
                 } else {
                     CommentVec::new()
                 };
 
                 // Check for blank lines
                 if !is_first {
-                    let check_pos = if comments.is_empty() {
-                        member_start
-                    } else {
-                        comments[0].span.start
-                    };
-                    self.push_blank_preserving_hardline(&mut member_parts, prev_end, check_pos);
+                    self.push_item_blank_separator(&mut member_parts, prev_end, member_start);
                 }
 
                 // Process leading comments
@@ -1158,56 +1152,17 @@ impl<'a> Printer<'a> {
                     .get(i + 1)
                     .map_or(body_end, |next| next.span.start);
 
-                // Find comma to split: comments before comma = trailing, after = trailing-after-comma
-                // Enum members always have trailing commas, so comma must exist
-                let comma_pos = find_char_skipping_comments(
-                    self.source.as_bytes(),
-                    member_end as usize,
-                    upper_bound as usize,
-                    b',',
-                );
-
-                if let Some(cp) = comma_pos {
-                    let cp = cp as u32;
-                    // Trailing same-line comments before the comma (block comments
-                    // inline, line comments in line_suffix) — same dispatch as the
-                    // statement-list / class-member paths.
-                    if body_has_comments {
-                        member_parts
-                            .extend(self.build_trailing_same_line_comment_docs(member_end, cp));
-                    }
-
-                    // Separator comma between members; no trailing comma on the last
-                    // member under `trailingComma: 'none'`.
-                    if !is_last {
-                        member_parts.push(d.text(","));
-                    }
-
-                    // Same-line trailing comments after comma (line comments)
-                    // Update prev_end past trailing comments. With no comment in the
-                    // body, `find_end_with_trailing_comments(cp + 1) == cp + 1`.
-                    if body_has_comments {
-                        member_parts.extend(
-                            self.build_trailing_same_line_comment_docs(cp + 1, upper_bound),
-                        );
-                        prev_end = self.find_end_with_trailing_comments(cp + 1);
-                    } else {
-                        prev_end = cp + 1;
-                    }
-                } else {
-                    // Fallback: no comma found (shouldn't happen in valid enum)
-                    if !is_last {
-                        member_parts.push(d.text(","));
-                    }
-                    if body_has_comments {
-                        member_parts.extend(
-                            self.build_trailing_same_line_comment_docs(member_end, upper_bound),
-                        );
-                        prev_end = self.find_end_with_trailing_comments(member_end);
-                    } else {
-                        prev_end = member_end;
-                    }
-                }
+                // The trailing run around the separator, on the shared element-comma
+                // contract (`collect_trailing_comments` / `push_element_comma_trailing`) —
+                // the same one the object-literal, destructuring-pattern and specifier
+                // loops use. Blocks keep their side of the comma, line comments defer via
+                // `line_suffix`, and the claim is a prefix of the gap, so this member's
+                // run and the next member's leading scan partition it. No trailing comma
+                // on the last member under `trailingComma: 'none'`.
+                let trailing = self.collect_trailing_comments(member_end, upper_bound, is_last);
+                let comma = if is_last { d.empty() } else { d.text(",") };
+                self.push_element_comma_trailing(&mut member_parts, &trailing, comma);
+                prev_end = trailing.end_pos;
             }
 
             // Handle trailing comments after the last member

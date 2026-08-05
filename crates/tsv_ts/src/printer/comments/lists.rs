@@ -682,6 +682,30 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// A list item's **leading** run: the comments in `[gap_start, item_start)`, minus any
+    /// the opening delimiter pulled onto its own line ([`Self::first_member_leading_comments`]).
+    ///
+    /// ⚠️ `gap_start` is where the PREVIOUS item's **trailing run ended**
+    /// (`TrailingComments::end_pos`) — never a position past the separator. The two runs
+    /// partition one gap, so a scan that starts past the comma leaves the comments the
+    /// author wrote on the other side of it (`a: 1⏎// c⏎, b`) with no emitter at all; that
+    /// was a live DROP at four sites. The parameter is named for the cursor it wants.
+    /// See [docs/comments.md](../../../../../docs/comments.md) §The element-comma seam.
+    ///
+    /// `delimiter_pull` is `Some(pos)` **only for the first item** — a later item's gap can
+    /// still be on the delimiter's line (a one-line list), and dropping there would delete
+    /// a comment nothing else prints. Callers pass `if is_first { pull } else { None }`.
+    pub(in crate::printer) fn collect_item_leading_comments(
+        &self,
+        gap_start: u32,
+        item_start: u32,
+        delimiter_pull: Option<u32>,
+    ) -> CommentVec<'_> {
+        let comments: CommentVec<'_> =
+            comments_to_emit_in_range(self.comments, gap_start, item_start).collect();
+        self.first_member_leading_comments(comments, delimiter_pull)
+    }
+
     /// Build a line_suffix doc for all comments between two positions
     ///
     /// Used for trailing comments on call arguments, where comments should stay
