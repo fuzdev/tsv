@@ -1,0 +1,1071 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 601,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a block after the comma stays on the comma line, in front of the line comment the",
+			"start": 10,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " author wrote after it",
+			"start": 96,
+			"end": 120,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 143,
+			"end": 151,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 9
+				},
+				"end": {
+					"line": 5,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 152,
+			"end": 157,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 18
+				},
+				"end": {
+					"line": 5,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a run of blocks after the comma keeps its order",
+			"start": 172,
+			"end": 222,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 245,
+			"end": 253,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 9
+				},
+				"end": {
+					"line": 11,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 254,
+			"end": 262,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 18
+				},
+				"end": {
+					"line": 11,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 263,
+			"end": 268,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 27
+				},
+				"end": {
+					"line": 11,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " blocks on both sides of the comma each keep their side of it",
+			"start": 283,
+			"end": 346,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c0 ",
+			"start": 368,
+			"end": 376,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 8
+				},
+				"end": {
+					"line": 17,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 378,
+			"end": 386,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 18
+				},
+				"end": {
+					"line": 17,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 387,
+			"end": 392,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 27
+				},
+				"end": {
+					"line": 17,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a block with no line comment after it leads the next property instead - nothing",
+			"start": 407,
+			"end": 489,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " defers, so it keeps the side of the comma the author chose",
+			"start": 491,
+			"end": 552,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 1
+				},
+				"end": {
+					"line": 22,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 573,
+			"end": 581,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 20
+				},
+				"end": {
+					"line": 23,
+					"column": 28
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 600,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 591,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 24,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 122,
+					"end": 169,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 128,
+							"end": 168,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 128,
+								"end": 129,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 132,
+								"end": 168,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 11
+									},
+									"end": {
+										"line": 7,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 136,
+										"end": 141,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 2
+											},
+											"end": {
+												"line": 5,
+												"column": 7
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 136,
+											"end": 138,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 2
+												},
+												"end": {
+													"line": 5,
+													"column": 4
+												}
+											},
+											"name": "p1"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 140,
+											"end": 141,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 6
+												},
+												"end": {
+													"line": 5,
+													"column": 7
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 143,
+												"end": 151
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 160,
+										"end": 165,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 7
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 160,
+											"end": 162,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 2
+												},
+												"end": {
+													"line": 6,
+													"column": 4
+												}
+											},
+											"name": "p2"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 164,
+											"end": 165,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 6
+												},
+												"end": {
+													"line": 6,
+													"column": 7
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 152,
+												"end": 157
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block after the comma stays on the comma line, in front of the line comment the",
+							"start": 10,
+							"end": 94
+						},
+						{
+							"type": "Line",
+							"value": " author wrote after it",
+							"start": 96,
+							"end": 120
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 224,
+					"end": 280,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 230,
+							"end": 279,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 230,
+								"end": 231,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 234,
+								"end": 279,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 11
+									},
+									"end": {
+										"line": 13,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 238,
+										"end": 243,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 7
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 238,
+											"end": 240,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 2
+												},
+												"end": {
+													"line": 11,
+													"column": 4
+												}
+											},
+											"name": "p1"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 242,
+											"end": 243,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 6
+												},
+												"end": {
+													"line": 11,
+													"column": 7
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 245,
+												"end": 253
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 271,
+										"end": 276,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 7
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 271,
+											"end": 273,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 2
+												},
+												"end": {
+													"line": 12,
+													"column": 4
+												}
+											},
+											"name": "p2"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 275,
+											"end": 276,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 6
+												},
+												"end": {
+													"line": 12,
+													"column": 7
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c2 ",
+												"start": 254,
+												"end": 262
+											},
+											{
+												"type": "Line",
+												"value": " c3",
+												"start": 263,
+												"end": 268
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a run of blocks after the comma keeps its order",
+							"start": 172,
+							"end": 222
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 348,
+					"end": 404,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 354,
+							"end": 403,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 354,
+								"end": 355,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 358,
+								"end": 403,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 11
+									},
+									"end": {
+										"line": 19,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 362,
+										"end": 367,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 17,
+												"column": 7
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 362,
+											"end": 364,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 2
+												},
+												"end": {
+													"line": 17,
+													"column": 4
+												}
+											},
+											"name": "p1"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 366,
+											"end": 367,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 6
+												},
+												"end": {
+													"line": 17,
+													"column": 7
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c0 ",
+												"start": 368,
+												"end": 376
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 395,
+										"end": 400,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 7
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 395,
+											"end": 397,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 2
+												},
+												"end": {
+													"line": 18,
+													"column": 4
+												}
+											},
+											"name": "p2"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 399,
+											"end": 400,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 6
+												},
+												"end": {
+													"line": 18,
+													"column": 7
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 378,
+												"end": 386
+											},
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 387,
+												"end": 392
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " blocks on both sides of the comma each keep their side of it",
+							"start": 283,
+							"end": 346
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 554,
+					"end": 590,
+					"loc": {
+						"start": {
+							"line": 23,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 37
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 560,
+							"end": 589,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 7
+								},
+								"end": {
+									"line": 23,
+									"column": 36
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 560,
+								"end": 561,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 7
+									},
+									"end": {
+										"line": 23,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 564,
+								"end": 589,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 11
+									},
+									"end": {
+										"line": 23,
+										"column": 36
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 566,
+										"end": 571,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 13
+											},
+											"end": {
+												"line": 23,
+												"column": 18
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 566,
+											"end": 568,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 13
+												},
+												"end": {
+													"line": 23,
+													"column": 15
+												}
+											},
+											"name": "p1"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 570,
+											"end": 571,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 17
+												},
+												"end": {
+													"line": 23,
+													"column": 18
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 573,
+												"end": 581
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 582,
+										"end": 587,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 29
+											},
+											"end": {
+												"line": 23,
+												"column": 34
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 582,
+											"end": 584,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 29
+												},
+												"end": {
+													"line": 23,
+													"column": 31
+												}
+											},
+											"name": "p2"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 586,
+											"end": 587,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 33
+												},
+												"end": {
+													"line": 23,
+													"column": 34
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block with no line comment after it leads the next property instead - nothing",
+							"start": 407,
+							"end": 489
+						},
+						{
+							"type": "Line",
+							"value": " defers, so it keeps the side of the comma the author chose",
+							"start": 491,
+							"end": 552
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

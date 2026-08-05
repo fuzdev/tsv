@@ -14,7 +14,7 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 533
+# shapes: 522
 DROPPED	!)⟨⟩!.	annotation,block,jsdoc_cast
 DROPPED	&&⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
@@ -23,16 +23,13 @@ DROPPED	',,⟨⟩,'	annotation,block,jsdoc_cast
 DROPPED	',⟨⟩,'	annotation,block,jsdoc_cast
 DROPPED	',⟨⟩,,'	annotation,block,jsdoc_cast
 DROPPED	',⟨⟩,];	annotation,block,jsdoc_cast
-DROPPED	',⟨⟩//	annotation,block,jsdoc_cast
 DROPPED	',⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	']⟨⟩);	annotation,block,jsdoc_cast,multiline
 DROPPED	']⟨⟩/*	line
 DROPPED	']⟨⟩␣	annotation,block,jsdoc_cast,multiline
-DROPPED	'},⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	'⟨⟩));	annotation,block,jsdoc_cast,line,multiline
 DROPPED	'⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	'⟨⟩,	annotation,block,jsdoc_cast,line,multiline
-DROPPED	'⟨⟩,/*	line
 DROPPED	'⟨⟩/*	line,multiline
 DROPPED	'⟨⟩//	line,multiline
 DROPPED	'⟨⟩;	annotation,block,jsdoc_cast,line,multiline
@@ -82,7 +79,6 @@ DROPPED	)⟨⟩)	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)⟨⟩));	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)⟨⟩++;	annotation,block,jsdoc_cast
-DROPPED	)⟨⟩,	annotation,block,jsdoc_cast,line,multiline
 DROPPED	)⟨⟩=>	annotation,block,jsdoc_cast
 DROPPED	)⟨⟩=>(	annotation,block,jsdoc_cast
 DROPPED	)⟨⟩=>[	annotation,block,jsdoc_cast
@@ -90,10 +86,7 @@ DROPPED	)⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	*/(⟨⟩IDENT	line,multiline
 DROPPED	*/,⟨⟩,	annotation,block,jsdoc_cast
 DROPPED	*/,⟨⟩,,]	annotation,block,jsdoc_cast
-DROPPED	*/,⟨⟩//	annotation,block,jsdoc_cast
 DROPPED	*/,⟨⟩␣	annotation,block,jsdoc_cast
-DROPPED	*/⟨⟩,	annotation,block,jsdoc_cast,line,multiline
-DROPPED	*/⟨⟩,/*	line
 DROPPED	*/⟨⟩/*	line,multiline
 DROPPED	*/⟨⟩␣	line
 DROPPED	++⟨⟩);	annotation,block,jsdoc_cast,multiline
@@ -104,16 +97,12 @@ DROPPED	,[]⟨⟩);	annotation,block,jsdoc_cast,multiline
 DROPPED	,{}⟨⟩);	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩,	annotation,block,jsdoc_cast
 DROPPED	,⟨⟩,,	annotation,block,jsdoc_cast
-DROPPED	,⟨⟩/*	annotation,block,jsdoc_cast,line,multiline
-DROPPED	,⟨⟩//	annotation,block,jsdoc_cast
+DROPPED	,⟨⟩/*	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩>(	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩>()	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩>(/	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩>/*	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩IDENT	annotation,block,jsdoc_cast,multiline
-DROPPED	,⟨⟩]	annotation,block,jsdoc_cast,multiline
-DROPPED	,⟨⟩]);	multiline
-DROPPED	,⟨⟩];	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	.()⟨⟩)!(	annotation,block,jsdoc_cast,line,multiline
 DROPPED	.()⟨⟩)!`	annotation,block,jsdoc_cast,line,multiline
@@ -180,8 +169,7 @@ DROPPED	IDENT⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)=>	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩)>(	annotation,block,jsdoc_cast,line,multiline
 DROPPED	IDENT⟨⟩,	annotation,block,jsdoc_cast,line,multiline
-DROPPED	IDENT⟨⟩,/*	line,multiline
-DROPPED	IDENT⟨⟩,//	line
+DROPPED	IDENT⟨⟩,/*	multiline
 DROPPED	IDENT⟨⟩,>(	annotation,block,jsdoc_cast,multiline
 DROPPED	IDENT⟨⟩,>/	annotation,block,jsdoc_cast,multiline
 DROPPED	IDENT⟨⟩/*	line,multiline
@@ -202,7 +190,6 @@ DROPPED	IDENT⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	NUM⟨⟩))}	annotation,block,jsdoc_cast,line,multiline
 DROPPED	NUM⟨⟩),	annotation,block,jsdoc_cast,line,multiline
 DROPPED	NUM⟨⟩);	annotation,block,jsdoc_cast,multiline
-DROPPED	NUM⟨⟩/*	line,multiline
 DROPPED	[((⟨⟩IDENT	line
 DROPPED	[(⟨⟩(	line
 DROPPED	[(⟨⟩/*	line
@@ -220,7 +207,6 @@ DROPPED	[⟨⟩NUM	line
 DROPPED	[⟨⟩{	annotation,block,jsdoc_cast,multiline
 DROPPED	[⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	])⟨⟩␣	annotation,block,jsdoc_cast
-DROPPED	],⟨⟩␣	multiline
 DROPPED	]:⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	]⟨⟩)	annotation,block,jsdoc_cast,line,multiline
 DROPPED	]⟨⟩);	annotation,block,jsdoc_cast,multiline
@@ -237,7 +223,6 @@ DROPPED	case⟨⟩'	line
 DROPPED	case⟨⟩␣	line
 DROPPED	class⟨⟩<	annotation,block,jsdoc_cast,line,multiline
 DROPPED	class⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
-DROPPED	const⟨⟩,	line
 DROPPED	function⟨⟩*	annotation,block,jsdoc_cast,line,multiline
 DROPPED	function⟨⟩*/*	annotation,block,jsdoc_cast,line,multiline
 DROPPED	function⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
@@ -305,14 +290,13 @@ DROPPED	␣⟨⟩)	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩)!`	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩)!}	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩)(	annotation,block,jsdoc_cast,multiline
-DROPPED	␣⟨⟩),	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩).	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩);/	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩)}	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩)}'	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩)}`	annotation,block,jsdoc_cast,multiline
-DROPPED	␣⟨⟩,	annotation,block,jsdoc_cast,line,multiline
+DROPPED	␣⟨⟩,	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩,'	annotation,block,jsdoc_cast
 DROPPED	␣⟨⟩,/*	annotation,block,jsdoc_cast
 DROPPED	␣⟨⟩,];	annotation,block,jsdoc_cast
@@ -332,7 +316,6 @@ DROPPED	␣⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩NUM	line
 DROPPED	␣⟨⟩[	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩[/*	annotation,block,jsdoc_cast,multiline
-DROPPED	␣⟨⟩]	multiline
 DROPPED	␣⟨⟩as	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩{	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩{}	annotation,block,jsdoc_cast,line,multiline
@@ -341,8 +324,6 @@ DROPPED	␣⟨⟩}	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩}`	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩}`;	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
-DOUBLE-PRINTED	',⟨⟩/*	line
-DOUBLE-PRINTED	',⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	'}⟨⟩/*	line
 DOUBLE-PRINTED	'}⟨⟩;	line
 DOUBLE-PRINTED	(@⟨⟩/*	line
@@ -355,14 +336,10 @@ DOUBLE-PRINTED	(⟨⟩NUM	line
 DOUBLE-PRINTED	).⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	)⟨⟩.	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	)⟨⟩␣	line
-DOUBLE-PRINTED	*/,⟨⟩/*	line,multiline
-DOUBLE-PRINTED	*/,⟨⟩IDENT	annotation,block,jsdoc_cast,multiline
-DOUBLE-PRINTED	*/,⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	*/}⟨⟩;	line
+DOUBLE-PRINTED	*/⟨⟩),	line
 DOUBLE-PRINTED	*/⟨⟩;	line
 DOUBLE-PRINTED	*/⟨⟩␣	line
-DOUBLE-PRINTED	,⟨⟩/*	line,multiline
-DOUBLE-PRINTED	,⟨⟩//	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	,⟨⟩IDENT	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	,⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	...⟨⟩IDENT	line
@@ -397,7 +374,7 @@ DOUBLE-PRINTED	}⟨⟩␣	line
 DOUBLE-PRINTED	␣⟨⟩(	jsdoc_cast
 DOUBLE-PRINTED	␣⟨⟩(<	jsdoc_cast
 DOUBLE-PRINTED	␣⟨⟩/*	annotation,block,jsdoc_cast,line,multiline
-DOUBLE-PRINTED	␣⟨⟩//	annotation,block,jsdoc_cast,line,multiline
+DOUBLE-PRINTED	␣⟨⟩//	annotation,block,jsdoc_cast,multiline
 DOUBLE-PRINTED	␣⟨⟩;	line
 DOUBLE-PRINTED	␣⟨⟩@	line
 DOUBLE-PRINTED	␣⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
@@ -488,8 +465,6 @@ SWALLOW	IDENT⟨⟩;//	line
 SWALLOW	IDENT⟨⟩?(/	line
 SWALLOW	IDENT⟨⟩{	line
 SWALLOW	IDENT⟨⟩␣	line
-SWALLOW	NUM⟨⟩,	line
-SWALLOW	NUM⟨⟩,//	line
 SWALLOW	NUM⟨⟩;	line
 SWALLOW	`,⟨⟩␣	line
 SWALLOW	`⟨⟩);	line
