@@ -5,7 +5,7 @@
 // - Type parameter instantiation (type arguments): `<T, U>`
 
 use super::helpers::is_simple_type_arg;
-use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer};
+use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, TrailingBlock};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
 use crate::printer::layout::{bracketed_list_body, fluid_after_operator};
 use smallvec::smallvec;
@@ -509,8 +509,9 @@ impl<'a> Printer<'a> {
                 // single-line block comment (own-line, trailing, or glued) collapses inline
                 // and keeps `<…>` collapsed (the fall-through below). Type position: a
                 // trailing block lifted from a stripped shell trails the value inline
-                // before the `,`/`>` (`defer = false`).
-                let value_doc = self.build_hang_value_doc(head.child, value_type, false);
+                // before the `,`/`>`.
+                let value_doc =
+                    self.build_hang_value_doc(head.child, value_type, TrailingBlock::Inline);
                 self.append_keyword_value_line_comments(
                     parts,
                     keyword_end,

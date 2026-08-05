@@ -39,8 +39,10 @@ above the member).
 -conditional, or plain paren-intersection member keeps the comment inside too.
 Prettier instead trails the comment on the *previous* member (`| A // c`) and keeps
 the member inline (`| (() => B)`). Because tsv keeps the comment inside, the line
-comment forces the paren group open, so a conditional breaks its branches and an
-intersection its members — an expansion prettier's hoist avoids. Whether the paren
+comment forces the paren group open — but only the paren: the conditional or
+intersection inside stays inline when it fits, the same as the union arms above
+(the comment's own line is supplied by the paren, so breaking the inner type too
+would be a break its reparse has no cause to reproduce). Whether the paren
 is *retained* is decided exactly as it is comment-free; only a **redundant** paren
 (stripped) can't host the comment, and there it leads the member on its own line
 instead — see

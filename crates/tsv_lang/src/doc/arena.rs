@@ -188,6 +188,25 @@ pub enum DocNode {
 
     /// Force parent group to break
     BreakParent,
+
+    /// Flush-scoped break: force only the nearest enclosing group that can
+    /// actually END THE LINE after this point — the group a deferred
+    /// [`LineSuffix`](DocNode::LineSuffix) run flushes in.
+    ///
+    /// Emitted right after a deferred trailing comment whose construct is
+    /// stripped from the output (a redundant paren shell): the comment must
+    /// meet a line end, but [`BreakParent`](DocNode::BreakParent) would force
+    /// *every* enclosing group — including intermediate groups with no line
+    /// opportunity after the suffix, whose break the reparse cannot reproduce
+    /// (the comment lands past their closer), a format∘format ≠ format class.
+    ///
+    /// Semantics live in `arena_fits`: walking this node sets a pending-flush
+    /// state under which a *flat* breakable line — a `Line(Normal|Soft)` or an
+    /// `IfBreak` whose break arm can break — does not fit, so the group owning
+    /// the next line opportunity breaks and the flush lands there, while a
+    /// group with no line after the suffix stays flat. Invisible to
+    /// `will_break` (it forces no particular group) and a no-op at render.
+    FlushBreak,
 }
 
 // `DocNode` must stay free of drop glue: dynamically-built text lives in the
@@ -682,7 +701,7 @@ pub struct DocArena {
     /// The current document's format generation, keying the validity of the
     /// interned node halves in `static_cache` and the singleton cells
     /// (`empty_node`, `line_nodes`, `line_suffix_boundary_node`,
-    /// `break_parent_node`). Starts
+    /// `break_parent_node`, `flush_break_node`). Starts
     /// at 1 (0 marks a never-stamped slot) and is bumped by `reset()`, so a
     /// prior document's `node_id`s — invalidated by the reset — can never be
     /// returned for the new document.
@@ -709,6 +728,10 @@ pub struct DocArena {
     /// (generation, id) — stateless like `Line`, same dedicated-cell
     /// interning. Valid iff the generation matches `format_gen`.
     break_parent_node: Cell<(u32, DocId)>,
+    /// The interned [`DocNode::FlushBreak`] node for the current document
+    /// (generation, id) — stateless like `Line`, same dedicated-cell
+    /// interning. Valid iff the generation matches `format_gen`.
+    flush_break_node: Cell<(u32, DocId)>,
     /// Diagnostic side-set: indices of text nodes that are line comments,
     /// recorded by `line_comment_text_pooled` only while the swallow check is
     /// enabled (empty and untouched otherwise). Appended in `alloc` order, so
@@ -812,6 +835,7 @@ impl DocArena {
             line_nodes: [const { Cell::new((0, DocId(0))) }; 4],
             line_suffix_boundary_node: Cell::new((0, DocId(0))),
             break_parent_node: Cell::new((0, DocId(0))),
+            flush_break_node: Cell::new((0, DocId(0))),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -866,6 +890,7 @@ impl DocArena {
             line_nodes: [const { Cell::new((0, DocId(0))) }; 4],
             line_suffix_boundary_node: Cell::new((0, DocId(0))),
             break_parent_node: Cell::new((0, DocId(0))),
+            flush_break_node: Cell::new((0, DocId(0))),
             #[cfg(feature = "swallow_check")]
             line_comment_ids: RefCell::new(Vec::new()),
             #[cfg(feature = "comment_check")]
@@ -919,6 +944,7 @@ impl DocArena {
             }
             self.line_suffix_boundary_node.set((0, DocId(0)));
             self.break_parent_node.set((0, DocId(0)));
+            self.flush_break_node.set((0, DocId(0)));
             self.format_gen.set(1);
         } else {
             self.format_gen.set(next);
@@ -1512,7 +1538,7 @@ impl DocArena {
     ///
     /// The shared engine behind the singleton builders — [`Self::empty`],
     /// [`Self::line`] and its kind siblings, [`Self::line_suffix_boundary`],
-    /// and [`Self::break_parent`]: each is a node with no per-use state, so
+    /// [`Self::break_parent`], and [`Self::flush_break`]: each is a node with no per-use state, so
     /// one node per document serves every call site. Hot path: one cell load
     /// plus a generation compare — no hash, cheaper than even the static
     /// cache's slot probe. `reset()` invalidates every cell in O(1) via the
@@ -1768,6 +1794,17 @@ impl DocArena {
         self.interned_singleton(&self.break_parent_node, || DocNode::BreakParent)
     }
 
+    /// Flush-scoped break for a deferred trailing run ([`DocNode::FlushBreak`]):
+    /// force only the nearest enclosing group with a line opportunity AFTER this
+    /// point — where the pending [`Self::line_suffix`] actually flushes — leaving
+    /// groups that close before it free to stay flat. Emit it right after the
+    /// `line_suffix` it scopes. Interned per document (stateless, like
+    /// [`Self::break_parent`]).
+    #[inline]
+    pub fn flush_break(&self) -> DocId {
+        self.interned_singleton(&self.flush_break_node, || DocNode::FlushBreak)
+    }
+
     //
     // Convenience builders
     //
@@ -1935,6 +1972,10 @@ impl DocArena {
             DocNode::LineSuffix(_) => false,
             DocNode::LineSuffixBoundary => false,
             DocNode::BreakParent => true,
+            // Forces only the group its deferred run flushes in — decided by the
+            // fits walk's pending-flush state, not by this subtree query, so a
+            // containing group is NOT unconditionally broken.
+            DocNode::FlushBreak => false,
         };
         cache[id.index()] = Some(result);
         result
@@ -1975,6 +2016,7 @@ impl DocArena {
             DocNode::LineSuffix(_) => false,
             DocNode::LineSuffixBoundary => false,
             DocNode::BreakParent => true,
+            DocNode::FlushBreak => false,
         }
     }
 
@@ -1988,29 +2030,40 @@ impl DocArena {
     /// instead of inside the assignment target.
     pub fn can_break(&self, id: DocId) -> bool {
         let nodes = self.nodes.borrow();
-        self.can_break_inner(id, &nodes)
+        let children = self.children.borrow();
+        Self::can_break_inner(id, &nodes, &children)
     }
 
-    fn can_break_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
+    /// The slice-threaded body of [`Self::can_break`] — `pub(super)` so the
+    /// `arena_fits` walk's pending-flush veto asks it through the slices the
+    /// walk already holds instead of re-borrowing per call (the threading
+    /// idiom of `will_break_fill` / `flat_width_fill`).
+    pub(super) fn can_break_inner(id: DocId, nodes: &[DocNode], children: &[DocId]) -> bool {
         match &nodes[id.index()] {
             DocNode::Line(_) => true,
-            DocNode::Indent(inner) | DocNode::Dedent(inner) => self.can_break_inner(*inner, nodes),
-            DocNode::AlignRoot { contents, .. } | DocNode::Align { contents, .. } => {
-                self.can_break_inner(*contents, nodes)
+            DocNode::Indent(inner) | DocNode::Dedent(inner) => {
+                Self::can_break_inner(*inner, nodes, children)
             }
-            DocNode::IndentIfBreak { contents, .. } => self.can_break_inner(*contents, nodes),
+            DocNode::AlignRoot { contents, .. } | DocNode::Align { contents, .. } => {
+                Self::can_break_inner(*contents, nodes, children)
+            }
+            DocNode::IndentIfBreak { contents, .. } => {
+                Self::can_break_inner(*contents, nodes, children)
+            }
             DocNode::Group {
                 contents,
                 expanded_states,
                 ..
             } => {
-                if self.can_break_inner(*contents, nodes) {
+                if Self::can_break_inner(*contents, nodes, children) {
                     return true;
                 }
                 if !expanded_states.is_empty() {
-                    let children = self.children.borrow();
-                    let kids = expanded_states.resolve(&children);
-                    if kids.iter().any(|&kid| self.can_break_inner(kid, nodes)) {
+                    let kids = expanded_states.resolve(children);
+                    if kids
+                        .iter()
+                        .any(|&kid| Self::can_break_inner(kid, nodes, children))
+                    {
                         return true;
                     }
                 }
@@ -2020,20 +2073,26 @@ impl DocArena {
                 break_doc,
                 flat_doc,
                 ..
-            } => self.can_break_inner(*break_doc, nodes) || self.can_break_inner(*flat_doc, nodes),
-            DocNode::Concat(range) | DocNode::Fill(range) => {
-                let children = self.children.borrow();
-                let kids = range.resolve(&children);
-                kids.iter().any(|&kid| self.can_break_inner(kid, nodes))
+            } => {
+                Self::can_break_inner(*break_doc, nodes, children)
+                    || Self::can_break_inner(*flat_doc, nodes, children)
             }
-            DocNode::WithContext { doc, .. } => self.can_break_inner(*doc, nodes),
-            DocNode::LineSuffix(inner) => self.can_break_inner(*inner, nodes),
+            DocNode::Concat(range) | DocNode::Fill(range) => {
+                let kids = range.resolve(children);
+                kids.iter()
+                    .any(|&kid| Self::can_break_inner(kid, nodes, children))
+            }
+            DocNode::WithContext { doc, .. } => Self::can_break_inner(*doc, nodes, children),
+            DocNode::LineSuffix(inner) => Self::can_break_inner(*inner, nodes, children),
             DocNode::MultilineText { .. } => true,
             // deliberately newline-blind, unlike `will_break_fill`: canBreak asks
             // "is there a breakable `line` in here?", and a Text's embedded newline
             // (line-continuation string, verbatim slice) is content, not a break point
             DocNode::Text(_) | DocNode::LineSuffixBoundary => false,
             DocNode::BreakParent => true,
+            // No line of its own; whether a line follows is positional, which a
+            // subtree query cannot see.
+            DocNode::FlushBreak => false,
         }
     }
 
@@ -2168,7 +2227,9 @@ impl DocArena {
                 }
                 DocNode::WithContext { doc, context } => Info::WithContext(*doc, context.clone()),
                 DocNode::LineSuffix(inner) => Info::LineSuffix(*inner),
-                DocNode::BreakParent => Info::BreakParent,
+                // Both are pure layout-forcing markers with no content: flattening
+                // drops them the same way (`Info::BreakParent` → `empty()`).
+                DocNode::BreakParent | DocNode::FlushBreak => Info::BreakParent,
             }
         }; // nodes borrow dropped here
 

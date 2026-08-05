@@ -1063,8 +1063,8 @@ fn render_doc_core<P: RenderPolicy>(
                 }
             }
 
-            DocNode::BreakParent => {
-                // No-op during rendering
+            DocNode::BreakParent | DocNode::FlushBreak => {
+                // No-op during rendering (both act only on fits decisions)
             }
         }
 

@@ -371,6 +371,10 @@ impl<'a> Printer<'a> {
 
         let mut inner_parts: DocBuf = smallvec![d.indent(d.concat(&indented)), d.softline()];
         if needs_break {
+            // Unscoped, deliberately: this shell is RETAINED (`d.parens` below), so its
+            // doc regenerates identically on the reparse and the force is reproducible —
+            // `flush_break` is only for stripped shells
+            // (`build_parenthesized_type_unwrap_doc`'s trailing arm).
             inner_parts.push(d.break_parent());
         }
         let inner = d.group(d.concat(&inner_parts));
@@ -479,7 +483,9 @@ impl<'a> Printer<'a> {
         // because it shares that column: every line this shell drops below its `(` sits
         // under it, and a run emitted outside the align lands an align-step LEFT of the
         // `)` it precedes — the un-fused closer's lesson, re-asked for the comments that
-        // now travel with it.
+        // now travel with it. The `hardline` is an unscoped force, deliberately: this
+        // shell is RETAINED, so its doc regenerates identically on the reparse —
+        // `flush_break` is only for stripped shells.
         let mut tail: DocBuf = DocBuf::new();
         let broke = paren.is_some_and(|p| {
             self.push_trailing_comments_in_range(&mut tail, trailing_obj.span.end, p.span.end - 1)
@@ -943,19 +949,17 @@ impl<'a> Printer<'a> {
                 let inner = self.build_type_doc_for_type_arg(p.type_annotation);
                 let inner_start = p.type_annotation.span().start;
                 let inner_end = p.type_annotation.span().end;
-                let has_leading = self.has_comments_to_emit_between(p.span.start + 1, inner_start);
-                let has_trailing = self.has_comments_to_emit_between(inner_end, p.span.end - 1);
+                let (has_leading, has_trailing) = self.paren_inner_comment_flags(p);
                 if !has_leading && !has_trailing {
                     return inner;
                 }
                 let leading: CommentVec<'_> = if has_leading {
-                    comments_to_emit_in_range(self.comments, p.span.start + 1, inner_start)
-                        .collect()
+                    comments_to_emit_in_range(self.comments, p.span.start, inner_start).collect()
                 } else {
                     smallvec![]
                 };
                 let trailing: CommentVec<'_> = if has_trailing {
-                    comments_to_emit_in_range(self.comments, inner_end, p.span.end - 1).collect()
+                    comments_to_emit_in_range(self.comments, inner_end, p.span.end).collect()
                 } else {
                     smallvec![]
                 };
@@ -964,6 +968,11 @@ impl<'a> Printer<'a> {
                 // forward `fits()` scan — otherwise it poisons that scan and needlessly
                 // expands an inner union (`Foo<(a | b // c)>` keeps `a | b` inline,
                 // matching prettier, rather than `| a | b`).
+                // TODO: the trailing half pairs a deferred run with this unscoped
+                // `break_parent` where `build_parenthesized_type_unwrap_doc`'s strip arm
+                // now scopes it via `flush_break`; likely reproducible here — the reparse
+                // re-forces the list from the type-argument list's own trailing gap — but
+                // unevaluated.
                 let needs_break = leading
                     .iter()
                     .chain(&trailing)

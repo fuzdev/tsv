@@ -874,6 +874,12 @@ bracketed type region does this (`{}`, `<>`, tuple `[]`, function-type `()`, ind
 sanctioned exception is a union / intersection member a `|`/`&` separator still **follows**,
 whose per-member break ends the line where the shell ends
 (`Printer::type_member_separator_follows`); the last member has no separator and retains.
+The break that sanctioned strip forces is **flush-scoped** (`DocArena::flush_break`, not
+`break_parent`): only the group the deferred run actually flushes in breaks — an
+intermediate composite with no line after the suffix stays flat, since forcing it was a
+break the reparse could not reproduce. Unscoped `break_parent` after a deferred suffix
+stays correct only where the comment's construct is *retained* (its doc regenerates
+identically each pass); a strip changes the reparse geometry and needs the scoped node.
 
 ⚠️ **A deferred run's FLUSH must end the line, so a `lineSuffixBoundary` belongs only where
 nothing else does.** The renderer drains the buffer at a break-mode `line` or at a boundary,

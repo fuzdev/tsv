@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 299,
+	"end": 698,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,120 @@
 					"column": 14
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " the same union-fit layout in an INTERSECTION member's retained parens - the",
+			"start": 291,
+			"end": 369,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment trails the last inner member and the inner union re-fits inline",
+			"start": 371,
+			"end": 445,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 474,
+			"end": 478,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 9
+				},
+				"end": {
+					"line": 21,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " control: a comment BETWEEN inner members forces the one-member-per-line",
+			"start": 492,
+			"end": 566,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " layout in both formatters - only the trailing position re-collapses",
+			"start": 568,
+			"end": 638,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 665,
+			"end": 669,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 7
+				},
+				"end": {
+					"line": 29,
+					"column": 11
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 298,
+		"end": 697,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 289,
+			"end": 688,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 16,
+					"line": 33,
 					"column": 9
 				}
 			},
@@ -501,6 +597,458 @@
 							"value": " trailing line comment inside a retained parenthesized union member (middle member)",
 							"start": 152,
 							"end": 237
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 447,
+					"end": 489,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 452,
+						"end": 454,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 6
+							},
+							"end": {
+								"line": 19,
+								"column": 8
+							}
+						},
+						"name": "A3"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 457,
+						"end": 488,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 11
+							},
+							"end": {
+								"line": 23,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 457,
+								"end": 458,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 11
+									},
+									"end": {
+										"line": 19,
+										"column": 12
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 457,
+									"end": 458,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 11
+										},
+										"end": {
+											"line": 19,
+											"column": 12
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 463,
+								"end": 482,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 3
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnionType",
+									"start": 468,
+									"end": 473,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 3
+										},
+										"end": {
+											"line": 21,
+											"column": 8
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 468,
+											"end": 469,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 3
+												},
+												"end": {
+													"line": 21,
+													"column": 4
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 468,
+												"end": 469,
+												"loc": {
+													"start": {
+														"line": 21,
+														"column": 3
+													},
+													"end": {
+														"line": 21,
+														"column": 4
+													}
+												},
+												"name": "b"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 472,
+											"end": 473,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 7
+												},
+												"end": {
+													"line": 21,
+													"column": 8
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 472,
+												"end": 473,
+												"loc": {
+													"start": {
+														"line": 21,
+														"column": 7
+													},
+													"end": {
+														"line": 21,
+														"column": 8
+													}
+												},
+												"name": "c"
+											}
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 474,
+											"end": 478
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 487,
+								"end": 488,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 487,
+									"end": 488,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 23,
+											"column": 3
+										}
+									},
+									"name": "d"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same union-fit layout in an INTERSECTION member's retained parens - the",
+							"start": 291,
+							"end": 369
+						},
+						{
+							"type": "Line",
+							"value": " comment trails the last inner member and the inner union re-fits inline",
+							"start": 371,
+							"end": 445
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 640,
+					"end": 687,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 645,
+						"end": 647,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 6
+							},
+							"end": {
+								"line": 27,
+								"column": 8
+							}
+						},
+						"name": "A4"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 650,
+						"end": 686,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 11
+							},
+							"end": {
+								"line": 32,
+								"column": 3
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 650,
+								"end": 651,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 11
+									},
+									"end": {
+										"line": 27,
+										"column": 12
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 650,
+									"end": 651,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 11
+										},
+										"end": {
+											"line": 27,
+											"column": 12
+										}
+									},
+									"name": "a"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 656,
+								"end": 680,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 31,
+										"column": 3
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSUnionType",
+									"start": 661,
+									"end": 676,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 3
+										},
+										"end": {
+											"line": 30,
+											"column": 6
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 663,
+											"end": 664,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 5
+												},
+												"end": {
+													"line": 29,
+													"column": 6
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 663,
+												"end": 664,
+												"loc": {
+													"start": {
+														"line": 29,
+														"column": 5
+													},
+													"end": {
+														"line": 29,
+														"column": 6
+													}
+												},
+												"name": "b"
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " c",
+													"start": 665,
+													"end": 669
+												}
+											]
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 675,
+											"end": 676,
+											"loc": {
+												"start": {
+													"line": 30,
+													"column": 5
+												},
+												"end": {
+													"line": 30,
+													"column": 6
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 675,
+												"end": 676,
+												"loc": {
+													"start": {
+														"line": 30,
+														"column": 5
+													},
+													"end": {
+														"line": 30,
+														"column": 6
+													}
+												},
+												"name": "c"
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 685,
+								"end": 686,
+								"loc": {
+									"start": {
+										"line": 32,
+										"column": 2
+									},
+									"end": {
+										"line": 32,
+										"column": 3
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 685,
+									"end": 686,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 2
+										},
+										"end": {
+											"line": 32,
+											"column": 3
+										}
+									},
+									"name": "d"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " control: a comment BETWEEN inner members forces the one-member-per-line",
+							"start": 492,
+							"end": 566
+						},
+						{
+							"type": "Line",
+							"value": " layout in both formatters - only the trailing position re-collapses",
+							"start": 568,
+							"end": 638
 						}
 					]
 				}

@@ -6,7 +6,7 @@
 // - Return type annotations
 
 use super::helpers::type_args_should_wrap_for_return_type;
-use super::{CommentSpacing, Printer};
+use super::{CommentSpacing, Printer, TrailingBlock};
 use crate::ast::internal::{self, TSType};
 use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
@@ -95,8 +95,9 @@ impl<'a> Printer<'a> {
             // (`a: /* c */ X`) rather than hanging — a deliberate, cataloged choice
             // (annotation_leading_block_prettier_divergence).
             // Type position: a trailing block lifted from the shell trails the type
-            // inline before the terminator (`defer = false`).
-            let type_doc = self.build_hang_value_doc(annotation.type_annotation, ty, false);
+            // inline before the terminator.
+            let type_doc =
+                self.build_hang_value_doc(annotation.type_annotation, ty, TrailingBlock::Inline);
             d.concat(&[
                 d.text(":"),
                 self.build_continuation_indent(colon_end, type_start, type_doc),
@@ -171,7 +172,7 @@ impl<'a> Printer<'a> {
             let inner_doc = self.build_routed_child_doc(inner);
             (
                 inner.span().start,
-                self.with_stripped_paren_trailing(inner_doc, child, inner, false),
+                self.with_stripped_paren_trailing(inner_doc, child, inner, TrailingBlock::Inline),
             )
         } else {
             (child.span().start, self.build_type_doc(child))

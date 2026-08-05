@@ -1,0 +1,877 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 425,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " the shell ends an intersection inside a union member: the comment trails",
+			"start": 20,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the whole member and the intersection prints flat",
+			"start": 97,
+			"end": 149,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 173,
+			"end": 178,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 12
+				},
+				"end": {
+					"line": 5,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " same through a redundant outer paren layer around the intersection",
+			"start": 188,
+			"end": 257,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 287,
+			"end": 292,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 12
+				},
+				"end": {
+					"line": 11,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " two composites deep: every intermediate composite prints flat",
+			"start": 302,
+			"end": 366,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 65
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 402,
+			"end": 407,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 18
+				},
+				"end": {
+					"line": 17,
+					"column": 23
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 424,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 415,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 151,
+					"end": 185,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 156,
+						"end": 158,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 6
+							},
+							"end": {
+								"line": 4,
+								"column": 8
+							}
+						},
+						"name": "A1"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 163,
+						"end": 184,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 2
+							},
+							"end": {
+								"line": 6,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSParenthesizedType",
+								"start": 165,
+								"end": 172,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 4
+									},
+									"end": {
+										"line": 5,
+										"column": 11
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSIntersectionType",
+									"start": 166,
+									"end": 171,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 5
+										},
+										"end": {
+											"line": 5,
+											"column": 10
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 166,
+											"end": 167,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 5
+												},
+												"end": {
+													"line": 5,
+													"column": 6
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 166,
+												"end": 167,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 5
+													},
+													"end": {
+														"line": 5,
+														"column": 6
+													}
+												},
+												"name": "B"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 170,
+											"end": 171,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 9
+												},
+												"end": {
+													"line": 5,
+													"column": 10
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 170,
+												"end": 171,
+												"loc": {
+													"start": {
+														"line": 5,
+														"column": 9
+													},
+													"end": {
+														"line": 5,
+														"column": 10
+													}
+												},
+												"name": "A"
+											}
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c1",
+											"start": 173,
+											"end": 178
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 183,
+								"end": 184,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 4
+									},
+									"end": {
+										"line": 6,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 183,
+									"end": 184,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 4
+										},
+										"end": {
+											"line": 6,
+											"column": 5
+										}
+									},
+									"name": "C"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the shell ends an intersection inside a union member: the comment trails",
+							"start": 20,
+							"end": 95
+						},
+						{
+							"type": "Line",
+							"value": " the whole member and the intersection prints flat",
+							"start": 97,
+							"end": 149
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 259,
+					"end": 299,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 264,
+						"end": 266,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 8
+							}
+						},
+						"name": "A2"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 271,
+						"end": 298,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 2
+							},
+							"end": {
+								"line": 12,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 273,
+								"end": 274,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 4
+									},
+									"end": {
+										"line": 10,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 273,
+									"end": 274,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 4
+										},
+										"end": {
+											"line": 10,
+											"column": 5
+										}
+									},
+									"name": "A"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 279,
+								"end": 286,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 4
+									},
+									"end": {
+										"line": 11,
+										"column": 11
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSIntersectionType",
+									"start": 280,
+									"end": 285,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 5
+										},
+										"end": {
+											"line": 11,
+											"column": 10
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 280,
+											"end": 281,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 5
+												},
+												"end": {
+													"line": 11,
+													"column": 6
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 280,
+												"end": 281,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 5
+													},
+													"end": {
+														"line": 11,
+														"column": 6
+													}
+												},
+												"name": "B"
+											}
+										},
+										{
+											"type": "TSTypeReference",
+											"start": 284,
+											"end": 285,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 9
+												},
+												"end": {
+													"line": 11,
+													"column": 10
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 284,
+												"end": 285,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 9
+													},
+													"end": {
+														"line": 11,
+														"column": 10
+													}
+												},
+												"name": "C"
+											}
+										}
+									],
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c2",
+											"start": 287,
+											"end": 292
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 297,
+								"end": 298,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 4
+									},
+									"end": {
+										"line": 12,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 297,
+									"end": 298,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 4
+										},
+										"end": {
+											"line": 12,
+											"column": 5
+										}
+									},
+									"name": "D"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " same through a redundant outer paren layer around the intersection",
+							"start": 188,
+							"end": 257
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 368,
+					"end": 414,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 6
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 373,
+						"end": 375,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 6
+							},
+							"end": {
+								"line": 15,
+								"column": 8
+							}
+						},
+						"name": "A3"
+					},
+					"typeAnnotation": {
+						"type": "TSUnionType",
+						"start": 380,
+						"end": 413,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 2
+							},
+							"end": {
+								"line": 18,
+								"column": 5
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 382,
+								"end": 383,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 4
+									},
+									"end": {
+										"line": 16,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 382,
+									"end": 383,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 4
+										},
+										"end": {
+											"line": 16,
+											"column": 5
+										}
+									},
+									"name": "A"
+								}
+							},
+							{
+								"type": "TSParenthesizedType",
+								"start": 388,
+								"end": 401,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 4
+									},
+									"end": {
+										"line": 17,
+										"column": 17
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSIntersectionType",
+									"start": 389,
+									"end": 400,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 5
+										},
+										"end": {
+											"line": 17,
+											"column": 16
+										}
+									},
+									"types": [
+										{
+											"type": "TSTypeReference",
+											"start": 389,
+											"end": 390,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 5
+												},
+												"end": {
+													"line": 17,
+													"column": 6
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 389,
+												"end": 390,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 5
+													},
+													"end": {
+														"line": 17,
+														"column": 6
+													}
+												},
+												"name": "B"
+											}
+										},
+										{
+											"type": "TSParenthesizedType",
+											"start": 393,
+											"end": 400,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 9
+												},
+												"end": {
+													"line": 17,
+													"column": 16
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSIntersectionType",
+												"start": 394,
+												"end": 399,
+												"loc": {
+													"start": {
+														"line": 17,
+														"column": 10
+													},
+													"end": {
+														"line": 17,
+														"column": 15
+													}
+												},
+												"types": [
+													{
+														"type": "TSTypeReference",
+														"start": 394,
+														"end": 395,
+														"loc": {
+															"start": {
+																"line": 17,
+																"column": 10
+															},
+															"end": {
+																"line": 17,
+																"column": 11
+															}
+														},
+														"typeName": {
+															"type": "Identifier",
+															"start": 394,
+															"end": 395,
+															"loc": {
+																"start": {
+																	"line": 17,
+																	"column": 10
+																},
+																"end": {
+																	"line": 17,
+																	"column": 11
+																}
+															},
+															"name": "C"
+														}
+													},
+													{
+														"type": "TSTypeReference",
+														"start": 398,
+														"end": 399,
+														"loc": {
+															"start": {
+																"line": 17,
+																"column": 14
+															},
+															"end": {
+																"line": 17,
+																"column": 15
+															}
+														},
+														"typeName": {
+															"type": "Identifier",
+															"start": 398,
+															"end": 399,
+															"loc": {
+																"start": {
+																	"line": 17,
+																	"column": 14
+																},
+																"end": {
+																	"line": 17,
+																	"column": 15
+																}
+															},
+															"name": "D"
+														}
+													}
+												],
+												"trailingComments": [
+													{
+														"type": "Line",
+														"value": " c3",
+														"start": 402,
+														"end": 407
+													}
+												]
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 412,
+								"end": 413,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 4
+									},
+									"end": {
+										"line": 18,
+										"column": 5
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 412,
+									"end": 413,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 4
+										},
+										"end": {
+											"line": 18,
+											"column": 5
+										}
+									},
+									"name": "E"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " two composites deep: every intermediate composite prints flat",
+							"start": 302,
+							"end": 366
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

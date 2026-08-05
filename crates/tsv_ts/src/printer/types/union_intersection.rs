@@ -12,7 +12,7 @@ use super::helpers::{
     type_needs_parens_in_union_or_intersection, union_has_brace_member, union_hug_shape,
     unwrap_parenthesized,
 };
-use super::{CommentFilter, CommentSpacing, Printer};
+use super::{CommentFilter, CommentSpacing, Printer, TrailingBlock};
 use crate::ast::internal::{Comment, TSIntersectionType, TSType, TSUnionType};
 use crate::printer::CommentVec;
 use crate::printer::LeadingGlue;
@@ -847,9 +847,14 @@ impl<'a> Printer<'a> {
                 let inner = unwrap_parenthesized(t);
                 let member_doc = self.build_union_member_offset_doc(inner, member_parens);
                 // A trailing comment lifted from the shell (`(// c⏎ b /* t */)`) trails the
-                // member inline (`| b /* t */`) — a type position, so `defer = false`. A
-                // no-op for the pure-line / mixed cases (no comment in the trailing gap).
-                parts.push(self.with_stripped_paren_trailing(member_doc, t, inner, false));
+                // member inline (`| b /* t */`) — a type position. A no-op for the
+                // pure-line / mixed cases (no comment in the trailing gap).
+                parts.push(self.with_stripped_paren_trailing(
+                    member_doc,
+                    t,
+                    inner,
+                    TrailingBlock::Inline,
+                ));
             } else if let TSType::Parenthesized(p) = t
                 && let TSType::Union(inner_union) = p.type_annotation
                 && self.paren_has_leading_line_comment(p)
@@ -1881,14 +1886,19 @@ impl<'a> Printer<'a> {
                 // re-wrap adds is not the stripped shell's, so the trailing gap comment
                 // still needs re-attaching.
                 let rewrapped = d.concat(&[d.text("("), self.build_type_doc(inner), d.text(")")]);
-                self.with_stripped_paren_trailing(rewrapped, first_member, inner, false)
+                self.with_stripped_paren_trailing(
+                    rewrapped,
+                    first_member,
+                    inner,
+                    TrailingBlock::Inline,
+                )
             }
         } else {
             // Re-attach any trailing comment lifted from a stripped shell (`(A /* t */)`);
-            // type position, so a trailing block trails the member inline (defer = false).
+            // type position, so a trailing block trails the member inline.
             // A no-op when `first_member` was not a stripped shell or held no trailing
             // comment — leaving the bare-inner layout unchanged.
-            self.build_hang_value_doc(first_member, inner, false)
+            self.build_hang_value_doc(first_member, inner, TrailingBlock::Inline)
         }
     }
 

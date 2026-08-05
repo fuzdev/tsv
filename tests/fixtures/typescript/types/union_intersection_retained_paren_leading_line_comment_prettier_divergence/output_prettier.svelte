@@ -34,16 +34,16 @@
 		| (() => B)
 		| D;
 
-	// a later paren-conditional member - keeping the comment inside forces the paren
-	// group open, so the conditional breaks its branches; prettier hoists the comment
-	// out and keeps the conditional inline
+	// a later paren-conditional member - the comment's own line forces the paren
+	// group open, but the conditional itself stays inline when it fits; prettier
+	// hoists the comment out and keeps the member inline
 	type MidConditional =
 		| A // c
 		| (B extends C ? D : E)
 		| F;
 
 	// a later paren-intersection member (no trailing object) - same keep-inside, the
-	// forced-open paren breaks the intersection
+	// intersection likewise staying inline when it fits
 	type MidIntersection =
 		| A // c
 		| (B & C)

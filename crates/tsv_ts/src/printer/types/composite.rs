@@ -13,7 +13,7 @@ use super::helpers::{
     type_needs_parens_for_array_element, type_needs_parens_for_conditional_check,
     type_needs_parens_for_conditional_extends, unwrap_parenthesized,
 };
-use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer};
+use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, TrailingBlock};
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
@@ -513,7 +513,7 @@ impl<'a> Printer<'a> {
             // A re-added extends-type paren carries the conditional check/extends indent
             // depth (`build_type_doc_maybe_parens`), matching this builder's other arms —
             // not the prefix operator's bare `d.parens`. Type position, so a trailing block
-            // lifted from the shell trails the inner inline (`defer = false`).
+            // lifted from the shell trails the inner inline.
             let value_doc = self.with_stripped_paren_trailing(
                 self.build_type_doc_maybe_parens(
                     value_hang_type,
@@ -521,7 +521,7 @@ impl<'a> Printer<'a> {
                 ),
                 c.extends_type,
                 value_hang_type,
-                false,
+                TrailingBlock::Inline,
             );
             let mut parts: DocBuf = smallvec![];
             self.append_keyword_value_line_comments(
@@ -1156,7 +1156,7 @@ impl<'a> Printer<'a> {
                 }
                 body_parts.push(d.text(":"));
                 if self.has_line_comments_between(bracket_close, head.value_start) {
-                    let value_doc = self.build_keyword_value_doc(&head, false);
+                    let value_doc = self.build_keyword_value_doc(&head, TrailingBlock::Inline);
                     self.append_keyword_value_line_comments(
                         &mut body_parts,
                         bracket_close,
@@ -1311,7 +1311,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut tail_parts: DocBuf = smallvec![d.text(":")];
         if self.has_line_comments_between(colon_pos + 1, head.value_start) {
-            let value_doc = self.build_keyword_value_doc(head, false);
+            let value_doc = self.build_keyword_value_doc(head, TrailingBlock::Inline);
             self.append_keyword_value_line_comments(
                 &mut tail_parts,
                 colon_pos + 1,
@@ -1625,8 +1625,12 @@ impl<'a> Printer<'a> {
         // (`with_stripped_paren_trailing`), so every shell comment prints once.
         if let Some(inner) = self.paren_interior_routed_inner(arr.element_type) {
             let inner_doc = self.build_routed_child_doc(inner);
-            let value_doc =
-                self.with_stripped_paren_trailing(inner_doc, arr.element_type, inner, false);
+            let value_doc = self.with_stripped_paren_trailing(
+                inner_doc,
+                arr.element_type,
+                inner,
+                TrailingBlock::Inline,
+            );
             let mut parts: DocBuf = smallvec![d.text("(")];
             self.append_keyword_value_line_comments(
                 &mut parts,
