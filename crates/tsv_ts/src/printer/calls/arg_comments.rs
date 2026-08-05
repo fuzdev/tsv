@@ -600,10 +600,18 @@ pub(crate) fn emit_last_arg_trailing_comments(
     last_arg: &internal::Expression<'_>,
     paren_close: u32,
 ) {
+    let scan_start = printer.last_arg_comment_scan_start(last_arg);
+    // Every argument list reaching these builders pays this call, comments or not, so
+    // skip the partition on the common empty gap (same guard as
+    // `emit_first_arg_leading_comments`). Both emits `PartitionedComments` would run
+    // walk only its own buckets, so an empty range is already a no-op.
+    if !printer.has_comments_to_emit_between(scan_start, paren_close) {
+        return;
+    }
     let pc = PartitionedComments::new(
         printer.comments,
         printer.comment_line_breaks,
-        printer.last_arg_comment_scan_start(last_arg),
+        scan_start,
         paren_close,
     );
     pc.emit_last_arg_comments(parts, printer);
@@ -745,6 +753,17 @@ impl<'a> PartitionedComments<'a> {
 
     pub fn has_trailing_block(&self) -> bool {
         !self.trailing_block.is_empty()
+    }
+
+    /// Whether anything at all sits on the opening delimiter's line — exactly what
+    /// [`Self::emit_trailing_comments`] would emit, asked ahead of emitting it.
+    ///
+    /// The delimiter-line question every argument builder opens with: a non-empty run
+    /// has to be injected after the `(` rather than led onto the first argument, and
+    /// the run is taken WHOLE (both buckets) or an authored `/* b */ // c` pair comes
+    /// back reversed. Paired with the emitter so the two can't answer differently.
+    pub fn has_trailing_comments(&self) -> bool {
+        self.has_trailing_block() || self.has_trailing_line()
     }
 
     /// Check for a blank line in the gap between trailing and leading comments.

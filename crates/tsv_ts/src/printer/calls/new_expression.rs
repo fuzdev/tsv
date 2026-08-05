@@ -6,7 +6,7 @@ use super::arg_comments::{
     build_after_comma_leading_comments, first_arg_has_any_comments, last_arg_has_comments,
 };
 use super::arg_wrapping::{
-    append_type_args_with_gap_comments, build_args_with_blank_lines, build_empty_args_doc,
+    append_type_args_with_gap_comments, build_call_args_with_blank_lines, build_empty_args_doc,
     should_expand_first_arg, try_hug_multiline_template_arg, wrap_call_with_soft_breaks,
 };
 use crate::ast::internal;
@@ -391,21 +391,14 @@ impl<'a> Printer<'a> {
 
         if has_blank_lines {
             // Unlike the plain call's twin, no comment path preempts this one, so both
-            // edge gaps are live here: a `(`-line run lands in `paren_line`, and the
-            // last argument's trailing comments come back inside `arg_doc`.
-            let mut paren_line = DocBuf::new();
-            let arg_doc = build_args_with_blank_lines(
+            // edge gaps are live here: the builder puts a `(`-line run on the `(` line
+            // and the last argument's trailing comments after that argument.
+            return build_call_args_with_blank_lines(
                 self,
+                callee_with_types,
                 new_expr.arguments,
                 paren_open,
                 new_expr.span.end,
-                &mut paren_line,
-            );
-            return wrap_call_with_hard_breaks_paren_line(
-                d,
-                callee_with_types,
-                &paren_line,
-                arg_doc,
             );
         }
 
@@ -801,8 +794,7 @@ impl<'a> Printer<'a> {
                 paren_open,
                 first_arg_start,
             );
-            let has_paren_line =
-                !gap_pc.trailing_block.is_empty() || !gap_pc.trailing_line.is_empty();
+            let has_paren_line = gap_pc.has_trailing_comments();
             if has_paren_line
                 && should_force_expansion_for_comments(self, paren_open, first_arg_start)
             {

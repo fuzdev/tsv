@@ -27,10 +27,7 @@ pub(super) fn member_only_has_interior_line_comments<'a>(
         .iter()
         .flat_map(|g| g.nodes.iter())
         .any(|node| match node_comment_gap(node, printer) {
-            Some((start, end)) => {
-                let c = printer.classify_comments(start, end);
-                !c.trailing_line.is_empty() || !c.leading_line.is_empty()
-            }
+            Some((start, end)) => printer.classify_comments(start, end).has_line_comments(),
             None => false,
         })
 }

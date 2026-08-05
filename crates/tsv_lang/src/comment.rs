@@ -314,6 +314,20 @@ impl<'a> ClassifiedComments<'a> {
             && self.leading_line.is_empty()
     }
 
+    /// Whether a **line** comment sits anywhere in the range, trailing or leading.
+    ///
+    /// The break-forcing question a `//` alone answers: it runs to end of line, so
+    /// whatever the layout would otherwise print after it on that line has to move.
+    /// Asking it of both line buckets is the whole predicate — a caller that checks
+    /// only `trailing_line` goes blind to the own-line one (and vice versa), which is
+    /// why this lives here rather than at each chain site. Distinct from the chain
+    /// printers' `gap_has_break_forcing_comments`, which additionally counts an
+    /// own-line *block*.
+    #[inline]
+    pub fn has_line_comments(&self) -> bool {
+        !self.trailing_line.is_empty() || !self.leading_line.is_empty()
+    }
+
     /// All leading (own-line) comments in source order, merging the `leading_block`
     /// and `leading_line` buckets.
     ///

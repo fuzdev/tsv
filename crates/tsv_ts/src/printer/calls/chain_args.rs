@@ -498,8 +498,7 @@ fn build_chain_args_force_expand(
                 arg_start,
             );
 
-            let has_paren_line =
-                !first_pc.trailing_block.is_empty() || !first_pc.trailing_line.is_empty();
+            let has_paren_line = first_pc.has_trailing_comments();
 
             if has_paren_line {
                 // Comments trailing the `(` stay on the `(` line; the own-line set
