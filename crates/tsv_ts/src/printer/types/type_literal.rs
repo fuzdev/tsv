@@ -968,11 +968,24 @@ impl<'a> Printer<'a> {
                 // forward `fits()` scan — otherwise it poisons that scan and needlessly
                 // expands an inner union (`Foo<(a | b // c)>` keeps `a | b` inline,
                 // matching prettier, rather than `| a | b`).
-                // TODO: the trailing half pairs a deferred run with this unscoped
-                // `break_parent` where `build_parenthesized_type_unwrap_doc`'s strip arm
-                // now scopes it via `flush_break`; likely reproducible here — the reparse
-                // re-forces the list from the type-argument list's own trailing gap — but
-                // unevaluated.
+                // Unscoped, deliberately — even though this shell is STRIPPED: the
+                // trailing half's deferred run flushes inside the `<…>` list, a RETAINED
+                // bracketed construct, so the reparse finds the comment in the list's own
+                // trailing gap and re-forces the all-hardline expansion
+                // (`type_arguments_force_expansion`), whose hardlines re-break every
+                // enclosing group exactly as this unscoped force did — reproducible
+                // geometry, matching prettier at every nesting (enclosing composites,
+                // assignments, multi-argument lists, nested `<…>`). Contrast
+                // `build_parenthesized_type_unwrap_doc`'s trailing arm, whose stripped
+                // shell leaves the comment in a member gap that cannot re-force
+                // intermediate groups — that strip needs `flush_break`. Pinned by
+                // `type_argument_paren_union_line_comment`.
+                // TODO: the LEADING half's landing is wrong for a single NON-HUGGING
+                // argument: the expansion its hardline forces is prettier's fixed point,
+                // not tsv's — the reparse routes the now-bare leading comment to the
+                // single-argument hug (`build_angle_list_with_line_comments`), a 2-pass
+                // convergence. Pinned (failing) by
+                // `type_argument_paren_union_leading_line_comment`.
                 let needs_break = leading
                     .iter()
                     .chain(&trailing)
