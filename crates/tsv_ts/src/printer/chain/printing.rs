@@ -7,7 +7,10 @@
 use super::types::{ChainGroup, ChainNode, is_numeric_index};
 use crate::ast::internal::{self, Expression};
 use crate::printer::{ParenContext, Printer, needs_parens};
-use tsv_lang::doc::{DocBuf, arena::DocId};
+use tsv_lang::doc::{
+    DocBuf,
+    arena::{DocArena, DocId},
+};
 use tsv_lang::printing::has_blank_line_between_strict;
 
 //
@@ -395,6 +398,18 @@ fn print_group_inner<'a>(
 //
 // Member Access Printing
 //
+
+/// Wrap a plain `.prop` lookup in its own break point — Prettier's
+/// `printMemberExpression` (member.js): `group(indent([softline, lookup]))`.
+///
+/// The lookup hugs the previous line's end when it fits there and drops to its
+/// own indented line otherwise, each lookup wrapping only its own break point —
+/// so a base that breaks internally still keeps its lookups glued to the `)`/`}`
+/// it ends on. The per-member counterpart of [`computed_lookup_doc`], which
+/// breaks *inside* its brackets instead.
+pub(crate) fn member_lookup_group(d: &DocArena, lookup: DocId) -> DocId {
+    d.group(d.indent(d.concat(&[d.softline(), lookup])))
+}
 
 /// Build a computed member lookup — Prettier's `printMemberLookup` (member.js):
 /// `group([open, indent([softline, index]), softline, "]"])`.

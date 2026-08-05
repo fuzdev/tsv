@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 654,
+	"end": 773,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -156,9 +156,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " optional call, plain callee — the comment sits after `?.`",
+			"value": " optional call, plain callee — the comment stays before `?.`",
 			"start": 275,
-			"end": 335,
+			"end": 337,
 			"loc": {
 				"start": {
 					"line": 19,
@@ -166,7 +166,7 @@
 				},
 				"end": {
 					"line": 19,
-					"column": 61
+					"column": 63
 				}
 			}
 		},
@@ -178,19 +178,19 @@
 			"loc": {
 				"start": {
 					"line": 20,
-					"column": 8
+					"column": 6
 				},
 				"end": {
 					"line": 20,
-					"column": 13
+					"column": 11
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " optional call, member callee — the comment sits before `?.`",
-			"start": 358,
-			"end": 420,
+			"value": " optional call, member callee — the comment stays before `?.`",
+			"start": 360,
+			"end": 423,
 			"loc": {
 				"start": {
 					"line": 23,
@@ -198,15 +198,15 @@
 				},
 				"end": {
 					"line": 23,
-					"column": 63
+					"column": 64
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c7",
-			"start": 428,
-			"end": 433,
+			"start": 431,
+			"end": 436,
 			"loc": {
 				"start": {
 					"line": 24,
@@ -221,8 +221,8 @@
 		{
 			"type": "Line",
 			"value": " member callee — the chain stays flat",
-			"start": 444,
-			"end": 483,
+			"start": 447,
+			"end": 486,
 			"loc": {
 				"start": {
 					"line": 27,
@@ -237,8 +237,8 @@
 		{
 			"type": "Line",
 			"value": " c8",
-			"start": 489,
-			"end": 494,
+			"start": 492,
+			"end": 497,
 			"loc": {
 				"start": {
 					"line": 28,
@@ -253,8 +253,8 @@
 		{
 			"type": "Line",
 			"value": " longer chain, same gap",
-			"start": 503,
-			"end": 528,
+			"start": 506,
+			"end": 531,
 			"loc": {
 				"start": {
 					"line": 31,
@@ -269,8 +269,8 @@
 		{
 			"type": "Line",
 			"value": " c9",
-			"start": 550,
-			"end": 555,
+			"start": 553,
+			"end": 558,
 			"loc": {
 				"start": {
 					"line": 32,
@@ -285,8 +285,8 @@
 		{
 			"type": "Line",
 			"value": " a block comment does not end its line, so it stays inline",
-			"start": 564,
-			"end": 624,
+			"start": 567,
+			"end": 627,
 			"loc": {
 				"start": {
 					"line": 35,
@@ -301,8 +301,8 @@
 		{
 			"type": "Block",
 			"value": " c10 ",
-			"start": 631,
-			"end": 640,
+			"start": 634,
+			"end": 643,
 			"loc": {
 				"start": {
 					"line": 36,
@@ -313,24 +313,72 @@
 					"column": 15
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a block comment in an optional call stays before `?.`, glued to it",
+			"start": 649,
+			"end": 718,
+			"loc": {
+				"start": {
+					"line": 38,
+					"column": 1
+				},
+				"end": {
+					"line": 38,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c11 ",
+			"start": 725,
+			"end": 734,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 6
+				},
+				"end": {
+					"line": 39,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c12 ",
+			"start": 748,
+			"end": 757,
+			"loc": {
+				"start": {
+					"line": 41,
+					"column": 7
+				},
+				"end": {
+					"line": 41,
+					"column": 16
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 653,
+		"end": 772,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 644,
+			"end": 763,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 37,
+					"line": 42,
 					"column": 9
 				}
 			},
@@ -639,8 +687,8 @@
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 337,
-					"end": 355,
+					"start": 339,
+					"end": 357,
 					"loc": {
 						"start": {
 							"line": 20,
@@ -648,13 +696,13 @@
 						},
 						"end": {
 							"line": 21,
-							"column": 5
+							"column": 7
 						}
 					},
 					"expression": {
 						"type": "ChainExpression",
-						"start": 337,
-						"end": 354,
+						"start": 339,
+						"end": 356,
 						"loc": {
 							"start": {
 								"line": 20,
@@ -662,13 +710,13 @@
 							},
 							"end": {
 								"line": 21,
-								"column": 4
+								"column": 6
 							}
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 337,
-							"end": 354,
+							"start": 339,
+							"end": 356,
 							"loc": {
 								"start": {
 									"line": 20,
@@ -676,13 +724,13 @@
 								},
 								"end": {
 									"line": 21,
-									"column": 4
+									"column": 6
 								}
 							},
 							"callee": {
 								"type": "Identifier",
-								"start": 337,
-								"end": 341,
+								"start": 339,
+								"end": 343,
 								"loc": {
 									"start": {
 										"line": 20,
@@ -693,7 +741,15 @@
 										"column": 5
 									}
 								},
-								"name": "call"
+								"name": "call",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c6",
+										"start": 344,
+										"end": 349
+									}
+								]
 							},
 							"arguments": [],
 							"optional": true
@@ -708,16 +764,16 @@
 						},
 						{
 							"type": "Line",
-							"value": " optional call, plain callee — the comment sits after `?.`",
+							"value": " optional call, plain callee — the comment stays before `?.`",
 							"start": 275,
-							"end": 335
+							"end": 337
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 422,
-					"end": 441,
+					"start": 425,
+					"end": 444,
 					"loc": {
 						"start": {
 							"line": 24,
@@ -730,8 +786,8 @@
 					},
 					"expression": {
 						"type": "ChainExpression",
-						"start": 422,
-						"end": 440,
+						"start": 425,
+						"end": 443,
 						"loc": {
 							"start": {
 								"line": 24,
@@ -744,8 +800,8 @@
 						},
 						"expression": {
 							"type": "CallExpression",
-							"start": 422,
-							"end": 440,
+							"start": 425,
+							"end": 443,
 							"loc": {
 								"start": {
 									"line": 24,
@@ -758,8 +814,8 @@
 							},
 							"callee": {
 								"type": "MemberExpression",
-								"start": 422,
-								"end": 427,
+								"start": 425,
+								"end": 430,
 								"loc": {
 									"start": {
 										"line": 24,
@@ -772,8 +828,8 @@
 								},
 								"object": {
 									"type": "Identifier",
-									"start": 422,
-									"end": 425,
+									"start": 425,
+									"end": 428,
 									"loc": {
 										"start": {
 											"line": 24,
@@ -788,8 +844,8 @@
 								},
 								"property": {
 									"type": "Identifier",
-									"start": 426,
-									"end": 427,
+									"start": 429,
+									"end": 430,
 									"loc": {
 										"start": {
 											"line": 24,
@@ -808,8 +864,8 @@
 									{
 										"type": "Line",
 										"value": " c7",
-										"start": 428,
-										"end": 433
+										"start": 431,
+										"end": 436
 									}
 								]
 							},
@@ -820,22 +876,16 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " c6",
-							"start": 344,
-							"end": 349
-						},
-						{
-							"type": "Line",
-							"value": " optional call, member callee — the comment sits before `?.`",
-							"start": 358,
-							"end": 420
+							"value": " optional call, member callee — the comment stays before `?.`",
+							"start": 360,
+							"end": 423
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 485,
-					"end": 500,
+					"start": 488,
+					"end": 503,
 					"loc": {
 						"start": {
 							"line": 28,
@@ -848,8 +898,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 485,
-						"end": 499,
+						"start": 488,
+						"end": 502,
 						"loc": {
 							"start": {
 								"line": 28,
@@ -862,8 +912,8 @@
 						},
 						"callee": {
 							"type": "MemberExpression",
-							"start": 485,
-							"end": 488,
+							"start": 488,
+							"end": 491,
 							"loc": {
 								"start": {
 									"line": 28,
@@ -876,8 +926,8 @@
 							},
 							"object": {
 								"type": "Identifier",
-								"start": 485,
-								"end": 486,
+								"start": 488,
+								"end": 489,
 								"loc": {
 									"start": {
 										"line": 28,
@@ -892,8 +942,8 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 487,
-								"end": 488,
+								"start": 490,
+								"end": 491,
 								"loc": {
 									"start": {
 										"line": 28,
@@ -912,8 +962,8 @@
 								{
 									"type": "Line",
 									"value": " c8",
-									"start": 489,
-									"end": 494
+									"start": 492,
+									"end": 497
 								}
 							]
 						},
@@ -924,15 +974,15 @@
 						{
 							"type": "Line",
 							"value": " member callee — the chain stays flat",
-							"start": 444,
-							"end": 483
+							"start": 447,
+							"end": 486
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 530,
-					"end": 561,
+					"start": 533,
+					"end": 564,
 					"loc": {
 						"start": {
 							"line": 32,
@@ -945,8 +995,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 530,
-						"end": 560,
+						"start": 533,
+						"end": 563,
 						"loc": {
 							"start": {
 								"line": 32,
@@ -959,8 +1009,8 @@
 						},
 						"callee": {
 							"type": "MemberExpression",
-							"start": 530,
-							"end": 549,
+							"start": 533,
+							"end": 552,
 							"loc": {
 								"start": {
 									"line": 32,
@@ -973,8 +1023,8 @@
 							},
 							"object": {
 								"type": "CallExpression",
-								"start": 530,
-								"end": 545,
+								"start": 533,
+								"end": 548,
 								"loc": {
 									"start": {
 										"line": 32,
@@ -987,8 +1037,8 @@
 								},
 								"callee": {
 									"type": "MemberExpression",
-									"start": 530,
-									"end": 543,
+									"start": 533,
+									"end": 546,
 									"loc": {
 										"start": {
 											"line": 32,
@@ -1001,8 +1051,8 @@
 									},
 									"object": {
 										"type": "CallExpression",
-										"start": 530,
-										"end": 539,
+										"start": 533,
+										"end": 542,
 										"loc": {
 											"start": {
 												"line": 32,
@@ -1015,8 +1065,8 @@
 										},
 										"callee": {
 											"type": "MemberExpression",
-											"start": 530,
-											"end": 537,
+											"start": 533,
+											"end": 540,
 											"loc": {
 												"start": {
 													"line": 32,
@@ -1029,8 +1079,8 @@
 											},
 											"object": {
 												"type": "Identifier",
-												"start": 530,
-												"end": 533,
+												"start": 533,
+												"end": 536,
 												"loc": {
 													"start": {
 														"line": 32,
@@ -1045,8 +1095,8 @@
 											},
 											"property": {
 												"type": "Identifier",
-												"start": 534,
-												"end": 537,
+												"start": 537,
+												"end": 540,
 												"loc": {
 													"start": {
 														"line": 32,
@@ -1067,8 +1117,8 @@
 									},
 									"property": {
 										"type": "Identifier",
-										"start": 540,
-										"end": 543,
+										"start": 543,
+										"end": 546,
 										"loc": {
 											"start": {
 												"line": 32,
@@ -1089,8 +1139,8 @@
 							},
 							"property": {
 								"type": "Identifier",
-								"start": 546,
-								"end": 549,
+								"start": 549,
+								"end": 552,
 								"loc": {
 									"start": {
 										"line": 32,
@@ -1109,8 +1159,8 @@
 								{
 									"type": "Line",
 									"value": " c9",
-									"start": 550,
-									"end": 555
+									"start": 553,
+									"end": 558
 								}
 							]
 						},
@@ -1121,15 +1171,15 @@
 						{
 							"type": "Line",
 							"value": " longer chain, same gap",
-							"start": 503,
-							"end": 528
+							"start": 506,
+							"end": 531
 						}
 					]
 				},
 				{
 					"type": "ExpressionStatement",
-					"start": 626,
-					"end": 643,
+					"start": 629,
+					"end": 646,
 					"loc": {
 						"start": {
 							"line": 36,
@@ -1142,8 +1192,8 @@
 					},
 					"expression": {
 						"type": "CallExpression",
-						"start": 626,
-						"end": 642,
+						"start": 629,
+						"end": 645,
 						"loc": {
 							"start": {
 								"line": 36,
@@ -1156,8 +1206,8 @@
 						},
 						"callee": {
 							"type": "Identifier",
-							"start": 626,
-							"end": 630,
+							"start": 629,
+							"end": 633,
 							"loc": {
 								"start": {
 									"line": 36,
@@ -1173,8 +1223,8 @@
 								{
 									"type": "Block",
 									"value": " c10 ",
-									"start": 631,
-									"end": 640
+									"start": 634,
+									"end": 643
 								}
 							]
 						},
@@ -1185,10 +1235,193 @@
 						{
 							"type": "Line",
 							"value": " a block comment does not end its line, so it stays inline",
-							"start": 564,
-							"end": 624
+							"start": 567,
+							"end": 627
 						}
 					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 720,
+					"end": 739,
+					"loc": {
+						"start": {
+							"line": 39,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 20
+						}
+					},
+					"expression": {
+						"type": "ChainExpression",
+						"start": 720,
+						"end": 738,
+						"loc": {
+							"start": {
+								"line": 39,
+								"column": 1
+							},
+							"end": {
+								"line": 39,
+								"column": 19
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 720,
+							"end": 738,
+							"loc": {
+								"start": {
+									"line": 39,
+									"column": 1
+								},
+								"end": {
+									"line": 39,
+									"column": 19
+								}
+							},
+							"callee": {
+								"type": "Identifier",
+								"start": 720,
+								"end": 724,
+								"loc": {
+									"start": {
+										"line": 39,
+										"column": 1
+									},
+									"end": {
+										"line": 39,
+										"column": 5
+									}
+								},
+								"name": "call",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c11 ",
+										"start": 725,
+										"end": 734
+									}
+								]
+							},
+							"arguments": [],
+							"optional": true
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment in an optional call stays before `?.`, glued to it",
+							"start": 649,
+							"end": 718
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 742,
+					"end": 762,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 1
+						},
+						"end": {
+							"line": 41,
+							"column": 21
+						}
+					},
+					"expression": {
+						"type": "ChainExpression",
+						"start": 742,
+						"end": 761,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 1
+							},
+							"end": {
+								"line": 41,
+								"column": 20
+							}
+						},
+						"expression": {
+							"type": "CallExpression",
+							"start": 742,
+							"end": 761,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 1
+								},
+								"end": {
+									"line": 41,
+									"column": 20
+								}
+							},
+							"callee": {
+								"type": "MemberExpression",
+								"start": 742,
+								"end": 747,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 1
+									},
+									"end": {
+										"line": 41,
+										"column": 6
+									}
+								},
+								"object": {
+									"type": "Identifier",
+									"start": 742,
+									"end": 745,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 1
+										},
+										"end": {
+											"line": 41,
+											"column": 4
+										}
+									},
+									"name": "obj"
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 746,
+									"end": 747,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 5
+										},
+										"end": {
+											"line": 41,
+											"column": 6
+										}
+									},
+									"name": "m"
+								},
+								"computed": false,
+								"optional": false,
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c12 ",
+										"start": 748,
+										"end": 757
+									}
+								]
+							},
+							"arguments": [],
+							"optional": true
+						}
+					}
 				}
 			],
 			"sourceType": "module"

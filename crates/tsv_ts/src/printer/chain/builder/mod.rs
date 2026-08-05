@@ -20,7 +20,7 @@ use expansion::{
 };
 use helpers::{
     build_expanded_doc, build_first_groups_doc, build_first_groups_expanded_doc,
-    build_rest_parts_with_comments,
+    build_rest_parts_with_comments, gap_has_break_forcing_comments,
 };
 use member_only::{
     build_member_only_chain_doc, build_member_only_chain_with_comments_doc,
@@ -29,15 +29,16 @@ use member_only::{
 
 use super::analysis::should_merge_first_groups;
 use super::printing::{
-    has_inside_bracket_comments, print_group, print_group_expanded, print_group_standard_expanded,
-    print_node,
+    has_inside_bracket_comments, member_lookup_group, node_comment_gap, print_group,
+    print_group_expanded, print_group_standard_expanded, print_node_inner,
 };
-use super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
+use super::types::{ChainGroup, ChainNode, ChainNodeVec};
 use crate::ast::internal::Expression;
 use crate::printer::Printer;
+use smallvec::SmallVec;
 use smallvec::smallvec;
-use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
+use tsv_lang::{ClassifiedComments, Span};
 
 /// Cutoff for short chains when groups should NOT be merged
 const SHORT_CHAIN_CUTOFF: usize = 2;
@@ -144,6 +145,16 @@ fn build_chain_doc_impl<'a>(groups: &[ChainGroup<'a>], printer: &Printer<'_>) ->
     // already computed this and stashed it (also feeding the print path), so read it back
     // rather than repeating the search.
     let chain_has_comments = printer.chain_has_comments();
+
+    // A trailing member tail (`….bb(cb).prop`) prints OUTSIDE the member chain:
+    // prettier roots the chain at the outermost CALL, so a `.prop` above it is
+    // `printMemberExpression`'s to lay out — the chain's own expand decision
+    // (`any_non_last_breaks`, the call-count rules) never sees it, which is what
+    // keeps `obj.aa(x).bb(cb)` flat with the arrow hugged and `.prop` trailing.
+    // Folding the tail into the chain made `.bb` non-last and force-expanded it.
+    if has_calls && let Some(peeled) = peel_trailing_member_tail(groups, printer) {
+        return build_peeled_tail_doc(groups, &peeled, printer);
+    }
 
     // Prettier's logic (member-chain.js:351-359):
     // If groups.length <= cutoff && !nodeHasComment:
@@ -312,16 +323,6 @@ fn build_short_chain_doc<'a>(
         return d.group(first_doc);
     }
 
-    // `base_call(args).a.b...` — a plain base call followed by ONLY trailing member
-    // accesses. Prettier prints this via member.js (printMemberExpression), NOT the
-    // member chain: the call's args group and each trailing member are independent
-    // sibling groups, so the args break only when the call itself overflows and
-    // otherwise the trailing members break individually. The chain conditionalGroup
-    // would instead expand the call args even when the call fits inline.
-    if is_base_call_then_only_members(first_groups, rest_groups, printer) {
-        return build_base_call_then_members_doc(first_groups, rest_groups, printer);
-    }
-
     // Check if first groups contain calls with multiple args that might need expansion
     let first_has_multiarg_calls = first_groups.iter().flat_map(|g| g.nodes.iter()).any(|n| {
         matches!(
@@ -387,13 +388,11 @@ fn build_short_chain_doc<'a>(
             }
 
             // A `.prop` lookup hugs the base's closing `)` when it fits after the base's
-            // last line, and drops to its own indented line otherwise — prettier's
-            // `printMemberExpression` (`[objectDoc, group(indent([softline, lookup]))]`).
-            // The base breaks on its own (parens hang-break or inner call args), so we must
-            // not force the lookup onto its own line just because the base is multi-line;
-            // the softline lets it hug the `)`.
-            let member = d.group(d.indent(d.concat(&[d.softline(), lookup])));
-            return d.concat(&[first_doc, member]);
+            // last line, and drops to its own indented line otherwise. The base breaks on
+            // its own (parens hang-break or inner call args), so we must not force the
+            // lookup onto its own line just because the base is multi-line; the softline
+            // lets it hug the `)`.
+            return d.concat(&[first_doc, member_lookup_group(d, lookup)]);
         }
         return d.group(on_line);
     }
@@ -407,82 +406,158 @@ fn build_short_chain_doc<'a>(
     d.group(on_line)
 }
 
-/// Whether the chain is `base_call(args).a.b...` — a bare base call followed by ONLY
-/// plain `.prop` member accesses (no further calls, no computed/private/non-null
-/// nodes, no inter-element comments). This is prettier's `printMemberExpression`
-/// (member.js) territory, not the member chain; other shapes fall back to the chain
-/// conditionalGroup.
-fn is_base_call_then_only_members<'a>(
-    first_groups: &[ChainGroup<'a>],
-    rest_groups: &[ChainGroup<'a>],
-    printer: &Printer<'_>,
-) -> bool {
-    // Runs on every short chain with rest groups — kept off the heap via the
-    // stack-friendly `ChainNodeRefVec` (the common short chain stays inline).
-    let all_nodes: ChainNodeRefVec<'_, 'a> = first_groups
+/// A chain's trailing member tail, split off by [`peel_trailing_member_tail`]
+/// together with the facts [`build_peeled_tail_doc`] and [`append_member_tail`]
+/// consume — computed once at the peel so the consumers neither re-scan the
+/// groups nor re-classify the gap.
+struct PeeledTail<'a, 'p> {
+    /// Index of the group holding the chain's last call.
+    last_call_group: usize,
+    /// Index of that call within its group's nodes.
+    last_call_idx: usize,
+    /// Every node after the last call, collected across group boundaries.
+    tail: ChainNodeVec<'a>,
+    /// The prefix→tail gap's comments — only same-line trailing blocks by
+    /// construction (the peel refuses break-forcing ones). `None` when the chain
+    /// window holds no comments or the tail's first node has no gap.
+    gap_comments: Option<ClassifiedComments<'p>>,
+    /// Bare base call (`fn(args).a.b` — one call, nothing else before the tail):
+    /// the tail keeps member.js's per-member break points.
+    per_member_breaks: bool,
+}
+
+/// Split off the trailing member tail — every node AFTER the chain's last call,
+/// collected ACROSS group boundaries (the grouping may keep the first post-call
+/// member in the call's own group: `read(...).a.b` groups as
+/// `[[base, call, .a], [.b]]`). Returns `Some` only when the tail is ALL plain
+/// `.prop` members and its gaps are quiet: a computed / private / non-null node
+/// keeps its own break structure on the existing paths, a break-forcing comment
+/// (trailing line, or any leading) needs the comment-aware chain paths, and a
+/// blank line before the tail is expansion signal the chain-level scan must keep
+/// seeing. A trailing same-line block comment is fine — the append emits it
+/// inline, as `add_group_no_break` does.
+fn peel_trailing_member_tail<'a, 'p>(
+    groups: &[ChainGroup<'a>],
+    printer: &'p Printer<'_>,
+) -> Option<PeeledTail<'a, 'p>> {
+    let last_call_group = groups
         .iter()
-        .chain(rest_groups.iter())
-        .flat_map(|g| g.nodes.iter())
+        .rposition(|g| g.nodes.iter().any(ChainNode::is_call))?;
+    let last_call_idx = groups[last_call_group]
+        .nodes
+        .iter()
+        .rposition(ChainNode::is_call)?;
+
+    let mut tail: ChainNodeVec<'a> = groups[last_call_group].nodes[last_call_idx + 1..]
+        .iter()
+        .copied()
         .collect();
-    // Need base + one call + at least one trailing member.
-    if all_nodes.len() < 3 {
-        return false;
+    for group in &groups[last_call_group + 1..] {
+        tail.extend(group.nodes.iter().copied());
     }
-    // Base must be a bare (non-parenthesized) expression directly followed by the call.
-    if !matches!(
-        all_nodes[0],
-        ChainNode::Base {
-            needs_parens: false,
-            ..
+    if tail.is_empty() || !tail.iter().all(|n| matches!(n, ChainNode::Member { .. })) {
+        return None;
+    }
+    // The prefix→tail gap: refuse a break-forcing comment or a blank line.
+    let mut gap_comments = None;
+    if let Some((object_end, property_start)) = node_comment_gap(&tail[0], printer) {
+        if printer.chain_has_comments() {
+            let classified = printer.classify_comments(object_end, property_start);
+            if gap_has_break_forcing_comments(&classified) {
+                return None;
+            }
+            gap_comments = Some(classified);
         }
-    ) || !all_nodes[1].is_call()
+        if printer.is_next_line_empty(object_end, property_start) {
+            return None;
+        }
+    }
+    // The tail's interior gaps must be comment-free — an interior comment needs the
+    // comment-aware chain paths.
+    if printer.chain_has_comments()
+        && tail[1..].iter().any(|n| {
+            n.comment_range()
+                .is_some_and(|(start, end)| printer.has_comments_to_emit_between(start, end))
+        })
     {
-        return false;
+        return None;
     }
-    // Exactly one call in the whole chain (the base call).
-    if all_nodes.iter().filter(|n| n.is_call()).count() != 1 {
-        return false;
-    }
-    // Everything after the base call must be a plain `.prop` member — computed,
-    // private, and non-null nodes have their own break structure.
-    if !all_nodes[2..]
-        .iter()
-        .all(|n| matches!(n, ChainNode::Member { .. }))
-    {
-        return false;
-    }
-    // No inter-element comments (those need the comment-aware chain path).
-    all_nodes[1..].iter().all(|n| {
-        n.comment_range()
-            .is_none_or(|(start, end)| !printer.has_comments_to_emit_between(start, end))
+
+    let per_member_breaks = last_call_group == 0
+        && last_call_idx == 1
+        && matches!(
+            groups[0].nodes[0],
+            ChainNode::Base {
+                needs_parens: false,
+                ..
+            }
+        );
+    Some(PeeledTail {
+        last_call_group,
+        last_call_idx,
+        tail,
+        gap_comments,
+        per_member_breaks,
     })
 }
 
-/// Build the member.js sibling-group doc for `base_call(args).a.b...`: the base call
-/// prints inline (its args group breaks only if the call itself overflows) and each
-/// trailing member is `group(indent([softline, .prop]))`, so the overflowing member
-/// drops to its own indented line while earlier members hug the call's `)`.
-fn build_base_call_then_members_doc<'a>(
-    first_groups: &[ChainGroup<'a>],
-    rest_groups: &[ChainGroup<'a>],
+/// Build the doc for a peeled chain: the prefix (everything through the last
+/// call) prints as its own chain, then the member tail is appended outside it.
+/// The prefix is a plain reborrow of `groups` whenever the call closes its group
+/// — only a tail node sharing the call's group forces rebuilding the prefix with
+/// that group truncated.
+fn build_peeled_tail_doc<'a>(
+    groups: &[ChainGroup<'a>],
+    peeled: &PeeledTail<'a, '_>,
+    printer: &Printer<'_>,
+) -> DocId {
+    let call_group = &groups[peeled.last_call_group];
+    let chain_doc = if peeled.last_call_idx + 1 == call_group.nodes.len() {
+        build_chain_doc_impl(&groups[..=peeled.last_call_group], printer)
+    } else {
+        let mut prefix: SmallVec<[ChainGroup<'a>; 4]> =
+            groups[..peeled.last_call_group].iter().cloned().collect();
+        let mut cut = call_group.clone();
+        cut.nodes.truncate(peeled.last_call_idx + 1);
+        prefix.push(cut);
+        build_chain_doc_impl(&prefix, printer)
+    };
+    append_member_tail(chain_doc, peeled, printer)
+}
+
+/// Append a peeled member tail to the chain's doc. The gap's same-line block
+/// comments stay inline; how the members land depends on `per_member_breaks`:
+///
+/// - A **bare base call** (`fn(args).a.b` — one call, nothing else) keeps
+///   member.js's per-member break points: each `.prop` rides
+///   [`member_lookup_group`], so the overflowing member drops to its own
+///   line while the call's arguments stay inline
+///   (`expressions/member/call_base_trailing_members_long`).
+/// - Every other prefix GLUES the tail: it takes no break point of its own, so
+///   its width lands in the preceding group's fit reserve and the break falls
+///   inside the chain or the call's arguments (`X.f({…}).success` expands the
+///   object, `.success` staying on the `}` — tsv's §Print Width stance,
+///   `trailing_member_expand_args_long_prettier_divergence`). The same glue
+///   `add_group_no_break` applies when the chain prints a tail itself.
+fn append_member_tail(
+    chain_doc: DocId,
+    peeled: &PeeledTail<'_, '_>,
     printer: &Printer<'_>,
 ) -> DocId {
     let d = printer.arena();
-    let all_nodes: ChainNodeRefVec<'_, 'a> = first_groups
-        .iter()
-        .chain(rest_groups.iter())
-        .flat_map(|g| g.nodes.iter())
-        .collect();
-    // The leading non-member nodes are the base call; the rest are trailing members.
-    let first_member_idx = all_nodes.iter().take_while(|n| !n.is_member()).count();
-    let prefix_docs: DocBuf = all_nodes[..first_member_idx]
-        .iter()
-        .map(|n| print_node(n, printer))
-        .collect();
-    let mut parts: DocBuf = smallvec![d.concat(&prefix_docs)];
-    for node in &all_nodes[first_member_idx..] {
-        let member = print_node(node, printer);
-        parts.push(d.group(d.indent(d.concat(&[d.softline(), member]))));
+    let mut parts: DocBuf = smallvec![chain_doc];
+    if let Some(classified) = &peeled.gap_comments {
+        parts.push(printer.build_trailing_block_doc(&classified.trailing_block));
+    }
+    for (i, node) in peeled.tail.iter().enumerate() {
+        // The first member's gap comments were just emitted above — skip them in the
+        // node print so they can't double-print (the add_group_no_break seam).
+        let member = print_node_inner(node, printer, false, i == 0);
+        parts.push(if peeled.per_member_breaks {
+            member_lookup_group(d, member)
+        } else {
+            member
+        });
     }
     d.concat(&parts)
 }
@@ -578,7 +653,11 @@ fn build_long_chain_doc<'a>(
         .count();
 
     // For longer chains (>cutoff), force expanded if any non-last group breaks
-    // EXCEPTION: When chain ends with member AND has exactly one call in rest
+    // EXCEPTION: When chain ends with member AND has exactly one call in rest.
+    // Only the tails the peel refuses still reach this — a computed / private /
+    // non-null node in the tail, or a commented / blank-preceded gap
+    // (`member_ending_computed`, `member_ending_nonnull`); a plain `.prop` tail
+    // was peeled off before the chain's expand decision ever ran.
     let force_expand_from_breaking =
         any_non_last_breaks && !(chain_ends_with_member && rest_call_count == 1);
 

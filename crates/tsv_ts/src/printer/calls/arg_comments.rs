@@ -54,8 +54,7 @@ impl<'a> Printer<'a> {
 /// `search_from` is where to look for the `(` (the position after the type
 /// arguments, or after the callee when there are none) and `paren_close` the
 /// position past the `)`. `prefix` is the open delimiter — `"("`, or `"?.("` for
-/// an optional call — and `empty_pair` its closed form, used only when no `(` is
-/// found at all (unreachable for valid code).
+/// an optional call.
 ///
 /// Shared by the plain call/`new` path and the member-chain path so the empty-args
 /// shape lives in one place: these two drifted apart once already, and the
@@ -66,11 +65,12 @@ pub(super) fn push_empty_args(
     search_from: u32,
     paren_close: u32,
     prefix: &'static str,
-    empty_pair: &'static str,
 ) {
     let d = printer.d();
     let Some(paren_pos) = printer.find_char_outside_comments(search_from, paren_close, b'(') else {
-        parts.push(d.text(empty_pair));
+        // No `(` found at all (unreachable for valid code): emit the closed form.
+        parts.push(d.text(prefix));
+        parts.push(d.text(")"));
         return;
     };
     let parens =

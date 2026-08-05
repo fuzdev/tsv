@@ -975,15 +975,19 @@ pub(super) fn append_type_args_with_gap_comments(
 ///
 /// `after_type_args` is the position after the type arguments (or the callee
 /// when there are none); the actual `(` is located to separate pre-paren
-/// comments from inside-paren comments, e.g. `fn<string> /* c */()`.
+/// comments from inside-paren comments, e.g. `fn<string> /* c */()`. `optional`
+/// fuses `?.` into the list's opening (`call /* c */?.()`), so a gap comment
+/// stays before it — the same `?.(` prefix the member-chain path passes.
 pub(super) fn build_empty_args_doc(
     printer: &Printer<'_>,
     callee: DocId,
     after_type_args: u32,
     paren_close: u32,
+    optional: bool,
 ) -> DocId {
+    let prefix = if optional { "?.(" } else { "(" };
     let mut parts: DocBuf = smallvec![callee];
-    push_empty_args(printer, &mut parts, after_type_args, paren_close, "(", "()");
+    push_empty_args(printer, &mut parts, after_type_args, paren_close, prefix);
     printer.d().concat(&parts)
 }
 
