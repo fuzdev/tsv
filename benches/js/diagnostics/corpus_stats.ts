@@ -234,9 +234,10 @@ function main(): void {
 		if (files.length === 0) throw new Error(`No in-scope files found for ${title}`);
 
 		const overall = stats_of(files);
-		const per_lang = LANGUAGES.map(
-			(l) => ({ language: l, stats: stats_of(files.filter((f) => f.language === l)) })
-		).filter((r) => r.stats.files > 0);
+		const per_lang = LANGUAGES.map((l) => ({
+			language: l,
+			stats: stats_of(files.filter((f) => f.language === l))
+		})).filter((r) => r.stats.files > 0);
 		const groups = dir ? [] : group_by_entry(files, entry_paths);
 		const conc = dir ? concentration(files, root, largest_n) : [];
 		const big_files = files.filter((f) => f.bytes > big).sort((a, b) => b.bytes - a.bytes);

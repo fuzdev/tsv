@@ -35,7 +35,6 @@ use super::printing::{
 use super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
 use crate::ast::internal::Expression;
 use crate::printer::Printer;
-use crate::printer::calls::arg_predicates::contains_call_expression;
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::doc::{DocBuf, arena::DocId};
@@ -360,19 +359,6 @@ fn build_short_chain_doc<'a>(
         );
     }
 
-    // Check if chain ends with member (for callback arg breaking preference)
-    let chain_ends_with_member = ends_with_member(rest_groups, first_groups);
-
-    // When chain ends with member and first groups have calls, prefer expanding
-    // first groups' call args over breaking the chain.
-    if first_has_calls && chain_ends_with_member {
-        let first_expanded_doc = build_first_groups_expanded_doc(first_groups, printer);
-        let mut state_first_expanded_parts: DocBuf = smallvec![first_expanded_doc];
-        state_first_expanded_parts.extend(rest_docs.iter().copied());
-        let state_first_expanded = d.concat(&state_first_expanded_parts);
-        return d.conditional_group(&[on_line, state_first_expanded]);
-    }
-
     // Prettier's short chain behavior (member-chain.js lines 351-360):
     // For chains with groups.length <= cutoff, just return group(oneLine).
     if !first_has_calls {
@@ -412,32 +398,13 @@ fn build_short_chain_doc<'a>(
         return d.group(on_line);
     }
 
-    // Check for nested calls in first call's args
-    let first_call_arg_contains_call = first_groups
-        .iter()
-        .flat_map(|g| g.nodes.iter())
-        .filter_map(ChainNode::as_call_expression)
-        .any(|call| call.arguments.iter().any(contains_call_expression));
-
-    if !first_call_arg_contains_call {
-        // Prettier: group(printedGroups.flat()) for short chains (member-chain.js:351-359).
-        // group() lets hardlines in the first call (e.g., multiline array) render
-        // naturally while the second call's inner group handles its own arg layout.
-        return d.group(on_line);
-    }
-
-    // When first call's arg contains calls, try both expansion directions
-    let rest_expanded = build_rest_expanded_docs(rest_groups, printer);
-    let mut state_last_expanded_parts: DocBuf = smallvec![first_doc];
-    state_last_expanded_parts.extend(rest_expanded);
-    let state_last_expanded = d.concat(&state_last_expanded_parts);
-
-    let first_expanded_doc = build_first_groups_expanded_doc(first_groups, printer);
-    let mut state_first_expanded_parts: DocBuf = smallvec![first_expanded_doc];
-    state_first_expanded_parts.extend(rest_docs.iter().copied());
-    let state_first_expanded = d.concat(&state_first_expanded_parts);
-
-    d.conditional_group(&[on_line, state_last_expanded, state_first_expanded])
+    // Prettier: group(printedGroups.flat()) for short chains (member-chain.js:351-359).
+    // group() lets hardlines in the first call (e.g., multiline array) render
+    // naturally while each call's inner args group handles its own layout — including
+    // the last-argument hug of a first call whose argument breaks (`X.map((x) => ({`).
+    // A chain-level conditional_group here would measure the whole line flat and
+    // pre-empt that inner hug, force-expanding the first call's argument list instead.
+    d.group(on_line)
 }
 
 /// Whether the chain is `base_call(args).a.b...` — a bare base call followed by ONLY
