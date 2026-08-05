@@ -128,44 +128,37 @@ impl<'a> Printer<'a> {
         if !has_comments {
             return false;
         }
-        // The **effective** first-argument start: a redundant paren shell around the
-        // first argument is stripped in this position, so a line comment the author
-        // wrote just inside it lands in the list's own `<`→argument gap and must route
-        // the list here like any other leading line comment. Asking the shell's span
-        // instead made that gap empty, so the shape fell through to the group path and
-        // the comment rendered from the argument's doc — on its own line, never on the
-        // `<` line the author wrote it on.
+        // Every clause below asks the **effective** argument span — the node left once a
+        // redundant paren shell carrying only leading comments is stripped
+        // ([`Self::leading_paren_unwrapped`]), the same node the expansion builder emits.
+        // The shell is stripped in this position, so a comment the author wrote just
+        // inside it physically lands in one of the list's own gaps (`<`→argument,
+        // argument→argument, argument→`>`) and must route the list here like any other
+        // comment there. Asking `TSType::span` left those gaps empty, so the shape fell
+        // through to the group path and the comment rendered from the argument's own
+        // doc — reaching a different fixed point than the same comment written without
+        // the parens (`Foo<(⏎/* c */⏎T)>` collapsing inline where the bare authoring
+        // expands; `Foo<A, (// c⏎B)>` leading `B` where the bare authoring trails the
+        // comma). Both spellings are idempotent, so only a bare-vs-paren comparison
+        // shows the split — the `unformatted_parens` variants are that claim.
+        //
+        // The strip is also what settles the second case against the element-comma seam
+        // ([`comments.md`](../../../../docs/comments.md)): the two authorings have
+        // byte-identical stripped forms, so the shell carries no position signal past
+        // its own deletion, and the seam's partition claims the comment for the previous
+        // argument's trailing run exactly as it does for the bare form.
+        //
+        // Own-line-ness is measured after the strip too, and correctly: a block glued to
+        // the `(` shares the `<` line, which is the `prev_boundary` the bracket-list
+        // helper compares against, so `Foo<(/* c */⏎T)>` keeps collapsing inline — where
+        // prettier also collapses it. Only a block the author gave its own line expands.
+        let arg_span = |ty: &TSType<'_>| self.leading_paren_unwrapped(ty).span();
         let has_leading_line_comment = args.params.first().is_some_and(|first| {
-            self.has_line_comments_between(
-                args.span.start + 1,
-                self.leading_paren_unwrapped(first).span().start,
-            )
+            self.has_line_comments_between(args.span.start + 1, arg_span(first).start)
         });
-        // TODO: the two clauses below still ask `TSType::span`, so they keep the very
-        // blindness the clause above fixed — a comment inside a *later* argument's
-        // redundant parens, or an own-line BLOCK inside any argument's, sits inside the
-        // param span rather than in a gap they scan, so the list doesn't expand and the
-        // comment renders from the argument's own doc instead. Both make one comment's
-        // two authorings reach two fixed points (idempotent, so F1 is blind — only a
-        // bare-vs-paren comparison shows it):
-        //   `Foo<(/* c */⏎a | b)>`  → `Foo</* c */ a | b>`, where the bare authoring
-        //                              expands (`single_arg_own_line_block_comment`)
-        //   `Map<a, (// c⏎b)>`     → `// c` leads `b`, where the bare `Map<a, // c⏎b>`
-        //                              trails the comma (`a, // c`)
-        // Threading `leading_paren_unwrapped` through both is the shape of the fix, but
-        // it changes layout, so it wants fixtures first — and the second case must be
-        // reconciled with the element-comma seam, which owns that gap's partition.
         has_leading_line_comment
-            || self.has_line_comments_in_delimited_list(
-                args.params,
-                TSType::span,
-                args.span.end - 1,
-            )
-            || self.has_own_line_block_comments_in_bracket_list(
-                args.span,
-                args.params,
-                TSType::span,
-            )
+            || self.has_line_comments_in_delimited_list(args.params, arg_span, args.span.end - 1)
+            || self.has_own_line_block_comments_in_bracket_list(args.span, args.params, arg_span)
     }
 
     /// Build doc for type arguments: `<T, U>`.

@@ -636,6 +636,16 @@ impl<'a> Printer<'a> {
         // Multi-argument (or non-hugging single) tail: the shared width-decided core.
         // The doc printer's look-ahead (fits_with_lookahead) handles the decision
         // of whether to break based on what follows the type params.
+        // Items render through the type-argument printer, the same one the
+        // type-position list uses — an argument here *is* a type argument, so the two
+        // families agree on this path rather than by parallel maintenance (the
+        // comment-forced-multiline sibling below routes the same way). It is
+        // what strips a redundant paren shell whose comments are trailing
+        // (`f<(a | b // c)>(y)`): the generic `build_type_doc` retains such a shell,
+        // because a deferred run must not escape the construct it was written in, but
+        // inside a `<…>` the enclosing list is itself a retained bracketed construct
+        // that the run flushes safely inside of — the reason the type-position path
+        // has always stripped it (see `build_type_doc_for_type_arg`).
         d.group(self.build_angle_list_doc(
             inst.span,
             inst.params.len(),
@@ -644,7 +654,7 @@ impl<'a> Printer<'a> {
                 if frozen {
                     self.build_frozen_list_member_doc(&inst.params[i])
                 } else {
-                    self.build_type_doc(&inst.params[i])
+                    self.build_type_arg_doc(&inst.params[i], true)
                 }
             },
             |i| self.frozen_list_member_multiline(&inst.params[i]),
@@ -657,9 +667,15 @@ impl<'a> Printer<'a> {
         &self,
         inst: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
-        // Call/`new`-expression type arguments render each argument with
-        // `build_type_doc`; the layout is shared with type-position arguments, down to
-        // the leading-only paren unwrap (see `leading_paren_unwrapped`).
+        // Call/`new`-expression type arguments render through the type-argument printer,
+        // exactly as the type-position twin does (`build_type_arguments_doc_with_line_comments`)
+        // — same item printer, same `is_multi` keying, same leading-only paren unwrap
+        // (see `leading_paren_unwrapped`). Rendering with the generic `build_type_doc`
+        // here left a redundant shell whose comments are TRAILING un-stripped
+        // (`f<A, // c1⏎(a | b // c2)>()` kept its parens where the type-position
+        // `Foo<…>` spelling of the same argument stripped them), so one type reached two
+        // layouts by call-vs-type position alone.
+        let is_multi = inst.params.len() > 1;
         self.build_angle_list_with_line_comments(
             inst.span,
             inst.params.len(),
@@ -669,7 +685,7 @@ impl<'a> Printer<'a> {
                 if frozen {
                     self.build_frozen_list_member_doc(param)
                 } else {
-                    self.build_type_doc(param)
+                    self.build_type_arg_doc(param, is_multi)
                 }
             },
         )
