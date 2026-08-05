@@ -148,22 +148,6 @@ impl<'a> Printer<'a> {
             .is_some_and(|b| matches!(b, b'\n' | b'\r'))
     }
 
-    /// Get the search start position for leading comments on list elements
-    ///
-    /// For the first element, returns `prev_end` (search starts after opening delimiter).
-    /// For subsequent elements, returns position after the comma, or `prev_end` if no comma found.
-    ///
-    /// This ensures that comments after a comma are treated as leading on the next element,
-    /// not trailing on the previous element.
-    pub(crate) fn leading_comment_search_start(&self, prev_end: u32, is_first: bool) -> u32 {
-        if is_first {
-            prev_end
-        } else {
-            self.find_comma_after(prev_end)
-                .map_or(prev_end, |pos| pos + 1)
-        }
-    }
-
     /// **in source**: where a blank-line scan running *up to* `node_start` must **stop** —
     /// at the first comment physically in `[prev_end, node_start)`, else at `node_start`.
     ///

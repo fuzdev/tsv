@@ -303,6 +303,75 @@ impl<'a> Printer<'a> {
         self.push_blank_preserving_separator(parts, comment_end, next, self.d().hardline());
     }
 
+    /// The **list-element** sibling of [`Self::push_blank_preserving_hardline`]: same
+    /// emission (`literalline` + `hardline` for an author blank, a bare `hardline`
+    /// otherwise), different blank question.
+    ///
+    /// Here it is prettier's `isNextLineEmpty` ([`Self::is_next_line_empty`]), measured
+    /// from the **element's own end** — which is what makes the *separator* and the
+    /// element's same-line trailing comments trivia. Two consequences the range-based
+    /// question cannot express, and both are authored shapes: a blank the author left
+    /// before a comma they pushed onto its own line still counts (`a: 1⏎⏎// c⏎, b`), and
+    /// one *after* such a comma does not (`a: 1⏎,⏎⏎b` — the rule
+    /// `property_own_line_comma_blank` pins). Callers pass `content_start` = where this
+    /// element's printed content begins (its first leading comment, else the element), so
+    /// a blank ahead of that content is inside the measured range.
+    ///
+    /// The function-parameter list calls it directly, deriving its own `content_start`
+    /// (decorators, the `(`-line pull); every other list goes through
+    /// [`Self::push_item_blank_separator`], which derives that position once. A further
+    /// list that needs the same rule should call one of the two rather than re-derive the
+    /// two-line emission around a bare `is_next_line_empty`.
+    ///
+    /// The literal and the pattern are one entry, not two: prettier prints
+    /// `ObjectExpression` and `ObjectPattern` through the same `printObject`, so a site
+    /// that answers this question differently for one of them is a divergence by
+    /// omission. Arrays are the deliberate exception — array literals and array patterns
+    /// take prettier's *other* helper (`isLineAfterElementEmpty`, [`Self::has_blank_line_after_comma`]),
+    /// which advances to the comma before measuring; see [`Self::is_next_line_empty`] for
+    /// the table of where the two disagree.
+    pub(crate) fn push_next_line_empty_hardline(
+        &self,
+        parts: &mut DocBuf,
+        elem_end: u32,
+        content_start: u32,
+    ) {
+        let d = self.d();
+        if self.is_next_line_empty(elem_end, content_start) {
+            parts.push(d.literalline());
+        }
+        parts.push(d.hardline());
+    }
+
+    /// [`Self::push_next_line_empty_hardline`] with the `content_start` derived here: the
+    /// separator between two list items, asked once for every list that shares the
+    /// element-comma contract (object literal, object pattern, import/export specifiers,
+    /// enum members).
+    ///
+    /// `prev_end` is the previous item's trailing-run end, `item_start` this item's node
+    /// start; the content between them is this item's leading comment run, so the scan
+    /// stops at the first comment.
+    ///
+    /// ⚠️ **in source** — the first comment *physically* in the gap, not the first one
+    /// this caller will emit. A blank-line scan reads bytes, so an OWNED comment (glued
+    /// to the item's first token and printed from inside its doc) bounds it just the
+    /// same: the author's blank sits *before* that comment, and a bound past it would put
+    /// the blank outside the measured range. Deriving this per site is how the literal
+    /// and the pattern came to ask it on two different axes — the one thing `printObject`
+    /// printing both through one path says they must not do.
+    pub(crate) fn push_item_blank_separator(
+        &self,
+        parts: &mut DocBuf,
+        prev_end: u32,
+        item_start: u32,
+    ) {
+        let content_start = self
+            .comments_in_source_between(prev_end, item_start)
+            .next()
+            .map_or(item_start, |c| c.span.start);
+        self.push_next_line_empty_hardline(parts, prev_end, content_start);
+    }
+
     /// Whether `[from, next)` holds a **truly blank line** — two newlines with nothing
     /// but horizontal whitespace between them.
     ///

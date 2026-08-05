@@ -1,0 +1,995 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 480,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a block after the comma stays on the comma line, in front of the line comment the",
+			"start": 10,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " author wrote after it",
+			"start": 96,
+			"end": 120,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 136,
+			"end": 144,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 6
+				},
+				"end": {
+					"line": 5,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 145,
+			"end": 150,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 15
+				},
+				"end": {
+					"line": 5,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " same placement in an array pattern",
+			"start": 166,
+			"end": 203,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 38
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 219,
+			"end": 227,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 6
+				},
+				"end": {
+					"line": 11,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 228,
+			"end": 233,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 15
+				},
+				"end": {
+					"line": 11,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a run of blocks after the comma keeps its order",
+			"start": 249,
+			"end": 299,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 315,
+			"end": 323,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 6
+				},
+				"end": {
+					"line": 17,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 324,
+			"end": 332,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 15
+				},
+				"end": {
+					"line": 17,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 333,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 24
+				},
+				"end": {
+					"line": 17,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " blocks on both sides of the comma each keep their side of it",
+			"start": 354,
+			"end": 417,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 64
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c0 ",
+			"start": 432,
+			"end": 440,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 5
+				},
+				"end": {
+					"line": 23,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 442,
+			"end": 450,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 15
+				},
+				"end": {
+					"line": 23,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 451,
+			"end": 456,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 24
+				},
+				"end": {
+					"line": 23,
+					"column": 29
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 479,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 470,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 26,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 122,
+					"end": 163,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 128,
+							"end": 162,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 7,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 128,
+								"end": 158,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 132,
+										"end": 134,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 2
+											},
+											"end": {
+												"line": 5,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 132,
+											"end": 134,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 2
+												},
+												"end": {
+													"line": 5,
+													"column": 4
+												}
+											},
+											"name": "a1"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 132,
+											"end": 134,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 2
+												},
+												"end": {
+													"line": 5,
+													"column": 4
+												}
+											},
+											"name": "a1"
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 136,
+												"end": 144
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 153,
+										"end": 155,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 153,
+											"end": 155,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 2
+												},
+												"end": {
+													"line": 6,
+													"column": 4
+												}
+											},
+											"name": "b1"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 153,
+											"end": 155,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 2
+												},
+												"end": {
+													"line": 6,
+													"column": 4
+												}
+											},
+											"name": "b1"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 145,
+												"end": 150
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 161,
+								"end": 162,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 5
+									},
+									"end": {
+										"line": 7,
+										"column": 6
+									}
+								},
+								"name": "o"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block after the comma stays on the comma line, in front of the line comment the",
+							"start": 10,
+							"end": 94
+						},
+						{
+							"type": "Line",
+							"value": " author wrote after it",
+							"start": 96,
+							"end": 120
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 205,
+					"end": 246,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 211,
+							"end": 245,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 211,
+								"end": 241,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 215,
+										"end": 217,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 4
+											}
+										},
+										"name": "a2",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 219,
+												"end": 227
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 236,
+										"end": 238,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 4
+											}
+										},
+										"name": "b2",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 228,
+												"end": 233
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 244,
+								"end": 245,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 5
+									},
+									"end": {
+										"line": 13,
+										"column": 6
+									}
+								},
+								"name": "o"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " same placement in an array pattern",
+							"start": 166,
+							"end": 203
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 301,
+					"end": 351,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 307,
+							"end": 350,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 307,
+								"end": 346,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 311,
+										"end": 313,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 17,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 311,
+											"end": 313,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 2
+												},
+												"end": {
+													"line": 17,
+													"column": 4
+												}
+											},
+											"name": "a3"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 311,
+											"end": 313,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 2
+												},
+												"end": {
+													"line": 17,
+													"column": 4
+												}
+											},
+											"name": "a3"
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 315,
+												"end": 323
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 341,
+										"end": 343,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 341,
+											"end": 343,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 2
+												},
+												"end": {
+													"line": 18,
+													"column": 4
+												}
+											},
+											"name": "b3"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 341,
+											"end": 343,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 2
+												},
+												"end": {
+													"line": 18,
+													"column": 4
+												}
+											},
+											"name": "b3"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c2 ",
+												"start": 324,
+												"end": 332
+											},
+											{
+												"type": "Line",
+												"value": " c3",
+												"start": 333,
+												"end": 338
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 349,
+								"end": 350,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 5
+									},
+									"end": {
+										"line": 19,
+										"column": 6
+									}
+								},
+								"name": "o"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a run of blocks after the comma keeps its order",
+							"start": 249,
+							"end": 299
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 419,
+					"end": 469,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 425,
+							"end": 468,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 7
+								},
+								"end": {
+									"line": 25,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 425,
+								"end": 464,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 7
+									},
+									"end": {
+										"line": 25,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 429,
+										"end": 431,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 2
+											},
+											"end": {
+												"line": 23,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 429,
+											"end": 431,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 2
+												},
+												"end": {
+													"line": 23,
+													"column": 4
+												}
+											},
+											"name": "a4"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 429,
+											"end": 431,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 2
+												},
+												"end": {
+													"line": 23,
+													"column": 4
+												}
+											},
+											"name": "a4"
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c0 ",
+												"start": 432,
+												"end": 440
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 459,
+										"end": 461,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 2
+											},
+											"end": {
+												"line": 24,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 459,
+											"end": 461,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 2
+												},
+												"end": {
+													"line": 24,
+													"column": 4
+												}
+											},
+											"name": "b4"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 459,
+											"end": 461,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 2
+												},
+												"end": {
+													"line": 24,
+													"column": 4
+												}
+											},
+											"name": "b4"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 442,
+												"end": 450
+											},
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 451,
+												"end": 456
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 467,
+								"end": 468,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 5
+									},
+									"end": {
+										"line": 25,
+										"column": 6
+									}
+								},
+								"name": "o"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " blocks on both sides of the comma each keep their side of it",
+							"start": 354,
+							"end": 417
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

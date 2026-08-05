@@ -368,9 +368,9 @@ impl<'a> Printer<'a> {
                     prev_end = trailing.end_pos;
                 }
 
-                // Check for trailing comments after last property (before closing brace)
-                // e.g., `{a /*, b*/}`
-                let trailing = self.build_object_pattern_trailing_comments(obj);
+                // Whatever the last property's trailing run left unclaimed, before the
+                // closing brace — e.g. `{a /*, b*/}`.
+                let trailing = self.build_object_pattern_trailing_comments(obj, prev_end);
                 parts.push(trailing);
 
                 // Build group contents: { + properties + } with bracketSpacing
@@ -398,32 +398,31 @@ impl<'a> Printer<'a> {
     /// Build trailing comments doc for the inline (single-line) object pattern
     /// path (between last property and `}`), e.g. `{a /*, b*/}`.
     ///
-    /// Only captures comments on NEW lines (not same-line trailing comments,
-    /// which are handled in the main loop). The expanded paths use
-    /// `build_pattern_trailing_dangling_comments` instead, which puts each
-    /// comment on its own line.
-    fn build_object_pattern_trailing_comments(&self, obj: &internal::ObjectPattern<'_>) -> DocId {
+    /// `prev_end` is the loop's cursor — the last property's trailing-run end
+    /// (`TrailingComments::end_pos`) — so everything still in `[prev_end, boundary)` is by
+    /// construction unclaimed and emitted here. Re-deriving "not on the last property's line" instead would ask the gap a
+    /// second, *different* question than the run that already answered it: the collector
+    /// follows a multi-line block to its closing line, and a comment sitting on that line
+    /// is neither on the property's line nor unclaimed. The expanded paths use
+    /// `build_pattern_trailing_dangling_comments` instead, which puts each comment on its
+    /// own line.
+    fn build_object_pattern_trailing_comments(
+        &self,
+        obj: &internal::ObjectPattern<'_>,
+        prev_end: u32,
+    ) -> DocId {
         let d = self.d();
-        if let Some(last_prop) = obj.properties.last() {
-            let prop_end = last_prop.span().end;
-            let boundary = obj
-                .type_annotation
-                .as_ref()
-                .map_or(obj.span.end, |t| t.span.start);
+        let boundary = obj
+            .type_annotation
+            .as_ref()
+            .map_or(obj.span.end, |t| t.span.start);
 
-            // Only collect comments that are NOT on the same line as the property
-            // Same-line comments are handled in the property loop
-            let mut parts = DocBuf::new();
-            for comment in comments_to_emit_in_range(self.comments, prop_end, boundary) {
-                if !self.is_same_line(prop_end, comment.span.start) {
-                    parts.push(d.text(" "));
-                    parts.push(self.build_comment_doc(comment));
-                }
-            }
-            d.concat(&parts)
-        } else {
-            d.empty()
+        let mut parts = DocBuf::new();
+        for comment in comments_to_emit_in_range(self.comments, prev_end, boundary) {
+            parts.push(d.text(" "));
+            parts.push(self.build_comment_doc(comment));
         }
+        d.concat(&parts)
     }
 
     /// Build dangling comments after the last element of an *expanded* pattern
@@ -442,15 +441,13 @@ impl<'a> Printer<'a> {
         let mut last_pos = prev_end;
         for comment in comments_to_emit_in_range(self.comments, prev_end, boundary) {
             if self.is_same_line(last_pos, comment.span.start) {
-                // Same source line as the preceding content — e.g. a line comment
-                // trailing a *multiline* block's closing line (`*/ // c`). The
-                // per-element loop keys its same-line capture on the element's end,
-                // so a comment sitting on the block's *closing* line (a different
-                // line than the element) was never captured there; keep it inline
-                // here rather than dropping it or forcing it onto its own line.
-                // Keying the test on the running `last_pos` (not the original
-                // `prev_end`) also keeps two same-line dangling comments together
-                // (`/* a */ // b`).
+                // Same source line as the preceding content, which here means the
+                // preceding *comment*: the per-element loop's run already claimed
+                // everything sharing a line with the element (and follows a multi-line
+                // block to its closing line), so `prev_end` opens on a fresh line. The
+                // test is keyed on the running `last_pos` rather than `prev_end` for
+                // exactly that reason — it keeps two same-line dangling comments
+                // together (`/* a */ // b`) instead of splitting them onto two lines.
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             } else {
@@ -632,15 +629,11 @@ impl<'a> Printer<'a> {
             // Handle leading comments before this property (with blank line preservation)
             let prop_start = prop.span().start;
             let leading_comments: CommentVec<'_> = if has_comments {
-                comments_to_emit_in_range(self.comments, prev_end, prop_start)
-                    .filter(|c| {
-                        // The brace-line comment pulled onto the `{` line above is emitted
-                        // as the prefix, not here (only relevant for the first property).
-                        !(i == 0
-                            && brace_pull_pos
-                                .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c)))
-                    })
-                    .collect()
+                self.collect_item_leading_comments(
+                    prev_end,
+                    prop_start,
+                    (i == 0).then_some(brace_pull_pos).flatten(),
+                )
             } else {
                 CommentVec::new()
             };
@@ -674,25 +667,15 @@ impl<'a> Printer<'a> {
             self.push_element_comma_trailing(&mut prop_parts, &trailing, comma);
 
             if !is_last {
-                // Check for blank line before next property
-                let next_prop = &obj.properties[i + 1];
-                let next_start = next_prop.span().start;
-
-                // Check from after trailing comments to next property (or its leading comment)
-                // **in source**: bounds a raw blank-line scan (see `blank_scan_end`).
-                let check_pos = if has_comments {
-                    self.comments_in_source_between(trailing.end_pos, next_start)
-                        .next()
-                        .map_or(next_start, |c| c.span.start)
-                } else {
-                    next_start
-                };
-
-                if self.has_blank_line_between(trailing.end_pos, check_pos) {
-                    // Preserve blank line: literalline (no indent) + hardline (with indent)
-                    prop_parts.push(d.literalline());
-                }
-                prop_parts.push(d.hardline());
+                // Blank line before the next property, on prettier's `isNextLineEmpty` —
+                // the same question the object LITERAL asks, through the same helper,
+                // because `printObject` prints `ObjectExpression` and `ObjectPattern`
+                // through one path. The range-based predicate this used to ask cannot
+                // express it: it counted the newlines in the gap, so a blank *after* a
+                // comma the author pushed onto its own line (`a1⏎,⏎⏎b1`) read as an author
+                // blank and was preserved, where prettier collapses it.
+                let next_start = obj.properties[i + 1].span().start;
+                self.push_item_blank_separator(&mut prop_parts, trailing.end_pos, next_start);
             }
 
             prev_end = trailing.end_pos;
@@ -1011,16 +994,11 @@ impl<'a> Printer<'a> {
             if let Some(e) = elem {
                 // Check for leading comments before this element (with blank line preservation)
                 let elem_start = e.span().start;
-                let leading_comments: CommentVec<'_> =
-                    comments_to_emit_in_range(self.comments, prev_end, elem_start)
-                        .filter(|c| {
-                            // The bracket-line comment pulled onto the `[` line above is
-                            // emitted as the prefix, not here (only the first element).
-                            !(i == 0
-                                && bracket_pull_pos
-                                    .is_some_and(|dpos| self.comment_on_delimiter_line(dpos, c)))
-                        })
-                        .collect();
+                let leading_comments = self.collect_item_leading_comments(
+                    prev_end,
+                    elem_start,
+                    (i == 0).then_some(bracket_pull_pos).flatten(),
+                );
                 // The element's leading run and the element form one group — see
                 // `build_list_element_group` for why (prettier routes `ArrayPattern`
                 // through the same `printArray` as an array literal). An own-line

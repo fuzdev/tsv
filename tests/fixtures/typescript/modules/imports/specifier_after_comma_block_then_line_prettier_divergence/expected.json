@@ -1,0 +1,848 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 488,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a block after the comma stays on the comma line, in front of the line comment the",
+			"start": 10,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " author wrote after it",
+			"start": 96,
+			"end": 120,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 137,
+			"end": 145,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 6
+				},
+				"end": {
+					"line": 5,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 146,
+			"end": 151,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 15
+				},
+				"end": {
+					"line": 5,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a run of blocks after the comma keeps its order",
+			"start": 174,
+			"end": 224,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 241,
+			"end": 249,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 6
+				},
+				"end": {
+					"line": 11,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 250,
+			"end": 258,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 15
+				},
+				"end": {
+					"line": 11,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 259,
+			"end": 264,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 24
+				},
+				"end": {
+					"line": 11,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " exports take the same placement",
+			"start": 287,
+			"end": 321,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 338,
+			"end": 346,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 6
+				},
+				"end": {
+					"line": 17,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 347,
+			"end": 352,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 15
+				},
+				"end": {
+					"line": 17,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a block with no line comment after it leads the next specifier instead",
+			"start": 364,
+			"end": 437,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 1
+				},
+				"end": {
+					"line": 21,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 452,
+			"end": 460,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 14
+				},
+				"end": {
+					"line": 22,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 487,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 478,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 122,
+					"end": 171,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 14
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 133,
+							"end": 135,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 2
+								},
+								"end": {
+									"line": 5,
+									"column": 4
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 133,
+								"end": 135,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 4
+									}
+								},
+								"name": "a1"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 133,
+								"end": 135,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 4
+									}
+								},
+								"name": "a1"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 137,
+									"end": 145
+								}
+							]
+						},
+						{
+							"type": "ImportSpecifier",
+							"start": 154,
+							"end": 156,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 6,
+									"column": 4
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 154,
+								"end": 156,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 4
+									}
+								},
+								"name": "b1"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 154,
+								"end": 156,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 4
+									}
+								},
+								"name": "b1"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c2",
+									"start": 146,
+									"end": 151
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 165,
+						"end": 170,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 8
+							},
+							"end": {
+								"line": 7,
+								"column": 13
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block after the comma stays on the comma line, in front of the line comment the",
+							"start": 10,
+							"end": 94
+						},
+						{
+							"type": "Line",
+							"value": " author wrote after it",
+							"start": 96,
+							"end": 120
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 226,
+					"end": 284,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 14
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 237,
+							"end": 239,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 4
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 237,
+								"end": 239,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 4
+									}
+								},
+								"name": "a2"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 237,
+								"end": 239,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 4
+									}
+								},
+								"name": "a2"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 241,
+									"end": 249
+								}
+							]
+						},
+						{
+							"type": "ImportSpecifier",
+							"start": 267,
+							"end": 269,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 2
+								},
+								"end": {
+									"line": 12,
+									"column": 4
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 267,
+								"end": 269,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 4
+									}
+								},
+								"name": "b2"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 267,
+								"end": 269,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 4
+									}
+								},
+								"name": "b2"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c2 ",
+									"start": 250,
+									"end": 258
+								},
+								{
+									"type": "Line",
+									"value": " c3",
+									"start": 259,
+									"end": 264
+								}
+							]
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 278,
+						"end": 283,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 8
+							},
+							"end": {
+								"line": 13,
+								"column": 13
+							}
+						},
+						"value": "./b",
+						"raw": "'./b'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a run of blocks after the comma keeps its order",
+							"start": 174,
+							"end": 224
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 323,
+					"end": 361,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 3
+						}
+					},
+					"declaration": null,
+					"specifiers": [
+						{
+							"type": "ExportSpecifier",
+							"start": 334,
+							"end": 336,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 2
+								},
+								"end": {
+									"line": 17,
+									"column": 4
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 334,
+								"end": 336,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 4
+									}
+								},
+								"name": "a3"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 334,
+								"end": 336,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 4
+									}
+								},
+								"name": "a3"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 338,
+									"end": 346
+								}
+							]
+						},
+						{
+							"type": "ExportSpecifier",
+							"start": 355,
+							"end": 357,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 2
+								},
+								"end": {
+									"line": 18,
+									"column": 4
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 355,
+								"end": 357,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 4
+									}
+								},
+								"name": "b3"
+							},
+							"exported": {
+								"type": "Identifier",
+								"start": 355,
+								"end": 357,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 4
+									}
+								},
+								"name": "b3"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c2",
+									"start": 347,
+									"end": 352
+								}
+							]
+						}
+					],
+					"source": null,
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " exports take the same placement",
+							"start": 287,
+							"end": 321
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 439,
+					"end": 477,
+					"loc": {
+						"start": {
+							"line": 22,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 39
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 448,
+							"end": 450,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 10
+								},
+								"end": {
+									"line": 22,
+									"column": 12
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 448,
+								"end": 450,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 10
+									},
+									"end": {
+										"line": 22,
+										"column": 12
+									}
+								},
+								"name": "a4"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 448,
+								"end": 450,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 10
+									},
+									"end": {
+										"line": 22,
+										"column": 12
+									}
+								},
+								"name": "a4"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 452,
+									"end": 460
+								}
+							]
+						},
+						{
+							"type": "ImportSpecifier",
+							"start": 461,
+							"end": 463,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 23
+								},
+								"end": {
+									"line": 22,
+									"column": 25
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 461,
+								"end": 463,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 23
+									},
+									"end": {
+										"line": 22,
+										"column": 25
+									}
+								},
+								"name": "b4"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 461,
+								"end": 463,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 23
+									},
+									"end": {
+										"line": 22,
+										"column": 25
+									}
+								},
+								"name": "b4"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 471,
+						"end": 476,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 33
+							},
+							"end": {
+								"line": 22,
+								"column": 38
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block with no line comment after it leads the next specifier instead",
+							"start": 364,
+							"end": 437
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
