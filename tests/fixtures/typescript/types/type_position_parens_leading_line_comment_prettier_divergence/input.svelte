@@ -13,10 +13,11 @@
 	];
 
 	// generic type argument
-	type C = Array<// leading
-	a>;
+	type C = Array< // leading
+		a
+	>;
 
 	// function type return
 	type D = () => // leading
-	a;
+		a;
 </script>

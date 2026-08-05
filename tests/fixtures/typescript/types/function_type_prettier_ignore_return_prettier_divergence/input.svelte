@@ -16,7 +16,7 @@
 
 	// control: a plain comment keeps the trailing relocation
 	type D = () => // c
-	{ x: 1 };
+		{ x: 1 };
 
 	// placement, not spelling: a BLOCK directive alone on its line in the `)`→`=>` gap
 	type E = ()

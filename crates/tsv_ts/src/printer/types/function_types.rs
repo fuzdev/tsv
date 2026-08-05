@@ -161,7 +161,13 @@ impl<'a> Printer<'a> {
         // Comments between `=>` and the return type (e.g., `() => /* c */ string`)
         // For function types, the annotation span starts at `=` in `=>`
         let arrow_end = return_type.span.start + "=>".len() as u32;
-        let type_start = return_type.type_annotation.span().start;
+        // The **effective** return type: a redundant paren shell holding only leading
+        // comments is stripped here, so those comments belong to the `=>` gap below and
+        // are emitted by it (see `leading_paren_unwrapped`) — that is what makes
+        // `() => // c⏎T` and `() => (// c⏎T)` reach the same fixed point instead of the
+        // shell's own flush hang.
+        let return_ty = self.leading_paren_unwrapped(return_type.type_annotation);
+        let type_start = return_ty.span().start;
         // An alone-on-line format-ignore directive in the `=>`→return gap stays
         // OWN-LINE — the trailing-hang emitter below would relocate it to trail the
         // `=>` (`=> // prettier-ignore`), an inert placement that loses the freeze on
@@ -170,7 +176,7 @@ impl<'a> Printer<'a> {
         // leading-run walk, which reaches the directive across the gap's whitespace).
         // Covers function, constructor, and abstract-constructor types (all route here).
         if self.member_gap_frozen(arrow_end, type_start) {
-            let value_doc = self.build_routed_child_doc(return_type.type_annotation);
+            let value_doc = self.build_routed_child_doc(return_ty);
             let mut parts: DocBuf = smallvec![d.text(arrow)];
             self.append_keyword_value_line_comments(&mut parts, arrow_end, type_start, value_doc);
             return d.concat(&parts);
@@ -183,8 +189,19 @@ impl<'a> Printer<'a> {
         let comments_doc = self
             .has_comments_to_emit_between(arrow_end, type_start)
             .then(|| self.build_trailing_comments_hang_next(arrow_end, type_start));
+        // A comment that hangs the return type takes the continuation indent every
+        // other keyword→value gap takes (§Uniform Forced-Continuation Indent) — the
+        // `member_gap_frozen` arm above already gets it from
+        // `append_keyword_value_line_comments`, and this is the same seam without a
+        // directive. The indent wraps the comment run *and* the type, so the hardline
+        // inside the run is what carries it; an inline block hangs nothing, so the
+        // wrapper is gated rather than unconditional (it would be inert, but the gate
+        // states which case it is for).
+        let hangs =
+            comments_doc.is_some() && self.comments_force_own_line_between(arrow_end, type_start);
         // `<lead><comments><type>`, skipping the comment slot when the gap is bare.
         let joined = |lead: DocId, ty: DocId| match comments_doc {
+            Some(c) if hangs => d.concat(&[lead, d.indent(d.concat(&[c, ty]))]),
             Some(c) => d.concat(&[lead, c, ty]),
             None => d.concat(&[lead, ty]),
         };
@@ -192,7 +209,7 @@ impl<'a> Printer<'a> {
         // types get the same hanging layout as the bare form (prettier strips them
         // too). Only union/intersection are unwrapped; other parenthesized types
         // keep the match-on-original fall-through below.
-        let value_type = self.unwrap_redundant_parens(return_type.type_annotation);
+        let value_type = self.unwrap_redundant_parens(return_ty);
         if let TSType::Union(u) = value_type {
             let type_doc = self.build_union_type_doc(u);
             // A brace-hugging union return (`{ … } | null` / `| void`) hugs `=>`
@@ -223,7 +240,7 @@ impl<'a> Printer<'a> {
             let wrapped = self.intersection_hanging_with_indent(i);
             return joined(d.text(arrow_sp), wrapped);
         }
-        match return_type.type_annotation {
+        match return_ty {
             // TypeReference with complex type args (like Promise<Result<...>>):
             // Build with wrapping type args so it can break inside the <...>
             TSType::TypeReference(r)
@@ -232,13 +249,10 @@ impl<'a> Printer<'a> {
                     .is_some_and(type_args_should_wrap_for_return_type) =>
             {
                 // The type reference's own type arguments wrap internally when too wide.
-                let type_doc = self.build_type_doc(return_type.type_annotation);
+                let type_doc = self.build_type_doc(return_ty);
                 joined(d.text(arrow_sp), type_doc)
             }
-            _ => joined(
-                d.text(arrow_sp),
-                self.build_type_doc(return_type.type_annotation),
-            ),
+            _ => joined(d.text(arrow_sp), self.build_type_doc(return_ty)),
         }
     }
 
