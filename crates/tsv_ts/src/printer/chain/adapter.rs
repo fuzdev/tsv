@@ -157,24 +157,6 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    pub(crate) fn build_trailing_line_doc(&self, comments: &[&Comment]) -> DocId {
-        let d = self.d();
-        if comments.is_empty() {
-            return d.empty();
-        }
-
-        // Line comments in chains need special handling:
-        // Use line_suffix_boundary + line_suffix to keep comment with preceding call
-        // The boundary ensures the comment is flushed before the next softline
-        let mut parts = DocBuf::with_capacity(comments.len() + 1);
-        for comment in comments {
-            parts.push(self.build_trailing_line_comment_doc(comment));
-        }
-        // Add boundary to flush the line_suffix before any following softline
-        parts.push(d.line_suffix_boundary());
-        d.concat(&parts)
-    }
-
     pub(crate) fn build_chain_leading_comments_doc(&self, comments: &[&Comment]) -> DocId {
         let d = self.d();
         if comments.is_empty() {
@@ -190,14 +172,22 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    pub(crate) fn build_line_comments_no_boundary(&self, comments: &[&Comment]) -> DocId {
+    /// A chain gap's trailing line comments, deferred via `line_suffix` — the run
+    /// rides to the end of the output line and is flushed by whatever break the
+    /// caller emits next.
+    ///
+    /// **The caller must emit that break.** A `line_suffix_boundary` here would flush
+    /// the run *and end the line itself* (see `tsv_lang`'s `render_line_node`), so a
+    /// caller that also breaks — every chain gap does, `build_chain_line_break` being
+    /// a hardline at minimum — would render a blank line under the comment. Prettier
+    /// plants its boundary at a member lookup whose following `softline` may collapse
+    /// (`print/member.js`); a chain gap is the case where it may not.
+    pub(crate) fn build_deferred_line_comments_doc(&self, comments: &[&Comment]) -> DocId {
         let d = self.d();
         if comments.is_empty() {
             return d.empty();
         }
 
-        // Build line_suffix docs WITHOUT a trailing boundary.
-        // The comments will stay deferred until the actual end of line.
         let mut parts = DocBuf::with_capacity(comments.len());
         for comment in comments {
             parts.push(self.build_trailing_line_comment_doc(comment));

@@ -1,6 +1,5 @@
 //! Width fitting algorithms for arena-based doc trees.
 
-use crate::EmbedContext;
 use crate::config::TAB_WIDTH;
 use crate::printing::visual_width;
 use smallvec::SmallVec;
@@ -123,7 +122,11 @@ fn flat_width_fill(
             flat_width_memo(*doc, nodes, children, cache, source)
                 .map(|w| w.saturating_add(context.trailing_reserve() as u32))
         }
-        DocNode::LineSuffix(_) | DocNode::LineSuffixBoundary => Some(0),
+        // Neither occupies a column, but both carry the `has_line_suffix` state
+        // the walk needs (a boundary with a suffix pending doesn't fit), and a
+        // memoized width would hide them from it. `None` here means "walk it",
+        // never "it breaks" — the walk's own arms charge them 0 columns.
+        DocNode::LineSuffix(_) | DocNode::LineSuffixBoundary => None,
         DocNode::BreakParent => None,
     };
     cache[id.index()] = match result {
@@ -135,16 +138,23 @@ fn flat_width_fill(
 
 /// Check if a doc fits in the remaining width, looking ahead at remaining commands.
 ///
-/// `embed` is currently unused — fits decisions only need the fixed
-/// [`crate::TAB_WIDTH`]. The parameter is threaded so internal callers from
-/// `arena_render` can pass it uniformly.
+/// `has_line_suffix` is the caller's pending-suffix state (Prettier's
+/// `hasLineSuffix`, passed as `lineSuffix.length > 0`): a deferred comment
+/// already queued for this line. Reaching a `LineSuffixBoundary` with one
+/// pending doesn't fit — the boundary will end the line to flush it, so a group
+/// measured flat across it would render a break it never accounted for.
+///
+/// Takes no `EmbedContext`: a fits decision needs only the fixed
+/// [`crate::TAB_WIDTH`], and the embed context's one width effect
+/// (`effective_suffix_width`) is already folded into `remaining_width` by the
+/// caller.
 pub(super) fn arena_fits_with_lookahead(
     arena: &DocArena,
     doc: DocId,
     mode: Mode,
     rest_commands: &[ArenaCommand],
     remaining_width: isize,
-    _embed: &EmbedContext,
+    mut has_line_suffix: bool,
     source: Option<&str>,
 ) -> bool {
     if remaining_width == isize::MAX {
@@ -306,8 +316,16 @@ pub(super) fn arena_fits_with_lookahead(
                     continue;
                 }
 
-                DocNode::LineSuffix(_) => {}
-                DocNode::LineSuffixBoundary => {}
+                // Zero columns each — a suffix is deferred to the line's end, and
+                // the boundary is the flush point. What they carry is state: a
+                // boundary reached with a suffix pending will END THE LINE to
+                // flush it, so nothing measured past it is on this line.
+                DocNode::LineSuffix(_) => has_line_suffix = true,
+                DocNode::LineSuffixBoundary => {
+                    if has_line_suffix {
+                        return false;
+                    }
+                }
                 DocNode::BreakParent => return false,
             }
         }
@@ -336,7 +354,8 @@ pub(super) fn arena_fits_with_lookahead(
 ///
 /// Uses the production [`crate::TAB_WIDTH`] for visual width calculations.
 /// Internal callers that need look-ahead use [`arena_fits_with_lookahead`]
-/// directly.
+/// directly. Build-time callers have no render loop and so no pending line
+/// suffix — hence `has_line_suffix: false`.
 pub fn arena_fits(
     arena: &DocArena,
     doc: DocId,
@@ -344,15 +363,7 @@ pub fn arena_fits(
     mode: Mode,
     source: Option<&str>,
 ) -> bool {
-    arena_fits_with_lookahead(
-        arena,
-        doc,
-        mode,
-        &[],
-        width as isize,
-        &EmbedContext::default(),
-        source,
-    )
+    arena_fits_with_lookahead(arena, doc, mode, &[], width as isize, false, source)
 }
 
 /// Check if multiple docs fit sequentially in the remaining width.
@@ -368,7 +379,7 @@ pub(super) fn arena_fits_multi(
     doc_ids: &[DocId],
     width: usize,
     mode: Mode,
-    embed: &EmbedContext,
+    has_line_suffix: bool,
     source: Option<&str>,
 ) -> bool {
     if width == usize::MAX {
@@ -392,7 +403,7 @@ pub(super) fn arena_fits_multi(
         mode,
         &rest_commands,
         width as isize,
-        embed,
+        has_line_suffix,
         source,
     )
 }
