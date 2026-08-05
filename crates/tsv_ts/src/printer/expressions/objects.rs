@@ -141,6 +141,17 @@ impl<'a> Printer<'a> {
                 // (between two comments, and between the last one and the property), and
                 // emits a soft `line` where the run may still collapse, so an object that
                 // stays inline is decided by its group rather than by a hardcoded space.
+                // TODO: the object literal is a third case in the array-family / params-family
+                // split (docs/comments.md §Array family vs params family) and it is not named
+                // there. It gives a property no group of its own, so a leading run's soft
+                // `line` breaks — `p1: 1,⏎/* c */⏎p2: 2` — where the ARRAY family collapses it
+                // onto the element (`'aaaa',⏎/* c */ 'bbbb'`) from the identical authoring.
+                // Prettier relocates the block before the comma at both sites (the sanctioned
+                // §Array element end-of-line block comment rule, currently cataloged for the
+                // array only), so its own grouping is not observable here and neither form is
+                // validated against it. Settle which family the object literal belongs to
+                // before cataloging the object / specifier / enum face of that divergence —
+                // sanctioning the own-line form first would pin whichever one this is.
                 self.push_leading_comments_before(&mut parts, &comments, prop_start);
 
                 // Build property doc — a preceding format-ignore directive keeps the

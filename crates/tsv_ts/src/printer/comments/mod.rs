@@ -317,9 +317,18 @@ impl<'a> Printer<'a> {
     /// element's printed content begins (its first leading comment, else the element), so
     /// a blank ahead of that content is inside the measured range.
     ///
-    /// The object-literal, import/export-specifier, enum-member and function-parameter
-    /// list loops share it; a fifth list that needs the same rule should call it rather
-    /// than re-derive the two-line emission around a bare `is_next_line_empty`.
+    /// The object-literal, object-**pattern**, import/export-specifier, enum-member and
+    /// function-parameter list loops share it; a further list that needs the same rule
+    /// should call it rather than re-derive the two-line emission around a bare
+    /// `is_next_line_empty`.
+    ///
+    /// The literal and the pattern are one entry, not two: prettier prints
+    /// `ObjectExpression` and `ObjectPattern` through the same `printObject`, so a site
+    /// that answers this question differently for one of them is a divergence by
+    /// omission. Arrays are the deliberate exception — array literals and array patterns
+    /// take prettier's *other* helper (`isLineAfterElementEmpty`, [`Self::has_blank_line_after_comma`]),
+    /// which advances to the comma before measuring; see [`Self::is_next_line_empty`] for
+    /// the table of where the two disagree.
     pub(crate) fn push_next_line_empty_hardline(
         &self,
         parts: &mut DocBuf,

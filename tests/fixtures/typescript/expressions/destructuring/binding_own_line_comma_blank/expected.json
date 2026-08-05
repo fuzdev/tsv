@@ -1,0 +1,661 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 515,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a blank line counts only when it starts on the line the binding ends on, so a comma the",
+			"start": 10,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " author pushed onto its own line takes the following blank out of the gap",
+			"start": 102,
+			"end": 177,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 189,
+			"end": 194,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 2
+				},
+				"end": {
+					"line": 5,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " authored the other way round, the blank does start on that line and is preserved",
+			"start": 216,
+			"end": 299,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 311,
+			"end": 316,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an array pattern takes the other rule - it measures from the comma, so a blank after an",
+			"start": 339,
+			"end": 429,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " own-line comma is preserved there",
+			"start": 431,
+			"end": 467,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 479,
+			"end": 484,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 7
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 514,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 505,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 26,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 179,
+					"end": 213,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 185,
+							"end": 212,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 185,
+								"end": 208,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 8,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 197,
+										"end": 199,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 2
+											},
+											"end": {
+												"line": 6,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 197,
+											"end": 199,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 2
+												},
+												"end": {
+													"line": 6,
+													"column": 4
+												}
+											},
+											"name": "a1"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 197,
+											"end": 199,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 2
+												},
+												"end": {
+													"line": 6,
+													"column": 4
+												}
+											},
+											"name": "a1"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c1",
+												"start": 189,
+												"end": 194
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 203,
+										"end": 205,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 203,
+											"end": 205,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 2
+												},
+												"end": {
+													"line": 7,
+													"column": 4
+												}
+											},
+											"name": "b1"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 203,
+											"end": 205,
+											"loc": {
+												"start": {
+													"line": 7,
+													"column": 2
+												},
+												"end": {
+													"line": 7,
+													"column": 4
+												}
+											},
+											"name": "b1"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 211,
+								"end": 212,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 5
+									},
+									"end": {
+										"line": 8,
+										"column": 6
+									}
+								},
+								"name": "o"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a blank line counts only when it starts on the line the binding ends on, so a comma the",
+							"start": 10,
+							"end": 100
+						},
+						{
+							"type": "Line",
+							"value": " author pushed onto its own line takes the following blank out of the gap",
+							"start": 102,
+							"end": 177
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 301,
+					"end": 336,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 307,
+							"end": 335,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 16,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 307,
+								"end": 331,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 319,
+										"end": 321,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 2
+											},
+											"end": {
+												"line": 13,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 319,
+											"end": 321,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 2
+												},
+												"end": {
+													"line": 13,
+													"column": 4
+												}
+											},
+											"name": "a2"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 319,
+											"end": 321,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 2
+												},
+												"end": {
+													"line": 13,
+													"column": 4
+												}
+											},
+											"name": "a2"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 311,
+												"end": 316
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 326,
+										"end": 328,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 4
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 326,
+											"end": 328,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 2
+												},
+												"end": {
+													"line": 15,
+													"column": 4
+												}
+											},
+											"name": "b2"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 326,
+											"end": 328,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 2
+												},
+												"end": {
+													"line": 15,
+													"column": 4
+												}
+											},
+											"name": "b2"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 334,
+								"end": 335,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 5
+									},
+									"end": {
+										"line": 16,
+										"column": 6
+									}
+								},
+								"name": "o"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " authored the other way round, the blank does start on that line and is preserved",
+							"start": 216,
+							"end": 299
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 469,
+					"end": 504,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 7
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 475,
+							"end": 503,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 7
+								},
+								"end": {
+									"line": 25,
+									"column": 6
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 475,
+								"end": 499,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 7
+									},
+									"end": {
+										"line": 25,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 487,
+										"end": 489,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 2
+											},
+											"end": {
+												"line": 22,
+												"column": 4
+											}
+										},
+										"name": "a3",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c3",
+												"start": 479,
+												"end": 484
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 494,
+										"end": 496,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 2
+											},
+											"end": {
+												"line": 24,
+												"column": 4
+											}
+										},
+										"name": "b3"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 502,
+								"end": 503,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 5
+									},
+									"end": {
+										"line": 25,
+										"column": 6
+									}
+								},
+								"name": "o"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an array pattern takes the other rule - it measures from the comma, so a blank after an",
+							"start": 339,
+							"end": 429
+						},
+						{
+							"type": "Line",
+							"value": " own-line comma is preserved there",
+							"start": 431,
+							"end": 467
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

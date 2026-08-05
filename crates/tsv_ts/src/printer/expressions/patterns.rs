@@ -674,8 +674,11 @@ impl<'a> Printer<'a> {
                 let next_prop = &obj.properties[i + 1];
                 let next_start = next_prop.span().start;
 
-                // Check from after trailing comments to next property (or its leading comment)
-                // **in source**: bounds a raw blank-line scan (see `blank_scan_end`).
+                // Where this property's printed content begins — its first leading comment,
+                // else the property. **in source**, so an OWNED comment (glued to the
+                // property's first token, printed from inside its doc) bounds the scan too:
+                // the author's blank sits *before* it, and a bound past it would put the
+                // blank outside the measured range.
                 let check_pos = if has_comments {
                     self.comments_in_source_between(trailing.end_pos, next_start)
                         .next()
@@ -684,11 +687,14 @@ impl<'a> Printer<'a> {
                     next_start
                 };
 
-                if self.has_blank_line_between(trailing.end_pos, check_pos) {
-                    // Preserve blank line: literalline (no indent) + hardline (with indent)
-                    prop_parts.push(d.literalline());
-                }
-                prop_parts.push(d.hardline());
+                // Prettier's `isNextLineEmpty`, the same question the object LITERAL asks —
+                // `printObject` prints `ObjectExpression` and `ObjectPattern` through one
+                // path, so the two must agree on which blank survives. The range-based
+                // predicate this used to ask cannot express that: it counted the newlines
+                // in the gap, so a blank *after* a comma the author pushed onto its own
+                // line (`a1⏎,⏎⏎b1`) read as an author blank and was preserved, where
+                // prettier collapses it.
+                self.push_next_line_empty_hardline(&mut prop_parts, trailing.end_pos, check_pos);
             }
 
             prev_end = trailing.end_pos;

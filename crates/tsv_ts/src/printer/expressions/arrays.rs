@@ -195,8 +195,18 @@ impl<'a> Printer<'a> {
     /// `comma_pos` is the separator after `prev_end`, and `gap_end` bounds the gap the
     /// line comment is looked for in — the SAME range the caller classifies over, so the
     /// trailing collection and the next element's leading filter (its complement) stay
-    /// two readings of one predicate. An own-line comment (a newline *before* it) forces
-    /// the expanding path, so it never reaches the non-expanding callers.
+    /// two readings of one predicate.
+    ///
+    /// ⚠️ **Only the expanding printer can reach that exception**, and the whole-array
+    /// gate is what guarantees it: a `//` anywhere between `[` and `]` sets
+    /// `has_expanding_comments`, so a gap holding one is never classified by the
+    /// non-expanding callers. There the second arm is provably inert and this predicate
+    /// collapses to the comma test — which is exactly what lets
+    /// [`Self::add_inline_leading_block_comments`] emit its whole range without a
+    /// trailing-side filter. Widening either the exception or that gate has to keep the
+    /// two in step, or a block past the comma is claimed by both emitters.
+    /// (An own-line comment — a newline *before* it — routes to the expanding path the
+    /// same way.)
     fn block_comment_trails_prev_element(
         &self,
         prev_end: u32,
@@ -227,9 +237,18 @@ impl<'a> Printer<'a> {
     /// paths in the non-expanding array printers.
     ///
     /// No trailing-side filter is needed: `search_start` is already past slot `i - 1`'s
-    /// comma ([`Self::leading_comment_search_start_for`]), and a block comment trails the
-    /// previous element only from *before* that comma — so this range holds none of them,
-    /// and the trailing emitter's own comma test excludes exactly what this one keeps.
+    /// comma ([`Self::leading_comment_search_start_for`]), and *here* a block comment
+    /// trails the previous element only from *before* that comma — so this range holds
+    /// none of them, and the trailing emitter's own comma test excludes exactly what this
+    /// one keeps.
+    ///
+    /// ⚠️ "Here" is load-bearing, and it rests on a gate one call away rather than on the
+    /// range: [`Self::block_comment_trails_prev_element`] also trails a block *past* the
+    /// comma when a same-line `//` follows it, and such a block would be in this range.
+    /// A `//` anywhere in the array routes it to the expanding printer instead, so the
+    /// exception cannot reach this one — the complement holds because of that gate, not
+    /// because of where `search_start` sits. A filter-free emit is only safe while both
+    /// stay true.
     fn add_inline_leading_block_comments(
         &self,
         search_start: u32,
