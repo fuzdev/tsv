@@ -128,6 +128,9 @@ fn flat_width_fill(
         // never "it breaks" — the walk's own arms charge them 0 columns.
         DocNode::LineSuffix(_) | DocNode::LineSuffixBoundary => None,
         DocNode::BreakParent => None,
+        // Carries the pending-flush state the walk needs (like the suffix pair
+        // above); a memoized width would hide it. `None` = "walk it".
+        DocNode::FlushBreak => None,
     };
     cache[id.index()] = match result {
         Some(w) => w,
@@ -142,7 +145,10 @@ fn flat_width_fill(
 /// `hasLineSuffix`, passed as `lineSuffix.length > 0`): a deferred comment
 /// already queued for this line. Reaching a `LineSuffixBoundary` with one
 /// pending doesn't fit — the boundary will end the line to flush it, so a group
-/// measured flat across it would render a break it never accounted for.
+/// measured flat across it would render a break it never accounted for. The
+/// walk arms an analogous flush-scoped state at a [`DocNode::FlushBreak`] and
+/// carries it into the `rest_commands` look-ahead the same way — see
+/// `pending_flush` below.
 ///
 /// Takes no `EmbedContext`: a fits decision needs only the fixed
 /// [`crate::TAB_WIDTH`], and the embed context's one width effect
@@ -175,6 +181,18 @@ pub(super) fn arena_fits_with_lookahead(
     let mut stack: SmallVec<[(DocId, Mode); 16]> = SmallVec::new();
     let mut rest_idx = rest_commands.len();
 
+    // Pending flush-scoped break ([`DocNode::FlushBreak`]): a deferred trailing
+    // run behind this point needs a line end, so a *flat* breakable line — a
+    // `Line(Normal|Soft)`, or an `IfBreak` whose break arm can break — reached
+    // while pending does not fit: the group owning that line must break to
+    // flush the run. A group with no line opportunity after the node is
+    // unaffected and stays flat (the whole point — an unscoped `BreakParent`
+    // here forced intermediate groups into breaks the reparse cannot
+    // reproduce). Discovered by walking, never seeded: the group whose verdict
+    // must flip always contains the node (the memo returns `None` on any
+    // subtree holding one, so the walk always sees it).
+    let mut pending_flush = false;
+
     // Tail-continuation dispatch — same shape as the render loops (see
     // `render_doc_iterative`): single-continuation arms assign the current
     // `(id, mode)` and `continue` instead of a push+pop round trip through the
@@ -188,8 +206,11 @@ pub(super) fn arena_fits_with_lookahead(
     loop {
         // Fast path: a break-free subtree in flat mode contributes a fixed,
         // memoized width — identical to walking it (the walk would only sum the
-        // same width with no early return).
+        // same width with no early return). Bypassed while a flush-scoped break
+        // is pending: the memo summarizes a `Line(Normal)` as width 1, hiding
+        // exactly the node the pending state must veto on.
         if current_mode == Mode::Flat
+            && !pending_flush
             && let Some(w) = flat_width_memo(
                 current_id,
                 &nodes,
@@ -233,10 +254,16 @@ pub(super) fn arena_fits_with_lookahead(
                 // Any `Line` reaching the slow walk ends the current line, so
                 // everything measured so far fits. `Hard`/`Literal` break in
                 // either mode; a `Soft`/`Normal` reaches here only in `Break`
-                // mode (the Flat fast path above answers them from the memo —
-                // `Some(0)`/`Some(1)` — so they never fall through), where the
-                // break likewise ends the line. Hence unconditionally `true`.
-                DocNode::Line(_) => return true,
+                // mode — where the break likewise ends the line — or in Flat
+                // mode with a flush-scoped break pending (the memo fast path
+                // answers them `Some(0)`/`Some(1)` otherwise). A flat
+                // `Soft`/`Normal` renders no line end, so while pending it is
+                // the veto point: the group must break here to flush the run.
+                DocNode::Line(kind) => {
+                    return !(pending_flush
+                        && current_mode == Mode::Flat
+                        && matches!(kind, LineKind::Soft | LineKind::Normal));
+                }
 
                 DocNode::Group {
                     contents,
@@ -290,6 +317,22 @@ pub(super) fn arena_fits_with_lookahead(
                     let chosen = if group_id.is_none() && current_mode == Mode::Break {
                         *break_doc
                     } else {
+                        // A flat if_break renders no line end, but its break arm may
+                        // hold one (a composite's `if_break(line + "| ", " | ")`
+                        // separator): with a flush-scoped break pending, that unmade
+                        // line is where the deferred run flushes, so the group
+                        // measured flat across it does not fit — it must break to
+                        // take the break arm. Scoped to plain if_breaks: a group-id
+                        // one keys on another group's decision, which breaking the
+                        // measured group would not change. Mode here is necessarily
+                        // Flat for a plain if_break — the Break case chose
+                        // `break_doc` above — so no explicit mode check is needed.
+                        if pending_flush
+                            && group_id.is_none()
+                            && DocArena::can_break_inner(*break_doc, &nodes, &children_vec)
+                        {
+                            return false;
+                        }
                         *flat_doc
                     };
                     current_id = chosen;
@@ -327,6 +370,10 @@ pub(super) fn arena_fits_with_lookahead(
                     }
                 }
                 DocNode::BreakParent => return false,
+                // Zero columns; arms the pending-flush veto above. Not an
+                // unconditional "doesn't fit" — a group with no line
+                // opportunity after this point is deliberately left flat.
+                DocNode::FlushBreak => pending_flush = true,
             }
         }
 

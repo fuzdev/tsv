@@ -5,7 +5,7 @@ use super::{Printer, build_entity_name_doc, is_effectively_empty_body};
 use crate::ast::internal::{self, TSType};
 use crate::printer::ignore::is_freeze_target;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
-use crate::printer::types::ArraySuffixLayout;
+use crate::printer::types::{ArraySuffixLayout, TrailingBlock};
 use crate::printer::{CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue};
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
@@ -263,11 +263,9 @@ impl<'a> Printer<'a> {
                     || self.paren_retains_for_trailing_run(a.element_type)
             }
             // A redundant paren shell whose comments are ALL in its trailing gap
-            // (`= (U // c)[]`, `= (A // c)`). The shell emits a `break_parent` so that a
-            // sibling member can't absorb the comment's line, but with nothing after the
-            // shell that break reaches only the `=` — where it renders a split the reparse
-            // cannot reproduce, the parens being gone by then. The run itself is deferred,
-            // so the value prints flat: the `=` must not break either.
+            // (`= (U // c)[]`, `= (A // c)`): with no separator following, the shell
+            // RETAINS and opens over real hardlines — the value breaks internally, so
+            // the `=` hugs it like a tuple or type literal rather than also breaking.
             TSType::Parenthesized(_) => self.paren_retains_for_trailing_run(ty),
             // A single-member union / intersection prints transparently as its member
             // (prettier drops the node in postprocess), so the `=` asks the member —
@@ -385,7 +383,7 @@ impl<'a> Printer<'a> {
             // can independently decide whether to break. Built from the unwrapped inner
             // (equal to the RHS when no shell was stripped) plus any trailing comment
             // lifted from the shell; type position, so a trailing block trails the value
-            // inline before the `;` (`defer = false`). A frozen RHS is the verbatim
+            // inline before the `;`. A frozen RHS is the verbatim
             // slice instead (redundant parens drop unless the shell holds a comment).
             let type_doc = if interior_frozen_inner.is_some() {
                 // The frozen paren-stripped inner, with any trailing shell-gap
@@ -394,10 +392,10 @@ impl<'a> Printer<'a> {
                     self.build_frozen_single_child_doc(value_type),
                     &decl.type_annotation,
                     value_type,
-                    false,
+                    TrailingBlock::Inline,
                 )
             } else {
-                self.build_keyword_value_doc(&head, false)
+                self.build_keyword_value_doc(&head, TrailingBlock::Inline)
             };
             let mut indent_content: DocBuf = smallvec![d.hardline()];
             indent_content.extend(indent_comment_parts);

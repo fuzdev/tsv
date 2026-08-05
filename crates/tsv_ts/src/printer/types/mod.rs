@@ -52,6 +52,21 @@ use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{find_char_skipping_comments, skip_comment};
 
+/// How [`Printer::with_stripped_paren_trailing`] emits a trailing **block**
+/// comment lifted from a stripped shell's gap (a trailing **line** comment
+/// always defers — a `//` must end its line).
+#[derive(Debug, Clone, Copy)]
+pub(in crate::printer) enum TrailingBlock {
+    /// Trail inline (`X /* c */`) — a **type** position, where the enclosing
+    /// construct keeps a value-trailing block before its terminator, so inline
+    /// is that position's fixed point.
+    Inline,
+    /// Defer via `line_suffix` past the statement terminator — a **value**
+    /// position (an `as`/`satisfies` cast), matching the declarator's own
+    /// value→`;` trailing-comment handling.
+    Deferred,
+}
+
 /// A resolved keyword→value head — see [`Printer::keyword_value_head`].
 pub(in crate::printer) struct KeywordValueHead<'t> {
     /// The head gap's start — the keyword's end. `None` only at a site that PROVED its
@@ -203,8 +218,8 @@ impl<'a> Printer<'a> {
                             || self.comments_force_own_line_between(is_end, head.value_start))
                     {
                         // Type position: a trailing block lifted from the shell trails
-                        // the type inline before the body `{` (`defer = false`).
-                        let value_doc = self.build_keyword_value_doc(head, false);
+                        // the type inline before the body `{`.
+                        let value_doc = self.build_keyword_value_doc(head, TrailingBlock::Inline);
                         parts.push(d.text(" is"));
                         self.append_keyword_value_line_comments(
                             &mut parts,
@@ -293,12 +308,12 @@ impl<'a> Printer<'a> {
                         operand_doc
                     };
                     // Type position: a trailing block lifted from the shell trails the
-                    // operand inline (`defer = false`).
+                    // operand inline.
                     let value_doc = self.with_stripped_paren_trailing(
                         value_doc,
                         o.type_annotation,
                         operand_hang_type,
-                        false,
+                        TrailingBlock::Inline,
                     );
                     let mut parts = smallvec![d.text(o.operator.as_str())];
                     self.append_keyword_value_line_comments(
@@ -851,19 +866,16 @@ impl<'a> Printer<'a> {
     /// comment in its trailing gap `(inner.end, original.end)` — the gap the leading-run
     /// emitters ([`Self::append_keyword_value_line_comments`] et al.) never reach.
     ///
-    /// A trailing **line** comment always uses `line_suffix` (a `//` must end its line).
-    /// A trailing **block** comment trails inline at a **type** position (`defer` =
-    /// false) — where the enclosing construct keeps a value-trailing block before its
-    /// terminator, so inline is that position's fixed point — but uses `line_suffix` at a
-    /// **value** position (`defer` = true, an `as`/`satisfies` cast) so it defers past the
-    /// statement `;`, matching the declarator's own value→`;` trailing-comment handling.
+    /// A trailing **line** comment always uses `line_suffix` (a `//` must end its line);
+    /// a trailing **block** comment follows `trailing_block` — see [`TrailingBlock`] for
+    /// the position rationale.
     /// Mirrors [`Self::build_parenthesized_type_unwrap_doc`]'s trailing arm.
     pub(in crate::printer) fn with_stripped_paren_trailing(
         &self,
         value_doc: DocId,
         original: &TSType<'_>,
         inner: &TSType<'_>,
-        defer: bool,
+        trailing_block: TrailingBlock,
     ) -> DocId {
         // Not a stripped shell → nothing was lifted out of a trailing gap.
         if original.span() == inner.span() {
@@ -878,7 +890,7 @@ impl<'a> Printer<'a> {
         let mut parts: DocBuf = smallvec![value_doc];
         let mut needs_break = false;
         for comment in comments_to_emit_in_range(self.comments, trailing_start, trailing_end) {
-            if comment.is_block && !defer {
+            if comment.is_block && matches!(trailing_block, TrailingBlock::Inline) {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             } else {
@@ -896,6 +908,12 @@ impl<'a> Printer<'a> {
             }
         }
         if needs_break {
+            // Unscoped `break_parent`, deliberately NOT the flush-scoped node the
+            // stripped shell emits (`build_parenthesized_type_unwrap_doc`): every
+            // caller is a hang seam whose leading comment regenerates the same
+            // hardlines on the reparse, so the force is reproducible — the scoped
+            // node exists for strips whose comment ends up in a different gap next
+            // pass, which a hang's retained geometry never does.
             parts.push(d.break_parent());
         }
         d.concat(&parts)
@@ -905,16 +923,21 @@ impl<'a> Printer<'a> {
     /// build `inner`'s type doc and append any trailing comment lifted from a stripped
     /// `original` shell in one call, so callers don't repeat `inner`. `original` /
     /// `inner` are the seam's `(shell, unwrapped)` pair — equal when nothing was
-    /// stripped, a no-op then. `defer` follows `with_stripped_paren_trailing` (true at a
-    /// value position — an `as`/`satisfies` cast). The prefix-operator site keeps calling
+    /// stripped, a no-op then. `trailing_block` follows
+    /// [`Self::with_stripped_paren_trailing`]. The prefix-operator site keeps calling
     /// the lower-level helper directly because it re-parenthesizes the operand first.
     pub(in crate::printer) fn build_hang_value_doc(
         &self,
         original: &TSType<'_>,
         inner: &TSType<'_>,
-        defer: bool,
+        trailing_block: TrailingBlock,
     ) -> DocId {
-        self.with_stripped_paren_trailing(self.build_type_doc(inner), original, inner, defer)
+        self.with_stripped_paren_trailing(
+            self.build_type_doc(inner),
+            original,
+            inner,
+            trailing_block,
+        )
     }
 
     /// Resolve a keyword→value head: the freeze verdict and the value window, together.
@@ -954,18 +977,17 @@ impl<'a> Printer<'a> {
 
     /// The value doc for a resolved [`Self::keyword_value_head`]: the frozen verbatim
     /// slice, or the hung value with any comment lifted from a stripped shell's trailing
-    /// gap appended ([`Self::build_hang_value_doc`] — `defer` per that seam, true at a
-    /// value position). Reads the child off the head, so no caller can pair a head with
-    /// the wrong node.
+    /// gap appended ([`Self::build_hang_value_doc`] — `trailing_block` per that seam).
+    /// Reads the child off the head, so no caller can pair a head with the wrong node.
     pub(in crate::printer) fn build_keyword_value_doc(
         &self,
         head: &KeywordValueHead<'_>,
-        defer: bool,
+        trailing_block: TrailingBlock,
     ) -> DocId {
         if head.frozen {
             self.build_frozen_single_child_doc(head.child)
         } else {
-            self.build_hang_value_doc(head.child, head.value_type, defer)
+            self.build_hang_value_doc(head.child, head.value_type, trailing_block)
         }
     }
 
@@ -1126,9 +1148,14 @@ impl<'a> Printer<'a> {
     }
 
     /// Whether a union / intersection member separator (`|` / `&`) immediately follows
-    /// `pos` in source — looking through trivia and through the `)` closers of any
-    /// enclosing redundant paren layers, which strip along with the shell being asked
-    /// about and so cannot separate it from the member break.
+    /// `pos` in source — looking through trivia and through any `)` closers. A crossed
+    /// `)` is usually an enclosing redundant layer, which strips along with the shell
+    /// and so cannot separate it from the member break; it can also be a RETAINED
+    /// closer (a parenthesized union inside an intersection, `B & (A | (C // c)) & D`),
+    /// and the licence is deliberately granted there too: the stripped comment then
+    /// flushes inside that retained construct, before its `)`, converging onto the
+    /// sanctioned union-fit form (`union_intersection_retained_paren_line_comment`) —
+    /// still lossless, still one pass.
     ///
     /// This is the one carve-out from the retain rule above, scoped to exactly its
     /// argument: a separator means a per-member break ends the output line right after
@@ -1138,7 +1165,10 @@ impl<'a> Printer<'a> {
     /// deferred run would escape past the `;` onto a line the reparse cannot re-break —
     /// non-idempotent — so the shell is retained instead
     /// (`type_suffix_trailing_comment_union_member`). A `|`/`&` after a type occurs only
-    /// as a member separator, so the byte answers the structural question directly.
+    /// as a member separator, so the byte answers the structural question directly. The
+    /// forced break the strip pairs with is flush-scoped (`DocArena::flush_break`), so
+    /// the licence never breaks a group the flush doesn't land in — see
+    /// [`Self::build_parenthesized_type_unwrap_doc`]'s trailing arm.
     fn type_member_separator_follows(&self, pos: u32) -> bool {
         let bytes = self.source.as_bytes();
         let end = bytes.len();
@@ -1181,8 +1211,8 @@ impl<'a> Printer<'a> {
     /// Unwrap a parenthesized type, preserving any comments inside the parens.
     ///
     /// Block comments are emitted inline: `(/* c */ a)` → `/* c */ a`
-    /// Line comments use `line_suffix` to defer to end of the rendered line,
-    /// plus `break_parent` to force the enclosing union/intersection group to break:
+    /// Line comments use `line_suffix` to defer to end of the rendered line, plus
+    /// `flush_break` to break exactly the group the deferred run flushes in:
     /// `(a // comment\n) | b` → `| a // comment\n| b`
     /// `(a // comment\n) & b` → `a & // comment\nb`
     fn build_parenthesized_type_unwrap_doc(&self, p: &TSParenthesizedType<'_>) -> DocId {
@@ -1251,26 +1281,29 @@ impl<'a> Printer<'a> {
         // `(a // c) | b` must break the enclosing union so the comment stays on `a`
         // (`union_intersection_parens_line_comment`) — flat, the deferred comment flushes
         // past `| b` and ends up documenting the whole statement instead of the member it
-        // was written on. Where there is no sibling the same `break_parent` escapes to the
+        // was written on. Where there is no sibling the break escapes to the
         // enclosing assignment and splits it after the `=` for nothing — and that split is
         // NOT reproducible (the reparse has no parens left to re-break it), so it was
         // non-idempotent. That case is absorbed at the assignment, by
         // `value_owns_its_comment_break`, which is where the "does the value actually
         // break?" question already lives.
         //
-        // TODO: `break_parent` breaks EVERY enclosing group, so a shell nested one
-        // composite deep (`B & (A // c) | C` — the shell ends the intersection inside a
-        // union member) also breaks that intermediate group, and THAT break the reparse
-        // cannot reproduce: the flush lands in the union's member gap, which re-breaks
-        // the union but reprints the intersection flat — a 2-pass convergence. Needs a
-        // break scoped to the group the deferred run actually flushes in, which the doc
-        // IR's unscoped `break_parent` cannot express today.
+        // `flush_break`, not `break_parent`: the unscoped break also forced every
+        // INTERMEDIATE group — a shell nested one composite deep (`B & (A // c) | C`,
+        // the shell ending an intersection inside a union member) broke that
+        // intersection too, a break the reparse cannot reproduce once the comment sits
+        // in the union's member gap (a 2-pass convergence,
+        // `type_suffix_trailing_comment_nested_composite`). The flush-scoped node
+        // forces only the group the deferred run actually flushes in: the union (its
+        // member separator is the next line opportunity) breaks, the intersection —
+        // with no line after the suffix — prints flat, which is both formatters'
+        // fixed point.
         if has_trailing {
             needs_break |= self.push_trailing_comments_in_range(&mut parts, inner_end, paren_close);
         }
 
         if needs_break {
-            parts.push(d.break_parent());
+            parts.push(d.flush_break());
         }
         d.concat(&parts)
     }

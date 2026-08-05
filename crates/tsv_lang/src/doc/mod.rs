@@ -1354,6 +1354,132 @@ mod arena_tests {
         assert!(!fits_flat(&a, doc, 100));
     }
 
+    // --- flush_break: force only the group the deferred run flushes in ---
+    //
+    // The scoped alternative to BreakParent for a deferred trailing run whose
+    // construct is STRIPPED from the output: the group owning the next line
+    // opportunity after the node must break (the flush lands there), while a
+    // group with no line after it stays flat — the unscoped force there was a
+    // break the reparse could not reproduce (format∘format ≠ format). See the
+    // stripped paren shell in `tsv_ts` (`build_parenthesized_type_unwrap_doc`).
+
+    #[test]
+    fn test_flush_break_breaks_the_flush_group_not_the_closed_one() {
+        let a = DocArena::new();
+        // The union/intersection shape: the suffix + flush sit inside `inner`
+        // (the intersection), whose only line is BEFORE them; the next line
+        // opportunity is `outer`'s if_break separator. Outer must break — the
+        // deferred comment flushes at its separator line — while inner, with
+        // nothing left to put on a new line, stays flat.
+        let inner = a.group(a.concat(&[
+            a.text("(B"),
+            a.line(),
+            a.text("& A"),
+            a.line_suffix(a.text(" // c")),
+            a.flush_break(),
+            a.text(")"),
+        ]));
+        let sep = a.if_break(a.concat(&[a.line(), a.text("| ")]), a.text(" | "));
+        let outer = a.group(a.concat(&[inner, sep, a.text("C")]));
+        assert_eq!(render_pw(&a, outer, 100), "(B & A) // c\n| C");
+    }
+
+    #[test]
+    fn test_fits_flat_flush_break_without_following_line_fits() {
+        let a = DocArena::new();
+        // No line opportunity after the node → nothing this group could break
+        // to flush the run → it fits (contrast BreakParent's unconditional
+        // false above). This is the intermediate-group half of the contract.
+        let doc = a.concat(&[
+            a.text("ab"),
+            a.line_suffix(a.text("X")),
+            a.flush_break(),
+            a.text("cd"),
+        ]);
+        assert!(fits_flat(&a, doc, 100));
+    }
+
+    #[test]
+    fn test_fits_flat_flush_break_vetoes_a_following_flat_line() {
+        let a = DocArena::new();
+        // A breakable line after the node is the flush's landing — measured
+        // flat it renders no line end, so the group must break: doesn't fit.
+        let doc = a.concat(&[
+            a.text("ab"),
+            a.line_suffix(a.text("X")),
+            a.flush_break(),
+            a.line(),
+            a.text("cd"),
+        ]);
+        assert!(!fits_flat(&a, doc, 100));
+        // …and order matters: a line BEFORE the node is not the flush point.
+        let line_before = a.concat(&[
+            a.text("ab"),
+            a.line(),
+            a.line_suffix(a.text("X")),
+            a.flush_break(),
+            a.text("cd"),
+        ]);
+        assert!(fits_flat(&a, line_before, 100));
+    }
+
+    #[test]
+    fn test_fits_flat_flush_break_vetoes_an_if_break_with_a_breakable_arm() {
+        let a = DocArena::new();
+        // The composite separator shape: flat the if_break renders " | " (no
+        // line end), but its break arm holds one — the group must break to
+        // take it, so measured flat it doesn't fit…
+        let sep = a.if_break(a.concat(&[a.line(), a.text("| ")]), a.text(" | "));
+        let doc = a.concat(&[
+            a.text("ab"),
+            a.line_suffix(a.text("X")),
+            a.flush_break(),
+            sep,
+            a.text("cd"),
+        ]);
+        assert!(!fits_flat(&a, doc, 100));
+        // …while an if_break whose break arm has no line to offer changes
+        // nothing and the walk continues into the flat arm.
+        let lineless = a.if_break(a.text(","), a.empty());
+        let doc2 = a.concat(&[
+            a.text("ab"),
+            a.line_suffix(a.text("X")),
+            a.flush_break(),
+            lineless,
+            a.text("cd"),
+        ]);
+        assert!(fits_flat(&a, doc2, 100));
+    }
+
+    #[test]
+    fn test_flush_break_is_invisible_to_will_break_and_render() {
+        let a = DocArena::new();
+        // No particular group is forced by the subtree query (the fits walk
+        // decides per group), and the node renders nothing.
+        let doc = a.concat(&[a.text("a"), a.flush_break(), a.text("b")]);
+        assert!(!a.will_break(doc));
+        assert_eq!(render_default(&a, doc), "ab");
+    }
+
+    #[test]
+    fn test_flush_break_pending_meets_a_hard_line_in_the_lookahead() {
+        let a = DocArena::new();
+        // The pending state rides into the rest-commands look-ahead like
+        // `has_line_suffix` does — and a HARD line there already ends the line
+        // (the flush lands on it), so the measured group has nothing left to
+        // break for and stays flat. Only a *breakable* line while pending vetoes.
+        let inner = a.group(a.concat(&[
+            a.text("(B"),
+            a.line(),
+            a.text("& A"),
+            a.line_suffix(a.text(" // c")),
+            a.flush_break(),
+            a.text(")"),
+        ]));
+        let doc = a.concat(&[inner, a.hardline(), a.text("C")]);
+        assert_eq!(render_pw(&a, doc, 100), "(B & A) // c\nC");
+    }
+
     #[test]
     fn test_fits_flat_newline_text_defers_to_walk() {
         let a = DocArena::new();

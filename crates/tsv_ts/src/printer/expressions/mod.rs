@@ -30,6 +30,7 @@ mod template_literal;
 use self::operators::OperatorBuf;
 use crate::ast::internal::{BinaryExpression, Expression, TSType};
 use crate::printer::comments::{CommentFilter, CommentSpacing};
+use crate::printer::types::TrailingBlock;
 use crate::printer::types::helpers::unwrap_parenthesized;
 use crate::printer::{
     ParenContext, PatternContext, Printer, chain, class_expr_has_decorators,
@@ -752,8 +753,8 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(keyword));
                 // A cast is a value position: a trailing block lifted from the shell
                 // defers past the statement `;` (`x as // c\n\tA; /* t */`), matching the
-                // declarator's own value→`;` trailing handling — so `defer = true`.
-                let type_doc = self.build_keyword_value_doc(&head, true);
+                // declarator's own value→`;` trailing handling.
+                let type_doc = self.build_keyword_value_doc(&head, TrailingBlock::Deferred);
                 self.append_keyword_value_line_comments(
                     &mut parts,
                     kw_end,
@@ -810,7 +811,11 @@ impl<'a> Printer<'a> {
                     parts.push(self.build_comment_doc(comment));
                     parts.push(d.text(" "));
                 }
-                parts.push(self.build_hang_value_doc(type_annotation, inner, true));
+                parts.push(self.build_hang_value_doc(
+                    type_annotation,
+                    inner,
+                    TrailingBlock::Deferred,
+                ));
             } else {
                 // Skip the `empty()` child on the comment-free `as Type` gap. Byte-identical.
                 if self.has_comments_to_emit_between(kw_end, type_start) {
