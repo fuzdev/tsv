@@ -593,7 +593,7 @@ impl<'a> Printer<'a> {
         // be dropped) or own-line block comments force the multiline layout. Shared
         // predicate with the type-position builder.
         if self.type_arguments_force_expansion(inst, has_comments) {
-            return self.build_type_parameter_instantiation_doc_with_line_comments(inst);
+            return self.build_type_arguments_doc_with_line_comments(inst);
         }
 
         // Special case: a single curly-brace type argument hugs the opening
@@ -633,46 +633,18 @@ impl<'a> Printer<'a> {
             return self.build_single_type_arg_inline(inst, has_comments);
         }
 
-        // Multi-argument (or non-hugging single) tail: the shared width-decided core.
-        // The doc printer's look-ahead (fits_with_lookahead) handles the decision
-        // of whether to break based on what follows the type params.
-        d.group(self.build_angle_list_doc(
-            inst.span,
-            inst.params.len(),
-            |i| inst.params[i].span(),
-            |i, frozen| {
-                if frozen {
-                    self.build_frozen_list_member_doc(&inst.params[i])
-                } else {
-                    self.build_type_doc(&inst.params[i])
-                }
-            },
-            |i| self.frozen_list_member_multiline(&inst.params[i]),
-            has_comments,
-        ))
-    }
-
-    /// Build type parameter instantiation with line comments
-    fn build_type_parameter_instantiation_doc_with_line_comments(
-        &self,
-        inst: &internal::TSTypeParameterInstantiation<'_>,
-    ) -> DocId {
-        // Call/`new`-expression type arguments render each argument with
-        // `build_type_doc`; the layout is shared with type-position arguments, down to
-        // the leading-only paren unwrap (see `leading_paren_unwrapped`).
-        self.build_angle_list_with_line_comments(
-            inst.span,
-            inst.params.len(),
-            |i| self.leading_paren_unwrapped(&inst.params[i]).span(),
-            |i, frozen| {
-                let param = self.leading_paren_unwrapped(&inst.params[i]);
-                if frozen {
-                    self.build_frozen_list_member_doc(param)
-                } else {
-                    self.build_type_doc(param)
-                }
-            },
-        )
+        // Multi-argument (or non-hugging single) tail: the type-argument families' shared
+        // width-decided core (`build_type_arguments_group_doc`), byte-for-byte the body the
+        // type-position list runs. The doc printer's look-ahead (fits_with_lookahead)
+        // handles whether to break based on what follows the type params.
+        //
+        // Routing here — rather than rendering items with the generic `build_type_doc` —
+        // is also what strips a redundant paren shell whose comments are trailing
+        // (`f<(a | b // c)>(y)`): `build_type_doc` retains such a shell, because a
+        // deferred run must not escape the construct it was written in, but inside a
+        // `<…>` the enclosing list is itself a retained bracketed construct that the run
+        // flushes safely inside of (see `build_type_doc_for_type_arg`).
+        self.build_type_arguments_group_doc(inst, has_comments)
     }
 
     /// The shared width-decided angle-list body: `<` + softline-indented,
@@ -775,11 +747,10 @@ impl<'a> Printer<'a> {
     }
 
     /// Render a type-argument list `<…>` that breaks onto multiple lines because it
-    /// carries comments — the shared body behind all three angle-list families: the
-    /// call/`new`-expression ([`Self::build_type_parameter_instantiation_doc_with_line_comments`]),
-    /// type-position ([`Self::build_type_arguments_doc_with_line_comments`]), and
-    /// type-parameter-declaration
-    /// ([`Self::build_type_parameter_declaration_doc_with_line_comments`]) printers.
+    /// carries comments — the shared body behind the angle-list families: type arguments
+    /// in both type and call/`new`-expression position (which share one caller,
+    /// [`Self::build_type_arguments_doc_with_line_comments`]) and type-parameter
+    /// declarations ([`Self::build_type_parameter_declaration_doc_with_line_comments`]).
     /// `item_span`/`item_doc` select the family's item type and per-item printer.
     ///
     /// **Argument count changes nothing here.** A single argument is the N=1 form of

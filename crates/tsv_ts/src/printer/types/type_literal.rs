@@ -958,11 +958,6 @@ impl<'a> Printer<'a> {
                 } else {
                     smallvec![]
                 };
-                let trailing: CommentVec<'_> = if has_trailing {
-                    comments_to_emit_in_range(self.comments, inner_end, p.span.end).collect()
-                } else {
-                    smallvec![]
-                };
                 // A line comment forces the type-argument list to break. Emit
                 // `break_parent` FIRST so it sits behind the inner type's group in the
                 // forward `fits()` scan — otherwise it poisons that scan and needlessly
@@ -986,10 +981,11 @@ impl<'a> Printer<'a> {
                 // single-argument hug (`build_angle_list_with_line_comments`), a 2-pass
                 // convergence. Pinned (failing) by
                 // `type_argument_paren_union_leading_line_comment`.
-                let needs_break = leading
-                    .iter()
-                    .chain(&trailing)
-                    .any(|comment| !comment.is_block);
+                // The trailing half is asked as a predicate rather than collected: the
+                // emitter below re-walks that range anyway, so materializing it here
+                // bought a second scan and a `SmallVec` to answer one bool.
+                let needs_break = leading.iter().any(|comment| !comment.is_block)
+                    || (has_trailing && self.has_line_comments_between(inner_end, p.span.end));
                 let mut parts = DocBuf::new();
                 if needs_break {
                     parts.push(d.break_parent());
@@ -1003,9 +999,15 @@ impl<'a> Printer<'a> {
                     }
                 }
                 parts.push(inner);
-                for comment in &trailing {
-                    parts.push(self.build_trailing_comment_doc(comment));
-                }
+                // The shared trailing-gap emitter, never an open-coded loop: it takes the
+                // separator BEFORE each comment and asks the SOURCE for it, so a run the
+                // author spread over lines stays a run. Emitting back to back welded it
+                // into one comment (`// c // injected` — the second `//` becoming text of
+                // the first, so that comment stops existing), and a block after a line
+                // comment additionally reordered ahead of it. The weld reparses and is
+                // stable, so the ledger, F1, the round-trip and the fuzzer are all blind
+                // to it — `gaps:audit` is what sees it.
+                self.push_trailing_comments_in_range(&mut parts, inner_end, p.span.end);
                 d.concat(&parts)
             }
             _ => self.build_type_doc(ts_type),

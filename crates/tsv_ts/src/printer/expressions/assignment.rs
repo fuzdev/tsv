@@ -22,6 +22,7 @@ use crate::printer::expressions::literals::format_string_literal_from_ast;
 use crate::printer::is_multiline_string_literal;
 use crate::printer::is_string_literal;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
+use crate::printer::types::helpers::unwrap_parenthesized;
 use tsv_lang::Comment;
 use tsv_lang::PRINT_WIDTH;
 use tsv_lang::Span;
@@ -401,8 +402,11 @@ fn unwrap_expression<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
 ///
 /// Returns `true` (has complex type args) when:
 /// - More than 1 type argument, or
+/// - A comment inside the `<…>` forces it open (see the comment leg below) — the one
+///   clause that fires whatever the argument's shape, or
 /// - The single type argument is an object/type literal, union, or intersection
-///   (always), or a mapped type that force-breaks (see below).
+///   (always), or a mapped type that force-breaks (see below). Asked of the argument
+///   with its redundant paren shell unwrapped.
 ///
 /// These cases are NOT poorly breakable — the type arguments themselves can break,
 /// so we should not break at the assignment operator.
@@ -426,7 +430,11 @@ fn unwrap_expression<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
 /// newline to decide the force-break. Both are deliberately left un-erased by the
 /// canonical reprint (`crate::format_canonical`) — gating either one alone, or both,
 /// is unsound. See `build_mapped_type_doc` for the full reasoning before touching this.
-fn is_call_with_complex_type_arguments(call: &internal::CallExpression<'_>, source: &str) -> bool {
+fn is_call_with_complex_type_arguments(
+    call: &internal::CallExpression<'_>,
+    source: &str,
+    comments: &[Comment],
+) -> bool {
     use internal::TSType;
     let Some(type_args) = &call.type_arguments else {
         return false;
@@ -434,7 +442,28 @@ fn is_call_with_complex_type_arguments(call: &internal::CallExpression<'_>, sour
     if type_args.params.len() > 1 {
         return true;
     }
-    match type_args.params.first() {
+    // The comment half of the same `willBreak` fallback, and the only one that fires for
+    // a type argument outside the unconditional list: a comment that forces the `<…>`
+    // open (`f<A // c>()`) gives the call an internal break point exactly as a union
+    // does, so the `=` hugs it. The sound static stand-in is a comment ON PAGE inside the
+    // `<…>` *and* a newline in that span — every force-break here is a line comment or an
+    // own-line block, and both leave a newline between the brackets, while an inline
+    // block (`f</* c */ A>()`), which forces nothing, leaves none. **On-page** is the
+    // axis because this is a layout gate; an emit-keyed answer would go blind to an owned
+    // comment. Without this leg the call was classified poorly-breakable while its doc
+    // force-broke, so the `=` broke *and* the `<…>` opened — two breaks where prettier
+    // takes one, and a second fixed point (prettier's form was not tsv-stable).
+    if tsv_lang::has_comments_on_page_in_range(comments, type_args.span.start, type_args.span.end)
+        && type_args.span.extract(source).contains('\n')
+    {
+        return true;
+    }
+    // Asked of the **unwrapped** argument: a redundant paren shell is stripped in
+    // type-argument position, and prettier's AST has no paren node here at all, so its
+    // unconditional list sees the union directly. Reading the shell instead classified
+    // `f<(A | B)>()` as simple where the bare `f<A | B>()` was complex — one authoring of
+    // one type reaching two layouts.
+    match type_args.params.first().map(unwrap_parenthesized) {
         Some(TSType::TypeLiteral(_) | TSType::Union(_) | TSType::Intersection(_)) => true,
         Some(TSType::Mapped(m)) => m.span.extract(source).contains('\n'),
         _ => false,
@@ -525,7 +554,7 @@ fn is_poorly_breakable_chain_recursive(
             // or multiple type args) are NOT poorly breakable - they have internal break
             // points via the type arguments.
             // Matches Prettier's `isCallExpressionWithComplexTypeArguments` (assignment.js:422)
-            if is_call_with_complex_type_arguments(call, source) {
+            if is_call_with_complex_type_arguments(call, source, comments) {
                 return false;
             }
 
