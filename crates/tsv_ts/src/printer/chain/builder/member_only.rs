@@ -4,7 +4,8 @@
 // lookup its own group — prettier's `printMemberExpression` shape.
 
 use super::super::printing::{
-    node_comment_gap, print_node, print_node_inner, push_gap_comments_and_break,
+    member_lookup_group, node_comment_gap, print_node, print_node_inner,
+    push_gap_comments_and_break,
 };
 use super::super::types::{ChainGroup, ChainNode, ChainNodeRefVec};
 use crate::printer::Printer;
@@ -263,7 +264,7 @@ pub(super) fn build_member_only_chain_doc<'a>(
     // one that breaks (`alpha.bravo…papa⏎.quebec`).
     let mut doc = first_doc;
     for &segment in &segments {
-        doc = d.concat(&[doc, d.group(d.indent(d.concat(&[d.softline(), segment])))]);
+        doc = d.concat(&[doc, member_lookup_group(d, segment)]);
     }
     doc
 }

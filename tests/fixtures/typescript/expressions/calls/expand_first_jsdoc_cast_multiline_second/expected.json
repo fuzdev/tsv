@@ -1,0 +1,639 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 317,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " expand-first shape whose cast second arg holds a source-multiline object:",
+			"start": 10,
+			"end": 86,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " all args break out, in the plain and member-chain printers alike",
+			"start": 88,
+			"end": 155,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 189,
+			"end": 205,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 2
+				},
+				"end": {
+					"line": 8,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": "* @type {T} ",
+			"start": 270,
+			"end": 286,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 18
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 316,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 307,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 157,
+					"end": 225,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 11,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 157,
+						"end": 224,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 11,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 157,
+							"end": 159,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 163,
+								"end": 185,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 169,
+									"end": 185,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 8
+										},
+										"end": {
+											"line": 7,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 174,
+											"end": 181,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 3
+												},
+												"end": {
+													"line": 6,
+													"column": 10
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 174,
+												"end": 180,
+												"loc": {
+													"start": {
+														"line": 6,
+														"column": 3
+													},
+													"end": {
+														"line": 6,
+														"column": 9
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 174,
+													"end": 178,
+													"loc": {
+														"start": {
+															"line": 6,
+															"column": 3
+														},
+														"end": {
+															"line": 6,
+															"column": 7
+														}
+													},
+													"name": "tick"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "ObjectExpression",
+								"start": 207,
+								"end": 220,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 20
+									},
+									"end": {
+										"line": 10,
+										"column": 3
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 212,
+										"end": 216,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 3
+											},
+											"end": {
+												"line": 9,
+												"column": 7
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 212,
+											"end": 213,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 3
+												},
+												"end": {
+													"line": 9,
+													"column": 4
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 215,
+											"end": 216,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 6
+												},
+												"end": {
+													"line": 9,
+													"column": 7
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 189,
+										"end": 205
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " expand-first shape whose cast second arg holds a source-multiline object:",
+							"start": 10,
+							"end": 86
+						},
+						{
+							"type": "Line",
+							"value": " all args break out, in the plain and member-chain printers alike",
+							"start": 88,
+							"end": 155
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 228,
+					"end": 306,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 228,
+						"end": 305,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 228,
+							"end": 240,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 1
+								},
+								"end": {
+									"line": 13,
+									"column": 13
+								}
+							},
+							"object": {
+								"type": "CallExpression",
+								"start": 228,
+								"end": 237,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 1
+									},
+									"end": {
+										"line": 13,
+										"column": 10
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 228,
+									"end": 234,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 1
+										},
+										"end": {
+											"line": 13,
+											"column": 7
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 228,
+										"end": 231,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 1
+											},
+											"end": {
+												"line": 13,
+												"column": 4
+											}
+										},
+										"name": "obj"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 232,
+										"end": 234,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 5
+											},
+											"end": {
+												"line": 13,
+												"column": 7
+											}
+										},
+										"name": "aa"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 235,
+										"end": 236,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 8
+											},
+											"end": {
+												"line": 13,
+												"column": 9
+											}
+										},
+										"name": "x"
+									}
+								],
+								"optional": false
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 238,
+								"end": 240,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 11
+									},
+									"end": {
+										"line": 13,
+										"column": 13
+									}
+								},
+								"name": "bb"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 244,
+								"end": 266,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 250,
+									"end": 266,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 8
+										},
+										"end": {
+											"line": 16,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 255,
+											"end": 262,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 3
+												},
+												"end": {
+													"line": 15,
+													"column": 10
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 255,
+												"end": 261,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 3
+													},
+													"end": {
+														"line": 15,
+														"column": 9
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 255,
+													"end": 259,
+													"loc": {
+														"start": {
+															"line": 15,
+															"column": 3
+														},
+														"end": {
+															"line": 15,
+															"column": 7
+														}
+													},
+													"name": "tick"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "ObjectExpression",
+								"start": 288,
+								"end": 301,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 20
+									},
+									"end": {
+										"line": 19,
+										"column": 3
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 293,
+										"end": 297,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 3
+											},
+											"end": {
+												"line": 18,
+												"column": 7
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 293,
+											"end": 294,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 3
+												},
+												"end": {
+													"line": 18,
+													"column": 4
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 296,
+											"end": 297,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 6
+												},
+												"end": {
+													"line": 18,
+													"column": 7
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								],
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": "* @type {T} ",
+										"start": 270,
+										"end": 286
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -16,11 +16,11 @@
 // c5
 	();
 
-	// optional call, plain callee — the comment sits after `?.`
+	// optional call, plain callee — the comment stays before `?.`
 	call?. // c6
 ();
 
-	// optional call, member callee — the comment sits before `?.`
+	// optional call, member callee — the comment stays before `?.`
 	obj.m?. // c7
 			();
 
@@ -34,4 +34,9 @@
 
 	// a block comment does not end its line, so it stays inline
 	call /* c10 */    ();
+
+	// a block comment in an optional call stays before `?.`, glued to it
+	call?. /* c11 */ ();
+
+	obj.m?. /* c12 */ ();
 </script>

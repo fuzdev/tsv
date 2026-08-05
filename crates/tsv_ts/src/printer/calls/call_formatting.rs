@@ -81,8 +81,14 @@ pub(super) fn build_call_doc_with_wrapping(
         callee_doc,
     );
 
-    // Handle optional chaining
-    let callee = if call.optional {
+    // Handle optional chaining. With an empty argument list and no explicit type
+    // arguments, `?.` fuses into the list's own `?.(` instead of gluing onto the
+    // callee, so a comment in the callee→`(` gap lands BEFORE `?.` — the side
+    // prettier picks, and the member-chain printer's answer to the same gap
+    // (`build_chain_args_empty`). With type arguments `?.` precedes them
+    // (`call?.<T>()`), and with arguments present it stays on the callee.
+    let fuse_optional = call.optional && call.arguments.is_empty() && call.type_arguments.is_none();
+    let callee = if call.optional && !fuse_optional {
         d.concat(&[callee, d.text("?.")])
     } else {
         callee
@@ -103,7 +109,13 @@ pub(super) fn build_call_doc_with_wrapping(
             .type_arguments
             .as_ref()
             .map_or_else(|| call.callee.span().end, |ta| ta.span.end);
-        return build_empty_args_doc(printer, callee, after_type_args, call.span.end);
+        return build_empty_args_doc(
+            printer,
+            callee,
+            after_type_args,
+            call.span.end,
+            fuse_optional,
+        );
     }
 
     // Single-argument comment paths: leading line comments (multi-line expansion)
@@ -447,25 +459,16 @@ pub(super) fn build_call_doc_with_wrapping(
         d.comma_line(),
     );
 
-    // Prettier: group(contents, { shouldBreak: printedArguments.some(willBreak) })
-    // If any arg has hardlines (e.g., non-empty block body), force the group to break.
-    // This handles block functions before the last arg (e.g., `fn((x) => { body }, aaa)`)
-    // without the old has_block_function_before_last check, which was too aggressive —
-    // it forced hardlines for empty block bodies like `async () => {}`, preventing
-    // calls like `fn([], 3, async () => {}, aaa)` from staying on one line.
-    if d.will_break(arg_parts) {
-        d.concat(&[
-            callee,
-            d.group_break(d.concat(&[
-                d.text("("),
-                d.indent_softline(arg_parts),
-                d.softline(),
-                d.text(")"),
-            ])),
-        ])
-    } else {
-        wrap_call_with_soft_breaks(d, callee, arg_parts)
-    }
+    // Prettier: group(contents, { shouldBreak: printedArguments.some(willBreak) }).
+    // The explicit shouldBreak is redundant here: a forced break anywhere in
+    // `arg_parts` (a non-empty block body's hardlines, a source-multiline object's
+    // group_break) already breaks this group at render, so the plain group is the
+    // same layout. This still handles block functions before the last arg
+    // (`fn((x) => { body }, aaa)`) without the old has_block_function_before_last
+    // check, which was too aggressive — it forced hardlines for empty block bodies
+    // like `async () => {}`, preventing calls like `fn([], 3, async () => {}, aaa)`
+    // from staying on one line.
+    wrap_call_with_soft_breaks(d, callee, arg_parts)
 }
 
 /// Single-argument comment paths: leading line comments (multi-line expansion)
@@ -578,14 +581,11 @@ fn try_single_arg_comment_paths(
         }
         let arg_with_comment = d.concat(&parts);
 
-        // If the arg will break internally (multiline content), use expanded format
-        // e.g., fn(/* c */ {\n  prop,\n}) → fn(\n  /* c */ {\n    prop,\n  },\n)
-        if d.will_break(arg_doc) {
-            return Some(wrap_call_with_hard_breaks(d, callee, arg_with_comment));
-        }
-
-        // Use soft-break wrapping so outer call can expand when content exceeds print width
-        // e.g., fn(/** @type {T} */ call(long_args)) → fn(\n\t/** @type {T} */ call(\n\t\tlong_args,\n\t),\n)
+        // Soft-break wrapping so the outer call can expand when content exceeds print
+        // width — e.g., fn(/** @type {T} */ call(long_args)) →
+        // fn(\n\t/** @type {T} */ call(\n\t\tlong_args,\n\t),\n). An arg that breaks
+        // internally (multiline content) breaks this group with it, which is already
+        // the expanded form — no separate hard-break arm.
         return Some(wrap_call_with_soft_breaks(d, callee, arg_with_comment));
     }
 
@@ -1163,8 +1163,9 @@ fn try_expand_last_array_object_arg(
             // Prettier: group(args, { shouldBreak: args.some(willBreak) })
             // When same-type args and any will break, force expand-all.
             // Note: will_break() catches both hardlines and group_break() (source-multiline
-            // objects). The different-type path below uses has_forced_break() instead because
-            // it has a hug state where group_break objects should still hug.
+            // objects). The different-type path below runs no such check at all — it has a
+            // hug state, and a last arg that breaks selects it, which is that path's
+            // correct layout for both break kinds.
             if d.will_break(last_arg_doc) {
                 return Some(build_expand_all_args(d, callee, all_args_broken));
             }
@@ -1178,8 +1179,7 @@ fn try_expand_last_array_object_arg(
             ));
         }
 
-        // Different types: check if last arg has hardlines (e.g., comments)
-        // If it does, Prettier uses expand-all instead of hug
+        // Different types
         let (head_parts, last_arg_doc, all_args_broken) =
             build_args_split_last(call.arguments, printer, paren_open, call_has_comments);
 
@@ -1188,19 +1188,10 @@ fn try_expand_last_array_object_arg(
             return Some(build_expand_all_args(d, callee, all_args_broken));
         }
 
-        // If last arg has forced breaks (hardlines), use expand-all instead of hug.
-        // Note: Use has_forced_break() not will_break() - see comment above.
-        if d.has_forced_break(last_arg_doc) {
-            return Some(build_inline_or_expand_all(
-                d,
-                callee,
-                &head_parts,
-                last_arg_doc,
-                all_args_broken,
-            ));
-        }
-
-        // No hardlines: build 3-state conditional_group
+        // Build the 3-state conditional_group. A last arg carrying its own forced
+        // break (a hardline from an interior comment, a source-multiline
+        // group_break) falls out of state 0 and lands on the hug — the same layout
+        // for both break kinds, so no pre-check screens for them.
         // State 0: inline - fn('x', [a, b])
         // State 1: hug - fn('x', [\n  a,\n  b,\n]) - head inline, last expands
         // State 2: expand all - fn(\n  'x',\n  [\n    a,\n  ],\n)

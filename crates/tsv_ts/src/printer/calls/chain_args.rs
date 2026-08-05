@@ -365,18 +365,7 @@ fn build_chain_args_empty(
     let ChainArgsContext {
         paren_open, prefix, ..
     } = ctx;
-    // `prefix` is `"("` or `"?.("` (the prologue's two literals), so the closed
-    // empty-args form is one of two statics — no transient `format!` String.
-    let empty_pair: &'static str = if prefix == "?.(" { "?.()" } else { "()" };
-
-    push_empty_args(
-        printer,
-        &mut parts,
-        paren_open,
-        call.span.end,
-        prefix,
-        empty_pair,
-    );
+    push_empty_args(printer, &mut parts, paren_open, call.span.end, prefix);
     printer.d().concat(&parts)
 }
 
