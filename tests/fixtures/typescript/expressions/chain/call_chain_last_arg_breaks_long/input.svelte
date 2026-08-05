@@ -21,4 +21,18 @@
 				headers: defaultHeaders
 			})
 		);
+
+	// direct multiline object in the last call - authored broken, stays broken, chain stays flat
+	const objArg = obj.fn1(g, 'f').fn2({
+		status: 200,
+		headers: defaultHeaders
+	});
+
+	// direct array in the last call - no preserved break: the chain overflows and expands per method
+	const arrArg = obj
+		.fn1(g, 'f')
+		.fn2([
+			'aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa',
+			'bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb'
+		]);
 </script>
