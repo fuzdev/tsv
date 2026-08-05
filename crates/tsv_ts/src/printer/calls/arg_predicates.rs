@@ -396,109 +396,6 @@ pub fn is_simple_call_argument(expr: &Expression<'_>, depth: usize) -> bool {
     }
 }
 
-/// Check if an expression contains a call expression with arguments (recursively).
-///
-/// Used to determine if a chain's first call has an argument that may need to
-/// break independently. When the first call's arg contains a call WITH arguments,
-/// that inner call might break, so we let each group format independently rather
-/// than forcing expansion on the last call.
-///
-/// Empty calls like `a.b()` don't count because they won't break.
-pub fn contains_call_expression(expr: &Expression<'_>) -> bool {
-    match expr {
-        // A call with arguments might break - return true
-        // Empty calls (no args) won't break - continue checking inside
-        Expression::CallExpression(call) => {
-            !call.arguments.is_empty() || contains_call_expression(call.callee)
-        }
-        Expression::NewExpression(new_expr) => {
-            !new_expr.arguments.is_empty() || contains_call_expression(new_expr.callee)
-        }
-
-        // Recurse into common wrapper types
-        Expression::MemberExpression(member) => {
-            contains_call_expression(member.object)
-                || (member.computed && contains_call_expression(member.property))
-        }
-        Expression::TSAsExpression(e) => contains_call_expression(e.expression),
-        Expression::TSSatisfiesExpression(e) => contains_call_expression(e.expression),
-        Expression::TSTypeAssertion(e) => contains_call_expression(e.expression),
-        Expression::TSNonNullExpression(e) => contains_call_expression(e.expression),
-        Expression::TSInstantiationExpression(e) => contains_call_expression(e.expression),
-        Expression::AwaitExpression(e) => contains_call_expression(e.argument),
-        Expression::UnaryExpression(e) => contains_call_expression(e.argument),
-        Expression::UpdateExpression(e) => contains_call_expression(e.argument),
-        Expression::SpreadElement(e) => contains_call_expression(e.argument),
-        Expression::JsdocCast(cast) => contains_call_expression(cast.inner),
-        Expression::ParenthesizedExpression(paren) => contains_call_expression(paren.expression),
-
-        // Binary expressions (includes logical operators in internal AST)
-        Expression::BinaryExpression(e) => {
-            contains_call_expression(e.left) || contains_call_expression(e.right)
-        }
-        Expression::AssignmentExpression(e) => {
-            contains_call_expression(e.left) || contains_call_expression(e.right)
-        }
-
-        // Conditional expression
-        Expression::ConditionalExpression(e) => {
-            contains_call_expression(e.test)
-                || contains_call_expression(e.consequent)
-                || contains_call_expression(e.alternate)
-        }
-
-        // Sequence expression
-        Expression::SequenceExpression(e) => e.expressions.iter().any(contains_call_expression),
-
-        // Template literal expressions
-        Expression::TemplateLiteral(t) => t.expressions.iter().any(contains_call_expression),
-        Expression::TaggedTemplateExpression(t) => {
-            contains_call_expression(t.tag)
-                || t.quasi.expressions.iter().any(contains_call_expression)
-        }
-
-        // Array/object literals
-        Expression::ArrayExpression(arr) => arr
-            .elements
-            .iter()
-            .any(|el| el.as_ref().is_some_and(contains_call_expression)),
-        Expression::ObjectExpression(obj) => obj.properties.iter().any(|prop| match prop {
-            internal::ObjectProperty::Property(p) => {
-                (p.computed && contains_call_expression(&p.key))
-                    || contains_call_expression(&p.value)
-            }
-            internal::ObjectProperty::SpreadElement(s) => contains_call_expression(s.argument),
-        }),
-
-        // Arrow/function expressions - check body for expression arrows
-        Expression::ArrowFunctionExpression(arr) => {
-            if let internal::ArrowFunctionBody::Expression(body) = &arr.body {
-                contains_call_expression(body)
-            } else {
-                false
-            }
-        }
-
-        // Simple expressions that don't contain calls
-        Expression::Identifier(_)
-        | Expression::Literal(_)
-        | Expression::RegexLiteral(_)
-        | Expression::ThisExpression(_)
-        | Expression::Super(_)
-        | Expression::MetaProperty(_)
-        | Expression::FunctionExpression(_)
-        | Expression::ClassExpression(_)
-        | Expression::YieldExpression(_)
-        | Expression::ImportExpression(_)
-        | Expression::ArrayPattern(_)
-        | Expression::ObjectPattern(_)
-        | Expression::AssignmentPattern(_)
-        | Expression::RestElement(_)
-        | Expression::PrivateIdentifier(_)
-        | Expression::TSParameterProperty(_) => false,
-    }
-}
-
 /// Check if arguments form a "function composition" pattern that forces expansion.
 ///
 /// Matches Prettier's `isFunctionCompositionArgs` logic:
@@ -592,21 +489,6 @@ mod tests {
         assert!(is_simple_call_argument(&parse_expr(&arena, "f(a)"), 2));
         // Spread elements are never simple.
         assert!(!is_simple_call_argument(&parse_expr(&arena, "[...x]"), 2));
-    }
-
-    #[test]
-    fn contains_call_expression_recursion() {
-        let arena = Bump::new();
-        // An empty call does not count, but we recurse into the callee.
-        assert!(!contains_call_expression(&parse_expr(&arena, "a.b()")));
-        // A call WITH arguments counts.
-        assert!(contains_call_expression(&parse_expr(&arena, "a.b(x)")));
-        // Recurse through a binary expression.
-        assert!(contains_call_expression(&parse_expr(&arena, "a + f(x)")));
-        // A computed member recurses into the property.
-        assert!(contains_call_expression(&parse_expr(&arena, "a[f(x)]")));
-        // No call anywhere.
-        assert!(!contains_call_expression(&parse_expr(&arena, "a + b")));
     }
 
     #[test]
