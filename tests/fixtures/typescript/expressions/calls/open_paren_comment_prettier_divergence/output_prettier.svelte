@@ -18,4 +18,12 @@
 		// lead
 		a
 	);
+
+	// line comment trailing `(` — arguments the call force-expands (function
+	// composition): the comment still stays on the `(` line
+	fn(
+		// c3
+		arr.map((x) => x),
+		b
+	);
 </script>

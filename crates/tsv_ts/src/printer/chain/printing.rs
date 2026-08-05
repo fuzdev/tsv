@@ -78,9 +78,7 @@ pub(crate) fn print_node_inner<'a>(
                 if let Some(end) = *paren_comment_end {
                     let start = expr.span().end;
                     let classified = printer.classify_comments(start, end);
-                    let has_line =
-                        !classified.trailing_line.is_empty() || !classified.leading_line.is_empty();
-                    if has_line {
+                    if classified.has_line_comments() {
                         // A line comment can't trail inline before `)` (the `//` would
                         // swallow it), so force the multiline operand layout, keeping
                         // the comment inside — the same shape as a unary line-comment
@@ -291,7 +289,7 @@ pub(crate) fn print_node_inner<'a>(
             // comment, which can sit inline) would instead defer the `//` to end of line:
             // `a.b()[0]; // c`, relocating it past the brackets AND the `;`, and merging
             // consecutive ones onto one line where the first `//` swallows the rest.
-            if !pre_bracket.trailing_line.is_empty() || !pre_bracket.leading_line.is_empty() {
+            if pre_bracket.has_line_comments() {
                 let mut parts = DocBuf::new();
                 push_gap_comments_and_break(&mut parts, printer, *object_end, bracket_open_pos);
                 parts.push(bracket_doc);

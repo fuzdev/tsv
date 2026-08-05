@@ -18,12 +18,12 @@ use super::arg_predicates::{
 };
 use super::arg_wrapping::{
     ArgItem, append_type_args_with_gap_comments, arg_needs_soft_wrap, build_args_split_last,
-    build_args_with_blank_lines, build_arrow_call_body_states, build_arrow_sig_doc,
-    build_break_body_state, build_call_args_expanded, build_empty_args_doc, build_expand_all_args,
-    build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
+    build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
+    build_call_args_expanded, build_call_args_with_blank_lines, build_empty_args_doc,
+    build_expand_all_args, build_inline_args, build_inline_or_expand_all, could_expand_arrow_chain,
     last_two_args_same_type, prebuild_expand_last_break_body, prebuild_expand_last_obj_array_body,
     prepend_arrow_body_comments, should_expand_first_arg, try_hug_multiline_template_arg,
-    wrap_call_with_hard_breaks, wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
+    wrap_call_with_soft_breaks, wrap_call_with_will_break_guard,
 };
 use super::call_paren_open;
 use super::module_paths::{get_module_path_chain_break, is_boolean_call, is_module_path_no_break};
@@ -277,7 +277,7 @@ pub(super) fn build_call_doc_with_wrapping(
     // Single template literal argument with embedded newlines on the same line
     // as `(` — hug it. A template on its own line falls through to
     // has_multiline_content, which produces the expanded form via
-    // wrap_call_with_hard_breaks.
+    // build_call_args_expanded.
     if let Some(doc) =
         try_hug_multiline_template_arg(printer, callee, call.arguments, call.span.end)
     {
@@ -299,6 +299,7 @@ pub(super) fn build_call_doc_with_wrapping(
             callee,
             call.arguments,
             paren_open,
+            call.span.end,
             ArgItem::ArgContext,
         );
     }
@@ -313,6 +314,7 @@ pub(super) fn build_call_doc_with_wrapping(
             callee,
             call.arguments,
             paren_open,
+            call.span.end,
             ArgItem::ArgContext,
         );
     }
@@ -350,6 +352,7 @@ pub(super) fn build_call_doc_with_wrapping(
                 callee,
                 call.arguments,
                 paren_open,
+                call.span.end,
                 ArgItem::Plain,
             );
         }
@@ -380,6 +383,7 @@ pub(super) fn build_call_doc_with_wrapping(
             callee,
             call.arguments,
             paren_open,
+            call.span.end,
             ArgItem::Plain,
         );
     }
@@ -430,9 +434,15 @@ pub(super) fn build_call_doc_with_wrapping(
     if has_blank_lines {
         // Build arguments with blank line preservation (forced expansion).
         // The shared builder's comment branches never fire here: the comment
-        // handling path above returns early when any inter-arg comments exist.
-        let arg_doc = build_args_with_blank_lines(printer, call.arguments, paren_open);
-        return wrap_call_with_hard_breaks(d, callee, arg_doc);
+        // handling path above returns early when any inter-arg comments exist —
+        // so its `(`-line run stays empty and the wrap it applies is the plain one.
+        return build_call_args_with_blank_lines(
+            printer,
+            callee,
+            call.arguments,
+            paren_open,
+            call.span.end,
+        );
     }
 
     // Build args with line separators (one per line when broken)
@@ -1307,8 +1317,7 @@ fn build_call_with_arg_comments(
                 paren_open,
                 first_arg_start,
             );
-            let has_paren_line =
-                !gap_pc.trailing_block.is_empty() || !gap_pc.trailing_line.is_empty();
+            let has_paren_line = gap_pc.has_trailing_comments();
 
             if force_expansion && has_paren_line {
                 // Comments trailing the `(` stay on the `(` line; the own-line set

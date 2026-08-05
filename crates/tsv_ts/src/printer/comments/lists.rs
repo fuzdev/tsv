@@ -629,13 +629,13 @@ impl<'a> Printer<'a> {
         // block standalone on its own line). `pull_expanding_block` adds the
         // object case: a block on the delimiter line with the first element on a
         // later line — the object will break, so the block trails the `{`.
-        let pull = (!pc.trailing_block.is_empty() || !pc.trailing_line.is_empty())
+        let pull = pc.has_trailing_comments()
             && (super::calls::should_force_expansion_for_comments(
                 self,
                 delim_pos,
                 first_elem_start,
             ) || (pull_expanding_block
-                && !pc.trailing_block.is_empty()
+                && pc.has_trailing_block()
                 && !self.is_same_line(delim_pos, first_elem_start)));
         let mut prefix = DocBuf::new();
         if pull {
