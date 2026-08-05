@@ -10,8 +10,8 @@ use super::super::{
     is_multiline_template_expression,
 };
 use super::arg_comments::{
-    emit_first_arg_leading_comments, find_comma_pos, is_inline_block_after_comma,
-    is_inline_block_before_comma, push_empty_args,
+    emit_first_arg_leading_comments, emit_last_arg_trailing_comments, find_comma_pos,
+    is_inline_block_after_comma, is_inline_block_before_comma, push_empty_args,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, is_block_function, is_short_second_arg_for_expand_first,
@@ -154,10 +154,41 @@ pub(crate) fn wrap_call_with_soft_breaks(d: &DocArena, callee: DocId, args: DocI
 }
 
 /// Wrap arguments in an expanded call expression: `callee(\n\targs,\n)`
-/// Uses hard breaks to force multi-line layout
+/// Uses hard breaks to force multi-line layout.
+///
+/// Private: every caller outside this module goes through
+/// [`wrap_call_with_hard_breaks_paren_line`], since a `(`-line comment run is always a
+/// possibility there and dropping it on the floor is content loss.
 #[inline]
-pub(crate) fn wrap_call_with_hard_breaks(d: &DocArena, callee: DocId, args: DocId) -> DocId {
+fn wrap_call_with_hard_breaks(d: &DocArena, callee: DocId, args: DocId) -> DocId {
     wrap_call(d, callee, args, CallBreakStyle::Hard)
+}
+
+/// [`wrap_call_with_hard_breaks`] with the `(`→first-argument gap's same-line comment
+/// run injected on the `(` line: `callee( // c⏎\targs⏎)`.
+///
+/// The counterpart to [`emit_first_arg_leading_comments`]'s `paren_line` output, and the
+/// reason that run obliges a hard break: it ends in a `//` whose `line_suffix` needs a
+/// following break to flush against, and any argument printed onto that line would be
+/// swallowed by the comment. An empty run is just [`wrap_call_with_hard_breaks`].
+#[inline]
+pub(crate) fn wrap_call_with_hard_breaks_paren_line(
+    d: &DocArena,
+    callee: DocId,
+    paren_line: &[DocId],
+    args: DocId,
+) -> DocId {
+    if paren_line.is_empty() {
+        return wrap_call_with_hard_breaks(d, callee, args);
+    }
+    d.concat(&[
+        callee,
+        d.text("("),
+        d.concat(paren_line),
+        d.indent(d.concat(&[d.hardline(), args])),
+        d.hardline(),
+        d.text(")"),
+    ])
 }
 
 /// Wrap arguments with a `will_break` guard: if any arg contains hardlines
@@ -767,13 +798,18 @@ pub(crate) fn build_arrow_call_body_states(
 /// that would otherwise lose comments with simple `join_doc`.
 ///
 /// `join` picks the separator style and says whether the `(`→first-argument gap is this
-/// builder's to emit; `item` picks the per-argument builder.
+/// builder's to emit; `item` picks the per-argument builder. `paren_close` bounds the
+/// LAST argument's trailing gap, and `paren_line` receives the `(`-line comment run (see
+/// [`emit_first_arg_leading_comments`]) — a non-empty run obliges the caller to wrap with
+/// [`wrap_call_with_hard_breaks_paren_line`].
 pub(crate) fn build_args_joined_with_comments(
     printer: &Printer<'_>,
     arguments: &[internal::Expression<'_>],
     paren_open: u32,
+    paren_close: u32,
     join: ArgsJoin,
     item: ArgItem,
+    paren_line: &mut DocBuf,
 ) -> DocId {
     let d = printer.d();
     let mut parts = DocBuf::new();
@@ -782,7 +818,13 @@ pub(crate) fn build_args_joined_with_comments(
     // Leading comments before first arg (e.g., `fn(/* c */ arg)`)
     let first_arg_start = arguments[0].span().start;
     if !matches!(join, ArgsJoin::HardlineLeadingGapEmitted) {
-        emit_first_arg_leading_comments(printer, &mut parts, paren_open, first_arg_start);
+        emit_first_arg_leading_comments(
+            printer,
+            paren_line,
+            &mut parts,
+            paren_open,
+            first_arg_start,
+        );
     }
 
     let no_comment_sep = if use_hardline {
@@ -811,6 +853,13 @@ pub(crate) fn build_args_joined_with_comments(
             } else {
                 parts.push(no_comment_sep);
             }
+        } else {
+            // The LAST argument's gap to `)` is this builder's too — the counterpart to
+            // `open_inter_arg_gap` above. These layouts are reached by force-expansion
+            // triggers (multiline content, function composition, the expand-first
+            // fallback) that preempt the callers' own comment-aware paths, so nothing
+            // else emits it and the loss is total.
+            emit_last_arg_trailing_comments(printer, &mut parts, arg, paren_close);
         }
     }
 
@@ -825,11 +874,20 @@ pub(crate) fn build_call_args_expanded(
     callee: DocId,
     arguments: &[internal::Expression<'_>],
     paren_open: u32,
+    paren_close: u32,
     item: ArgItem,
 ) -> DocId {
-    let args =
-        build_args_joined_with_comments(printer, arguments, paren_open, ArgsJoin::Hardline, item);
-    wrap_call_with_hard_breaks(printer.d(), callee, args)
+    let mut paren_line = DocBuf::new();
+    let args = build_args_joined_with_comments(
+        printer,
+        arguments,
+        paren_open,
+        paren_close,
+        ArgsJoin::Hardline,
+        item,
+        &mut paren_line,
+    );
+    wrap_call_with_hard_breaks_paren_line(printer.d(), callee, &paren_line, args)
 }
 
 /// How [`build_args_joined_with_comments`] separates arguments, and who owns the
@@ -1022,27 +1080,37 @@ pub(super) fn try_hug_multiline_template_arg(
     Some(d.concat(&parts))
 }
 
-/// Build the argument list doc for a call/new whose arguments have blank lines
-/// between them (hardline expansion, preserving at most one blank line per gap).
+/// Build a call/new whose arguments have blank lines between them (hardline
+/// expansion, preserving at most one blank line per gap): `callee(\n\targ1,\n\n\targ2\n)`.
 ///
 /// Handles comments in the gaps; a gap without comments preserves its blank
-/// line at the top of the next iteration. The caller wraps the result with
-/// `wrap_call_with_hard_breaks`.
+/// line at the top of the next iteration. The blank-line twin of
+/// [`build_call_args_expanded`] — it owns the wrap for the same reason, so the `(`-line
+/// comment run never escapes as an out-param a caller could forget to inject.
 ///
 /// The per-argument loop below only opens the gaps BETWEEN arguments (each via the
-/// previous argument's end), so the `(`→first-argument gap is emitted up front or its
-/// comments are DROPPED — the hazard-4 shape in docs/comments.md. Reachable from the
-/// `new` cascade, whose comment paths do not preempt this one the way the plain call's do;
-/// `blanks:audit` found it by injecting a blank line beside a leading comment.
-pub(super) fn build_args_with_blank_lines(
+/// previous argument's end), so BOTH edge gaps are emitted here or their comments are
+/// DROPPED — the hazard-4 shape in docs/comments.md. Reachable from the `new` cascade,
+/// whose comment paths do not preempt this one the way the plain call's do; `blanks:audit`
+/// found the `(`→first-argument half by injecting a blank line beside a leading comment.
+pub(super) fn build_call_args_with_blank_lines(
     printer: &Printer<'_>,
+    callee: DocId,
     args: &[internal::Expression<'_>],
     paren_open: u32,
+    paren_close: u32,
 ) -> DocId {
     let d = printer.d();
+    let mut paren_line = DocBuf::new();
     let mut arg_parts = DocBuf::new();
     if let Some(first) = args.first() {
-        emit_first_arg_leading_comments(printer, &mut arg_parts, paren_open, first.span().start);
+        emit_first_arg_leading_comments(
+            printer,
+            &mut paren_line,
+            &mut arg_parts,
+            paren_open,
+            first.span().start,
+        );
     }
     // Whether the gap just closed — between `args[i - 1]` and `args[i]` — carries an
     // author blank line. Computed once at the bottom of the previous iteration (the
@@ -1103,7 +1171,11 @@ pub(super) fn build_args_with_blank_lines(
                     arg_parts.push(d.hardline());
                 }
             }
+        } else {
+            // The last argument's gap to `)`, the other edge this loop must own (see
+            // the doc comment above).
+            emit_last_arg_trailing_comments(printer, &mut arg_parts, arg, paren_close);
         }
     }
-    d.concat(&arg_parts)
+    wrap_call_with_hard_breaks_paren_line(d, callee, &paren_line, d.concat(&arg_parts))
 }
