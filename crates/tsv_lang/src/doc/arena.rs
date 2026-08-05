@@ -1981,45 +1981,6 @@ impl DocArena {
         result
     }
 
-    /// Check if a doc has forced breaks (hardlines only, no should_break groups).
-    pub fn has_forced_break(&self, id: DocId) -> bool {
-        let nodes = self.nodes.borrow();
-        self.has_forced_break_inner(id, &nodes)
-    }
-
-    fn has_forced_break_inner(&self, id: DocId, nodes: &[DocNode]) -> bool {
-        match &nodes[id.index()] {
-            // deliberate asymmetry with `will_break_fill`: this predicate stays blind to
-            // newline-bearing Text on purpose — it is the "less aggressive" (hardlines-only,
-            // ignores `should_break`) test for the last-argument hug state in the call/new printers
-            DocNode::Text(_) => false,
-            DocNode::MultilineText { .. } => true,
-            DocNode::Line(kind) => matches!(kind, LineKind::Hard | LineKind::Literal),
-            DocNode::Indent(inner) | DocNode::Dedent(inner) => {
-                self.has_forced_break_inner(*inner, nodes)
-            }
-            DocNode::AlignRoot { contents, .. } | DocNode::Align { contents, .. } => {
-                self.has_forced_break_inner(*contents, nodes)
-            }
-            DocNode::IndentIfBreak { contents, .. } => {
-                self.has_forced_break_inner(*contents, nodes)
-            }
-            DocNode::Group { contents, .. } => self.has_forced_break_inner(*contents, nodes),
-            DocNode::IfBreak { .. } => false,
-            DocNode::Concat(range) | DocNode::Fill(range) => {
-                let children = self.children.borrow();
-                let kids = range.resolve(&children);
-                kids.iter()
-                    .any(|&kid| self.has_forced_break_inner(kid, nodes))
-            }
-            DocNode::WithContext { doc, .. } => self.has_forced_break_inner(*doc, nodes),
-            DocNode::LineSuffix(_) => false,
-            DocNode::LineSuffixBoundary => false,
-            DocNode::BreakParent => true,
-            DocNode::FlushBreak => false,
-        }
-    }
-
     /// Check if a doc can break (contains any line elements) — Prettier's `canBreak`.
     ///
     /// The dual of [`Self::will_break`]: `will_break` asks whether a doc *must* break,
