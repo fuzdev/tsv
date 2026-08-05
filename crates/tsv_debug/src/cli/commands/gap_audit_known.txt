@@ -14,7 +14,7 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 527
+# shapes: 522
 DROPPED	!)⟨⟩!.	annotation,block,jsdoc_cast
 DROPPED	&&⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
@@ -27,7 +27,6 @@ DROPPED	',⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	']⟨⟩);	annotation,block,jsdoc_cast,multiline
 DROPPED	']⟨⟩/*	line
 DROPPED	']⟨⟩␣	annotation,block,jsdoc_cast,multiline
-DROPPED	'},⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	'⟨⟩));	annotation,block,jsdoc_cast,line,multiline
 DROPPED	'⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	'⟨⟩,	annotation,block,jsdoc_cast,line,multiline
@@ -104,9 +103,6 @@ DROPPED	,⟨⟩>()	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩>(/	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩>/*	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩IDENT	annotation,block,jsdoc_cast,multiline
-DROPPED	,⟨⟩]	annotation,block,jsdoc_cast,multiline
-DROPPED	,⟨⟩]);	multiline
-DROPPED	,⟨⟩];	annotation,block,jsdoc_cast,multiline
 DROPPED	,⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	.()⟨⟩)!(	annotation,block,jsdoc_cast,line,multiline
 DROPPED	.()⟨⟩)!`	annotation,block,jsdoc_cast,line,multiline
@@ -211,7 +207,6 @@ DROPPED	[⟨⟩NUM	line
 DROPPED	[⟨⟩{	annotation,block,jsdoc_cast,multiline
 DROPPED	[⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	])⟨⟩␣	annotation,block,jsdoc_cast
-DROPPED	],⟨⟩␣	multiline
 DROPPED	]:⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	]⟨⟩)	annotation,block,jsdoc_cast,line,multiline
 DROPPED	]⟨⟩);	annotation,block,jsdoc_cast,multiline
@@ -321,7 +316,6 @@ DROPPED	␣⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩NUM	line
 DROPPED	␣⟨⟩[	annotation,block,jsdoc_cast,multiline
 DROPPED	␣⟨⟩[/*	annotation,block,jsdoc_cast,multiline
-DROPPED	␣⟨⟩]	multiline
 DROPPED	␣⟨⟩as	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩{	annotation,block,jsdoc_cast,line,multiline
 DROPPED	␣⟨⟩{}	annotation,block,jsdoc_cast,line,multiline
@@ -343,6 +337,7 @@ DOUBLE-PRINTED	).⟨⟩IDENT	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	)⟨⟩.	annotation,block,jsdoc_cast,line,multiline
 DOUBLE-PRINTED	)⟨⟩␣	line
 DOUBLE-PRINTED	*/}⟨⟩;	line
+DOUBLE-PRINTED	*/⟨⟩),	line
 DOUBLE-PRINTED	*/⟨⟩;	line
 DOUBLE-PRINTED	*/⟨⟩␣	line
 DOUBLE-PRINTED	,⟨⟩IDENT	annotation,block,jsdoc_cast,multiline

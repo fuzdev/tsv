@@ -7,6 +7,7 @@
 // - Comment preservation
 
 use crate::ast::internal::{self, Expression, LiteralValue};
+use crate::printer::comments::block_is_before_comma;
 use crate::printer::{
     CommentVec, Printer, container_may_have_multiline_content, has_multiline_content,
 };
@@ -174,7 +175,10 @@ impl<'a> Printer<'a> {
 
     /// Does this **block** comment trail the element before it, rather than lead the one after?
     /// The separator decides, and is the whole rule: before the comma the comment trails
-    /// (`[A /* c */, B]`); past it, it leads the next element (`[A, /* c */ B]`).
+    /// (`[A /* c */, B]`); past it, it leads the next element (`[A, /* c */ B]`). On the
+    /// LAST element (`is_last`) there is no next element to lead and the comma is never
+    /// emitted (`trailingComma: 'none'`), so the whole same-line run trails — the shared
+    /// comma arm, [`block_is_before_comma`], stated once with the collector's classifier.
     ///
     /// A newline after the comment does **not** carry it across the comma. Prettier classifies
     /// on newlines alone (`endOfLine`, `main/comments/attach.js` — a comma is not a node) and so
@@ -207,17 +211,24 @@ impl<'a> Printer<'a> {
     /// two in step, or a block past the comma is claimed by both emitters.
     /// (An own-line comment — a newline *before* it — routes to the expanding path the
     /// same way.)
+    ///
+    /// The `is_last` arm can't disturb that complement: it widens the claim only past the
+    /// LAST element, a range no leading scan ever covers (there is no next element to
+    /// lead). Its double-print hazard is the OTHER side — the end-of-array scans, which
+    /// must not re-emit what this arm claims; [`Self::end_scan_comment_is_own_line`] is
+    /// the one statement of that exclusion.
     fn block_comment_trails_prev_element(
         &self,
         prev_end: u32,
         gap_end: u32,
         comment: &tsv_lang::Comment,
         comma_pos: Option<u32>,
+        is_last: bool,
     ) -> bool {
         if !self.is_same_line(prev_end, comment.span.start) {
             return false;
         }
-        comma_pos.is_none_or(|pos| comment.span.start < pos)
+        block_is_before_comma(is_last, comma_pos, comment.span.start)
             || self
                 .same_line_line_comment_start(prev_end, gap_end)
                 .is_some_and(|line_start| comment.span.start < line_start)
@@ -293,6 +304,10 @@ impl<'a> Printer<'a> {
 
     /// Add trailing block comments for an array element — the ones
     /// [`Self::block_comment_trails_prev_element`] binds to it.
+    ///
+    /// `is_last` is the SLOT question, not the real-element one: a trailing elision keeps
+    /// its (syntactically significant) comma, and the comments past it belong to the
+    /// trailing-hole seams — so a real element followed by holes must not claim them.
     fn add_trailing_array_comments(
         &self,
         arr: &internal::ArrayExpression<'_>,
@@ -302,9 +317,10 @@ impl<'a> Printer<'a> {
     ) {
         let next_boundary = self.next_element_boundary(arr, current_index);
         // Bounded at `next_boundary`: this element's separator, if it has one, lies before the
-        // next element. Past the last element there is none — and every candidate comment is
-        // in range, so `None` tie-breaks them all the same way a comma beyond the array would.
+        // next element. A SOURCE trailing comma past the last element is still found — the
+        // `is_last` arm is what keeps the comments past it on this element.
         let comma_pos = self.find_comma_in_range(elem_end, next_boundary);
+        let is_last = current_index + 1 == arr.elements.len();
 
         for comment in comments_to_emit_in_range(self.comments, elem_end, next_boundary) {
             if comment.is_block
@@ -313,11 +329,45 @@ impl<'a> Printer<'a> {
                     next_boundary,
                     comment,
                     comma_pos,
+                    is_last,
                 )
             {
                 parts.push(self.format_inline_block_comment(comment, false));
             }
         }
+    }
+
+    /// Is this comment OWN-LINE for an end-of-array trailing scan — i.e. left for the
+    /// scan to emit as an array sibling, rather than already printed by someone closer?
+    ///
+    /// The one statement of the scan's **two regions, two anchors** rule, shared by
+    /// [`Self::build_array_group_doc`]'s end-of-array scan and
+    /// [`Self::build_array_doc_with_expanding_comments`]'s final scan (it drifted between
+    /// them once — the group side learned the element anchor and the final scan kept
+    /// re-emitting what the element claimed):
+    ///
+    /// - **PAST the last real element** (`last_real_end`), same-line means the element's
+    ///   trailing claim already printed it — every same-line block, before or after a
+    ///   source trailing comma alike, via [`Self::block_comment_trails_prev_element`]'s
+    ///   `is_last` arm, and every same-line line comment always. The anchor is the
+    ///   element's END, the same key that claim is made with.
+    /// - **INSIDE a spread's stripped parens** (`scan_start` < `last_real_end`), a
+    ///   comment glued to the argument is the spread doc's own; an own-line one is
+    ///   re-parented to the array. The anchor is the argument's end, `scan_start`.
+    ///
+    /// `last_real_end` is `None` when the array ends in a trailing hole — the hole seams
+    /// own that region's comments and the plain `scan_start` anchor stands.
+    fn end_scan_comment_is_own_line(
+        &self,
+        comment: &tsv_lang::Comment,
+        scan_start: u32,
+        last_real_end: Option<u32>,
+    ) -> bool {
+        let anchor = match last_real_end {
+            Some(end) if comment.span.start >= end => end,
+            _ => scan_start,
+        };
+        !self.is_same_line(anchor, comment.span.start)
     }
 
     /// Build a Doc for an array expression, wrapping on width.
@@ -420,25 +470,10 @@ impl<'a> Printer<'a> {
         let d = self.d();
         let mut parts = DocBuf::new();
 
-        for (i, elem) in arr.elements.iter().enumerate() {
-            // Handle comments and element (skip comment collection for elisions)
-            if let Some(expr) = elem {
-                // Zero-comment fast gate: with no comments anywhere in the array,
-                // no comment can lie in this element's leading/trailing gap, so skip
-                // the inline block-comment collection (and its comma scan).
-                if has_comments {
-                    let elem_start = expr.span().start;
-                    let search_start = self.leading_comment_search_start_for(arr, i, elem_start);
-                    self.add_inline_leading_block_comments(search_start, elem_start, &mut parts);
-                }
-
-                parts.push(self.build_arg_expression_doc(expr));
-
-                if has_comments {
-                    // Trailing block comments (before comma only)
-                    self.add_trailing_array_comments(arr, expr.span().end, i, &mut parts);
-                }
-            }
+        for i in 0..arr.elements.len() {
+            // Elements and their glued comments (a hole pushes nothing — though
+            // `is_numbers_only_array` already excludes elisions from this path).
+            self.push_array_element_with_inline_comments(arr, i, has_comments, &mut parts);
 
             if i < arr.elements.len() - 1 {
                 parts.push(d.comma_line());
@@ -454,12 +489,17 @@ impl<'a> Printer<'a> {
     /// Push slot `i`'s element doc plus its inline leading/trailing block comments.
     ///
     /// The one definition of "an array element and the comments glued around it",
-    /// shared by [`Self::build_array_group_doc`] and its forced twin
-    /// [`Self::build_array_group_doc_forced`] — the two printers a *glued* block comment
-    /// can reach, since gluing is not an expansion trigger and so does not divert the
-    /// array to the expanding printer. Emitting the element alone DROPS the trailing
-    /// side (the leading side is owned by the element and rides inside its own doc), so
-    /// the pairing is an invariant worth having one home rather than two.
+    /// shared by [`Self::build_array_fill_doc`], [`Self::build_array_group_doc`] and its
+    /// forced twin [`Self::build_array_group_doc_forced`] — the three printers a *glued*
+    /// block comment can reach, since gluing is not an expansion trigger and so does not
+    /// divert the array to the expanding printer. Emitting the element alone DROPS the
+    /// trailing side (the leading side is owned by the element and rides inside its own
+    /// doc), so the pairing is an invariant worth having one home rather than three.
+    ///
+    /// TODO: in the fill printer the pushed comment docs land in the fill's
+    /// content/separator alternation as items of their own, so the fill neither measures
+    /// nor breaks on a trailing block comment (a 100+ col numbers array ending
+    /// `n /* c */` renders over-width instead of wrapping).
     ///
     /// Takes the slot INDEX rather than the element, and resolves it here: the comment
     /// lookups are keyed on `(arr, i)` while the doc comes from the element, so handing
@@ -491,7 +531,9 @@ impl<'a> Printer<'a> {
         parts.push(self.build_arg_expression_doc(expr));
 
         if has_comments {
-            // Trailing block comments (before comma only)
+            // Trailing block comments — the ones `block_comment_trails_prev_element`
+            // binds to this element (before its comma; on the last slot the whole
+            // same-line run, its comma never being emitted).
             self.add_trailing_array_comments(arr, expr.span().end, i, parts);
         }
     }
@@ -582,54 +624,40 @@ impl<'a> Printer<'a> {
         // array to the expanding printer before this path runs. The collection stays
         // general — it costs nothing and the spread case shares its shape.
         let mut trailing_own_line_comments: CommentVec<'_> = smallvec![];
-        // Same-line block comment past the LAST element's comma — a dangling comment with
-        // no element after it to lead. Under `trailingComma: 'none'` the comma it followed
-        // is dropped, so it renders directly against the element: `['a', 'b', /* c */]` →
-        // `['a', 'b' /* c */]`. Prettier emits the same. Own-line comments are siblings
-        // (above); this is not a relocation tsv chose, it is the only position left once
-        // the separator the author wrote it against is gone.
-        let mut trailing_same_line_after_comma: CommentVec<'_> = smallvec![];
-        // Zero-comment fast gate: both lists collect nothing but comments, so with none
-        // anywhere in the array the whole scan is a no-op.
-        let last_elem_end = has_comments
+        // Zero-comment fast gate: the scan collects nothing but comments, so with none
+        // anywhere in the array it is a no-op.
+        let last_real = has_comments
             .then(|| arr.elements.last().and_then(|e| e.as_ref()))
-            .flatten()
-            .map(|e| {
-                // For spread elements, also check inside the spread span for
-                // comments from stripped parens (argument.end to spread.end)
-                if let Expression::SpreadElement(spread) = e {
-                    let has_inner = self
-                        .has_comments_to_emit_between(spread.argument.span().end, spread.span.end);
-                    if has_inner {
-                        return spread.argument.span().end;
-                    }
+            .flatten();
+        if let Some(e) = last_real {
+            let elem_end = e.span().end;
+            // For a spread element the scan extends INTO the spread span, where stripped
+            // grouping parens may have left comments (argument.end to spread.end).
+            let search_start = match e {
+                Expression::SpreadElement(spread)
+                    if self.has_comments_to_emit_between(
+                        spread.argument.span().end,
+                        spread.span.end,
+                    ) =>
+                {
+                    spread.argument.span().end
                 }
-                e.span().end
-            });
-        if let Some(search_start) = last_elem_end {
-            // Bounded at `]`: under `trailingComma: 'none'` the last element has no
-            // separator, so an unbounded probe would scan the rest of the file for a comma
-            // that is not this array's. Every candidate is in range, so `None` tie-breaks
-            // them all the same way a comma past the array would.
-            let comma_pos = self.find_comma_in_range(search_start, arr.span.end - 1);
+                _ => elem_end,
+            };
             for comment in comments_to_emit_in_range(self.comments, search_start, arr.span.end - 1)
             {
-                if !comment.is_block {
-                    continue;
-                }
-                if !self.is_same_line(search_start, comment.span.start) {
+                // Only what no one closer prints — see `end_scan_comment_is_own_line`
+                // for the two-anchor rule; a same-line comment collected here would
+                // double-print.
+                if comment.is_block
+                    && self.end_scan_comment_is_own_line(comment, search_start, Some(elem_end))
+                {
                     trailing_own_line_comments.push(comment);
-                } else if comma_pos.is_some_and(|pos| comment.span.start > pos) {
-                    trailing_same_line_after_comma.push(comment);
                 }
             }
         }
 
         let mut inner_parts: DocBuf = smallvec![d.softline(), d.concat(&parts)];
-        for comment in &trailing_same_line_after_comma {
-            inner_parts.push(d.text(" "));
-            inner_parts.push(self.build_comment_doc(comment));
-        }
         if !trailing_own_line_comments.is_empty() {
             for comment in &trailing_own_line_comments {
                 inner_parts.push(d.line());
@@ -692,11 +720,13 @@ impl<'a> Printer<'a> {
         }
 
         // No trailing comma after the last element under `trailingComma: 'none'`, and no
-        // trailing comment to place: an own-line block comment before the closing bracket
-        // can't reach this path. `build_array_doc` routes an array to
-        // `build_array_doc_with_expanding_comments` whenever one is present — a single-line
-        // one via `has_own_line_block_comments_in_array` (which returns true for any
-        // own-line comment past the last element), a multi-line one via the on-page check.
+        // trailing comment left to place: the last element's same-line run — including a
+        // block past its source trailing comma — is claimed by the element seam above, and
+        // an own-line block comment before the closing bracket can't reach this path.
+        // `build_array_doc` routes an array to `build_array_doc_with_expanding_comments`
+        // whenever one is present — a single-line one via
+        // `has_own_line_block_comments_in_array` (which returns true for any own-line
+        // comment past the last element), a multi-line one via the on-page check.
         let inner = d.concat(&[d.hardline(), d.concat(&parts)]);
         let (indented_content, closing_line) = self.wrap_with_decl_indent(inner, d.hardline());
         d.concat(&[d.text("["), indented_content, closing_line, d.text("]")])
@@ -782,12 +812,15 @@ impl<'a> Printer<'a> {
                         if i > 0 && self.is_same_line(last_real_emit_end, c.span.start) {
                             // The complement of the trailing filter below — same predicate,
                             // so each same-line block comment lands on exactly one side.
+                            // The previous element has this element after it, so it is
+                            // never the last slot: `is_last` is false here by construction.
                             c.is_block
                                 && !self.block_comment_trails_prev_element(
                                     last_real_emit_end,
                                     upper,
                                     c,
                                     prev_comma_pos,
+                                    false,
                                 )
                         } else {
                             true
@@ -840,6 +873,8 @@ impl<'a> Printer<'a> {
                 ));
             }
 
+            let is_last = i + 1 == arr.elements.len();
+
             // Same-line trailing comments (real elements only).
             let trailing_comma_pos = elem
                 .is_some()
@@ -855,6 +890,7 @@ impl<'a> Printer<'a> {
                                 next_boundary,
                                 c,
                                 trailing_comma_pos,
+                                is_last,
                             )
                         } else {
                             // A same-line line comment always trails: nothing can follow it
@@ -867,9 +903,12 @@ impl<'a> Printer<'a> {
                 smallvec![]
             };
             // Which side of the comma each trailing block keeps — the author's side. A
-            // block past the comma is here only because a line comment follows it (see
-            // `block_comment_trails_prev_element`), and it must render in front of that
-            // deferred suffix, so the run comes out in source order.
+            // block past a non-last element's comma is here only because a line comment
+            // follows it (see `block_comment_trails_prev_element`), and it must render in
+            // front of that deferred suffix, so the run comes out in source order. On the
+            // LAST element the comma below is never emitted, so its after-comma blocks
+            // render straight against the element — the only position left once the
+            // separator the author wrote them against is gone (prettier agrees).
             let past_comma =
                 |c: &tsv_lang::Comment| trailing_comma_pos.is_some_and(|pos| c.span.start > pos);
 
@@ -881,7 +920,6 @@ impl<'a> Printer<'a> {
             // Separator comma between elements; under `trailingComma: 'none'` the last
             // REAL element gets no trailing comma, but a trailing-elision hole keeps its
             // (syntactically significant) comma.
-            let is_last = i + 1 == arr.elements.len();
             if !is_last || elem.is_none() {
                 parts.push(d.text(","));
             }
@@ -956,12 +994,20 @@ impl<'a> Printer<'a> {
         }
 
         // Final comments before closing bracket. Skip what trailing-hole emission
-        // already handled.
+        // already handled. Only what no one closer prints — see
+        // `end_scan_comment_is_own_line` for the two-anchor rule; a `None` element end
+        // (trailing hole) keeps the plain `final_scan_start` anchor, since the last real
+        // element (`is_last` false, holes follow) claimed nothing out here.
         let final_scan_start = trailing_hole_comments_end.unwrap_or(last_real_emit_end);
+        let last_real_end = trailing_hole_comments_end
+            .is_none()
+            .then(|| arr.elements.last().and_then(|e| e.as_ref()))
+            .flatten()
+            .map(|e| e.span().end);
         let mut prev_end = final_scan_start;
         for comment in comments_to_emit_in_range(self.comments, final_scan_start, arr.span.end - 1)
         {
-            if !self.is_same_line(final_scan_start, comment.span.start) {
+            if self.end_scan_comment_is_own_line(comment, final_scan_start, last_real_end) {
                 // Preserve an author blank line before an own-line trailing comment.
                 self.push_blank_preserving_hardline(&mut parts, prev_end, comment.span.start);
                 parts.push(self.build_comment_doc(comment));
