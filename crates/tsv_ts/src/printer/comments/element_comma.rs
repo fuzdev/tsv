@@ -10,7 +10,9 @@
 // destructuring-pattern, import/export specifier and enum-member loops so the
 // ordering can't drift between them. (The array literal answers the same rule
 // through its own paired trailing/leading predicate — holes and the fill path don't
-// fit this collector's shape — so a change here has to be mirrored there.)
+// fit this collector's shape. Its comma arm is [`block_is_before_comma`], shared with
+// this collector's classifier; the deferred-line-comment order arm and the emission
+// are still its own, so a change to THOSE has to be mirrored there.)
 //
 // This side is half of a partition: what it does NOT claim leads the next element,
 // and every caller resumes its own leading scan at `end_pos`. See
@@ -27,6 +29,22 @@ use tsv_lang::Comment;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+
+/// Does a same-line block comment at `start` sit on the trailing side of the element's
+/// separator? The element-comma partition's **comma arm**, stated once and shared by
+/// [`Printer::collect_trailing_comments`] and the array literal's paired predicate
+/// (`block_comment_trails_prev_element`) so the two can't drift: before the comma the
+/// block trails the element, and on the LAST element the comma is never emitted
+/// (`trailingComma: 'none'`), so "before" and "after" it are one position and the whole
+/// run trails. A block past a non-last element's comma is NOT covered here — that is
+/// the callers' own second arm (the deferred-line-comment order rule).
+pub(in crate::printer) fn block_is_before_comma(
+    is_last: bool,
+    comma_pos: Option<u32>,
+    start: u32,
+) -> bool {
+    is_last || comma_pos.is_none_or(|comma| start < comma)
+}
 
 /// Trailing comments collected for a list element (property or array element)
 pub(in crate::printer) struct TrailingComments<'a> {
@@ -117,8 +135,7 @@ impl<'a> Printer<'a> {
         // block trails the element in the same run as its before-comma blocks, so all
         // same-line blocks collect into one source-ordered `before_comma` (the comma
         // between them is `d.empty()`).
-        let is_before_comma =
-            |c: &Comment| is_last || comma_pos.is_none_or(|comma| c.span.start < comma);
+        let is_before_comma = |c: &Comment| block_is_before_comma(is_last, comma_pos, c.span.start);
 
         let mut before_comma = SmallVec::new();
         let mut after_comma = SmallVec::new();

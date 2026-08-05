@@ -36,6 +36,7 @@ mod render;
 mod scan;
 
 pub(crate) use declarations::HeritageKeyword;
+pub(super) use element_comma::block_is_before_comma;
 pub(crate) use lists::BlankRule;
 pub(crate) use owned::OwnedCommentEffect;
 
