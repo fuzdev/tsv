@@ -128,44 +128,37 @@ impl<'a> Printer<'a> {
         if !has_comments {
             return false;
         }
-        // The **effective** first-argument start: a redundant paren shell around the
-        // first argument is stripped in this position, so a line comment the author
-        // wrote just inside it lands in the list's own `<`→argument gap and must route
-        // the list here like any other leading line comment. Asking the shell's span
-        // instead made that gap empty, so the shape fell through to the group path and
-        // the comment rendered from the argument's doc — on its own line, never on the
-        // `<` line the author wrote it on.
+        // Every clause below asks the **effective** argument span — the node left once a
+        // redundant paren shell carrying only leading comments is stripped
+        // ([`Self::leading_paren_unwrapped`]), the same node the expansion builder emits.
+        // The shell is stripped in this position, so a comment the author wrote just
+        // inside it physically lands in one of the list's own gaps (`<`→argument,
+        // argument→argument, argument→`>`) and must route the list here like any other
+        // comment there. Asking `TSType::span` left those gaps empty, so the shape fell
+        // through to the group path and the comment rendered from the argument's own
+        // doc — reaching a different fixed point than the same comment written without
+        // the parens (`Foo<(⏎/* c */⏎T)>` collapsing inline where the bare authoring
+        // expands; `Foo<A, (// c⏎B)>` leading `B` where the bare authoring trails the
+        // comma). Both spellings are idempotent, so only a bare-vs-paren comparison
+        // shows the split — the `unformatted_parens` variants are that claim.
+        //
+        // The strip is also what settles the second case against the element-comma seam
+        // ([`comments.md`](../../../../docs/comments.md)): the two authorings have
+        // byte-identical stripped forms, so the shell carries no position signal past
+        // its own deletion, and the seam's partition claims the comment for the previous
+        // argument's trailing run exactly as it does for the bare form.
+        //
+        // Own-line-ness is measured after the strip too, and correctly: a block glued to
+        // the `(` shares the `<` line, which is the `prev_boundary` the bracket-list
+        // helper compares against, so `Foo<(/* c */⏎T)>` keeps collapsing inline — where
+        // prettier also collapses it. Only a block the author gave its own line expands.
+        let arg_span = |ty: &TSType<'_>| self.leading_paren_unwrapped(ty).span();
         let has_leading_line_comment = args.params.first().is_some_and(|first| {
-            self.has_line_comments_between(
-                args.span.start + 1,
-                self.leading_paren_unwrapped(first).span().start,
-            )
+            self.has_line_comments_between(args.span.start + 1, arg_span(first).start)
         });
-        // TODO: the two clauses below still ask `TSType::span`, so they keep the very
-        // blindness the clause above fixed — a comment inside a *later* argument's
-        // redundant parens, or an own-line BLOCK inside any argument's, sits inside the
-        // param span rather than in a gap they scan, so the list doesn't expand and the
-        // comment renders from the argument's own doc instead. Both make one comment's
-        // two authorings reach two fixed points (idempotent, so F1 is blind — only a
-        // bare-vs-paren comparison shows it):
-        //   `Foo<(/* c */⏎a | b)>`  → `Foo</* c */ a | b>`, where the bare authoring
-        //                              expands (`single_arg_own_line_block_comment`)
-        //   `Map<a, (// c⏎b)>`     → `// c` leads `b`, where the bare `Map<a, // c⏎b>`
-        //                              trails the comma (`a, // c`)
-        // Threading `leading_paren_unwrapped` through both is the shape of the fix, but
-        // it changes layout, so it wants fixtures first — and the second case must be
-        // reconciled with the element-comma seam, which owns that gap's partition.
         has_leading_line_comment
-            || self.has_line_comments_in_delimited_list(
-                args.params,
-                TSType::span,
-                args.span.end - 1,
-            )
-            || self.has_own_line_block_comments_in_bracket_list(
-                args.span,
-                args.params,
-                TSType::span,
-            )
+            || self.has_line_comments_in_delimited_list(args.params, arg_span, args.span.end - 1)
+            || self.has_own_line_block_comments_in_bracket_list(args.span, args.params, arg_span)
     }
 
     /// Build doc for type arguments: `<T, U>`.
@@ -214,10 +207,26 @@ impl<'a> Printer<'a> {
             return self.build_single_type_arg_inline(args, has_comments);
         }
 
-        // Matches Prettier's group([<, indent([softline, join([",", line], args)]), softline, >])
-        // via the shared width-decided core; each argument renders in multi-arg
-        // (hugging) mode — also for a non-hugging single argument, preserving the
-        // pre-merge behavior of the type-position path.
+        self.build_type_arguments_group_doc(args, has_comments)
+    }
+
+    /// The width-decided `<…>` tail, shared by **both** type-argument families — the
+    /// type-position list above and the call/`new` instantiation
+    /// (`build_type_parameter_instantiation_doc`). Matches Prettier's
+    /// `group([<, indent([softline, join([",", line], args)]), softline, >])` via the
+    /// shared angle-list core; each argument renders in multi-arg (hugging) mode — also
+    /// for a non-hugging single argument, preserving the pre-merge behavior of the
+    /// type-position path.
+    ///
+    /// The two families differ **only** in which single arguments they hug before
+    /// reaching here (the instantiation's curly-hug arm is a documented divergence);
+    /// everything past that decision is one body, so neither can drift from the other.
+    pub(in crate::printer) fn build_type_arguments_group_doc(
+        &self,
+        args: &internal::TSTypeParameterInstantiation<'_>,
+        has_comments: bool,
+    ) -> DocId {
+        let d = self.d();
         d.group(self.build_angle_list_doc(
             args.span,
             args.params.len(),
@@ -234,18 +243,19 @@ impl<'a> Printer<'a> {
         ))
     }
 
-    /// Build doc for type arguments with expanding comments (line or own-line block).
+    /// Build doc for type arguments with expanding comments (line or own-line block),
+    /// which force multiline because they can't appear inline. Shared by **both**
+    /// type-argument families, like the width-decided tail above — a call/`new`
+    /// argument *is* a type argument, so both route here rather than keeping twin
+    /// bodies in step by hand.
     ///
-    /// Line comments and own-line block comments force multiline because they can't appear inline.
-    fn build_type_arguments_doc_with_line_comments(
+    /// Spans and docs both come from `leading_paren_unwrapped`, so this builder's gap
+    /// emitters and the item docs agree on where each argument starts — see that
+    /// function for why a leading-only paren shell must not reach here.
+    pub(in crate::printer) fn build_type_arguments_doc_with_line_comments(
         &self,
         args: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
-        // Type-position type arguments render each argument with `build_type_arg_doc`;
-        // the layout is shared with call/`new`-expression arguments.
-        // Spans and docs both come from `leading_paren_unwrapped`, so this
-        // builder's gap emitters and the item docs agree on where each argument starts
-        // — see that function for why a leading-only paren shell must not reach here.
         let is_multi = args.params.len() > 1;
         self.build_angle_list_with_line_comments(
             args.span,

@@ -14,7 +14,7 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 494
+# shapes: 493
 DROPPED	!)⟨⟩!.	annotation,block,jsdoc_cast
 DROPPED	&&⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
@@ -486,7 +486,6 @@ SWALLOW	␣⟨⟩()	line
 SWALLOW	␣⟨⟩({	line
 SWALLOW	␣⟨⟩)	annotation,block,jsdoc_cast,line,multiline
 SWALLOW	␣⟨⟩);	annotation,block,jsdoc_cast,line,multiline
-SWALLOW	␣⟨⟩)>;	line
 SWALLOW	␣⟨⟩*	line
 SWALLOW	␣⟨⟩,	line
 SWALLOW	␣⟨⟩.	line

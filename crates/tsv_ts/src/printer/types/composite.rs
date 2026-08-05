@@ -1458,6 +1458,16 @@ impl<'a> Printer<'a> {
         // Check for comments that force expansion: line comments, multiline block comments,
         // or own-line single-line block comments. Also check for line comments BEFORE the
         // first element (between `[` and first element), e.g., `[// leading\n a, b]`.
+        // TODO: all three clauses ask the raw `TSType::span`, so a comment inside an
+        // element's REDUNDANT paren shell — which is stripped in this position — sits
+        // inside the element span rather than in a gap they scan, and the list never
+        // expands: `[A, (⏎/* c */⏎B)]` collapses to `[A, /* c */ B]` where the bare
+        // `[A,⏎/* c */⏎B]` expands (prettier expands both). Idempotent, so F1 / the
+        // ledger / the census are all blind; only a bare-vs-paren compare shows it.
+        // Same shape and same fix as `type_arguments_force_expansion`
+        // (`types/type_arguments.rs`): thread `leading_paren_unwrapped` through the item
+        // spans here AND through `build_tuple_type_doc_with_line_comments`'s spans and
+        // item docs, so the gate and the emitter agree on where an element starts.
         let has_leading_line_comment = t.element_types.first().is_some_and(|first| {
             self.has_line_comments_between(t.span.start + 1, first.span().start)
         });
