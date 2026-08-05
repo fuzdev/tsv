@@ -60,6 +60,12 @@ fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType<'_>) -> bo
         // is the disagreement `build_conditional_check_doc` names for its own union gate.
         // A narrow arm, not the recursion the wider enumeration wants (`Ref<…>[]`,
         // `keyof Ref<…>`, `Ref<…>['k']` are still missing) — that one needs a corpus A/B.
+        // The first disjunct needs no comment carve-out: a parenthesized element always
+        // breaks once it carries one, since a trailing line comment RETAINS the shell over
+        // real hardlines ([`Printer::paren_retains_for_trailing_run`]) and a leading one
+        // takes its own `hardline`. The flat-shell exclusion this arm used to carry existed
+        // only while a trailing run was deferred out past the closer, leaving the shell
+        // rendering flat while still claiming a break.
         // The suffix's own `[]` is the same argument once it holds a comment
         // (`string[⏎↹// c⏎]`): the break is inside a delimiter the array owns, so it hugs
         // `=` exactly as the empty tuple type `[…]` and the empty object `{…}` already do.
@@ -68,17 +74,18 @@ fn type_has_internal_breaking(printer: &Printer<'_>, ts_type: &TSType<'_>) -> bo
         // the first disjunct misses — an element the author left bare that the printer
         // parenthesizes anyway (`typeof x /* c */[]`), where the AST holds no
         // `Parenthesized` node to match on.
-        // ⚠️ The first disjunct asks whether the parens BREAK, so a shell whose whole
-        // comment run is deferred to end of line is excluded: its parens are stripped and
-        // nothing breaks inside them (`(U // c)[]` prints flat as `U[]; // c`). Claiming
-        // the internal break there sent it to `fluid`, whose marker broke on the shell's
-        // `break_parent` and split the `=` — a split the reparse can't reproduce, the
-        // parens being gone (F1). A LEADING comment keeps its real `hardline`, so it still
-        // answers `true` here.
         TSType::Array(a) => {
-            (matches!(a.element_type, TSType::Parenthesized(_))
-                && !printer.paren_defers_its_whole_run(a.element_type))
+            matches!(a.element_type, TSType::Parenthesized(_))
                 || matches!(printer.array_suffix_layout(a), ArraySuffixLayout::Split { .. })
+        }
+        // An indexed access whose index→`]` gap holds a line comment breaks inside the
+        // brackets it owns, exactly as the array suffix's `[]` does above — so it hugs
+        // `=` like the tuple / type-literal / type-argument siblings, which all keep an
+        // internally-breaking value on the `=` line in both formatters. Comment-free
+        // input never breaks here, so this disjunct cannot move any input the old
+        // enumeration covered.
+        TSType::IndexedAccess(i) => {
+            printer.has_line_comments_between(i.index_type.span().end, i.span.end)
         }
         _ => false,
     }
@@ -253,7 +260,7 @@ impl<'a> Printer<'a> {
             // on `has_format_ignore`).
             TSType::Array(a) => {
                 self.paren_interior_routed_inner(a.element_type).is_some()
-                    || self.paren_defers_its_whole_run(a.element_type)
+                    || self.paren_retains_for_trailing_run(a.element_type)
             }
             // A redundant paren shell whose comments are ALL in its trailing gap
             // (`= (U // c)[]`, `= (A // c)`). The shell emits a `break_parent` so that a
@@ -261,7 +268,16 @@ impl<'a> Printer<'a> {
             // shell that break reaches only the `=` — where it renders a split the reparse
             // cannot reproduce, the parens being gone by then. The run itself is deferred,
             // so the value prints flat: the `=` must not break either.
-            TSType::Parenthesized(_) => self.paren_defers_its_whole_run(ty),
+            TSType::Parenthesized(_) => self.paren_retains_for_trailing_run(ty),
+            // A single-member union / intersection prints transparently as its member
+            // (prettier drops the node in postprocess), so the `=` asks the member —
+            // `= | (A // c)` collapses to the retained shell, which hugs.
+            TSType::Union(u) if u.types.len() == 1 => {
+                self.value_owns_its_comment_break(&u.types[0])
+            }
+            TSType::Intersection(x) if x.types.len() == 1 => {
+                self.value_owns_its_comment_break(&x.types[0])
+            }
             TSType::Literal(internal::TSLiteralType::TemplateLiteral(t)) => {
                 self.template_literal_type_breaks_for_comment(t)
             }
@@ -442,6 +458,15 @@ impl<'a> Printer<'a> {
                 if self.union_prints_hugged(u) {
                     // Hugged unions (e.g., `{ ... } | null`): the object type handles its own
                     // expansion, so keep `= {` together like other internally-breaking types
+                    parts.push(d.text(" "));
+                    parts.push(make_rhs(type_doc));
+                } else if u.types.len() == 1 && self.value_owns_its_comment_break(&u.types[0]) {
+                    // A single-member union prints transparently as its member (prettier
+                    // drops the node in postprocess), so a member that owns its comment
+                    // break hugs the `=` exactly as it would bare — `= | (A // c)`
+                    // collapses to the retained shell, whose parens own the break. The
+                    // hang below would split the `=` for a break the reparse (seeing the
+                    // bare shell) reproduces at the shell, not the `=` (F1).
                     parts.push(d.text(" "));
                     parts.push(make_rhs(type_doc));
                 } else if lead_space {

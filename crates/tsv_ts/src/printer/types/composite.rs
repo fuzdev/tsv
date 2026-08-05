@@ -1249,15 +1249,17 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            // Trailing comments after the value type. A block comment trails
-            // inline before the `;` (`V /* c */;`); a line comment goes through
-            // `line_suffix` (`build_trailing_comment_doc`) so it floats to
-            // end-of-line *after* the `;` (`V; // c`) instead of swallowing it —
-            // the `;` is emitted separately by the multiline/one-line branch below.
+            // Trailing comments after the value type, via the shared trailing-gap
+            // emitter: a block trails inline before the `;` (`V /* c */;`), a line
+            // comment rides `line_suffix` so it floats to end-of-line *after* the `;`
+            // (`V; // c`) instead of swallowing it — the `;` is emitted separately by
+            // the multiline/one-line branch below. Open-coding the loop here dropped
+            // the emitter's separator and ordering rules, welding a run onto one line
+            // (`V; // c1 // c2`) and reordering an inline block ahead of a deferred
+            // line comment; see [docs/comments.md](../../../../../docs/comments.md)
+            // §Trailing and dangling runs.
             let body_end = m.span.end.saturating_sub(1); // before `}`
-            for comment in comments_to_emit_in_range(self.comments, type_end, body_end) {
-                body_parts.push(self.build_trailing_comment_doc(comment));
-            }
+            self.push_trailing_comments_in_range(&mut body_parts, type_end, body_end);
         } else {
             // No value type (`{ [K in T] }`): comments after the `]` (or the
             // optional modifier) still trail the member the same way — dropping
@@ -1266,9 +1268,7 @@ impl<'a> Printer<'a> {
                 body_parts.push(d.text(marker));
             }
             let body_end = m.span.end.saturating_sub(1); // before `}`
-            for comment in comments_to_emit_in_range(self.comments, bracket_close, body_end) {
-                body_parts.push(self.build_trailing_comment_doc(comment));
-            }
+            self.push_trailing_comments_in_range(&mut body_parts, bracket_close, body_end);
         }
 
         self.build_mapped_type_shell(

@@ -273,6 +273,12 @@ impl<'a> Printer<'a> {
     /// The hug path (`{ … } | null`) and the line-comment path return bare,
     /// ungrouped docs — they have no flat/broken choice to make (the object owns
     /// its own expansion; line comments force multiline).
+    /// A redundant paren shell around a member the next `|` separator follows can
+    /// strip and let its trailing line comment trail that member — the per-member
+    /// break ends the line right after it, the lossless carve-out of the preserve
+    /// rule (§Comment Position Philosophy). The shell answers that structurally
+    /// (`Printer::type_member_separator_follows`), so the LAST member — whose line
+    /// ends only at the statement's tail — retains its shell instead.
     pub(in crate::printer) fn build_union_type_doc(&self, union: &TSUnionType<'_>) -> DocId {
         let d = self.d();
         if union.types.is_empty() {

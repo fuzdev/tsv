@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 474,
+	"end": 466,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -12,9 +12,9 @@
 	"comments": [
 		{
 			"type": "Line",
-			"value": " a comment in the annotation's trailing gap escapes the type and lands after the",
+			"value": " a line comment at the end of an indexed access's brackets stays inside them,",
 			"start": 20,
-			"end": 102,
+			"end": 99,
 			"loc": {
 				"start": {
 					"line": 2,
@@ -22,15 +22,15 @@
 				},
 				"end": {
 					"line": 2,
-					"column": 83
+					"column": 80
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " `=`, dropping the initializer to its own line",
-			"start": 104,
-			"end": 152,
+			"value": " like every other bracketed type region, with the `]` on its own line",
+			"start": 101,
+			"end": 172,
 			"loc": {
 				"start": {
 					"line": 3,
@@ -38,15 +38,15 @@
 				},
 				"end": {
 					"line": 3,
-					"column": 49
+					"column": 72
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " (unformatted_inside_suffix carries the authored placement)",
-			"start": 154,
-			"end": 215,
+			"value": " (unformatted_ours_flat carries the flat authoring)",
+			"start": 174,
+			"end": 227,
 			"loc": {
 				"start": {
 					"line": 4,
@@ -54,87 +54,87 @@
 				},
 				"end": {
 					"line": 4,
-					"column": 62
+					"column": 54
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c1",
-			"start": 234,
-			"end": 239,
+			"start": 246,
+			"end": 251,
 			"loc": {
 				"start": {
-					"line": 5,
-					"column": 18
+					"line": 6,
+					"column": 4
 				},
 				"end": {
-					"line": 5,
-					"column": 23
+					"line": 6,
+					"column": 9
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " a redundant paren's trailing gap escapes the same way once the parens are stripped",
-			"start": 247,
-			"end": 332,
+			"value": " a redundant paren shell is retained for the same reason, as in value position",
+			"start": 262,
+			"end": 342,
 			"loc": {
 				"start": {
-					"line": 8,
+					"line": 9,
 					"column": 1
 				},
 				"end": {
-					"line": 8,
-					"column": 86
+					"line": 9,
+					"column": 81
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c2",
-			"start": 348,
-			"end": 353,
+			"start": 360,
+			"end": 365,
 			"loc": {
 				"start": {
-					"line": 9,
-					"column": 15
+					"line": 11,
+					"column": 4
 				},
 				"end": {
-					"line": 9,
-					"column": 20
+					"line": 11,
+					"column": 9
 				}
 			}
 		},
 		{
 			"type": "Line",
-			"value": " with no initializer there is no `=` to cross — the comment trails the statement",
-			"start": 361,
-			"end": 443,
+			"value": " with no initializer there is no `=` to reach either",
+			"start": 376,
+			"end": 430,
 			"loc": {
 				"start": {
-					"line": 12,
+					"line": 14,
 					"column": 1
 				},
 				"end": {
-					"line": 12,
-					"column": 83
+					"line": 14,
+					"column": 55
 				}
 			}
 		},
 		{
 			"type": "Line",
 			"value": " c3",
-			"start": 458,
-			"end": 463,
+			"start": 446,
+			"end": 451,
 			"loc": {
 				"start": {
-					"line": 13,
-					"column": 14
+					"line": 16,
+					"column": 4
 				},
 				"end": {
-					"line": 13,
-					"column": 19
+					"line": 16,
+					"column": 9
 				}
 			}
 		}
@@ -142,99 +142,99 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 473,
+		"end": 465,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 464,
+			"end": 456,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 14,
+					"line": 18,
 					"column": 9
 				}
 			},
 			"body": [
 				{
 					"type": "VariableDeclaration",
-					"start": 217,
-					"end": 244,
+					"start": 229,
+					"end": 259,
 					"loc": {
 						"start": {
 							"line": 5,
 							"column": 1
 						},
 						"end": {
-							"line": 6,
-							"column": 4
+							"line": 7,
+							"column": 7
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 223,
-							"end": 243,
+							"start": 235,
+							"end": 258,
 							"loc": {
 								"start": {
 									"line": 5,
 									"column": 7
 								},
 								"end": {
-									"line": 6,
-									"column": 3
+									"line": 7,
+									"column": 6
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 223,
-								"end": 231,
+								"start": 235,
+								"end": 254,
 								"loc": {
 									"start": {
 										"line": 5,
 										"column": 7
 									},
 									"end": {
-										"line": 5,
-										"column": 15
+										"line": 7,
+										"column": 2
 									}
 								},
 								"name": "a1",
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 225,
-									"end": 231,
+									"start": 237,
+									"end": 254,
 									"loc": {
 										"start": {
 											"line": 5,
 											"column": 9
 										},
 										"end": {
-											"line": 5,
-											"column": 15
+											"line": 7,
+											"column": 2
 										}
 									},
 									"typeAnnotation": {
 										"type": "TSIndexedAccessType",
-										"start": 227,
-										"end": 231,
+										"start": 239,
+										"end": 254,
 										"loc": {
 											"start": {
 												"line": 5,
 												"column": 11
 											},
 											"end": {
-												"line": 5,
-												"column": 15
+												"line": 7,
+												"column": 2
 											}
 										},
 										"objectType": {
 											"type": "TSTypeReference",
-											"start": 227,
-											"end": 228,
+											"start": 239,
+											"end": 240,
 											"loc": {
 												"start": {
 													"line": 5,
@@ -247,8 +247,8 @@
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 227,
-												"end": 228,
+												"start": 239,
+												"end": 240,
 												"loc": {
 													"start": {
 														"line": 5,
@@ -264,61 +264,61 @@
 										},
 										"indexType": {
 											"type": "TSTypeReference",
-											"start": 229,
-											"end": 230,
+											"start": 244,
+											"end": 245,
 											"loc": {
 												"start": {
-													"line": 5,
-													"column": 13
+													"line": 6,
+													"column": 2
 												},
 												"end": {
-													"line": 5,
-													"column": 14
+													"line": 6,
+													"column": 3
 												}
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 229,
-												"end": 230,
+												"start": 244,
+												"end": 245,
 												"loc": {
 													"start": {
-														"line": 5,
-														"column": 13
+														"line": 6,
+														"column": 2
 													},
 													"end": {
-														"line": 5,
-														"column": 14
+														"line": 6,
+														"column": 3
 													}
 												},
 												"name": "K"
-											}
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " c1",
+													"start": 246,
+													"end": 251
+												}
+											]
 										}
 									}
 								}
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 242,
-								"end": 243,
+								"start": 257,
+								"end": 258,
 								"loc": {
 									"start": {
-										"line": 6,
-										"column": 2
+										"line": 7,
+										"column": 5
 									},
 									"end": {
-										"line": 6,
-										"column": 3
+										"line": 7,
+										"column": 6
 									}
 								},
-								"name": "y",
-								"leadingComments": [
-									{
-										"type": "Line",
-										"value": " c1",
-										"start": 234,
-										"end": 239
-									}
-								]
+								"name": "y"
 							}
 						}
 					],
@@ -326,138 +326,153 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " a comment in the annotation's trailing gap escapes the type and lands after the",
+							"value": " a line comment at the end of an indexed access's brackets stays inside them,",
 							"start": 20,
-							"end": 102
+							"end": 99
 						},
 						{
 							"type": "Line",
-							"value": " `=`, dropping the initializer to its own line",
-							"start": 104,
-							"end": 152
+							"value": " like every other bracketed type region, with the `]` on its own line",
+							"start": 101,
+							"end": 172
 						},
 						{
 							"type": "Line",
-							"value": " (unformatted_inside_suffix carries the authored placement)",
-							"start": 154,
-							"end": 215
+							"value": " (unformatted_ours_flat carries the flat authoring)",
+							"start": 174,
+							"end": 227
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 334,
-					"end": 358,
+					"start": 344,
+					"end": 373,
 					"loc": {
 						"start": {
-							"line": 9,
+							"line": 10,
 							"column": 1
 						},
 						"end": {
-							"line": 10,
-							"column": 4
+							"line": 12,
+							"column": 7
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 340,
-							"end": 357,
+							"start": 350,
+							"end": 372,
 							"loc": {
 								"start": {
-									"line": 9,
+									"line": 10,
 									"column": 7
 								},
 								"end": {
-									"line": 10,
-									"column": 3
+									"line": 12,
+									"column": 6
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 340,
-								"end": 345,
+								"start": 350,
+								"end": 368,
 								"loc": {
 									"start": {
-										"line": 9,
+										"line": 10,
 										"column": 7
 									},
 									"end": {
-										"line": 9,
-										"column": 12
+										"line": 12,
+										"column": 2
 									}
 								},
 								"name": "a2",
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 342,
-									"end": 345,
+									"start": 352,
+									"end": 368,
 									"loc": {
 										"start": {
-											"line": 9,
+											"line": 10,
 											"column": 9
 										},
 										"end": {
-											"line": 9,
-											"column": 12
+											"line": 12,
+											"column": 2
 										}
 									},
 									"typeAnnotation": {
-										"type": "TSTypeReference",
-										"start": 344,
-										"end": 345,
+										"type": "TSParenthesizedType",
+										"start": 354,
+										"end": 368,
 										"loc": {
 											"start": {
-												"line": 9,
+												"line": 10,
 												"column": 11
 											},
 											"end": {
-												"line": 9,
-												"column": 12
+												"line": 12,
+												"column": 2
 											}
 										},
-										"typeName": {
-											"type": "Identifier",
-											"start": 344,
-											"end": 345,
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 358,
+											"end": 359,
 											"loc": {
 												"start": {
-													"line": 9,
-													"column": 11
+													"line": 11,
+													"column": 2
 												},
 												"end": {
-													"line": 9,
-													"column": 12
+													"line": 11,
+													"column": 3
 												}
 											},
-											"name": "A"
+											"typeName": {
+												"type": "Identifier",
+												"start": 358,
+												"end": 359,
+												"loc": {
+													"start": {
+														"line": 11,
+														"column": 2
+													},
+													"end": {
+														"line": 11,
+														"column": 3
+													}
+												},
+												"name": "A"
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " c2",
+													"start": 360,
+													"end": 365
+												}
+											]
 										}
 									}
 								}
 							},
 							"init": {
 								"type": "Identifier",
-								"start": 356,
-								"end": 357,
+								"start": 371,
+								"end": 372,
 								"loc": {
 									"start": {
-										"line": 10,
-										"column": 2
+										"line": 12,
+										"column": 5
 									},
 									"end": {
-										"line": 10,
-										"column": 3
+										"line": 12,
+										"column": 6
 									}
 								},
-								"name": "y",
-								"leadingComments": [
-									{
-										"type": "Line",
-										"value": " c2",
-										"start": 348,
-										"end": 353
-									}
-								]
+								"name": "y"
 							}
 						}
 					],
@@ -465,109 +480,109 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " a redundant paren's trailing gap escapes the same way once the parens are stripped",
-							"start": 247,
-							"end": 332
+							"value": " a redundant paren shell is retained for the same reason, as in value position",
+							"start": 262,
+							"end": 342
 						}
 					]
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 445,
-					"end": 457,
+					"start": 432,
+					"end": 455,
 					"loc": {
 						"start": {
-							"line": 13,
+							"line": 15,
 							"column": 1
 						},
 						"end": {
-							"line": 13,
-							"column": 13
+							"line": 17,
+							"column": 3
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 449,
-							"end": 456,
+							"start": 436,
+							"end": 454,
 							"loc": {
 								"start": {
-									"line": 13,
+									"line": 15,
 									"column": 5
 								},
 								"end": {
-									"line": 13,
-									"column": 12
+									"line": 17,
+									"column": 2
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 449,
-								"end": 456,
+								"start": 436,
+								"end": 454,
 								"loc": {
 									"start": {
-										"line": 13,
+										"line": 15,
 										"column": 5
 									},
 									"end": {
-										"line": 13,
-										"column": 12
+										"line": 17,
+										"column": 2
 									}
 								},
 								"name": "b",
 								"typeAnnotation": {
 									"type": "TSTypeAnnotation",
-									"start": 450,
-									"end": 456,
+									"start": 437,
+									"end": 454,
 									"loc": {
 										"start": {
-											"line": 13,
+											"line": 15,
 											"column": 6
 										},
 										"end": {
-											"line": 13,
-											"column": 12
+											"line": 17,
+											"column": 2
 										}
 									},
 									"typeAnnotation": {
 										"type": "TSIndexedAccessType",
-										"start": 452,
-										"end": 456,
+										"start": 439,
+										"end": 454,
 										"loc": {
 											"start": {
-												"line": 13,
+												"line": 15,
 												"column": 8
 											},
 											"end": {
-												"line": 13,
-												"column": 12
+												"line": 17,
+												"column": 2
 											}
 										},
 										"objectType": {
 											"type": "TSTypeReference",
-											"start": 452,
-											"end": 453,
+											"start": 439,
+											"end": 440,
 											"loc": {
 												"start": {
-													"line": 13,
+													"line": 15,
 													"column": 8
 												},
 												"end": {
-													"line": 13,
+													"line": 15,
 													"column": 9
 												}
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 452,
-												"end": 453,
+												"start": 439,
+												"end": 440,
 												"loc": {
 													"start": {
-														"line": 13,
+														"line": 15,
 														"column": 8
 													},
 													"end": {
-														"line": 13,
+														"line": 15,
 														"column": 9
 													}
 												},
@@ -576,34 +591,42 @@
 										},
 										"indexType": {
 											"type": "TSTypeReference",
-											"start": 454,
-											"end": 455,
+											"start": 444,
+											"end": 445,
 											"loc": {
 												"start": {
-													"line": 13,
-													"column": 10
+													"line": 16,
+													"column": 2
 												},
 												"end": {
-													"line": 13,
-													"column": 11
+													"line": 16,
+													"column": 3
 												}
 											},
 											"typeName": {
 												"type": "Identifier",
-												"start": 454,
-												"end": 455,
+												"start": 444,
+												"end": 445,
 												"loc": {
 													"start": {
-														"line": 13,
-														"column": 10
+														"line": 16,
+														"column": 2
 													},
 													"end": {
-														"line": 13,
-														"column": 11
+														"line": 16,
+														"column": 3
 													}
 												},
 												"name": "K"
-											}
+											},
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " c3",
+													"start": 446,
+													"end": 451
+												}
+											]
 										}
 									}
 								}
@@ -615,17 +638,9 @@
 					"leadingComments": [
 						{
 							"type": "Line",
-							"value": " with no initializer there is no `=` to cross — the comment trails the statement",
-							"start": 361,
-							"end": 443
-						}
-					],
-					"trailingComments": [
-						{
-							"type": "Line",
-							"value": " c3",
-							"start": 458,
-							"end": 463
+							"value": " with no initializer there is no `=` to reach either",
+							"start": 376,
+							"end": 430
 						}
 					]
 				}

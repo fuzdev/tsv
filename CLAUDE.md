@@ -855,13 +855,25 @@ fuzzer, and round-trip are all blind to it; only a prettier `compare` finds it �
 why the rule lives in one emitter per question rather than at each container.
 
 ⚠️ **A trailing GAP inside a construct is the third emitter of that same rule** —
-`Printer::push_trailing_comments_in_range` (a paren shell's `)`, an indexed access's `]`).
-It asks the separator question of the **source** ("did the author give this comment its own
-line?"), since these comments may be legitimately glued, and the break rides **inside** the
-`line_suffix` — a real break between two deferred comments splits the very construct they
-are escaping. Only a **line** comment defers by construction; a block defers solely to stay
-behind one, because deferring is what carries a comment out past the closer. Back-to-back
-emission welds the run, and an inline block mixed into a deferred one **reorders** it.
+`Printer::push_trailing_comments_in_range` (a paren shell's `)`, an indexed access's `]`, a
+mapped-type member's value). It asks the separator question of the **source** ("did the
+author give this comment its own line?"), since these comments may be legitimately glued,
+and the break rides **inside** the `line_suffix` — a real break between two deferred
+comments splits the very construct they sit in. Only a **line** comment defers by
+construction; a block defers solely to stay behind one. Back-to-back emission welds the run,
+and an inline block mixed into a deferred one **reorders** it — so open-coding this loop is
+the recurring bug rather than a shortcut.
+
+⚠️ **A deferred run must not leave the construct it was written in.** Deferring is *end of
+line*, not *escape*: a construct that closes without breaking carries the comment past its
+own closer, re-binding it and landing it on a line that may already hold a deferred comment,
+where the two weld irreversibly. So a **line** comment in one of these gaps forces its
+construct **open** — the closer drops to its own line and the comment flushes inside. Every
+bracketed type region does this (`{}`, `<>`, tuple `[]`, function-type `()`, indexed-access
+`[]`), and a paren shell is **retained** rather than stripped for the same reason. The one
+sanctioned exception is a union / intersection member a `|`/`&` separator still **follows**,
+whose per-member break ends the line where the shell ends
+(`Printer::type_member_separator_follows`); the last member has no separator and retains.
 
 ⚠️ **A deferred run's FLUSH must end the line, so a `lineSuffixBoundary` belongs only where
 nothing else does.** The renderer drains the buffer at a break-mode `line` or at a boundary,
