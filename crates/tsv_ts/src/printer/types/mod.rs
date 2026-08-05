@@ -1208,6 +1208,38 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// The node a type effectively renders as once a redundant paren shell carrying
+    /// only *leading* comments is stripped — so the **enclosing gap** owns those
+    /// comments rather than the paren.
+    ///
+    /// Where the shell is redundant (prettier strips it too), its leading comments are
+    /// physically in the enclosing construct's own gap — a type-argument list's
+    /// `<`→first-argument gap, a function type's `=>`→return gap — and that gap's
+    /// emitter is what knows the construct's layout: the list's delimiter-line prefix,
+    /// the return's continuation hang. Handing it the **unwrapped** node is what makes
+    /// the two agree, because `build_parenthesized_type_unwrap_doc` (and
+    /// `build_type_doc_for_type_arg`'s `Parenthesized` arm) emit those same comments —
+    /// leaving the shell on would print them twice. Ownership of a gap is one
+    /// emitter's, never two ([`comments.md`](../../../../docs/comments.md) hazard 3).
+    ///
+    /// A shell with **trailing** comments keeps its shell: those sit *after* the type,
+    /// a gap the enclosing construct does not emit, so the paren doc must stay their
+    /// emitter. Nested shells peel while each is leading-only.
+    ///
+    /// This is what makes the two authorings of one comment agree — `f() => // c⏎T`
+    /// and `f() => (// c⏎T)` reach one fixed point instead of two, which is the
+    /// `unformatted_ours_*` variants' whole claim.
+    pub(in crate::printer) fn leading_paren_unwrapped<'t>(
+        &self,
+        ty: &'t TSType<'t>,
+    ) -> &'t TSType<'t> {
+        match ty {
+            TSType::Parenthesized(p) if self.paren_inner_comment_flags(p).1 => ty,
+            TSType::Parenthesized(p) => self.leading_paren_unwrapped(p.type_annotation),
+            other => other,
+        }
+    }
+
     /// Unwrap a parenthesized type, preserving any comments inside the parens.
     ///
     /// Block comments are emitted inline: `(/* c */ a)` → `/* c */ a`

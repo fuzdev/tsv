@@ -128,9 +128,33 @@ impl<'a> Printer<'a> {
         if !has_comments {
             return false;
         }
+        // The **effective** first-argument start: a redundant paren shell around the
+        // first argument is stripped in this position, so a line comment the author
+        // wrote just inside it lands in the list's own `<`→argument gap and must route
+        // the list here like any other leading line comment. Asking the shell's span
+        // instead made that gap empty, so the shape fell through to the group path and
+        // the comment rendered from the argument's doc — on its own line, never on the
+        // `<` line the author wrote it on.
         let has_leading_line_comment = args.params.first().is_some_and(|first| {
-            self.has_line_comments_between(args.span.start + 1, first.span().start)
+            self.has_line_comments_between(
+                args.span.start + 1,
+                self.leading_paren_unwrapped(first).span().start,
+            )
         });
+        // TODO: the two clauses below still ask `TSType::span`, so they keep the very
+        // blindness the clause above fixed — a comment inside a *later* argument's
+        // redundant parens, or an own-line BLOCK inside any argument's, sits inside the
+        // param span rather than in a gap they scan, so the list doesn't expand and the
+        // comment renders from the argument's own doc instead. Both make one comment's
+        // two authorings reach two fixed points (idempotent, so F1 is blind — only a
+        // bare-vs-paren comparison shows it):
+        //   `Foo<(/* c */⏎a | b)>`  → `Foo</* c */ a | b>`, where the bare authoring
+        //                              expands (`single_arg_own_line_block_comment`)
+        //   `Map<a, (// c⏎b)>`     → `// c` leads `b`, where the bare `Map<a, // c⏎b>`
+        //                              trails the comma (`a, // c`)
+        // Threading `leading_paren_unwrapped` through both is the shape of the fix, but
+        // it changes layout, so it wants fixtures first — and the second case must be
+        // reconciled with the element-comma seam, which owns that gap's partition.
         has_leading_line_comment
             || self.has_line_comments_in_delimited_list(
                 args.params,
@@ -219,19 +243,22 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         // Type-position type arguments render each argument with `build_type_arg_doc`;
         // the layout is shared with call/`new`-expression arguments.
+        // Spans and docs both come from `leading_paren_unwrapped`, so this
+        // builder's gap emitters and the item docs agree on where each argument starts
+        // — see that function for why a leading-only paren shell must not reach here.
         let is_multi = args.params.len() > 1;
         self.build_angle_list_with_line_comments(
             args.span,
             args.params.len(),
-            |i| args.params[i].span(),
+            |i| self.leading_paren_unwrapped(&args.params[i]).span(),
             |i, frozen| {
+                let param = self.leading_paren_unwrapped(&args.params[i]);
                 if frozen {
-                    self.build_frozen_list_member_doc(&args.params[i])
+                    self.build_frozen_list_member_doc(param)
                 } else {
-                    self.build_type_arg_doc(&args.params[i], is_multi)
+                    self.build_type_arg_doc(param, is_multi)
                 }
             },
-            true,
         )
     }
 }
