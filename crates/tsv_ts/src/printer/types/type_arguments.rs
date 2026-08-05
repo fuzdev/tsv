@@ -207,10 +207,26 @@ impl<'a> Printer<'a> {
             return self.build_single_type_arg_inline(args, has_comments);
         }
 
-        // Matches Prettier's group([<, indent([softline, join([",", line], args)]), softline, >])
-        // via the shared width-decided core; each argument renders in multi-arg
-        // (hugging) mode — also for a non-hugging single argument, preserving the
-        // pre-merge behavior of the type-position path.
+        self.build_type_arguments_group_doc(args, has_comments)
+    }
+
+    /// The width-decided `<…>` tail, shared by **both** type-argument families — the
+    /// type-position list above and the call/`new` instantiation
+    /// (`build_type_parameter_instantiation_doc`). Matches Prettier's
+    /// `group([<, indent([softline, join([",", line], args)]), softline, >])` via the
+    /// shared angle-list core; each argument renders in multi-arg (hugging) mode — also
+    /// for a non-hugging single argument, preserving the pre-merge behavior of the
+    /// type-position path.
+    ///
+    /// The two families differ **only** in which single arguments they hug before
+    /// reaching here (the instantiation's curly-hug arm is a documented divergence);
+    /// everything past that decision is one body, so neither can drift from the other.
+    pub(in crate::printer) fn build_type_arguments_group_doc(
+        &self,
+        args: &internal::TSTypeParameterInstantiation<'_>,
+        has_comments: bool,
+    ) -> DocId {
+        let d = self.d();
         d.group(self.build_angle_list_doc(
             args.span,
             args.params.len(),
@@ -227,18 +243,19 @@ impl<'a> Printer<'a> {
         ))
     }
 
-    /// Build doc for type arguments with expanding comments (line or own-line block).
+    /// Build doc for type arguments with expanding comments (line or own-line block),
+    /// which force multiline because they can't appear inline. Shared by **both**
+    /// type-argument families, like the width-decided tail above — a call/`new`
+    /// argument *is* a type argument, so both route here rather than keeping twin
+    /// bodies in step by hand.
     ///
-    /// Line comments and own-line block comments force multiline because they can't appear inline.
-    fn build_type_arguments_doc_with_line_comments(
+    /// Spans and docs both come from `leading_paren_unwrapped`, so this builder's gap
+    /// emitters and the item docs agree on where each argument starts — see that
+    /// function for why a leading-only paren shell must not reach here.
+    pub(in crate::printer) fn build_type_arguments_doc_with_line_comments(
         &self,
         args: &internal::TSTypeParameterInstantiation<'_>,
     ) -> DocId {
-        // Type-position type arguments render each argument with `build_type_arg_doc`;
-        // the layout is shared with call/`new`-expression arguments.
-        // Spans and docs both come from `leading_paren_unwrapped`, so this
-        // builder's gap emitters and the item docs agree on where each argument starts
-        // — see that function for why a leading-only paren shell must not reach here.
         let is_multi = args.params.len() > 1;
         self.build_angle_list_with_line_comments(
             args.span,
