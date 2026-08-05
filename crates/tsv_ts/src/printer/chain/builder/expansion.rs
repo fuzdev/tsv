@@ -87,8 +87,7 @@ fn computed_pre_bracket_line_comment<'a>(node: &ChainNode<'a>, printer: &Printer
     let Some((start, end)) = node_comment_gap(node, printer) else {
         return false;
     };
-    let classified = printer.classify_comments(start, end);
-    !classified.trailing_line.is_empty() || !classified.leading_line.is_empty()
+    printer.classify_comments(start, end).has_line_comments()
 }
 
 /// Check if a call node has complex (non-simple) arguments

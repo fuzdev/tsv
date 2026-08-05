@@ -1,0 +1,1370 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 996,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment after the LAST argument survives every layout that force-expands the",
+			"start": 20,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " argument list, in the plain call and in `new`.",
+			"start": 103,
+			"end": 152,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " function composition (an argument is a call with a callback): the block comment",
+			"start": 155,
+			"end": 237,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " trails the last argument",
+			"start": 239,
+			"end": 266,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 28
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 298,
+			"end": 305,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 4
+				},
+				"end": {
+					"line": 9,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " same layout, comment on its own line: it stays on its own line before the `)`",
+			"start": 312,
+			"end": 392,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 426,
+			"end": 433,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 2
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " multiline content (a legacy line continuation) forces the same expansion",
+			"start": 440,
+			"end": 515,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 538,
+			"end": 545,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 4
+				},
+				"end": {
+					"line": 23,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " same path, line comment trailing the last argument",
+			"start": 552,
+			"end": 605,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 628,
+			"end": 632,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 4
+				},
+				"end": {
+					"line": 30,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `new` reaches the multiline-content expansion too",
+			"start": 639,
+			"end": 691,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 718,
+			"end": 725,
+			"loc": {
+				"start": {
+					"line": 37,
+					"column": 4
+				},
+				"end": {
+					"line": 37,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " expand-first falls back to one argument per line when a tail argument breaks",
+			"start": 732,
+			"end": 811,
+			"loc": {
+				"start": {
+					"line": 40,
+					"column": 1
+				},
+				"end": {
+					"line": 40,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " i",
+			"start": 857,
+			"end": 861,
+			"loc": {
+				"start": {
+					"line": 46,
+					"column": 3
+				},
+				"end": {
+					"line": 46,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 871,
+			"end": 878,
+			"loc": {
+				"start": {
+					"line": 48,
+					"column": 4
+				},
+				"end": {
+					"line": 48,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a blank line between arguments forces the same expansion in `new`",
+			"start": 885,
+			"end": 953,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 1
+				},
+				"end": {
+					"line": 51,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 974,
+			"end": 981,
+			"loc": {
+				"start": {
+					"line": 55,
+					"column": 4
+				},
+				"end": {
+					"line": 55,
+					"column": 11
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 995,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 986,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 57,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 268,
+					"end": 309,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 268,
+						"end": 308,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 268,
+							"end": 271,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "CallExpression",
+								"start": 275,
+								"end": 292,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 19
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 275,
+									"end": 282,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 2
+										},
+										"end": {
+											"line": 8,
+											"column": 9
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 275,
+										"end": 278,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 5
+											}
+										},
+										"name": "arr"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 279,
+										"end": 282,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 6
+											},
+											"end": {
+												"line": 8,
+												"column": 9
+											}
+										},
+										"name": "map"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 283,
+										"end": 291,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 10
+											},
+											"end": {
+												"line": 8,
+												"column": 18
+											}
+										},
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 284,
+												"end": 285,
+												"loc": {
+													"start": {
+														"line": 8,
+														"column": 11
+													},
+													"end": {
+														"line": 8,
+														"column": 12
+													}
+												},
+												"name": "x"
+											}
+										],
+										"body": {
+											"type": "Identifier",
+											"start": 290,
+											"end": 291,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 17
+												},
+												"end": {
+													"line": 8,
+													"column": 18
+												}
+											},
+											"name": "x"
+										}
+									}
+								],
+								"optional": false
+							},
+							{
+								"type": "Identifier",
+								"start": 296,
+								"end": 297,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 2
+									},
+									"end": {
+										"line": 9,
+										"column": 3
+									}
+								},
+								"name": "b",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 298,
+										"end": 305
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment after the LAST argument survives every layout that force-expands the",
+							"start": 20,
+							"end": 101
+						},
+						{
+							"type": "Line",
+							"value": " argument list, in the plain call and in `new`.",
+							"start": 103,
+							"end": 152
+						},
+						{
+							"type": "Line",
+							"value": " function composition (an argument is a call with a callback): the block comment",
+							"start": 155,
+							"end": 237
+						},
+						{
+							"type": "Line",
+							"value": " trails the last argument",
+							"start": 239,
+							"end": 266
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 394,
+					"end": 437,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 394,
+						"end": 436,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 394,
+							"end": 397,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 1
+								},
+								"end": {
+									"line": 13,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "CallExpression",
+								"start": 401,
+								"end": 418,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 19
+									}
+								},
+								"callee": {
+									"type": "MemberExpression",
+									"start": 401,
+									"end": 408,
+									"loc": {
+										"start": {
+											"line": 14,
+											"column": 2
+										},
+										"end": {
+											"line": 14,
+											"column": 9
+										}
+									},
+									"object": {
+										"type": "Identifier",
+										"start": 401,
+										"end": 404,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 2
+											},
+											"end": {
+												"line": 14,
+												"column": 5
+											}
+										},
+										"name": "arr"
+									},
+									"property": {
+										"type": "Identifier",
+										"start": 405,
+										"end": 408,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 6
+											},
+											"end": {
+												"line": 14,
+												"column": 9
+											}
+										},
+										"name": "map"
+									},
+									"computed": false,
+									"optional": false
+								},
+								"arguments": [
+									{
+										"type": "ArrowFunctionExpression",
+										"start": 409,
+										"end": 417,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 10
+											},
+											"end": {
+												"line": 14,
+												"column": 18
+											}
+										},
+										"id": null,
+										"expression": true,
+										"generator": false,
+										"async": false,
+										"params": [
+											{
+												"type": "Identifier",
+												"start": 410,
+												"end": 411,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 11
+													},
+													"end": {
+														"line": 14,
+														"column": 12
+													}
+												},
+												"name": "x"
+											}
+										],
+										"body": {
+											"type": "Identifier",
+											"start": 416,
+											"end": 417,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 17
+												},
+												"end": {
+													"line": 14,
+													"column": 18
+												}
+											},
+											"name": "x"
+										}
+									}
+								],
+								"optional": false
+							},
+							{
+								"type": "Identifier",
+								"start": 422,
+								"end": 423,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 2
+									},
+									"end": {
+										"line": 15,
+										"column": 3
+									}
+								},
+								"name": "b"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " same layout, comment on its own line: it stays on its own line before the `)`",
+							"start": 312,
+							"end": 392
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 517,
+					"end": 549,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 517,
+						"end": 548,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 1
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 517,
+							"end": 520,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 1
+								},
+								"end": {
+									"line": 20,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 524,
+								"end": 532,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 3
+									}
+								},
+								"value": "aabb",
+								"raw": "'aa\\\nbb'"
+							},
+							{
+								"type": "Identifier",
+								"start": 536,
+								"end": 537,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 3
+									}
+								},
+								"name": "b",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 538,
+										"end": 545
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 426,
+							"end": 433
+						},
+						{
+							"type": "Line",
+							"value": " multiline content (a legacy line continuation) forces the same expansion",
+							"start": 440,
+							"end": 515
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 607,
+					"end": 636,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 607,
+						"end": 635,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 1
+							},
+							"end": {
+								"line": 31,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 607,
+							"end": 610,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 1
+								},
+								"end": {
+									"line": 27,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 614,
+								"end": 622,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 3
+									}
+								},
+								"value": "aabb",
+								"raw": "'aa\\\nbb'"
+							},
+							{
+								"type": "Identifier",
+								"start": 626,
+								"end": 627,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 2
+									},
+									"end": {
+										"line": 30,
+										"column": 3
+									}
+								},
+								"name": "b",
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " c",
+										"start": 628,
+										"end": 632
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " same path, line comment trailing the last argument",
+							"start": 552,
+							"end": 605
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 693,
+					"end": 729,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 693,
+						"end": 728,
+						"loc": {
+							"start": {
+								"line": 34,
+								"column": 1
+							},
+							"end": {
+								"line": 38,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 697,
+							"end": 700,
+							"loc": {
+								"start": {
+									"line": 34,
+									"column": 5
+								},
+								"end": {
+									"line": 34,
+									"column": 8
+								}
+							},
+							"name": "Foo"
+						},
+						"arguments": [
+							{
+								"type": "Literal",
+								"start": 704,
+								"end": 712,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 2
+									},
+									"end": {
+										"line": 36,
+										"column": 3
+									}
+								},
+								"value": "aabb",
+								"raw": "'aa\\\nbb'"
+							},
+							{
+								"type": "Identifier",
+								"start": 716,
+								"end": 717,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 2
+									},
+									"end": {
+										"line": 37,
+										"column": 3
+									}
+								},
+								"name": "b",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 718,
+										"end": 725
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `new` reaches the multiline-content expansion too",
+							"start": 639,
+							"end": 691
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 813,
+					"end": 882,
+					"loc": {
+						"start": {
+							"line": 41,
+							"column": 1
+						},
+						"end": {
+							"line": 49,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 813,
+						"end": 881,
+						"loc": {
+							"start": {
+								"line": 41,
+								"column": 1
+							},
+							"end": {
+								"line": 49,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 813,
+							"end": 816,
+							"loc": {
+								"start": {
+									"line": 41,
+									"column": 1
+								},
+								"end": {
+									"line": 41,
+									"column": 4
+								}
+							},
+							"name": "foo"
+						},
+						"arguments": [
+							{
+								"type": "ArrowFunctionExpression",
+								"start": 820,
+								"end": 845,
+								"loc": {
+									"start": {
+										"line": 42,
+										"column": 2
+									},
+									"end": {
+										"line": 44,
+										"column": 3
+									}
+								},
+								"id": null,
+								"expression": false,
+								"generator": false,
+								"async": false,
+								"params": [],
+								"body": {
+									"type": "BlockStatement",
+									"start": 826,
+									"end": 845,
+									"loc": {
+										"start": {
+											"line": 42,
+											"column": 8
+										},
+										"end": {
+											"line": 44,
+											"column": 3
+										}
+									},
+									"body": [
+										{
+											"type": "ExpressionStatement",
+											"start": 831,
+											"end": 841,
+											"loc": {
+												"start": {
+													"line": 43,
+													"column": 3
+												},
+												"end": {
+													"line": 43,
+													"column": 13
+												}
+											},
+											"expression": {
+												"type": "CallExpression",
+												"start": 831,
+												"end": 840,
+												"loc": {
+													"start": {
+														"line": 43,
+														"column": 3
+													},
+													"end": {
+														"line": 43,
+														"column": 12
+													}
+												},
+												"callee": {
+													"type": "Identifier",
+													"start": 831,
+													"end": 838,
+													"loc": {
+														"start": {
+															"line": 43,
+															"column": 3
+														},
+														"end": {
+															"line": 43,
+															"column": 10
+														}
+													},
+													"name": "doThing"
+												},
+												"arguments": [],
+												"optional": false
+											}
+										}
+									]
+								}
+							},
+							{
+								"type": "CallExpression",
+								"start": 849,
+								"end": 870,
+								"loc": {
+									"start": {
+										"line": 45,
+										"column": 2
+									},
+									"end": {
+										"line": 48,
+										"column": 3
+									}
+								},
+								"callee": {
+									"type": "Identifier",
+									"start": 849,
+									"end": 852,
+									"loc": {
+										"start": {
+											"line": 45,
+											"column": 2
+										},
+										"end": {
+											"line": 45,
+											"column": 5
+										}
+									},
+									"name": "bar"
+								},
+								"arguments": [
+									{
+										"type": "Identifier",
+										"start": 865,
+										"end": 866,
+										"loc": {
+											"start": {
+												"line": 47,
+												"column": 3
+											},
+											"end": {
+												"line": 47,
+												"column": 4
+											}
+										},
+										"name": "a",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " i",
+												"start": 857,
+												"end": 861
+											}
+										]
+									}
+								],
+								"optional": false,
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 871,
+										"end": 878
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " expand-first falls back to one argument per line when a tail argument breaks",
+							"start": 732,
+							"end": 811
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 955,
+					"end": 985,
+					"loc": {
+						"start": {
+							"line": 52,
+							"column": 1
+						},
+						"end": {
+							"line": 56,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 955,
+						"end": 984,
+						"loc": {
+							"start": {
+								"line": 52,
+								"column": 1
+							},
+							"end": {
+								"line": 56,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 959,
+							"end": 962,
+							"loc": {
+								"start": {
+									"line": 52,
+									"column": 5
+								},
+								"end": {
+									"line": 52,
+									"column": 8
+								}
+							},
+							"name": "Foo"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 966,
+								"end": 967,
+								"loc": {
+									"start": {
+										"line": 53,
+										"column": 2
+									},
+									"end": {
+										"line": 53,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 972,
+								"end": 973,
+								"loc": {
+									"start": {
+										"line": 55,
+										"column": 2
+									},
+									"end": {
+										"line": 55,
+										"column": 3
+									}
+								},
+								"name": "b",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 974,
+										"end": 981
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a blank line between arguments forces the same expansion in `new`",
+							"start": 885,
+							"end": 953
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
