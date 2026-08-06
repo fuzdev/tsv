@@ -512,8 +512,11 @@ impl<'a> Printer<'a> {
         // below would drop it. That interior may hold a `//` — hence "no line comment in
         // the GAP" rather than "block-only": the spread's own doc defers its line
         // comments through `line_suffix`, and `hard` below forces the break they need.
+        // `new_has_comments` (on page over `[paren_open, span.end)`, a superset of every
+        // interior) gates the per-argument scan off the comment-free path, like the
+        // call/chain entry gates.
         let spread_paren_comments_expand =
-            self.any_spread_paren_comment_forces_expansion(new_expr.arguments);
+            new_has_comments && self.any_spread_paren_comment_forces_expansion(new_expr.arguments);
         let has_trailing_comments_no_gap_line = new_has_comments
             && new_expr.arguments.last().is_some_and(|last_arg| {
                 let arg_end = last_arg.span().end;

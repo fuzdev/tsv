@@ -11,10 +11,11 @@
 // ordering can't drift between them. (The array literal answers the same rule
 // through its own paired trailing/leading predicate — holes and the fill path don't
 // fit this collector's shape. Its comma arm is [`block_is_before_comma`], shared with
-// this collector's classifier; the two deferred-line-comment arms — the block's ORDER
-// past the comma, and the DEMOTION of a line comment off a deferred run's line
-// ([`TrailingComments::demote_line_after_deferred`]) — and the emission are still its
-// own, so a change to THOSE has to be mirrored there.)
+// this collector's classifier, and a demoted line comment's RENDERING is
+// [`Printer::push_trailing_line_comment_demotion_aware`], shared likewise; the block's
+// ORDER past the comma and the demotion trigger
+// ([`TrailingComments::demote_line_after_deferred`]'s question, which the array asks
+// itself) are still its own, so a change to THOSE has to be mirrored there.)
 //
 // This side is half of a partition: what it does NOT claim leads the next element,
 // and every caller resumes its own leading scan at `end_pos`. See
@@ -67,10 +68,10 @@ pub(in crate::printer) struct TrailingComments<'a> {
     after_comma: SmallVec<[&'a Comment; 2]>,
     /// Line comments that go after the comma (in line_suffix)
     line: SmallVec<[&'a Comment; 2]>,
-    /// Line comments moved out of `line` by [`TrailingComments::demote_line_after_deferred`]:
-    /// the element's own doc already ends in a deferred `//`, so these take their own
-    /// lines instead of welding onto it.
-    demoted_line: SmallVec<[&'a Comment; 2]>,
+    /// Whether `line` renders DEMOTED — each comment on a fresh line of its own instead
+    /// of through `line_suffix` — because the element's own doc already ends in a
+    /// deferred `//`. Set by [`TrailingComments::demote_line_after_deferred`].
+    line_demoted: bool,
     /// Position after all trailing comments (for updating prev_end)
     pub(in crate::printer) end_pos: u32,
 }
@@ -93,9 +94,7 @@ impl TrailingComments<'_> {
     /// `element_defers_line_comment` is the question already answered by the caller,
     /// which is the only place that knows the element's node type.
     pub(in crate::printer) fn demote_line_after_deferred(&mut self, element_defers_line: bool) {
-        if element_defers_line {
-            self.demoted_line = std::mem::take(&mut self.line);
-        }
+        self.line_demoted = element_defers_line;
     }
 }
 
@@ -125,7 +124,7 @@ impl<'a> Printer<'a> {
                 before_comma: SmallVec::new(),
                 after_comma: SmallVec::new(),
                 line: SmallVec::new(),
-                demoted_line: SmallVec::new(),
+                line_demoted: false,
                 end_pos: elem_end,
             };
         }
@@ -191,7 +190,7 @@ impl<'a> Printer<'a> {
             before_comma,
             after_comma,
             line,
-            demoted_line: SmallVec::new(),
+            line_demoted: false,
             end_pos,
         }
     }
@@ -207,14 +206,25 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Build docs for line comments (go after comma, excluded from width)
-    fn build_line_comments_suffix_doc(&self, comments: &[&Comment]) -> DocId {
-        let d = self.d();
-        let mut parts = DocBuf::new();
-        for comment in comments {
+    /// Push one trailing LINE comment, demotion-aware — the single rendering of the
+    /// deferred-`//` weld rule, shared by [`Self::push_element_comma_trailing`] and the
+    /// array literal's element loop so the two can't drift. Not demoted, the comment
+    /// defers past the element through `line_suffix`; demoted (the element's own doc
+    /// already ends in a deferred `//` —
+    /// [`TrailingComments::demote_line_after_deferred`]), it takes a fresh line of its
+    /// own, where a reparse keeps it.
+    pub(in crate::printer) fn push_trailing_line_comment_demotion_aware(
+        &self,
+        parts: &mut DocBuf,
+        comment: &Comment,
+        demoted: bool,
+    ) {
+        if demoted {
+            parts.push(self.d().hardline());
+            parts.push(self.build_comment_doc(comment));
+        } else {
             parts.push(self.build_trailing_line_comment_doc(comment));
         }
-        d.concat(&parts)
     }
 
     /// Push one element's trailing comments around its `comma` doc, in the order
@@ -244,17 +254,8 @@ impl<'a> Printer<'a> {
         if !trailing.after_comma.is_empty() {
             parts.push(self.build_block_comments_doc(&trailing.after_comma));
         }
-        if !trailing.line.is_empty() {
-            parts.push(self.build_line_comments_suffix_doc(&trailing.line));
-        }
-        // Demoted line comments take their own lines rather than welding onto the
-        // element's own deferred `//` (see `TrailingComments::demote_line_after_deferred`).
-        if !trailing.demoted_line.is_empty() {
-            let d = self.d();
-            for comment in &trailing.demoted_line {
-                parts.push(d.hardline());
-                parts.push(self.build_comment_doc(comment));
-            }
+        for comment in &trailing.line {
+            self.push_trailing_line_comment_demotion_aware(parts, comment, trailing.line_demoted);
         }
     }
 }

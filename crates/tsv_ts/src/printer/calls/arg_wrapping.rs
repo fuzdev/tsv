@@ -841,6 +841,12 @@ pub(crate) fn build_args_joined_with_comments(
 
             if printer.inter_arg_gap_has_comments(arg, next_arg_start) {
                 let gap = printer.open_inter_arg_gap(&mut parts, arg, next_arg_start);
+                // The gap's `forces_expansion` obligation is the callers': the soft-join
+                // callers are unreachable when any spread interior forces expansion —
+                // their earlier trailing-comment arms, keyed on
+                // `any_spread_paren_comment_forces_expansion`, return first — and every
+                // other join is hardline.
+                debug_assert!(!gap.forces_expansion || use_hardline);
                 // A line comment runs to EOL → hard-break; otherwise honor the caller's style.
                 parts.push(if gap.comments.has_trailing_line() || use_hardline {
                     d.hardline()

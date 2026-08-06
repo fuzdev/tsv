@@ -287,12 +287,9 @@ impl<'a> Printer<'a> {
         &self,
         expr: &internal::Expression<'_>,
     ) -> CommentVec<'_> {
-        match expr {
-            internal::Expression::SpreadElement(spread) => {
-                self.spread_element_own_line_block_comments(spread)
-            }
-            _ => smallvec![],
-        }
+        expr.as_spread()
+            .map(|spread| self.spread_element_own_line_block_comments(spread))
+            .unwrap_or_default()
     }
 
     /// [`Self::spread_own_line_block_comments`] on the node itself, for the parents whose
@@ -323,7 +320,7 @@ impl<'a> Printer<'a> {
         &self,
         expr: &internal::Expression<'_>,
     ) -> bool {
-        let internal::Expression::SpreadElement(spread) = expr else {
+        let Some(spread) = expr.as_spread() else {
             return false;
         };
         let arg_end = spread.argument.span().end;
@@ -359,12 +356,8 @@ impl<'a> Printer<'a> {
     /// (`// c1 // c2`). That is the merge prettier performs here and tsv refuses — see
     /// `docs/comments.md` §Trailing and dangling runs.
     pub(crate) fn defers_trailing_line_comment(&self, expr: &internal::Expression<'_>) -> bool {
-        match expr {
-            internal::Expression::SpreadElement(spread) => {
-                self.spread_element_defers_trailing_line_comment(spread)
-            }
-            _ => false,
-        }
+        expr.as_spread()
+            .is_some_and(|spread| self.spread_element_defers_trailing_line_comment(spread))
     }
 
     /// [`Self::defers_trailing_line_comment`] on the node itself — see
@@ -382,11 +375,6 @@ impl<'a> Printer<'a> {
     /// author blank lines preserved. Returns whether anything was emitted — which is also
     /// the caller's signal to force its argument list open, since an own-line comment is
     /// a sibling of the argument rather than a trailer on its line.
-    ///
-    /// The caller does NOT carry a `prev_end` out of here: its own gap starts at the
-    /// spread's end, which already lies past every interior comment, so its first blank
-    /// scan is over `[spread.span.end, …)` and cannot double-count a blank this loop
-    /// already consumed.
     ///
     /// Where this sits relative to the caller's own `[spread.span.end, closer)` gap
     /// depends on whether a **comma** follows the spread, and that is a position
@@ -411,12 +399,8 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         expr: &internal::Expression<'_>,
     ) -> bool {
-        match expr {
-            internal::Expression::SpreadElement(spread) => {
-                self.push_spread_element_own_line_block_comments(parts, spread)
-            }
-            _ => false,
-        }
+        expr.as_spread()
+            .is_some_and(|spread| self.push_spread_element_own_line_block_comments(parts, spread))
     }
 
     /// [`Self::push_spread_own_line_block_comments`] on the node itself — see

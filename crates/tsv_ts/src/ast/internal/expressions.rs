@@ -151,6 +151,16 @@ impl<'arena> Expression<'arena> {
         e
     }
 
+    /// The spread node behind this expression, if it is one — the adapter the printer's
+    /// spread-interior helpers unwrap to reach their `SpreadElement` core.
+    /// `ObjectProperty::as_spread` is the property-list counterpart.
+    pub fn as_spread(&self) -> Option<&SpreadElement<'arena>> {
+        match self {
+            Expression::SpreadElement(s) => Some(s),
+            _ => None,
+        }
+    }
+
     /// Check if this expression is a chain root that needs ChainExpression wrapping.
     ///
     /// Returns true if this is a MemberExpression/CallExpression (or TSNonNullExpression
