@@ -11,8 +11,10 @@
 // ordering can't drift between them. (The array literal answers the same rule
 // through its own paired trailing/leading predicate — holes and the fill path don't
 // fit this collector's shape. Its comma arm is [`block_is_before_comma`], shared with
-// this collector's classifier; the deferred-line-comment order arm and the emission
-// are still its own, so a change to THOSE has to be mirrored there.)
+// this collector's classifier; the two deferred-line-comment arms — the block's ORDER
+// past the comma, and the DEMOTION of a line comment off a deferred run's line
+// ([`TrailingComments::demote_line_after_deferred`]) — and the emission are still its
+// own, so a change to THOSE has to be mirrored there.)
 //
 // This side is half of a partition: what it does NOT claim leads the next element,
 // and every caller resumes its own leading scan at `end_pos`. See
@@ -65,8 +67,36 @@ pub(in crate::printer) struct TrailingComments<'a> {
     after_comma: SmallVec<[&'a Comment; 2]>,
     /// Line comments that go after the comma (in line_suffix)
     line: SmallVec<[&'a Comment; 2]>,
+    /// Line comments moved out of `line` by [`TrailingComments::demote_line_after_deferred`]:
+    /// the element's own doc already ends in a deferred `//`, so these take their own
+    /// lines instead of welding onto it.
+    demoted_line: SmallVec<[&'a Comment; 2]>,
     /// Position after all trailing comments (for updating prev_end)
     pub(in crate::printer) end_pos: u32,
+}
+
+impl TrailingComments<'_> {
+    /// Give this run's same-line LINE comments their own lines when the element's own doc
+    /// already ends in a DEFERRED `//` — today only a spread whose stripped grouping
+    /// parens held one ([`Printer::defers_trailing_line_comment`]).
+    ///
+    /// Its output line already terminates in a `//`, so nothing more may join it:
+    /// deferring a second line comment onto the same line welds the two into ONE comment,
+    /// the second `//` becoming text inside the first. The argument-list twin is
+    /// [`super::super::calls::PartitionedComments::demote_trailing_line_after_deferred`];
+    /// it moves the comments to the *next* element's leading run, which this collector
+    /// cannot do — the run stays claimed here (`end_pos` already covers it) and
+    /// [`Printer::push_element_comma_trailing`] gives each its own line instead. Both
+    /// land on the same output, and both are fixed points: a comment printed onto a fresh
+    /// line is own-line when it is reparsed.
+    ///
+    /// `element_defers_line_comment` is the question already answered by the caller,
+    /// which is the only place that knows the element's node type.
+    pub(in crate::printer) fn demote_line_after_deferred(&mut self, element_defers_line: bool) {
+        if element_defers_line {
+            self.demoted_line = std::mem::take(&mut self.line);
+        }
+    }
 }
 
 impl<'a> Printer<'a> {
@@ -95,6 +125,7 @@ impl<'a> Printer<'a> {
                 before_comma: SmallVec::new(),
                 after_comma: SmallVec::new(),
                 line: SmallVec::new(),
+                demoted_line: SmallVec::new(),
                 end_pos: elem_end,
             };
         }
@@ -160,6 +191,7 @@ impl<'a> Printer<'a> {
             before_comma,
             after_comma,
             line,
+            demoted_line: SmallVec::new(),
             end_pos,
         }
     }
@@ -214,6 +246,15 @@ impl<'a> Printer<'a> {
         }
         if !trailing.line.is_empty() {
             parts.push(self.build_line_comments_suffix_doc(&trailing.line));
+        }
+        // Demoted line comments take their own lines rather than welding onto the
+        // element's own deferred `//` (see `TrailingComments::demote_line_after_deferred`).
+        if !trailing.demoted_line.is_empty() {
+            let d = self.d();
+            for comment in &trailing.demoted_line {
+                parts.push(d.hardline());
+                parts.push(self.build_comment_doc(comment));
+            }
         }
     }
 }

@@ -471,10 +471,13 @@ impl<'a> Printer<'a> {
 
                 // Check for comments after this argument
                 if i < new_expr.arguments.len() - 1 {
-                    let arg_end = arg.span().end;
                     let next_arg_start = new_expr.arguments[i + 1].span().start;
 
-                    let pc = self.open_inter_arg_gap(&mut arg_parts, arg_end, next_arg_start);
+                    // Hardline-joined throughout, so the gap's `forces_expansion`
+                    // obligation is already met and nothing reads it.
+                    let pc = self
+                        .open_inter_arg_gap(&mut arg_parts, arg, next_arg_start)
+                        .comments;
                     arg_parts.push(d.hardline());
                     // hugging after-comma + own-line comments lead the next arg (`C`).
                     pc.emit_leading_comments_inline_aware(&mut arg_parts, self);
@@ -503,21 +506,20 @@ impl<'a> Printer<'a> {
         // express). A block stays inline for simple args (`new A(a, b /* comment */)`);
         // function composition expands (`new A(() => {}, () => {} /* comment */,)`).
         //
-        // A last argument whose stripped grouping parens hid a comment
+        // An argument whose stripped grouping parens hid a comment
         // (`new A(a, ...(b⏎/* c */))`) routes here too: it lies *before* the argument's
         // own end, so the `[arg_end, )` scan cannot see it and every collapsing path
         // below would drop it. That interior may hold a `//` — hence "no line comment in
         // the GAP" rather than "block-only": the spread's own doc defers its line
         // comments through `line_suffix`, and `hard` below forces the break they need.
-        let last_arg_spread_expands = new_expr
-            .arguments
-            .last()
-            .is_some_and(|last_arg| self.spread_paren_comment_forces_expansion(last_arg));
+        let spread_paren_comments_expand =
+            self.any_spread_paren_comment_forces_expansion(new_expr.arguments);
         let has_trailing_comments_no_gap_line = new_has_comments
             && new_expr.arguments.last().is_some_and(|last_arg| {
                 let arg_end = last_arg.span().end;
                 let paren_close = new_expr.span.end;
-                (last_arg_spread_expands || self.has_comments_to_emit_between(arg_end, paren_close))
+                (spread_paren_comments_expand
+                    || self.has_comments_to_emit_between(arg_end, paren_close))
                     && !self.has_line_comments_between(arg_end, paren_close)
             });
 
@@ -546,7 +548,7 @@ impl<'a> Printer<'a> {
             )
             .has_trailing_line();
             let hard = paren_line_run
-                || last_arg_spread_expands
+                || spread_paren_comments_expand
                 || is_function_composition_args(new_expr.arguments)
                 || tsv_lang::comments_to_emit_in_range(self.comments, arg_end, paren_close)
                     .any(|c| c.is_block && !self.is_same_line(arg_end, c.span.start));

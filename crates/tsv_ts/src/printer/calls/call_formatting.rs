@@ -1285,27 +1285,29 @@ fn build_call_with_arg_comments(
 
     // Check for own-line block comments after the last arg (before closing paren).
     // These need per-element handling to emit after the trailing comma.
-    // A spread's stripped parens can leave one *before* the argument's own end, where
-    // the `[arg_end, )` scan can't reach it — that share is asked for by name.
+    // A spread's stripped parens can leave one *before* the argument's own end, where no
+    // scan here can reach it — that share is asked for by name, of every argument.
+    let has_spread_paren_comments =
+        printer.any_spread_paren_comment_forces_expansion(call.arguments);
     let has_own_line_trailing_block = call.arguments.last().is_some_and(|last_arg| {
         let search_start = last_arg.span().end;
-        printer.spread_paren_comment_forces_expansion(last_arg)
-            || printer
-                .comments_on_page_between(search_start, call.span.end)
-                .any(|c| {
-                    c.is_block
-                        && !tsv_lang::printing::is_same_line_fast(
-                            printer.comment_line_breaks,
-                            search_start,
-                            c.span.start,
-                        )
-                })
+        printer
+            .comments_on_page_between(search_start, call.span.end)
+            .any(|c| {
+                c.is_block
+                    && !tsv_lang::printing::is_same_line_fast(
+                        printer.comment_line_breaks,
+                        search_start,
+                        c.span.start,
+                    )
+            })
     });
 
     if !(has_leading_comments
         || has_inter_arg_comments
         || has_any_trailing_comments
-        || has_own_line_trailing_block)
+        || has_own_line_trailing_block
+        || has_spread_paren_comments)
     {
         return None;
     }
@@ -1405,26 +1407,23 @@ fn build_call_with_arg_comments(
             let arg_end = arg.span().end;
             let next_arg_start = call.arguments[i + 1].span().start;
 
-            // Own-line block comments from spread with stripped parens:
-            // placed after the comma as siblings in the call.
-            let spread_comments = printer.spread_own_line_block_comments(arg);
-            if !spread_comments.is_empty() {
-                arg_parts.push(d.text(","));
-                for comment in &spread_comments {
-                    arg_parts.push(d.hardline());
-                    arg_parts.push(printer.build_comment_doc(comment));
-                }
-                force_expansion = true;
-                arg_parts.push(d.hardline());
-            } else if printer.has_comments_to_emit_between(arg_end, next_arg_start) {
+            // The gap after this argument, in the two regions that partition it: the
+            // parent's share of a spread's stripped-paren interior and the ordinary
+            // `[arg_end, next_arg_start)` scan. `open_inter_arg_gap` owns both — asking
+            // only one of them (as an `if`/`else` over the two) drops the other.
+            if printer.inter_arg_gap_has_comments(arg, next_arg_start) {
                 if should_force_expansion_for_comments(printer, arg_end, next_arg_start) {
                     force_expansion = true;
                 }
 
                 // Open the gap (reclassify hugging blocks, emit before/after-comma
-                // trailing comments + the comma); the separator + leading comments
-                // below finish it.
-                let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_arg_start);
+                // trailing comments + the comma, then the interior's own-line blocks);
+                // the separator + leading comments below finish it.
+                let gap = printer.open_inter_arg_gap(&mut arg_parts, arg, next_arg_start);
+                let pc = gap.comments;
+                if gap.forces_expansion {
+                    force_expansion = true;
+                }
 
                 let has_blank_line =
                     pc.has_blank_line_in_gap(printer.source, printer.layout_line_breaks);

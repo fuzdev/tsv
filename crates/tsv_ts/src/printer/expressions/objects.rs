@@ -174,9 +174,23 @@ impl<'a> Printer<'a> {
                     .map_or(obj.span.end, |next| next.span().start);
 
                 let is_last = i == obj.properties.len() - 1;
-                let trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
+                let spread = prop.as_spread();
+                let mut trailing = self.collect_trailing_comments(prop_end, upper_bound, is_last);
+                // A spread whose stripped parens held a `//` already ends its line in one;
+                // a second may not weld onto it.
+                trailing.demote_line_after_deferred(
+                    spread.is_some_and(|s| self.spread_element_defers_trailing_line_comment(s)),
+                );
                 let comma = if is_last { d.empty() } else { d.text(",") };
                 self.push_element_comma_trailing(&mut parts, &trailing, comma);
+
+                // The object's share of a spread's stripped-paren interior: the own-line
+                // blocks the spread's own doc leaves behind, each a sibling line the
+                // object cannot stay collapsed around. Emitted past the comma, like the
+                // array element loop and the argument-list gaps.
+                if let Some(s) = spread {
+                    self.push_spread_element_own_line_block_comments(&mut parts, s);
+                }
 
                 prev_end = trailing.end_pos;
             }

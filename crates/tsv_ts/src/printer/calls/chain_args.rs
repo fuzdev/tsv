@@ -270,17 +270,19 @@ fn build_call_args_doc_for_chain_impl(
     let has_inter_arg_comments = call_has_comments && has_inter_argument_comments(call, printer);
     let has_trailing_comments = call_has_comments && has_trailing_comments_on_args(call, printer);
     // Also check for trailing block comments on last arg (for inline handling).
-    // A spread's stripped parens can hide one *before* the argument's own end, so ask
-    // the interior too — otherwise the collapsing paths below drop it.
     let has_trailing_block_comments = call_has_comments
         && call.arguments.last().is_some_and(|last| {
-            printer.spread_paren_comment_forces_expansion(last)
-                || printer.has_comments_to_emit_between(last.span().end, call.span.end)
+            printer.has_comments_to_emit_between(last.span().end, call.span.end)
         });
+    // A spread's stripped parens can hide a comment *before* the argument's own end,
+    // where no scan above reaches it and the collapsing paths below drop it.
+    let has_spread_paren_comments =
+        call_has_comments && printer.any_spread_paren_comment_forces_expansion(call.arguments);
     let has_any_comments = has_leading_comments
         || has_inter_arg_comments
         || has_trailing_comments
-        || has_trailing_block_comments;
+        || has_trailing_block_comments
+        || has_spread_paren_comments;
 
     // Build leading comment doc once for reuse in single-arg arrow paths
     // (e.g., /** @param {any} x */ before arrow function parameters)
@@ -570,9 +572,13 @@ fn build_chain_args_force_expand(
             let next_arg_start = call.arguments[i + 1].span().start;
 
             // Reclassify a hugging after-comma block as leading, emit the
-            // before/after-comma trailing comments + comma; the separator + leading
-            // comments below finish the gap.
-            let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_arg_start);
+            // before/after-comma trailing comments + comma, then the spread interior's
+            // own-line share; the separator + leading comments below finish the gap.
+            // This layout is hardline-joined throughout, so the gap's `forces_expansion`
+            // obligation is already met and nothing reads it.
+            let pc = printer
+                .open_inter_arg_gap(&mut arg_parts, arg, next_arg_start)
+                .comments;
 
             // Skip hardline if next arg has blank line
             // (blank line preservation at the top of the loop handles the line break)

@@ -287,14 +287,25 @@ impl<'a> Printer<'a> {
         &self,
         expr: &internal::Expression<'_>,
     ) -> CommentVec<'_> {
-        if let internal::Expression::SpreadElement(spread) = expr {
-            let arg_end = spread.argument.span().end;
-            comments_to_emit_in_range(self.comments, arg_end, spread.span.end)
-                .filter(|c| c.is_block && self.has_newline_between(arg_end, c.span.start))
-                .collect()
-        } else {
-            smallvec![]
+        match expr {
+            internal::Expression::SpreadElement(spread) => {
+                self.spread_element_own_line_block_comments(spread)
+            }
+            _ => smallvec![],
         }
+    }
+
+    /// [`Self::spread_own_line_block_comments`] on the node itself, for the parents whose
+    /// element type is a [`internal::SpreadElement`] rather than an
+    /// [`internal::Expression`] — the object literal's property list.
+    pub(crate) fn spread_element_own_line_block_comments(
+        &self,
+        spread: &internal::SpreadElement<'_>,
+    ) -> CommentVec<'_> {
+        let arg_end = spread.argument.span().end;
+        comments_to_emit_in_range(self.comments, arg_end, spread.span.end)
+            .filter(|c| c.is_block && self.has_newline_between(arg_end, c.span.start))
+            .collect()
     }
 
     /// Whether a spread's stripped-paren interior holds a comment the enclosing argument
@@ -320,6 +331,24 @@ impl<'a> Printer<'a> {
             .any(|c| !c.is_block || self.has_newline_between(arg_end, c.span.start))
     }
 
+    /// [`Self::spread_paren_comment_forces_expansion`] asked of a whole element list — the
+    /// **entry-gate** form, and the only one an argument-list builder should use to decide
+    /// whether it must run its comment-aware path at all.
+    ///
+    /// Asked of EVERY element, not just the last: an interior lies *before* its own
+    /// element's end, so no gap scan in any of these builders can see it, and a non-last
+    /// spread's interior is exactly as invisible as a last one's. Spelling the gate on
+    /// `arguments.last()` is what dropped it at three of the call family's entry points
+    /// (the same reach `any_comment_forces_expansion` already has per argument).
+    pub(crate) fn any_spread_paren_comment_forces_expansion(
+        &self,
+        elements: &[internal::Expression<'_>],
+    ) -> bool {
+        elements
+            .iter()
+            .any(|e| self.spread_paren_comment_forces_expansion(e))
+    }
+
     /// Whether this expression's own doc ends in a DEFERRED line comment — today only a
     /// spread whose stripped grouping parens held one (`...(b // c⏎)`), which
     /// [`Self::append_spread_trailing_paren_comments`] emits through `line_suffix`.
@@ -330,9 +359,20 @@ impl<'a> Printer<'a> {
     /// (`// c1 // c2`). That is the merge prettier performs here and tsv refuses — see
     /// `docs/comments.md` §Trailing and dangling runs.
     pub(crate) fn defers_trailing_line_comment(&self, expr: &internal::Expression<'_>) -> bool {
-        let internal::Expression::SpreadElement(spread) = expr else {
-            return false;
-        };
+        match expr {
+            internal::Expression::SpreadElement(spread) => {
+                self.spread_element_defers_trailing_line_comment(spread)
+            }
+            _ => false,
+        }
+    }
+
+    /// [`Self::defers_trailing_line_comment`] on the node itself — see
+    /// [`Self::spread_element_own_line_block_comments`] for why both spellings exist.
+    pub(crate) fn spread_element_defers_trailing_line_comment(
+        &self,
+        spread: &internal::SpreadElement<'_>,
+    ) -> bool {
         comments_to_emit_in_range(self.comments, spread.argument.span().end, spread.span.end)
             .any(|c| !c.is_block)
     }
@@ -348,23 +388,45 @@ impl<'a> Printer<'a> {
     /// scan is over `[spread.span.end, …)` and cannot double-count a blank this loop
     /// already consumed.
     ///
-    /// Emitted BEFORE the caller partitions its own `[arg.span().end, closer)` gap,
-    /// because that is the source order: the interior comments sit inside the stripped
-    /// `)`, ahead of anything written after it. The caller's own gap keeps the plain
-    /// argument-end anchor, so a `//` written after the stripped `)` still classifies as
-    /// trailing and defers onto the same output line as the spread's own deferred run.
+    /// Where this sits relative to the caller's own `[spread.span.end, closer)` gap
+    /// depends on whether a **comma** follows the spread, and that is a position
+    /// question, not a source-order one:
     ///
-    /// Every caller is a hard-broken (or comment-force-expanded) argument layout: an
-    /// own-line block is exactly the thing that forces one.
+    /// - at the END of a list there is no comma, so both the interior and anything
+    ///   written after the `)` merely trail the element; source order decides, and this
+    ///   run is emitted FIRST (`emit_last_arg_trailing_comments`).
+    /// - between two elements the comma gives an outside block a home on the element's
+    ///   own line, so the ordinary gap goes first and this run follows it, past the comma
+    ///   ([`Printer::open_inter_arg_gap`], the array element loop, the object property
+    ///   loop).
+    ///
+    /// Either way the caller does NOT carry a `prev_end` out of here: its own gap starts
+    /// at the spread's end, which already lies past every interior comment, so its blank
+    /// scan cannot double-count a blank this loop already consumed.
+    ///
+    /// Every caller is a hard-broken (or comment-force-expanded) layout: an own-line
+    /// block is exactly the thing that forces one.
     pub(crate) fn push_spread_own_line_block_comments(
         &self,
         parts: &mut DocBuf,
         expr: &internal::Expression<'_>,
     ) -> bool {
-        let internal::Expression::SpreadElement(spread) = expr else {
-            return false;
-        };
-        let comments = self.spread_own_line_block_comments(expr);
+        match expr {
+            internal::Expression::SpreadElement(spread) => {
+                self.push_spread_element_own_line_block_comments(parts, spread)
+            }
+            _ => false,
+        }
+    }
+
+    /// [`Self::push_spread_own_line_block_comments`] on the node itself — see
+    /// [`Self::spread_element_own_line_block_comments`] for why both spellings exist.
+    pub(crate) fn push_spread_element_own_line_block_comments(
+        &self,
+        parts: &mut DocBuf,
+        spread: &internal::SpreadElement<'_>,
+    ) -> bool {
+        let comments = self.spread_element_own_line_block_comments(spread);
         let mut prev_end = spread.argument.span().end;
         for comment in &comments {
             self.push_blank_preserving_hardline(parts, prev_end, comment.span.start);
