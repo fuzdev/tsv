@@ -14,6 +14,11 @@ each idempotent under both formatters (`variant_before_comma`). The divergence i
 normalization — prettier normalizes the newline-after form to before the comma, while we
 normalize it to after the comma (`unformatted_ours_newline_after`).
 
+The comma pushed onto its own line with the comment (`['aaaa'⏎, /* c */⏎'bbbb']`) is the same
+authoring one notch further — the comma is re-emitted structure, outside every element span, so
+the comment still sits after it, leading `'bbbb'` — and it takes the same normalization split:
+ours to after the comma, prettier to before it (`unformatted_ours_comma_own_line`).
+
 An authored **blank** line after the comment separates the two facts the comment carries. The
 comment still leads the element, so it stays after the comma and takes its own line; the blank
 line is authorship *about the element* and survives between them (`h`). Only the comment's own
