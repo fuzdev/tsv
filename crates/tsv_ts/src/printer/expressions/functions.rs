@@ -807,67 +807,6 @@ impl<'a> Printer<'a> {
         ])
     }
 
-    /// Build doc for arrow function type params.
-    ///
-    /// The brackets are always wrapped in their own group so they break
-    /// independently of the rest of the signature — matching Prettier's
-    /// `printTypeParameters`, which always returns a `group([...])` (or an inline
-    /// form). This is what keeps `<T>` inline while only the return type expands,
-    /// regardless of whether the arrow has parameters.
-    fn build_type_params_doc_for_arrow(
-        &self,
-        decl: &internal::TSTypeParameterDeclaration<'_>,
-    ) -> DocId {
-        let d = self.d();
-        if decl.params.is_empty() {
-            return d.text("<>");
-        }
-
-        // Expanding comments (e.g. a line comment trailing `<`) force the shared
-        // multiline layout — without this the arrow's own type-param printer drops
-        // the comment (content loss). The disambiguation trailing comma is moot here
-        // since the multiline form always emits one.
-        if self.has_expanding_comments_in_type_param_declaration(decl) {
-            let inner = self.build_type_parameter_declaration_doc_with_line_comments(decl);
-            return d.group(inner);
-        }
-
-        let param_docs: DocBuf = decl
-            .params
-            .iter()
-            .map(|param| self.build_type_parameter_doc(param))
-            .collect();
-
-        // A bare `<T>` is the canonical form everywhere. Prettier forces a trailing
-        // comma (`<T,>`) on single-unconstrained arrow type params to stay valid as
-        // TSX, but tsv never emits TSX and Svelte's parser accepts the bare form in
-        // every TS position, so the disambiguation is moot — see the
-        // single_type_param_prettier_divergence fixture. The trailing comma added
-        // here only appears when the group breaks across lines.
-        // A test call's callback inlines its type parameters too — prettier asks the same
-        // `isTestCall` question from its type-parameter printer (`print/type-parameters.js`
-        // `isParameterInTestCall` → `shouldInline`). PEEKED, not consumed: the signature builds
-        // type parameters before the value parameters, which are the ones that spend the flag.
-        if self.test_call_flat_params.get() {
-            return d.concat(&[
-                d.text("<"),
-                d.join_doc(param_docs, d.text(", ")),
-                d.text(">"),
-            ]);
-        }
-
-        let inner_parts = d.join_doc(param_docs, d.comma_line());
-
-        let brackets_doc = d.concat(&[
-            d.text("<"),
-            d.indent_softline(inner_parts),
-            d.softline(),
-            d.text(">"),
-        ]);
-
-        d.group(brackets_doc)
-    }
-
     /// Build doc for arrow params NOT in their own group (outer signature group controls breaking)
     ///
     /// Structure matches prettier's function-parameters.js:
@@ -912,9 +851,15 @@ impl<'a> Printer<'a> {
         }
 
         // Type parameters: always their own group so they break independently of
-        // the rest of the signature (Prettier's printTypeParameters semantics).
+        // the rest of the signature (Prettier's printTypeParameters semantics) —
+        // which is what `_wrapping` is, so an arrow shares the declaration printer
+        // rather than restating its layout. A hand-copied twin lived here and emitted
+        // only its children's docs, so every block comment in the list's own gaps was
+        // DROPPED (`<T /* c */, U>` → `<T, U>`, and the three sibling positions) —
+        // hazard 4, masked by the line-comment arm routing to the comment-aware
+        // builder, which is why only a `//` survived.
         if let Some(tp) = &arrow.type_parameters {
-            parts.push(self.build_type_params_doc_for_arrow(tp));
+            parts.push(self.build_type_parameter_declaration_doc_wrapping(tp));
 
             // Comments between type_params `>` and `(` go after type_params
             if let Some(pp) = find_char_skipping_comments(

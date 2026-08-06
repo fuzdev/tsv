@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 569,
+	"end": 685,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -185,24 +185,56 @@
 					"column": 13
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " the same shell at the LAST element, where the bracket closes the run instead of a comma",
+			"start": 561,
+			"end": 651,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 661,
+			"end": 668,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 9
+				},
+				"end": {
+					"line": 24,
+					"column": 16
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 568,
+		"end": 684,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 559,
+			"end": 675,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 22,
+					"line": 25,
 					"column": 9
 				}
 			},
@@ -876,6 +908,118 @@
 							"value": " an own-line block comment with nothing before it on its line leads the next element",
 							"start": 449,
 							"end": 535
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 653,
+					"end": 674,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 22
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 653,
+						"end": 673,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 1
+							},
+							"end": {
+								"line": 24,
+								"column": 21
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ArrayPattern",
+							"start": 653,
+							"end": 669,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 1
+								},
+								"end": {
+									"line": 24,
+									"column": 17
+								}
+							},
+							"elements": [
+								{
+									"type": "Identifier",
+									"start": 654,
+									"end": 656,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 2
+										},
+										"end": {
+											"line": 24,
+											"column": 4
+										}
+									},
+									"name": "a6"
+								},
+								{
+									"type": "Identifier",
+									"start": 658,
+									"end": 660,
+									"loc": {
+										"start": {
+											"line": 24,
+											"column": 6
+										},
+										"end": {
+											"line": 24,
+											"column": 8
+										}
+									},
+									"name": "b6",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 661,
+											"end": 668
+										}
+									]
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 672,
+							"end": 673,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 20
+								},
+								"end": {
+									"line": 24,
+									"column": 21
+								}
+							},
+							"name": "x"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same shell at the LAST element, where the bracket closes the run instead of a comma",
+							"start": 561,
+							"end": 651
 						}
 					]
 				}

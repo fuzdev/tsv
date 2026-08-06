@@ -17,8 +17,8 @@ use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer,
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
+use crate::printer::CommentVec;
 use crate::printer::layout::{bracketed_list_body, hang_after_operator};
-use crate::printer::{CommentVec, OwnLineBasis};
 use smallvec::smallvec;
 use tsv_lang::Comment;
 use tsv_lang::INDENT;
@@ -1527,7 +1527,6 @@ impl<'a> Printer<'a> {
                 t.span,
                 t.element_types,
                 tuple_elem_span,
-                OwnLineBasis::Source,
             )
         {
             return self.build_tuple_type_doc_with_line_comments(t);

@@ -6,7 +6,6 @@
 use super::header_comments::is_only_whitespace_and_comments;
 use super::{MODULE_KW_LEN, MODULE_TYPE_KW_LEN, Printer};
 use crate::ast::internal;
-use crate::printer::OwnLineBasis;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -295,18 +294,10 @@ impl<'a> Printer<'a> {
         let after_brace = brace_close + 1;
 
         // Expanding comments (line comments, or own-line single-line block
-        // comments) force the multiline path. One zero-comment window check over
-        // the braces gates all three queries (each is bounded within the braces).
+        // comments) force the multiline path — the shared bracketed-list question.
         let brace_span = Span::new(brace_start, after_brace);
-        let has_expanding_comments = self.has_comments_to_emit_between(brace_start, after_brace)
-            && (self.has_line_comments_in_delimited_list(specifiers, &get_span, brace_close)
-                || self.has_line_comments_between(brace_start + 1, first_start)
-                || self.has_own_line_block_comments_in_bracket_list(
-                    brace_span,
-                    specifiers,
-                    &get_span,
-                    OwnLineBasis::ItemBoundary,
-                ));
+        let has_expanding_comments =
+            self.has_expanding_comments_in_bracket_list(brace_span, specifiers, &get_span);
 
         let braces_doc = if has_expanding_comments {
             // `first_start` keeps a same-line `{` comment on the brace line

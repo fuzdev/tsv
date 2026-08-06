@@ -9,7 +9,7 @@
 use crate::ast::internal::{self, Expression, LiteralValue};
 use crate::printer::comments::{block_is_before_comma, run_defers_line};
 use crate::printer::{
-    CommentVec, OwnLineBasis, Printer, container_may_have_multiline_content, has_multiline_content,
+    CommentVec, Printer, container_may_have_multiline_content, has_multiline_content,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
@@ -534,21 +534,16 @@ impl<'a> Printer<'a> {
     /// Delegates to the generic `has_own_line_block_comments_in_bracket_list` helper,
     /// filtering out holes (elisions) from the element list.
     ///
-    /// [`OwnLineBasis::Source`], the same reading the element→`,` seam takes
+    /// The helper reads the SOURCE, the same reading the element→`,` seam takes
     /// ([`Self::block_comment_trails_prev_element`]): a comment with the comma or a
     /// stripped `)` before it on its line is not own-line, so it collapses onto the
-    /// element it binds to instead of expanding the list. On the item-boundary reading
+    /// element it binds to instead of expanding the list. On an item-boundary reading
     /// those two spellings expanded — a third fixed point neither the bare authoring nor
     /// prettier produces, and, since the reprint puts the comment back on the element's
     /// line, one the next pass immediately collapsed (`[a⏎, /* c */⏎b]` was a 2-pass).
     fn has_own_line_block_comments_in_array(&self, arr: &internal::ArrayExpression<'_>) -> bool {
         let non_null: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
-        self.has_own_line_block_comments_in_bracket_list(
-            arr.span,
-            &non_null,
-            |e| e.span(),
-            OwnLineBasis::Source,
-        )
+        self.has_own_line_block_comments_in_bracket_list(arr.span, &non_null, |e| e.span())
     }
 
     /// Check if array contains only numeric literals (for fill behavior)
