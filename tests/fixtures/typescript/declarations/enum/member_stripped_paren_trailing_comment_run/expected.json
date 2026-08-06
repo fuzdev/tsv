@@ -1,0 +1,1153 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 715,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a block comment glued to a stripped paren shell's closer trails the member",
+			"start": 20,
+			"end": 97,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 117,
+			"end": 124,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 8
+				},
+				"end": {
+					"line": 4,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a line comment in the same position defers past the comma",
+			"start": 139,
+			"end": 199,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 220,
+			"end": 224,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 9
+				},
+				"end": {
+					"line": 10,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a block then a line comment each keep the side of the comma the author gave them",
+			"start": 238,
+			"end": 321,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 341,
+			"end": 349,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 8
+				},
+				"end": {
+					"line": 16,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 351,
+			"end": 356,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 18
+				},
+				"end": {
+					"line": 16,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " on the last member, whose comma is never emitted, the run trails it",
+			"start": 370,
+			"end": 440,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 71
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 469,
+			"end": 476,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 8
+				},
+				"end": {
+					"line": 23,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a line comment there defers past the member the same way",
+			"start": 482,
+			"end": 541,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 60
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 570,
+			"end": 574,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 8
+				},
+				"end": {
+					"line": 29,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line block comment with nothing before it on its line leads the next member",
+			"start": 580,
+			"end": 665,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 1
+				},
+				"end": {
+					"line": 32,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 688,
+			"end": 695,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 2
+				},
+				"end": {
+					"line": 35,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 714,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 705,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 37,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSEnumDeclaration",
+					"start": 99,
+					"end": 136,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 104,
+						"end": 106,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 6
+							},
+							"end": {
+								"line": 3,
+								"column": 8
+							}
+						},
+						"name": "E1"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 111,
+							"end": 116,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 2
+								},
+								"end": {
+									"line": 4,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 111,
+								"end": 112,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 2
+									},
+									"end": {
+										"line": 4,
+										"column": 3
+									}
+								},
+								"name": "A"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 115,
+								"end": 116,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 6
+									},
+									"end": {
+										"line": 4,
+										"column": 7
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 117,
+									"end": 124
+								}
+							]
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 128,
+							"end": 133,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 2
+								},
+								"end": {
+									"line": 5,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 128,
+								"end": 129,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 132,
+								"end": 133,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 6
+									},
+									"end": {
+										"line": 5,
+										"column": 7
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment glued to a stripped paren shell's closer trails the member",
+							"start": 20,
+							"end": 97
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 201,
+					"end": 235,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 206,
+						"end": 208,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 8
+							}
+						},
+						"name": "E2"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 213,
+							"end": 218,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 2
+								},
+								"end": {
+									"line": 10,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 213,
+								"end": 214,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 2
+									},
+									"end": {
+										"line": 10,
+										"column": 3
+									}
+								},
+								"name": "A"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 217,
+								"end": 218,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 6
+									},
+									"end": {
+										"line": 10,
+										"column": 7
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 220,
+									"end": 224
+								}
+							]
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 227,
+							"end": 232,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 227,
+								"end": 228,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 231,
+								"end": 232,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 6
+									},
+									"end": {
+										"line": 11,
+										"column": 7
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment in the same position defers past the comma",
+							"start": 139,
+							"end": 199
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 323,
+					"end": 367,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 328,
+						"end": 330,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 6
+							},
+							"end": {
+								"line": 15,
+								"column": 8
+							}
+						},
+						"name": "E3"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 335,
+							"end": 340,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 335,
+								"end": 336,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 3
+									}
+								},
+								"name": "A"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 339,
+								"end": 340,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 6
+									},
+									"end": {
+										"line": 16,
+										"column": 7
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 341,
+									"end": 349
+								}
+							]
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 359,
+							"end": 364,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 2
+								},
+								"end": {
+									"line": 17,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 359,
+								"end": 360,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 363,
+								"end": 364,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 6
+									},
+									"end": {
+										"line": 17,
+										"column": 7
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							},
+							"leadingComments": [
+								{
+									"type": "Line",
+									"value": " c2",
+									"start": 351,
+									"end": 356
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block then a line comment each keep the side of the comma the author gave them",
+							"start": 238,
+							"end": 321
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 442,
+					"end": 479,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 447,
+						"end": 449,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 6
+							},
+							"end": {
+								"line": 21,
+								"column": 8
+							}
+						},
+						"name": "E4"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 454,
+							"end": 459,
+							"loc": {
+								"start": {
+									"line": 22,
+									"column": 2
+								},
+								"end": {
+									"line": 22,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 454,
+								"end": 455,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 3
+									}
+								},
+								"name": "A"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 458,
+								"end": 459,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 6
+									},
+									"end": {
+										"line": 22,
+										"column": 7
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 463,
+							"end": 468,
+							"loc": {
+								"start": {
+									"line": 23,
+									"column": 2
+								},
+								"end": {
+									"line": 23,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 463,
+								"end": 464,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 23,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 467,
+								"end": 468,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 6
+									},
+									"end": {
+										"line": 23,
+										"column": 7
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 469,
+									"end": 476
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " on the last member, whose comma is never emitted, the run trails it",
+							"start": 370,
+							"end": 440
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 543,
+					"end": 577,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 30,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 548,
+						"end": 550,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 6
+							},
+							"end": {
+								"line": 27,
+								"column": 8
+							}
+						},
+						"name": "E5"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 555,
+							"end": 560,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 2
+								},
+								"end": {
+									"line": 28,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 555,
+								"end": 556,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 3
+									}
+								},
+								"name": "A"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 559,
+								"end": 560,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 6
+									},
+									"end": {
+										"line": 28,
+										"column": 7
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 564,
+							"end": 569,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 2
+								},
+								"end": {
+									"line": 29,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 564,
+								"end": 565,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 2
+									},
+									"end": {
+										"line": 29,
+										"column": 3
+									}
+								},
+								"name": "B"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 568,
+								"end": 569,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 6
+									},
+									"end": {
+										"line": 29,
+										"column": 7
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							},
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c",
+									"start": 570,
+									"end": 574
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment there defers past the member the same way",
+							"start": 482,
+							"end": 541
+						}
+					]
+				},
+				{
+					"type": "TSEnumDeclaration",
+					"start": 667,
+					"end": 704,
+					"loc": {
+						"start": {
+							"line": 33,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 672,
+						"end": 674,
+						"loc": {
+							"start": {
+								"line": 33,
+								"column": 6
+							},
+							"end": {
+								"line": 33,
+								"column": 8
+							}
+						},
+						"name": "E6"
+					},
+					"members": [
+						{
+							"type": "TSEnumMember",
+							"start": 679,
+							"end": 684,
+							"loc": {
+								"start": {
+									"line": 34,
+									"column": 2
+								},
+								"end": {
+									"line": 34,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 679,
+								"end": 680,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 2
+									},
+									"end": {
+										"line": 34,
+										"column": 3
+									}
+								},
+								"name": "A"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 683,
+								"end": 684,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 6
+									},
+									"end": {
+										"line": 34,
+										"column": 7
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						},
+						{
+							"type": "TSEnumMember",
+							"start": 696,
+							"end": 701,
+							"loc": {
+								"start": {
+									"line": 35,
+									"column": 10
+								},
+								"end": {
+									"line": 35,
+									"column": 15
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 696,
+								"end": 697,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 10
+									},
+									"end": {
+										"line": 35,
+										"column": 11
+									}
+								},
+								"name": "B"
+							},
+							"initializer": {
+								"type": "Literal",
+								"start": 700,
+								"end": 701,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 14
+									},
+									"end": {
+										"line": 35,
+										"column": 15
+									}
+								},
+								"value": 2,
+								"raw": "2"
+							},
+							"leadingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 688,
+									"end": 695
+								}
+							]
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line block comment with nothing before it on its line leads the next member",
+							"start": 580,
+							"end": 665
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
