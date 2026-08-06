@@ -1,0 +1,543 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 281,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a spread's stripped parens leave an own-line comment behind, and a block",
+			"start": 10,
+			"end": 85,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " written after the `)` trails the last argument too",
+			"start": 87,
+			"end": 140,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 160,
+			"end": 167,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 168,
+			"end": 175,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 10
+				},
+				"end": {
+					"line": 7,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 203,
+			"end": 210,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 211,
+			"end": 218,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 10
+				},
+				"end": {
+					"line": 13,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 251,
+			"end": 258,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 259,
+			"end": 266,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 10
+				},
+				"end": {
+					"line": 19,
+					"column": 17
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 280,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 271,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 142,
+					"end": 179,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 142,
+						"end": 178,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 142,
+							"end": 144,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 148,
+								"end": 149,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "SpreadElement",
+								"start": 153,
+								"end": 157,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 6
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 156,
+									"end": 157,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 5
+										},
+										"end": {
+											"line": 6,
+											"column": 6
+										}
+									},
+									"name": "b"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a spread's stripped parens leave an own-line comment behind, and a block",
+							"start": 10,
+							"end": 85
+						},
+						{
+							"type": "Line",
+							"value": " written after the `)` trails the last argument too",
+							"start": 87,
+							"end": 140
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 182,
+					"end": 222,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 182,
+						"end": 221,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 186,
+							"end": 187,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 5
+								},
+								"end": {
+									"line": 10,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 191,
+								"end": 192,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "SpreadElement",
+								"start": 196,
+								"end": 200,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 6
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 199,
+									"end": 200,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 5
+										},
+										"end": {
+											"line": 12,
+											"column": 6
+										}
+									},
+									"name": "b"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " i ",
+							"start": 160,
+							"end": 167
+						},
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 168,
+							"end": 175
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 225,
+					"end": 270,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 225,
+						"end": 269,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 1
+							},
+							"end": {
+								"line": 20,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 225,
+							"end": 235,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 1
+								},
+								"end": {
+									"line": 16,
+									"column": 11
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 225,
+								"end": 228,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 1
+									},
+									"end": {
+										"line": 16,
+										"column": 4
+									}
+								},
+								"name": "obj"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 229,
+								"end": 235,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 5
+									},
+									"end": {
+										"line": 16,
+										"column": 11
+									}
+								},
+								"name": "method"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 239,
+								"end": 240,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 2
+									},
+									"end": {
+										"line": 17,
+										"column": 3
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "SpreadElement",
+								"start": 244,
+								"end": 248,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 6
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 247,
+									"end": 248,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 5
+										},
+										"end": {
+											"line": 18,
+											"column": 6
+										}
+									},
+									"name": "b"
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " i ",
+							"start": 203,
+							"end": 210
+						},
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 211,
+							"end": 218
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " i ",
+							"start": 251,
+							"end": 258
+						},
+						{
+							"type": "Block",
+							"value": " t ",
+							"start": 259,
+							"end": 266
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

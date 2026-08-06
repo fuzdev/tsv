@@ -222,6 +222,17 @@ impl<'a> Printer<'a> {
     /// in the parent list, after the spread's comma. Using `line_suffix` would defer
     /// them past the enclosing `]`/`)` bracket. Instead, the parent formatter picks
     /// them up via `spread_own_line_block_comments()`.
+    ///
+    /// ⚠️ A second line comment must carry its own break, and must carry it **inside the
+    /// `line_suffix`**. Deferred back to back the two land on one output line and weld
+    /// into ONE comment — the second `//` becomes text inside the first (`// c1 // c2`).
+    /// Emitting the break as a plain `hardline` instead fixes the weld and breaks
+    /// something worse: the argument's doc then ENDS in a literal `//`, so anything the
+    /// parent appends inline after it (a same-line block written past the `)`) is
+    /// swallowed by that comment (`// c2 /* t */`) and stops existing on reparse. Buffered,
+    /// the whole run replays in source order once the line is actually ending, and inline
+    /// text the parent adds still lands ahead of it — prettier's form. Same shape as
+    /// [`Self::append_trailing_paren_comments`]'s own-line arm.
     pub(crate) fn append_spread_trailing_paren_comments(
         &self,
         parts: &mut DocBuf,
@@ -229,26 +240,49 @@ impl<'a> Printer<'a> {
         span_end: u32,
     ) {
         let d = self.d();
+        let mut deferred_line = false;
         for comment in comments_to_emit_in_range(self.comments, argument_end, span_end) {
             if comment.is_block && !self.has_newline_between(argument_end, comment.span.start) {
                 // Same-line block comment: `...x /* c */`
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             } else if !comment.is_block {
-                // Line comment: defer to after semicolon via line_suffix
-                let suffix = d.concat(&[d.text(" "), self.build_comment_doc(comment)]);
-                parts.push(d.line_suffix(suffix));
+                // Line comment: defer past the argument's own text via line_suffix. The
+                // first trails that line; every one after it opens its own, from inside
+                // the buffer.
+                let lead = if deferred_line {
+                    d.hardline()
+                } else {
+                    d.text(" ")
+                };
+                parts.push(d.line_suffix(d.concat(&[lead, self.build_comment_doc(comment)])));
+                deferred_line = true;
             }
             // Own-line block comments: skip (handled by parent array/call)
         }
     }
 
-    /// Get own-line block comments from stripped parens in a spread element.
+    /// The PARENT's share of a spread's stripped-paren interior.
     ///
-    /// When the parser strips grouping parens (e.g., `...(x\n/* c */)`), own-line
-    /// block comments between `argument.end` and `spread.span.end` need to be emitted
-    /// by the parent formatter (array/call) as siblings after the spread's comma,
-    /// not by the spread doc itself.
+    /// When the parser strips grouping parens (`...(x⏎/* c */)`) the comments land in
+    /// `[spread.argument.end, spread.span.end)`, and that region has **two** emitters
+    /// which must partition it exactly once (the seam in `docs/comments.md` §The
+    /// element-comma seam, applied to a node's own interior rather than to a list gap):
+    ///
+    /// - [`Self::append_spread_trailing_paren_comments`] — the spread's own doc — prints
+    ///   everything that rides the argument's line: the same-line blocks, and **every**
+    ///   line comment (a `//` defers through `line_suffix`, whatever line it sat on).
+    /// - the parent (array element loop, call/`new`/member-chain last-argument emitter)
+    ///   prints the **own-line blocks**, which need a line of their own that only the
+    ///   parent can give — a `line_suffix` raised from inside the spread would escape
+    ///   past the enclosing `]`/`)`.
+    ///
+    /// This function is the ONLY spelling of that share — the emitting form,
+    /// [`Self::push_spread_own_line_block_comments`], reads it from here rather than
+    /// re-deriving the predicate. Expressing it as an *anchor shift* instead — scanning
+    /// the parent's trailing gap from `spread.argument.end` rather than from the spread's
+    /// own end — reads as equivalent and is not: it hands the parent the spread's share
+    /// too, so every same-line block and interior `//` prints twice.
     pub(crate) fn spread_own_line_block_comments(
         &self,
         expr: &internal::Expression<'_>,
@@ -261,6 +295,83 @@ impl<'a> Printer<'a> {
         } else {
             smallvec![]
         }
+    }
+
+    /// Whether a spread's stripped-paren interior holds a comment the enclosing argument
+    /// list must EXPAND around. Two kinds, for two different reasons:
+    ///
+    /// - an **own-line block** (the parent's share, above) — the parent prints it, and it
+    ///   needs a line of its own that only a broken list has;
+    /// - **any line comment** — the spread's own doc defers it through `line_suffix`, and
+    ///   on a list that stays collapsed that buffer flushes past the call's `)` *and* its
+    ///   `;`, re-binding the comment from the argument to the statement
+    ///   (`fn(a, ...(b // c⏎))` → `fn(a, ...b); // c`). A deferred run must not leave the
+    ///   construct it was written in — `docs/comments.md`. The array family has no such
+    ///   hazard: its brackets already break around a spread carrying a comment.
+    pub(crate) fn spread_paren_comment_forces_expansion(
+        &self,
+        expr: &internal::Expression<'_>,
+    ) -> bool {
+        let internal::Expression::SpreadElement(spread) = expr else {
+            return false;
+        };
+        let arg_end = spread.argument.span().end;
+        comments_to_emit_in_range(self.comments, arg_end, spread.span.end)
+            .any(|c| !c.is_block || self.has_newline_between(arg_end, c.span.start))
+    }
+
+    /// Whether this expression's own doc ends in a DEFERRED line comment — today only a
+    /// spread whose stripped grouping parens held one (`...(b // c⏎)`), which
+    /// [`Self::append_spread_trailing_paren_comments`] emits through `line_suffix`.
+    ///
+    /// The caller that owns the gap *after* such a node must not let its own same-line
+    /// `//` defer onto the same output line: two deferred line comments emitted back to
+    /// back weld into ONE comment, the second `//` becoming text inside the first
+    /// (`// c1 // c2`). That is the merge prettier performs here and tsv refuses — see
+    /// `docs/comments.md` §Trailing and dangling runs.
+    pub(crate) fn defers_trailing_line_comment(&self, expr: &internal::Expression<'_>) -> bool {
+        let internal::Expression::SpreadElement(spread) = expr else {
+            return false;
+        };
+        comments_to_emit_in_range(self.comments, spread.argument.span().end, spread.span.end)
+            .any(|c| !c.is_block)
+    }
+
+    /// Emit the parent's share of a spread's stripped-paren interior
+    /// ([`Self::spread_own_line_block_comments`]) into `parts`, each on its own line with
+    /// author blank lines preserved. Returns whether anything was emitted — which is also
+    /// the caller's signal to force its argument list open, since an own-line comment is
+    /// a sibling of the argument rather than a trailer on its line.
+    ///
+    /// The caller does NOT carry a `prev_end` out of here: its own gap starts at the
+    /// spread's end, which already lies past every interior comment, so its first blank
+    /// scan is over `[spread.span.end, …)` and cannot double-count a blank this loop
+    /// already consumed.
+    ///
+    /// Emitted BEFORE the caller partitions its own `[arg.span().end, closer)` gap,
+    /// because that is the source order: the interior comments sit inside the stripped
+    /// `)`, ahead of anything written after it. The caller's own gap keeps the plain
+    /// argument-end anchor, so a `//` written after the stripped `)` still classifies as
+    /// trailing and defers onto the same output line as the spread's own deferred run.
+    ///
+    /// Every caller is a hard-broken (or comment-force-expanded) argument layout: an
+    /// own-line block is exactly the thing that forces one.
+    pub(crate) fn push_spread_own_line_block_comments(
+        &self,
+        parts: &mut DocBuf,
+        expr: &internal::Expression<'_>,
+    ) -> bool {
+        let internal::Expression::SpreadElement(spread) = expr else {
+            return false;
+        };
+        let comments = self.spread_own_line_block_comments(expr);
+        let mut prev_end = spread.argument.span().end;
+        for comment in &comments {
+            self.push_blank_preserving_hardline(parts, prev_end, comment.span.start);
+            parts.push(self.build_comment_doc(comment));
+            prev_end = comment.span.end;
+        }
+        !comments.is_empty()
     }
 
     /// Check if stripped grouping parens left trailing comments.

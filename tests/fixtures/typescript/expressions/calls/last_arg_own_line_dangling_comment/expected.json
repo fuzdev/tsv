@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 83,
+	"end": 119,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -57,24 +57,56 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Block",
+			"value": " block ",
+			"start": 85,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 2
+				},
+				"end": {
+					"line": 15,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line",
+			"start": 97,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 14
+				},
+				"end": {
+					"line": 15,
+					"column": 21
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 82,
+		"end": 118,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 73,
+			"end": 109,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 12,
+					"line": 17,
 					"column": 9
 				}
 			},
@@ -215,8 +247,73 @@
 							"start": 20,
 							"end": 30
 						}
-					],
-					"trailingComments": [
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 75,
+					"end": 108,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 75,
+						"end": 107,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 75,
+							"end": 77,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 1
+								},
+								"end": {
+									"line": 13,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 81,
+								"end": 82,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 3
+									}
+								},
+								"name": "c"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
 						{
 							"type": "Block",
 							"value": " block ",
@@ -228,6 +325,20 @@
 							"value": " line",
 							"start": 61,
 							"end": 68
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " block ",
+							"start": 85,
+							"end": 96
+						},
+						{
+							"type": "Line",
+							"value": " line",
+							"start": 97,
+							"end": 104
 						}
 					]
 				}

@@ -7,9 +7,9 @@ use super::super::comments::CommentSpacing;
 use super::super::{Printer, is_multiline_template_expression};
 use super::arg_comments::{
     PartitionedComments, any_comment_forces_expansion, build_after_comma_leading_comments,
-    build_before_comma_trailing_comments, first_arg_has_any_comments, has_inter_argument_comments,
-    has_trailing_comments_on_args, is_comment_inline_with_next, last_arg_has_comments,
-    push_empty_args,
+    build_before_comma_trailing_comments, emit_last_arg_trailing_comments,
+    first_arg_has_any_comments, has_inter_argument_comments, has_trailing_comments_on_args,
+    is_comment_inline_with_next, last_arg_has_comments, push_empty_args,
 };
 use super::arg_predicates::{
     arrow_body_is_call_through_non_null, arrow_has_trailing_param_comments, is_block_function,
@@ -269,10 +269,13 @@ fn build_call_args_doc_for_chain_impl(
         && printer.has_comments_on_page_between(paren_open, call.arguments[0].span().start);
     let has_inter_arg_comments = call_has_comments && has_inter_argument_comments(call, printer);
     let has_trailing_comments = call_has_comments && has_trailing_comments_on_args(call, printer);
-    // Also check for trailing block comments on last arg (for inline handling)
+    // Also check for trailing block comments on last arg (for inline handling).
+    // A spread's stripped parens can hide one *before* the argument's own end, so ask
+    // the interior too — otherwise the collapsing paths below drop it.
     let has_trailing_block_comments = call_has_comments
         && call.arguments.last().is_some_and(|last| {
-            printer.has_comments_to_emit_between(last.span().end, call.span.end)
+            printer.spread_paren_comment_forces_expansion(last)
+                || printer.has_comments_to_emit_between(last.span().end, call.span.end)
         });
     let has_any_comments = has_leading_comments
         || has_inter_arg_comments
@@ -598,17 +601,12 @@ fn build_chain_args_force_expand(
             // blank line preservation at top of next iteration adds literalline + hardline
             pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
         } else {
-            let pc = PartitionedComments::new(
-                printer.comments,
-                printer.comment_line_breaks,
-                arg_end,
-                next_boundary,
-            );
-            // Last argument - same-line trailing comments trail the arg in source order
-            // (a block that sat after the source comma just trails past where the comma
-            // was; a line comment follows via `line_suffix`), then own-line dangling
-            // comments. No trailing comma (trailingComma: 'none').
-            pc.emit_last_arg_comments(&mut arg_parts, printer);
+            // Last argument — the parent's share of a spread's stripped-paren interior,
+            // then same-line trailing comments in source order (a block that sat after
+            // the source comma just trails past where the comma was; a line comment
+            // follows via `line_suffix`), then own-line dangling comments. No trailing
+            // comma (trailingComma: 'none').
+            emit_last_arg_trailing_comments(printer, &mut arg_parts, arg, next_boundary);
         }
     }
 
