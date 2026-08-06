@@ -400,6 +400,16 @@ pub(super) fn any_comment_forces_expansion(
 
     // Check inter-argument and trailing comments
     for (i, arg) in call.arguments.iter().enumerate() {
+        // A comment a spread's stripped grouping parens left behind (`...(x⏎/* c */)`,
+        // `...(x // c⏎)`) sits BEFORE the argument's own end, so the gap scan below cannot
+        // see it — yet it is exactly what forces the list open, either because it needs a
+        // line of its own or because its deferred `//` would otherwise flush past the
+        // call's `)`. Asked per argument: a non-last spread's interior needs the expansion
+        // just as much as the last one's.
+        if printer.spread_paren_comment_forces_expansion(arg) {
+            return true;
+        }
+
         let arg_end = arg.span().end;
         let next_boundary = if i < call.arguments.len() - 1 {
             call.arguments[i + 1].span().start
@@ -558,6 +568,19 @@ pub(crate) fn has_trailing_line_comments_slice(
 /// Several per-argument printer loops only emit leading comments for args `1..n` (via
 /// the previous arg's gap), so the first arg's leading comment must be emitted
 /// explicitly or it's dropped.
+///
+/// **Why the split is `has_trailing_line` here and
+/// `Printer::delimiter_line_comment_prefix`'s wider conjunction elsewhere** — the two are
+/// the same rule read at different points, not drift (`docs/comments.md` §The
+/// delimiter-line question). Both say *pull onto the delimiter's line only when the
+/// container is breaking anyway; otherwise let the block hug the first element*. The list
+/// family has to derive "is it breaking?" from the gap
+/// (`should_force_expansion_for_comments`), and so do the call family's force-expanded
+/// builders, which spell that same conjunction over
+/// [`PartitionedComments::has_trailing_comments`]. This emitter runs on the paths where
+/// the call may still collapse, so the only thing that can force the break is a `//` in
+/// the run itself — and a block-only run must NOT be pulled, or a call that would have fit
+/// is broken by the pull.
 pub(crate) fn emit_first_arg_leading_comments(
     printer: &Printer<'_>,
     paren_line: &mut DocBuf,
@@ -591,29 +614,36 @@ pub(crate) fn emit_first_arg_leading_comments(
 /// owes beyond its interior gaps (see `docs/comments.md` §The element-comma seam).
 ///
 /// A loop whose gap lookup is guarded by `i < len - 1` has no emitter for this region at
-/// all, so everything an author parked after the last argument is DROPPED. Anchored at
-/// [`Printer::last_arg_comment_scan_start`] so a spread's stripped parens can't hide a
-/// comment past the argument's own end.
+/// all, so everything an author parked after the last argument is DROPPED.
+///
+/// Two regions, in source order, and they must **partition**: the parent's share of the
+/// last argument's own stripped-paren interior
+/// ([`Printer::push_spread_own_line_block_comments`] — the own-line blocks a spread's
+/// doc deliberately leaves for its parent), then the ordinary gap between the argument's
+/// end and `)`. The second keeps the plain `arg.span().end` anchor: widening it to reach
+/// the interior is what claims the spread's own share a second time.
 pub(crate) fn emit_last_arg_trailing_comments(
     printer: &Printer<'_>,
     parts: &mut DocBuf,
     last_arg: &internal::Expression<'_>,
     paren_close: u32,
 ) {
-    let scan_start = printer.last_arg_comment_scan_start(last_arg);
+    printer.push_spread_own_line_block_comments(parts, last_arg);
+    let arg_end = last_arg.span().end;
     // Every argument list reaching these builders pays this call, comments or not, so
     // skip the partition on the common empty gap (same guard as
     // `emit_first_arg_leading_comments`). Both emits `PartitionedComments` would run
     // walk only its own buckets, so an empty range is already a no-op.
-    if !printer.has_comments_to_emit_between(scan_start, paren_close) {
+    if !printer.has_comments_to_emit_between(arg_end, paren_close) {
         return;
     }
-    let pc = PartitionedComments::new(
+    let mut pc = PartitionedComments::new(
         printer.comments,
         printer.comment_line_breaks,
-        scan_start,
+        arg_end,
         paren_close,
     );
+    pc.demote_trailing_line_after_deferred(printer, last_arg);
     pc.emit_last_arg_comments(parts, printer);
 }
 
@@ -751,6 +781,34 @@ impl<'a> PartitionedComments<'a> {
         !self.trailing_line.is_empty()
     }
 
+    /// Reclassify this gap's same-line LINE comments as own-line when `prev` — the node
+    /// the gap opens after — already ends in a DEFERRED line comment
+    /// ([`Printer::defers_trailing_line_comment`]).
+    ///
+    /// Its output line already terminates in a `//`, so nothing more may join it:
+    /// deferring a second line comment onto the same line welds the two into ONE comment,
+    /// the second `//` becoming text inside the first. Moving it to `leading` gives it the
+    /// line it needs — which is also where a reparse keeps it, so the form is a fixed
+    /// point. Prepended, because a same-line comment precedes every own-line one in
+    /// source.
+    ///
+    /// Asked at the gap rather than inside the emitters, so the two last-argument
+    /// consumers (the shared [`emit_last_arg_trailing_comments`] and
+    /// `call_formatting`'s own loop, which needs its `force_expansion` feedback) get the
+    /// rule from one place.
+    pub fn demote_trailing_line_after_deferred(
+        &mut self,
+        printer: &Printer<'_>,
+        prev: &internal::Expression<'_>,
+    ) {
+        if self.trailing_line.is_empty() || !printer.defers_trailing_line_comment(prev) {
+            return;
+        }
+        for comment in self.trailing_line.drain(..).rev() {
+            self.leading.insert(0, comment);
+        }
+    }
+
     pub fn has_trailing_block(&self) -> bool {
         !self.trailing_block.is_empty()
     }
@@ -762,6 +820,11 @@ impl<'a> PartitionedComments<'a> {
     /// has to be injected after the `(` rather than led onto the first argument, and
     /// the run is taken WHOLE (both buckets) or an authored `/* b */ // c` pair comes
     /// back reversed. Paired with the emitter so the two can't answer differently.
+    ///
+    /// Conjoined with `should_force_expansion_for_comments` at every force-expanded call
+    /// site, this **is** `Printer::delimiter_line_comment_prefix`'s `pull` — the list
+    /// family's spelling of the same rule (`docs/comments.md` §The delimiter-line
+    /// question). Keep the two in step.
     pub fn has_trailing_comments(&self) -> bool {
         self.has_trailing_block() || self.has_trailing_line()
     }
@@ -844,20 +907,36 @@ impl<'a> PartitionedComments<'a> {
         }
     }
 
-    /// Emit own-line ("leading") comments each on its own line (hardline before),
-    /// with no comma. The bare dangling-comment emission shared by every last-argument
-    /// path (no trailing comma precedes them — trailingComma: 'none') and by comma-less
-    /// shapes (dynamic `import()`). Without it, own-line comments before the closing paren
-    /// are dropped (content loss).
+    /// Emit own-line ("leading") comments, with no comma. The bare dangling-comment
+    /// emission shared by every last-argument path (no trailing comma precedes them —
+    /// trailingComma: 'none') and by comma-less shapes (dynamic `import()`). Without it,
+    /// own-line comments before the closing paren are dropped (content loss).
     /// The dangling comments follow the gap `start` (the preceding element's end);
     /// that is the base for preserving an author blank line before the first own-line
     /// comment.
+    ///
+    /// The separator goes BEFORE each comment (`docs/comments.md` §Trailing and dangling
+    /// runs) and is asked of the **source**, like
+    /// [`Printer::push_trailing_comments_in_range`]: a comment the author glued to the
+    /// previous one's line (`/* c */ // t`, `/* c1 */ /* c2 */`) stays on that line.
+    /// Giving each its own line unconditionally reads as the safer rule and is not — the
+    /// run re-collapses on the next pass, because a comment printed onto a fresh line is
+    /// no longer glued when it is reparsed, so the output never reaches a fixed point
+    /// (F1). The first comment's separator is unconditional: either it is own-line by
+    /// construction (that is what put it in `leading`), or
+    /// [`Self::demote_trailing_line_after_deferred`] moved it here precisely because it
+    /// needs a line the previous node's deferred `//` denies it.
     pub fn emit_dangling_comments(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
+        let d = printer.d();
         let mut prev_end = self.start;
-        for comment in &self.leading {
-            // Preserve an author blank line before an own-line trailing comment
-            // (`arg⏎⏎/* c */` before the closing `)`), matching prettier.
-            printer.push_blank_preserving_hardline(parts, prev_end, comment.span.start);
+        for (i, comment) in self.leading.iter().enumerate() {
+            if i > 0 && !printer.has_newline_between(prev_end, comment.span.start) {
+                parts.push(d.text(" "));
+            } else {
+                // Preserve an author blank line before an own-line trailing comment
+                // (`arg⏎⏎/* c */` before the closing `)`), matching prettier.
+                printer.push_blank_preserving_hardline(parts, prev_end, comment.span.start);
+            }
             parts.push(printer.build_comment_doc(comment));
             prev_end = comment.span.end;
         }

@@ -9,4 +9,9 @@
 		/* block */
 		// line
 	);
+
+	new A(
+		c
+		/* block */ // line
+	);
 </script>

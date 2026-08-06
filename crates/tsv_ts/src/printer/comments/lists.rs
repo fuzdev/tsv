@@ -558,6 +558,14 @@ impl<'a> Printer<'a> {
     /// hugging the first element (`{ /* c */ a: 1 }`, `[/* c */ x]`) is left in
     /// place and the result is `(empty, None)`. See conformance_prettier_ts_comments.md
     /// §Comment relocation.
+    ///
+    /// The call family asks the same question about its `(` and reaches the same rule
+    /// from the other side — see `docs/comments.md` §The delimiter-line question. Its
+    /// force-expanded builders spell this predicate identically
+    /// (`PartitionedComments::has_trailing_comments` conjoined with
+    /// `should_force_expansion_for_comments`); its collapse-capable path
+    /// (`emit_first_arg_leading_comments`) asks the narrower
+    /// `PartitionedComments::has_trailing_line` instead, which is load-bearing, not drift.
     pub(in crate::printer) fn delimiter_line_comment_prefix(
         &self,
         delim_pos: u32,

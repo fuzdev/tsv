@@ -19,16 +19,15 @@ use crate::printer::calls::{
     ArgItem, ArgsJoin, PartitionedComments, build_args_joined_with_comments, build_args_split_last,
     build_arrow_call_body_states, build_arrow_sig_doc, build_break_body_state,
     build_call_args_expanded, build_expand_all_args, build_inline_args, build_inline_or_expand_all,
-    could_expand_arrow_chain, emit_first_arg_leading_comments, has_inter_argument_comments_slice,
-    has_trailing_comments_slice, has_trailing_line_comments_slice, last_two_args_same_type,
-    prebuild_expand_last_break_body, prepend_arrow_body_comments,
-    should_force_expansion_for_comments, wrap_call_with_hard_breaks_paren_line,
-    wrap_call_with_will_break_guard,
+    could_expand_arrow_chain, emit_first_arg_leading_comments, emit_last_arg_trailing_comments,
+    has_inter_argument_comments_slice, has_trailing_comments_slice,
+    has_trailing_line_comments_slice, last_two_args_same_type, prebuild_expand_last_break_body,
+    prepend_arrow_body_comments, should_force_expansion_for_comments,
+    wrap_call_with_hard_breaks_paren_line, wrap_call_with_will_break_guard,
 };
 use crate::printer::{
-    CommentVec, ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
+    ParenContext, Printer, container_may_have_multiline_content, has_multiline_content,
 };
-use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -480,31 +479,13 @@ impl<'a> Printer<'a> {
                     // hugging after-comma + own-line comments lead the next arg (`C`).
                     pc.emit_leading_comments_inline_aware(&mut arg_parts, self);
                 } else {
-                    // Last argument - check for trailing comments before closing paren
-                    let arg_end = arg.span().end;
-                    let paren_close = new_expr.span.end;
-
-                    let pc = PartitionedComments::new(
-                        self.comments,
-                        self.comment_line_breaks,
-                        arg_end,
-                        paren_close,
-                    );
-
-                    // Same-line trailing comments trail the arg in source order (a block
-                    // that sat after the source comma just trails past where the comma was,
+                    // Last argument: the parent's share of a spread's stripped-paren
+                    // interior, then the same-line trailing comments (a block that sat
+                    // after the source comma just trails past where the comma was,
                     // `b /* c */` — the tsv divergence; a line comment follows via
                     // `line_suffix`), then own-line dangling comments. No trailing comma
                     // (trailingComma: 'none'). Matches the call/member-chain last-arg paths.
-                    //
-                    // TODO: this is `emit_last_arg_trailing_comments` off the WRONG anchor —
-                    // `arg_end`, not `last_arg_comment_scan_start`, so a spread's stripped
-                    // parens hide their comments past the argument's own end and the scan
-                    // starts beyond them. Live drop, verified against prettier:
-                    // `new Foo(a, ...(b⏎/* i */⏎) // t)` loses `/* i */`. Route this site
-                    // through the shared emitter — needs a fixture first, since it changes
-                    // output.
-                    pc.emit_last_arg_comments(&mut arg_parts, self);
+                    emit_last_arg_trailing_comments(self, &mut arg_parts, arg, new_expr.span.end);
                 }
             }
 
@@ -517,84 +498,74 @@ impl<'a> Printer<'a> {
             );
         }
 
-        // Check for trailing BLOCK comments only (no line comments)
-        // Block comments should stay inline for simple args: new A(a, b /* comment */)
-        // But function composition cases should expand: new A(() => {}, () => {} /* comment */,)
-        let has_trailing_block_only = new_has_comments
+        // The last argument trails comments, and no LINE comment sits in the gap after it
+        // (one there ends the `)` line, which the expand-last / hug paths below cannot
+        // express). A block stays inline for simple args (`new A(a, b /* comment */)`);
+        // function composition expands (`new A(() => {}, () => {} /* comment */,)`).
+        //
+        // A last argument whose stripped grouping parens hid a comment
+        // (`new A(a, ...(b⏎/* c */))`) routes here too: it lies *before* the argument's
+        // own end, so the `[arg_end, )` scan cannot see it and every collapsing path
+        // below would drop it. That interior may hold a `//` — hence "no line comment in
+        // the GAP" rather than "block-only": the spread's own doc defers its line
+        // comments through `line_suffix`, and `hard` below forces the break they need.
+        let last_arg_spread_expands = new_expr
+            .arguments
+            .last()
+            .is_some_and(|last_arg| self.spread_paren_comment_forces_expansion(last_arg));
+        let has_trailing_comments_no_gap_line = new_has_comments
             && new_expr.arguments.last().is_some_and(|last_arg| {
                 let arg_end = last_arg.span().end;
                 let paren_close = new_expr.span.end;
-                self.has_comments_to_emit_between(arg_end, paren_close)
+                (last_arg_spread_expands || self.has_comments_to_emit_between(arg_end, paren_close))
                     && !self.has_line_comments_between(arg_end, paren_close)
             });
 
-        if has_trailing_block_only {
-            // Build args with trailing block comment
-            let last_idx = new_expr.arguments.len() - 1;
-            let mut arg_docs: DocBuf = (0..new_expr.arguments.len())
-                .map(|i| self.build_arg_item_doc(paren_open, new_expr.arguments, i))
-                .collect();
+        if has_trailing_comments_no_gap_line {
+            // The shared joined-argument builder owns every gap in the list — the
+            // `(`→first-argument run (into `paren_line`), each inter-argument gap, and
+            // the last argument's trailing region (its spread interior included). The
+            // hand-rolled loop this replaced built the argument docs and joined them with
+            // commas, so it had no inter-argument emitter at all: a comment between two
+            // arguments was DROPPED whenever the argument itself didn't own it (the
+            // hazard-4 shape in docs/comments.md).
+            let last_arg = &new_expr.arguments[new_expr.arguments.len() - 1];
+            let arg_end = last_arg.span().end;
+            let paren_close = new_expr.span.end;
 
-            // Prepend leading comments before the first arg (e.g. `new Foo(/* c */ a /* t */)`);
-            // this path otherwise emits only trailing comments, dropping the leading one.
-            // A `(`-line run goes to `paren_line` instead, which then forces the hard-broken
-            // wrap below — it ends in a `//`, so nothing may share its line.
-            let mut paren_line = DocBuf::new();
-            if let Some(first_arg) = new_expr.arguments.first() {
-                let mut lead = DocBuf::new();
-                emit_first_arg_leading_comments(
-                    self,
-                    &mut paren_line,
-                    &mut lead,
-                    paren_open,
-                    first_arg.span().start,
-                );
-                if !lead.is_empty() {
-                    lead.push(arg_docs[0]);
-                    arg_docs[0] = d.concat(&lead);
-                }
-            }
-
-            // Add trailing block comment to last arg. For spread elements, scan
-            // inside the spread span for comments from stripped parens.
-            let last_arg = &new_expr.arguments[last_idx];
-            let effective_arg_end = self.last_arg_comment_scan_start(last_arg);
-
-            let pc = PartitionedComments::new(
+            // An own-line comment — from the spread interior or from the `[arg_end, )`
+            // gap — is a sibling of the last argument rather than a trailer on its line,
+            // so the argument list must hard-break around it. So must a `(`-line run,
+            // which ends in a `//` nothing may share a line with; asked here rather than
+            // read off `paren_line` afterwards, since the join is chosen before the build.
+            let paren_line_run = PartitionedComments::new(
                 self.comments,
                 self.comment_line_breaks,
-                effective_arg_end,
-                new_expr.span.end,
-            );
+                paren_open,
+                new_expr.arguments[0].span().start,
+            )
+            .has_trailing_line();
+            let hard = paren_line_run
+                || last_arg_spread_expands
+                || is_function_composition_args(new_expr.arguments)
+                || tsv_lang::comments_to_emit_in_range(self.comments, arg_end, paren_close)
+                    .any(|c| c.is_block && !self.is_same_line(arg_end, c.span.start));
 
-            // Own-line block comments after the last arg (before closing paren).
-            // These appear as siblings after the last arg (no trailing comma), forcing expansion.
-            let leading_block: CommentVec<'_> =
-                pc.leading.iter().filter(|c| c.is_block).copied().collect();
-            if !leading_block.is_empty()
-                && let Some(last_doc) = arg_docs.pop()
-            {
-                let mut last_parts = DocBuf::new();
-                last_parts.push(last_doc);
-                let mut prev_end = effective_arg_end;
-                for comment in &leading_block {
-                    // Preserve an author blank line before the own-line trailing comment
-                    // (`b⏎⏎/* c */` before `)`), matching prettier and the call path.
-                    self.push_blank_preserving_hardline(
-                        &mut last_parts,
-                        prev_end,
-                        comment.span.start,
-                    );
-                    last_parts.push(self.build_comment_doc(comment));
-                    prev_end = comment.span.end;
-                }
-                arg_docs.push(d.concat(&last_parts));
-
-                let arg_parts = if new_expr.arguments.len() > 1 {
-                    d.join_doc(arg_docs, d.comma_hardline())
+            let mut paren_line = DocBuf::new();
+            let arg_parts = build_args_joined_with_comments(
+                self,
+                new_expr.arguments,
+                paren_open,
+                paren_close,
+                if hard {
+                    ArgsJoin::Hardline
                 } else {
-                    d.concat(&arg_docs)
-                };
+                    ArgsJoin::SoftLine
+                },
+                ArgItem::ArgContext,
+                &mut paren_line,
+            );
+            if hard {
                 return wrap_call_with_hard_breaks_paren_line(
                     d,
                     callee_with_types,
@@ -602,35 +573,7 @@ impl<'a> Printer<'a> {
                     arg_parts,
                 );
             }
-
-            if let Some(last_doc) = arg_docs.pop() {
-                // Same-line blocks trail the last arg in source order. With no trailing
-                // comma emitted (trailingComma: 'none'), a block that sat after the
-                // source comma simply trails the arg past where the comma was
-                // (`b /* c */`) — no split around the never-emitted comma.
-                // No line comments reach this block-only path.
-                let mut last_with_comment: DocBuf = smallvec![last_doc];
-                for comment in &pc.trailing_block {
-                    last_with_comment.push(d.text(" "));
-                    last_with_comment.push(self.build_comment_doc(comment));
-                }
-                arg_docs.push(d.concat(&last_with_comment));
-
-                // For function composition (multiple callbacks), use hardlines
-                // For simple args, use soft breaks (can stay inline) — unless a comment
-                // sits on the `(` line, whose `//` ends that line and forces the break.
-                if is_function_composition_args(new_expr.arguments) || !paren_line.is_empty() {
-                    let arg_parts = d.join_doc(arg_docs, d.comma_hardline());
-                    return wrap_call_with_hard_breaks_paren_line(
-                        d,
-                        callee_with_types,
-                        &paren_line,
-                        arg_parts,
-                    );
-                }
-                let arg_parts = d.join_doc(arg_docs, d.comma_line());
-                return wrap_call_with_soft_breaks(d, callee_with_types, arg_parts);
-            }
+            return wrap_call_with_soft_breaks(d, callee_with_types, arg_parts);
         }
 
         // "Expand last arg" pattern — matches call_formatting.rs logic.
