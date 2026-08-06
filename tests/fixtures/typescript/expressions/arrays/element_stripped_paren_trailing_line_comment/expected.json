@@ -1,0 +1,647 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 481,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a line comment glued to a stripped paren shell's closer trails the element",
+			"start": 10,
+			"end": 87,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 106,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 5
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a block before it keeps its side of the comma while the line comment defers past it",
+			"start": 121,
+			"end": 207,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 225,
+			"end": 233,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 4
+				},
+				"end": {
+					"line": 10,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 235,
+			"end": 240,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 14
+				},
+				"end": {
+					"line": 10,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " on the last element, whose comma is never emitted, the line comment trails it",
+			"start": 251,
+			"end": 331,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 81
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 354,
+			"end": 358,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 4
+				},
+				"end": {
+					"line": 17,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a line comment that leads its own line leads the next element instead",
+			"start": 365,
+			"end": 437,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 458,
+			"end": 462,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 480,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 471,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 26,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 89,
+					"end": 118,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 95,
+							"end": 117,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 95,
+								"end": 96,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 99,
+								"end": 117,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 6,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 103,
+										"end": 104,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 2
+											},
+											"end": {
+												"line": 4,
+												"column": 3
+											}
+										},
+										"name": "x",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 106,
+												"end": 110
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 113,
+										"end": 114,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 2
+											},
+											"end": {
+												"line": 5,
+												"column": 3
+											}
+										},
+										"name": "y"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment glued to a stripped paren shell's closer trails the element",
+							"start": 10,
+							"end": 87
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 209,
+					"end": 248,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 215,
+							"end": 247,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 215,
+								"end": 216,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 219,
+								"end": 247,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 11
+									},
+									"end": {
+										"line": 12,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 223,
+										"end": 224,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 10,
+												"column": 3
+											}
+										},
+										"name": "x",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 225,
+												"end": 233
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 243,
+										"end": 244,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 3
+											}
+										},
+										"name": "y",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 235,
+												"end": 240
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block before it keeps its side of the comma while the line comment defers past it",
+							"start": 121,
+							"end": 207
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 333,
+					"end": 362,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 339,
+							"end": 361,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 339,
+								"end": 340,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 343,
+								"end": 361,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 11
+									},
+									"end": {
+										"line": 18,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 347,
+										"end": 348,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 2
+											},
+											"end": {
+												"line": 16,
+												"column": 3
+											}
+										},
+										"name": "x"
+									},
+									{
+										"type": "Identifier",
+										"start": 352,
+										"end": 353,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 17,
+												"column": 3
+											}
+										},
+										"name": "y",
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 354,
+												"end": 358
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " on the last element, whose comma is never emitted, the line comment trails it",
+							"start": 251,
+							"end": 331
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 439,
+					"end": 470,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 445,
+							"end": 469,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 25,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 445,
+								"end": 446,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 21,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 449,
+								"end": 469,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 11
+									},
+									"end": {
+										"line": 25,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 453,
+										"end": 454,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 2
+											},
+											"end": {
+												"line": 22,
+												"column": 3
+											}
+										},
+										"name": "x"
+									},
+									{
+										"type": "Identifier",
+										"start": 465,
+										"end": 466,
+										"loc": {
+											"start": {
+												"line": 24,
+												"column": 2
+											},
+											"end": {
+												"line": 24,
+												"column": 3
+											}
+										},
+										"name": "y",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " c",
+												"start": 458,
+												"end": 462
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment that leads its own line leads the next element instead",
+							"start": 365,
+							"end": 437
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

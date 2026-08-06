@@ -901,8 +901,15 @@ scan — from drifting apart. Three standing rules: the leading scan resumes at 
 claimed run must stay a **prefix** of the gap, so a same-line block ahead of a deferred line
 comment is claimed too — skipping it drops it, and leaving it to lead the next element
 **reorders** it past the `line_suffix`; and the gate is the **source** reading
-(`is_own_line_comment`), since a stripped `)` and the comma itself sit in the gap outside every
-item span, where a `is_same_line(prev_end, …)` gate is blind to both. And an **elision opens no
+(`comment_follows_content_on_its_line`), since a stripped `)` and the comma itself sit in the gap
+outside every item span, where a `is_same_line(prev_end, …)` gate is blind to both. **Both arms
+ask it** — a `//` glued to that `)` trails its element too, and `is_own_line_comment` cannot
+answer, its `!is_block` short-circuit calling every line comment own-line — so the run must then
+**end at the first line comment**, which the anchored gate used to guarantee for free: a second
+deferred `//` welds onto the first's line and swallows the code behind it. The seam's **anchor**
+is likewise the element's PRINTED end: where the element node's span swallows a stripped `)`
+(a destructuring `Property`, an `AssignmentPattern`) the scan starts past the shell's interior and
+nothing else emits it. And an **elision opens no
 gap of its own**: the anchor stays the last REAL element's split however many holes intervene,
 so a comment slides *forward* past their (structural) commas to the element it leads — or, past
 the last one, to the list's own trailing position. Counting commas instead handed the region to

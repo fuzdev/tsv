@@ -7,7 +7,7 @@
 // - Comment preservation
 
 use crate::ast::internal::{self, Expression, LiteralValue};
-use crate::printer::comments::block_is_before_comma;
+use crate::printer::comments::{block_is_before_comma, run_defers_line};
 use crate::printer::{
     CommentVec, OwnLineBasis, Printer, container_may_have_multiline_content, has_multiline_content,
 };
@@ -196,18 +196,21 @@ impl<'a> Printer<'a> {
     /// that exists (the sanctioned pure-separator trail) — a block comment renders fine either
     /// side, making the move unforced. See conformance_prettier_ts_comments.md §Comment relocation.
     ///
-    /// The separator rule has one exception, and it is the run's **order**: a same-line
-    /// LINE comment later in the gap (`A, /* c */ // x⏎B`) defers through `line_suffix`,
-    /// so a block left to lead `B` renders *after* it and the authored pair comes back
-    /// reversed across two lines. Such a block trails `A` instead — emitted past the
-    /// comma, in front of the suffix, exactly where it was written. Same rule, same
-    /// reason as `Printer::push_trailing_comments_in_range`'s deferred-run block, and as
-    /// the shared element-comma emitter's `after_comma` run.
+    /// The separator rule has one exception, and it is the run's **order**:
+    /// `run_defers_line` — the run ends in a `//` (`A, /* c */ // x⏎B`), which defers
+    /// through `line_suffix`, so a block left to lead `B` would render *after* it and the
+    /// authored pair comes back reversed across two lines. Such a block trails `A`
+    /// instead — emitted past the comma, in front of the suffix, exactly where it was
+    /// written. Same rule, same reason as `Printer::push_trailing_comments_in_range`'s
+    /// deferred-run block, and as the shared element-comma emitter's `after_comma` run.
+    /// It is a **boolean, not a position**, because the deferring `//` can only be the
+    /// run's last member, so every block being classified provably precedes it.
     ///
-    /// `comma_pos` is the separator after `prev_end`, and `gap_end` bounds the gap the
-    /// line comment is looked for in — the SAME range [`Self::element_gap_split`] walks,
-    /// which is the only caller: the two sides of the gap take ranges from that split
-    /// rather than each asking this predicate, so they cannot answer it differently.
+    /// ⚠️ **This decides the comma SIDE only. The positional half — is the comment in this
+    /// element's run at all — is [`Printer::trailing_comment_run`]**, which every caller
+    /// goes through first, so the source reading and the run's end are answered once for
+    /// both this family and the shared collector. An own-line comment therefore never
+    /// reaches here: the run stops before it.
     ///
     /// Only the expanding printer can reach the order exception, and the whole-array gate
     /// is what guarantees it: a `//` anywhere between `[` and `]` sets
@@ -219,45 +222,13 @@ impl<'a> Printer<'a> {
     /// The `is_last` arm's double-print hazard is the end-of-array scans, which must not
     /// re-emit what it claims; [`Self::end_scan_emits_comment`] is the one statement of
     /// that exclusion, and it too keys on the split rather than re-deriving this question.
-    ///
-    /// ⚠️ **The gate is a SOURCE reading, not an item-boundary one** — the comment leads
-    /// its line, or something precedes it there ([`Printer::is_own_line_comment`]) — and
-    /// the difference is the whole [`OwnLineBasis`] question asked at the seam instead of
-    /// at the expansion gate. Two kinds of text sit in this gap without being covered by
-    /// any item span: a **stripped paren shell**'s `)` (erased by the printer, never a
-    /// node in expression position) and the list's own **comma**, which the author can
-    /// push onto its own line. Keying on `is_same_line(prev_end, …)` is blind to both, and
-    /// each blindness was a live defect: a block glued to a stripped `)` on a line of its
-    /// own (`[(⏎a⏎)/* c */, b]`) read as leading, and one the author wrote before a
-    /// glued comma (`[a⏎/* c */, b]`) as trailing NEITHER side — dropped outright, since
-    /// the leading scan started past the comma. Both are answered here, once, and the
-    /// comma arm still decides the side: content before the comment on its line makes it
-    /// this element's business, and `block_is_before_comma` says which side of the
-    /// separator it keeps.
     fn block_comment_trails_prev_element(
-        &self,
-        prev_end: u32,
-        gap_end: u32,
         comment: &tsv_lang::Comment,
         comma_pos: Option<u32>,
         is_last: bool,
+        run_defers_line: bool,
     ) -> bool {
-        if self.is_own_line_comment(comment) {
-            return false;
-        }
-        block_is_before_comma(is_last, comma_pos, comment.span.start)
-            || self
-                .same_line_line_comment_start(prev_end, gap_end)
-                .is_some_and(|line_start| comment.span.start < line_start)
-    }
-
-    /// Where the gap's first same-line LINE comment starts, if it has one — the point a
-    /// same-line block before it must not be carried past (see
-    /// [`Self::block_comment_trails_prev_element`]).
-    fn same_line_line_comment_start(&self, prev_end: u32, gap_end: u32) -> Option<u32> {
-        comments_to_emit_in_range(self.comments, prev_end, gap_end)
-            .find(|c| !c.is_block && self.is_same_line(prev_end, c.span.start))
-            .map(|c| c.span.start)
+        block_is_before_comma(is_last, comma_pos, comment.span.start) || run_defers_line
     }
 
     /// The SPLIT POINT of the gap after the real element in slot `idx`: where that
@@ -293,18 +264,26 @@ impl<'a> Printer<'a> {
         let comma_pos = self.find_comma_in_range(elem_end, gap_end);
         let is_last = idx + 1 == arr.elements.len();
 
+        // The positional half is the shared run — the source reading, ending at the first
+        // line comment — so this printer and the collector cannot disagree about which
+        // comments are even candidates. A line comment in the run always trails (nothing
+        // can follow it on its line); a block additionally has to keep the author's side
+        // of the comma, which is this family's own arm. The run's deferring `//` is read
+        // ONCE, above the loop: it is the run's last member, so the answer is the same for
+        // every block being classified.
+        let run: CommentVec<'_> = self.trailing_comment_run(elem_end, gap_end).collect();
+        let defers_line = run_defers_line(&run);
+
         let mut split = elem_end;
-        for comment in comments_to_emit_in_range(self.comments, elem_end, gap_end) {
-            let claimed = if comment.is_block {
-                self.block_comment_trails_prev_element(
-                    elem_end, gap_end, comment, comma_pos, is_last,
+        for comment in run {
+            if comment.is_block
+                && !Self::block_comment_trails_prev_element(
+                    comment,
+                    comma_pos,
+                    is_last,
+                    defers_line,
                 )
-            } else {
-                // A same-line line comment always trails — nothing can follow it on its
-                // line. Any other one leads the next element.
-                self.is_same_line(elem_end, comment.span.start)
-            };
-            if !claimed {
+            {
                 break;
             }
             split = comment.span.end;
