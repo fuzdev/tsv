@@ -104,64 +104,6 @@ pub(crate) enum ArrowChainContext {
     CallArgOrBinaryish,
 }
 
-/// How [`Printer::has_own_line_block_comments_in_bracket_list`] decides a block comment
-/// leads its line — i.e. whether the author gave it a line of its own, or merely parked it
-/// after something.
-///
-/// The two readings agree unless text the item spans don't cover precedes the comment on
-/// its line, and there are **two** such kinds — not one:
-///
-/// - a **stripped delimiter**, a paren shell the printer erases (`[a,⏎(/* c */⏎b)]`, and in
-///   expression position every grouping paren, which is never a node at all);
-/// - the list's own **comma**, which the author can push onto its own line
-///   (`[a⏎, /* c */⏎b]`) — re-emitted, never stripped, and still outside every item span.
-///
-/// Both make [`Self::ItemBoundary`] read the comment as own-line and expand the list, where
-/// prettier collapses it inline (verified across the tuple, both type-argument positions,
-/// type parameters, specifier lists, object patterns and the array literal). So the two
-/// bases are nowhere *provably* equivalent — a site on `ItemBoundary` is a site that has not
-/// been moved yet, not a site where the question doesn't arise.
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum OwnLineBasis {
-    /// The comment does not share a line with the preceding ITEM (or the opening bracket).
-    /// Blind to both kinds of uncovered text above, so a comment glued to either reads as
-    /// own-line.
-    ///
-    /// The remaining holders are the array PATTERN, the object pattern, the type-parameter
-    /// DECLARATION list and the import/export specifier list. For three of them only the
-    /// comma case is live (a type parameter and a specifier cannot be parenthesized; an
-    /// object pattern's property span ends *past* any shell around its value, so its items
-    /// cover the closer): `<T⏎, /* c */⏎U>` expands where prettier collapses. Each is
-    /// 1-pass stable there — a prettier divergence, not a robustness defect — so they move
-    /// on their own evidence, per family, not on the array literal's.
-    ///
-    /// ⚠️ **The array PATTERN is the exception, and it does reach a stripped delimiter.** A
-    /// pattern element's own parens are a parse error only in a *declaration*; in
-    /// assignment-target position they parse, so `[(⏎a⏎)/* c */] = x` gives an element
-    /// span that ends inside the shell. Its element→`,` seam already asks the source
-    /// reading, which is what the last-element authoring now turns on: the gate's
-    /// dangling arm (a comment before the closer with no following element) reads the
-    /// comment as own-line off the shell and expands where prettier collapses.
-    /// TODO: pin that authoring per family and move them onto [`Self::Source`].
-    ItemBoundary,
-    /// Nothing but whitespace precedes the comment on its line
-    /// ([`Printer::is_own_line_comment`]) — the reading a caller **must** use once it strips
-    /// a delimiter out of its item spans, since the erased text still occupied the line the
-    /// author wrote the comment on. Held by the tuple, by both type-argument positions (the
-    /// three that unwrap a paren shell to build their item spans), and by the array literal.
-    ///
-    /// ⚠️ **The array literal reached it only once its element→`,` seam asked the same
-    /// question**, and the order was load-bearing: on the item-boundary reading the
-    /// expansion gate's blindness *cancelled* the seam's, so switching the basis alone lost
-    /// a comment outright. The seam now keys on this same source reading and partitions its
-    /// gap by a split point rather than by two filters
-    /// (`Printer::trailing_comment_split`), which is what made the basis safe to move —
-    /// and retired, in the same change, a content loss (`[a⏎/* c */, b]`, claimed by
-    /// neither side) and four non-idempotent shapes. A future family that strips a
-    /// delimiter needs both halves, not just this one.
-    Source,
-}
-
 /// Printer state for building output
 pub struct Printer<'a> {
     /// Output buffer
@@ -1089,9 +1031,31 @@ impl<'a> Printer<'a> {
 
     /// Check if a delimited list contains own-line single-line block comments.
     ///
-    /// A block comment is "own-line" when it leads its line — the basis the caller names,
-    /// see [`OwnLineBasis`] — and doesn't share a line with the following element (or
-    /// closing delimiter).
+    /// A block comment is "own-line" when nothing but whitespace precedes it on its line
+    /// ([`Printer::is_own_line_comment`]) and it doesn't share a line with the following
+    /// element (or closing delimiter).
+    ///
+    /// ⚠️ **The reading is of the SOURCE, never of the preceding item's end**, and the two
+    /// differ by exactly the text no item span covers — of which there are **two** kinds:
+    ///
+    /// - a **stripped delimiter**, a paren shell the printer erases (`[a,⏎(/* c */⏎b)]`, and
+    ///   in expression position every grouping paren, which is never a node at all);
+    /// - the list's own **comma**, which the author can push onto its own line
+    ///   (`[a⏎, /* c */⏎b]`) — re-emitted, never stripped, and still outside every item span.
+    ///
+    /// An item-boundary reading is blind to both, so a comment glued to either reads as
+    /// own-line and expands the list where prettier collapses it inline — a third fixed
+    /// point neither the bare authoring nor prettier produces. Every list here flattens when
+    /// it fits, so the author's break around a comma is layout, not own-line-ness
+    /// (`docs/conformance_prettier.md` §Comment Position Philosophy); a comment given a line
+    /// **of its own** still expands the list, which is what this predicate is for.
+    ///
+    /// ⚠️ **This gate and the element→`,` seam must ask the same question.** The array
+    /// literal proved the coupling: on the item-boundary reading the gate's blindness
+    /// *cancelled* the seam's, so tightening either one alone lost a comment outright. The
+    /// seam keys on the same source reading and partitions its gap by a split point
+    /// ([`Printer::element_gap_split`]); a future family that strips a delimiter needs both
+    /// halves, not just this one.
     ///
     /// `span` is the whole construct's span and only its ENDS are read (`span.start` as the
     /// opening delimiter, `span.end - 1` as the closing one), so the delimiter pair is the
@@ -1105,7 +1069,6 @@ impl<'a> Printer<'a> {
         span: Span,
         items: &[T],
         get_span: F,
-        basis: OwnLineBasis,
     ) -> bool
     where
         F: Fn(&T) -> Span,
@@ -1128,29 +1091,25 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
-            // Skip a trailing inline comment, on the basis the caller named.
-            let leads_its_line = match basis {
-                OwnLineBasis::ItemBoundary => {
-                    // Preceding item end (or the opening bracket).
-                    let prev_boundary = items
-                        .iter()
-                        .map(|e| get_span(e).end)
-                        .take_while(|&end| end <= comment.span.start)
-                        .last()
-                        .unwrap_or(open_bracket);
-                    !self.is_same_line(prev_boundary, comment.span.start)
-                }
-                OwnLineBasis::Source => self.is_own_line_comment(comment),
-            };
-            if !leads_its_line {
+            // Skip a trailing inline comment — anything shares its line, item or not.
+            if !self.is_own_line_comment(comment) {
                 continue;
             }
 
             // Find the following element start, if any.
+            //
+            // ⚠️ `>=`, not `>`: an element GLUED to the comment starts exactly where the
+            // comment ends (`[a,⏎/* c */b]`), and a strict `>` skipped it — so a comment
+            // that plainly leads the next element fell through to the dangling arm and
+            // expanded the list. That was **non-idempotent**, not merely a divergence: the
+            // expanded print re-emits the run spaced (`/* c */ b`), which un-glues it, so
+            // the second pass collapsed. All seven families carried it, and the space is
+            // the only thing that ever distinguished them — authorship no reader could
+            // see.
             let next_elem_start = items
                 .iter()
                 .map(|e| get_span(e).start)
-                .find(|&start| start > comment.span.end);
+                .find(|&start| start >= comment.span.end);
 
             match next_elem_start {
                 // A comment between two elements is own-line when it doesn't share
@@ -1168,6 +1127,44 @@ impl<'a> Printer<'a> {
             }
         }
         false
+    }
+
+    /// Whether a bracketed comma list holds a comment that forces it OPEN.
+    ///
+    /// The three clauses every such list asks, stated once: a line comment in the
+    /// opener→first-item gap, a line comment anywhere between or after the items, or an
+    /// own-line single-line block comment ([`Self::has_own_line_block_comments_in_bracket_list`]).
+    /// Held by the type-argument list, the type-parameter declaration and the
+    /// import/export specifier list; a caller with a further question of its own `||`s it on.
+    ///
+    /// ⚠️ **The opener→first-item clause is the one that has been forgotten, and forgetting
+    /// it loses content.** `has_line_comments_in_delimited_list` covers only *between* and
+    /// *after* the items, so a `//` trailing the opener (`<// c⏎T>`) reaches no clause; the
+    /// inline path then runs, emits block comments only, and the line comment is DROPPED.
+    /// That is why the question lives here rather than at each site.
+    ///
+    /// The zero-comment window gate is an **on-page** question: it guards a LAYOUT
+    /// decision, and an emit-keyed gate would skip an owned comment and answer for a page
+    /// that is not empty. Every clause below is bounded within `span`, so with nothing on
+    /// the page all three are provably false — this skips them on the common bare list.
+    pub(crate) fn has_expanding_comments_in_bracket_list<T, F>(
+        &self,
+        span: Span,
+        items: &[T],
+        get_span: F,
+    ) -> bool
+    where
+        F: Fn(&T) -> Span,
+    {
+        let Some(first) = items.first() else {
+            return false;
+        };
+        if !self.has_comments_on_page_between(span.start, span.end) {
+            return false;
+        }
+        self.has_line_comments_between(span.start + 1, get_span(first).start)
+            || self.has_line_comments_in_delimited_list(items, &get_span, span.end - 1)
+            || self.has_own_line_block_comments_in_bracket_list(span, items, &get_span)
     }
 
     /// Find the closing `)` between a start position and end boundary.

@@ -7,7 +7,6 @@
 use super::helpers::is_simple_type_arg;
 use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, TrailingBlock};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
-use crate::printer::OwnLineBasis;
 use crate::printer::layout::{bracketed_list_body, fluid_after_operator};
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -135,38 +134,22 @@ impl<'a> Printer<'a> {
         &self,
         decl: &TSTypeParameterDeclaration<'_>,
     ) -> bool {
-        let Some(first) = decl.params.first() else {
-            return false;
-        };
-        // Zero-comment window gate: one binary search over the whole `<…>` span.
-        // Every sub-query below is bounded within `[decl.span.start, decl.span.end]`
-        // (the `<`→first-param gap, the delimited-list scan up to `end - 1`, and each
-        // per-param constraint/default gap), so with no comment inside the `<…>` all
-        // are provably false. Skips them on the common comment-free `<T, U>`.
-        if !self.has_comments_to_emit_between(decl.span.start, decl.span.end) {
+        // Zero-comment window gate: one binary search over the whole `<…>` span. The
+        // shared clauses and the per-param one below are all bounded within
+        // `[decl.span.start, decl.span.end]`, so with nothing on the page all are
+        // provably false. Skips them on the common comment-free `<T, U>`.
+        if !self.has_comments_on_page_between(decl.span.start, decl.span.end) {
             return false;
         }
-        // A line comment trailing the opening `<` (`<// c\n T>`) forces expansion;
-        // `has_line_comments_in_delimited_list` only covers between/after params,
-        // not the `<`→first-param gap, so check it explicitly. Without this the
-        // inline path runs and emits block-only comments, dropping the line comment
-        // entirely (content loss). Own-line block comments in this gap are already
-        // handled by `has_own_line_block_comments_in_bracket_list`.
-        self.has_line_comments_between(decl.span.start + 1, first.span.start)
-            || self.has_line_comments_in_delimited_list(decl.params, |p| p.span, decl.span.end - 1)
-            || self.has_own_line_block_comments_in_bracket_list(
-                decl.span,
-                decl.params,
-                |p| p.span,
-                OwnLineBasis::ItemBoundary,
-            )
+        self.has_expanding_comments_in_bracket_list(decl.span, decl.params, |p| p.span)
             || decl
                 .params
                 .iter()
                 // A line comment or multiline block in a param's constraint/default gap
                 // (`<T extends⏎// c⏎U>`) forces the whole `<…>` to expand, so the hang
                 // renders inside the broken list; a single-line block comment collapses
-                // inline and keeps `<…>` collapsed.
+                // inline and keeps `<…>` collapsed. The type parameter's own question,
+                // which the shared list clauses don't ask.
                 .any(|p| self.comments_force_own_line_between(p.span.start, p.span.end))
     }
 

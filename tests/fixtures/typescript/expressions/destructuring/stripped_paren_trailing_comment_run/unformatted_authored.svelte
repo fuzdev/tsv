@@ -24,4 +24,9 @@ a3
 	// an own-line block comment with nothing before it on its line leads the next element
 	[a5
 /* c */, b5] = x;
+
+	// the same shell at the LAST element, where the bracket closes the run instead of a comma
+	[a6, (
+b6
+)/* c */] = x;
 </script>
