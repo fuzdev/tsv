@@ -3,6 +3,7 @@
 use super::Printer;
 use super::helpers::{is_huggable_type, is_simple_type_arg, unwrap_parenthesized};
 use crate::ast::internal::{self, TSType};
+use crate::printer::OwnLineBasis;
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
 
@@ -148,17 +149,26 @@ impl<'a> Printer<'a> {
         // its own deletion, and the seam's partition claims the comment for the previous
         // argument's trailing run exactly as it does for the bare form.
         //
-        // Own-line-ness is measured after the strip too, and correctly: a block glued to
-        // the `(` shares the `<` line, which is the `prev_boundary` the bracket-list
-        // helper compares against, so `Foo<(/* c */⏎T)>` keeps collapsing inline — where
-        // prettier also collapses it. Only a block the author gave its own line expands.
+        // Own-line-ness is measured on the SOURCE for the same reason the strip happens at
+        // all: the `(` occupies the comment's line whether or not the item span still
+        // covers it, so a block glued to the shell (`Foo<A,⏎(/* c */⏎B)>`) collapses inline
+        // — matching prettier, and matching the tuple's identical spelling. Asking the item
+        // BOUNDARY instead reads that block as own-line and expands the list, a third fixed
+        // point neither the bare authoring nor prettier produces;
+        // `type_position_parens_glued_block_comment_prettier_divergence` is that claim. Only
+        // a block the author gave a line of its own expands. See [`OwnLineBasis`].
         let arg_span = |ty: &TSType<'_>| self.leading_paren_unwrapped(ty).span();
         let has_leading_line_comment = args.params.first().is_some_and(|first| {
             self.has_line_comments_between(args.span.start + 1, arg_span(first).start)
         });
         has_leading_line_comment
             || self.has_line_comments_in_delimited_list(args.params, arg_span, args.span.end - 1)
-            || self.has_own_line_block_comments_in_bracket_list(args.span, args.params, arg_span)
+            || self.has_own_line_block_comments_in_bracket_list(
+                args.span,
+                args.params,
+                arg_span,
+                OwnLineBasis::Source,
+            )
     }
 
     /// Build doc for type arguments: `<T, U>`.

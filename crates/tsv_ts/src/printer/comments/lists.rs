@@ -1259,8 +1259,21 @@ impl<'a> Printer<'a> {
                 // comma still counts — and one after a comma pushed onto its own line
                 // does not.
                 BlankRule::NextLineEmpty => self.is_next_line_empty(elem_end, next_lead),
-                // Measured from past the comma, prettier's array/tuple rule.
-                BlankRule::AfterComma => self.has_blank_line_between(after_comma_end, next_lead),
+                // Measured from past the comma, prettier's array/tuple rule. **Strict**:
+                // the next element's span can begin inside a paren shell the printer
+                // strips (a tuple element's `[a,⏎(⏎/* c */⏎b)]`), and the newline before
+                // that `(` plus the one after it read as an author blank line to the
+                // table lookup — emitting a blank the reparse then reads back as real.
+                //
+                // Strict removes the FABRICATED blank, not every blank the shell touches:
+                // a blank the author actually typed inside the shell (`[a,⏎(⏎⏎/* c */⏎b)]`)
+                // still has a whitespace-only line to find, so it survives the strip and
+                // leads the element, where prettier drops it. Defensible — the author did
+                // write the blank, and the result is stable — but it is a divergence, not
+                // an equivalence.
+                BlankRule::AfterComma => {
+                    self.has_blank_line_between_strict(after_comma_end, next_lead)
+                }
                 // Bailed out above; spelled here so the match stays total.
                 BlankRule::None => false,
             };
