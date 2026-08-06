@@ -837,19 +837,25 @@ pub(crate) fn build_args_joined_with_comments(
         parts.push(item.build(printer, paren_open, arguments, i));
 
         if i < arguments.len() - 1 {
-            let arg_end = arg.span().end;
             let next_arg_start = arguments[i + 1].span().start;
 
-            if printer.has_comments_to_emit_between(arg_end, next_arg_start) {
-                let pc = printer.open_inter_arg_gap(&mut parts, arg_end, next_arg_start);
+            if printer.inter_arg_gap_has_comments(arg, next_arg_start) {
+                let gap = printer.open_inter_arg_gap(&mut parts, arg, next_arg_start);
+                // The gap's `forces_expansion` obligation is the callers': the soft-join
+                // callers are unreachable when any spread interior forces expansion —
+                // their earlier trailing-comment arms, keyed on
+                // `any_spread_paren_comment_forces_expansion`, return first — and every
+                // other join is hardline.
+                debug_assert!(!gap.forces_expansion || use_hardline);
                 // A line comment runs to EOL → hard-break; otherwise honor the caller's style.
-                parts.push(if pc.has_trailing_line() || use_hardline {
+                parts.push(if gap.comments.has_trailing_line() || use_hardline {
                     d.hardline()
                 } else {
                     d.line()
                 });
                 // hugging after-comma + own-line comments lead the next arg (`C`).
-                pc.emit_leading_comments_inline_aware(&mut parts, printer);
+                gap.comments
+                    .emit_leading_comments_inline_aware(&mut parts, printer);
             } else {
                 parts.push(no_comment_sep);
             }
@@ -1145,17 +1151,19 @@ pub(super) fn build_call_args_with_blank_lines(
             let arg_end = arg.span().end;
             let next_start = args[i + 1].span().start;
 
-            if printer.has_comments_to_emit_between(arg_end, next_start) {
-                let pc = printer.open_inter_arg_gap(&mut arg_parts, arg_end, next_start);
+            if printer.inter_arg_gap_has_comments(arg, next_start) {
+                let gap = printer.open_inter_arg_gap(&mut arg_parts, arg, next_start);
 
-                let next_has_blank =
-                    pc.has_blank_line_in_gap(printer.source, printer.layout_line_breaks);
+                let next_has_blank = gap
+                    .comments
+                    .has_blank_line_in_gap(printer.source, printer.layout_line_breaks);
                 if next_has_blank {
                     arg_parts.push(d.literalline());
                 }
                 arg_parts.push(d.hardline());
                 // hugging after-comma + own-line comments lead the next arg (`C`).
-                pc.emit_leading_comments_inline_aware(&mut arg_parts, printer);
+                gap.comments
+                    .emit_leading_comments_inline_aware(&mut arg_parts, printer);
                 // The comment gap's blank is emitted here; the next iteration's top guard
                 // (a comment exists) skips the reuse anyway, so leave it false.
                 prev_gap_has_blank = false;

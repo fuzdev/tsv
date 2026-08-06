@@ -20,30 +20,80 @@ impl<'a> Printer<'a> {
     /// (`A`), then emit the before-comma blocks, the comma, the stranded after-comma
     /// blocks, and the same-line line comment.
     ///
+    /// Like [`emit_last_arg_trailing_comments`] at the other end of the list, the region
+    /// after `prev_arg` has **two** sources and they must partition it exactly once
+    /// (`docs/comments.md` §The element-comma seam, §A stripped-paren interior is a
+    /// partition too): the ordinary gap `[prev_arg.end, next_arg_start)` above, and the
+    /// parent's share of `prev_arg`'s own stripped-paren interior — the own-line blocks a
+    /// spread's doc deliberately leaves behind ([`Printer::push_spread_own_line_block_comments`]),
+    /// emitted past the comma because the comma is what gives an outside block a home on
+    /// the argument's line. That share lies BEFORE `prev_arg`'s end, so a caller guarding
+    /// this call on a plain gap scan must ask [`Printer::inter_arg_gap_has_comments`]
+    /// instead or the interior is DROPPED.
+    ///
     /// Returns the routed [`PartitionedComments`] so the caller supplies the rest of the
-    /// gap — its own separator policy (soft vs. hard line, blank-line preservation, any
-    /// force-expansion feedback), then the next arg's leading comments via
-    /// [`PartitionedComments::emit_leading_comments_inline_aware`]. Every per-argument
-    /// loop (`call`, `new`, member-chain, and the wrapping helpers) shares this head so
-    /// the route-then-emit ordering — and the respect-the-newline rule it encodes —
-    /// lives in one place; only the separator, which genuinely differs per layout, stays
-    /// at the call site.
+    /// gap — its own separator policy (soft vs. hard line, blank-line preservation), then
+    /// the next arg's leading comments via
+    /// [`PartitionedComments::emit_leading_comments_inline_aware`] — alongside the
+    /// force-expansion feedback the interior obliges. Every per-argument loop (`call`,
+    /// `new`, member-chain, and the wrapping helpers) shares this head so the
+    /// route-then-emit ordering — and the respect-the-newline rule it encodes — lives in
+    /// one place; only the separator, which genuinely differs per layout, stays at the
+    /// call site.
     pub(super) fn open_inter_arg_gap(
         &self,
         parts: &mut DocBuf,
-        arg_end: u32,
+        prev_arg: &internal::Expression<'_>,
         next_arg_start: u32,
-    ) -> PartitionedComments<'a> {
+    ) -> InterArgGap<'a> {
         let mut pc = PartitionedComments::new(
             self.comments,
             self.comment_line_breaks,
-            arg_end,
+            prev_arg.span().end,
             next_arg_start,
         );
         pc.route_after_comma_hugging_to_leading(self);
+        // The argument's own doc may already end in a deferred `//` (a spread whose
+        // stripped parens held one); a second one may not join that line.
+        let prev_defers_line = self.defers_trailing_line_comment(prev_arg);
+        pc.demote_trailing_line_after_deferred(prev_defers_line);
         pc.emit_trailing_comments_around_comma(parts, self);
-        pc
+        let own_line_interior = self.push_spread_own_line_block_comments(parts, prev_arg);
+        InterArgGap {
+            // An own-line interior block is a sibling line, and an interior `//` the
+            // spread defers must flush INSIDE the list — on a collapsed one the buffer
+            // drains past the `)` and the `;`, re-binding the comment to the statement.
+            forces_expansion: own_line_interior || prev_defers_line,
+            comments: pc,
+        }
     }
+
+    /// Whether the region between `prev_arg` and the next argument holds anything for
+    /// [`Self::open_inter_arg_gap`] to emit.
+    ///
+    /// The ordinary gap `[prev_arg.end, next_arg_start)` is only half of it: the parent's
+    /// share of a spread's stripped-paren interior lies *before* `prev_arg`'s end, where a
+    /// plain gap scan cannot see it. A guard spelled as that scan alone routes the whole
+    /// gap to a comment-free arm and drops the interior — the [`Printer::open_inter_arg_gap`]
+    /// counterpart of the entry-gate hole [`any_comment_forces_expansion`] closes.
+    pub(super) fn inter_arg_gap_has_comments(
+        &self,
+        prev_arg: &internal::Expression<'_>,
+        next_arg_start: u32,
+    ) -> bool {
+        self.has_comments_to_emit_between(prev_arg.span().end, next_arg_start)
+            || self.spread_paren_comment_forces_expansion(prev_arg)
+    }
+}
+
+/// What [`Printer::open_inter_arg_gap`] emitted, and what it obliges of the caller.
+pub(super) struct InterArgGap<'a> {
+    /// The routed gap, for the caller's separator policy and the next argument's leading
+    /// comments.
+    pub comments: PartitionedComments<'a>,
+    /// Whether the gap's content cannot survive a collapsed argument list, so the caller
+    /// must force its layout open. Always already true for the hard-broken layouts.
+    pub forces_expansion: bool,
 }
 
 /// Emit an empty argument list into `parts`: the comments in the gap before the
@@ -643,7 +693,7 @@ pub(crate) fn emit_last_arg_trailing_comments(
         arg_end,
         paren_close,
     );
-    pc.demote_trailing_line_after_deferred(printer, last_arg);
+    pc.demote_trailing_line_after_deferred(printer.defers_trailing_line_comment(last_arg));
     pc.emit_last_arg_comments(parts, printer);
 }
 
@@ -781,9 +831,11 @@ impl<'a> PartitionedComments<'a> {
         !self.trailing_line.is_empty()
     }
 
-    /// Reclassify this gap's same-line LINE comments as own-line when `prev` — the node
-    /// the gap opens after — already ends in a DEFERRED line comment
-    /// ([`Printer::defers_trailing_line_comment`]).
+    /// Reclassify this gap's same-line LINE comments as own-line when the node the gap
+    /// opens after already ends in a DEFERRED line comment — `prev_defers_line`, the
+    /// caller's answer to [`Printer::defers_trailing_line_comment`] (asked there because
+    /// every caller also feeds it to its own force-expansion signal; same shape as the
+    /// twin `TrailingComments::demote_line_after_deferred`).
     ///
     /// Its output line already terminates in a `//`, so nothing more may join it:
     /// deferring a second line comment onto the same line welds the two into ONE comment,
@@ -796,12 +848,8 @@ impl<'a> PartitionedComments<'a> {
     /// consumers (the shared [`emit_last_arg_trailing_comments`] and
     /// `call_formatting`'s own loop, which needs its `force_expansion` feedback) get the
     /// rule from one place.
-    pub fn demote_trailing_line_after_deferred(
-        &mut self,
-        printer: &Printer<'_>,
-        prev: &internal::Expression<'_>,
-    ) {
-        if self.trailing_line.is_empty() || !printer.defers_trailing_line_comment(prev) {
+    pub fn demote_trailing_line_after_deferred(&mut self, prev_defers_line: bool) {
+        if self.trailing_line.is_empty() || !prev_defers_line {
             return;
         }
         for comment in self.trailing_line.drain(..).rev() {
