@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 375,
+	"end": 470,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -121,24 +121,56 @@
 					"column": 10
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A same-line block comment does NOT force expansion",
+			"start": 367,
+			"end": 420,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 443,
+			"end": 450,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 22
+				},
+				"end": {
+					"line": 25,
+					"column": 29
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 374,
+		"end": 469,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 365,
+			"end": 460,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 23,
+					"line": 26,
 					"column": 9
 				}
 			},
@@ -521,6 +553,131 @@
 							"value": " Multiple own-line block comments between arguments",
 							"start": 251,
 							"end": 304
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 422,
+					"end": 459,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 38
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 427,
+						"end": 428,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 6
+							},
+							"end": {
+								"line": 25,
+								"column": 7
+							}
+						},
+						"name": "D"
+					},
+					"typeAnnotation": {
+						"type": "TSTypeReference",
+						"start": 431,
+						"end": 458,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 10
+							},
+							"end": {
+								"line": 25,
+								"column": 37
+							}
+						},
+						"typeName": {
+							"type": "Identifier",
+							"start": 431,
+							"end": 434,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 10
+								},
+								"end": {
+									"line": 25,
+									"column": 13
+								}
+							},
+							"name": "Map"
+						},
+						"typeArguments": {
+							"type": "TSTypeParameterInstantiation",
+							"start": 434,
+							"end": 458,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 13
+								},
+								"end": {
+									"line": 25,
+									"column": 37
+								}
+							},
+							"params": [
+								{
+									"type": "TSStringKeyword",
+									"start": 435,
+									"end": 441,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 14
+										},
+										"end": {
+											"line": 25,
+											"column": 20
+										}
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 443,
+											"end": 450
+										}
+									]
+								},
+								{
+									"type": "TSNumberKeyword",
+									"start": 451,
+									"end": 457,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 30
+										},
+										"end": {
+											"line": 25,
+											"column": 36
+										}
+									}
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A same-line block comment does NOT force expansion",
+							"start": 367,
+							"end": 420
 						}
 					]
 				}

@@ -1,0 +1,1069 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 542,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A block comment after the comma leads the next element - it stays there",
+			"start": 10,
+			"end": 84,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 97,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 12
+				},
+				"end": {
+					"line": 3,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An object pattern takes the same rule",
+			"start": 118,
+			"end": 158,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 172,
+			"end": 179,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 13
+				},
+				"end": {
+					"line": 6,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Assignment-target position takes it too",
+			"start": 194,
+			"end": 236,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 43
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 243,
+			"end": 250,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 6
+				},
+				"end": {
+					"line": 9,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Contrast - a comment before the comma trails the previous element",
+			"start": 264,
+			"end": 332,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 344,
+			"end": 351,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 11
+				},
+				"end": {
+					"line": 12,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 376,
+			"end": 383,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 12
+				},
+				"end": {
+					"line": 13,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A line comment expands the pattern - the glued comment still leads its element",
+			"start": 399,
+			"end": 480,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 498,
+			"end": 506,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 2
+				},
+				"end": {
+					"line": 18,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 511,
+			"end": 516,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 15
+				},
+				"end": {
+					"line": 18,
+					"column": 20
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 541,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 532,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 86,
+					"end": 115,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 92,
+							"end": 114,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 92,
+								"end": 108,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 23
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 93,
+										"end": 95,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 8
+											},
+											"end": {
+												"line": 3,
+												"column": 10
+											}
+										},
+										"name": "a1",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 97,
+												"end": 104
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 105,
+										"end": 107,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 20
+											},
+											"end": {
+												"line": 3,
+												"column": 22
+											}
+										},
+										"name": "b1"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 111,
+								"end": 114,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 26
+									},
+									"end": {
+										"line": 3,
+										"column": 29
+									}
+								},
+								"name": "arr"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A block comment after the comma leads the next element - it stays there",
+							"start": 10,
+							"end": 84
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 160,
+					"end": 191,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 166,
+							"end": 190,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 166,
+								"end": 184,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 25
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 168,
+										"end": 170,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 9
+											},
+											"end": {
+												"line": 6,
+												"column": 11
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 168,
+											"end": 170,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 9
+												},
+												"end": {
+													"line": 6,
+													"column": 11
+												}
+											},
+											"name": "a2"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 168,
+											"end": 170,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 9
+												},
+												"end": {
+													"line": 6,
+													"column": 11
+												}
+											},
+											"name": "a2"
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 172,
+												"end": 179
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 180,
+										"end": 182,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 21
+											},
+											"end": {
+												"line": 6,
+												"column": 23
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 180,
+											"end": 182,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 21
+												},
+												"end": {
+													"line": 6,
+													"column": 23
+												}
+											},
+											"name": "b2"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 180,
+											"end": 182,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 21
+												},
+												"end": {
+													"line": 6,
+													"column": 23
+												}
+											},
+											"name": "b2"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 187,
+								"end": 190,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 28
+									},
+									"end": {
+										"line": 6,
+										"column": 31
+									}
+								},
+								"name": "obj"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An object pattern takes the same rule",
+							"start": 118,
+							"end": 158
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 238,
+					"end": 261,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 24
+						}
+					},
+					"expression": {
+						"type": "AssignmentExpression",
+						"start": 238,
+						"end": 260,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 23
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "ArrayPattern",
+							"start": 238,
+							"end": 254,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 1
+								},
+								"end": {
+									"line": 9,
+									"column": 17
+								}
+							},
+							"elements": [
+								{
+									"type": "Identifier",
+									"start": 239,
+									"end": 241,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 2
+										},
+										"end": {
+											"line": 9,
+											"column": 4
+										}
+									},
+									"name": "a3",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 243,
+											"end": 250
+										}
+									]
+								},
+								{
+									"type": "Identifier",
+									"start": 251,
+									"end": 253,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 14
+										},
+										"end": {
+											"line": 9,
+											"column": 16
+										}
+									},
+									"name": "b3"
+								}
+							]
+						},
+						"right": {
+							"type": "Identifier",
+							"start": 257,
+							"end": 260,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 20
+								},
+								"end": {
+									"line": 9,
+									"column": 23
+								}
+							},
+							"name": "arr"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Assignment-target position takes it too",
+							"start": 194,
+							"end": 236
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 334,
+					"end": 363,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 340,
+							"end": 362,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 12,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 340,
+								"end": 356,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 23
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 341,
+										"end": 343,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 8
+											},
+											"end": {
+												"line": 12,
+												"column": 10
+											}
+										},
+										"name": "a4",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 344,
+												"end": 351
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 353,
+										"end": 355,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 20
+											},
+											"end": {
+												"line": 12,
+												"column": 22
+											}
+										},
+										"name": "b4"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 359,
+								"end": 362,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 26
+									},
+									"end": {
+										"line": 12,
+										"column": 29
+									}
+								},
+								"name": "arr"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Contrast - a comment before the comma trails the previous element",
+							"start": 264,
+							"end": 332
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 365,
+					"end": 396,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 371,
+							"end": 395,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 371,
+								"end": 389,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 25
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 373,
+										"end": 375,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 9
+											},
+											"end": {
+												"line": 13,
+												"column": 11
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 373,
+											"end": 375,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 9
+												},
+												"end": {
+													"line": 13,
+													"column": 11
+												}
+											},
+											"name": "a5"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 373,
+											"end": 375,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 9
+												},
+												"end": {
+													"line": 13,
+													"column": 11
+												}
+											},
+											"name": "a5"
+										},
+										"kind": "init",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 376,
+												"end": 383
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 385,
+										"end": 387,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 21
+											},
+											"end": {
+												"line": 13,
+												"column": 23
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 385,
+											"end": 387,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 21
+												},
+												"end": {
+													"line": 13,
+													"column": 23
+												}
+											},
+											"name": "b5"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 385,
+											"end": 387,
+											"loc": {
+												"start": {
+													"line": 13,
+													"column": 21
+												},
+												"end": {
+													"line": 13,
+													"column": 23
+												}
+											},
+											"name": "b5"
+										},
+										"kind": "init"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 392,
+								"end": 395,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 28
+									},
+									"end": {
+										"line": 13,
+										"column": 31
+									}
+								},
+								"name": "obj"
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 482,
+					"end": 531,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 20,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 488,
+							"end": 530,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 20,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 488,
+								"end": 524,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 20,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 492,
+										"end": 494,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 17,
+												"column": 4
+											}
+										},
+										"name": "a6"
+									},
+									{
+										"type": "Identifier",
+										"start": 507,
+										"end": 509,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 11
+											},
+											"end": {
+												"line": 18,
+												"column": 13
+											}
+										},
+										"name": "b6",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c1 ",
+												"start": 498,
+												"end": 506
+											}
+										],
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " c2",
+												"start": 511,
+												"end": 516
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 519,
+										"end": 521,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 2
+											},
+											"end": {
+												"line": 19,
+												"column": 4
+											}
+										},
+										"name": "c6"
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 527,
+								"end": 530,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 5
+									},
+									"end": {
+										"line": 20,
+										"column": 8
+									}
+								},
+								"name": "arr"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A line comment expands the pattern - the glued comment still leads its element",
+							"start": 399,
+							"end": 480
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

@@ -11,7 +11,7 @@ use super::assignment::RhsCommentInfo;
 use crate::ast::internal::{self, ArrowFunctionBody, Expression, ObjectPatternProperty};
 use crate::printer::layout::hang_after_operator;
 use crate::printer::{
-    CommentVec, OwnLineBasis, ParenContext, PatternContext, Printer, object_pattern_should_expand,
+    CommentVec, ParenContext, PatternContext, Printer, object_pattern_should_expand,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
@@ -584,7 +584,6 @@ impl<'a> Printer<'a> {
             span,
             obj.properties,
             ObjectPatternProperty::span,
-            OwnLineBasis::ItemBoundary,
         )
     }
 
@@ -880,7 +879,6 @@ impl<'a> Printer<'a> {
                 Span::new(arr.span.start, boundary),
                 &non_null,
                 |elem| elem.span(),
-                OwnLineBasis::ItemBoundary,
             );
             (has_line_comments, has_multiline_block, has_own_line_block)
         } else {

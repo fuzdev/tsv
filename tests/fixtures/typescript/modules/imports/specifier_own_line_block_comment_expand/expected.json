@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 142,
+	"end": 235,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -57,24 +57,56 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A same-line block comment does NOT force expansion",
+			"start": 134,
+			"end": 187,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 201,
+			"end": 208,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 13
+				},
+				"end": {
+					"line": 21,
+					"column": 20
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 141,
+		"end": 234,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 132,
+			"end": 225,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 19,
+					"line": 22,
 					"column": 9
 				}
 			},
@@ -475,6 +507,151 @@
 						"raw": "'./b'"
 					},
 					"attributes": []
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 189,
+					"end": 224,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 36
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportSpecifier",
+							"start": 198,
+							"end": 199,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 10
+								},
+								"end": {
+									"line": 21,
+									"column": 11
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 198,
+								"end": 199,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 10
+									},
+									"end": {
+										"line": 21,
+										"column": 11
+									}
+								},
+								"name": "g"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 198,
+								"end": 199,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 10
+									},
+									"end": {
+										"line": 21,
+										"column": 11
+									}
+								},
+								"name": "g"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 201,
+									"end": 208
+								}
+							]
+						},
+						{
+							"type": "ImportSpecifier",
+							"start": 209,
+							"end": 210,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 21
+								},
+								"end": {
+									"line": 21,
+									"column": 22
+								}
+							},
+							"imported": {
+								"type": "Identifier",
+								"start": 209,
+								"end": 210,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 21
+									},
+									"end": {
+										"line": 21,
+										"column": 22
+									}
+								},
+								"name": "h"
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 209,
+								"end": 210,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 21
+									},
+									"end": {
+										"line": 21,
+										"column": 22
+									}
+								},
+								"name": "h"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 218,
+						"end": 223,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 30
+							},
+							"end": {
+								"line": 21,
+								"column": 35
+							}
+						},
+						"value": "./c",
+						"raw": "'./c'"
+					},
+					"attributes": [],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A same-line block comment does NOT force expansion",
+							"start": 134,
+							"end": 187
+						}
+					]
 				}
 			],
 			"sourceType": "module"

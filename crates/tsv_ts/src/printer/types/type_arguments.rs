@@ -3,7 +3,6 @@
 use super::Printer;
 use super::helpers::{is_huggable_type, is_simple_type_arg, unwrap_parenthesized};
 use crate::ast::internal::{self, TSType};
-use crate::printer::OwnLineBasis;
 use smallvec::smallvec;
 use tsv_lang::doc::arena::DocId;
 
@@ -156,19 +155,9 @@ impl<'a> Printer<'a> {
         // BOUNDARY instead reads that block as own-line and expands the list, a third fixed
         // point neither the bare authoring nor prettier produces;
         // `type_position_parens_glued_block_comment_prettier_divergence` is that claim. Only
-        // a block the author gave a line of its own expands. See [`OwnLineBasis`].
+        // a block the author gave a line of its own expands.
         let arg_span = |ty: &TSType<'_>| self.leading_paren_unwrapped(ty).span();
-        let has_leading_line_comment = args.params.first().is_some_and(|first| {
-            self.has_line_comments_between(args.span.start + 1, arg_span(first).start)
-        });
-        has_leading_line_comment
-            || self.has_line_comments_in_delimited_list(args.params, arg_span, args.span.end - 1)
-            || self.has_own_line_block_comments_in_bracket_list(
-                args.span,
-                args.params,
-                arg_span,
-                OwnLineBasis::Source,
-            )
+        self.has_expanding_comments_in_bracket_list(args.span, args.params, arg_span)
     }
 
     /// Build doc for type arguments: `<T, U>`.

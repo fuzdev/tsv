@@ -22,5 +22,6 @@
 	>;
 
 	// A same-line block comment does NOT force expansion
-	type D = Map<string, /* c */ number>;
+	type D = Map<string,
+/* c */number>;
 </script>
