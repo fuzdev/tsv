@@ -9,7 +9,7 @@
 use crate::ast::internal::{self, Expression, LiteralValue};
 use crate::printer::comments::block_is_before_comma;
 use crate::printer::{
-    CommentVec, Printer, container_may_have_multiline_content, has_multiline_content,
+    CommentVec, OwnLineBasis, Printer, container_may_have_multiline_content, has_multiline_content,
 };
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::doc::DocBuf;
@@ -435,7 +435,12 @@ impl<'a> Printer<'a> {
     /// filtering out holes (elisions) from the element list.
     fn has_own_line_block_comments_in_array(&self, arr: &internal::ArrayExpression<'_>) -> bool {
         let non_null: SmallVec<[_; 8]> = arr.elements.iter().flatten().collect();
-        self.has_own_line_block_comments_in_bracket_list(arr.span, &non_null, |e| e.span())
+        self.has_own_line_block_comments_in_bracket_list(
+            arr.span,
+            &non_null,
+            |e| e.span(),
+            OwnLineBasis::ItemBoundary,
+        )
     }
 
     /// Check if array contains only numeric literals (for fill behavior)

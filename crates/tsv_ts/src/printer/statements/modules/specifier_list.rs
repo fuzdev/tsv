@@ -6,6 +6,7 @@
 use super::header_comments::is_only_whitespace_and_comments;
 use super::{MODULE_KW_LEN, MODULE_TYPE_KW_LEN, Printer};
 use crate::ast::internal;
+use crate::printer::OwnLineBasis;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::find_char_skipping_comments;
@@ -301,7 +302,10 @@ impl<'a> Printer<'a> {
             && (self.has_line_comments_in_delimited_list(specifiers, &get_span, brace_close)
                 || self.has_line_comments_between(brace_start + 1, first_start)
                 || self.has_own_line_block_comments_in_bracket_list(
-                    brace_span, specifiers, &get_span,
+                    brace_span,
+                    specifiers,
+                    &get_span,
+                    OwnLineBasis::ItemBoundary,
                 ));
 
         let braces_doc = if has_expanding_comments {

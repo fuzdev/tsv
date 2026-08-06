@@ -104,6 +104,63 @@ pub(crate) enum ArrowChainContext {
     CallArgOrBinaryish,
 }
 
+/// How [`Printer::has_own_line_block_comments_in_bracket_list`] decides a block comment
+/// leads its line — i.e. whether the author gave it a line of its own, or merely parked it
+/// after something.
+///
+/// The two readings agree unless text the item spans don't cover precedes the comment on
+/// its line, and there are **two** such kinds — not one:
+///
+/// - a **stripped delimiter**, a paren shell the printer erases (`[a,⏎(/* c */⏎b)]`, and in
+///   expression position every grouping paren, which is never a node at all);
+/// - the list's own **comma**, which the author can push onto its own line
+///   (`[a⏎, /* c */⏎b]`) — re-emitted, never stripped, and still outside every item span.
+///
+/// Both make [`Self::ItemBoundary`] read the comment as own-line and expand the list, where
+/// prettier collapses it inline (verified across the tuple, both type-argument positions,
+/// type parameters, specifier lists, object patterns and the array literal). So the two
+/// bases are nowhere *provably* equivalent — a site on `ItemBoundary` is a site that has not
+/// been moved yet, not a site where the question doesn't arise.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub(crate) enum OwnLineBasis {
+    /// The comment does not share a line with the preceding ITEM (or the opening bracket).
+    /// Blind to both kinds of uncovered text above, so a comment glued to either reads as
+    /// own-line.
+    ///
+    /// ⚠️ For the **array literal** that blindness currently cancels a second one and must
+    /// not be tightened alone: the element→`,` seam claims a comment on the element's last
+    /// line, so a comment glued to a stripped `)` the author put on its own line
+    /// (`[(⏎a⏎)/* c */⏎, b]`) is claimed by neither side of the gap — reading it as own-line
+    /// is what routes the list to the comment-aware builder that prints it at all. Measured,
+    /// not argued: on [`Self::Source`] that spelling loses the comment outright. Tighten the
+    /// seam first, then the basis.
+    /// TODO: partition that gap exhaustively (see `docs/comments.md` §The element-comma
+    /// seam) and move the array families onto [`Self::Source`] too.
+    ///
+    /// ⚠️ Note where the comma sits in that example — on a line *below* the comment. Pull it
+    /// up onto the comment's line (`[(⏎a⏎)/* c */, b]`, and equally the shell-free
+    /// `[a⏎/* c */, b]`) and the comment is **already dropped today**, under both bases: the
+    /// list doesn't expand (the comment shares a line with the following element) and the
+    /// seam claims it for neither side. A pre-existing hole in the same partition, and the
+    /// second reason this basis can't move before the seam does.
+    /// TODO: that drop is content loss and wants its own fixture — no fixture or corpus file
+    /// carries the authoring today, which is why every gate is green through it.
+    ///
+    /// The remaining holders — the type-parameter DECLARATION list and the import/export
+    /// specifier list — have no seam to tighten and no stripped delimiter reachable in
+    /// their item spans (neither a type parameter nor a specifier can be parenthesized), so
+    /// only the comma case is live for them: `<T⏎, /* c */⏎U>` expands where prettier
+    /// collapses. They move on their own evidence, not on the array families'.
+    /// TODO: pin that authoring per family and move both onto [`Self::Source`].
+    ItemBoundary,
+    /// Nothing but whitespace precedes the comment on its line
+    /// ([`Printer::is_own_line_comment`]) — the reading a caller **must** use once it strips
+    /// a delimiter out of its item spans, since the erased text still occupied the line the
+    /// author wrote the comment on. Held by the tuple and by both type-argument positions,
+    /// the three that unwrap a paren shell to build their item spans.
+    Source,
+}
+
 /// Printer state for building output
 pub struct Printer<'a> {
     /// Output buffer
@@ -1015,16 +1072,25 @@ impl<'a> Printer<'a> {
         between || trailing
     }
 
-    /// Check if a bracket-delimited list contains own-line single-line block comments.
+    /// Check if a delimited list contains own-line single-line block comments.
     ///
-    /// Generic version for tuples, array patterns, and other `[...]`-delimited lists.
-    /// A block comment is "own-line" when it's not on the same line as either the
-    /// preceding element (or opening bracket) or the following element (or closing bracket).
+    /// A block comment is "own-line" when it leads its line — the basis the caller names,
+    /// see [`OwnLineBasis`] — and doesn't share a line with the following element (or
+    /// closing delimiter).
+    ///
+    /// `span` is the whole construct's span and only its ENDS are read (`span.start` as the
+    /// opening delimiter, `span.end - 1` as the closing one), so the delimiter pair is the
+    /// caller's business, not this function's: tuples and array patterns pass `[…]`,
+    /// type-parameter/argument lists `<…>`, and the object pattern and specifier list
+    /// `{…}`. Every such list is one delimiter byte at each end, which is the only shape
+    /// assumption here — a caller whose node span runs PAST the closer (an object pattern's
+    /// `: T` annotation) trims it back to the closer before calling.
     pub(crate) fn has_own_line_block_comments_in_bracket_list<T, F>(
         &self,
         span: Span,
         items: &[T],
         get_span: F,
+        basis: OwnLineBasis,
     ) -> bool
     where
         F: Fn(&T) -> Span,
@@ -1047,16 +1113,21 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
-            // Find preceding element end (or opening bracket)
-            let prev_boundary = items
-                .iter()
-                .map(|e| get_span(e).end)
-                .take_while(|&end| end <= comment.span.start)
-                .last()
-                .unwrap_or(open_bracket);
-
-            // Skip if on same line as preceding element (trailing inline comment)
-            if self.is_same_line(prev_boundary, comment.span.start) {
+            // Skip a trailing inline comment, on the basis the caller named.
+            let leads_its_line = match basis {
+                OwnLineBasis::ItemBoundary => {
+                    // Preceding item end (or the opening bracket).
+                    let prev_boundary = items
+                        .iter()
+                        .map(|e| get_span(e).end)
+                        .take_while(|&end| end <= comment.span.start)
+                        .last()
+                        .unwrap_or(open_bracket);
+                    !self.is_same_line(prev_boundary, comment.span.start)
+                }
+                OwnLineBasis::Source => self.is_own_line_comment(comment),
+            };
+            if !leads_its_line {
                 continue;
             }
 

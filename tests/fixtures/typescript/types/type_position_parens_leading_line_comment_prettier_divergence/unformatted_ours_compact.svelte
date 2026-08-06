@@ -4,7 +4,8 @@
 	a)>=T;
 
 	// tuple element
-	type B=[(// leading
+	type B=[
+	(// leading
 	a),b];
 
 	// generic type argument
