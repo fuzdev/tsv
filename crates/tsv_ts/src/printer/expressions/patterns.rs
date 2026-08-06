@@ -435,11 +435,27 @@ impl<'a> Printer<'a> {
     /// this, expanded array patterns dropped these comments entirely (content
     /// loss) and expanded object patterns glued them onto the last property's
     /// line.
-    fn build_pattern_trailing_dangling_comments(&self, prev_end: u32, boundary: u32) -> DocId {
+    ///
+    /// ⚠️ `past_elision` says a trailing **hole** sits between `prev_end` and this run, and
+    /// suppresses the blank line ahead of the FIRST comment. An elision's own line break is
+    /// structure, not authorship — the rule `Printer::has_blank_line_after_slot` states for
+    /// the array literal (prettier's `node &&`) — and a raw scan from the last binding's end
+    /// counts it, so `const [a,⏎,⏎/* c */] = arr` grew a blank the first pass never wrote:
+    /// not a fixed point. Blanks *between* two dangling comments are unaffected; only the
+    /// one measured across the hole is.
+    fn build_pattern_trailing_dangling_comments(
+        &self,
+        prev_end: u32,
+        boundary: u32,
+        past_elision: bool,
+    ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
         let mut last_pos = prev_end;
+        let mut first = true;
         for comment in comments_to_emit_in_range(self.comments, prev_end, boundary) {
+            let blanks_measurable = !(first && past_elision);
+            first = false;
             if self.is_same_line(last_pos, comment.span.start) {
                 // Same source line as the preceding content, which here means the
                 // preceding *comment*: the per-element loop's run already claimed
@@ -451,7 +467,7 @@ impl<'a> Printer<'a> {
                 parts.push(d.text(" "));
                 parts.push(self.build_comment_doc(comment));
             } else {
-                if self.has_blank_line_between(last_pos, comment.span.start) {
+                if blanks_measurable && self.has_blank_line_between(last_pos, comment.span.start) {
                     parts.push(d.literalline());
                 }
                 parts.push(d.hardline());
@@ -684,7 +700,9 @@ impl<'a> Printer<'a> {
 
         // Check for dangling comments after the last property (before `}`)
         if has_comments {
-            prop_parts.push(self.build_pattern_trailing_dangling_comments(prev_end, boundary));
+            // An object pattern has no elisions, so the blank scan is never across one.
+            prop_parts
+                .push(self.build_pattern_trailing_dangling_comments(prev_end, boundary, false));
         }
 
         // Structure: { + brace-line prefix + indent(hardline + props) + hardline + } + type_annotation
@@ -945,10 +963,34 @@ impl<'a> Printer<'a> {
 
                 prev_end = trailing.end_pos;
             } else {
-                // Hole in array pattern
+                // A hole's comma is syntactically significant and is ALWAYS emitted,
+                // the last slot included: a trailing elision is a destructuring slot,
+                // and dropping its comma turns `[a, ,]` into `[a, ]` — one binding
+                // fewer, so the iterator advances one step fewer. The expanded twin
+                // already emits it unconditionally; only this one asked `is_last`, and
+                // the result was not even a fixed point (each pass ate another hole).
+                parts.push(d.text(","));
                 if !is_last {
-                    parts.push(d.text(","));
                     parts.push(d.line());
+                }
+            }
+        }
+
+        // The trailing-elision region: a comment past the last binding has no next element
+        // to lead, so it slides to the pattern's own trailing position — the array
+        // literal's rule (`build_array_group_doc`'s `has_trailing_elision` arm), and this
+        // is its only emitter, since no hole slot prints an element. `prev_end` is the last
+        // binding's claim end (just inside `[` when there is no binding at all), so the two
+        // sides partition the gap. A line comment routes to the expanded path, so only
+        // blocks reach here.
+        if has_comments && arr.elements.last().is_some_and(Option::is_none) {
+            let boundary = arr
+                .type_annotation
+                .as_ref()
+                .map_or(arr.span.end, |t| t.span.start);
+            for comment in comments_to_emit_in_range(self.comments, prev_end, boundary) {
+                if comment.is_block {
+                    parts.push(self.build_comment_doc(comment));
                 }
             }
         }
@@ -1070,7 +1112,8 @@ impl<'a> Printer<'a> {
             .type_annotation
             .as_ref()
             .map_or(arr.span.end, |t| t.span.start);
-        parts.push(self.build_pattern_trailing_dangling_comments(prev_end, boundary));
+        let past_elision = arr.elements.last().is_some_and(Option::is_none);
+        parts.push(self.build_pattern_trailing_dangling_comments(prev_end, boundary, past_elision));
 
         // Structure: [ + bracket-line prefix + indent(hardline + elements) + hardline + ] + type_annotation
         let mut result_parts: DocBuf = smallvec![

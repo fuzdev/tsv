@@ -902,8 +902,12 @@ claimed run must stay a **prefix** of the gap, so a same-line block ahead of a d
 comment is claimed too — skipping it drops it, and leaving it to lead the next element
 **reorders** it past the `line_suffix`; and the gate is the **source** reading
 (`is_own_line_comment`), since a stripped `)` and the comma itself sit in the gap outside every
-item span, where a `is_same_line(prev_end, …)` gate is blind to both. Full text:
-[docs/comments.md](docs/comments.md) §The element-comma seam.
+item span, where a `is_same_line(prev_end, …)` gate is blind to both. And an **elision opens no
+gap of its own**: the anchor stays the last REAL element's split however many holes intervene,
+so a comment slides *forward* past their (structural) commas to the element it leads — or, past
+the last one, to the list's own trailing position. Counting commas instead handed the region to
+seams that print nothing, which was a DROP every time; no blank line is measured across a hole
+either. Full text: [docs/comments.md](docs/comments.md) §The element-comma seam.
 
 Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/linter use
 cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — see
