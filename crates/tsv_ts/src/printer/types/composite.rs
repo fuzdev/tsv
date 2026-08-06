@@ -17,14 +17,34 @@ use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer,
 use crate::ast::internal::{
     self, TSArrayType, TSConditionalType, TSMappedType, TSMappedTypeModifier, TSTupleType, TSType,
 };
-use crate::printer::CommentVec;
 use crate::printer::layout::{bracketed_list_body, hang_after_operator};
+use crate::printer::{CommentVec, OwnLineBasis};
 use smallvec::smallvec;
 use tsv_lang::Comment;
 use tsv_lang::INDENT;
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::source_scan::{find_char_skipping_comments, has_newline_after_position};
+
+/// The **effective** span of a tuple element — the node left once the element's redundant
+/// paren shell is stripped ([`unwrap_parenthesized`]), which is the node
+/// [`Printer::build_tuple_type_doc_with_line_comments`] emits.
+///
+/// Shared by that builder and by [`Printer::build_tuple_type_doc`]'s expansion gate so the
+/// two cannot disagree about where an element starts. The width path below that gate
+/// deliberately does NOT use it — see the ⚠️ on `build_tuple_type_doc`.
+///
+/// ⚠️ One shell deep, at the element's own top. A shell **nested inside** the element is
+/// stripped by that inner node's printer instead, so a comment the author wrote in it still
+/// falls inside this span and the tuple's own gaps never see it — an array-type element
+/// (`[a, (⏎/* c */⏎number)[]]`) and a rest element (`[a, ...(⏎/* c */⏎T)]`) both collapse
+/// inline where their bare authoring expands, and prettier expands both.
+/// TODO: reach those by asking each element printer for the span it will emit from, rather
+/// than peeling only the top shell here.
+fn tuple_elem_span(ty: &TSType<'_>) -> Span {
+    unwrap_parenthesized(ty).span()
+}
 
 /// How an array type renders its `[]` suffix — the verdict
 /// [`Printer::array_suffix_layout`] resolves once for both the emitter and the
@@ -1428,6 +1448,14 @@ impl<'a> Printer<'a> {
     /// Build a Doc for a tuple type: `[A, B, C]`
     ///
     /// Uses width-aware breaking: inline if fits, one element per line if not.
+    ///
+    /// ⚠️ Below the expansion gate this builder reads **raw** `TSType::span`s, not
+    /// [`tuple_elem_span`], and the asymmetry with its expanding twin is deliberate:
+    /// here each element's doc is `build_type_doc`, so a shell that survives to this path
+    /// emits its own interior comments ([`Self::build_parenthesized_type_unwrap_doc`]) and
+    /// the gaps this loop scans must stop at the shell, not inside it. Unwrapping the spans
+    /// here without also unwrapping the docs would double-print every one of those comments
+    /// ([`comments.md`](../../../../docs/comments.md) hazard 3).
     pub(super) fn build_tuple_type_doc(&self, t: &TSTupleType<'_>) -> DocId {
         let d = self.d();
         if t.element_types.is_empty() {
@@ -1458,29 +1486,48 @@ impl<'a> Printer<'a> {
         // Check for comments that force expansion: line comments, multiline block comments,
         // or own-line single-line block comments. Also check for line comments BEFORE the
         // first element (between `[` and first element), e.g., `[// leading\n a, b]`.
-        // TODO: all three clauses ask the raw `TSType::span`, so a comment inside an
-        // element's REDUNDANT paren shell — which is stripped in this position — sits
-        // inside the element span rather than in a gap they scan, and the list never
-        // expands: `[A, (⏎/* c */⏎B)]` collapses to `[A, /* c */ B]` where the bare
-        // `[A,⏎/* c */⏎B]` expands (prettier expands both). Idempotent, so F1 / the
-        // ledger / the census are all blind; only a bare-vs-paren compare shows it.
-        // Same shape and same fix as `type_arguments_force_expansion`
-        // (`types/type_arguments.rs`): thread `leading_paren_unwrapped` through the item
-        // spans here AND through `build_tuple_type_doc_with_line_comments`'s spans and
-        // item docs, so the gate and the emitter agree on where an element starts.
+        //
+        // Every clause asks the **effective** element span (the free `tuple_elem_span`) —
+        // the node left once the element's redundant paren shell is stripped, the
+        // same node the expansion builder emits. A comment the author wrote inside that
+        // shell physically lands in one of the tuple's own gaps (`[`→element,
+        // element→element, element→`]`) and must route the list here like any other
+        // comment there. Asking `TSType::span` left those gaps empty, so the shape fell
+        // through to the width path and the comment rendered from the element's own doc —
+        // reaching a different fixed point than the same comment written without the
+        // parens (`[A, (⏎/* c */⏎B)]` collapsing inline where the bare authoring expands).
+        // Both spellings are idempotent, so only a bare-vs-paren comparison shows the
+        // split — the `unformatted_parens` variants are that claim.
+        //
+        // Own-line-ness is measured on the SOURCE, so a block glued to the shell's `(`
+        // (`[A,⏎(/* c */⏎B)]`) still collapses inline, matching prettier: the `(` occupies
+        // the comment's line whether or not the item span covers it — see
+        // `has_own_line_block_comments_in_bracket_list`.
+        //
+        // The shell peels whatever it carries — [`unwrap_parenthesized`], not
+        // [`Self::leading_paren_unwrapped`], so a **trailing** run comes here too. That
+        // stops short of the type-argument family for a reason: the deferred-run rule
+        // ([`Self::paren_retains_for_trailing_run`]) retains a shell only where the
+        // comment would escape the construct it was written in, and a tuple element's
+        // trailing gap is one the enclosing `[…]` DOES emit — the same argument
+        // `type_member_separator_follows` makes for a `|`/`&` member, since the per-element
+        // break ends the output line right where the shell ends. Routed here, the run
+        // lands in the element→`,` / element→`]` gap and prints from the seam that already
+        // owns it (`[A, (B // c⏎)]` → `[⏎A,⏎B // c⏎]`), inside the brackets either way.
         let has_leading_line_comment = t.element_types.first().is_some_and(|first| {
-            self.has_line_comments_between(t.span.start + 1, first.span().start)
+            self.has_line_comments_between(t.span.start + 1, tuple_elem_span(first).start)
         });
         if has_leading_line_comment
             || self.has_line_comments_in_delimited_list(
                 t.element_types,
-                TSType::span,
+                tuple_elem_span,
                 t.span.end - 1,
             )
             || self.has_own_line_block_comments_in_bracket_list(
                 t.span,
                 t.element_types,
-                TSType::span,
+                tuple_elem_span,
+                OwnLineBasis::Source,
             )
         {
             return self.build_tuple_type_doc_with_line_comments(t);
@@ -1545,6 +1592,11 @@ impl<'a> Printer<'a> {
     }
 
     /// Build tuple type with expanding comments (line comments or own-line block comments)
+    ///
+    /// Spans and docs both come from the free `tuple_elem_span` / [`unwrap_parenthesized`],
+    /// so this builder's gap emitters and the item docs agree on where each element starts —
+    /// see [`Self::build_tuple_type_doc`]'s expansion gate for why a paren shell must not
+    /// reach here.
     fn build_tuple_type_doc_with_line_comments(&self, t: &TSTupleType<'_>) -> DocId {
         let d = self.d();
         // A comment trailing the opening `[` on its own line is kept on the `[`
@@ -1553,14 +1605,16 @@ impl<'a> Printer<'a> {
         // line/own-line comment is itself what forces this path. Tuple types have
         // no elision, so the first element is always present. See
         // conformance_prettier_ts_comments.md §Comment relocation (Tuple type `[`).
-        let first_elem_start = t.element_types[0].span().start;
+        let elem_span_at = |i: usize| tuple_elem_span(&t.element_types[i]);
+        let first_elem_start = elem_span_at(0).start;
         let (bracket_line_prefix, delimiter_pull_pos) =
             self.delimiter_line_comment_prefix(t.span.start, first_elem_start);
 
         let mut inner_parts = DocBuf::new();
         let mut prev_end = t.span.start + 1; // After the opening `[`
 
-        for (i, elem) in t.element_types.iter().enumerate() {
+        for (i, raw_elem) in t.element_types.iter().enumerate() {
+            let elem = unwrap_parenthesized(raw_elem); // pairs with `tuple_elem_span`
             let elem_start = elem.span().start;
             let elem_end = elem.span().end;
             let is_last = i == t.element_types.len() - 1;
@@ -1573,7 +1627,7 @@ impl<'a> Printer<'a> {
             // Rule A: an alone-on-line directive in this element's gap freezes
             // it; the directive itself was just emitted by the leading run above.
             // No must-break question — this layout is already all-hardline.
-            let frozen = self.list_member_frozen(t.span.start + 1, t.element_types, i, false);
+            let frozen = self.list_item_frozen(t.span.start + 1, &elem_span_at, i);
             let elem_doc = if frozen {
                 self.build_frozen_list_member_doc(elem)
             } else {
@@ -1582,7 +1636,7 @@ impl<'a> Printer<'a> {
             inner_parts.push(self.build_list_element_group(leading, elem_doc));
 
             if !is_last {
-                let next_start = t.element_types[i + 1].span().start;
+                let next_start = elem_span_at(i + 1).start;
                 // Tuples preserve an author blank line before a member's own-line
                 // leading comment (prettier does; type-param/arg lists do not).
                 prev_end = self.emit_multiline_comma_with_comments(
