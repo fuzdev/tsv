@@ -128,12 +128,20 @@ pub(crate) enum OwnLineBasis {
     /// own-line.
     ///
     /// The remaining holders are the array PATTERN, the object pattern, the type-parameter
-    /// DECLARATION list and the import/export specifier list. None of them can reach a
-    /// stripped delimiter through its item spans (a type parameter and a specifier cannot
-    /// be parenthesized; a pattern element's own parens are a parse error), so only the
-    /// comma case is live for them: `<T⏎, /* c */⏎U>` expands where prettier collapses.
-    /// Each is 1-pass stable there — a prettier divergence, not a robustness defect — so
-    /// they move on their own evidence, per family, not on the array literal's.
+    /// DECLARATION list and the import/export specifier list. For three of them only the
+    /// comma case is live (a type parameter and a specifier cannot be parenthesized; an
+    /// object pattern's property span ends *past* any shell around its value, so its items
+    /// cover the closer): `<T⏎, /* c */⏎U>` expands where prettier collapses. Each is
+    /// 1-pass stable there — a prettier divergence, not a robustness defect — so they move
+    /// on their own evidence, per family, not on the array literal's.
+    ///
+    /// ⚠️ **The array PATTERN is the exception, and it does reach a stripped delimiter.** A
+    /// pattern element's own parens are a parse error only in a *declaration*; in
+    /// assignment-target position they parse, so `[(⏎a⏎)/* c */] = x` gives an element
+    /// span that ends inside the shell. Its element→`,` seam already asks the source
+    /// reading, which is what the last-element authoring now turns on: the gate's
+    /// dangling arm (a comment before the closer with no following element) reads the
+    /// comment as own-line off the shell and expands where prettier collapses.
     /// TODO: pin that authoring per family and move them onto [`Self::Source`].
     ItemBoundary,
     /// Nothing but whitespace precedes the comment on its line
@@ -977,16 +985,30 @@ impl<'a> Printer<'a> {
         false
     }
 
+    /// Whether anything at all precedes this comment on its physical line — the
+    /// **source** reading of "does this comment trail what came before it", asked of
+    /// BOTH comment kinds and taking no anchor: `has_newline_before_position` walks
+    /// back over spaces/tabs, so a comment following another on the same line
+    /// (`/* a */ /* b */`) follows content, and one the author put on a fresh line does
+    /// not. Unlike the neighbor-anchored `is_same_line(prev, …)` /
+    /// `has_newline_between(prev, …)` checks it is blind to nothing: the text it sees
+    /// includes what no item span covers — a **stripped paren shell**'s `)` and a
+    /// list's own **comma** — which is exactly why the element-comma seam asks it
+    /// ([`Self::collect_trailing_comments`], `docs/comments.md` §The element-comma seam).
+    pub(crate) fn comment_follows_content_on_its_line(&self, comment: &internal::Comment) -> bool {
+        !has_newline_before_position(self.source, comment.span.start)
+    }
+
     /// Whether a single comment occupies its own physical line — a line comment
-    /// (always runs to end-of-line), or a block comment with only horizontal
-    /// whitespace then a newline before it (`…⏎/* c */…`). The precise "starts a
-    /// fresh line" test: `has_newline_before_position` walks back over spaces/tabs
-    /// from the comment, so a block following another comment on the same line
-    /// (`/* a */ /* b */`) is *not* own-line. Unlike the neighbor-anchored
-    /// `is_same_line(prev, …)` / `has_newline_between(prev, …)` checks, it takes no
-    /// anchor — each comment is judged against whatever immediately precedes it.
+    /// (always runs to end-of-line, so it owns whatever line it is on), or a block
+    /// comment that starts a fresh line ([`Self::comment_follows_content_on_its_line`]).
+    ///
+    /// ⚠️ The `!is_block` short-circuit is a **layout** answer, and the reason this is
+    /// not the predicate a comment-position seam wants: asked of a line comment it says
+    /// "own line" whatever the author wrote before it on that line. A seam deciding
+    /// which element a `//` trails must ask the physical question directly.
     pub(crate) fn is_own_line_comment(&self, comment: &internal::Comment) -> bool {
-        !comment.is_block || has_newline_before_position(self.source, comment.span.start)
+        !comment.is_block || !self.comment_follows_content_on_its_line(comment)
     }
 
     /// Whether a multi-line block comment **prints as indented lines**
