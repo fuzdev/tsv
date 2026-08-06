@@ -9,4 +9,9 @@
 		/* block */
 		// line
 	);
+
+	fn(
+		c
+		/* block */ // line
+	);
 </script>

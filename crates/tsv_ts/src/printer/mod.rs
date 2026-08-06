@@ -772,23 +772,6 @@ impl<'a> Printer<'a> {
         tsv_lang::comments_in_source_range(self.comments, start, end)
     }
 
-    /// Position to start scanning from when looking for comments that trail the
-    /// last argument (between the argument and the closing paren).
-    ///
-    /// For a spread element whose stripped grouping parens hide comments
-    /// (`...( /* c */ x )`), the spread span extends past the inner argument, so
-    /// scan from the inner argument's end to find those comments; otherwise scan
-    /// from the argument's own end.
-    pub(crate) fn last_arg_comment_scan_start(&self, arg: &internal::Expression<'_>) -> u32 {
-        if let internal::Expression::SpreadElement(spread) = arg
-            && self.has_comments_on_page_between(spread.argument.span().end, spread.span.end)
-        {
-            spread.argument.span().end
-        } else {
-            arg.span().end
-        }
-    }
-
     /// Find the first occurrence of a byte in source between `start` and `end`
     /// that is NOT inside a comment. Returns absolute position.
     pub(crate) fn find_char_outside_comments(&self, start: u32, end: u32, ch: u8) -> Option<u32> {

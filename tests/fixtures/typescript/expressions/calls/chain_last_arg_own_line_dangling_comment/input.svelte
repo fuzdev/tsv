@@ -16,4 +16,9 @@
 		/* block */
 		// line
 	);
+
+	obj.method(
+		d
+		/* block */ // line
+	);
 </script>

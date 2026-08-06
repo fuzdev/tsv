@@ -530,6 +530,20 @@ fn try_single_arg_comment_paths(
             });
 
     let has_line_comments = printer.has_line_comments_between(paren_open, arg_start);
+
+    // TODO: a lone argument answers the delimiter-line question differently from every
+    // sibling (`docs/comments.md` §The delimiter-line question). With a block-only run in
+    // the `(`→argument gap, the hug branch below joins the whole run with spaces, MERGING
+    // comments the author put on separate lines (`fn(/* c1 */⏎/* c2 */⏎a)` →
+    // `fn(⏎/* c1 */ /* c2 */⏎a⏎)`). This is an F1 IDEMPOTENCY break, not just a prettier
+    // divergence: the merged form is not a fixed point, and pass 2 collapses the whole
+    // call to `fn(/* c1 */ /* c2 */ a);`. Every other argument count, and `new`/member-chain at this
+    // one, pull the `(`-line comment onto the `(` and give each own-line comment its own
+    // line. Deferring the gap to the general comment path is NOT the fix on its own: it
+    // regresses the blank-line-after-a-leading-comment shape
+    // (`calls/first_arg_leading_comment_blank`, `calls/leading_arg_block_comment_newline`,
+    // `syntax/comments/blank_line_after_value_leading_comment`), so the general path needs
+    // the blank-preserving arm first. Needs a fixture.
     if has_line_comments && !has_own_line_trailing_comment {
         // Multi-line format: fn( // comment\n\targ,\n)
         // Comments trailing the `(` on its own line stay there (a divergence from
@@ -1271,19 +1285,21 @@ fn build_call_with_arg_comments(
 
     // Check for own-line block comments after the last arg (before closing paren).
     // These need per-element handling to emit after the trailing comma.
-    // Also checks inside spread spans for comments from stripped parens.
+    // A spread's stripped parens can leave one *before* the argument's own end, where
+    // the `[arg_end, )` scan can't reach it — that share is asked for by name.
     let has_own_line_trailing_block = call.arguments.last().is_some_and(|last_arg| {
-        let search_start = printer.last_arg_comment_scan_start(last_arg);
-        printer
-            .comments_on_page_between(search_start, call.span.end)
-            .any(|c| {
-                c.is_block
-                    && !tsv_lang::printing::is_same_line_fast(
-                        printer.comment_line_breaks,
-                        search_start,
-                        c.span.start,
-                    )
-            })
+        let search_start = last_arg.span().end;
+        printer.spread_paren_comment_forces_expansion(last_arg)
+            || printer
+                .comments_on_page_between(search_start, call.span.end)
+                .any(|c| {
+                    c.is_block
+                        && !tsv_lang::printing::is_same_line_fast(
+                            printer.comment_line_breaks,
+                            search_start,
+                            c.span.start,
+                        )
+                })
     });
 
     if !(has_leading_comments
@@ -1443,18 +1459,36 @@ fn build_call_with_arg_comments(
                 }
             }
         } else {
-            // Last argument - check for trailing comments before closing paren.
-            // For spread elements, scan inside the spread span for comments from
-            // stripped parens (argument.end to spread.end).
-            let effective_arg_end = printer.last_arg_comment_scan_start(arg);
+            // Last argument - trailing comments before the closing paren, in two
+            // regions that partition it (see `emit_last_arg_trailing_comments`, which
+            // states the same split for the builders that need no force-expansion
+            // feedback). First the parent's share of a spread's stripped-paren
+            // interior: own-line blocks the spread's own doc deliberately leaves behind,
+            // each a sibling line the call cannot stay collapsed around.
+            if printer.push_spread_own_line_block_comments(&mut arg_parts, arg)
+                // A `//` the spread's own doc defers must flush INSIDE the call: on a
+                // collapsed list the buffer drains past the `)` and the `;`, re-binding
+                // the comment to the statement.
+                || printer.defers_trailing_line_comment(arg)
+            {
+                force_expansion = true;
+            }
+
+            // Then the ordinary gap, on the argument's own end. Widening this anchor to
+            // reach the interior claims the spread's share a second time — the same-line
+            // blocks and interior `//`s print twice.
+            let arg_end = arg.span().end;
             let paren_close = call.span.end;
 
-            let pc = PartitionedComments::new(
+            let mut pc = PartitionedComments::new(
                 printer.comments,
                 printer.comment_line_breaks,
-                effective_arg_end,
+                arg_end,
                 paren_close,
             );
+            // The argument's own doc may already end in a deferred `//` (a spread whose
+            // stripped parens held one); a second one may not join that line.
+            pc.demote_trailing_line_after_deferred(printer, arg);
 
             // Trailing comments after the last arg, before the closing paren, in
             // source order: same-line block comments first, then the same-line line
@@ -1496,8 +1530,7 @@ fn build_call_with_arg_comments(
 
             // (3) Own-line comments (block or line) after the last arg, before the
             // closing paren — emitted each on its own line, with no trailing comma
-            // (trailingComma: 'none'). Also handles spread with stripped parens via
-            // effective_arg_end.
+            // (trailingComma: 'none').
             if !pc.leading.is_empty() {
                 force_expansion = true;
                 pc.emit_dangling_comments(&mut arg_parts, printer);
