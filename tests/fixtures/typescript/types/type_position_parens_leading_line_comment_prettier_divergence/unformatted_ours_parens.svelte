@@ -4,8 +4,11 @@
 		a)> = T;
 
 	// tuple element
-	type B = [(// leading
-		a), b];
+	type B = [
+		(// leading
+		a),
+		b
+	];
 
 	// generic type argument
 	type C = Array<(// leading

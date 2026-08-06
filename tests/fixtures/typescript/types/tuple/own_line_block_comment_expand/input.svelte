@@ -26,4 +26,7 @@
 
 	// Inline block comment after comma does NOT force expansion
 	type E = [string, /* c */ number, boolean];
+
+	// Same-line block comment before the first element does NOT force expansion
+	type F = [/* c */ string, number];
 </script>

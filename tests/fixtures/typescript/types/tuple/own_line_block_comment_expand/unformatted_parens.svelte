@@ -1,32 +1,27 @@
 <script lang="ts">
 	// Own-line block comment between elements forces expansion
-	type A = [
-		string,
-		/* c */
-		number,
-	];
+	type A = [string, (
+	/* c */
+	number)];
 
 	// Own-line block comment before first element forces expansion
-	type B = [
-		/* c */
-		string,
-		number,
-	];
+	type B = [(
+	/* c */
+	string), number];
 
 	// Multiple own-line block comments between elements
-	type C = [
-		string,
-		/* c1 */
-		/* c2 */
-		number,
-	];
+	type C = [string, (
+	/* c1 */
+	/* c2 */
+	number)];
 
 	// Same-line block comment does NOT force expansion (short tuple)
-	type D = [string,/* c */ number];
+	type D = [string, /* c */ number];
 
 	// Inline block comment after comma does NOT force expansion
-	type E = [string,/* c */ number,boolean];
+	type E = [string, /* c */ number, boolean];
 
 	// Same-line block comment before the first element does NOT force expansion
-	type F = [/* c */ string,number];
+	type F = [(/* c */
+	string), number];
 </script>

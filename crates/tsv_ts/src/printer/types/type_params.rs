@@ -7,6 +7,7 @@
 use super::helpers::is_simple_type_arg;
 use super::{BlankRule, CommentFilter, CommentSpacing, KeywordValueHead, Printer, TrailingBlock};
 use crate::ast::internal::{self, TSType, TSTypeParameter, TSTypeParameterDeclaration};
+use crate::printer::OwnLineBasis;
 use crate::printer::layout::{bracketed_list_body, fluid_after_operator};
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -153,7 +154,12 @@ impl<'a> Printer<'a> {
         // handled by `has_own_line_block_comments_in_bracket_list`.
         self.has_line_comments_between(decl.span.start + 1, first.span.start)
             || self.has_line_comments_in_delimited_list(decl.params, |p| p.span, decl.span.end - 1)
-            || self.has_own_line_block_comments_in_bracket_list(decl.span, decl.params, |p| p.span)
+            || self.has_own_line_block_comments_in_bracket_list(
+                decl.span,
+                decl.params,
+                |p| p.span,
+                OwnLineBasis::ItemBoundary,
+            )
             || decl
                 .params
                 .iter()

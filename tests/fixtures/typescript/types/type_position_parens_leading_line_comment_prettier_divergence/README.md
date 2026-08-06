@@ -29,5 +29,11 @@ only the continuation indent differs, which is the uniform rule rather than a
 per-construct choice. The remaining cases — a tuple element and the
 type-parameter constraint — match both formatters.
 
+The tuple's shell sits on the line *below* its `[` in the `unformatted_ours_*`
+variants, deliberately: the shell is stripped here, so gluing it to the bracket
+(`[( // leading`) would put the comment on the `[` line and hand the case to the
+separate open-delimiter divergence, which keeps it there —
+[tuple/open_bracket_comment](../tuple/open_bracket_comment_prettier_divergence/).
+
 See [conformance_prettier_ts_comments.md](../../../../../docs/conformance_prettier_ts_comments.md)
 §Comment relocation.

@@ -7,6 +7,11 @@ Prettier relocates it to its own line as the first element's leading comment.
 tsv: keeps the comment trailing `[` where the user placed it
 Prettier: moves the comment down to its own line
 
+A redundant paren shell around the first element is stripped in this position, so
+`type A = [( // c1⏎string)]` is the same document — `unformatted_ours_parens`
+pins the two authorings onto this one fixed point rather than letting the shell
+carry the comment to a second one.
+
 ```
 // tsv                          // prettier
 type A = [ // c1                type A = [
