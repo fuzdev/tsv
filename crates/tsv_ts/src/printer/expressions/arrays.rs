@@ -764,7 +764,7 @@ impl<'a> Printer<'a> {
         // End of the most recently emitted REAL element. Holes don't advance it;
         // this lets the next real element's leading-comment range walk back across
         // any intervening hole commas to claim the comments between them and the
-        // previous real element. Also drives the post-loop trailing-comments scan.
+        // previous real element.
         let mut last_real_emit_end = arr.span.start + 1;
 
         // End position of the last trailing-on-array comment emitted by the
@@ -934,8 +934,24 @@ impl<'a> Printer<'a> {
                 parts.push(self.build_comment_doc(comment));
             }
 
+            // A spread whose stripped parens held a `//` already ends its line in one, so a
+            // line comment written after the `)` takes its own line instead of welding onto
+            // it — the array's spelling of `TrailingComments::demote_line_after_deferred`
+            // (the demotion trigger this loop owns, per the note at the top of
+            // `element_comma.rs`; the rendering is the shared helper).
+            let defers_line = elem
+                .as_ref()
+                .is_some_and(|e| self.defers_trailing_line_comment(e));
             for comment in trailing.iter().filter(|c| !c.is_block) {
-                parts.push(self.build_trailing_line_comment_doc(comment));
+                self.push_trailing_line_comment_demotion_aware(&mut parts, comment, defers_line);
+            }
+
+            // The array's share of a spread's stripped-paren interior, past the comma —
+            // the own-line blocks the spread's own doc leaves behind. The LAST element has
+            // no comma to emit against, so its share is the final scan's second anchor
+            // instead (see `end_scan_comment_is_own_line` and `final_scan_start` below).
+            if !is_last && let Some(e) = elem {
+                self.push_spread_own_line_block_comments(&mut parts, e);
             }
 
             // Trailing-hole iter: emit collected trailing-on-array comments inline
@@ -983,18 +999,6 @@ impl<'a> Printer<'a> {
             // exactly the arrays that had one.
             if elem.is_some() {
                 last_real_emit_end = elem_end;
-
-                // Spread elements with own-line trailing comments from stripped parens:
-                // expose them to subsequent leading-comment searches and the final scan.
-                if let Some(Expression::SpreadElement(spread)) = elem {
-                    let arg_end = spread.argument.span().end;
-                    let has_own_line = self
-                        .comments_on_page_between(arg_end, spread.span.end)
-                        .any(|c| c.is_block && self.has_newline_between(arg_end, c.span.start));
-                    if has_own_line {
-                        last_real_emit_end = arg_end;
-                    }
-                }
             }
         }
 
@@ -1003,7 +1007,32 @@ impl<'a> Printer<'a> {
         // `end_scan_comment_is_own_line` for the two-anchor rule; a `None` element end
         // (trailing hole) keeps the plain `final_scan_start` anchor, since the last real
         // element (`is_last` false, holes follow) claimed nothing out here.
-        let final_scan_start = trailing_hole_comments_end.unwrap_or(last_real_emit_end);
+        //
+        // The scan starts at the last real element's end — except inside a LAST spread's
+        // stripped parens, the final scan's second anchor
+        // (`end_scan_comment_is_own_line`'s "inside the parens" region), which is how
+        // the last element's own-line share reaches the array: there is no comma past it
+        // to emit against (a non-last spread's share is pushed by the loop above). Only
+        // this scan may see that region — pulling `last_real_emit_end` back too would
+        // hand it to the NEXT element's leading scan, which the element's own trailing
+        // claim has already emitted from: the anchor shift `docs/comments.md` names, and
+        // it DOUBLE-PRINTS every `//` written in the gap after the `)`.
+        let final_scan_start = trailing_hole_comments_end.unwrap_or_else(|| {
+            arr.elements
+                .iter()
+                .rev()
+                .find_map(|e| e.as_ref())
+                .map_or(arr.span.start + 1, |e| match e.as_spread() {
+                    Some(spread)
+                        if !self
+                            .spread_element_own_line_block_comments(spread)
+                            .is_empty() =>
+                    {
+                        spread.argument.span().end
+                    }
+                    _ => e.span().end,
+                })
+        });
         let last_real_end = trailing_hole_comments_end
             .is_none()
             .then(|| arr.elements.last().and_then(|e| e.as_ref()))

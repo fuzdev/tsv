@@ -151,6 +151,16 @@ impl<'arena> Expression<'arena> {
         e
     }
 
+    /// The spread node behind this expression, if it is one — the adapter the printer's
+    /// spread-interior helpers unwrap to reach their `SpreadElement` core.
+    /// `ObjectProperty::as_spread` is the property-list counterpart.
+    pub fn as_spread(&self) -> Option<&SpreadElement<'arena>> {
+        match self {
+            Expression::SpreadElement(s) => Some(s),
+            _ => None,
+        }
+    }
+
     /// Check if this expression is a chain root that needs ChainExpression wrapping.
     ///
     /// Returns true if this is a MemberExpression/CallExpression (or TSNonNullExpression
@@ -277,7 +287,23 @@ impl<'arena> ObjectProperty<'arena> {
                     p.value.span().end
                 }
             }
-            ObjectProperty::SpreadElement(s) => s.argument.span().end,
+            // The spread's OWN end, past any grouping parens the parser stripped — not
+            // the argument's. The interior of those parens is the spread doc's share to
+            // print (`docs/comments.md` §A stripped-paren interior is a partition too);
+            // anchoring the object's trailing scan at the argument's end is the anchor
+            // shift that hands the object that share as well, printing every same-line
+            // block and interior `//` TWICE.
+            ObjectProperty::SpreadElement(s) => s.span.end,
+        }
+    }
+
+    /// The spread node behind this property, if it is one — the adapter the printer's
+    /// spread-interior helpers take, since a property list has no `Expression` to hand
+    /// them the way an argument list or array does.
+    pub fn as_spread(&self) -> Option<&SpreadElement<'arena>> {
+        match self {
+            ObjectProperty::SpreadElement(s) => Some(s),
+            ObjectProperty::Property(_) => None,
         }
     }
 }

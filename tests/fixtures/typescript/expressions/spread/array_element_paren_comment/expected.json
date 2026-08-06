@@ -1,0 +1,1087 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 791,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a same-line comment left behind by an array spread's stripped parens rides the",
+			"start": 10,
+			"end": 91,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " element's line — printed by the spread's own doc, never again by the array",
+			"start": 93,
+			"end": 170,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 189,
+			"end": 196,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 18
+				},
+				"end": {
+					"line": 4,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a line comment inside the stripped parens runs to end of line, so the array breaks",
+			"start": 204,
+			"end": 289,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " i",
+			"start": 312,
+			"end": 316,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 8
+				},
+				"end": {
+					"line": 8,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " i",
+			"start": 353,
+			"end": 357,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 8
+				},
+				"end": {
+					"line": 14,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line comment is the array's share instead: a sibling line ahead of the next",
+			"start": 368,
+			"end": 453,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " element",
+			"start": 455,
+			"end": 465,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 490,
+			"end": 497,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a block written after the stripped `)` sits before the comma, so it trails the",
+			"start": 508,
+			"end": 589,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " element; the own-line comment keeps the line below",
+			"start": 591,
+			"end": 644,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 54
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " t ",
+			"start": 666,
+			"end": 673,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 7
+				},
+				"end": {
+					"line": 29,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 677,
+			"end": 684,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 2
+				},
+				"end": {
+					"line": 30,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an author blank line after the spread survives",
+			"start": 695,
+			"end": 744,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " i",
+			"start": 767,
+			"end": 771,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 8
+				},
+				"end": {
+					"line": 36,
+					"column": 12
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 790,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 781,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 40,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 172,
+					"end": 201,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 178,
+							"end": 200,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 178,
+								"end": 180,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 9
+									}
+								},
+								"name": "a1"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 183,
+								"end": 200,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 12
+									},
+									"end": {
+										"line": 4,
+										"column": 29
+									}
+								},
+								"elements": [
+									{
+										"type": "SpreadElement",
+										"start": 184,
+										"end": 188,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 13
+											},
+											"end": {
+												"line": 4,
+												"column": 17
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 187,
+											"end": 188,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 16
+												},
+												"end": {
+													"line": 4,
+													"column": 17
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " i ",
+												"start": 189,
+												"end": 196
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 198,
+										"end": 199,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 27
+											},
+											"end": {
+												"line": 4,
+												"column": 28
+											}
+										},
+										"name": "c"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a same-line comment left behind by an array spread's stripped parens rides the",
+							"start": 10,
+							"end": 91
+						},
+						{
+							"type": "Line",
+							"value": " element's line — printed by the spread's own doc, never again by the array",
+							"start": 93,
+							"end": 170
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 291,
+					"end": 324,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 297,
+							"end": 323,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 7
+								},
+								"end": {
+									"line": 10,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 297,
+								"end": 299,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 9
+									}
+								},
+								"name": "a2"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 302,
+								"end": 323,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 12
+									},
+									"end": {
+										"line": 10,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "SpreadElement",
+										"start": 306,
+										"end": 310,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 2
+											},
+											"end": {
+												"line": 8,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 309,
+											"end": 310,
+											"loc": {
+												"start": {
+													"line": 8,
+													"column": 5
+												},
+												"end": {
+													"line": 8,
+													"column": 6
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " i",
+												"start": 312,
+												"end": 316
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 319,
+										"end": 320,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 2
+											},
+											"end": {
+												"line": 9,
+												"column": 3
+											}
+										},
+										"name": "c"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment inside the stripped parens runs to end of line, so the array breaks",
+							"start": 204,
+							"end": 289
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 327,
+					"end": 365,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 333,
+							"end": 364,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 7
+								},
+								"end": {
+									"line": 16,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 333,
+								"end": 335,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 7
+									},
+									"end": {
+										"line": 12,
+										"column": 9
+									}
+								},
+								"name": "a3"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 338,
+								"end": 364,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 12
+									},
+									"end": {
+										"line": 16,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 342,
+										"end": 343,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 2
+											},
+											"end": {
+												"line": 13,
+												"column": 3
+											}
+										},
+										"name": "a"
+									},
+									{
+										"type": "SpreadElement",
+										"start": 347,
+										"end": 351,
+										"loc": {
+											"start": {
+												"line": 14,
+												"column": 2
+											},
+											"end": {
+												"line": 14,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 350,
+											"end": 351,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 5
+												},
+												"end": {
+													"line": 14,
+													"column": 6
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " i",
+												"start": 353,
+												"end": 357
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 360,
+										"end": 361,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 2
+											},
+											"end": {
+												"line": 15,
+												"column": 3
+											}
+										},
+										"name": "c"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 467,
+					"end": 505,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 473,
+							"end": 504,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 7
+								},
+								"end": {
+									"line": 24,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 473,
+								"end": 475,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 7
+									},
+									"end": {
+										"line": 20,
+										"column": 9
+									}
+								},
+								"name": "a4"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 478,
+								"end": 504,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 12
+									},
+									"end": {
+										"line": 24,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "SpreadElement",
+										"start": 482,
+										"end": 486,
+										"loc": {
+											"start": {
+												"line": 21,
+												"column": 2
+											},
+											"end": {
+												"line": 21,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 485,
+											"end": 486,
+											"loc": {
+												"start": {
+													"line": 21,
+													"column": 5
+												},
+												"end": {
+													"line": 21,
+													"column": 6
+												}
+											},
+											"name": "b"
+										}
+									},
+									{
+										"type": "Identifier",
+										"start": 500,
+										"end": 501,
+										"loc": {
+											"start": {
+												"line": 23,
+												"column": 2
+											},
+											"end": {
+												"line": 23,
+												"column": 3
+											}
+										},
+										"name": "c",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " i ",
+												"start": 490,
+												"end": 497
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line comment is the array's share instead: a sibling line ahead of the next",
+							"start": 368,
+							"end": 453
+						},
+						{
+							"type": "Line",
+							"value": " element",
+							"start": 455,
+							"end": 465
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 646,
+					"end": 692,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 652,
+							"end": 691,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 7
+								},
+								"end": {
+									"line": 32,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 652,
+								"end": 654,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 7
+									},
+									"end": {
+										"line": 28,
+										"column": 9
+									}
+								},
+								"name": "a5"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 657,
+								"end": 691,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 12
+									},
+									"end": {
+										"line": 32,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "SpreadElement",
+										"start": 661,
+										"end": 665,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 2
+											},
+											"end": {
+												"line": 29,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 664,
+											"end": 665,
+											"loc": {
+												"start": {
+													"line": 29,
+													"column": 5
+												},
+												"end": {
+													"line": 29,
+													"column": 6
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " t ",
+												"start": 666,
+												"end": 673
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 687,
+										"end": 688,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 2
+											},
+											"end": {
+												"line": 31,
+												"column": 3
+											}
+										},
+										"name": "c",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " i ",
+												"start": 677,
+												"end": 684
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block written after the stripped `)` sits before the comma, so it trails the",
+							"start": 508,
+							"end": 589
+						},
+						{
+							"type": "Line",
+							"value": " element; the own-line comment keeps the line below",
+							"start": 591,
+							"end": 644
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 746,
+					"end": 780,
+					"loc": {
+						"start": {
+							"line": 35,
+							"column": 1
+						},
+						"end": {
+							"line": 39,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 752,
+							"end": 779,
+							"loc": {
+								"start": {
+									"line": 35,
+									"column": 7
+								},
+								"end": {
+									"line": 39,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 752,
+								"end": 754,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 7
+									},
+									"end": {
+										"line": 35,
+										"column": 9
+									}
+								},
+								"name": "a6"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 757,
+								"end": 779,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 12
+									},
+									"end": {
+										"line": 39,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "SpreadElement",
+										"start": 761,
+										"end": 765,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 2
+											},
+											"end": {
+												"line": 36,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 764,
+											"end": 765,
+											"loc": {
+												"start": {
+													"line": 36,
+													"column": 5
+												},
+												"end": {
+													"line": 36,
+													"column": 6
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " i",
+												"start": 767,
+												"end": 771
+											}
+										]
+									},
+									{
+										"type": "Identifier",
+										"start": 775,
+										"end": 776,
+										"loc": {
+											"start": {
+												"line": 38,
+												"column": 2
+											},
+											"end": {
+												"line": 38,
+												"column": 3
+											}
+										},
+										"name": "c"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank line after the spread survives",
+							"start": 695,
+							"end": 744
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

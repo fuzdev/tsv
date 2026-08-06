@@ -1,0 +1,1405 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 691,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a same-line comment left behind by an object spread's stripped parens rides the",
+			"start": 10,
+			"end": 92,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " property's line — printed by the spread's own doc, never again by the object",
+			"start": 94,
+			"end": 173,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 193,
+			"end": 200,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 19
+				},
+				"end": {
+					"line": 4,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 230,
+			"end": 237,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 22
+				},
+				"end": {
+					"line": 6,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a line comment inside the stripped parens runs to end of line, so the object",
+			"start": 243,
+			"end": 322,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " breaks around it",
+			"start": 324,
+			"end": 343,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " i",
+			"start": 366,
+			"end": 370,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 8
+				},
+				"end": {
+					"line": 11,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " i",
+			"start": 407,
+			"end": 411,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 8
+				},
+				"end": {
+					"line": 17,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " i",
+			"start": 442,
+			"end": 446,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 7
+				},
+				"end": {
+					"line": 22,
+					"column": 11
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an own-line comment is the object's share instead: a sibling line ahead of the",
+			"start": 453,
+			"end": 534,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " next property",
+			"start": 536,
+			"end": 552,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 1
+				},
+				"end": {
+					"line": 26,
+					"column": 17
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " i ",
+			"start": 577,
+			"end": 584,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 2
+				},
+				"end": {
+					"line": 29,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " an author blank line after the spread survives",
+			"start": 595,
+			"end": 644,
+			"loc": {
+				"start": {
+					"line": 33,
+					"column": 1
+				},
+				"end": {
+					"line": 33,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " i",
+			"start": 667,
+			"end": 671,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 8
+				},
+				"end": {
+					"line": 35,
+					"column": 12
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 690,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 681,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 39,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 175,
+					"end": 206,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 181,
+							"end": 205,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 7
+								},
+								"end": {
+									"line": 4,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 181,
+								"end": 183,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 7
+									},
+									"end": {
+										"line": 4,
+										"column": 9
+									}
+								},
+								"name": "o1"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 186,
+								"end": 205,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 12
+									},
+									"end": {
+										"line": 4,
+										"column": 31
+									}
+								},
+								"properties": [
+									{
+										"type": "SpreadElement",
+										"start": 188,
+										"end": 192,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 14
+											},
+											"end": {
+												"line": 4,
+												"column": 18
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 191,
+											"end": 192,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 17
+												},
+												"end": {
+													"line": 4,
+													"column": 18
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " i ",
+												"start": 193,
+												"end": 200
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 202,
+										"end": 203,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 28
+											},
+											"end": {
+												"line": 4,
+												"column": 29
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 202,
+											"end": 203,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 28
+												},
+												"end": {
+													"line": 4,
+													"column": 29
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 202,
+											"end": 203,
+											"loc": {
+												"start": {
+													"line": 4,
+													"column": 28
+												},
+												"end": {
+													"line": 4,
+													"column": 29
+												}
+											},
+											"name": "c"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a same-line comment left behind by an object spread's stripped parens rides the",
+							"start": 10,
+							"end": 92
+						},
+						{
+							"type": "Line",
+							"value": " property's line — printed by the spread's own doc, never again by the object",
+							"start": 94,
+							"end": 173
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 209,
+					"end": 240,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 215,
+							"end": 239,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 215,
+								"end": 217,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 9
+									}
+								},
+								"name": "o2"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 220,
+								"end": 239,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 12
+									},
+									"end": {
+										"line": 6,
+										"column": 31
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 222,
+										"end": 223,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 14
+											},
+											"end": {
+												"line": 6,
+												"column": 15
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 222,
+											"end": 223,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 14
+												},
+												"end": {
+													"line": 6,
+													"column": 15
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 222,
+											"end": 223,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 14
+												},
+												"end": {
+													"line": 6,
+													"column": 15
+												}
+											},
+											"name": "c"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "SpreadElement",
+										"start": 225,
+										"end": 229,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 17
+											},
+											"end": {
+												"line": 6,
+												"column": 21
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 228,
+											"end": 229,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 20
+												},
+												"end": {
+													"line": 6,
+													"column": 21
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " i ",
+												"start": 230,
+												"end": 237
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 345,
+					"end": 378,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 351,
+							"end": 377,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 351,
+								"end": 353,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 9
+									}
+								},
+								"name": "o3"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 356,
+								"end": 377,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 12
+									},
+									"end": {
+										"line": 13,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "SpreadElement",
+										"start": 360,
+										"end": 364,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 363,
+											"end": 364,
+											"loc": {
+												"start": {
+													"line": 11,
+													"column": 5
+												},
+												"end": {
+													"line": 11,
+													"column": 6
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " i",
+												"start": 366,
+												"end": 370
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 373,
+										"end": 374,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 373,
+											"end": 374,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 2
+												},
+												"end": {
+													"line": 12,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 373,
+											"end": 374,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 2
+												},
+												"end": {
+													"line": 12,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment inside the stripped parens runs to end of line, so the object",
+							"start": 243,
+							"end": 322
+						},
+						{
+							"type": "Line",
+							"value": " breaks around it",
+							"start": 324,
+							"end": 343
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 381,
+					"end": 419,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 19,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 387,
+							"end": 418,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 19,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 387,
+								"end": 389,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 9
+									}
+								},
+								"name": "o4"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 392,
+								"end": 418,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 12
+									},
+									"end": {
+										"line": 19,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 396,
+										"end": 397,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 2
+											},
+											"end": {
+												"line": 16,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 396,
+											"end": 397,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 2
+												},
+												"end": {
+													"line": 16,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 396,
+											"end": 397,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 2
+												},
+												"end": {
+													"line": 16,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "SpreadElement",
+										"start": 401,
+										"end": 405,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 17,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 404,
+											"end": 405,
+											"loc": {
+												"start": {
+													"line": 17,
+													"column": 5
+												},
+												"end": {
+													"line": 17,
+													"column": 6
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " i",
+												"start": 407,
+												"end": 411
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 414,
+										"end": 415,
+										"loc": {
+											"start": {
+												"line": 18,
+												"column": 2
+											},
+											"end": {
+												"line": 18,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 414,
+											"end": 415,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 2
+												},
+												"end": {
+													"line": 18,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 414,
+											"end": 415,
+											"loc": {
+												"start": {
+													"line": 18,
+													"column": 2
+												},
+												"end": {
+													"line": 18,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 422,
+					"end": 450,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 428,
+							"end": 449,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 23,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 428,
+								"end": 430,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 21,
+										"column": 9
+									}
+								},
+								"name": "o5"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 433,
+								"end": 449,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 12
+									},
+									"end": {
+										"line": 23,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "SpreadElement",
+										"start": 437,
+										"end": 441,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 2
+											},
+											"end": {
+												"line": 22,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 440,
+											"end": 441,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 5
+												},
+												"end": {
+													"line": 22,
+													"column": 6
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " i",
+												"start": 442,
+												"end": 446
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 554,
+					"end": 592,
+					"loc": {
+						"start": {
+							"line": 27,
+							"column": 1
+						},
+						"end": {
+							"line": 31,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 560,
+							"end": 591,
+							"loc": {
+								"start": {
+									"line": 27,
+									"column": 7
+								},
+								"end": {
+									"line": 31,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 560,
+								"end": 562,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 7
+									},
+									"end": {
+										"line": 27,
+										"column": 9
+									}
+								},
+								"name": "o6"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 565,
+								"end": 591,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 12
+									},
+									"end": {
+										"line": 31,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "SpreadElement",
+										"start": 569,
+										"end": 573,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 2
+											},
+											"end": {
+												"line": 28,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 572,
+											"end": 573,
+											"loc": {
+												"start": {
+													"line": 28,
+													"column": 5
+												},
+												"end": {
+													"line": 28,
+													"column": 6
+												}
+											},
+											"name": "b"
+										}
+									},
+									{
+										"type": "Property",
+										"start": 587,
+										"end": 588,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 2
+											},
+											"end": {
+												"line": 30,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 587,
+											"end": 588,
+											"loc": {
+												"start": {
+													"line": 30,
+													"column": 2
+												},
+												"end": {
+													"line": 30,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 587,
+											"end": 588,
+											"loc": {
+												"start": {
+													"line": 30,
+													"column": 2
+												},
+												"end": {
+													"line": 30,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " i ",
+												"start": 577,
+												"end": 584
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an own-line comment is the object's share instead: a sibling line ahead of the",
+							"start": 453,
+							"end": 534
+						},
+						{
+							"type": "Line",
+							"value": " next property",
+							"start": 536,
+							"end": 552
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 646,
+					"end": 680,
+					"loc": {
+						"start": {
+							"line": 34,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 652,
+							"end": 679,
+							"loc": {
+								"start": {
+									"line": 34,
+									"column": 7
+								},
+								"end": {
+									"line": 38,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 652,
+								"end": 654,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 7
+									},
+									"end": {
+										"line": 34,
+										"column": 9
+									}
+								},
+								"name": "o7"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 657,
+								"end": 679,
+								"loc": {
+									"start": {
+										"line": 34,
+										"column": 12
+									},
+									"end": {
+										"line": 38,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "SpreadElement",
+										"start": 661,
+										"end": 665,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 2
+											},
+											"end": {
+												"line": 35,
+												"column": 6
+											}
+										},
+										"argument": {
+											"type": "Identifier",
+											"start": 664,
+											"end": 665,
+											"loc": {
+												"start": {
+													"line": 35,
+													"column": 5
+												},
+												"end": {
+													"line": 35,
+													"column": 6
+												}
+											},
+											"name": "b"
+										},
+										"trailingComments": [
+											{
+												"type": "Line",
+												"value": " i",
+												"start": 667,
+												"end": 671
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 675,
+										"end": 676,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 2
+											},
+											"end": {
+												"line": 37,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 675,
+											"end": 676,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 2
+												},
+												"end": {
+													"line": 37,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 675,
+											"end": 676,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 2
+												},
+												"end": {
+													"line": 37,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an author blank line after the spread survives",
+							"start": 595,
+							"end": 644
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

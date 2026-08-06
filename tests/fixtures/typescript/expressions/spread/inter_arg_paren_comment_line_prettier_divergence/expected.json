@@ -1,0 +1,571 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 364,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a line comment left behind by a spread's stripped parens runs to end of line, so a",
+			"start": 10,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line comment written after the `)` takes its own line — on an argument the list",
+			"start": 97,
+			"end": 179,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " continues past, that line sits ahead of the next argument",
+			"start": 181,
+			"end": 241,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 61
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " i",
+			"start": 255,
+			"end": 259,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 8
+				},
+				"end": {
+					"line": 6,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " t",
+			"start": 262,
+			"end": 266,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 2
+				},
+				"end": {
+					"line": 7,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " i",
+			"start": 292,
+			"end": 296,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 8
+				},
+				"end": {
+					"line": 12,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " t",
+			"start": 299,
+			"end": 303,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 2
+				},
+				"end": {
+					"line": 13,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " i",
+			"start": 334,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 8
+				},
+				"end": {
+					"line": 18,
+					"column": 12
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " t",
+			"start": 341,
+			"end": 345,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 2
+				},
+				"end": {
+					"line": 19,
+					"column": 6
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 363,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 354,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 243,
+					"end": 274,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 243,
+						"end": 273,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 1
+							},
+							"end": {
+								"line": 9,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 243,
+							"end": 245,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 1
+								},
+								"end": {
+									"line": 5,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "SpreadElement",
+								"start": 249,
+								"end": 253,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 2
+									},
+									"end": {
+										"line": 6,
+										"column": 6
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 252,
+									"end": 253,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 5
+										},
+										"end": {
+											"line": 6,
+											"column": 6
+										}
+									},
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " i",
+										"start": 255,
+										"end": 259
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 269,
+								"end": 270,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 2
+									},
+									"end": {
+										"line": 8,
+										"column": 3
+									}
+								},
+								"name": "c",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " t",
+										"start": 262,
+										"end": 266
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment left behind by a spread's stripped parens runs to end of line, so a",
+							"start": 10,
+							"end": 95
+						},
+						{
+							"type": "Line",
+							"value": " line comment written after the `)` takes its own line — on an argument the list",
+							"start": 97,
+							"end": 179
+						},
+						{
+							"type": "Line",
+							"value": " continues past, that line sits ahead of the next argument",
+							"start": 181,
+							"end": 241
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 277,
+					"end": 311,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 277,
+						"end": 310,
+						"loc": {
+							"start": {
+								"line": 11,
+								"column": 1
+							},
+							"end": {
+								"line": 15,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 281,
+							"end": 282,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 5
+								},
+								"end": {
+									"line": 11,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": [
+							{
+								"type": "SpreadElement",
+								"start": 286,
+								"end": 290,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 6
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 289,
+									"end": 290,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 5
+										},
+										"end": {
+											"line": 12,
+											"column": 6
+										}
+									},
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " i",
+										"start": 292,
+										"end": 296
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 306,
+								"end": 307,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 3
+									}
+								},
+								"name": "c",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " t",
+										"start": 299,
+										"end": 303
+									}
+								]
+							}
+						]
+					}
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 314,
+					"end": 353,
+					"loc": {
+						"start": {
+							"line": 17,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 314,
+						"end": 352,
+						"loc": {
+							"start": {
+								"line": 17,
+								"column": 1
+							},
+							"end": {
+								"line": 21,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "MemberExpression",
+							"start": 314,
+							"end": 324,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 1
+								},
+								"end": {
+									"line": 17,
+									"column": 11
+								}
+							},
+							"object": {
+								"type": "Identifier",
+								"start": 314,
+								"end": 317,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 1
+									},
+									"end": {
+										"line": 17,
+										"column": 4
+									}
+								},
+								"name": "obj"
+							},
+							"property": {
+								"type": "Identifier",
+								"start": 318,
+								"end": 324,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 5
+									},
+									"end": {
+										"line": 17,
+										"column": 11
+									}
+								},
+								"name": "method"
+							},
+							"computed": false,
+							"optional": false
+						},
+						"arguments": [
+							{
+								"type": "SpreadElement",
+								"start": 328,
+								"end": 332,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 2
+									},
+									"end": {
+										"line": 18,
+										"column": 6
+									}
+								},
+								"argument": {
+									"type": "Identifier",
+									"start": 331,
+									"end": 332,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 5
+										},
+										"end": {
+											"line": 18,
+											"column": 6
+										}
+									},
+									"name": "b"
+								},
+								"trailingComments": [
+									{
+										"type": "Line",
+										"value": " i",
+										"start": 334,
+										"end": 338
+									}
+								]
+							},
+							{
+								"type": "Identifier",
+								"start": 348,
+								"end": 349,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 3
+									}
+								},
+								"name": "c",
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " t",
+										"start": 341,
+										"end": 345
+									}
+								]
+							}
+						],
+						"optional": false
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
