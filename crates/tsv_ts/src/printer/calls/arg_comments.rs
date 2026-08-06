@@ -55,14 +55,15 @@ impl<'a> Printer<'a> {
         pc.route_after_comma_hugging_to_leading(self);
         // The argument's own doc may already end in a deferred `//` (a spread whose
         // stripped parens held one); a second one may not join that line.
-        pc.demote_trailing_line_after_deferred(self, prev_arg);
+        let prev_defers_line = self.defers_trailing_line_comment(prev_arg);
+        pc.demote_trailing_line_after_deferred(prev_defers_line);
         pc.emit_trailing_comments_around_comma(parts, self);
         let own_line_interior = self.push_spread_own_line_block_comments(parts, prev_arg);
         InterArgGap {
             // An own-line interior block is a sibling line, and an interior `//` the
             // spread defers must flush INSIDE the list — on a collapsed one the buffer
             // drains past the `)` and the `;`, re-binding the comment to the statement.
-            forces_expansion: own_line_interior || self.defers_trailing_line_comment(prev_arg),
+            forces_expansion: own_line_interior || prev_defers_line,
             comments: pc,
         }
     }
@@ -692,7 +693,7 @@ pub(crate) fn emit_last_arg_trailing_comments(
         arg_end,
         paren_close,
     );
-    pc.demote_trailing_line_after_deferred(printer, last_arg);
+    pc.demote_trailing_line_after_deferred(printer.defers_trailing_line_comment(last_arg));
     pc.emit_last_arg_comments(parts, printer);
 }
 
@@ -830,9 +831,11 @@ impl<'a> PartitionedComments<'a> {
         !self.trailing_line.is_empty()
     }
 
-    /// Reclassify this gap's same-line LINE comments as own-line when `prev` — the node
-    /// the gap opens after — already ends in a DEFERRED line comment
-    /// ([`Printer::defers_trailing_line_comment`]).
+    /// Reclassify this gap's same-line LINE comments as own-line when the node the gap
+    /// opens after already ends in a DEFERRED line comment — `prev_defers_line`, the
+    /// caller's answer to [`Printer::defers_trailing_line_comment`] (asked there because
+    /// every caller also feeds it to its own force-expansion signal; same shape as the
+    /// twin `TrailingComments::demote_line_after_deferred`).
     ///
     /// Its output line already terminates in a `//`, so nothing more may join it:
     /// deferring a second line comment onto the same line welds the two into ONE comment,
@@ -845,12 +848,8 @@ impl<'a> PartitionedComments<'a> {
     /// consumers (the shared [`emit_last_arg_trailing_comments`] and
     /// `call_formatting`'s own loop, which needs its `force_expansion` feedback) get the
     /// rule from one place.
-    pub fn demote_trailing_line_after_deferred(
-        &mut self,
-        printer: &Printer<'_>,
-        prev: &internal::Expression<'_>,
-    ) {
-        if self.trailing_line.is_empty() || !printer.defers_trailing_line_comment(prev) {
+    pub fn demote_trailing_line_after_deferred(&mut self, prev_defers_line: bool) {
+        if self.trailing_line.is_empty() || !prev_defers_line {
             return;
         }
         for comment in self.trailing_line.drain(..).rev() {

@@ -1464,12 +1464,11 @@ fn build_call_with_arg_comments(
             // feedback). First the parent's share of a spread's stripped-paren
             // interior: own-line blocks the spread's own doc deliberately leaves behind,
             // each a sibling line the call cannot stay collapsed around.
-            if printer.push_spread_own_line_block_comments(&mut arg_parts, arg)
-                // A `//` the spread's own doc defers must flush INSIDE the call: on a
-                // collapsed list the buffer drains past the `)` and the `;`, re-binding
-                // the comment to the statement.
-                || printer.defers_trailing_line_comment(arg)
-            {
+            // A `//` the spread's own doc defers must flush INSIDE the call: on a
+            // collapsed list the buffer drains past the `)` and the `;`, re-binding
+            // the comment to the statement. Also feeds the demotion below.
+            let arg_defers_line = printer.defers_trailing_line_comment(arg);
+            if printer.push_spread_own_line_block_comments(&mut arg_parts, arg) || arg_defers_line {
                 force_expansion = true;
             }
 
@@ -1487,7 +1486,7 @@ fn build_call_with_arg_comments(
             );
             // The argument's own doc may already end in a deferred `//` (a spread whose
             // stripped parens held one); a second one may not join that line.
-            pc.demote_trailing_line_after_deferred(printer, arg);
+            pc.demote_trailing_line_after_deferred(arg_defers_line);
 
             // Trailing comments after the last arg, before the closing paren, in
             // source order: same-line block comments first, then the same-line line
