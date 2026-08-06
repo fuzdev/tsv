@@ -127,37 +127,30 @@ pub(crate) enum OwnLineBasis {
     /// Blind to both kinds of uncovered text above, so a comment glued to either reads as
     /// own-line.
     ///
-    /// ⚠️ For the **array literal** that blindness currently cancels a second one and must
-    /// not be tightened alone: the element→`,` seam claims a comment on the element's last
-    /// line, so a comment glued to a stripped `)` the author put on its own line
-    /// (`[(⏎a⏎)/* c */⏎, b]`) is claimed by neither side of the gap — reading it as own-line
-    /// is what routes the list to the comment-aware builder that prints it at all. Measured,
-    /// not argued: on [`Self::Source`] that spelling loses the comment outright. Tighten the
-    /// seam first, then the basis.
-    /// TODO: partition that gap exhaustively (see `docs/comments.md` §The element-comma
-    /// seam) and move the array families onto [`Self::Source`] too.
-    ///
-    /// ⚠️ Note where the comma sits in that example — on a line *below* the comment. Pull it
-    /// up onto the comment's line (`[(⏎a⏎)/* c */, b]`, and equally the shell-free
-    /// `[a⏎/* c */, b]`) and the comment is **already dropped today**, under both bases: the
-    /// list doesn't expand (the comment shares a line with the following element) and the
-    /// seam claims it for neither side. A pre-existing hole in the same partition, and the
-    /// second reason this basis can't move before the seam does.
-    /// TODO: that drop is content loss and wants its own fixture — no fixture or corpus file
-    /// carries the authoring today, which is why every gate is green through it.
-    ///
-    /// The remaining holders — the type-parameter DECLARATION list and the import/export
-    /// specifier list — have no seam to tighten and no stripped delimiter reachable in
-    /// their item spans (neither a type parameter nor a specifier can be parenthesized), so
-    /// only the comma case is live for them: `<T⏎, /* c */⏎U>` expands where prettier
-    /// collapses. They move on their own evidence, not on the array families'.
-    /// TODO: pin that authoring per family and move both onto [`Self::Source`].
+    /// The remaining holders are the array PATTERN, the object pattern, the type-parameter
+    /// DECLARATION list and the import/export specifier list. None of them can reach a
+    /// stripped delimiter through its item spans (a type parameter and a specifier cannot
+    /// be parenthesized; a pattern element's own parens are a parse error), so only the
+    /// comma case is live for them: `<T⏎, /* c */⏎U>` expands where prettier collapses.
+    /// Each is 1-pass stable there — a prettier divergence, not a robustness defect — so
+    /// they move on their own evidence, per family, not on the array literal's.
+    /// TODO: pin that authoring per family and move them onto [`Self::Source`].
     ItemBoundary,
     /// Nothing but whitespace precedes the comment on its line
     /// ([`Printer::is_own_line_comment`]) — the reading a caller **must** use once it strips
     /// a delimiter out of its item spans, since the erased text still occupied the line the
-    /// author wrote the comment on. Held by the tuple and by both type-argument positions,
-    /// the three that unwrap a paren shell to build their item spans.
+    /// author wrote the comment on. Held by the tuple, by both type-argument positions (the
+    /// three that unwrap a paren shell to build their item spans), and by the array literal.
+    ///
+    /// ⚠️ **The array literal reached it only once its element→`,` seam asked the same
+    /// question**, and the order was load-bearing: on the item-boundary reading the
+    /// expansion gate's blindness *cancelled* the seam's, so switching the basis alone lost
+    /// a comment outright. The seam now keys on this same source reading and partitions its
+    /// gap by a split point rather than by two filters
+    /// (`Printer::trailing_comment_split`), which is what made the basis safe to move —
+    /// and retired, in the same change, a content loss (`[a⏎/* c */, b]`, claimed by
+    /// neither side) and four non-idempotent shapes. A future family that strips a
+    /// delimiter needs both halves, not just this one.
     Source,
 }
 
