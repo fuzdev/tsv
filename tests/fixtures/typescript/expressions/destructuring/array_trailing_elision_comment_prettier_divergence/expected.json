@@ -1,0 +1,417 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 296,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Past the last binding the run slides to the pattern's trailing position",
+			"start": 10,
+			"end": 84,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 97,
+			"end": 104,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 12
+				},
+				"end": {
+					"line": 3,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " With no binding at all",
+			"start": 115,
+			"end": 140,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 152,
+			"end": 159,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 11
+				},
+				"end": {
+					"line": 6,
+					"column": 18
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An own-line comment takes its own line there, still past the elision comma",
+			"start": 170,
+			"end": 247,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 268,
+			"end": 275,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 295,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 286,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 14,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 86,
+					"end": 112,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 27
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 92,
+							"end": 111,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 26
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 92,
+								"end": 105,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 20
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 93,
+										"end": 94,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 8
+											},
+											"end": {
+												"line": 3,
+												"column": 9
+											}
+										},
+										"name": "a",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 97,
+												"end": 104
+											}
+										]
+									},
+									null
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 108,
+								"end": 111,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 23
+									},
+									"end": {
+										"line": 3,
+										"column": 26
+									}
+								},
+								"name": "arr"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Past the last binding the run slides to the pattern's trailing position",
+							"start": 10,
+							"end": 84
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 142,
+					"end": 167,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 26
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 148,
+							"end": 166,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 25
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 148,
+								"end": 160,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 19
+									}
+								},
+								"elements": [
+									null,
+									null
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 163,
+								"end": 166,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 22
+									},
+									"end": {
+										"line": 6,
+										"column": 25
+									}
+								},
+								"name": "arr",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 152,
+										"end": 159
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " With no binding at all",
+							"start": 115,
+							"end": 140
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 249,
+					"end": 285,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 255,
+							"end": 284,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 255,
+								"end": 278,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 13,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 259,
+										"end": 260,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 2
+											},
+											"end": {
+												"line": 10,
+												"column": 3
+											}
+										},
+										"name": "b"
+									},
+									null
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 281,
+								"end": 284,
+								"loc": {
+									"start": {
+										"line": 13,
+										"column": 5
+									},
+									"end": {
+										"line": 13,
+										"column": 8
+									}
+								},
+								"name": "arr",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 268,
+										"end": 275
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An own-line comment takes its own line there, still past the elision comma",
+							"start": 170,
+							"end": 247
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

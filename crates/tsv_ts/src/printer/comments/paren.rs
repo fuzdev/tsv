@@ -399,8 +399,30 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         expr: &internal::Expression<'_>,
     ) -> bool {
-        expr.as_spread()
-            .is_some_and(|spread| self.push_spread_element_own_line_block_comments(parts, spread))
+        self.push_spread_own_line_block_comments_with_blanks(parts, expr, true)
+    }
+
+    /// [`Self::push_spread_own_line_block_comments`] with the author-blank policy named.
+    ///
+    /// `preserve_blanks: false` is for a run the caller emits **past an elision comma** (the
+    /// array element loop, when holes follow the spread). The blank was authored between the
+    /// argument and the comment, a gap the run no longer occupies once a structural comma
+    /// sits in front of it — and the array's own rule is that a hole carries **no** blank
+    /// line after it (`has_blank_line_after_slot`, prettier's `node &&`), so the reprint
+    /// drops it. Preserving it here would print a blank the next pass removes.
+    pub(crate) fn push_spread_own_line_block_comments_with_blanks(
+        &self,
+        parts: &mut DocBuf,
+        expr: &internal::Expression<'_>,
+        preserve_blanks: bool,
+    ) -> bool {
+        expr.as_spread().is_some_and(|spread| {
+            self.push_spread_element_own_line_block_comments_with_blanks(
+                parts,
+                spread,
+                preserve_blanks,
+            )
+        })
     }
 
     /// [`Self::push_spread_own_line_block_comments`] on the node itself — see
@@ -410,10 +432,25 @@ impl<'a> Printer<'a> {
         parts: &mut DocBuf,
         spread: &internal::SpreadElement<'_>,
     ) -> bool {
+        self.push_spread_element_own_line_block_comments_with_blanks(parts, spread, true)
+    }
+
+    /// [`Self::push_spread_element_own_line_block_comments`] with the author-blank policy
+    /// named — see [`Self::push_spread_own_line_block_comments_with_blanks`].
+    pub(crate) fn push_spread_element_own_line_block_comments_with_blanks(
+        &self,
+        parts: &mut DocBuf,
+        spread: &internal::SpreadElement<'_>,
+        preserve_blanks: bool,
+    ) -> bool {
         let comments = self.spread_element_own_line_block_comments(spread);
         let mut prev_end = spread.argument.span().end;
         for comment in &comments {
-            self.push_blank_preserving_hardline(parts, prev_end, comment.span.start);
+            if preserve_blanks {
+                self.push_blank_preserving_hardline(parts, prev_end, comment.span.start);
+            } else {
+                parts.push(self.d().hardline());
+            }
             parts.push(self.build_comment_doc(comment));
             prev_end = comment.span.end;
         }

@@ -159,18 +159,26 @@ impl<'a> Printer<'a> {
         doc
     }
 
-    /// The last real element before slot `i` — its end position and its index.
+    /// The last real element before slot `i` — its slot index and the element itself.
     ///
-    /// A hole has no span, so this is the only anchor a source scan across earlier slots can
-    /// start from. When every earlier slot is a hole the anchor is just inside `[`, paired
-    /// with index 0 so a comma count from it still measures whole slots.
-    fn prev_real_element_end(&self, arr: &internal::ArrayExpression<'_>, i: usize) -> (u32, usize) {
+    /// A hole has no span, so this is the only anchor a scan across earlier slots can start
+    /// from, and the slot index is what [`Self::element_gap_split`] derives `is_last` from.
+    /// `None` when every earlier slot is a hole (or there are none): there is no element to
+    /// have claimed anything, so the region opens at `[`.
+    ///
+    /// `i == arr.elements.len()` asks it of the whole array — "the last real element" — which
+    /// is the form [`Self::end_scan_start`] and [`Self::last_element_trailing_split`] take, so
+    /// the three sites share one walk rather than restating the search past holes.
+    fn prev_real_slot<'e>(
+        &self,
+        arr: &'e internal::ArrayExpression<'e>,
+        i: usize,
+    ) -> Option<(usize, &'e Expression<'e>)> {
         arr.elements[..i]
             .iter()
             .enumerate()
             .rev()
-            .find_map(|(idx, e)| e.as_ref().map(|e| (e.span().end, idx)))
-            .unwrap_or((arr.span.start + 1, 0))
+            .find_map(|(idx, e)| e.as_ref().map(|e| (idx, e)))
     }
 
     /// Does this **block** comment trail the element before it, rather than lead the one after?
@@ -333,43 +341,35 @@ impl<'a> Printer<'a> {
     }
 
     /// Where the array element at `i`'s leading-comment scan starts. `elem_start` is this
-    /// element's own start, which bounds every comma scan (only a real element collects
-    /// leading comments, so there is always one to bound it).
+    /// element's own start, which bounds the scan (only a real element collects leading
+    /// comments, so there is always one to bound it).
     ///
-    /// The immediately-preceding slot decides which of two shapes this is:
+    /// **One rule, whatever sits in between**: the scan resumes at the last REAL element's
+    /// gap SPLIT POINT ([`Self::element_gap_split`]) — or at `[` when there is no earlier
+    /// element to have claimed anything. Everything from there on leads this element,
+    /// which is the complement of that element's trailing claim, so the gap is partitioned
+    /// exactly once however many elisions lie in it.
     ///
-    /// - **A real element** — the scan starts at that element's gap SPLIT POINT
-    ///   ([`Self::element_gap_split`]), which spans the separator. Starting past the
-    ///   comma instead leaves the pre-comma region to neither side.
-    /// - **A hole** — the scan starts past the hole's comma, and there is no split to
-    ///   take: a hole prints no element, so the comments between the last real element and
-    ///   the hole's comma are the hole seams' business, not this element's. A hole has no
-    ///   span to anchor on, so that comma is located by **counting** from the last real
-    ///   element: its own separator is the first comma past the anchor, and each hole
-    ///   after it adds one more. Anchoring on the array's first comma instead would start
-    ///   the search before earlier elements and re-collect their comments.
+    /// ⚠️ **Intervening holes do not move the anchor forward.** They used to: the scan
+    /// started past the hole's comma, located by *counting* commas from the last real
+    /// element, on the reading that the region before that comma was "the hole seams'
+    /// business". No hole seam prints, so it was nobody's — every comment in it was
+    /// DROPPED (`[x⏎/* c */, , y]`, `[/* c */, y]`, `[x, /* c */ , y]`, and a run of two
+    /// came back with only its tail). A hole is a **slot**, not an element: it prints
+    /// nothing and its comma is re-emitted structure outside every element span, so a
+    /// comment slides *forward* past it to the element it leads. Sliding backward across
+    /// the previous element's own comma is the move tsv refuses — see
+    /// conformance_prettier_ts_comments.md §Comment relocation (`across an elision`).
     fn leading_comment_search_start_for(
         &self,
         arr: &internal::ArrayExpression<'_>,
         i: usize,
         elem_start: u32,
     ) -> u32 {
-        if i == 0 {
-            return arr.span.start + 1;
+        match self.prev_real_slot(arr, i) {
+            Some((idx, prev)) => self.element_gap_split(arr, idx, prev.span().end, elem_start),
+            None => arr.span.start + 1,
         }
-        if let Some(prev) = arr.elements[i - 1].as_ref() {
-            // The previous slot holds an element — resume where its claim ended.
-            return self.element_gap_split(arr, i - 1, prev.span().end, elem_start);
-        }
-        let (anchor, r) = self.prev_real_element_end(arr, i);
-        let mut pos = anchor;
-        for _ in 0..(i - r) {
-            let Some(comma) = self.find_comma_in_range(pos, elem_start) else {
-                break;
-            };
-            pos = comma + 1;
-        }
-        pos
     }
 
     /// Add trailing block comments for an array element — the ones
@@ -455,7 +455,7 @@ impl<'a> Printer<'a> {
     ///
     /// `None` when the array holds no real element: there is nothing to scan past.
     fn end_scan_start(&self, arr: &internal::ArrayExpression<'_>) -> Option<u32> {
-        let elem = arr.elements.iter().rev().find_map(Option::as_ref)?;
+        let (_, elem) = self.prev_real_slot(arr, arr.elements.len())?;
         Some(match elem.as_spread() {
             Some(spread)
                 if !self
@@ -481,12 +481,7 @@ impl<'a> Printer<'a> {
         &self,
         arr: &internal::ArrayExpression<'_>,
     ) -> Option<(u32, u32)> {
-        let (idx, elem) = arr
-            .elements
-            .iter()
-            .enumerate()
-            .rev()
-            .find_map(|(i, e)| e.as_ref().map(|e| (i, e)))?;
+        let (idx, elem) = self.prev_real_slot(arr, arr.elements.len())?;
         let elem_end = elem.span().end;
         // No real element follows, so the gap runs to the closing `]`.
         let gap_end = arr.span.end - 1;
@@ -697,6 +692,15 @@ impl<'a> Printer<'a> {
         // Check Prettier's shouldBreak heuristic for nested arrays/objects
         let mut should_break = self.should_break_nested_array(arr);
 
+        // The array's share of a spread's stripped-paren interior, carried until every
+        // elision comma between the spread and the next real element is out — the same
+        // forward slide the hole region's own comments take
+        // ([`Self::leading_comment_search_start_for`]). Emitting it against the spread's own
+        // comma is what the reprint disagrees with: by then the parens are gone and the
+        // comment is an ordinary hole-region one, so it slides — two fixed points for one
+        // document. It always drains, at the next real slot or in the trailing-elision arm.
+        let mut pending_spread_comments: CommentVec<'_> = smallvec![];
+
         for (i, elem) in arr.elements.iter().enumerate() {
             // Elements and their glued comments (a hole pushes nothing).
             self.push_array_element_with_inline_comments(arr, i, has_comments, &mut parts);
@@ -708,17 +712,20 @@ impl<'a> Printer<'a> {
                 // Separator comma between elements
                 parts.push(d.text(","));
 
-                // Own-line block comments from spread with stripped parens:
-                // placed after the comma as siblings in the array.
+                // Own-line block comments from spread with stripped parens: siblings in the
+                // array, past this comma and past any elision commas that follow it. Only a
+                // spread slot fills this, and a real slot always drains it first, so the
+                // assignment never overwrites a live run.
                 if let Some(expr) = elem {
-                    let spread_comments = self.spread_own_line_block_comments(expr);
-                    if !spread_comments.is_empty() {
-                        for comment in &spread_comments {
-                            parts.push(d.line());
-                            parts.push(self.build_comment_doc(comment));
-                        }
+                    pending_spread_comments = self.spread_own_line_block_comments(expr);
+                }
+                if !matches!(arr.elements.get(i + 1), Some(None)) {
+                    for comment in &pending_spread_comments {
+                        parts.push(d.line());
+                        parts.push(self.build_comment_doc(comment));
                         should_break = true;
                     }
+                    pending_spread_comments.clear();
                 }
 
                 if has_blank_after {
@@ -733,23 +740,33 @@ impl<'a> Printer<'a> {
                 // Trailing comma for elision - MUST be preserved (semantically significant)
                 parts.push(d.text(","));
 
-                // Block comments past the trailing-elision comma (e.g., `[, , ,/* c */]`)
-                // aren't picked up by add_leading/add_trailing, which only run for real
-                // elements. Anchor on the last comma in the array, then emit any block
-                // comments after it inline.
-                let scan_start = arr
-                    .elements
-                    .iter()
-                    .flatten()
-                    .next_back()
-                    .map_or(arr.span.start + 1, |e| e.span().end);
-                if let Some(lc) = self.find_last_comma_before(scan_start, arr.span.end - 1) {
-                    for comment in
-                        comments_to_emit_in_range(self.comments, lc + 1, arr.span.end - 1)
-                    {
-                        if comment.is_block {
-                            parts.push(self.build_comment_doc(comment));
-                        }
+                // The carried spread share drains here when only elisions followed it.
+                for comment in &pending_spread_comments {
+                    parts.push(d.line());
+                    parts.push(self.build_comment_doc(comment));
+                    should_break = true;
+                }
+                pending_spread_comments.clear();
+
+                // The trailing-hole region: everything past the last real element's own
+                // claim (e.g. `[, , ,/* c */]`, `[x, /* c */ , ]`). No hole slot prints an
+                // element, so add_leading/add_trailing never run for it and this is the
+                // region's only emitter — it takes the SPLIT ([`Self::element_gap_split`],
+                // via [`Self::last_element_trailing_split`]) so the two sides partition the
+                // gap. Anchoring on the last comma instead dropped everything the author
+                // wrote *before* one of the elision commas, which no other emitter sees.
+                //
+                // With no real element at all the region opens at `[`. The split is at or
+                // past the element's end either way, so a LAST spread's stripped-paren
+                // interior stays the spread doc's share and is never re-emitted here.
+                let scan_start = self
+                    .last_element_trailing_split(arr)
+                    .map_or(arr.span.start + 1, |(_, split)| split);
+                for comment in
+                    comments_to_emit_in_range(self.comments, scan_start, arr.span.end - 1)
+                {
+                    if comment.is_block {
+                        parts.push(self.build_comment_doc(comment));
                     }
                 }
             }
@@ -902,6 +919,10 @@ impl<'a> Printer<'a> {
         // to avoid re-emitting those comments.
         let mut trailing_hole_comments_end: Option<u32> = None;
 
+        // A spread element whose stripped-paren interior the array still owes a line to,
+        // held across the elisions that follow it — see the emission site below.
+        let mut pending_spread_share: Option<&Expression<'_>> = None;
+
         for (i, elem) in arr.elements.iter().enumerate() {
             // O(remaining elements) — compute once and reuse below.
             let next_boundary = self.next_element_boundary(arr, i);
@@ -963,10 +984,20 @@ impl<'a> Printer<'a> {
             //   comment, and the blank line before it falls outside the range and is lost;
             // - else `None`, letting `has_blank_line_after_slot` take this slot's own
             //   boundary — for a hole its comma, rather than the next real element past it.
+            //
+            // ⚠️ A **hole** always takes `None`, whatever the list above holds. Its printed
+            // content is the comma alone, and the trailing-hole branch below fills
+            // `leading_comments` with the ARRAY's trailing run, which sits *past* that
+            // comma: bounding the scan there reads the hole's own line break as an author's
+            // blank line. That fabricated blank was an F1 break, since the reprint puts the
+            // comment on its own line where the next pass measures a real blank
+            // (`[x⏎/* c */, , ]` → `[x,⏎,⏎/* c */]` → `[x,⏎⏎,⏎/* c */]`).
             if i > 0 {
-                let content_start = leading_comments.first().map(|c| c.span.start).or_else(|| {
-                    elem.as_ref()
-                        .and_then(|e| self.owned_leading_comment_start(e))
+                let content_start = elem.as_ref().and_then(|e| {
+                    leading_comments
+                        .first()
+                        .map(|c| c.span.start)
+                        .or_else(|| self.owned_leading_comment_start(e))
                 });
                 if self.has_blank_line_after_slot(arr, i - 1, content_start) {
                     parts.push(d.literalline());
@@ -1050,8 +1081,25 @@ impl<'a> Printer<'a> {
             // the own-line blocks the spread's own doc leaves behind. The LAST element has
             // no comma to emit against, so its share is the final scan's second anchor
             // instead (see `end_scan_emits_comment` and `final_scan_start` below).
-            if !is_last && let Some(e) = elem {
-                self.push_spread_own_line_block_comments(&mut parts, e);
+            //
+            // Carried across any elisions that follow the spread, so it lands past their
+            // commas too — the same forward slide every other hole-region comment takes,
+            // and the one the reprint performs once the parens are gone (the share is an
+            // ordinary own-line comment there). Emitting it against the spread's own comma
+            // left our output disagreeing with our reprint of it. A non-spread element
+            // carries nothing, so the push is a no-op for it.
+            //
+            // The drain slot says whether it was in fact carried: `elem` is the spread
+            // itself when the next slot is real, and a HOLE when elisions intervened —
+            // which is exactly when the authored blank inside the parens must be dropped,
+            // the elision's line break being structure rather than authorship.
+            if !is_last && elem.is_some() {
+                pending_spread_share = elem.as_ref();
+            }
+            if !matches!(arr.elements.get(i + 1), Some(None))
+                && let Some(e) = pending_spread_share.take()
+            {
+                self.push_spread_own_line_block_comments_with_blanks(&mut parts, e, elem.is_some());
             }
 
             // Trailing-hole iter: emit collected trailing-on-array comments inline
