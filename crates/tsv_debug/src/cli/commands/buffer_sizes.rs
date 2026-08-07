@@ -58,7 +58,7 @@ pub struct BufferSizesCommand {
 
 impl BufferSizesCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let (files, _skipped) = resolve_profile_files(&self.paths, |_| false)?;
+        let (files, _skipped) = resolve_profile_files(&self.paths, |_| true)?;
 
         #[cfg(feature = "buffer_stats")]
         tsv_ts::set_buffer_stats(true);

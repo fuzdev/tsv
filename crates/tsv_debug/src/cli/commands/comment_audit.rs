@@ -2,12 +2,12 @@ use argh::FromArgs;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
+use crate::audit::sweep::{PristineSweep, sweep_pristine_armed};
+use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
 use crate::cli::CliError;
-use tsv_cli::cli::format_source::format_source;
-use tsv_cli::cli::input::ParserType;
 use tsv_lang::comment_ledger::{self, CommentFinding, CommentFindingKind};
 
-use super::profile::{is_input_invalid_fixture, resolve_files};
+use super::profile::resolve_seed_files;
 
 /// Audit that every parsed comment is printed exactly once.
 ///
@@ -15,6 +15,11 @@ use super::profile::{is_input_invalid_fixture, resolve_files};
 /// file, reporting every comment the format DROPPED (parsed, never emitted — silent
 /// content loss) or DOUBLE-PRINTED. Pure Rust — no Deno. Defaults to `tests/fixtures`
 /// when no paths are given.
+///
+/// The corpus walk is the shared [`sweep_pristine_armed`], as in its twin
+/// `swallow_audit` — so the skip buckets mean the same thing here as in the other
+/// as-authored audits, and a formatter panic mid-walk is caught and named rather
+/// than killing the run. Panics are counted, not gated: the panic gates own that class.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "comment_audit")]
 pub struct CommentAuditCommand {
@@ -34,29 +39,31 @@ struct Violation {
 }
 
 /// REGRESSION PIN (minimum, at the exact measured value): comments registered across a
-/// default (`tests/fixtures`) run — with an empty or all-parse-failing corpus the audit
-/// would pass vacuously ("0 findings across 0 comments"). A minimum, not a two-sided pin,
-/// because the fixtures tree is COMMITTED and grows with ordinary fixture PRs (`deno task
-/// check` must not fail per added fixture); shrinkage/collapse fails. Re-pin to current
-/// when it trips. Same ritual as `swallow_audit`'s `FORMATTED_MIN` and
+/// default (`tests/fixtures`) run — a corpus that SHRANK, or a registration that partly
+/// collapsed, still reports "no findings" and would otherwise pass. A minimum, not a
+/// two-sided pin, because the fixtures tree is COMMITTED and grows with ordinary fixture
+/// PRs (`deno task check` must not fail per added fixture); shrinkage/collapse fails.
+/// Re-pin to current when it trips. Same ritual as [`FIXTURES_FORMATTED_MIN`] and
 /// `benches/js/lib/gate_counts.ts`.
-const REGISTERED_MIN: usize = 24_042;
+///
+/// It answers a question the shared file pin cannot: **registration** collapsing without
+/// the file count moving (a format entry point that stops registering a carrier still
+/// formats every file). The converse holds too, which is why this audit passes BOTH —
+/// sharing the sweep means its `formatted` is the other four's by construction, so a skip
+/// policy that diverged here would drop below [`FIXTURES_FORMATTED_MIN`] and say so
+/// instead of hiding in this pin's slack. That slack is the reason to keep re-pinning
+/// tight: left at its first measured value it drifted 27% below the live count, a gap
+/// wide enough to swallow a quarter of the corpus in silence.
+///
+/// Only a default run can be held to a number, so both pins stay `default_paths`-gated;
+/// the floor *under* them — zero graded files, vacuous at any scope — is
+/// [`check_graded_nonzero`], called unconditionally above.
+const REGISTERED_MIN: usize = 33_138;
 
 impl CommentAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
         let default_paths = self.paths.is_empty();
-        let paths = if default_paths {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.paths
-        };
-        let files = match resolve_files(&paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
+        let files = resolve_seed_files(&self.paths, 0)?;
 
         // Arm the ledger for the whole run: the format entry points register each
         // document's comments and the printers' comment seams record each emit.
@@ -64,44 +71,32 @@ impl CommentAuditCommand {
         comment_ledger::set_comment_check(true);
 
         let mut violations: Vec<Violation> = Vec::new();
-        let mut formatted = 0usize;
-        let mut parse_errors = 0usize;
         let mut registered = 0usize;
         let mut unregistered_emits = 0usize;
-
-        for path in &files {
-            // Skip fixtures expected to fail parsing.
-            if is_input_invalid_fixture(path) {
-                continue;
-            }
-            let Ok(source) = std::fs::read_to_string(path) else {
-                continue;
-            };
-            // Drain any stragglers, then format and finalize this document.
-            let _ = comment_ledger::take_comment_ledger();
-            if format_source(&source, ParserType::from_extension(&path.to_string_lossy())).is_err()
-            {
-                parse_errors += 1;
+        let sweep = sweep_pristine_armed(
+            &files,
+            // Drain before each format, so a ledger left behind by a seed the sweep
+            // skipped (rejected, panicked) can't be attributed to the next file.
+            || {
                 let _ = comment_ledger::take_comment_ledger();
-                continue;
-            }
-            formatted += 1;
-            let ledger = comment_ledger::take_comment_ledger();
-            registered += ledger.parsed;
-            unregistered_emits += ledger.unregistered_emits;
-            for finding in ledger.findings {
-                violations.push(Violation {
-                    path: path.clone(),
-                    finding,
-                });
-            }
-        }
+            },
+            |path, _parser, _source, _output| {
+                let ledger = comment_ledger::take_comment_ledger();
+                registered += ledger.parsed;
+                unregistered_emits += ledger.unregistered_emits;
+                for finding in ledger.findings {
+                    violations.push(Violation {
+                        path: path.to_path_buf(),
+                        finding,
+                    });
+                }
+            },
+        );
 
         comment_ledger::set_comment_check(false);
 
         let stats = Stats {
-            formatted,
-            parse_errors,
+            sweep,
             registered,
             unregistered_emits,
         };
@@ -110,7 +105,12 @@ impl CommentAuditCommand {
         } else {
             print_report(&violations, &stats);
         }
+        stats.sweep.print_panic_sample();
 
+        check_graded_nonzero(stats.sweep.formatted, "files formatted")?;
+        if default_paths {
+            check_formatted_min(stats.sweep.formatted, FIXTURES_FORMATTED_MIN)?;
+        }
         if default_paths && registered < REGISTERED_MIN {
             eprintln!(
                 "Error: pinned minimum — registered {registered} comments < pinned \
@@ -129,8 +129,9 @@ impl CommentAuditCommand {
 }
 
 struct Stats {
-    formatted: usize,
-    parse_errors: usize,
+    /// The shared skip/format bookkeeping (the [`check_graded_nonzero`] vacuity
+    /// floor reads `formatted`; the report tail reads `skipped_note`).
+    sweep: PristineSweep,
     registered: usize,
     unregistered_emits: usize,
 }
@@ -155,16 +156,17 @@ fn preview(text: &str) -> String {
 
 fn print_report(violations: &[Violation], stats: &Stats) {
     let Stats {
-        formatted,
-        parse_errors,
+        sweep,
         registered,
         unregistered_emits,
-    } = *stats;
+    } = stats;
+    let formatted = sweep.formatted;
+    let skipped = sweep.skipped_note();
 
     if violations.is_empty() {
         println!(
             "✓ every comment printed exactly once — {registered} comments across {formatted} \
-             files ({parse_errors} parse-skipped, {unregistered_emits} unregistered emits)"
+             files ({skipped}, {unregistered_emits} unregistered emits)"
         );
         return;
     }
@@ -175,7 +177,7 @@ fn print_report(violations: &[Violation], stats: &Stats) {
         .count();
     println!(
         "✗ {} finding(s) across {} file(s) — {dropped} dropped, {} double-printed \
-         ({registered} comments, {formatted} formatted, {parse_errors} parse-skipped, \
+         ({registered} comments, {formatted} formatted, {skipped}, \
          {unregistered_emits} unregistered emits)\n",
         violations.len(),
         violations
@@ -237,14 +239,15 @@ fn print_json(violations: &[Violation], stats: &Stats) {
             })
         })
         .collect();
-    let output = serde_json::json!({
-        "formatted": stats.formatted,
-        "parse_skipped": stats.parse_errors,
-        "registered": stats.registered,
-        "unregistered_emits": stats.unregistered_emits,
-        "findings": violations.len(),
-        "violations": items,
-    });
+    let output = stats.sweep.json_report(
+        serde_json::json!({}),
+        serde_json::json!({
+            "registered": stats.registered,
+            "unregistered_emits": stats.unregistered_emits,
+            "findings": violations.len(),
+            "violations": items,
+        }),
+    );
     #[allow(clippy::unwrap_used)]
     let s = serde_json::to_string_pretty(&output).unwrap();
     println!("{s}");

@@ -43,12 +43,13 @@ use std::path::{Path, PathBuf};
 use argh::FromArgs;
 use futures_util::stream::{self, StreamExt};
 
+use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 use crate::deno;
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
-use super::profile::{is_input_invalid_fixture, resolve_files};
+use super::profile::{is_input_invalid_fixture, is_svelte, resolve_seed_files_named};
 
 /// Audit whether `tsv format` changes what a Svelte component renders.
 #[derive(FromArgs, Debug)]
@@ -62,9 +63,9 @@ pub struct RenderAuditCommand {
     #[argh(switch)]
     json: bool,
 
-    /// stop after N .svelte files
-    #[argh(option)]
-    limit: Option<usize>,
+    /// cap the number of files audited (0 = unlimited)
+    #[argh(option, default = "0")]
+    limit: usize,
 
     /// files or directories to audit (default: tests/fixtures)
     #[argh(positional)]
@@ -95,35 +96,11 @@ struct Tally {
 
 impl RenderAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let paths = if self.files.is_empty() {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.files.clone()
-        };
-
-        let mut files = match resolve_files(&paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
         // Svelte templates only — the render question is meaningless elsewhere.
         // `input_invalid_*` fixtures are deliberately unparseable.
-        files.retain(|p| {
-            p.extension().is_some_and(|e| e == "svelte")
-                && !p.to_string_lossy().ends_with(".svelte.ts")
-                && !is_input_invalid_fixture(p)
-        });
-        files.sort();
-        if let Some(limit) = self.limit {
-            files.truncate(limit);
-        }
-
-        if files.is_empty() {
-            eprintln!("No .svelte files found in: {}", paths.join(", "));
-            return Err(CliError::Failed);
-        }
+        let files = resolve_seed_files_named(&self.files, self.limit, ".svelte files", |p| {
+            is_svelte(p) && !is_input_invalid_fixture(p)
+        })?;
 
         let concurrency = deno::init_bulk_pool();
         let rt = super::create_runtime();
@@ -134,7 +111,17 @@ impl RenderAuditCommand {
         if self.gate && !tally.findings.is_empty() {
             return Err(CliError::Failed);
         }
-        Ok(())
+        // The floor UNDER the non-empty resolution: resolution proves `.svelte` files
+        // were found, not that the render question was ever put. The two skip buckets
+        // are the ones that could not put it — tsv failed to format, or the analyzer
+        // rejected a side — and a run that is entirely those reports "✓ no findings"
+        // and exits 0, indistinguishable from a clean sweep. A no-op format IS a
+        // verdict (render equality by identity), so it counts toward the floor even
+        // though the report calls it skipped: it skips the ORACLE, not the question.
+        check_graded_nonzero(
+            tally.unchanged + tally.preserved + tally.findings.len(),
+            ".svelte files render-checked",
+        )
     }
 
     fn report(&self, tally: &Tally, total: usize) {

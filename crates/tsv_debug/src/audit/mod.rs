@@ -9,10 +9,13 @@
 //! - [`census`] — the raw-text comment-trivia scanners behind the comment census
 //!   (`census_audit`): per-language extraction that never consults the parser's
 //!   own comment carrying, so parse-time drops are visible.
-//! - [`sweep`] — the pristine-format corpus loop the as-authored ratchet audits
-//!   (`fabrication_audit`, `census_audit`, `width_audit`) share: skip/read/format
-//!   bookkeeping with a per-file visitor, plus the vacuity guard that refuses to
-//!   grade a collapsed corpus.
+//! - [`sweep`] — the pristine-format corpus loop the as-authored audits
+//!   (`fabrication_audit`, `census_audit`, `width_audit`, `swallow_audit`,
+//!   `comment_audit`) share: skip/read/format bookkeeping with a per-file
+//!   visitor, and the human + `--json` report tails for it.
+//! - [`vacuity`] — the two-layer guard that refuses to grade nothing: the
+//!   scope-free floor every corpus-walking audit calls on its own denominator,
+//!   and the default-corpus pin above it.
 //! - [`panic_hook`] — the suppressed-default-hook bracket every corpus walk that
 //!   formats under `catch_unwind` installs, so N crashing files do not print N
 //!   backtraces over the report.
@@ -58,6 +61,11 @@ pub(crate) mod ratchet;
 // The pristine-format sweep is NOT gated: its consumers (`fabrication_audit`,
 // `census_audit`, `width_audit`) drive no instrumentation seam.
 pub(crate) mod sweep;
+
+// The vacuity guard is NOT gated, and reaches further than the sweep: seven of
+// its callers (`canonicalize`, `binding`, `neutrality`, `roundtrip`, `authoring`,
+// `render`, `fuzz`) drive no sweep, and several exist in a default build.
+pub(crate) mod vacuity;
 
 // The panic-hook bracket is NOT gated: `sweep` installs one in a default build.
 // `ArmedRun` (gated, in `parallel`) holds one too — one definition, so the two

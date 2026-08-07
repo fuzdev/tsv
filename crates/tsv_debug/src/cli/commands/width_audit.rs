@@ -8,9 +8,8 @@ use tsv_lang::{PRINT_WIDTH, TAB_WIDTH};
 
 use crate::audit::ratchet::{Ratchet, SnapshotKey, print_ratchet_skipped, refuse_narrowed_update};
 use crate::audit::shape::{markup_head, name_run};
-use crate::audit::sweep::{
-    FIXTURES_FORMATTED_MIN, PristineSweep, check_formatted_min, sweep_pristine,
-};
+use crate::audit::sweep::{PristineSweep, sweep_pristine};
+use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
 use crate::cli::CliError;
 
 use super::profile::resolve_seed_files;
@@ -248,6 +247,7 @@ impl WidthAuditCommand {
         // by `--json` (which writes stdout) so `2>/dev/null` still parses.
         sweep.pristine.print_panic_sample();
 
+        check_graded_nonzero(sweep.pristine.formatted, "files formatted")?;
         let full_run = narrowed.is_empty();
         if full_run {
             check_formatted_min(sweep.pristine.formatted, FIXTURES_FORMATTED_MIN)?;
@@ -573,18 +573,18 @@ fn print_json(sweep: &Sweep) {
             })
         })
         .collect();
-    let output = serde_json::json!({
-        "print_width": PRINT_WIDTH,
-        "formatted": sweep.pristine.formatted,
-        "parse_skipped": sweep.pristine.parse_errors,
-        "read_skipped": sweep.pristine.read_errors,
-        "panicked": sweep.pristine.panics.count(),
-        "panicked_sample": sweep.pristine.panics.sample(),
-        "lines_measured": sweep.lines_measured,
-        "overruns": sweep.overruns.len(),
-        "shapes": sweep.shapes.len(),
-        "items": items,
-    });
+    // `print_width` leads, as it always has — this audit's parameter before its
+    // measurements. The sweep's fields splice in after it, which is why
+    // `json_report` takes both halves instead of prepending a fixed block.
+    let output = sweep.pristine.json_report(
+        serde_json::json!({ "print_width": PRINT_WIDTH }),
+        serde_json::json!({
+            "lines_measured": sweep.lines_measured,
+            "overruns": sweep.overruns.len(),
+            "shapes": sweep.shapes.len(),
+            "items": items,
+        }),
+    );
     #[allow(clippy::unwrap_used)]
     let s = serde_json::to_string_pretty(&output).unwrap();
     println!("{s}");

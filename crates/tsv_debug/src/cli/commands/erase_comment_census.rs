@@ -1,7 +1,7 @@
 use argh::FromArgs;
 use std::path::{Path, PathBuf};
 
-use super::profile::resolve_files;
+use super::profile::{is_svelte, resolve_profile_files_named};
 use crate::cli::CliError;
 
 /// Census: comments exposed to the type-eraser's refusal window.
@@ -40,22 +40,10 @@ pub struct EraseCommentCensusCommand {
 
 impl EraseCommentCensusCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        if self.paths.is_empty() {
-            eprintln!("Error: No files provided. Use file paths, directories, or glob patterns.");
-            return Err(CliError::Failed);
-        }
-        let mut files = match resolve_files(&self.paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
-        files.retain(|p| p.extension().and_then(|e| e.to_str()) == Some("svelte"));
-        if files.is_empty() {
-            eprintln!("Error: No .svelte files found");
-            return Err(CliError::Failed);
-        }
+        // Svelte components only — the census counts comments a `lang="ts"`
+        // component's type erasure would expose.
+        let (files, _input_invalid_skipped) =
+            resolve_profile_files_named(&self.paths, ".svelte files", is_svelte)?;
 
         let mut scanned = 0usize;
         let mut parse_failed = 0usize;

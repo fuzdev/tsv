@@ -36,9 +36,10 @@ use std::path::Path;
 use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 
+use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 
-use super::profile::{is_input_invalid_fixture, resolve_files};
+use super::profile::{is_input_invalid_fixture, is_ts_family, resolve_seed_files_named};
 
 /// Audit whether a comment's *ownership* ever changes tsv's layout (a gate reading
 /// ownership where it should be blind to it).
@@ -84,28 +85,24 @@ struct Finding {
 
 impl NeutralityAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let paths = if self.paths.is_empty() {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.paths.clone()
-        };
-        let mut files = match resolve_files(&paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
-        files.retain(|p| is_ts_family(p) && !is_input_invalid_fixture(p));
-        if self.limit > 0 {
-            files.truncate(self.limit);
-        }
+        // TypeScript-family only; `.svelte`/`.css` (and intentionally-invalid fixture
+        // inputs) aren't neutrality subjects. An empty scan must not read as a pass —
+        // the report renders its (empty) counts and reports "no ownership-dependent
+        // layout" — so resolution fails loud on one.
+        let files =
+            resolve_seed_files_named(&self.paths, self.limit, "TypeScript-family files", |p| {
+                is_ts_family(p) && !is_input_invalid_fixture(p)
+            })?;
 
         let mut counts: BTreeMap<&'static str, usize> = BTreeMap::new();
         let mut findings: Vec<Finding> = Vec::new();
+        // The graded denominator: files the ownership probe actually ran on. `skipped`
+        // is everything else, and a run that skipped all of them proves nothing.
+        let mut probed = 0usize;
         for path in &files {
             match audit_file(path) {
                 Ok(fs) => {
+                    probed += 1;
                     if fs.is_empty() {
                         *counts.entry("clean").or_default() += 1;
                     } else {
@@ -118,7 +115,12 @@ impl NeutralityAuditCommand {
         }
         findings.sort_by(|a, b| a.display.cmp(&b.display).then(a.line.cmp(&b.line)));
 
-        self.report(files.len(), &counts, &findings)
+        self.report(files.len(), &counts, &findings)?;
+        // The floor UNDER the non-empty resolution: resolution proves files were found,
+        // not that any was graded. Every file landing in `skipped` reads exactly like a
+        // clean run here — "✓ no ownership-dependent layout", exit 0 — and this audit
+        // has no `default_paths` pin above it at any scope.
+        check_graded_nonzero(probed, "TypeScript-family files probed")
     }
 
     fn report(
@@ -308,13 +310,6 @@ fn indent(s: &str) -> String {
         let _ = writeln!(acc, "      {l}");
         acc
     })
-}
-
-fn is_ts_family(path: &Path) -> bool {
-    matches!(
-        path.extension().and_then(|e| e.to_str()),
-        Some("ts" | "js" | "mts" | "cts" | "mjs" | "cjs")
-    )
 }
 
 #[cfg(test)]

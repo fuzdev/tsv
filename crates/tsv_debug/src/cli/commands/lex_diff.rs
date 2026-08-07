@@ -1,4 +1,5 @@
 use crate::cli::CliError;
+use crate::cli::commands::profile::{is_pruned_dir, is_ts_family};
 use argh::FromArgs;
 use std::collections::BTreeMap;
 use std::path::{Path, PathBuf};
@@ -16,8 +17,9 @@ use std::path::{Path, PathBuf};
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "lex_diff")]
 pub struct LexDiffCommand {
-    /// files/dirs to lex (recursive; `.ts` / `.mts` / `.cts` / `.svelte.ts` /
-    /// `.css` — dispatched per file to the matching language lexer)
+    /// files/dirs to lex (recursive; the TypeScript family — `.ts` / `.mts` /
+    /// `.cts` / `.js` / `.mjs` / `.cjs`, `.svelte.ts` and `.d.ts` included — plus
+    /// `.css`, dispatched per file to the matching language lexer)
     #[argh(positional)]
     paths: Vec<PathBuf>,
 
@@ -225,8 +227,10 @@ fn collect_lex_files(path: &Path, out: &mut Vec<PathBuf>) {
     for entry in entries.flatten() {
         let p = entry.path();
         if p.is_dir() {
-            let name = p.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if matches!(name, "node_modules" | ".git" | "target" | "dist" | "build") {
+            if p.file_name()
+                .and_then(|n| n.to_str())
+                .is_none_or(is_pruned_dir)
+            {
                 continue;
             }
             collect_lex_files(&p, out);
@@ -236,18 +240,23 @@ fn collect_lex_files(path: &Path, out: &mut Vec<PathBuf>) {
     }
 }
 
+/// A file this harness can lex — the [TypeScript family](is_ts_family) or CSS,
+/// which is exactly the set the dispatch above has a lexer for.
+///
+/// The TS arm is the shared predicate rather than a local suffix test, and that
+/// **widens** it: it had listed `.ts`/`.mts`/`.cts` only, while `.js`/`.mjs`/`.cjs`
+/// dispatch to the very same `tsv_ts` lexer (`ParserType::from_extension` sends
+/// everything that is not `.svelte`/`.css` there, which is this file's own `else`
+/// branch). Nothing explained the omission — the comment there justified including
+/// `.d.ts`, not excluding the JS family — so it read as drift, and it cost the
+/// harness coverage of `next_token` over the source shapes only real JS has.
 fn is_lex_file(path: &Path) -> bool {
-    is_ts_file(path) || is_css_file(path)
+    is_ts_family(path) || is_css_file(path)
 }
 
-fn is_ts_file(path: &Path) -> bool {
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    // Any TypeScript source, including `.d.ts` declaration files — they lex like
-    // any other `.ts` and are worth diffing.
-    name.ends_with(".ts") || name.ends_with(".mts") || name.ends_with(".cts")
-}
-
+/// A CSS file. Extension-keyed like its siblings — a bare `.css` dotfile is a
+/// stem, not a CSS source. Local rather than hoisted beside `is_ts_family`
+/// because this is its only caller; hoist it when a second one appears.
 fn is_css_file(path: &Path) -> bool {
-    let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("");
-    name.ends_with(".css")
+    path.extension().and_then(|e| e.to_str()) == Some("css")
 }

@@ -72,10 +72,11 @@ use tsv_cli::cli::format_source::format_source;
 use tsv_cli::cli::input::ParserType;
 use tsv_svelte::ast::internal::{FragmentNode, is_collapsible_ws_char};
 
+use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 use crate::deno::{PrettierParser, run_prettier};
 
-use super::profile::{is_input_invalid_fixture, resolve_files};
+use super::profile::{is_input_invalid_fixture, is_svelte, resolve_seed_files_named};
 
 /// Audit Svelte boundary-whitespace authoring-independence.
 ///
@@ -573,26 +574,11 @@ fn interesting(b: Bucket) -> bool {
 
 impl AuthoringAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let paths = if self.paths.is_empty() {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.paths.clone()
-        };
-        let files = match resolve_files(&paths) {
-            Ok(f) => f.into_iter().filter(|p| is_svelte(p)).collect::<Vec<_>>(),
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
         // A scan with nothing in it must not read as a pass: the report renders its
         // (empty) per-site tables and exits 0, so a typo'd path or a tree with no
-        // `.svelte` files would look identical to a clean converge. Fail loud instead,
-        // matching `render_audit`'s "No .svelte files found".
-        if files.is_empty() {
-            eprintln!("Error: no .svelte files found (searched {paths:?})");
-            return Err(CliError::Failed);
-        }
+        // `.svelte` files would look identical to a clean converge. Resolution fails
+        // loud on one, naming the subject rather than the raw walk.
+        let files = resolve_seed_files_named(&self.paths, 0, ".svelte files", is_svelte)?;
 
         let report = if self.prettier {
             let rt = super::create_runtime();
@@ -619,10 +605,13 @@ impl AuthoringAuditCommand {
             + report.count(Bucket::NonIdempotent)
             + report.files_base_non_idempotent;
         if hard > 0 {
-            Err(CliError::Failed)
-        } else {
-            Ok(())
+            return Err(CliError::Failed);
         }
+        // The floor UNDER the non-empty resolution: this audit's product is per-SITE, so
+        // a corpus of `.svelte` files that all parse-failed — or that hold no boundary
+        // site at all — renders the same all-zero tables a clean converge does. The
+        // resolution's non-empty file list can't see that.
+        check_graded_nonzero(report.sites, "boundary sites probed")
     }
 
     /// Pure-Rust pass: convergence + self-stability only (no prettier).
@@ -781,10 +770,6 @@ impl AuthoringAuditCommand {
             }
         }
     }
-}
-
-fn is_svelte(p: &Path) -> bool {
-    p.extension().and_then(|e| e.to_str()) == Some("svelte")
 }
 
 /// Build a variant of `f` with one site's whitespace run flipped.

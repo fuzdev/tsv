@@ -88,10 +88,11 @@ use tsv_cli::cli::input::ParserType;
 use crate::audit::properties::{
     leaf_conservation_diff, structurally_equivalent, tsv_parse_to_value,
 };
+use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 use crate::deno;
 
-use super::profile::{is_input_invalid_fixture, resolve_files};
+use super::profile::{is_input_invalid_fixture, resolve_seed_files_named};
 
 /// Audit whether every file's formatted output reparses to the same document.
 ///
@@ -240,6 +241,15 @@ impl Bucket {
         }
     }
 
+    /// A bucket the round-trip property was actually EVALUATED on. The two
+    /// negations are skips — tsv couldn't format the input, or the canonical
+    /// oracle rejected it — so neither carries a verdict. The vacuity floor
+    /// counts these: a run where every file skipped reports "no round-trip
+    /// findings" and exits 0, which is what a clean run reports too.
+    fn is_graded(self) -> bool {
+        !matches!(self, Self::FormatError | Self::CanonicalRejectsInput)
+    }
+
     /// A stable severity rank for sorting findings worst-first.
     fn severity(self) -> u8 {
         match self {
@@ -329,31 +339,15 @@ impl RoundtripAuditCommand {
     }
 
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let paths = if self.paths.is_empty() {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.paths.clone()
-        };
-        let mut files = match resolve_files(&paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
-        // Intentionally-invalid fixture inputs aren't round-trip subjects.
-        files.retain(|p| !is_input_invalid_fixture(p));
-        // A scan with nothing in it must not read as a pass: `--gate` reports
-        // "no round-trip findings" and exits 0 on an empty set, so a typo'd path or
-        // a corpus that silently stopped resolving would look identical to a clean
-        // run. Fail loud instead, matching `gap_audit`/`blank_audit`/`fuzz`/`render_audit`.
-        if files.is_empty() {
-            eprintln!("Error: no round-trip subjects found (searched {paths:?})");
-            return Err(CliError::Failed);
-        }
-        if self.limit > 0 {
-            files.truncate(self.limit);
-        }
+        // Intentionally-invalid fixture inputs aren't round-trip subjects. A scan with
+        // nothing in it must not read as a pass: `--gate` reports "no round-trip
+        // findings" and exits 0 on an empty set, so a typo'd path or a corpus that
+        // silently stopped resolving would look identical to a clean run. Resolution
+        // fails loud on one, naming the subject rather than the raw walk.
+        let files =
+            resolve_seed_files_named(&self.paths, self.limit, "round-trip subjects", |p| {
+                !is_input_invalid_fixture(p)
+            })?;
 
         let render = !self.no_render;
         let reparse_only = self.reparse_only();
@@ -375,7 +369,12 @@ impl RoundtripAuditCommand {
             ));
         }
 
-        self.report(&results)
+        let graded = results.iter().filter(|r| r.bucket().is_graded()).count();
+        self.report(&results)?;
+        // The floor UNDER the non-empty resolution: resolution proves files were found,
+        // not that any was graded, and this audit has no `default_paths` pin above it at
+        // any scope.
+        check_graded_nonzero(graded, "round-trip subjects graded")
     }
 
     fn report(&self, results: &[FileResult]) -> Result<(), CliError> {
