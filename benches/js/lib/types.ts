@@ -35,7 +35,7 @@ export const LANGUAGE_PRETTIER_PARSERS: Record<Language, string> = {
  * and real TS), so `SourceFile.goal` is left undefined there and treated as
  * `module`. Threaded ONLY through the conformance-coverage preflight so that
  * corpus scores each tool on the goal test262 declares — see
- * `benches/js/CLAUDE.md` §Conformance-surface semantics.
+ * `docs/benchmarks.md` §Fairness caveats (Conformance-surface semantics).
  */
 export type ParseGoal = 'script' | 'module';
 

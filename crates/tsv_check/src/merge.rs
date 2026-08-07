@@ -15,7 +15,7 @@
 //! 5. non-global **module augmentations** (`declare module "X"`) resolve + merge.
 //!
 //! Iteration is **deterministic** (file order, then declaration order) — never a
-//! hash-map's iteration order (the grimoire-recorded tsgo determinism landmine).
+//! hash-map's iteration order (the tsgo determinism landmine).
 //!
 //! **Two-level globals (overlay + lib base).** A resolved lib set folds into an
 //! immutable [`LibBase`] (built once per distinct set, shared across variants);

@@ -31,7 +31,7 @@ type Runtime = (typeof RUNTIMES)[number];
  *
  * The timings are nullable because a perf report can carry a **coverage-only**
  * row — a tool measured for what it accepts but deliberately never timed
- * (`rsvelte-fmt`; see benches/js/CLAUDE.md §Coverage-only rows). Such a row is
+ * (`rsvelte-fmt`; see docs/benchmarks.md §Coverage-only rows). Such a row is
  * dropped below rather than folded.
  */
 interface Entry {

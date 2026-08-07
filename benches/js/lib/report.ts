@@ -701,7 +701,7 @@ function build_comparison_data(
 			comparisons.push({ name: 'biome-wasm', ratio: ratio(tsv_wasm_ns, biome_ns) });
 		}
 		// dprint is TypeScript/JS-only, so this contributes a row for that language
-		// alone — the same-tier WASM-vs-WASM read (see CLAUDE.md §Fairness Caveats).
+		// alone — the same-tier WASM-vs-WASM read (see docs/benchmarks.md §Fairness caveats).
 		const dprint_ns = get_mean_ns(group_name, 'dprint-wasm');
 		if (dprint_ns !== null) {
 			comparisons.push({ name: 'dprint-wasm', ratio: ratio(tsv_wasm_ns, dprint_ns) });

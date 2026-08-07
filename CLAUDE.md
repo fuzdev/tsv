@@ -281,7 +281,7 @@ deno task validate:artifacts             # tight wasm size bounds + Deno smoke o
 
 ### Corpus Comparison
 
-Compare formatting against Prettier, and parse output against the canonical parsers, on real codebases. Full runs enforce **pinned expected counts**: the format `--all` counts hold over the reproducible subset (version-pinned framework + prettier checkouts; live dev repos are a non-gating WARN, SAFETY still gates every file); parse `compared` counts + committed fixtures are live-growth minimums. See `benches/js/lib/gate_counts.ts` and ./benches/js/CLAUDE.md §Pinned gate counts.
+Compare formatting against Prettier, and parse output against the canonical parsers, on real codebases. Full runs enforce **pinned expected counts**: the format `--all` counts hold over the reproducible subset (version-pinned framework + prettier checkouts; live dev repos are a non-gating WARN, SAFETY still gates every file); parse `compared` counts + committed fixtures are live-growth minimums. See `benches/js/lib/gate_counts.ts` and ./docs/gate_counts.md.
 
 ```bash
 deno task corpus:compare:format ~/dev/some-project  # single project, or --all for the gates corpus (real repos + prettier suites)
@@ -356,7 +356,7 @@ BENCH_FILTER=zzz BENCH_LIMIT=10 deno task bench:deno:run
 
 **Prerequisites**: `cargo install wasm-pack` + `deno task bench:install` once (the install needs npm/Node). Beyond that **Deno is the only hard dependency**; Node ≥ 22.18 (native TS type-stripping) for `bench:node`, Bun for `bench:bun` — the aggregate `bench` needs both and fails fast if either is missing.
 
-Compares: canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node+Bun), WASM, and alternatives (oxc-parser, oxfmt, biome-wasm, dprint-wasm — the engine `deno fmt` runs, TS/JS only — and yuku-parser, a Zig TS/JS parser shipped as both an N-API and a WASM binding, parse-only and payload-matched to oxc; its lazy `parse()` and error-tolerant parser are corrected for in `benches/js/lib/yuku.ts`). `rsvelte-fmt` (Svelte only) is a **coverage-only** row — an accept rate with no timing, since it ships no in-process API and a per-file subprocess row would rank process spawn rather than format work; its end-to-end CLI numbers live in the separate hyperfine comparison published on tsv.fuz.dev. See ./benches/js/CLAUDE.md §Coverage-only rows. Results: `benches/js/results/report.<runtime>.{json,md}` (committed; every row carries a `runtime` field) + the combined `report.{json,md}`. To publish to tsv.fuz.dev: `npm run update-benchmarks` in ~/dev/tsv.fuz.dev. See ./benches/js/CLAUDE.md.
+Compares: canonical (prettier + svelte/compiler), native (FFI under Deno / N-API under Node+Bun), WASM, and alternatives (oxc-parser, oxfmt, biome-wasm, dprint-wasm — the engine `deno fmt` runs, TS/JS only — and yuku-parser, a Zig TS/JS parser shipped as both an N-API and a WASM binding, parse-only and payload-matched to oxc; its lazy `parse()` and error-tolerant parser are corrected for in `benches/js/lib/yuku.ts`). `rsvelte-fmt` (Svelte only) is a **coverage-only** row — an accept rate with no timing, since it ships no in-process API and a per-file subprocess row would rank process spawn rather than format work; its end-to-end CLI numbers live in the separate hyperfine comparison published on tsv.fuz.dev. See ./docs/benchmarks.md §Coverage-only rows. Results: `benches/js/results/report.<runtime>.{json,md}` (committed; every row carries a `runtime` field) + the combined `report.{json,md}`. To publish to tsv.fuz.dev: `npm run update-benchmarks` in ~/dev/tsv.fuz.dev. See ./benches/js/CLAUDE.md.
 
 ### Performance Profiling
 
@@ -986,6 +986,8 @@ formatting behavior. Key files: `src/language-js/print/assignment.js` (assignmen
 
 - ./docs/cli.md - CLI architecture, command patterns, multi-file formatting rules
 - ./docs/audits.md - the standing audit gates: what each proves, blind spots, flags, gating
+- ./docs/benchmarks.md - benchmark fairness caveats, the implementation catalog, binary sizes, the canonical-oracle-pin ritual
+- ./docs/gate_counts.md - the pinned counts every graded gate and harvest enforces
 - ./docs/comments.md - the detached comment model: ownership, the three axes, hazards, emitters
 - ./docs/compile_tooling.md - the sidecar-dependent compiler harnesses: corpus compare, compile fuzz, erase census
 - ./docs/compile_validation_ratchet.md - the validation-suite ratchet: snapshot, kinds, verdict, triage

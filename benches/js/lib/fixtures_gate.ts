@@ -248,7 +248,7 @@ export async function run_fixtures_gate(config: FixturesGateConfig): Promise<voi
 					`\n⚠ oracle version skew: ${config.oracle_pin.checkout_package_json} is v${checkout_pkg.version} but the ` +
 						`${config.oracle_pin.npm_package} oracle is pinned v${pinned} — the suite INPUTS and the grading parser ` +
 						`come from different versions. Align the checkout, or bump the canonical pins deliberately (see ` +
-						`benches/js/CLAUDE.md §"Canonical baseline is coupled").`
+						`docs/benchmarks.md §"Canonical baseline is coupled").`
 				);
 			}
 		} catch {

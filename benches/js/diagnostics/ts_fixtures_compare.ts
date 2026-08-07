@@ -47,8 +47,7 @@ import { type KnownGap, TS_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.ts';
  * Over-rejections where tsv is WRONG — genuine drop-in parse gaps, tracked so the
  * gate is green at baseline and only regressions (a NEW, untracked over-rejection)
  * fail it. This set must only SHRINK: when a gap is fixed, delete its entry (the
- * input then parses → parity). Full triage lives in internal notes
- * (TODO_PARSE_COVERAGE.md §"Productionized: conformance:ts-fixtures").
+ * input then parses → parity). Full triage lives in internal notes.
  */
 const KNOWN_GAPS: KnownGap[] = [];
 

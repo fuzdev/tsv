@@ -30,8 +30,8 @@
 //! Canonical Svelte rejects every `INVALID` case below and accepts every `VALID`
 //! case (verified via `tsv_debug canonical_parse`). Pinned as a Rust test rather
 //! than an `input_invalid_*` fixture: a new fixture file reshuffles the
-//! corpus-sensitive `fuzz:audit` seed-0 sample onto the next latent bug (see the
-//! fuzzer-backlog lore); a parser-rejection assertion has no such coupling.
+//! corpus-sensitive `fuzz:audit` seed-0 sample onto the next latent bug; a
+//! parser-rejection assertion has no such coupling.
 
 /// `true` if tsv's Svelte parser accepts `src`.
 fn accepts(src: &str) -> bool {

@@ -31,9 +31,8 @@ pub struct FlowReduceLabel {
 
 // --- FlowGraph -------------------------------------------------------------
 
-/// A per-file control-flow graph in struct-of-arrays form (per
-/// `TODO_TYPECHECKER_INTERNALS.md` §Flow graph). Backward edges only (the
-/// checker walks use→def).
+/// A per-file control-flow graph in struct-of-arrays form. Backward edges only
+/// (the checker walks use→def).
 ///
 /// Columns are indexed by `FlowNodeId::index()`. Antecedents are
 /// kind-discriminated via `flags`: a non-label node's `antecedent` slot is the

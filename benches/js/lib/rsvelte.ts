@@ -9,7 +9,7 @@
  * / `parse` / `svelte2tsx`, no format export). So it can only be driven as a
  * subprocess, which is why its row is **coverage-only**: it is measured for what
  * it accepts, never timed. See `implementations.ts` (`coverage_only`) and
- * benches/js/CLAUDE.md §Fairness Caveats.
+ * docs/benchmarks.md §Coverage-only rows.
  *
  * Two decisions keep the coverage number meaningful:
  *
@@ -115,7 +115,7 @@ export class RsvelteImplementation extends BaseImplementation {
 		// Passing `--config` explicitly is itself load-bearing: without it
 		// rsvelte-fmt runs that upward discovery, and a stray `.oxfmtrc.json`
 		// anywhere above the repo would silently restyle this row. See
-		// benches/js/CLAUDE.md §Fairness Caveats.
+		// docs/benchmarks.md §Coverage-only rows.
 		const config_path = fileURLToPath(new URL('../rsvelte.oxfmtrc.json', import.meta.url));
 		if (!existsSync(config_path)) {
 			throw new Error(`missing rsvelte-fmt bench config at ${config_path}`);

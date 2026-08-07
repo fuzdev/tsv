@@ -92,8 +92,8 @@ export type YukuBinding = keyof typeof YUKU_BINDINGS;
  *
  * Every value is set explicitly even where it matches yuku's current default, so
  * an upstream default change can't silently skew the rows — the same rule the
- * formatter rows follow for `printWidth`/`trailingComma` (CLAUDE.md §Fairness
- * Caveats). Each choice is a payload or work match against the opponents:
+ * formatter rows follow for `printWidth`/`trailingComma` (docs/benchmarks.md
+ * §Fairness caveats). Each choice is a payload or work match against the opponents:
  *
  * - `sourceType: 'module'` — yuku's default too, and the goal tsv/acorn parse the
  *   perf corpus at. `parse_yuku` overrides it per file when the harness threads a
@@ -126,8 +126,8 @@ const PARSE_OPTIONS: YukuParseOptions = {
  *
  * ⚠ **`parse()` is LAZY.** It returns memoized getters over the binary buffer the
  * Zig side produced; the JS AST is built only when `.program` is read. Forcing it
- * is a large measured cost (the per-binding figures live in CLAUDE.md §Fairness
- * Caveats) — so a row that called `parse()` and discarded the result would report
+ * is a large measured cost (the per-binding figures live in docs/benchmarks.md
+ * §Fairness caveats) — so a row that called `parse()` and discarded the result would report
  * a throughput for a tree nobody built, and would not be measuring the same
  * deliverable as `oxc-parser` (whose `.program` getter `JSON.parse`s) or
  * `tsv-json`. **Returning `result.program` is what forces the decode: never

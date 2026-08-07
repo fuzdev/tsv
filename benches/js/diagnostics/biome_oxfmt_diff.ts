@@ -1,7 +1,7 @@
 /**
  * 4-way formatter differential triage: tsv (FFI) vs prettier(-typescript) vs
- * biome-wasm vs oxfmt. A hand-triage aid for the Biome/oxfmt corpus-output
- * mining pass (see internal notes) — NOT a gate.
+ * biome-wasm vs oxfmt. A hand-triage aid for mining the Biome/oxfmt corpus
+ * output — NOT a gate.
  *
  * The corpus:compare:format tool only diffs tsv vs prettier; this adds biome +
  * oxfmt as third/fourth opinions so a tsv-vs-prettier divergence can be bucketed:
@@ -9,7 +9,13 @@
  *   - tsv + biome (or + oxfmt) agree vs prettier → candidate sanctioned divergence
  *
  * Prettier is routed through the TYPESCRIPT parser (filepath `snippet.ts`), never
- * babel — the item-2..5 guardrail ([[biome-diffs-use-babel-recheck-typescript]]).
+ * babel. That routing is load-bearing when working from Biome's "Differences with
+ * Prettier" doc: it reports prettier's behavior under prettier's BABEL parser, while
+ * tsv's oracle is prettier-TYPESCRIPT (prettier-plugin-svelte routes `lang="ts"`
+ * through it). The two often differ — several "Prettier omits X" claims there are
+ * babel-only and prettier-typescript actually does X — so a listed difference can
+ * turn out to be a plain tsv bug rather than a divergence. Confirm every such claim
+ * against the typescript parser before deciding it is one.
  *
  * Usage (from repo root):
  *   deno run --allow-ffi --allow-read --allow-env --allow-net --allow-sys \

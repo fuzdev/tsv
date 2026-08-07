@@ -67,7 +67,7 @@ export class DprintImplementation extends BaseImplementation {
 		// Match the prettier/tsv config — tabs, line width 100, single quotes, no
 		// trailing commas — so every format row does the same layout work (at
 		// dprint's defaults the rows wrap different amounts of code and the ratios
-		// conflate config with engine speed). See CLAUDE.md §Fairness Caveats.
+		// conflate config with engine speed). See docs/benchmarks.md §Fairness caveats.
 		// `lineWidth`/`indentWidth`/`useTabs` are dprint GLOBAL config; the quote and
 		// trailing-comma keys are plugin config (`trailingCommas` fans out to the 12
 		// per-construct keys — `arguments.trailingCommas`, `arrayExpression.…`, …).

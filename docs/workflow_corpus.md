@@ -11,8 +11,7 @@ fixture-first TDD flow rather than this file's hunk workflow.
 Exit-code notes for `--all` runs: besides SAFETY (which always gates), the
 tools fail on an empty scope, an all-errored / zero-compared run (systemic
 sidecar/FFI failure), and on the **pinned per-language counts**
-(`benches/js/lib/gate_counts.ts` — see ../benches/js/CLAUDE.md §Pinned gate
-counts): minimums on `compared`/`match` (live corpus — growth passes, drops
+(`benches/js/lib/gate_counts.ts` — see [gate_counts.md](gate_counts.md)): minimums on `compared`/`match` (live corpus — growth passes, drops
 fail) and exact pins on the negative buckets (`unknown`/`partial`/tsv parse
 failures — a new one fails until triaged; fixing some means re-pinning to
 record the win, which is exactly the loop this document drives).
