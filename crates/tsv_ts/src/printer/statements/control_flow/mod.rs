@@ -264,7 +264,7 @@ impl<'a> Printer<'a> {
         // A comment sharing the body's line is not trailing the anchor, so it does not
         // stay up there — but a **block** one glued to the body leads it inline
         // ([`Printer::split_glued_comments`]); the rest take their own line.
-        let (rest, glued) = self.split_glued_comments(inline_next, body_start);
+        let (rest, glued) = self.split_glued_comments(inline_next);
         own_line.extend(rest);
 
         self.build_comments_between_parts(parts, &inline_prev, &own_line, None);
@@ -320,7 +320,7 @@ impl<'a> Printer<'a> {
             self.partition_comments_by_line(gap_start, body_start);
         // A block comment glued to the body leads it inline rather than taking a line of
         // its own — see [`Printer::split_glued_comments`].
-        let (rest, glued) = self.split_glued_comments(inline_next, body_start);
+        let (rest, glued) = self.split_glued_comments(inline_next);
         own_line.extend(rest);
 
         // Only a **block** comment can stay on the anchor's line. A line comment authored

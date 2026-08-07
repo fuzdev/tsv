@@ -115,9 +115,15 @@ impl<'a> Printer<'a> {
                     is_first.then_some(brace_pull_pos).flatten(),
                 );
 
-                // For non-first properties, add separator
+                // For non-first properties, add separator. An author BLANK line takes the
+                // hardline separator even when nothing else forces the break: a soft
+                // `line` cannot carry a blank, so routing a blank gap through `line()`
+                // DROPS it — and the comment-free path below preserves the identical
+                // authoring (`{ a,⏎⏎b }`), so a commented object dropping it was the two
+                // paths disagreeing about one gap. Preserving it forces the object open,
+                // which is what the comment-free path's `literalline` does too.
                 if !is_first {
-                    if must_break {
+                    if must_break || self.item_gap_has_blank_line(prev_end, prop_start) {
                         // Must break: check for blank line preservation
                         self.push_item_blank_separator(&mut parts, prev_end, prop_start);
                     } else {
@@ -195,39 +201,21 @@ impl<'a> Printer<'a> {
                 prev_end = trailing.end_pos;
             }
 
-            // Handle trailing comments before closing brace
+            // Trailing comments before the closing brace, through the shared end-of-body
+            // run (`Printer::build_trailing_body_comments_doc`) rather than a copy of it:
+            // the same walk, the same "already trailed by the last property" question, and
+            // the same stripped-shell blank anchor every other container gets. The copy
+            // this replaces had drifted from it on all three. An object that may still
+            // COLLAPSE takes a soft `line` separator its group decides; a broken one takes
+            // the hardline, like every other body.
             let closing_brace_pos = obj.span.end - 1;
-            let trailing_comments: CommentVec<'_> =
-                comments_to_emit_in_range(self.comments, prev_end, closing_brace_pos)
-                    .filter(|c| !self.is_same_line(prev_end, c.span.start))
-                    .collect();
-
-            if !trailing_comments.is_empty() {
-                // Check for blank line before the first trailing comment
-                let first_comment = trailing_comments[0];
-                if must_break && self.has_blank_line_between(prev_end, first_comment.span.start) {
-                    parts.push(d.literalline());
-                }
-
-                let mut last_pos = prev_end;
-                for (j, comment) in trailing_comments.iter().enumerate() {
-                    // Check for blank lines between comments
-                    if must_break
-                        && j > 0
-                        && self.has_blank_line_between(last_pos, comment.span.start)
-                    {
-                        parts.push(d.literalline());
-                    }
-
-                    if must_break {
-                        parts.push(d.hardline());
-                    } else {
-                        parts.push(d.line());
-                    }
-                    parts.push(self.build_comment_doc(comment));
-                    last_pos = comment.span.end;
-                }
-            }
+            let separator = if must_break { d.hardline() } else { d.line() };
+            parts.extend(self.build_trailing_closer_comments_doc(
+                prev_end,
+                closing_brace_pos,
+                false,
+                separator,
+            ));
 
             if must_break {
                 // Forced multiline - use hardlines for predictable formatting

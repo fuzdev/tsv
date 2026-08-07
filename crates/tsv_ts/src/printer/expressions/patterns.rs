@@ -443,6 +443,14 @@ impl<'a> Printer<'a> {
     /// counts it, so `const [a,⏎,⏎/* c */] = arr` grew a blank the first pass never wrote:
     /// not a fixed point. Blanks *between* two dangling comments are unaffected; only the
     /// one measured across the hole is.
+    ///
+    /// ⚠️ The run is measured from the last element's shell end
+    /// ([`Printer::element_shell_end`]) — the same "structure is not authorship" rule in
+    /// its *stripped paren* spelling. An array pattern's element span ends INSIDE its
+    /// shell, so a raw scan from it reads the erased `)`'s line breaks as an author blank
+    /// and fabricates one. The comment range still opens at `prev_end`: the peel steps over
+    /// nothing but `)` and whitespace and stops at the first comment, so no interior
+    /// comment is skipped.
     fn build_pattern_trailing_dangling_comments(
         &self,
         prev_end: u32,
@@ -451,7 +459,7 @@ impl<'a> Printer<'a> {
     ) -> DocId {
         let d = self.d();
         let mut parts = DocBuf::new();
-        let mut last_pos = prev_end;
+        let mut last_pos = self.element_shell_end(prev_end, boundary);
         let mut first = true;
         for comment in comments_to_emit_in_range(self.comments, prev_end, boundary) {
             let blanks_measurable = !(first && past_elision);

@@ -1065,13 +1065,8 @@ impl<'a> Printer<'a> {
                     let param_end = p.span().end;
                     if i + 1 < params.len() {
                         let next_start = params[i + 1].span().start;
-                        let comma_pos = self.find_list_comma(param_end, next_start);
-                        self.append_trailing_inline_block_comments(
-                            &mut param_parts,
-                            param_end,
-                            comma_pos,
-                        );
-                        prev_end = comma_pos + 1; // After comma
+                        prev_end =
+                            self.push_item_trailing_run(&mut param_parts, param_end, next_start);
                     } else {
                         // Last param: trailing comments before `)` (`end_boundary` is
                         // the close paren, or the last param end fallback).

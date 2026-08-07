@@ -109,12 +109,7 @@ fn build_inline_trailing_comments(
     next_boundary: u32,
 ) -> Option<DocId> {
     let d = printer.d();
-    let pc = PartitionedComments::new(
-        printer.comments,
-        printer.comment_line_breaks,
-        arg_end,
-        next_boundary,
-    );
+    let pc = PartitionedComments::for_item_gap(printer, arg_end, next_boundary);
 
     if !pc.has_trailing_block() {
         return None;
@@ -1340,12 +1335,7 @@ fn build_chain_args_multi(
         } else {
             let next_arg_start = call.arguments[i + 1].span().start;
             if has_any_comments && printer.has_comments_to_emit_between(arg_end, next_arg_start) {
-                let mut pc = PartitionedComments::new(
-                    printer.comments,
-                    printer.comment_line_breaks,
-                    arg_end,
-                    next_arg_start,
-                );
+                let mut pc = PartitionedComments::for_item_gap(printer, arg_end, next_arg_start);
                 pc.route_after_comma_hugging_to_leading(printer);
                 // before-comma blocks trail the arg, the comma, stranded after-comma
                 // blocks (`A`).

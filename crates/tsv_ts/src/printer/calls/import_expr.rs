@@ -210,12 +210,7 @@ pub(super) fn build_import_expression_doc(
         || has_trailing_comments
         || inter_blank_no_comments
     {
-        let mut inter = PartitionedComments::new(
-            printer.comments,
-            printer.comment_line_breaks,
-            source_end,
-            options_start,
-        );
+        let mut inter = PartitionedComments::for_item_gap(printer, source_end, options_start);
         inter.route_after_comma_hugging_to_leading(printer);
 
         // Source arg + comma: before-comma blocks trail the source; stranded after-comma

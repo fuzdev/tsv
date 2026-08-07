@@ -41,4 +41,17 @@
 
 
 	};
+
+	// blank line before a comment glued to its property is preserved too
+	const o5 = {
+
+
+		a,
+
+
+
+		/* c */ b
+
+
+	};
 </script>

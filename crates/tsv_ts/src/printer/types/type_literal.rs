@@ -55,7 +55,7 @@ impl<'a> Printer<'a> {
         let leading_comments: CommentVec<'_> = if !is_first {
             all_comments
                 .iter()
-                .filter(|c| !self.is_same_line(prev_end, c.span.start))
+                .filter(|c| !self.comment_already_trailed(Some(prev_end), c, false))
                 .copied()
                 .collect()
         } else {

@@ -1584,17 +1584,31 @@ impl<'a> Printer<'a> {
     /// Whether a comment between two params forces the param list to expand.
     ///
     /// A **line** comment always forces it (it runs to end-of-line, so the
-    /// following param can't share the line). A **block** comment forces it only
-    /// when it sits on its OWN line — isolated from *both* neighbors: not
-    /// inline-adjacent to the previous param at `start` (`a /* c */,`), nor to the
-    /// following one at `end` (`/* c */ b`). Either adjacency stays inline, matching
-    /// prettier, which collapses `a,⏎/* c */ b` and `a /* c */,⏎b` both back to
-    /// `a, /* c */ b`. (Same isolated-from-both rule as the intersection member
-    /// gate; keying only on the following param over-expanded a block that trailed
-    /// the previous one before its comma.)
+    /// following param can't share the line). A **block** comment forces it only when it
+    /// sits on its OWN line — nothing before it on its line in SOURCE
+    /// ([`Printer::comment_follows_content_on_its_line`]) *and* not glued to the following
+    /// param at `end` (`/* c */ b`). Either adjacency stays inline, matching prettier,
+    /// which collapses `a,⏎/* c */ b` and `a /* c */,⏎b` both back to `a, /* c */ b`.
+    ///
+    /// ⚠️ **The own-line half reads the source, not the previous param's end at `start`.**
+    /// The two differ by exactly the text no param span covers — the list's own **comma**,
+    /// which the author can push onto its own line (`fn(a⏎, /* c */⏎b)`), and a stripped
+    /// paren shell's `)`. An item-boundary reading (the shared
+    /// [`Printer::comment_isolated_from_neighbors`], which the operator and keyword gaps
+    /// still want) calls such a comment own-line and expands a list that fits — a third
+    /// fixed point neither the bare authoring nor prettier produces. A parameter list is
+    /// the container `docs/conformance_prettier.md` §Comment Position Philosophy names
+    /// outright: it flattens when it fits, so the author's break around a comma is layout,
+    /// not own-line-ness. Same question the bracketed-list gate
+    /// ([`Printer::has_own_line_block_comments_in_bracket_list`]) and the element→comma
+    /// seam ask.
     fn has_own_line_comment_between(&self, start: u32, end: u32) -> bool {
-        self.comments_on_page_between(start, end)
-            .any(|c| self.comment_isolated_from_neighbors(start, c, end))
+        self.comments_on_page_between(start, end).any(|c| {
+            if !c.is_block {
+                return true;
+            }
+            !self.comment_follows_content_on_its_line(c) && !self.is_same_line(c.span.end, end)
+        })
     }
 
     /// Whether the author left a blank line between any two consecutive params.

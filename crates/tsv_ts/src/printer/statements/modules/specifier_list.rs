@@ -510,9 +510,7 @@ impl<'a> Printer<'a> {
 
             if !is_last {
                 let next_start = get_span(&items[i + 1]).start;
-                let comma_pos = self.find_list_comma(item_end, next_start);
-                self.append_trailing_inline_block_comments(&mut item_parts, item_end, comma_pos);
-                prev_end = comma_pos + 1;
+                prev_end = self.push_item_trailing_run(&mut item_parts, item_end, next_start);
             } else {
                 // Split the last item's trailing block comments around a source comma:
                 // before-comma stay with the item; after-comma are preserved below, past
@@ -618,7 +616,7 @@ impl<'a> Printer<'a> {
 
             for comment in &comments {
                 parts.push(self.build_comment_doc(comment));
-                if self.comment_hugs_next(comment, item_start) {
+                if self.comment_hugs_next(comment) {
                     parts.push(d.text(" "));
                 } else {
                     parts.push(d.hardline());
