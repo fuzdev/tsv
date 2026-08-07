@@ -121,7 +121,9 @@ pub(super) fn write_export_default_value(
             write_declare_function(w, func, ctx, true);
         }
         internal::ExportDefaultValue::ClassDeclaration(class) => {
-            write_class_declaration(w, class, ctx, true);
+            // As with `TSDeclareFunction` above, `declare` can't syntactically appear
+            // in an `export default`, so the declare-position flag is inert here.
+            write_class_declaration(w, class, ctx, false);
         }
         internal::ExportDefaultValue::TSInterfaceDeclaration(iface) => {
             write_interface_declaration(w, iface, ctx, true);

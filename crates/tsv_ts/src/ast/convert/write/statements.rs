@@ -115,10 +115,8 @@ pub(super) fn write_statement(
             write_class_declaration(w, class_decl, ctx, false);
         }
         internal::Statement::ExportNamedDeclaration(export_decl) => {
-            let export_kind = kind_token(
-                matches!(export_decl.export_kind, internal::ExportKind::Type),
-                schema,
-            );
+            let is_type_export = matches!(export_decl.export_kind, internal::ExportKind::Type);
+            let export_kind = kind_token(is_type_export, schema);
             let start = export_start(
                 ctx.source,
                 export_decl.span.start,
@@ -133,7 +131,7 @@ pub(super) fn write_statement(
             }
             w.raw(",\"declaration\":");
             write_or_null(w, export_decl.declaration.as_ref(), |w, d| {
-                write_exported_declaration(w, d, ctx, schema);
+                write_exported_declaration(w, d, ctx, schema, is_type_export);
             });
             w.raw(",\"specifiers\":");
             write_array(w, export_decl.specifiers, |w, s| {
@@ -348,18 +346,26 @@ pub(super) fn write_block_statement(
 /// `parseExportDeclaration` stamps `declare` on the *finished* node (post-hoc),
 /// unlike the statement-level `tsTryParseDeclare` prefix assignment — so
 /// `export declare` serializes `declare` last.
+///
+/// A decorated class needs the sharper question, because a decorator between
+/// `export` and `declare` sends the class back down the *statement* route: it
+/// takes `is_type_export`, the enclosing node's `exportKind`, which acorn sets in
+/// the very `if (isDeclare)` block that does the post-hoc stamp. For the other
+/// three, `declare` can only have come from the export route, so the bit is `true`
+/// by construction (and inert where there is no `declare` to place).
 fn write_exported_declaration(
     w: &mut JsonWriter,
     stmt: &internal::Statement<'_>,
     ctx: &Ctx<'_>,
     schema: Schema,
+    is_type_export: bool,
 ) {
     match stmt {
         internal::Statement::VariableDeclaration(var_decl) => {
             write_variable_declaration(w, var_decl, ctx, true);
         }
         internal::Statement::ClassDeclaration(class_decl) => {
-            write_class_declaration(w, class_decl, ctx, true);
+            write_class_declaration(w, class_decl, ctx, is_type_export);
         }
         internal::Statement::TSInterfaceDeclaration(iface) => {
             write_interface_declaration(w, iface, ctx, true);

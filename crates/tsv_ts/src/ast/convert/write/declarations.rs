@@ -164,17 +164,27 @@ fn write_super_class_fields(
 /// `declare?` (post-hoc position) — acorn-typescript's statement-level
 /// `declare class` stamps `declare` before parsing the class
 /// (`tsTryParseDeclare`), but `declare abstract class` (the
-/// `tsParseAbstractDeclaration` route) and every `export declare` form stamp
-/// the finished node, so the field's position depends on `exported`/`abstract`.
-/// `abstract` itself is assigned at its keyword, decorators attach after it.
+/// `tsParseAbstractDeclaration` route) and the `export declare` forms stamp
+/// the finished node, so the field's position depends on `abstract` and on
+/// *which* route consumed the `declare`. `abstract` itself is assigned at its
+/// keyword, decorators attach after it.
+///
+/// "Is it exported" does not settle the route once decorators are in play: a
+/// decorator between `export` and `declare` stops `parseExportDeclaration` from
+/// eating the keyword, so `export @dec declare class D {}` reaches the
+/// pre-stamping statement route while `@dec export declare class C {}` does not.
+/// `declare_stamped_by_export` is therefore the enclosing export's **type-export**
+/// bit, not merely "inside an export" — acorn sets `exportKind = 'type'` and does
+/// the post-hoc `declare` stamp in one `if (isDeclare)` block, and a class is
+/// never a type export for any other reason, so the two are the same fact.
 pub(super) fn write_class_declaration(
     w: &mut JsonWriter,
     class_decl: &internal::ClassDeclaration<'_>,
     ctx: &Ctx<'_>,
-    exported: bool,
+    declare_stamped_by_export: bool,
 ) {
     node_header(w, "ClassDeclaration", class_decl.span, ctx);
-    let declare_last = exported || class_decl.r#abstract;
+    let declare_last = declare_stamped_by_export || class_decl.r#abstract;
     if class_decl.declare && !declare_last {
         w.raw(",\"declare\":true");
     }

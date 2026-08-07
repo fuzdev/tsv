@@ -310,19 +310,6 @@ const DOCUMENTED_MATCHERS: DocumentedMatcher[] = [
 			/(^|\.)(leadingComments|trailingComments)$/.test(entry.path)
 	},
 	{
-		// acorn-typescript drops ALL params from async arrows with type params
-		// (`async <T,>(x: T) => x` → params: []) — documented semantic
-		// corruption tsv corrects.
-		name: 'async_generic_arrow_params',
-		conformance_section: 'TypeScript Corrections — Async generic arrow params',
-		matches: (entry, canonical_parent) => {
-			if (!/(^|\.)params$/.test(entry.path)) return false;
-			const parent = canonical_parent as
-				{ async?: unknown; typeParameters?: unknown } | null | undefined;
-			return parent?.async === true && parent?.typeParameters != null;
-		}
-	},
-	{
 		// Svelte's parseCss/parse call remove_bom before parsing, so every canonical
 		// offset in a BOM-prefixed file is 1 (UTF-16 unit) lower than the real file
 		// position; tsv deliberately keeps file-true offsets (its lexer skips the BOM
