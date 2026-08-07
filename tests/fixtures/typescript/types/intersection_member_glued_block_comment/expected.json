@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 305,
+	"end": 756,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -57,24 +57,152 @@
 					"column": 27
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " The run keeps its line at every boundary, not just the first, and the members below it",
+			"start": 297,
+			"end": 386,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 1
+				},
+				"end": {
+					"line": 7,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " still break on their own.",
+			"start": 388,
+			"end": 416,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block1 ",
+			"start": 488,
+			"end": 500,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 2
+				},
+				"end": {
+					"line": 10,
+					"column": 14
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block2 ",
+			"start": 501,
+			"end": 513,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 15
+				},
+				"end": {
+					"line": 10,
+					"column": 27
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " The same run collapses inline once the intersection fits — the line after it is the",
+			"start": 593,
+			"end": 679,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " group's to decide.",
+			"start": 681,
+			"end": 702,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block1 ",
+			"start": 717,
+			"end": 729,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 14
+				},
+				"end": {
+					"line": 16,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " block2 ",
+			"start": 730,
+			"end": 742,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 27
+				},
+				"end": {
+					"line": 16,
+					"column": 39
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 304,
+		"end": 755,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 295,
+			"end": 746,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 6,
+					"line": 17,
 					"column": 9
 				}
 			},
@@ -208,6 +336,313 @@
 							"value": " Blocks glued to each other but not to the intersection member stay together on their own line.",
 							"start": 20,
 							"end": 117
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 418,
+					"end": 590,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 26
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 423,
+						"end": 424,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 6
+							},
+							"end": {
+								"line": 9,
+								"column": 7
+							}
+						},
+						"name": "B"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 427,
+						"end": 589,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 10
+							},
+							"end": {
+								"line": 12,
+								"column": 25
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 427,
+								"end": 483,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 10
+									},
+									"end": {
+										"line": 9,
+										"column": 66
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 427,
+									"end": 483,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 10
+										},
+										"end": {
+											"line": 9,
+											"column": 66
+										}
+									},
+									"name": "Cccccccccccccccccccccccccccccccccccccccccccccccccccccccc"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 516,
+								"end": 561,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 2
+									},
+									"end": {
+										"line": 11,
+										"column": 47
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 516,
+									"end": 561,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 47
+										}
+									},
+									"name": "Ddddddddddddddddddddddddddddddddddddddddddddd"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " block1 ",
+										"start": 488,
+										"end": 500
+									},
+									{
+										"type": "Block",
+										"value": " block2 ",
+										"start": 501,
+										"end": 513
+									}
+								]
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 566,
+								"end": 589,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 2
+									},
+									"end": {
+										"line": 12,
+										"column": 25
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 566,
+									"end": 589,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 25
+										}
+									},
+									"name": "Eeeeeeeeeeeeeeeeeeeeeee"
+								}
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The run keeps its line at every boundary, not just the first, and the members below it",
+							"start": 297,
+							"end": 386
+						},
+						{
+							"type": "Line",
+							"value": " still break on their own.",
+							"start": 388,
+							"end": 416
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 704,
+					"end": 745,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 42
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 709,
+						"end": 710,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 6
+							},
+							"end": {
+								"line": 16,
+								"column": 7
+							}
+						},
+						"name": "C"
+					},
+					"typeAnnotation": {
+						"type": "TSIntersectionType",
+						"start": 713,
+						"end": 744,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 10
+							},
+							"end": {
+								"line": 16,
+								"column": 41
+							}
+						},
+						"types": [
+							{
+								"type": "TSTypeReference",
+								"start": 713,
+								"end": 714,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 10
+									},
+									"end": {
+										"line": 16,
+										"column": 11
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 713,
+									"end": 714,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 10
+										},
+										"end": {
+											"line": 16,
+											"column": 11
+										}
+									},
+									"name": "X"
+								}
+							},
+							{
+								"type": "TSTypeReference",
+								"start": 743,
+								"end": 744,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 40
+									},
+									"end": {
+										"line": 16,
+										"column": 41
+									}
+								},
+								"typeName": {
+									"type": "Identifier",
+									"start": 743,
+									"end": 744,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 40
+										},
+										"end": {
+											"line": 16,
+											"column": 41
+										}
+									},
+									"name": "Y"
+								},
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " block1 ",
+										"start": 717,
+										"end": 729
+									},
+									{
+										"type": "Block",
+										"value": " block2 ",
+										"start": 730,
+										"end": 742
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " The same run collapses inline once the intersection fits — the line after it is the",
+							"start": 593,
+							"end": 679
+						},
+						{
+							"type": "Line",
+							"value": " group's to decide.",
+							"start": 681,
+							"end": 702
 						}
 					]
 				}

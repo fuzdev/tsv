@@ -82,12 +82,14 @@ impl<'a> Printer<'a> {
     /// needs the *existence* answer (a break gate) this short-circuits on the first hit
     /// and allocates nothing.
     ///
-    /// Isolation is judged by position for **every** comment kind, which is what
-    /// separates this from [`Printer::comment_isolated_from_neighbors`] (and the
-    /// param-list gate over it): there a line comment counts as own-line wherever it
-    /// sits, because it forces the list open either way. Here a `//` sharing the
-    /// previous clause's line is that clause's trailing comment and belongs to the
-    /// `inline_prev` bucket, so it must not answer yes.
+    /// Isolation is judged by the neighboring **clause positions**, and for **every**
+    /// comment kind — both halves of what separates this from
+    /// [`Printer::comment_isolated_on_its_line`], which reads the source and calls every
+    /// line comment isolated (a `//` forces the list open wherever it sits). Here a `//`
+    /// sharing the previous clause's line is that clause's trailing comment and belongs
+    /// to the `inline_prev` bucket, so it must not answer yes; and the clause boundaries
+    /// are the right anchors because this gap's re-emitted text — a `;` — is what the
+    /// buckets are being partitioned around.
     fn has_isolated_comment_between(&self, prev_end: u32, next_start: u32) -> bool {
         comments_to_emit_in_range(self.comments, prev_end, next_start).any(|comment| {
             !self.is_same_line(prev_end, comment.span.start)
