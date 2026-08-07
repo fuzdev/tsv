@@ -893,7 +893,7 @@ a boundary reached with a suffix pending doesn't fit.
 run and the next element's leading run — and the two must **partition** it: unclaimed is a
 DROP, doubly-claimed a DOUBLE-PRINT. `collect_trailing_comments` / `push_element_comma_trailing`
 state that split once (object literal, both patterns, specifier list, enum members); the array
-literal states its own as a POSITION rather than two filters (`trailing_comment_split`, each
+literal states its own as a POSITION rather than two filters (`element_gap_split`, each
 emitter taking a range), which is what keeps its three readers — trailing, leading, end-of-array
 scan — from drifting apart. Three standing rules: the leading scan resumes at the trailing run's
 **end**, never past the separator — a comment before a comma the author pushed onto its own line

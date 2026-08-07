@@ -126,10 +126,26 @@ impl<'a> Printer<'a> {
     /// [`Self::prepend_owned_leading_comment`] keyed on a span start rather than a node,
     /// for a caller that already knows its node is the left edge.
     ///
-    /// The call-argument states and the curried-arrow chain **reassemble** an arrow from
-    /// its signature and body instead of routing it through `build_expression_doc`, so the
-    /// seam above never runs for them and the comment would be *dropped*. An arrow is
-    /// always its own left edge, so there is no innermost-node check to make.
+    /// **The rule, once:** a builder that **reassembles** a node from its parts instead of
+    /// routing it through `build_expression_doc` never runs the seam above, so it must claim
+    /// the owned comment here or the comment is *dropped* (`docs/comments.md` hazard 1).
+    /// The innermost-node check the seam above makes is skipped because every caller below
+    /// already knows its span start is the left edge — **which is a per-caller fact, not a
+    /// property of this function**, so a new caller owes that argument:
+    ///
+    /// - `build_arrow_sig_doc` (`calls/arg_wrapping.rs`) and `build_arrow_chain_doc`
+    ///   (`expressions/functions.rs`) reassemble an arrow from signature + body; an arrow is
+    ///   always its own left edge.
+    /// - `build_export_default_declaration_doc` (`statements/modules/mod.rs`) reassembles
+    ///   `export default @dec class {}`; the class expression is the left edge of what
+    ///   follows the decorator run.
+    /// - [`Self::build_frozen_node_doc`] (`ignore.rs`) prints a verbatim span; the frozen
+    ///   span's start *is* the node's first printed byte by construction.
+    ///
+    /// Prefer collapsing a reassembly path onto `build_expression_doc` over adding a fifth
+    /// caller, and prefer wrapping the claim in a named builder (as `build_frozen_node_doc`
+    /// does) over open-coding it — the call count has gone 2 → 3 → 4, each time out of step
+    /// with whatever prose enumerated it.
     pub(crate) fn prepend_owned_leading_comment_at(&self, start: u32, doc: DocId) -> DocId {
         // Document-level short-circuit (also covers the arrow-reassembly callers, which
         // reach here without going through `prepend_owned_leading_comment`).

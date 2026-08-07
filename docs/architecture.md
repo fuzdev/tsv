@@ -647,23 +647,34 @@ each comment's content start so derivation never has to re-guess delimiter width
 
 ### Lookup Functions
 
-The `tsv_lang::comment` module provides O(log n) lookup via binary search:
+The `tsv_lang::comment` module provides O(log n) lookup via binary search. **Every
+range lookup names the axis it answers on** — there is deliberately no axis-less
+`comments_in_range`, because the three questions differ in whether an *owned*
+comment counts, and a caller that doesn't say which it means is the bug. The axis
+table (which caller asks which) is in [comments.md](./comments.md); the functions are:
 
-- `comments_in_range()` — Find comments between two positions (O(log n))
+| axis | range | after a position | existence |
+| --- | --- | --- | --- |
+| **to emit** — "which must *I* print here?" (owned skipped) | `comments_to_emit_in_range()` | `comments_to_emit_after()` | `has_comments_to_emit_in_range()` |
+| **on page** — "does any comment occupy the page here?" (owned counted) | `comments_on_page_in_range()` | — | `has_comments_on_page_in_range()`, `has_multiline_block_comments_on_page_in_range()` |
+| **in source** — "what bytes are physically here?" (owned counted) | `comments_in_source_range()` | `comments_in_source_after()` | — |
+
+Plus the axis-independent primitives:
+
 - `classify_comment()` — Determine if trailing, leading-own-line, or inline
 - `classify_comment_fast()` — Same, using precomputed line breaks (faster)
 - `ClassifiedComments::from_range()` — Batch classify all categories in one pass
-- `has_comments_in_range()` — Quick existence check
-- `comments_after()` — Iterate comments at or after a position (O(log n))
 - `find_first_comment_from()` — Binary-search index of first comment with `span.start >= pos`
 
 ### Printer Strategy
 
-Printers find comments via range-based lookup between nodes:
+Printers find comments via range-based lookup between nodes — on the **to-emit**
+axis when the question is "what do I print", which is the common case for a gap
+between two siblings:
 
 ```rust
 // Between two sibling nodes
-let comments = comments_in_range(&self.comments, prev_end, node_start);
+let comments = comments_to_emit_in_range(self.comments, prev_end, node_start);
 
 // Classify each comment
 for comment in comments {
@@ -674,6 +685,10 @@ for comment in comments {
     }
 }
 ```
+
+A layout gate over the same range asks `has_comments_on_page_in_range` instead —
+an emit-keyed gate is blind to every owned comment it guards
+([comments.md](./comments.md) names this as a standing corollary).
 
 ### Tradeoffs
 
