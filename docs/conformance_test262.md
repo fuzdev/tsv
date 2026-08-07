@@ -244,7 +244,7 @@ strict-subset size (`GRADED_MANIFEST_PIN`), both in `test262.rs`. Any move
 fails with expected-vs-got: a `../test262` pull or a change to the
 skip/feature-filtering logic must be re-pinned deliberately, never absorbed
 silently. Same ritual as `benches/js/lib/gate_counts.ts` (see
-../benches/js/CLAUDE.md §Pinned gate counts); filtered runs skip the pins.
+[gate_counts.md](gate_counts.md)); filtered runs skip the pins.
 
 ```bash
 # Basic usage

@@ -65,7 +65,7 @@
  * as-authored audits' formatted-file count is one shared const,
  * `FIXTURES_FORMATTED_MIN` in `crates/tsv_debug/src/audit/sweep.rs`: they walk
  * one corpus under one skip policy, so a per-audit pin would only let their
- * slack drift apart. See benches/js/CLAUDE.md §Pinned gate counts.
+ * slack drift apart. See docs/gate_counts.md.
  */
 
 import type { Language } from './types.ts';
@@ -157,7 +157,7 @@ export const CORPUS_PARSE_TSV_ERRORS_PIN: Record<Language, number> = {
  * pinned code); a rise re-pins to keep the floor tight. It stays a minimum (not exact) only
  * so a fixed win needn't re-pin to pass — over pinned inputs a `match` DROP is always a real
  * regression, never live-corpus growth. Provenance in `GATE_CHECKOUT_COMMITS`; split rationale
- * in benches/js/CLAUDE.md §Pinned gate counts.
+ * in docs/gate_counts.md.
  */
 export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// 500 → 499: one reproducible file, `svelte.dev/.../lib/components/PageControls.svelte`,

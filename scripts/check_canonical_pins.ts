@@ -244,7 +244,7 @@ if (failures.length > 0) {
 		);
 	}
 	console.error(
-		'  ⚠ Bumping a canonical pin re-baselines the fixture corpus — see benches/js/CLAUDE.md §"Canonical baseline is coupled".'
+		'  ⚠ Bumping a canonical pin re-baselines the fixture corpus — see docs/benchmarks.md §"Canonical baseline is coupled".'
 	);
 	Deno.exit(1);
 }

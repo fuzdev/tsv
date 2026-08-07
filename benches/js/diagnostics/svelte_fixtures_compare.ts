@@ -44,8 +44,7 @@ import { type KnownGap, SVELTE_FIXTURE_SANCTIONS } from '../lib/parse_sanctions.
  * Over-rejections where tsv is WRONG — genuine drop-in parse gaps, tracked so the
  * gate is green at baseline and only regressions (a NEW, untracked over-rejection)
  * fail it. This set must only SHRINK: when a gap is fixed, delete its entry (the
- * input then parses → parity). Full triage lives in internal notes
- * (TODO_PARSE_COVERAGE.md §"Svelte parse over-rejections vs `svelte/tests`").
+ * input then parses → parity). Full triage lives in internal notes.
  */
 const KNOWN_GAPS: KnownGap[] = [
 	// Empty: every tracked Svelte-parser over-rejection is fixed. A drop-in gap here is one

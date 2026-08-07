@@ -17,7 +17,7 @@
 // `deno task fixtures:update` and review the churn, run the two sidecar-dependent gates
 // `deno task check` cannot (`compile:validation`, `bench:harvest`), and grep the repo for
 // the OLD version string — prose that restates a pin goes silently stale, and nothing gates
-// it. See benches/js/CLAUDE.md §"Canonical baseline is coupled" for the full procedure.
+// it. See docs/benchmarks.md §"Canonical baseline is coupled" for the full procedure.
 //
 // NOTE: Requires deno.json with "acorn": "npm:acorn@8.16.0" import map
 // to ensure @sveltejs/acorn-typescript uses the same acorn instance.

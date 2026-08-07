@@ -363,7 +363,7 @@ export function get_benchmark_tasks(
 		// then JSON.parses in JS, eagerly materializing the full AST (the like-for-like
 		// opponent to tsv-json). There is intentionally no `oxc-parser-lazy` row: oxc's
 		// `experimentalLazy` raw transfer is setup-dominated in every runtime (measures
-		// buffer copy, not parse speed) — see `lib/oxc.ts` and CLAUDE.md → Fairness Caveats.
+		// buffer copy, not parse speed) — see `lib/oxc.ts` and docs/benchmarks.md §Fairness caveats.
 		add(
 			impls.oxc?.supports_parse_language(language),
 			'oxc-parser',
@@ -383,7 +383,7 @@ export function get_benchmark_tasks(
 		// `tsv-json` carries the loc-bearing drop-in AST neither emits). The wrapper
 		// forces yuku's LAZY materialization and reads its diagnostics — without
 		// either, the row would report an unearned throughput at a fabricated 100%
-		// coverage. See lib/yuku.ts + CLAUDE.md §Fairness Caveats.
+		// coverage. See lib/yuku.ts + docs/benchmarks.md §Fairness caveats.
 		//
 		// ⚠ The N-API row is CONFORMANCE-EXCLUDED: yuku's native binding SEGFAULTS
 		// the host process on that corpus's escaped-identifier test262 fixtures, so
@@ -445,7 +445,7 @@ export function get_benchmark_tasks(
 		// format, so a timed row would rank `fork`/`exec`, not engines. It is
 		// measured for what it ACCEPTS instead. Its end-to-end CLI numbers — the
 		// shape that suits a CLI — live in the separate hyperfine comparison
-		// published on tsv.fuz.dev. See lib/rsvelte.ts + CLAUDE.md §Fairness Caveats.
+		// published on tsv.fuz.dev. See lib/rsvelte.ts + docs/benchmarks.md §Coverage-only rows.
 		add(
 			impls.rsvelte?.supports_format_language(language),
 			'rsvelte-fmt',

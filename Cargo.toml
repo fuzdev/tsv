@@ -59,8 +59,8 @@ tsv_check = { path = "crates/tsv_check" }
 argh = "0.1"
 # N-API (Node.js/Bun) bindings — the native path for the `tsv_napi` crate, the
 # Node-runtime sibling of `tsv_ffi` (Deno's C-FFI path). napi/napi-derive ride
-# the 3.x line together; napi-build (build dep) is its own 2.x line. tsv-scoped
-# carve-out from the ecosystem N-API deferral — see lore TODO_NAPI_BINDINGS.md.
+# the 3.x line together; napi-build (build dep) is its own 2.x line. A tsv-scoped
+# carve-out from the ecosystem's N-API deferral.
 napi = "3.9.4"
 napi-derive = "3.5.7"
 napi-build = "2.3.2"

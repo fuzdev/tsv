@@ -94,7 +94,7 @@ export class OxcImplementation extends BaseImplementation {
 		// lazy variant: oxc's `experimentalLazy` raw transfer is setup-dominated
 		// (~1.7ms/call on Node, ~2.1ms on Deno, vs ~0.7ms eager + ~0.16ms parse-only) —
 		// it eagerly copies the whole AST transfer buffer, so it measures buffer setup,
-		// not parse speed, in any runtime. See `benches/js/CLAUDE.md` → Fairness Caveats.
+		// not parse speed, in any runtime. See `docs/benchmarks.md` §Fairness caveats.
 		return result.program;
 	}
 

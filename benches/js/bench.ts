@@ -48,7 +48,8 @@
  *                       a missing required entry fails fast, since numbers from a
  *                       partial corpus aren't comparable to the committed reports)
  *   BENCH_GC            Set to 1 to force a major GC between every iteration
- *                       (default: off; see Fairness Caveats for the trade-off)
+ *                       (default: off; see docs/benchmarks.md §Fairness caveats
+ *                       for the trade-off)
  *   BENCH_STALE_OK      Set to 1 to run despite stale artifacts (default: off;
  *                       see lib/check_artifact_freshness.ts)
  *   BENCH_FORCED_ASYNC  Set to 1 to add the `tsv-forced-async` control row
@@ -256,7 +257,7 @@ const BENCH_WARMUP = BENCH_WARMUP_EXPLICIT ?? 3;
  * throughput where GC happens opportunistically, matching real-world usage).
  * Set `BENCH_GC=1` to force a major GC between every iteration; useful for
  * stabilizing high-allocation workloads at the cost of penalizing efficient
- * low-allocation paths. See `CLAUDE.md` → Fairness Caveats for the trade-off.
+ * low-allocation paths. See `docs/benchmarks.md` §Fairness caveats for the trade-off.
  */
 const BENCH_GC = env.BENCH_GC === '1';
 
@@ -1563,7 +1564,7 @@ async function save_baseline(data: Baseline): Promise<void> {
  * detection for per-task budget drift, and OR-gated noise warnings on
  * high-cv or high-outlier-ratio rows. The flat ±5% ops/sec gate that lived
  * here previously is gone — see `benchmark_baseline_compare` and the
- * fairness caveats in benches/js/CLAUDE.md.
+ * fairness caveats in docs/benchmarks.md.
  */
 async function compare_baseline(current: Baseline): Promise<void> {
 	const comparison = await benchmark_baseline_compare(

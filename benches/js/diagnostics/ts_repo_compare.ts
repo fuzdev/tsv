@@ -39,8 +39,8 @@
  *                            (ii) early-error TIMING — where tsv+acorn correctly
  *                            reject at parse (`(foo()) = x`, `for (foo() in b)`) what
  *                            tsc flags later as TS2364/TS2406. Only (i) is a real
- *                            gap, and fixing it diverges tsv from acorn toward spec
- *                            (see ./TODO_UPSTREAM.md). Reported, never gated.
+ *                            gap, and fixing it diverges tsv from acorn toward spec.
+ *                            Reported, never gated.
  *
  * Scope: single-file `.ts` only — `.tsx` (JSX grammar) and `@filename` multi-file
  * tests are skipped and counted (feeding a multi-module test as one parse unit is
@@ -90,9 +90,8 @@ const DEFAULT_ROOT = `${TS_REPO}/tests/cases/conformance/parser`;
  * tsv parse gaps confirmed against BOTH oracles (tsc-valid AND acorn-accepts),
  * tracked so the tool is green at baseline and a NEW gap surfaces. Must only
  * SHRINK: delete an entry when its gap is fixed. Kept SEPARATE from
- * `ts_fixtures_compare.ts` KNOWN_GAPS (different corpus + oracle). Full triage:
- * internal notes, TODO_PARSE_COVERAGE.md §"Broadening — the official typescript repo".
- * `pattern` uses `<basename>.ts` to avoid numeric-suffix collisions
+ * `ts_fixtures_compare.ts` KNOWN_GAPS (different corpus + oracle). Full triage lives
+ * in internal notes. `pattern` uses `<basename>.ts` to avoid numeric-suffix collisions
  * (`…Declaration1` vs `…Declaration11`).
  */
 const KNOWN_GAPS: KnownGap[] = [

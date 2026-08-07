@@ -54,10 +54,11 @@
 //! [`IgnoreKind::Panic`] (the injected directive crashed the formatter — production WASM is
 //! `panic = "abort"`, so a crash is a DoS) is NEVER pinnable and always fails the gate; the four
 //! graded kinds are the ratcheted position ledger. The honoring check is a deliberately
-//! **cheaper single-format check** than `blank_audit`'s F1 battery (see
-//! `[[gap-audit-f1-cost-and-cheaper-alternative]]`): one format per injection, one substring
-//! test. The companion checks add at most three more formats per injection — still far under an
-//! F1 battery, and the whole audit stays in the `deno task check` budget.
+//! **cheaper single-format check** than `blank_audit`'s F1 battery (a full F1 battery over an
+//! injection sweep was measured at >40x the baseline CPU — disqualifying against the whole
+//! `deno task check` budget): one format per injection, one substring test. The companion
+//! checks add at most three more formats per injection — still far under an F1 battery, and
+//! the whole audit stays in the `deno task check` budget.
 //!
 //! ## The finding key — AST position, not a token shape
 //!
