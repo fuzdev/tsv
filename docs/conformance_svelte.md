@@ -11,7 +11,7 @@ The tsv parser aims for **exact AST compatibility** with Svelte's parser. This d
 ## Classification
 
 - **Compat behavior** — Svelte has quirky but harmless behavior (design choices, tokenization quirks, output that doesn't affect semantics). tsv replicates it in AST output
-- **Correction** — Svelte/acorn violates spec, corrupts semantics, or lacks a spec-defined feature (e.g. acorn dropping all params from an `async <T>()` arrow). tsv produces correct/complete AST
+- **Correction** — Svelte/acorn violates spec, corrupts semantics, or lacks a spec-defined feature (e.g. acorn omitting an anonymous class expression's `id` for implements-first heritage). tsv produces correct/complete AST
 - **Representation limit** — a value acorn keeps can't round-trip tsv's UTF-8 strings (lone surrogate → U+FFFD; `raw` unaffected). Rare, not a correction
 
 **Critical distinction**: Compat behaviors apply ONLY to **AST/JSON output** for tool compatibility. The tsv **formatter** always produces clean, standards-compliant code.
@@ -289,7 +289,6 @@ Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 - `export default class implements I {}` (anonymous default class, implements-first heritage) — [export_default_implements](../tests/fixtures/typescript/declarations/class/export_default_implements_svelte_divergence/)
 - A cast as the left operand of `**` (`x as number ** 2`) — see below; the rejection itself is not pinnable
 - A `>=` following a `<` operand (`a < b >= d`) — see below — [relational_lt_greater_equal](../tests/fixtures/typescript/expressions/binary/relational_lt_greater_equal_svelte_divergence/)
-- Async generic arrow params — see fixtures below
 
 **`using` keyword-name comments**: tsv **accepts** a comment between `using` and the binding name (`using /* c */ x = fn()`) and round-trips it, which is correct — per ecma262 §sec-comments a comment "behave[s] like white space and [is] discarded", so any two tokens may be separated by one. A comment *containing a line terminator* is the exception the same clause names: it counts as a `LineTerminator`, which the `[no LineTerminator here]` in `await [no LT] using` and `using [no LT] BindingIdentifier` then demotes — so `await /* c⏎ */ using x = fn()` correctly fails to read as a declaration. acorn's verdict is not comparable here: it rejects `using` / `await using` outright (see the list above), so it never reaches the comment question.
 
@@ -303,7 +302,7 @@ Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 
 The rejection is the one case here that **cannot be pinned**. The `expected_svelte.json` = `{"error": "failed to parse"}` sentinel every fixture above uses attaches to `input.*`, and an `input.*` must be a formatting fixed point (F1) — `x as number ** 2` is not one, since both formatters normalize it to `(x as number) ** 2`. The source form can therefore only live in an `unformatted_*` variant, and the validator runs the canonical parser over `input.*` and `input_invalid_*` only, never over variants. So [as_satisfies_exponentiation](../tests/fixtures/typescript/expressions/as_satisfies_exponentiation/) is a *regular* fixture: it pins the parse shape and the paren insertion (both operand sides — a cast on the right needs parens too, since `as` otherwise binds looser and takes the whole exponentiation), and its `unformatted_no_parens` variant carries the source form. That variant formats at all only because prettier-plugin-svelte re-parses `<script>` content with prettier's own TypeScript parser rather than with Svelte's — Svelte's parser sees the fixture's parenthesized `input.svelte` and is happy.
 
-**Async generic arrow params**: acorn-typescript drops all function parameters from `async` arrow functions that have type parameters (`async <T,>(x: T) => x` → `params: []`). Non-async generic arrows are unaffected. This is semantic corruption — tools consuming the AST would see zero-argument functions. **Upstream candidate**: acorn-typescript async arrow parsing.
+**Async generic arrow param decorator**: a parameter decorator is invalid on an arrow function in every form — tsc and prettier reject `(@dec a) => a`, `<T>(@dec a) => a`, and `async (@dec a) => a`, and acorn-typescript rejects them too (`Leading decorators must be attached to a class declaration`). The lone exception is the **async generic** form: acorn alone accepts `async <T>(@dec a) => a`, because that form takes a separate path through its arrow parsing where the decorator check every other arrow form applies is never reached. tsc still rejects the input, so tsv rejects too — matching every other arrow form and diverging from acorn's inconsistent accept. Because the canonical parser accepts, this is pinned from the other side, by a `tsv_rejects.txt` fixture: [async_generic/param_decorator](../tests/fixtures/typescript/expressions/arrow/async_generic/param_decorator_svelte_divergence/); the drop-in rejections it contrasts with are the `input_invalid_*` cases in [decorators/parameter_arrow](../tests/fixtures/typescript/typescript_specific/decorators/parameter_arrow/). **Upstream candidate**: acorn-typescript — the async-generic arrow path should reject a parameter decorator like every other arrow form does.
 
 **Import-phase proposals (forward-looking, ungated).** tsv accepts the TC39
 import-phase syntax — `import defer * as ns from '…'` / `import source x from '…'`
@@ -324,14 +323,7 @@ import-phase with a different shape, tsv should re-align to it**. Emitted from
 `crates/tsv_ts/src/ast/convert/write/statements.rs` (declaration) and
 `crates/tsv_ts/src/ast/convert/write/expressions.rs` (expression).
 
-Its one accept-side consequence is a *reverse* divergence — tsv **over-rejects** here. A parameter decorator is invalid on an arrow in every form (tsc + prettier + acorn all reject `(@dec a) => a`, `<T>(@dec a) => a`, `async (@dec a) => a` — the drop-in rejections pinned by the `input_invalid_*` cases in [decorators/parameter_arrow](../tests/fixtures/typescript/typescript_specific/decorators/parameter_arrow/)). But in the async-generic form acorn *accepts* `async <T>(@dec a) => a`, only because the param-drop bug above silently discards the parameter and its decorator. tsc still rejects the decorator, so tsv rejects too — matching every other arrow form and diverging from acorn's lossy accept (a `tsv_rejects.txt` fixture).
-
-Fixtures: [async_generic/stacked](../tests/fixtures/typescript/expressions/arrow/async_generic/stacked_svelte_prettier_divergence/), [async_generic/forms](../tests/fixtures/typescript/expressions/arrow/async_generic/forms_svelte_prettier_divergence/), [async_generic/basic_ts](../tests/fixtures/typescript/expressions/arrow/async_generic/basic_ts_svelte_divergence/), [async_generic/long](../tests/fixtures/typescript/expressions/arrow/async_generic/long_svelte_divergence/), [async_generic/param_decorator](../tests/fixtures/typescript/expressions/arrow/async_generic/param_decorator_svelte_divergence/), [curried_typed_callback](../tests/fixtures/typescript/expressions/arrow/curried_typed_callback_svelte_prettier_divergence/). `async_generic/forms` adds the optional-param (`x?`) drop, distinct from the plain param (`stacked`) and rest param (`long`); `async_generic/param_decorator` is the over-rejection direction (tsv rejects a decorator acorn's param-drop swallows).
-
-The `async_generic/stacked`, `async_generic/forms`, and `curried_typed_callback` fixtures carry a second,
-independent divergence — prettier's forced `<T,>` trailing comma on single-unconstrained
-arrow type params (hence the `_svelte_prettier_divergence` suffix). See
-[conformance_prettier_ts.md](./conformance_prettier_ts.md) §TypeScript.
+**Decorated class modifier line break**: a class modifier keyword carries a `[no LineTerminator here]` restriction, so `declare` / `abstract` bind to the `class` head only on the same line. Undecorated, all three parsers agree that `declare⏎class A {}` is two statements. Behind a **decorator** the input has no valid reading — the decorator is left with no declaration to attach to, and tsc raises **TS1146 "Declaration expected"**. tsv rejects with it. acorn-typescript accepts, building a degenerate tree: an `ExpressionStatement` for the bare modifier plus a `ClassDeclaration` whose span runs *back over* that statement to the decorator, so two siblings overlap. Matching a self-overlapping tree is worse than rejecting. Pinned by the `tsv_rejects.txt` fixture [decorators/declare_line_break](../tests/fixtures/typescript/typescript_specific/decorators/declare_line_break_svelte_divergence/) (`@d⏎declare⏎class A {}`; `@d abstract⏎class B {}` is the same shape); the forms where acorn agrees there is no parse are ordinary `input_invalid_*` files in [decorators/declare](../tests/fixtures/typescript/typescript_specific/decorators/declare/). **Upstream candidate**: acorn-typescript — `canHaveLeadingDecorator`'s `isDeclareClass` / `isAbstractClass` lookaheads skip line terminators, admitting a decorator in front of a modifier that then fails to bind.
 
 **Type assertion vs. generic arrow**: at a `<` in expression position,
 acorn-typescript tries the generic-arrow reading first, and its Babel-ported
@@ -628,7 +620,8 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 
 **acorn-typescript** — fix in acorn-typescript, then Svelte updates its dependency:
 
-- Async generic arrow params — params dropped when `async` + type params
+- Async generic arrow param decorator — `async <T>(@dec a) => a` accepted, where every other arrow form correctly rejects
+- Decorated class modifier line break — `canHaveLeadingDecorator`'s `isDeclareClass` / `isAbstractClass` lookaheads skip line terminators, so `@dec⏎declare⏎class A {}` admits a decorator whose modifier then fails to bind, yielding two overlapping sibling nodes
 - `using` / `await using` — Explicit Resource Management declarations not recognized
 - `const` type params — `const` modifier on class type params
 - Import type options — `import()` type assertion options
@@ -686,7 +679,7 @@ because regex bodies are opaque, so it does not meet this section's bar and will
 ### Known Acorn-TypeScript Bugs (Not Corrections)
 
 These are bugs in **upstream/standalone `acorn-typescript`** — the non-fork npm
-package, distinct from the `@sveltejs/acorn-typescript@1.0.11` fork this project
+package, distinct from the `@sveltejs/acorn-typescript` fork this project
 pins (`crates/tsv_debug/src/deno/sidecar.ts`) and that every other
 "acorn-typescript" mention in this doc refers to. They **don't affect Svelte
 users** (Svelte's fork handles them):
