@@ -81,6 +81,7 @@ use tsv_svelte_compile::{
 };
 
 use super::fuzz::{Rng, stream_seed};
+use super::profile::{is_pruned_dir, is_svelte};
 use crate::cli::CliError;
 use crate::deno::{self, DenoError, SvelteGenerate};
 use crate::diff::{ColorChoice, DiffOptions, diff_to_string};
@@ -561,7 +562,13 @@ fn discover_svelte(paths: &[String]) -> Result<Vec<PathBuf>, CliError> {
     for path in paths {
         let path = PathBuf::from(path);
         if path.is_file() {
-            out.push(path);
+            // Filter an explicitly named file by the same subject test the walk
+            // applies. Without it a `.ts` argument entered the seed list and was
+            // then parsed as a Svelte component — a silent unparseable seed rather
+            // than an argument error.
+            if is_svelte(&path) {
+                out.push(path);
+            }
             continue;
         }
         if !path.is_dir() {
@@ -585,8 +592,18 @@ fn collect_svelte(dir: &std::path::Path, out: &mut Vec<PathBuf>) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
+            // Shared prune policy — without it this walk recursed into `node_modules`
+            // and `.git` on any real repo. Neutral over the default
+            // `tests/fixtures_compile` corpus, which holds no pruned directory.
+            if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_none_or(is_pruned_dir)
+            {
+                continue;
+            }
             collect_svelte(&path, out);
-        } else if path.extension().is_some_and(|e| e == "svelte") {
+        } else if is_svelte(&path) {
             out.push(path);
         }
     }

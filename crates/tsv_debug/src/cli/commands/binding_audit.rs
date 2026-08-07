@@ -58,10 +58,11 @@ use tsv_cli::cli::input::ParserType;
 use tsv_lang::source_scan::{TriviaProfile, skip_trivia};
 
 use crate::audit::properties::Utf16ToByte;
+use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 use crate::render_normalize::structural_skeleton;
 
-use super::profile::{is_input_invalid_fixture, resolve_files};
+use super::profile::{is_input_invalid_fixture, is_ts_family, resolve_seed_files_named};
 
 /// Audit whether tsv formatting re-binds any forward-binding comment (JSDoc cast
 /// or bundler annotation) to a different subtree.
@@ -184,35 +185,22 @@ struct Finding {
 
 impl BindingAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let paths = if self.paths.is_empty() {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.paths.clone()
-        };
-        let mut files = match resolve_files(&paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
         // TypeScript-family only; `.svelte`/`.css` (and intentionally-invalid
-        // fixture inputs) aren't binding-audit subjects.
-        files.retain(|p| is_ts_family(p) && !is_input_invalid_fixture(p));
-        // A scan with nothing in it must not read as a pass: `--gate` reports "no
-        // re-binding findings" and exits 0 on an empty set, so a typo'd path — or a
-        // tree with no TS-family files at all — would look identical to a clean run.
-        // Fail loud instead, matching `render_audit`'s "No .svelte files found".
-        if files.is_empty() {
-            eprintln!("Error: no TypeScript-family files found (searched {paths:?})");
-            return Err(CliError::Failed);
-        }
-        if self.limit > 0 {
-            files.truncate(self.limit);
-        }
+        // fixture inputs) aren't binding-audit subjects. A scan with nothing in it
+        // must not read as a pass: `--gate` reports "no re-binding findings" and
+        // exits 0 on an empty set, so a typo'd path — or a tree with no TS-family
+        // files at all — would look identical to a clean run. Resolution fails loud
+        // on one, naming the subject rather than the raw walk.
+        let files =
+            resolve_seed_files_named(&self.paths, self.limit, "TypeScript-family files", |p| {
+                is_ts_family(p) && !is_input_invalid_fixture(p)
+            })?;
 
         let mut counts: BTreeMap<&'static str, usize> = BTreeMap::new();
         let mut findings: Vec<Finding> = Vec::new();
+        // The graded denominator: files whose bindings were actually comparable. Every
+        // other outcome is a skip, and a run that skipped all of them proves nothing.
+        let mut compared = 0usize;
         for path in &files {
             match audit_file(path) {
                 FileOutcome::ParseError => *counts.entry("parse_error").or_default() += 1,
@@ -222,6 +210,7 @@ impl BindingAuditCommand {
                     *counts.entry("comment_set_changed").or_default() += 1;
                 }
                 FileOutcome::Compared(fs) => {
+                    compared += 1;
                     if fs.is_empty() {
                         *counts.entry("clean").or_default() += 1;
                     }
@@ -237,7 +226,12 @@ impl BindingAuditCommand {
         // Hard findings first.
         findings.sort_by(|a, b| b.hard.cmp(&a.hard).then(a.display.cmp(&b.display)));
 
-        self.report(files.len(), &counts, &findings)
+        self.report(files.len(), &counts, &findings)?;
+        // The floor UNDER the non-empty resolution: resolution proves files were found,
+        // not that any was graded. Every file parse-failing reads exactly like a clean
+        // run here — "✓ no re-binding findings", exit 0 — and no `default_paths` pin
+        // covers an explicitly-pathed run (`audit:corpus` is every run this audit gets).
+        check_graded_nonzero(compared, "TypeScript-family files compared")
     }
 
     fn report(
@@ -538,13 +532,6 @@ fn describe(b: Option<&Binding>) -> String {
 /// The `type` of a skeleton's top node (for the readable finding summary).
 fn top_type(sk: &Value) -> &str {
     sk.get("type").and_then(Value::as_str).unwrap_or("?")
-}
-
-fn is_ts_family(path: &Path) -> bool {
-    matches!(
-        path.extension().and_then(|e| e.to_str()),
-        Some("ts" | "js" | "mts" | "cts" | "mjs" | "cjs")
-    )
 }
 
 #[cfg(test)]

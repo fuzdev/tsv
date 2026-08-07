@@ -35,10 +35,10 @@ pub struct ProfileCommand {
 
 impl ProfileCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        // Bind mode is TypeScript-only (the checker binds no Svelte/CSS): exclude
-        // the other languages up front so the "format" column is a bind time.
+        // Bind mode is TypeScript-only (the checker binds no Svelte/CSS): drop the
+        // other languages up front so the "format" column is a bind time.
         let (files, skipped) = resolve_profile_files(&self.paths, |p| {
-            self.bind && ParserType::from_extension(&p.to_string_lossy()) != ParserType::TypeScript
+            !self.bind || ParserType::from_extension(&p.to_string_lossy()) == ParserType::TypeScript
         })?;
 
         let mut results = Vec::new();
@@ -604,11 +604,9 @@ fn display_path(path: &Path) -> String {
     format!(".../{}", last_3.display())
 }
 
-/// Resolve CLI path args to profileable files, returning [`CliError::Failed`]
-/// (after a user-facing message) when nothing matches. `excluded` files are
-/// dropped after resolution; `input_invalid_*` fixtures (expected to fail
-/// parsing) are filtered out and returned as a skip count. Shared preamble of
-/// the `profile` and `json_profile` commands.
+/// Resolve CLI path args to profileable files of unqualified `"supported files"`
+/// — the common case. See [`resolve_profile_files_named`] for the shape and for
+/// the callers that keep a narrower subject.
 ///
 /// # Errors
 ///
@@ -616,24 +614,46 @@ fn display_path(path: &Path) -> String {
 /// or no supported files remain after filtering.
 pub(crate) fn resolve_profile_files(
     paths: &[String],
-    excluded: impl Fn(&Path) -> bool,
+    keep: impl Fn(&Path) -> bool,
+) -> Result<(Vec<PathBuf>, usize), CliError> {
+    // The extension list is rendered from the constant the walk actually filters on,
+    // not restated — the hand-written version said "(.ts, .svelte, .css)" and had
+    // drifted three extensions behind `is_supported_file`.
+    let subject = format!(
+        "supported files ({})",
+        tsv_discover::FORMATTABLE_EXTENSIONS
+            .map(|e| format!(".{e}"))
+            .join(", ")
+    );
+    resolve_profile_files_named(paths, &subject, keep)
+}
+
+/// Resolve CLI path args to profileable files: `paths` (REQUIRED — a profiler has
+/// no default corpus, unlike [`resolve_seed_files_named`]) through
+/// [`resolve_files`], then `keep`, empty-is-error. `input_invalid_*` fixtures
+/// (expected to fail parsing) are then filtered out and returned as a skip count
+/// the caller reports.
+///
+/// The profiling-side twin of [`resolve_seed_files_named`], down to the `subject`
+/// noun and the `keep` polarity — the two share [`resolve_and_keep`], and reading
+/// the same way matters more than the two lines it saves: this one used to take
+/// the predicate INVERTED (`excluded`), so the file held two resolvers whose
+/// filter arguments meant opposite things.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] when no paths are given, path resolution fails,
+/// or no `subject` files remain after filtering.
+pub(crate) fn resolve_profile_files_named(
+    paths: &[String],
+    subject: &str,
+    keep: impl Fn(&Path) -> bool,
 ) -> Result<(Vec<PathBuf>, usize), CliError> {
     if paths.is_empty() {
         eprintln!("Error: No files provided. Use file paths, directories, or glob patterns.");
         return Err(CliError::Failed);
     }
-    let mut files = match resolve_files(paths) {
-        Ok(f) => f,
-        Err(e) => {
-            eprintln!("Error: {e}");
-            return Err(CliError::Failed);
-        }
-    };
-    files.retain(|p| !excluded(p));
-    if files.is_empty() {
-        eprintln!("Error: No supported files found (.ts, .svelte, .css)");
-        return Err(CliError::Failed);
-    }
+    let mut files = resolve_and_keep(paths, subject, keep)?;
     let total = files.len();
     files.retain(|p| !is_input_invalid_fixture(p));
     let skipped = total - files.len();
@@ -650,12 +670,36 @@ pub(crate) fn is_input_invalid_fixture(path: &Path) -> bool {
         .is_some_and(|n| n.starts_with("input_invalid"))
 }
 
-/// Resolve an injection audit's seed corpus: the positional `paths` (defaulting to
-/// `tests/fixtures` when empty — the corpus the audits' snapshots describe), through
-/// [`resolve_files`], then `limit` (`0` = unlimited). An empty result is an error — a gate over
-/// zero files proves nothing. Shared by `gap_audit` / `blank_audit` / `ignore_audit` and by the
-/// ungated `width_audit`, the way [`is_input_invalid_fixture`] is shared above — which is why it
-/// carries no `comment_check` gate: seed resolution is corpus plumbing, not instrumentation.
+/// Whether a file is in the **TypeScript family** — `.ts` / `.mts` / `.cts` / `.js` /
+/// `.mjs` / `.cjs`, all of which tsv parses as TypeScript (`.svelte.ts` included: its
+/// extension is `ts`). The subject filter the audits whose property is JS-only pass to
+/// [`resolve_seed_files_named`] — `binding_audit`, `neutrality_audit`,
+/// `canonicalize_audit`.
+///
+/// One definition rather than one per audit: the three had drifted into three
+/// spellings of the same set, and a `name.ends_with(".ts")` spelling disagrees with
+/// this one on a bare `.ts` dotfile (a stem, not an extension). Same reason
+/// [`is_input_invalid_fixture`] is shared.
+pub(crate) fn is_ts_family(path: &Path) -> bool {
+    matches!(
+        path.extension().and_then(|e| e.to_str()),
+        Some("ts" | "js" | "mts" | "cts" | "mjs" | "cjs")
+    )
+}
+
+/// Whether a file is a Svelte **component** — the subject filter of the audits whose
+/// property is a template's (`authoring_audit`, `render_audit`).
+///
+/// A `.svelte.ts` / `.svelte.js` rune module is excluded for free: its extension is
+/// `ts` / `js`, so it is [`is_ts_family`] instead. An explicit `!ends_with(".svelte.ts")`
+/// beside this test is therefore dead, which is what one caller carried.
+pub(crate) fn is_svelte(path: &Path) -> bool {
+    path.extension().and_then(|e| e.to_str()) == Some("svelte")
+}
+
+/// Resolve an audit's seed corpus of unfiltered `"seed files"` — the common case.
+/// See [`resolve_seed_files_named`] for the shape and for the audits that keep a
+/// narrower subject.
 ///
 /// # Errors
 ///
@@ -665,29 +709,86 @@ pub(crate) fn resolve_seed_files(
     arg_paths: &[String],
     limit: usize,
 ) -> Result<Vec<PathBuf>, CliError> {
+    resolve_seed_files_named(arg_paths, limit, "seed files", |_| true)
+}
+
+/// Resolve an audit's seed corpus: the positional `paths` (defaulting to
+/// `tests/fixtures` when empty — the corpus the audits' snapshots describe), through
+/// [`resolve_files`], then `keep`, then `limit` (`0` = unlimited).
+///
+/// **An empty result is an error at every scope** — a gate over zero files proves nothing,
+/// and it is the one vacuity a run can be sure of without a pinned count (the scope-relative
+/// half of the guard; see `audit::sweep::check_graded_nonzero`, which floors the audits whose
+/// headline denominator can still collapse to zero *below* a non-empty resolution).
+///
+/// `subject` names the resolved thing in that message, and `keep` is the audit's own
+/// subject filter — an audit that scans only `.svelte`, only the TypeScript family, or only
+/// non-`input_invalid_*` inputs reports "no .svelte files found" rather than a flattened
+/// "no seed files found", and reports it against the set it will actually scan rather than
+/// against the raw walk. Every corpus-walking audit resolves here, so the default corpus,
+/// the resolution failure, the limit, and the empty-is-an-error rule have one definition
+/// — the way [`is_input_invalid_fixture`] is shared above, and which is why this carries no
+/// `comment_check` gate: seed resolution is corpus plumbing, not instrumentation.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] (after a user-facing message) when a path fails to resolve or
+/// no `subject` files remain.
+pub(crate) fn resolve_seed_files_named(
+    arg_paths: &[String],
+    limit: usize,
+    subject: &str,
+    keep: impl Fn(&Path) -> bool,
+) -> Result<Vec<PathBuf>, CliError> {
     let paths: Vec<String> = if arg_paths.is_empty() {
         vec!["tests/fixtures".to_string()]
     } else {
         arg_paths.to_vec()
     };
-    let mut files = match resolve_files(&paths) {
+    let mut files = resolve_and_keep(&paths, subject, keep)?;
+    // After the empty check, never before: `0` means unlimited, so a positive limit
+    // cannot empty a non-empty set and the order is unobservable — stated so a future
+    // reader doesn't "fix" it into a truncate that can produce the vacuity above.
+    if limit > 0 {
+        files.truncate(limit);
+    }
+    Ok(files)
+}
+
+/// The resolution body both `resolve_*_files_named` share: [`resolve_files`], then
+/// the caller's subject filter, then **empty-is-an-error** — one definition of the
+/// walk failure, the subject-named vacuity message, and which of the two comes
+/// first. Not public: the two wrappers differ in what precedes it (a default corpus
+/// vs a required-paths check) and what follows (a limit vs an `input_invalid_*`
+/// split), and those are the parts worth reading at each call.
+///
+/// # Errors
+///
+/// Returns [`CliError::Failed`] (after a user-facing message) when a path fails to
+/// resolve or no `subject` files remain.
+fn resolve_and_keep(
+    paths: &[String],
+    subject: &str,
+    keep: impl Fn(&Path) -> bool,
+) -> Result<Vec<PathBuf>, CliError> {
+    let mut files = match resolve_files(paths) {
         Ok(f) => f,
         Err(e) => {
             eprintln!("Error: {e}");
             return Err(CliError::Failed);
         }
     };
-    if limit > 0 {
-        files.truncate(limit);
-    }
+    files.retain(|p| keep(p));
     if files.is_empty() {
-        eprintln!("Error: no seed files found (searched {paths:?})");
+        eprintln!("Error: no {subject} found (searched {paths:?})");
         return Err(CliError::Failed);
     }
     Ok(files)
 }
 
-/// Resolve paths to files, expanding directories
+/// Resolve paths to files, expanding directories. The **one** directory walk behind
+/// every corpus-walking command — the profilers, the audits' seed resolution
+/// ([`resolve_seed_files_named`]), and the glob expansion below.
 pub(crate) fn resolve_files(paths: &[String]) -> Result<Vec<PathBuf>, String> {
     let mut files = Vec::new();
     for path_str in paths {
@@ -723,9 +824,10 @@ fn collect_files_recursive(dir: &Path, files: &mut Vec<PathBuf>) {
     for entry in entries.flatten() {
         let path = entry.path();
         if path.is_dir() {
-            // Skip hidden directories and node_modules
-            if let Some(name) = path.file_name().and_then(|n| n.to_str())
-                && (name.starts_with('.') || name == "node_modules" || name == "target")
+            if path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_none_or(is_pruned_dir)
             {
                 continue;
             }
@@ -736,14 +838,39 @@ fn collect_files_recursive(dir: &Path, files: &mut Vec<PathBuf>) {
     }
 }
 
+/// Whether a corpus walk prunes a child directory, in `tsv_discover`'s vocabulary: the
+/// [safety nets](tsv_discover::SAFETY_NET_DIRS) plus the build-output heuristic
+/// ([hidden dirs and `dist`/`build`/`target`](tsv_discover::HEURISTIC_DIRS)).
+///
+/// The single prune policy for **every** source-corpus walk in `tsv_debug` — this one,
+/// `compile_corpus_compare`'s, `compile_fuzz`'s, and `lex_diff`'s. They had drifted into
+/// four different answers, one of which (the fuzzer's) pruned nothing at all and
+/// recursed into `node_modules` and `.git` when pointed at a real repo. Walks over
+/// *structured* corpora with their own layout rules (the fixture trees, test262, the
+/// tsgo cases) are a different question and keep their own traversal.
+///
+/// Ignore FILES are deliberately not consulted, which is why this is not
+/// `tsv_discover::classify_dir`: the root `.formatignore` prunes `tests/fixtures/`
+/// and `tests/fixtures_compile/` — the fixture trees are data, not format fixed
+/// points — so a walk honoring them would resolve the audits' own default corpus to
+/// nothing. Equivalently, this is `classify_dir` against an empty `IgnoreStack`,
+/// which leaves the heuristic unconditionally active: the conservative reading for a
+/// tool pointed at arbitrary real repos, where a project's own `.gitignore` would
+/// otherwise decide `dist`/`build`.
+pub(crate) fn is_pruned_dir(name: &str) -> bool {
+    tsv_discover::is_safety_net(name)
+        || name.starts_with('.')
+        || tsv_discover::HEURISTIC_DIRS.contains(&name)
+}
+
+/// Whether a file is in scope for a corpus walk — the same
+/// [extension set](tsv_discover::FORMATTABLE_EXTENSIONS) `tsv format`'s own discovery
+/// uses, so an audit's corpus is the set the production formatter would process
+/// rather than a hand-mirrored list beside it.
 fn is_supported_file(path: &Path) -> bool {
-    let Some(ext) = path.extension().and_then(|e| e.to_str()) else {
-        return false;
-    };
-    matches!(
-        ext,
-        "ts" | "svelte" | "css" | "js" | "mts" | "cts" | "mjs" | "cjs"
-    )
+    path.file_name()
+        .and_then(|n| n.to_str())
+        .is_some_and(tsv_discover::is_formattable)
 }
 
 /// Simple glob expansion (handles patterns like tests/fixtures/**/input.ts)
@@ -792,7 +919,52 @@ mod tests {
     fn resolve_profile_files_no_paths_fails() {
         // The missing-arg path: no positionals → the "No files provided" failure.
         assert_eq!(
-            resolve_profile_files(&[], |_| false).err(),
+            resolve_profile_files(&[], |_| true).err(),
+            Some(CliError::Failed)
+        );
+    }
+
+    #[test]
+    fn pruned_dirs_are_the_discovery_policy() {
+        // The walk's prune set is `tsv_discover`'s, not a hand-mirrored list: the
+        // safety nets (including the VCS dirs neither hand-rolled walker had) plus
+        // the build-output heuristic.
+        for name in tsv_discover::SAFETY_NET_DIRS {
+            assert!(is_pruned_dir(name), "safety net not pruned: {name}");
+        }
+        for name in tsv_discover::HEURISTIC_DIRS {
+            assert!(is_pruned_dir(name), "build-output dir not pruned: {name}");
+        }
+        assert!(is_pruned_dir(".svelte-kit"), "hidden dir not pruned");
+        assert!(!is_pruned_dir("src"));
+        assert!(!is_pruned_dir("tests"));
+    }
+
+    #[test]
+    fn subject_predicates_read_extensions_not_suffixes() {
+        // `.svelte.ts` / `.svelte.js` rune modules are TS-family, not components —
+        // the reason `is_svelte` needs no explicit `!ends_with(".svelte.ts")` clause.
+        assert!(is_svelte(Path::new("Foo.svelte")));
+        assert!(!is_svelte(Path::new("foo.svelte.ts")));
+        assert!(!is_svelte(Path::new("foo.ts")));
+        assert!(is_ts_family(Path::new("foo.svelte.ts")));
+        assert!(is_ts_family(Path::new("foo.mjs")));
+        assert!(!is_ts_family(Path::new("Foo.svelte")));
+        // The whole point of one definition: a bare dotfile is a STEM with no
+        // extension, so neither predicate claims it. The `ends_with(".svelte")` /
+        // `ends_with(".ts")` spellings these replaced all answered `true` here.
+        assert!(!is_svelte(Path::new(".svelte")));
+        assert!(!is_ts_family(Path::new(".ts")));
+    }
+
+    #[test]
+    fn resolve_seed_files_named_reports_its_subject() {
+        // The filtered-to-empty path: the message names the subject, not the raw walk.
+        assert_eq!(
+            resolve_seed_files_named(&["tests/fixtures".to_string()], 0, ".svelte files", |_| {
+                false
+            })
+            .err(),
             Some(CliError::Failed)
         );
     }

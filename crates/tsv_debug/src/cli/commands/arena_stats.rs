@@ -125,7 +125,7 @@ struct Stats {
 
 impl ArenaStatsCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let (files, _skipped) = resolve_profile_files(&self.paths, |_| false)?;
+        let (files, _skipped) = resolve_profile_files(&self.paths, |_| true)?;
 
         if self.reuse {
             return run_reuse(&files);

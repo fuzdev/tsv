@@ -1,14 +1,19 @@
 use crate::cli::CliError;
 use argh::FromArgs;
-use std::path::{Path, PathBuf};
+use std::path::Path;
 use tsv_cli::json_utils::to_json_with_tabs;
 use tsv_svelte_compile::{CanonicalizeError, canonicalize_js};
+
+use crate::audit::vacuity::check_graded_nonzero;
+
+use super::profile::{is_ts_family, resolve_seed_files_named};
 
 /// Audit `canonicalize_js` at corpus scale: idempotence + output validity +
 /// comment losslessness.
 ///
-/// Walks the given paths (default `tests/fixtures`) for TS/JS sources and runs
-/// the canonicalizer twice on each file. Buckets:
+/// Walks the given paths (default `tests/fixtures`) through the shared seed
+/// resolution, keeps the TS/JS sources, and runs the canonicalizer twice on each
+/// file. Buckets:
 ///
 /// - **input-rejected** — the file doesn't parse as a strict TS module
 ///   (deliberately-invalid fixtures, script-goal JS). Informational skip.
@@ -65,22 +70,11 @@ struct CommentLossEntry {
 
 impl CanonicalizeAuditCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let paths = if self.paths.is_empty() {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.paths.clone()
-        };
-
-        let mut files = Vec::new();
-        for path in &paths {
-            let p = Path::new(path);
-            if !p.exists() {
-                eprintln!("Error: path not found: {path}");
-                return Err(CliError::Failed);
-            }
-            collect_sources(p, &mut files);
-        }
-        files.sort();
+        // The canonicalizer is a JS reprinter, so `.svelte` / `.css` are out of subject
+        // even though the shared walk finds them. An empty scan must not read as a
+        // pass — the headline would print "0 files — 0 clean" and exit 0 — so
+        // resolution fails loud on one.
+        let files = resolve_seed_files_named(&self.paths, 0, "TS/JS sources", is_ts_family)?;
 
         let mut report = AuditReport {
             files: files.len(),
@@ -165,6 +159,16 @@ impl CanonicalizeAuditCommand {
             );
         }
 
+        // The floor UNDER the non-empty resolution: every file resolving and every
+        // file being input-rejected reads identically here — "0 clean", no failures,
+        // exit 0 — so a parser that started rejecting the whole corpus would pass.
+        // This audit is the `deno task check` leg invoked with explicit paths, so
+        // there is no `default_paths` pin above it to catch that.
+        check_graded_nonzero(
+            report.files - report.input_rejected,
+            "TS/JS sources canonicalized",
+        )?;
+
         if failures > 0 {
             Err(CliError::Failed)
         } else {
@@ -239,48 +243,4 @@ fn truncate(text: &str) -> String {
     }
     let clipped: String = text.chars().take(MAX).collect();
     format!("{clipped:?}...")
-}
-
-/// Recursively collect auditable sources: `.ts` / `.js` / `.mts` / `.cts`
-/// (`.svelte.ts` is `.ts`-suffixed and included). Skips the usual non-source
-/// directories so the audit can point at real repos.
-fn collect_sources(path: &Path, out: &mut Vec<PathBuf>) {
-    if path.is_file() {
-        if is_auditable(path) {
-            out.push(path.to_path_buf());
-        }
-        return;
-    }
-    let Ok(entries) = std::fs::read_dir(path) else {
-        return;
-    };
-    for entry in entries.flatten() {
-        let child = entry.path();
-        if child.is_dir() {
-            let name = child.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if name.starts_with('.')
-                || name == "node_modules"
-                || name == "dist"
-                || name == "build"
-                || name == "target"
-            {
-                continue;
-            }
-            collect_sources(&child, out);
-        } else if is_auditable(&child) {
-            out.push(child);
-        }
-    }
-}
-
-fn is_auditable(path: &Path) -> bool {
-    let Some(name) = path.file_name().and_then(|n| n.to_str()) else {
-        return false;
-    };
-    name.ends_with(".ts")
-        || name.ends_with(".js")
-        || name.ends_with(".mts")
-        || name.ends_with(".cts")
-        || name.ends_with(".mjs")
-        || name.ends_with(".cjs")
 }

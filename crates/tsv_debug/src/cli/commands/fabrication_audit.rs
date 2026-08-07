@@ -6,9 +6,8 @@ use crate::audit::ratchet::{
     Ratchet, SnapshotKey, grade_narrowed_strictly, refuse_narrowed_update,
 };
 use crate::audit::shape::markup_head;
-use crate::audit::sweep::{
-    FIXTURES_FORMATTED_MIN, PristineSweep, check_formatted_min, sweep_pristine,
-};
+use crate::audit::sweep::{PristineSweep, sweep_pristine};
+use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
 use crate::cli::CliError;
 
 use super::profile::resolve_seed_files;
@@ -147,6 +146,7 @@ impl FabricationAuditCommand {
         }
         sweep.pristine.print_panic_sample();
 
+        check_graded_nonzero(sweep.pristine.formatted, "files formatted")?;
         if default_paths {
             check_formatted_min(sweep.pristine.formatted, FIXTURES_FORMATTED_MIN)?;
         }
@@ -455,15 +455,13 @@ fn print_json(sweep: &Sweep) {
             })
         })
         .collect();
-    let output = serde_json::json!({
-        "formatted": pristine.formatted,
-        "parse_skipped": pristine.parse_errors,
-        "read_skipped": pristine.read_errors,
-        "panicked": pristine.panics.count(),
-        "panicked_sample": pristine.panics.sample(),
-        "fabrications": fabrications.len(),
-        "files": items,
-    });
+    let output = pristine.json_report(
+        serde_json::json!({}),
+        serde_json::json!({
+            "fabrications": fabrications.len(),
+            "files": items,
+        }),
+    );
     #[allow(clippy::unwrap_used)]
     let s = serde_json::to_string_pretty(&output).unwrap();
     println!("{s}");

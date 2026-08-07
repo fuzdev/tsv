@@ -25,10 +25,15 @@ real move in a number is a deliberate, visible edit.
   graded-manifest) and `fixtures_validate` (total fixtures — protecting the primary
   gate against a discovery collapse) live in their own commands, while the
   as-authored audits (`swallow_audit`, `fabrication_audit`, `census_audit`,
-  `width_audit`) share `FIXTURES_FORMATTED_MIN` in
-  `crates/tsv_debug/src/audit/sweep.rs` — formatted files, closing their
-  vacuous-pass. One const because they walk one corpus under one skip policy; four
-  would drift apart in slack, which is the collapse the pin exists to catch.
+  `width_audit`, `comment_audit`) share `FIXTURES_FORMATTED_MIN` in
+  `crates/tsv_debug/src/audit/vacuity.rs` — formatted files, closing their
+  vacuous-pass. One const because they walk one corpus under one skip policy; five
+  would drift apart in slack, which is the collapse the pin exists to catch —
+  `comment_audit`'s own `REGISTERED_MIN` had drifted 27% below its live count
+  before it was made to pass the shared pin too. That is the **default-corpus**
+  layer; under it sits `check_graded_nonzero` (same module), which every
+  corpus-walking audit calls unconditionally on its own graded count and which
+  therefore needs no pin at all.
 - **`tsc_conformance`** (the largest set) splits its pins by what they mean, and
   gates the ON-DEMAND experimental-typechecker tasks, not a release leg. The
   drifting tsv-side counts (denominators, parse-divergence census, family
