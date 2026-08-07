@@ -922,10 +922,13 @@ authoring nor prettier produces. The **width** emitters ask the seam too, as a r
 the *previous* item, sliding it BACKWARD across that item's comma. A **deferred** run leads the next
 item, so its last comment takes the leading separator (`comment_hugs_next`, keyed on the source
 right after the `*/` — never on where the item starts, which the list's own comma sits between), and
-an author blank belongs ahead of it and **forces the break**, since a soft `line` cannot carry one.
-And a scan measuring a **distance** rather than claiming a comment takes the other end of the shell
-(`element_shell_end`): anchored inside, it reads the erased `)`'s line breaks as an author blank and
-fabricates one. Full text: [docs/comments.md](docs/comments.md) §The element-comma seam.
+an author blank belongs ahead of it and **forces the break**, since a soft `line` cannot carry one —
+but WHICH blank is the **family's** rule (`BlankRule`), not the arm's, and answering the hugging arm
+with the params rule gave the tuple a blank prettier collapses. And a scan measuring a **distance**
+rather than claiming a comment takes the other end of the shell (`element_shell_end`): anchored
+inside, it reads the erased `)`'s line breaks as an author blank and fabricates one — in every
+trailing dangling run, so a container that HAND-ROLLS that run (the object literal did) gets to be
+wrong about it separately. Full text: [docs/comments.md](docs/comments.md) §The element-comma seam.
 
 Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/linter use
 cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — see

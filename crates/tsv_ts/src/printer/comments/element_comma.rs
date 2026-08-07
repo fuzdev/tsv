@@ -172,6 +172,31 @@ impl<'a> Printer<'a> {
             .map_or(item_end, |c| c.span.end)
     }
 
+    /// Emit a non-last item's inline trailing run and return the caller's new `prev_end` —
+    /// the whole width-layout spelling of the seam in one call, so the emit range and the
+    /// resume anchor cannot be given different ends.
+    ///
+    /// The two halves are one decision ([`Self::inline_trailing_run_end`]): claiming
+    /// `[item_end, comma_pos)` wholesale drags an own-line comment BACKWARD across the
+    /// item's comma, and resuming past the comma DROPS whatever the run left behind. Every
+    /// caller that wrote them as separate statements had to restate that coupling in a
+    /// comment; here it is the signature. Shared by the specifier list, the tuple type and
+    /// the function-type parameter list — the width-laid-out (`d.line()`) families whose
+    /// trailing emitter is [`Self::append_trailing_inline_block_comments`]. The
+    /// type-parameter/argument lists emit the same run through
+    /// `build_comments_between_filtered` and so take the bare end.
+    pub(in crate::printer) fn push_item_trailing_run(
+        &self,
+        parts: &mut DocBuf,
+        item_end: u32,
+        next_start: u32,
+    ) -> u32 {
+        let comma_pos = self.find_list_comma(item_end, next_start);
+        let run_end = self.inline_trailing_run_end(item_end, comma_pos);
+        self.append_trailing_inline_block_comments(parts, item_end, run_end);
+        run_end
+    }
+
     /// The trailing RUN in a list element's gap: the prefix of `[start, end)`'s to-emit
     /// comments that FOLLOW CONTENT on their line, ending AT the first line comment.
     ///

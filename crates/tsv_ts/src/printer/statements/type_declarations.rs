@@ -932,8 +932,9 @@ impl<'a> Printer<'a> {
                     all_comments
                         .iter()
                         .filter(|c| {
-                            // Keep if not on same line as prev_end
-                            if !self.is_same_line(prev_end, c.span.start) {
+                            // Not claimed by the previous member's trailing run, so it
+                            // leads this one.
+                            if !self.comment_already_trailed(Some(prev_end), c, false) {
                                 return true;
                             }
                             // A comment that hugs this member on its line leads it

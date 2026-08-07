@@ -749,21 +749,27 @@ where
 
 /// Partitioned comments between two positions
 ///
-/// Separates comments into categories based on position relative to `reference_pos`:
-/// - `trailing_line`: Line comments on the same line as reference_pos
-/// - `trailing_block`: Block comments on the same line as reference_pos
-/// - `leading`: Comments on their own lines (not on same line as reference_pos)
+/// Separates comments into a run that TRAILS what precedes the gap and one that LEADS
+/// what follows it:
+/// - `trailing_line`: the run's line comments
+/// - `trailing_block`: the run's block comments
+/// - `leading`: everything past the run
 ///
 /// Uses `SmallVec` to avoid heap allocations for the common case (0-2 comments per range).
 ///
-/// `new` takes its trailing/leading split from [`Printer::trailing_comment_run`], the
-/// same walk the object literal, both destructuring patterns, the enum and the array
-/// literal partition their element→comma gaps with, so the call family cannot answer the
-/// seam differently. (The ternary and member-chain gap printers stay on
-/// `tsv_lang::ClassifiedComments`' same-line reading: their gap holds an operator or a
-/// `.`, not a comma.) This type adds the call-argument-specific emission (`emit_*`) and
-/// comma-relative helpers on top; only the emission differs per shape, which is
-/// intentional.
+/// ⚠️ **The two constructors ask different questions, and the gap's shape picks one.**
+/// [`Self::for_item_gap`] — the gap holding the list's own **comma** — takes its split
+/// from [`Printer::trailing_comment_run`], the same walk the object literal, both
+/// destructuring patterns, the enum and the array literal partition their element→comma
+/// gaps with, so the call family cannot answer the seam differently. [`Self::new`] — a
+/// **delimiter** gap (`(`→first argument, last argument→`)`) — keeps the same-line
+/// reading of `tsv_lang::ClassifiedComments`, shared with the ternary
+/// (`conditional.rs`) and member-chain (`chain/builder/helpers.rs`) gap printers, whose
+/// gaps likewise hold an operator or a `.` rather than a comma. Each constructor's own
+/// doc states why the other's reading is wrong for it.
+///
+/// This type adds the call-argument-specific emission (`emit_*`) and comma-relative
+/// helpers on top; only the emission differs per shape, which is intentional.
 pub(crate) struct PartitionedComments<'a> {
     pub trailing_line: SmallVec<[&'a internal::Comment; 2]>,
     pub trailing_block: SmallVec<[&'a internal::Comment; 2]>,
@@ -782,11 +788,16 @@ impl<'a> PartitionedComments<'a> {
     /// Comments on the same line as `start` are "trailing" (they follow content on that line).
     /// Comments on subsequent lines are "leading" (they precede content on the next line).
     ///
-    /// ⚠️ **For a DELIMITER gap only** — `(`→first item, last item→`)`. There `start` is
-    /// the delimiter or the sole item's end, and "same line as `start`" is exactly the
-    /// question the delimiter-line rule asks (`docs/comments.md` §The delimiter-line
-    /// question). An **inter-item** gap holds a comma and takes
-    /// [`Self::for_item_gap`] instead: the seam's own reading, which this one is blind to.
+    /// ⚠️ **The DELIMITER-LINE reading**, and only that: "does the comment sit on the
+    /// anchor's line?" — exactly the question a `(`→first-item gap asks, where the anchor
+    /// IS the delimiter (`docs/comments.md` §The delimiter-line question). It is blind to
+    /// the two kinds of text no item span covers — the list's own **comma** and a stripped
+    /// paren shell's `)` — so it must not be used where the answer decides which ITEM a
+    /// comment binds to. An **inter-item** gap takes [`Self::for_item_gap`], and so does a
+    /// last-item→`)` gap whose emitter claims a trailing RUN
+    /// (`build_inline_trailing_comments`): a comment behind a stripped `)`, or behind a
+    /// comma the author pushed onto its own line, still trails that item and this reading
+    /// would leave it unclaimed.
     pub fn new(
         comments: &'a [internal::Comment],
         line_breaks: &[u32],

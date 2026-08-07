@@ -510,13 +510,7 @@ impl<'a> Printer<'a> {
 
             if !is_last {
                 let next_start = get_span(&items[i + 1]).start;
-                let comma_pos = self.find_list_comma(item_end, next_start);
-                // Only the run that follows content on its line trails this item; the rest
-                // leads the next one, so the leading scan resumes at the run's end rather
-                // than past the comma (`Printer::inline_trailing_run_end`).
-                let run_end = self.inline_trailing_run_end(item_end, comma_pos);
-                self.append_trailing_inline_block_comments(&mut item_parts, item_end, run_end);
-                prev_end = run_end;
+                prev_end = self.push_item_trailing_run(&mut item_parts, item_end, next_start);
             } else {
                 // Split the last item's trailing block comments around a source comma:
                 // before-comma stay with the item; after-comma are preserved below, past

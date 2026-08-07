@@ -185,12 +185,19 @@ impl<'a> Printer<'a> {
 
     /// Whether a comment between two neighbors can't share a line with either — any
     /// line comment (it runs to EOL), or a block comment isolated from *both* `prev`
-    /// (at the comment's start) and `next` (at its end). The shared "isolated from
-    /// both neighbors" rule behind the function-parameter-list expansion gate
-    /// (`has_own_line_comment_between`) and the intersection-member break gate
-    /// (`intersection_has_isolated_member_comment`): an adjacency on either side keeps
+    /// (at the comment's start) and `next` (at its end): an adjacency on either side keeps
     /// the comment inline (`a /* c */ b`), matching prettier, which collapses both
-    /// `a,⏎/* c */ b` and `a /* c */,⏎b` back to the inline form.
+    /// `a,⏎/* c */ b` and `a /* c */,⏎b` back to the inline form. The shared "isolated
+    /// from both neighbors" rule behind the union/intersection member break gates, the
+    /// import-attribute gaps, and the first-param leading-run collapse
+    /// (`build_param_leading_comments_doc`).
+    ///
+    /// ⚠️ **Only for a gap that holds NO comma.** `prev` is an item boundary, and the two
+    /// kinds of text no item span covers — a list's own comma and a stripped paren shell's
+    /// `)` — are invisible to it, so a comment glued to either reads as isolated. A
+    /// comma-list expansion gate must ask the source instead
+    /// ([`Printer::comment_follows_content_on_its_line`]); the parameter list's
+    /// `has_own_line_comment_between` used to share this predicate and no longer can.
     pub(crate) fn comment_isolated_from_neighbors(
         &self,
         prev: u32,
