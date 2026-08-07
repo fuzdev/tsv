@@ -173,7 +173,7 @@ deno task fixtures:update:formatted  # regenerate output_prettier.svelte only
 deno task fixtures:audit             # audit _prettier_divergence fixtures (diagnostic; --all for every fixture)
 deno task fixtures:ts-audit          # which input.ts fixtures genuinely need .ts vs could be .svelte (alias of `ts_fixture_audit`)
 deno task compile:fixtures:init      # create/reinit a compile fixture (oracle-compiles + canonicalizes; tests/fixtures_compile)
-deno task compile:fixtures:validate  # compile fixtures: oracle freshness + expected idempotence + ours parity, all gating (sidecar-free slice also gates in cargo test)
+deno task compile:fixtures:validate  # compile fixtures: oracle freshness + expected idempotence + ours parity, all gating. Preflights `deno task conformance` — the ONLY place oracle freshness is graded, since the sidecar-free slice that also gates in cargo test compares tsv to the COMMITTED file and stays green when both drift away from the oracle together
 ```
 
 **Standing audit gates** — full reference ./docs/audits.md: what each proves, blind spots, flags, and where it gates (its overview table maps every task). Read the relevant section before running or modifying an audit. RATCHET audits grade against a committed known-bug snapshot (`*_known.txt`); each has an `:update` task that re-pins after a fix and refuses a narrowed run. Everything below gates in `deno task check` unless noted.
@@ -182,7 +182,8 @@ deno task compile:fixtures:validate  # compile fixtures: oracle freshness + expe
 deno task conformance:audit          # doc/fixture integrity: divergences cataloged, every Markdown link in the repo resolves, divergence READMEs back-link, no catalog-family drift
 deno task conformance:audit:compiler # compile-fixture divergence integrity + checklist ↔ `Refusal` drift
 deno task canonicalize:audit         # canonicalize_js idempotence + output validity + comment preservation
-deno task pins:audit                 # canonical-oracle PIN AGREEMENT, a repo fact: sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map must be identical
+deno task pins:audit                 # canonical-oracle PIN AGREEMENT, a repo fact: sidecar.ts VERSIONS + npm: imports, benches/js/package.json, actor.rs acorn import-map, and the sidecar deno.lock must be identical. The lock also pins what no literal names — the oracle's own transitive deps (`LOCKED_TRANSITIVE`: esrap, which PRINTS svelte's compiled JS)
+deno task pins:lock                  # REGENERATE the sidecar lockfile (crates/tsv_debug/src/deno/deno.lock) after a canonical pin bump — the lock is frozen at runtime, so this is the only way it moves; `--check` reports drift without writing. Not a gate (resolution depends on what the registry currently offers). `--allow-fresh` opts past deno's 24h `minimumDependencyAge` supply-chain window, needed ONLY to take a version published in the last day — a lock made with it reproduces flag-free once that version ages out
 deno task pins:audit:checkouts       # checkout ALIGNMENT, an environment fact: a PRESENT ../svelte or ../acorn-typescript checkout must match its pin (absent → skipped); warn-only commit drift. Gates in `deno task conformance`, reported by doctor — deliberately NOT in check (nothing there reads the checkouts)
 deno task format:audit               # tsv formats its own TS/JS (`tsv format --check .`); fails on a would-change file (exit 1) OR a parse error (exit 2)
 deno task docs:audit                 # doc-comment `[link]`s resolve — rustdoc, doc lints DENIED, private items, `--all-features`; a dead link is a STALE DOC
@@ -300,7 +301,10 @@ deno task conformance:ts-repo          # tsv's TS parser vs the tsc corpus (../t
 # A missing/PARTIAL ../typescript checkout, or an empty scan, FAILS. See ./benches/js/CLAUDE.md.
 # The three gates above accept: -v, --json, <subtree>.
 
-deno task conformance                  # pre-release aggregate: the three gates above + corpus:compare:parse --all +
+deno task conformance                  # pre-release aggregate: preflights pins:audit:checkouts +
+# compile:fixtures:validate (the ORACLE-FRESHNESS leg — `check` runs only the sidecar-free slice of the compile
+# fixtures, which grades tsv against the committed file and so cannot see the oracle itself moving), then the three
+# gates above + corpus:compare:parse --all +
 # corpus:compare:format --all in ONE process (benches/js/conformance.ts; oracles load once, fail-fast, FFI built once),
 # then render:audit over the version-pinned checkouts (a subprocess — drives its own sidecar). The format leg's prettier
 # calls ride a content-addressed cache (benches/js/lib/prettier_cache.ts; TSV_PRETTIER_CACHE=0 disables).
