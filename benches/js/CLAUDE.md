@@ -1504,6 +1504,26 @@ deliberately: edit `package.json` and `sidecar.ts` in lockstep (the
 `//canonical-sync` note in package.json restates this), run
 `deno task fixtures:update`, and review the resulting fixture churn.
 
+**Fixture churn is only one of three ways an oracle bump lands, and the third is
+ungated.** Read each upstream commit's source diff *and* the regression fixture it
+ships, then run those constructs through tsv, the new oracle, and real tsc —
+comparing wire **key order**, not just accept/reject:
+
+- an upstream **bug fix** retires a tsv correction — divergence fixtures collapse,
+  and `fixtures:update` shows you exactly which;
+- an upstream **widening** exposes a tsv over-rejection — `conformance:ts-fixtures`
+  names it, because the fix ships its own test-suite entry (which also moves that
+  gate's `scanned`/`both_accept` pins, re-measured per its update ritual);
+- an upstream **loosening** converts a construct both sides used to reject into a
+  live divergence. **Nothing sees this** — there is no suite entry for a rejection
+  that merely stopped happening, so no gate has an input for it. The only way to
+  find it is a hand sweep of the fix's feature area.
+
+A bump can equally make a construct newly *reachable* in tsv, which is how a bump
+trips `gaps:audit` with a NEW comment-gap shape. Treat that as the real drop or
+double-print it reports, not as a prompt to re-pin: the fixture didn't find a
+pre-existing bug, the parser change put a printer seam in reach for the first time.
+
 **Then grep the repo for the OLD version string** — `rg '<old>' --glob '!benches/js/results/**'`.
 Nothing gates this, and it is the step that gets skipped. Prose that restates the pin
 ("pinned at svelte X", "valid at the X pin", "the pinned oracle (svelte X) throws") is a

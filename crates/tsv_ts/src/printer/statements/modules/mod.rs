@@ -282,15 +282,16 @@ impl<'a> Printer<'a> {
         let export_first = decorators[0].span.start > decl.span.start;
 
         // The token right after the decorators is the trailing-comment boundary for
-        // `build_decorators_doc`: the class keyword (`abstract`/`class`) for the
-        // export-first form, `export` for the decorator-first form.
+        // `build_decorators_doc`: the class's own first keyword for the export-first
+        // form, `export` for the decorator-first form. That first keyword must come
+        // from `class_declaration_keyword_start` — the same helper the class printer
+        // starts its own modifier walk at — so the two agree on where the decorator
+        // run ends. Re-deriving it here as `abstract`/`class` skipped `declare`,
+        // handing the boundary to the `class` keyword instead: the decorator run then
+        // claimed the `declare`→`class` gap that the class printer also emits, and a
+        // comment there (`export @dec declare /* c */ class D {}`) printed TWICE.
         let next_after_decorators = if export_first {
-            let class_kw = if class.r#abstract {
-                "abstract"
-            } else {
-                "class"
-            };
-            self.find_keyword_after_decorators(class.decorators, class_kw, class.span.start)
+            self.class_declaration_keyword_start(class)
         } else {
             self.find_keyword_after_decorators(class.decorators, "export", decl.span.start)
         };

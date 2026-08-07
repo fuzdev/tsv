@@ -122,7 +122,103 @@
 										}
 									]
 								},
-								"params": [],
+								"params": [
+									{
+										"type": "Identifier",
+										"start": 45,
+										"end": 49,
+										"loc": {
+											"start": {
+												"line": 2,
+												"column": 26
+											},
+											"end": {
+												"line": 2,
+												"column": 30
+											}
+										},
+										"name": "a",
+										"typeAnnotation": {
+											"type": "TSTypeAnnotation",
+											"start": 46,
+											"end": 49,
+											"loc": {
+												"start": {
+													"line": 2,
+													"column": 27
+												},
+												"end": {
+													"line": 2,
+													"column": 30
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 48,
+												"end": 49,
+												"loc": {
+													"start": {
+														"line": 2,
+														"column": 29
+													},
+													"end": {
+														"line": 2,
+														"column": 30
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 48,
+													"end": 49,
+													"loc": {
+														"start": {
+															"line": 2,
+															"column": 29
+														},
+														"end": {
+															"line": 2,
+															"column": 30
+														}
+													},
+													"name": "T"
+												}
+											}
+										},
+										"decorators": [
+											{
+												"type": "Decorator",
+												"start": 40,
+												"end": 44,
+												"loc": {
+													"start": {
+														"line": 2,
+														"column": 21
+													},
+													"end": {
+														"line": 2,
+														"column": 25
+													}
+												},
+												"expression": {
+													"type": "Identifier",
+													"start": 41,
+													"end": 44,
+													"loc": {
+														"start": {
+															"line": 2,
+															"column": 22
+														},
+														"end": {
+															"line": 2,
+															"column": 25
+														}
+													},
+													"name": "dec"
+												}
+											}
+										]
+									}
+								],
 								"id": null,
 								"expression": true,
 								"generator": false,

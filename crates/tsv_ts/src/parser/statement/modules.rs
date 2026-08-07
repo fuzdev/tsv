@@ -5,6 +5,7 @@ use crate::lexer::{KeywordKind, TokenKind};
 use tsv_lang::{ParseError, Span};
 
 use super::super::Parser;
+use super::class::DecoratedClassExport;
 
 /// The parsed pieces of a module specifier that begins with the contextual
 /// `type` keyword, after acorn-typescript's type-only disambiguation has run.
@@ -196,9 +197,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::At => {
                 let deco_start = self.current_pos().0;
                 let decorators = self.parse_decorators()?;
-                // Optional `abstract` + `class`, decorators attached and the span
-                // extended over them — shared with `parse_decorated_class`.
-                let class = self.finish_decorated_class(deco_start, decorators, true)?;
+                // Optional `declare`/`abstract` + `class`, decorators attached and the
+                // span extended over them — shared with `parse_decorated_class`. The
+                // `export` here *precedes* the decorators, so they stay the declaration
+                // head even for an ambient class, and acorn keeps `exportKind: value`.
+                let class = self.finish_decorated_class(
+                    deco_start,
+                    decorators,
+                    DecoratedClassExport::BeforeOrAbsent,
+                )?;
                 Ok(self.export_named(start, Statement::ClassDeclaration(class), ExportKind::Value))
             }
             // export type X = T or export interface X { } or export declare function/class

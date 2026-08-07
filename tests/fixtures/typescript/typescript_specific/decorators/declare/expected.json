@@ -1,0 +1,885 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 424,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Ambient class declaration",
+			"start": 20,
+			"end": 48,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 29
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Ambient abstract class",
+			"start": 75,
+			"end": 100,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 26
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Decorator before `export declare`",
+			"start": 136,
+			"end": 172,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 37
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Decorator between `export` and `declare`",
+			"start": 206,
+			"end": 249,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Stacked decorators",
+			"start": 284,
+			"end": 305,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 22
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Generic ambient class with a member",
+			"start": 338,
+			"end": 376,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 39
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 423,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 414,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 29,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ClassDeclaration",
+					"start": 50,
+					"end": 72,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 19
+						}
+					},
+					"declare": true,
+					"decorators": [
+						{
+							"type": "Decorator",
+							"start": 50,
+							"end": 52,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 1
+								},
+								"end": {
+									"line": 3,
+									"column": 3
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 51,
+								"end": 52,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 2
+									},
+									"end": {
+										"line": 3,
+										"column": 3
+									}
+								},
+								"name": "d"
+							}
+						}
+					],
+					"id": {
+						"type": "Identifier",
+						"start": 68,
+						"end": 69,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 15
+							},
+							"end": {
+								"line": 4,
+								"column": 16
+							}
+						},
+						"name": "A"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 70,
+						"end": 72,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 17
+							},
+							"end": {
+								"line": 4,
+								"column": 19
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Ambient class declaration",
+							"start": 20,
+							"end": 48
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 102,
+					"end": 133,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 28
+						}
+					},
+					"abstract": true,
+					"decorators": [
+						{
+							"type": "Decorator",
+							"start": 102,
+							"end": 104,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 3
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 103,
+								"end": 104,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 3
+									}
+								},
+								"name": "d"
+							}
+						}
+					],
+					"id": {
+						"type": "Identifier",
+						"start": 129,
+						"end": 130,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 24
+							},
+							"end": {
+								"line": 8,
+								"column": 25
+							}
+						},
+						"name": "B"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 131,
+						"end": 133,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 26
+							},
+							"end": {
+								"line": 8,
+								"column": 28
+							}
+						},
+						"body": []
+					},
+					"declare": true,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Ambient abstract class",
+							"start": 75,
+							"end": 100
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 178,
+					"end": 203,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 26
+						}
+					},
+					"exportKind": "type",
+					"declaration": {
+						"type": "ClassDeclaration",
+						"start": 185,
+						"end": 203,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 8
+							},
+							"end": {
+								"line": 12,
+								"column": 26
+							}
+						},
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 174,
+								"end": 176,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 1
+									},
+									"end": {
+										"line": 11,
+										"column": 3
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 175,
+									"end": 176,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 3
+										}
+									},
+									"name": "d"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 199,
+							"end": 200,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 22
+								},
+								"end": {
+									"line": 12,
+									"column": 23
+								}
+							},
+							"name": "C"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 201,
+							"end": 203,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 24
+								},
+								"end": {
+									"line": 12,
+									"column": 26
+								}
+							},
+							"body": []
+						},
+						"declare": true
+					},
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Decorator before `export declare`",
+							"start": 136,
+							"end": 172
+						}
+					]
+				},
+				{
+					"type": "ExportNamedDeclaration",
+					"start": 251,
+					"end": 281,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 19
+						}
+					},
+					"exportKind": "value",
+					"declaration": {
+						"type": "ClassDeclaration",
+						"start": 259,
+						"end": 281,
+						"loc": {
+							"start": {
+								"line": 16,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 19
+							}
+						},
+						"declare": true,
+						"decorators": [
+							{
+								"type": "Decorator",
+								"start": 259,
+								"end": 261,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 1
+									},
+									"end": {
+										"line": 16,
+										"column": 3
+									}
+								},
+								"expression": {
+									"type": "Identifier",
+									"start": 260,
+									"end": 261,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 3
+										}
+									},
+									"name": "d"
+								}
+							}
+						],
+						"id": {
+							"type": "Identifier",
+							"start": 277,
+							"end": 278,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 15
+								},
+								"end": {
+									"line": 17,
+									"column": 16
+								}
+							},
+							"name": "D"
+						},
+						"superClass": null,
+						"body": {
+							"type": "ClassBody",
+							"start": 279,
+							"end": 281,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 17
+								},
+								"end": {
+									"line": 17,
+									"column": 19
+								}
+							},
+							"body": []
+						}
+					},
+					"specifiers": [],
+					"source": null,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Decorator between `export` and `declare`",
+							"start": 206,
+							"end": 249
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 307,
+					"end": 335,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 19
+						}
+					},
+					"declare": true,
+					"decorators": [
+						{
+							"type": "Decorator",
+							"start": 307,
+							"end": 310,
+							"loc": {
+								"start": {
+									"line": 20,
+									"column": 1
+								},
+								"end": {
+									"line": 20,
+									"column": 4
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 308,
+								"end": 310,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 4
+									}
+								},
+								"name": "d1"
+							}
+						},
+						{
+							"type": "Decorator",
+							"start": 312,
+							"end": 315,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 1
+								},
+								"end": {
+									"line": 21,
+									"column": 4
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 313,
+								"end": 315,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 2
+									},
+									"end": {
+										"line": 21,
+										"column": 4
+									}
+								},
+								"name": "d2"
+							}
+						}
+					],
+					"id": {
+						"type": "Identifier",
+						"start": 331,
+						"end": 332,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 15
+							},
+							"end": {
+								"line": 22,
+								"column": 16
+							}
+						},
+						"name": "E"
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 333,
+						"end": 335,
+						"loc": {
+							"start": {
+								"line": 22,
+								"column": 17
+							},
+							"end": {
+								"line": 22,
+								"column": 19
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Stacked decorators",
+							"start": 284,
+							"end": 305
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 378,
+					"end": 413,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 2
+						}
+					},
+					"declare": true,
+					"decorators": [
+						{
+							"type": "Decorator",
+							"start": 378,
+							"end": 380,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 1
+								},
+								"end": {
+									"line": 25,
+									"column": 3
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 379,
+								"end": 380,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 2
+									},
+									"end": {
+										"line": 25,
+										"column": 3
+									}
+								},
+								"name": "d"
+							}
+						}
+					],
+					"id": {
+						"type": "Identifier",
+						"start": 396,
+						"end": 397,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 15
+							},
+							"end": {
+								"line": 26,
+								"column": 16
+							}
+						},
+						"name": "F"
+					},
+					"typeParameters": {
+						"type": "TSTypeParameterDeclaration",
+						"start": 397,
+						"end": 400,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 16
+							},
+							"end": {
+								"line": 26,
+								"column": 19
+							}
+						},
+						"params": [
+							{
+								"type": "TSTypeParameter",
+								"start": 398,
+								"end": 399,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 17
+									},
+									"end": {
+										"line": 26,
+										"column": 18
+									}
+								},
+								"name": "T"
+							}
+						]
+					},
+					"superClass": null,
+					"body": {
+						"type": "ClassBody",
+						"start": 401,
+						"end": 413,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 20
+							},
+							"end": {
+								"line": 28,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "PropertyDefinition",
+								"start": 405,
+								"end": 410,
+								"loc": {
+									"start": {
+										"line": 27,
+										"column": 2
+									},
+									"end": {
+										"line": 27,
+										"column": 7
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 405,
+									"end": 406,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 2
+										},
+										"end": {
+											"line": 27,
+											"column": 3
+										}
+									},
+									"name": "a"
+								},
+								"typeAnnotation": {
+									"type": "TSTypeAnnotation",
+									"start": 406,
+									"end": 409,
+									"loc": {
+										"start": {
+											"line": 27,
+											"column": 3
+										},
+										"end": {
+											"line": 27,
+											"column": 6
+										}
+									},
+									"typeAnnotation": {
+										"type": "TSTypeReference",
+										"start": 408,
+										"end": 409,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 5
+											},
+											"end": {
+												"line": 27,
+												"column": 6
+											}
+										},
+										"typeName": {
+											"type": "Identifier",
+											"start": 408,
+											"end": 409,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 5
+												},
+												"end": {
+													"line": 27,
+													"column": 6
+												}
+											},
+											"name": "T"
+										}
+									}
+								},
+								"value": null
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Generic ambient class with a member",
+							"start": 338,
+							"end": 376
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

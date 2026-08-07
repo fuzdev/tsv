@@ -42,6 +42,24 @@ struct ClassMemberHeader<'arena> {
     type_parameters: Option<TSTypeParameterDeclaration<'arena>>,
 }
 
+/// Where an `export` keyword sits relative to a decorated class's decorator run.
+///
+/// The axis acorn's shapes for an **ambient** decorated class turn on: whether the
+/// decorators or the class's own modifier chain act as the declaration head, and
+/// whether `declare` is a legal modifier at all. A concrete (non-`declare`) class is
+/// shaped identically in all three positions.
+#[derive(Clone, Copy, PartialEq, Eq)]
+pub(in crate::parser) enum DecoratedClassExport {
+    /// No `export` (`@dec class C {}`), or one *preceding* the decorators
+    /// (`export @dec class C {}`): the decorator run is the declaration head.
+    BeforeOrAbsent,
+    /// `export` between the decorators and the class (`@dec export class C {}`).
+    Between,
+    /// `@dec export default class {}` — the class name is optional, and `declare`
+    /// is not a legal modifier here (tsc raises TS1005; acorn rejects).
+    BetweenDefault,
+}
+
 impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_class_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let class = self.parse_class_declaration_inner(true, false)?;
@@ -84,9 +102,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             false
         };
 
-        // Optional `abstract`, then the `class` declaration with the decorators
-        // attached (name optional for `export default`).
-        let class = self.finish_decorated_class(start, decorators, !is_default)?;
+        // Optional `declare`/`abstract`, then the `class` declaration with the
+        // decorators attached (name optional for `export default`).
+        let export_position = match (is_export, is_default) {
+            (false, _) => DecoratedClassExport::BeforeOrAbsent,
+            (true, false) => DecoratedClassExport::Between,
+            (true, true) => DecoratedClassExport::BetweenDefault,
+        };
+        let class = self.finish_decorated_class(start, decorators, export_position)?;
 
         // Wrap in export if needed
         if is_export {
@@ -100,13 +123,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 ))
             } else {
                 let end = class.span.end;
+                // An exported *ambient* declaration is a type export to acorn, exactly
+                // as in the undecorated `export declare class C {}` shape.
+                let export_kind = if class.declare {
+                    ExportKind::Type
+                } else {
+                    ExportKind::Value
+                };
                 let class_decl = Statement::ClassDeclaration(class);
                 Ok(Statement::ExportNamedDeclaration(ExportNamedDeclaration {
                     declaration: Some(self.alloc(class_decl)),
                     specifiers: &[],
                     source: None,
                     attributes: None,
-                    export_kind: ExportKind::Value,
+                    export_kind,
                     span: Span::new(start as u32, end),
                 }))
             }
@@ -116,18 +146,54 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// With leading `decorators` (starting at `deco_start`) already parsed, consume the
-    /// optional `abstract` modifier, expect and parse the `class` declaration, attach
-    /// the decorators, and extend the class span back over them. Shared by
-    /// `parse_decorated_class` (decorator-first `@dec [export] class`) and the
+    /// optional `declare` and `abstract` modifiers, expect and parse the `class`
+    /// declaration, attach the decorators, and extend the class span back over them.
+    /// Shared by `parse_decorated_class` (decorator-first `@dec [export] class`) and the
     /// `export @dec class` arm of `parse_export_declaration` (decorator-after-`export`).
+    ///
+    /// An **ambient** class is a decorator target like its concrete counterpart — tsc
+    /// accepts `@dec declare class C {}` and `@dec declare abstract class C {}` outright
+    /// (parser *and* checker), and so does acorn-typescript. Two limits on that:
+    /// decorating any other ambient declaration (`declare namespace`, `declare
+    /// function`) is TS1206, a checker-raised early error the diagnostics layer owns —
+    /// so only the class forms are consumed here, and anything else after `declare`
+    /// still fails the `class` check below; and `export default` takes no `declare`
+    /// (tsc TS1005, acorn rejects), so the modifier is left unconsumed there and the
+    /// same check rejects.
     pub(super) fn finish_decorated_class(
         &mut self,
         deco_start: usize,
         decorators: bumpalo::collections::Vec<'arena, Decorator<'arena>>,
-        name_required: bool,
+        export: DecoratedClassExport,
     ) -> Result<ClassDeclaration<'arena>, ParseError> {
+        // `export default class {}` is the one name-optional decorated form.
+        let name_required = export != DecoratedClassExport::BetweenDefault;
+
+        // `declare` is contextual, so it only reads as the ambient modifier when a
+        // class head actually follows it *on the same line* — `class`, or the
+        // `abstract` before one. The `[no LineTerminator here]` gate is the same one
+        // the undecorated path applies (`peek_starts_ambient_declaration`); without it
+        // `@dec⏎declare⏎class A {}` would parse as one ambient class, where tsc raises
+        // TS1146 and acorn builds a `declare` expression statement *overlapped* by a
+        // class node spanning back to the decorator. tsv rejects, per tsc.
+        let head_start = self.current_pos().0;
+        let is_declare = name_required
+            && matches!(self.current_kind(), TokenKind::Identifier)
+            && self.current_value() == "declare"
+            && !self.peek_preceded_by_line_terminator()
+            && (self.peek_kind() == TokenKind::Keyword(KeywordKind::Class)
+                || (matches!(self.peek_kind(), TokenKind::Identifier)
+                    && self.peek_value() == "abstract"));
+        if is_declare {
+            self.advance()?; // consume 'declare'
+        }
+
+        // `abstract` takes the same `[no LineTerminator here]` gate, for the same
+        // reason: `@dec abstract⏎class B {}` is TS1146 to tsc, and acorn's accept is
+        // the same overlapping-node shape.
         let is_abstract = matches!(self.current_kind(), TokenKind::Identifier)
             && self.current_value() == "abstract"
+            && !self.peek_preceded_by_line_terminator()
             && self.peek_kind() == TokenKind::Keyword(KeywordKind::Class);
         if is_abstract {
             self.advance()?; // consume 'abstract'
@@ -137,13 +203,47 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             return Err(self.error_expected_after("'class'", "decorator"));
         }
 
-        let mut class = self.parse_class_declaration_inner(name_required, is_abstract)?;
+        let class_start = self.current_pos().0;
+        // Everything under `declare` parses in ambient context, exactly as the
+        // undecorated path does (`parse_declare_statement`). Only set the flag when
+        // this class introduces it — an unconditional `with_context_flag` would clear
+        // an ambient context the enclosing `declare module` already established.
+        let mut class = if is_declare {
+            self.with_context_flag(
+                |p| &mut p.in_ambient_context,
+                true,
+                |p| {
+                    p.parse_class_declaration_inner_with_start(
+                        name_required,
+                        is_abstract,
+                        class_start,
+                        true,
+                    )
+                },
+            )?
+        } else {
+            self.parse_class_declaration_inner_with_start(
+                name_required,
+                is_abstract,
+                class_start,
+                false,
+            )?
+        };
         class.decorators = if decorators.is_empty() {
             None
         } else {
             Some(decorators.into_bump_slice())
         };
-        class.span = Span::new(deco_start as u32, class.span.end);
+        // The class span covers its decorators — except for an ambient class behind an
+        // intervening `export`, where acorn anchors the declaration at its own
+        // `declare` and leaves the decorators outside the span (`@dec export declare
+        // class C {}` → class starts at `declare`, decorator at `@`).
+        let span_start = if is_declare && export == DecoratedClassExport::Between {
+            head_start
+        } else {
+            deco_start
+        };
+        class.span = Span::new(span_start as u32, class.span.end);
         Ok(class)
     }
 

@@ -247,6 +247,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Class)) {
                     return Err(self.error_expected_after("'class'", "declare abstract"));
                 }
+                // TODO: the `abstract`→`class` gap skips the `[no LineTerminator here]`
+                // check the `declare`→head gap gets from `peek_starts_ambient_declaration`,
+                // so `declare abstract⏎class B {}` reads as ONE ambient class here. Both
+                // oracles disagree, and with each other: acorn rejects it outright, while
+                // tsc reads three statements (`declare`, `abstract`, then the class — its
+                // modifier lookaheads bail on the break and both words fall back to
+                // expression statements). tsc's reading is the target. The decorated
+                // analog is gated in `finish_decorated_class`; nothing gates this one —
+                // acorn's suite has no such input.
                 self.parse_declare_class(start, true)
             }
             TokenKind::Keyword(KeywordKind::Enum) => {
