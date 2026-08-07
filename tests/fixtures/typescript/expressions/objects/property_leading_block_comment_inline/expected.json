@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 381,
+	"end": 489,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -137,24 +137,56 @@
 					"column": 9
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " blank line before a comment glued to its property is preserved too",
+			"start": 373,
+			"end": 442,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 465,
+			"end": 472,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 2
+				},
+				"end": {
+					"line": 32,
+					"column": 9
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 380,
+		"end": 488,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 371,
+			"end": 479,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 27,
+					"line": 34,
 					"column": 9
 				}
 			},
@@ -892,6 +924,190 @@
 							"value": " blank line around an own-line comment is preserved",
 							"start": 278,
 							"end": 331
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 444,
+					"end": 478,
+					"loc": {
+						"start": {
+							"line": 29,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 450,
+							"end": 477,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 7
+								},
+								"end": {
+									"line": 33,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 450,
+								"end": 452,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 9
+									}
+								},
+								"name": "o5"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 455,
+								"end": 477,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 12
+									},
+									"end": {
+										"line": 33,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 459,
+										"end": 460,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 2
+											},
+											"end": {
+												"line": 30,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 459,
+											"end": 460,
+											"loc": {
+												"start": {
+													"line": 30,
+													"column": 2
+												},
+												"end": {
+													"line": 30,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 459,
+											"end": 460,
+											"loc": {
+												"start": {
+													"line": 30,
+													"column": 2
+												},
+												"end": {
+													"line": 30,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"kind": "init"
+									},
+									{
+										"type": "Property",
+										"start": 473,
+										"end": 474,
+										"loc": {
+											"start": {
+												"line": 32,
+												"column": 10
+											},
+											"end": {
+												"line": 32,
+												"column": 11
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 473,
+											"end": 474,
+											"loc": {
+												"start": {
+													"line": 32,
+													"column": 10
+												},
+												"end": {
+													"line": 32,
+													"column": 11
+												}
+											},
+											"name": "b"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 473,
+											"end": 474,
+											"loc": {
+												"start": {
+													"line": 32,
+													"column": 10
+												},
+												"end": {
+													"line": 32,
+													"column": 11
+												}
+											},
+											"name": "b"
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 465,
+												"end": 472
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " blank line before a comment glued to its property is preserved too",
+							"start": 373,
+							"end": 442
 						}
 					]
 				}

@@ -46,12 +46,7 @@ impl<'a> Printer<'a> {
         prev_arg: &internal::Expression<'_>,
         next_arg_start: u32,
     ) -> InterArgGap<'a> {
-        let mut pc = PartitionedComments::new(
-            self.comments,
-            self.comment_line_breaks,
-            prev_arg.span().end,
-            next_arg_start,
-        );
+        let mut pc = PartitionedComments::for_item_gap(self, prev_arg.span().end, next_arg_start);
         pc.route_after_comma_hugging_to_leading(self);
         // The argument's own doc may already end in a deferred `//` (a spread whose
         // stripped parens held one); a second one may not join that line.
@@ -404,8 +399,18 @@ pub(super) fn is_comment_inline_with_next(
 /// force expansion — they're part of the next arg's line and the group/fits mechanism
 /// should decide the layout.
 ///
-/// Only truly standalone block comments (different line from both `start` AND `next_code_pos`)
-/// force expansion.
+/// Only truly standalone block comments — on a line of their own in SOURCE, and not glued
+/// to the next code — force expansion.
+///
+/// ⚠️ **The first half reads the SOURCE, never `start`**, which is a previous argument's
+/// end (or the `(`). The two differ by exactly the text no span covers — the list's own
+/// **comma**, which the author can push onto its own line (`fn(a⏎, /* c */⏎b)`), and a
+/// stripped paren shell's `)`. An item-boundary reading calls such a comment own-line and
+/// expands a list that fits, a third fixed point neither the bare authoring nor prettier
+/// produces; the same correction the bracketed-list gate carries
+/// ([`Printer::has_own_line_block_comments_in_bracket_list`]). An argument list flattens
+/// when it fits, so the author's break around a comma is layout, not own-line-ness
+/// (`docs/conformance_prettier.md` §Comment Position Philosophy).
 pub(crate) fn should_force_expansion_for_comments(
     printer: &Printer<'_>,
     start: u32,
@@ -418,7 +423,7 @@ pub(crate) fn should_force_expansion_for_comments(
     // Check if any block comment is truly standalone (not inline with the next code)
     for comment in comments_to_emit_in_range(printer.comments, start, next_code_pos) {
         if comment.is_block
-            && !printer.is_same_line(start, comment.span.start)
+            && printer.is_own_line_comment(comment)
             && !is_comment_inline_with_next(printer, comment.span.end, next_code_pos)
         {
             return true;
@@ -751,11 +756,14 @@ where
 ///
 /// Uses `SmallVec` to avoid heap allocations for the common case (0-2 comments per range).
 ///
-/// `new` shares the same-line/later-line classification with the ternary
-/// (`conditional.rs`) and member-chain (`chain/builder/helpers.rs`) gap printers via
-/// `tsv_lang::ClassifiedComments`. This type adds the call-argument-specific emission
-/// (`emit_*`) and comma-relative helpers on top; only the emission differs per shape
-/// (operator / comma / dot), which is intentional.
+/// `new` takes its trailing/leading split from [`Printer::trailing_comment_run`], the
+/// same walk the object literal, both destructuring patterns, the enum and the array
+/// literal partition their element→comma gaps with, so the call family cannot answer the
+/// seam differently. (The ternary and member-chain gap printers stay on
+/// `tsv_lang::ClassifiedComments`' same-line reading: their gap holds an operator or a
+/// `.`, not a comma.) This type adds the call-argument-specific emission (`emit_*`) and
+/// comma-relative helpers on top; only the emission differs per shape, which is
+/// intentional.
 pub(crate) struct PartitionedComments<'a> {
     pub trailing_line: SmallVec<[&'a internal::Comment; 2]>,
     pub trailing_block: SmallVec<[&'a internal::Comment; 2]>,
@@ -773,6 +781,12 @@ impl<'a> PartitionedComments<'a> {
     ///
     /// Comments on the same line as `start` are "trailing" (they follow content on that line).
     /// Comments on subsequent lines are "leading" (they precede content on the next line).
+    ///
+    /// ⚠️ **For a DELIMITER gap only** — `(`→first item, last item→`)`. There `start` is
+    /// the delimiter or the sole item's end, and "same line as `start`" is exactly the
+    /// question the delimiter-line rule asks (`docs/comments.md` §The delimiter-line
+    /// question). An **inter-item** gap holds a comma and takes
+    /// [`Self::for_item_gap`] instead: the seam's own reading, which this one is blind to.
     pub fn new(
         comments: &'a [internal::Comment],
         line_breaks: &[u32],
@@ -789,6 +803,51 @@ impl<'a> PartitionedComments<'a> {
         Self {
             trailing_line: classified.trailing_line,
             trailing_block: classified.trailing_block,
+            leading,
+            start,
+            end,
+        }
+    }
+
+    /// Partition an **inter-item** gap — one holding the list's own comma — into the
+    /// previous item's **trailing** run and the next item's **leading** one.
+    ///
+    /// The split is [`Printer::trailing_comment_run`]: the gap's leading PREFIX of
+    /// comments that follow content on their line in SOURCE, ending at the first `//`.
+    /// Everything past the run leads the next argument, so the two answers partition the
+    /// gap exactly once (`docs/comments.md` §The element-comma seam) — the same walk the
+    /// object literal, both destructuring patterns, the enum and the array literal use, so
+    /// the call family cannot answer the seam differently.
+    ///
+    /// ⚠️ **The reading is of the source, never of `start`** (the previous argument's
+    /// end), and the two differ by exactly the text no argument span covers: the list's
+    /// own **comma**, which the author can push onto its own line (`fn(a⏎, /* c */⏎b)`),
+    /// and a stripped paren shell's `)`. An `is_same_line(start, …)` classification calls a
+    /// comment glued to either one own-line, which both lifts it off the comma's line and
+    /// force-expands a list that fits — a third fixed point neither the bare authoring nor
+    /// prettier produces.
+    ///
+    /// ⚠️ **Not for a delimiter gap.** With `start` at the `(`/`[`, "follows content on
+    /// its line" is a different question from "sits on the delimiter's line": an elision's
+    /// comma or a leading `,` puts content ahead of a comment two lines below the opener,
+    /// which this would call trailing — pulling it onto the delimiter's line *and* leaving
+    /// it for the first item's leading run to print again. Use [`Self::new`] there.
+    pub fn for_item_gap(printer: &Printer<'a>, start: u32, end: u32) -> Self {
+        let mut trailing_line: SmallVec<[&'a internal::Comment; 2]> = SmallVec::new();
+        let mut trailing_block: SmallVec<[&'a internal::Comment; 2]> = SmallVec::new();
+        let mut run_end = start;
+        for comment in printer.trailing_comment_run(start, end) {
+            if comment.is_block {
+                trailing_block.push(comment);
+            } else {
+                trailing_line.push(comment);
+            }
+            run_end = comment.span.end;
+        }
+        let leading = comments_to_emit_in_range(printer.comments, run_end, end).collect();
+        Self {
+            trailing_line,
+            trailing_block,
             leading,
             start,
             end,

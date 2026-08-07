@@ -1066,12 +1066,17 @@ impl<'a> Printer<'a> {
                     if i + 1 < params.len() {
                         let next_start = params[i + 1].span().start;
                         let comma_pos = self.find_list_comma(param_end, next_start);
+                        // Only the run that follows content on its line trails this param;
+                        // the rest leads the next one, so the leading scan resumes at the
+                        // run's end rather than past the comma
+                        // (`Printer::inline_trailing_run_end`).
+                        let run_end = self.inline_trailing_run_end(param_end, comma_pos);
                         self.append_trailing_inline_block_comments(
                             &mut param_parts,
                             param_end,
-                            comma_pos,
+                            run_end,
                         );
-                        prev_end = comma_pos + 1; // After comma
+                        prev_end = run_end;
                     } else {
                         // Last param: trailing comments before `)` (`end_boundary` is
                         // the close paren, or the last param end fallback).

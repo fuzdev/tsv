@@ -914,7 +914,18 @@ gap of its own**: the anchor stays the last REAL element's split however many ho
 so a comment slides *forward* past their (structural) commas to the element it leads — or, past
 the last one, to the list's own trailing position. Counting commas instead handed the region to
 seams that print nothing, which was a DROP every time; no blank line is measured across a hole
-either. Full text: [docs/comments.md](docs/comments.md) §The element-comma seam.
+either. **The expansion gate over the seam asks the same source question**, in four spellings —
+one per family shape (bracketed lists, object/type literal, call arguments, parameter lists) — and
+an item-boundary reading there expands a list that fits, a third fixed point neither the bare
+authoring nor prettier produces. The **width** emitters ask the seam too, as a range
+(`inline_trailing_run_end`): claiming `[item_end, comma)` wholesale trails an own-line comment onto
+the *previous* item, sliding it BACKWARD across that item's comma. A **deferred** run leads the next
+item, so its last comment takes the leading separator (`comment_hugs_next`, keyed on the source
+right after the `*/` — never on where the item starts, which the list's own comma sits between), and
+an author blank belongs ahead of it and **forces the break**, since a soft `line` cannot carry one.
+And a scan measuring a **distance** rather than claiming a comment takes the other end of the shell
+(`element_shell_end`): anchored inside, it reads the erased `)`'s line breaks as an author blank and
+fabricates one. Full text: [docs/comments.md](docs/comments.md) §The element-comma seam.
 
 Higher-fidelity models (attached comments, trivia tokens) may be needed for IDE/linter use
 cases; prettier, oxfmt and biome all get the JSDoc-cast paren binding wrong — see

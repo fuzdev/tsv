@@ -115,9 +115,15 @@ impl<'a> Printer<'a> {
                     is_first.then_some(brace_pull_pos).flatten(),
                 );
 
-                // For non-first properties, add separator
+                // For non-first properties, add separator. An author BLANK line takes the
+                // hardline separator even when nothing else forces the break: a soft
+                // `line` cannot carry a blank, so routing a blank gap through `line()`
+                // DROPS it — and the comment-free path below preserves the identical
+                // authoring (`{ a,⏎⏎b }`), so a commented object dropping it was the two
+                // paths disagreeing about one gap. Preserving it forces the object open,
+                // which is what the comment-free path's `literalline` does too.
                 if !is_first {
-                    if must_break {
+                    if must_break || self.item_gap_has_blank_line(prev_end, prop_start) {
                         // Must break: check for blank line preservation
                         self.push_item_blank_separator(&mut parts, prev_end, prop_start);
                     } else {

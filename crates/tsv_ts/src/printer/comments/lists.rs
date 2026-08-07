@@ -242,37 +242,45 @@ impl<'a> Printer<'a> {
     /// Check if there's a block comment on its own line within a container.
     ///
     /// A "standalone" block comment is one that:
-    /// - Is not on the same line as the opening brace
-    /// - Is not on the same line as any item (start or end)
+    /// - Starts a line of its own in SOURCE ([`Printer::comment_follows_content_on_its_line`])
+    /// - Is not glued to a following item (`/* c */ item`)
     ///
     /// Used to force multiline formatting for objects/type literals.
+    ///
+    /// ⚠️ **The first half reads the SOURCE, never an item boundary.** The two differ by
+    /// exactly the text no item span covers — the container's own **comma**, which the
+    /// author can push onto its own line (`{ a: 1⏎, /* c */⏎b: 2 }`), the opening `{`, and
+    /// a stripped paren shell's `)`. Asking "is the comment on the same line as any item's
+    /// end?" calls a comment glued to any of those own-line and expands a container that
+    /// fits, a third fixed point neither the bare authoring nor prettier produces. It is
+    /// the same question the bracketed-list gate asks
+    /// ([`Printer::has_own_line_block_comments_in_bracket_list`]) and the same one the
+    /// element→comma seam partitions on, so the three cannot disagree about one gap.
+    /// A comment given a line **of its own** still expands the container, which is what
+    /// this predicate is for.
     pub(crate) fn has_standalone_block_comment(
         &self,
         container_start: u32,
         container_end: u32,
         item_spans: &[Span],
     ) -> bool {
-        let after_open_brace = container_start + 1;
         self.comments_on_page_between(container_start, container_end)
             .any(|c| {
                 if !c.is_block {
                     return false; // Line comments handled separately
                 }
-                // Must not be on same line as opening brace
-                if self.is_same_line(after_open_brace, c.span.start) {
+                // Anything before it on its line — an item, the `{`, a stripped `)`, the
+                // comma — makes it a trailing comment, not a standalone one.
+                if self.comment_follows_content_on_its_line(c) {
                     return false;
                 }
-                // Must not be on same line as any item. An item *before* the comment
-                // shares its line when the item's end and the comment's start match
-                // (`item /* c */`); an item *after* the comment shares its line when the
-                // comment's end and the item's start match (`/* c */ item`). Each
-                // `is_same_line` call must pass its earlier position first — the helper
-                // returns false for out-of-order args, so anchoring the leading-item check
-                // on `s.start` (which follows the comment) wrongly reported "standalone"
-                // for an inline-adjacent comment and force-expanded the container.
-                !item_spans.iter().any(|s| {
-                    self.is_same_line(s.end, c.span.start) || self.is_same_line(c.span.end, s.start)
-                })
+                // An item *after* the comment shares its line when the comment's end and
+                // the item's start match (`/* c */ item`); such a comment leads that item
+                // inline and forces nothing. `is_same_line` must take its earlier position
+                // first — the helper returns false for out-of-order args.
+                !item_spans
+                    .iter()
+                    .any(|s| self.is_same_line(c.span.end, s.start))
             })
     }
 
@@ -1236,7 +1244,35 @@ impl<'a> Printer<'a> {
         // See `split_separator_gap_comments`.
         let deferred_own_line =
             self.split_separator_gap_comments(parts, elem_end, comma_pos, false);
+        // A deferred run LEADS the next element, so its last comment takes the
+        // leading-comment separator, not this emitter's element hardline: a space when the
+        // author glued it to what follows on its line ([`Printer::comment_hugs_next`],
+        // prettier's `printLeadingComment`), which for a list is the comma the comment sits
+        // in front of (`[a⏎/* c */, b]`). Answering it with the element separator instead
+        // drops such a comment onto a line of its own — a third form, and one that puts
+        // this family at odds with the array literal, whose per-element group collapses
+        // the same soft `line` (`docs/comments.md` §Array family vs params family).
+        let mut deferred = comments_to_emit_in_range(self.comments, elem_end, comma_pos)
+            .filter(|c| !self.is_same_line(elem_end, c.span.start))
+            .peekable();
+        let deferred_first = deferred.peek().map(|c| c.span.start);
+        let deferred_hugs = !deferred_own_line.is_empty()
+            && deferred.last().is_some_and(|c| self.comment_hugs_next(c));
         parts.push(d.text(","));
+        if deferred_hugs {
+            // An author blank line belongs AHEAD of a hugging run, where it was written —
+            // between the element and the comment. The element separator below can only
+            // put it after, which for a glued run would split the comment from the item it
+            // leads.
+            if blank_rule != BlankRule::None
+                && deferred_first.is_some_and(|start| self.has_blank_line_between(elem_end, start))
+            {
+                parts.push(d.literalline());
+            }
+            parts.extend(deferred_own_line);
+            parts.push(d.text(" "));
+            return comma_pos + 1;
+        }
         parts.extend(deferred_own_line);
 
         // Same-line trailing comments after comma (line comments that consume the line).

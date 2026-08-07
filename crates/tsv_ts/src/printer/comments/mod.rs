@@ -47,6 +47,7 @@ use smallvec::SmallVec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 use tsv_lang::printing;
+use tsv_lang::source_scan::has_newline_after_position;
 use tsv_lang::{Comment, comments_to_emit_in_range};
 
 /// Small stack-allocated vector of comment references. Inline capacity 8 keeps
@@ -200,24 +201,33 @@ impl<'a> Printer<'a> {
             || (!self.is_same_line(prev, c.span.start) && !self.is_same_line(c.span.end, next))
     }
 
-    /// Whether a *block* comment is glued to what follows it at `next` (`/* c */ X` —
-    /// nothing but spaces after its `*/`), so it leads that token inline instead of
-    /// taking its own line. Prettier's leading-comment rule, and the reason it is
-    /// keyed on `next` rather than on the item the run leads: `printLeadingComment`
-    /// reads only the source right after the comment (`hasNewline(text,
-    /// locEnd(comment))`), so a run the author glued together stays glued
-    /// (`/* a */ /* b */⏎X` → the pair shares a line, `X` starts a new one).
+    /// Whether a *block* comment is glued to what follows it (`/* c */ X` — nothing but
+    /// spaces after its `*/`), so it leads that token inline instead of taking its own
+    /// line. Prettier's leading-comment rule, asked exactly as `printLeadingComment` asks
+    /// it: of the **source right after the comment** (`hasNewline(text, locEnd(comment))`),
+    /// never of where the item it leads happens to start. So a run the author glued
+    /// together stays glued (`/* a */ /* b */⏎X` → the pair shares a line, `X` starts a new
+    /// one).
+    ///
+    /// ⚠️ **The two readings differ by exactly the structure a list re-emits.** With a
+    /// comma between the comment and its item (`<T⏎/* c */, U // x>`), an
+    /// `is_same_line(comment.end, item_start)` approximation says "the item is on the next
+    /// line, so break" and drops the comment onto a line of its own — while the author's
+    /// own line, and prettier's, ends *after* the comma. The array literal reached the same
+    /// output by collapsing a soft `line` in its per-element group; the params family has
+    /// no such group (`docs/comments.md` §Array family vs params family), so the glue test
+    /// is the whole answer there and the two families disagreed about one authoring.
     ///
     /// The single statement of the rule. [`push_leading_comment_run`](Self::push_leading_comment_run)
     /// is the emitter for the sites whose surrounding loop is the shared one; a site
     /// whose separator policy genuinely differs (the union member's own-line run,
     /// which brackets the `| ` separator and preserves blanks in different positions)
     /// calls this directly rather than re-deriving it.
-    pub(crate) fn comment_hugs_next(&self, comment: &Comment, next: u32) -> bool {
-        comment.is_block && self.is_same_line(comment.span.end, next)
+    pub(crate) fn comment_hugs_next(&self, comment: &Comment) -> bool {
+        comment.is_block && !has_newline_after_position(self.source, comment.span.end)
     }
 
-    /// Split a comment run at `next` into the ones that stay in the RUN and the ones
+    /// Split a comment run into the ones that stay in the RUN and the ones
     /// **glued** to what follows ([`Self::comment_hugs_next`]) — for a site whose run and
     /// glued suffix take different separators, so it cannot hand the whole run to
     /// [`Self::push_leading_comment_run`] (which decides per comment) and must emit the two
@@ -237,20 +247,22 @@ impl<'a> Printer<'a> {
     /// must not also move it to another line: at a header→body gap
     /// ([`Printer::push_header_to_body_gap`]) everything reaching the suffix sat below the
     /// anchor, so it takes a `hardline` even when the run before it is empty.
+    ///
+    /// ⚠️ **The glued set is a SUFFIX**, taken by walking back from the end while each
+    /// comment still hugs. Per-comment it is not: `/* a1 */ /* a2 */⏎x` has a1 hugging a2
+    /// and a2 hugging nothing, so a per-comment test puts a1 in the glued half and a2 in
+    /// the run — two buckets emitted run-first, which prints the authored pair REVERSED.
+    /// A comment glued to one that takes its own line takes that line with it.
     pub(crate) fn split_glued_comments(
         &self,
         comments: impl IntoIterator<Item = &'a Comment>,
-        next: u32,
     ) -> (CommentVec<'a>, CommentVec<'a>) {
-        let mut run: CommentVec<'a> = SmallVec::new();
-        let mut glued: CommentVec<'a> = SmallVec::new();
-        for comment in comments {
-            if self.comment_hugs_next(comment, next) {
-                glued.push(comment);
-            } else {
-                run.push(comment);
-            }
+        let mut run: CommentVec<'a> = comments.into_iter().collect();
+        let mut split = run.len();
+        while split > 0 && self.comment_hugs_next(run[split - 1]) {
+            split -= 1;
         }
+        let glued: CommentVec<'a> = run.drain(split..).collect();
         (run, glued)
     }
 
@@ -366,11 +378,31 @@ impl<'a> Printer<'a> {
         prev_end: u32,
         item_start: u32,
     ) {
-        let content_start = self
-            .comments_in_source_between(prev_end, item_start)
+        self.push_next_line_empty_hardline(
+            parts,
+            prev_end,
+            self.item_gap_blank_bound(prev_end, item_start),
+        );
+    }
+
+    /// Whether the author left a blank line in an item gap — the predicate half of
+    /// [`Self::push_item_blank_separator`], for a caller that must *decide* on the blank
+    /// before it can pick a separator at all.
+    ///
+    /// A soft `line` cannot carry a blank, so a list whose separator is one has to know:
+    /// the blank is authorship the list preserves, and preserving it means taking the
+    /// hardline separator (which forces the break) rather than the `line`. Both halves read
+    /// the same bound, so the decision and the emission cannot disagree.
+    pub(crate) fn item_gap_has_blank_line(&self, prev_end: u32, item_start: u32) -> bool {
+        self.is_next_line_empty(prev_end, self.item_gap_blank_bound(prev_end, item_start))
+    }
+
+    /// Where an item gap's blank-line scan stops: the first comment **in source**, or the
+    /// item itself. See [`Self::push_item_blank_separator`] for why the bound is physical.
+    fn item_gap_blank_bound(&self, prev_end: u32, item_start: u32) -> u32 {
+        self.comments_in_source_between(prev_end, item_start)
             .next()
-            .map_or(item_start, |c| c.span.start);
-        self.push_next_line_empty_hardline(parts, prev_end, content_start);
+            .map_or(item_start, |c| c.span.start)
     }
 
     /// Whether `[from, next)` holds a **truly blank line** — two newlines with nothing
@@ -414,7 +446,7 @@ impl<'a> Printer<'a> {
         emit_next: u32,
     ) {
         let next = self.blank_scan_end(comment.span.end, emit_next);
-        if self.comment_hugs_next(comment, next) {
+        if self.comment_hugs_next(comment) {
             parts.push(self.d().text(" "));
         } else {
             self.push_blank_preserving_hardline(parts, comment.span.end, next);
@@ -952,7 +984,7 @@ impl<'a> Printer<'a> {
             parts.push(self.build_comment_doc(comment));
             let emit_next = comments.peek().map_or(end, |n| n.span.start);
             let next = self.blank_scan_end(comment.span.end, emit_next);
-            if self.comment_hugs_next(comment, next) {
+            if self.comment_hugs_next(comment) {
                 parts.push(d.text(" "));
             } else {
                 // An author blank after the comment is itself a break trigger
@@ -1211,7 +1243,7 @@ impl<'a> Printer<'a> {
                 // value gap (it lets a value too long for the comment's line break
                 // below it), so it must not become an unconditional space.
                 LeadingGlue::Adjacent | LeadingGlue::AdjacentValueGap => {
-                    self.comment_hugs_next(comment, next)
+                    self.comment_hugs_next(comment)
                 }
                 // A glued (not own-line) single-line block hugs across a source
                 // newline; the same-line-as-next case still hugs as in `Adjacent`.

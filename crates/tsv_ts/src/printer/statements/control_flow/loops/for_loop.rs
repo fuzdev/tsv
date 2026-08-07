@@ -201,8 +201,8 @@ impl<'a> Printer<'a> {
             // line stays on one line. A line comment is the one override — it must end
             // its line or the `//` swallows the next comment / the body. That rule
             // applies both between comments and before the body, so it is written once.
-            let sep_after = |p: &Comment, next_start: u32| {
-                if self.comment_hugs_next(p, next_start) {
+            let sep_after = |p: &Comment| {
+                if self.comment_hugs_next(p) {
                     d.text(" ")
                 } else {
                     d.hardline()
@@ -219,13 +219,13 @@ impl<'a> Printer<'a> {
                             Some(p.span.end),
                             comment.span.start,
                         );
-                        inner.push(sep_after(p, comment.span.start));
+                        inner.push(sep_after(p));
                     }
                 }
                 inner.push(self.build_comment_doc(comment));
                 prev = Some(comment);
             }
-            inner.push(prev.map_or_else(|| d.hardline(), |p| sep_after(p, body_start)));
+            inner.push(prev.map_or_else(|| d.hardline(), sep_after));
             inner.push(body_doc);
             parts.push(d.indent(d.concat(&inner)));
         } else {
@@ -889,7 +889,6 @@ impl<'a> Printer<'a> {
         let (run, hug) = self.split_glued_comments(
             comments_to_emit_in_range(self.comments, search_start, clause_start)
                 .filter(|c| !prev_end.is_some_and(|pe| self.is_same_line(pe, c.span.start))),
-            clause_start,
         );
 
         match run.first() {

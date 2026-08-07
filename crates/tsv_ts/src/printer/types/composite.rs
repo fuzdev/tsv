@@ -1569,8 +1569,12 @@ impl<'a> Printer<'a> {
             prev_end = if i + 1 < t.element_types.len() {
                 let next_start = t.element_types[i + 1].span().start;
                 let comma_pos = self.find_list_comma(elem_end, next_start);
-                self.append_trailing_inline_block_comments(&mut parts, elem_end, comma_pos);
-                comma_pos + 1 // After comma
+                // Only the run that follows content on its line trails this element; the
+                // rest leads the next one, so the leading scan resumes at the run's end
+                // rather than past the comma (`Printer::inline_trailing_run_end`).
+                let run_end = self.inline_trailing_run_end(elem_end, comma_pos);
+                self.append_trailing_inline_block_comments(&mut parts, elem_end, run_end);
+                run_end
             } else {
                 let before_close = t.span.end - 1;
                 self.append_last_trailing_block_comments_split(

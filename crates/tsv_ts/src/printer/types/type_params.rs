@@ -191,14 +191,18 @@ impl<'a> Printer<'a> {
                     // Find comma between this param and next
                     let next_start = decl.params[i + 1].span.start;
                     let comma_pos = self.find_list_comma(param.span.end, next_start);
-                    // Trailing block comments (before comma)
+                    // Trailing block comments: only the run that follows content on its
+                    // line: the rest leads the next param, so the leading scan resumes at
+                    // the run's end rather than past the comma
+                    // (`Printer::inline_trailing_run_end`).
+                    let run_end = self.inline_trailing_run_end(param.span.end, comma_pos);
                     parts.push(self.build_comments_between_filtered(
                         param.span.end,
-                        comma_pos,
+                        run_end,
                         CommentSpacing::Leading,
                         CommentFilter::BlockOnly,
                     ));
-                    prev_end = comma_pos + 1; // After comma
+                    prev_end = run_end;
                 } else {
                     // Last param: trailing comments before `>`
                     parts.push(self.build_comments_between_filtered(
@@ -708,16 +712,20 @@ impl<'a> Printer<'a> {
                     // Find comma between this item and the next
                     let next_start = item_span(i + 1).start;
                     let comma_pos = self.find_list_comma(item_end, next_start);
-                    // Trailing block comments (before the comma)
+                    // Trailing block comments: only the run that follows content on its
+                    // line: the rest leads the next item, so the leading scan resumes at
+                    // the run's end rather than past the comma
+                    // (`Printer::inline_trailing_run_end`).
+                    let run_end = self.inline_trailing_run_end(item_end, comma_pos);
                     if let Some(trailing) = self.build_comments_between_filtered_opt(
                         item_end,
-                        comma_pos,
+                        run_end,
                         CommentSpacing::Leading,
                         CommentFilter::BlockOnly,
                     ) {
                         inner_parts.push(trailing);
                     }
-                    prev_end = comma_pos + 1; // After comma
+                    prev_end = run_end;
                 } else if let Some(trailing) = self.build_comments_between_filtered_opt(
                     // Last item: trailing comments before `>` (including past a source
                     // comma — trailingComma 'none' emits none, so the comment stays

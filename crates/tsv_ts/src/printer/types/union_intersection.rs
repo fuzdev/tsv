@@ -739,9 +739,8 @@ impl<'a> Printer<'a> {
                     // fixed point keeps it own-line, and that form is stable here).
                     // A comment glued on BOTH sides still takes the post-`| ` path.
                     let after_pipe = pipe_pos + 1;
-                    let hugs_glued = |c: &Comment| {
-                        self.comment_hugs_next(c, type_start) && !self.is_own_line_comment(c)
-                    };
+                    let hugs_glued =
+                        |c: &Comment| self.comment_hugs_next(c) && !self.is_own_line_comment(c);
                     let own_line: CommentVec<'_> =
                         comments_to_emit_in_range(self.comments, after_pipe, type_start)
                             .filter(|c| !hugs_glued(c))
@@ -775,7 +774,7 @@ impl<'a> Printer<'a> {
                         // matching prettier's leading-comment rule. This run brackets the
                         // `| ` separator and has its own blank-line policy, so it can't use
                         // `push_leading_comment_run` — but it shares the rule.
-                        if self.comment_hugs_next(comment, next.span.start) {
+                        if self.comment_hugs_next(comment) {
                             parts.push(d.text(" "));
                             continue;
                         }
