@@ -63,8 +63,9 @@ use std::time::{Duration, Instant};
 
 use tsv_cli::cli::input::ParserType;
 
-use super::profile::resolve_files;
+use super::profile::resolve_seed_files;
 use crate::audit::properties::{F1Outcome, f1_check};
+use crate::audit::vacuity::check_graded_nonzero;
 use crate::cli::CliError;
 
 /// Seeded mutational fuzzer: mutate corpus bytes and assert the parser never
@@ -654,23 +655,10 @@ impl Slow {
 
 impl FuzzCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let paths = if self.paths.is_empty() {
-            vec!["tests/fixtures".to_string()]
-        } else {
-            self.paths.clone()
-        };
-        let mut files = match resolve_files(&paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
         // Intentionally-invalid fixtures are poor seeds (they don't parse), but
-        // they're still valid *bytes* to mutate — keep them; only cap the count.
-        if self.limit > 0 {
-            files.truncate(self.limit);
-        }
+        // they're still valid *bytes* to mutate — keep them, so no subject filter;
+        // the shared resolution caps the count and fails loud on an empty walk.
+        let files = resolve_seed_files(&self.paths, self.limit)?;
 
         let mut seeds: Vec<Seed> = files
             .iter()
@@ -687,10 +675,9 @@ impl FuzzCommand {
             .filter(|s| !s.bytes.is_empty())
             .collect();
 
-        if seeds.is_empty() {
-            eprintln!("Error: no seed files found (searched {paths:?})");
-            return Err(CliError::Failed);
-        }
+        // Resolution already rejects an empty walk; this is the narrower question
+        // below it — every resolved file was unreadable or empty of bytes.
+        check_graded_nonzero(seeds.len(), "readable non-empty seed files")?;
 
         if let Some(dir) = &self.dump_dir
             && let Err(e) = std::fs::create_dir_all(dir)

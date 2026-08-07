@@ -6,6 +6,8 @@ Most audits are pure Rust (no Deno sidecar). Those gated in `deno task check` sc
 
 The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, the validation-suite ratchet, the differential compile fuzzer — are not audits in this sense and are not gated here; they live in [compile_tooling.md](compile_tooling.md) and [compile_validation_ratchet.md](compile_validation_ratchet.md).
 
+**One seed resolution, one directory walk, and a vacuity floor that is not scope-dependent.** Every corpus-walking audit resolves its corpus through `resolve_seed_files` / `resolve_seed_files_named` (`tsv_debug`'s `cli/commands/profile.rs`): positional paths defaulting to `tests/fixtures`, one walk that prunes what `tsv format`'s own discovery prunes and keeps its extension set (`tsv_discover`'s safety nets, build-output heuristic, and `FORMATTABLE_EXTENSIONS` — so an audit's scope is the set the production formatter would process, not a hand-mirrored list beside it), then the audit's own subject filter, so an empty scan says "no `.svelte` files found" rather than a flattened message. **An empty scan is an error at every scope, and so is a run that resolves files but grades none of them** (`check_graded_nonzero` — the case where the corpus resolves fine and the parser rejects all of it). Each audit floors the count its own *verdict* rests on, not the count resolution returned: files formatted, files compared, boundary sites probed, render keys checked. The rule for picking it — count every outcome that carries a verdict, exclude only the ones that could not be evaluated. A trivially-clean outcome is a verdict (a no-op format renders identically by identity) and counts; "the parser rejected it" is not, and does not. The pinned minimums (`FIXTURES_FORMATTED_MIN`, `comments:audit`'s `REGISTERED_MIN`) are the stronger *default-corpus* guard layered above that floor: they catch a corpus that shrank rather than one that vanished, and only a default run can be held to a number, so they stay `default_paths`-gated. The two pins ask different questions — the file count catches a corpus that shrank or a skip policy that diverged, the comment count catches *registration* collapsing while every file still formats — so `comments:audit` passes both. Ignore files are deliberately **not** consulted by the walk — the root `.formatignore` prunes the fixture trees (they are data, not format fixed points), so a walk honoring them would resolve the audits' own default corpus to nothing.
+
 ## Overview
 
 | audit | task | catches | gating |
@@ -101,6 +103,8 @@ cargo run --profile corpus -p tsv_debug --features audits comment_audit ~/dev/zz
 # audit shares; `--features comment_check` alone still works for a targeted run. Gated in
 # `deno task check` (via `comments:audit`) over tests/fixtures.
 ```
+
+The corpus walk is the shared pristine-format sweep, as in its twin [`swallow:audit`](#line-comment-swallow-audit-swallowaudit) — same skip buckets, and a formatter panic mid-walk is caught, counted, and named with its input rather than killing the run (panics are reported, not gated: the panic gates own that class).
 
 **Model.** A format entry point (`tsv_ts::format_in`, `tsv_css`'s `format_css*`, `tsv_svelte`'s `format_svelte*`) REGISTERS the comment list it is about to print — that is the expectation. A doc-based printer (tsv_ts, tsv_svelte) TAGS each comment's doc node (`DocArena::tag_comment_doc`) and the RENDERER records the emit when it reaches the node; tsv_css, which writes comments straight to its buffer, records at the write. The render-time seam is load-bearing: a builder may assemble the same subtree into two `conditional_group` candidates of which one renders, so counting at build time reads as a double-print (and a comment built only into a LOSING candidate would read as printed while being lost). A `format-ignore` region — and any other raw source slice that carries comments out verbatim (a raw at-rule prelude, a glued CSS compound selector) — records a VERBATIM RANGE that counts as one emit per comment it covers; keep those ranges tight, a too-wide carve-out silently re-opens the hole.
 
@@ -659,14 +663,16 @@ cargo run -p tsv_debug binding_audit --verbose ../svelte/packages/svelte/src
 # fixed point renders like the input.
 cargo run --profile corpus -p tsv_debug --quiet render_audit ~/dev/zzz/src
 deno task render:audit ../svelte/packages/svelte/tests   # (--gate baked in)
-# Also: --gate (exit 1 on findings), --json, --limit N. Needs the Deno sidecar, so
+# Also: --gate (exit 1 on findings), --json, --limit N (0 = unlimited, as in every
+# other audit). Needs the Deno sidecar, so
 # NOT in `deno task check` — and not in the pure-Rust `audit:corpus` either. It is
 # release-gated as a leg of `deno task conformance` (the one leg that runs as a
 # subprocess), scoped there to the version-pinned `framework` + `suite` checkouts so
 # a live working tree can't move a release verdict; run it standalone on any corpus
-# after a printer change. Files whose format is a no-op are skipped (trivially
-# render-equal); files Svelte's semantic ANALYZER rejects are counted as
-# compile-blind (that arm cannot speak there). The in-repo, any-corpus form of
+# after a printer change. Files whose format is a no-op skip the ORACLE (trivially
+# render-equal by identity) but still carry a verdict, so they count toward the
+# vacuity floor; files Svelte's semantic ANALYZER rejects are counted as
+# compile-blind (that arm cannot speak there) and do not. The in-repo, any-corpus form of
 # ../test-svelte-prettier-whitespace/whitespace-safety-check.mjs.
 ```
 
@@ -773,7 +779,9 @@ deno task audit:corpus
 # lex_diff - differential lexer harness: snapshot the raw token stream over a
 # corpus and diff against a golden to prove token-stream identity (kind, start, end,
 # decoded per token) after a lexer change — stronger than format byte-identity.
-# Covers the context-free next_token dispatch for .ts/.mts/.cts/.svelte.ts/.css.
+# Covers the context-free next_token dispatch for the TypeScript family
+# (.ts/.mts/.cts/.js/.mjs/.cjs, .svelte.ts and .d.ts included — the whole family
+# dispatches to one lexer) plus .css.
 # Pure Rust, no Deno.
 cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden --write  # capture golden
 cargo run -p tsv_debug lex_diff ~/dev/zzz/src --golden /tmp/lex.golden          # check against it

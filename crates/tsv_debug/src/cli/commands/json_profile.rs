@@ -45,7 +45,8 @@ pub struct JsonProfileCommand {
 
 impl JsonProfileCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        let (files, skipped) = resolve_profile_files(&self.paths, is_bench_corpus_excluded)?;
+        let (files, skipped) =
+            resolve_profile_files(&self.paths, |p| !is_bench_corpus_excluded(p))?;
 
         let mut results = Vec::new();
         let mut parse_errors = 0usize;

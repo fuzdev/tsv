@@ -2,9 +2,8 @@ use argh::FromArgs;
 use std::collections::BTreeMap;
 use std::path::PathBuf;
 
-use crate::audit::sweep::{
-    FIXTURES_FORMATTED_MIN, PristineSweep, check_formatted_min, sweep_pristine_armed,
-};
+use crate::audit::sweep::{PristineSweep, sweep_pristine_armed};
+use crate::audit::vacuity::{FIXTURES_FORMATTED_MIN, check_formatted_min, check_graded_nonzero};
 use crate::cli::CliError;
 use tsv_lang::doc::swallow::{self, SwallowReport};
 
@@ -78,6 +77,7 @@ impl SwallowAuditCommand {
         }
         sweep.print_panic_sample();
 
+        check_graded_nonzero(sweep.formatted, "files formatted")?;
         if default_paths {
             check_formatted_min(sweep.formatted, FIXTURES_FORMATTED_MIN)?;
         }
@@ -141,15 +141,13 @@ fn print_json(violations: &[Violation], sweep: &PristineSweep) {
             })
         })
         .collect();
-    let output = serde_json::json!({
-        "formatted": sweep.formatted,
-        "parse_skipped": sweep.parse_errors,
-        "read_skipped": sweep.read_errors,
-        "panicked": sweep.panics.count(),
-        "panicked_sample": sweep.panics.sample(),
-        "swallows": violations.len(),
-        "violations": items,
-    });
+    let output = sweep.json_report(
+        serde_json::json!({}),
+        serde_json::json!({
+            "swallows": violations.len(),
+            "violations": items,
+        }),
+    );
     #[allow(clippy::unwrap_used)]
     let s = serde_json::to_string_pretty(&output).unwrap();
     println!("{s}");

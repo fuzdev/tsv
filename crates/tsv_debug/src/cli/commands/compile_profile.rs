@@ -2,7 +2,9 @@ use argh::FromArgs;
 use std::path::{Path, PathBuf};
 use std::time::Instant;
 
-use super::profile::{format_duration, format_size, median_us, resolve_files};
+use super::profile::{
+    format_duration, format_size, is_svelte, median_us, resolve_profile_files_named,
+};
 use crate::cli::CliError;
 use tsv_svelte_compile::{CompileError, CompileOptions, compile};
 
@@ -43,22 +45,9 @@ pub struct CompileProfileCommand {
 
 impl CompileProfileCommand {
     pub(crate) fn run(self) -> Result<(), CliError> {
-        if self.paths.is_empty() {
-            eprintln!("Error: No files provided. Use file paths, directories, or glob patterns.");
-            return Err(CliError::Failed);
-        }
-        let mut files = match resolve_files(&self.paths) {
-            Ok(f) => f,
-            Err(e) => {
-                eprintln!("Error: {e}");
-                return Err(CliError::Failed);
-            }
-        };
-        files.retain(|p| p.extension().and_then(|e| e.to_str()) == Some("svelte"));
-        if files.is_empty() {
-            eprintln!("Error: No .svelte files found");
-            return Err(CliError::Failed);
-        }
+        // Svelte components only — the compile wall is a component's.
+        let (files, _input_invalid_skipped) =
+            resolve_profile_files_named(&self.paths, ".svelte files", is_svelte)?;
 
         let mut results = Vec::new();
         let mut refused = 0usize;

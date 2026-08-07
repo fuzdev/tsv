@@ -1,4 +1,5 @@
 use crate::cli::CliError;
+use crate::cli::commands::profile::{is_pruned_dir, is_svelte};
 use crate::compile_fixtures::with_trailing_newline;
 use crate::deno::{self, DenoError, SvelteGenerate};
 use crate::diff::{ColorChoice, DiffOptions, diff_to_string};
@@ -618,7 +619,7 @@ impl VisitedSet {
 /// makes the walk cycle-safe and duplicate-free (see [`VisitedSet`]).
 fn collect_svelte_files(path: &Path, visited: &mut VisitedSet, out: &mut Vec<PathBuf>) {
     if path.is_file() {
-        if is_svelte_file(path) && VisitedSet::first_visit(&mut visited.files, path) {
+        if is_svelte(path) && VisitedSet::first_visit(&mut visited.files, path) {
             out.push(path.to_path_buf());
         }
         return;
@@ -632,28 +633,18 @@ fn collect_svelte_files(path: &Path, visited: &mut VisitedSet, out: &mut Vec<Pat
     for entry in entries.flatten() {
         let child = entry.path();
         if child.is_dir() {
-            let name = child.file_name().and_then(|n| n.to_str()).unwrap_or("");
-            if name.starts_with('.')
-                || name == "node_modules"
-                || name == "dist"
-                || name == "build"
-                || name == "target"
+            if child
+                .file_name()
+                .and_then(|n| n.to_str())
+                .is_none_or(is_pruned_dir)
             {
                 continue;
             }
             collect_svelte_files(&child, visited, out);
-        } else if is_svelte_file(&child) && VisitedSet::first_visit(&mut visited.files, &child) {
+        } else if is_svelte(&child) && VisitedSet::first_visit(&mut visited.files, &child) {
             out.push(child);
         }
     }
-}
-
-/// A `.svelte` component file — not a `.svelte.ts`/`.svelte.js` module (those
-/// end in `.ts`/`.js`, so the suffix test excludes them).
-fn is_svelte_file(path: &Path) -> bool {
-    path.file_name()
-        .and_then(|n| n.to_str())
-        .is_some_and(|n| n.ends_with(".svelte"))
 }
 
 // ---- Aggregation & reporting ------------------------------------------------
@@ -1945,13 +1936,6 @@ mod tests {
         let s = "a\nb\nc\nd\n";
         assert_eq!(bound_lines(s, 2), "a\nb\n… (diff truncated at 2 lines)\n");
         assert_eq!(bound_lines(s, 10), "a\nb\nc\nd\n");
-    }
-
-    #[test]
-    fn is_svelte_file_excludes_modules() {
-        assert!(is_svelte_file(Path::new("Foo.svelte")));
-        assert!(!is_svelte_file(Path::new("foo.svelte.ts")));
-        assert!(!is_svelte_file(Path::new("foo.ts")));
     }
 
     #[test]
