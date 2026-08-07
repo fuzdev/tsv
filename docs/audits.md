@@ -1,10 +1,10 @@
 # Audit Gates
 
-> The standing correctness audits over the formatter, the parsers, and the Svelte compiler's doc/canonicalizer surface — what each proves, what it is blind to, how to run it, and where it gates. The `deno task` entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--deno-based); this doc is the full reference.
+> The standing correctness audits over the formatter, the parsers and their wire contract, the Svelte compiler, and the canonical oracles all of them are graded against — what each proves, what it is blind to, how to run it, and where it gates. The `deno task` entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--deno-based); this doc is the full reference.
 
 Most audits are pure Rust (no Deno sidecar). Those gated in `deno task check` scan `tests/fixtures` — a curated, format-stable tree — so several are cheap tripwires there whose real yield is external corpora (`../prettier/tests/format`, `../svelte/packages/svelte/src`, sibling dev repos): point them at real code after a printer change, or run `deno task audit:corpus`, the standing bundle for exactly that. Audits that need the feature-gated instrumentation (`swallow_check` / `comment_check`) build via the `audits` umbrella feature under `--profile corpus` — the single build world every `deno task check` audit shares (optimized + `panic = "unwind"`, so a formatter panic is caught and reported instead of killing the process; plain `--release` is `panic = "abort"`).
 
-The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, the validation-suite ratchet, the differential compile fuzzer — are not audits in this sense and are not gated here; they live in [compile_tooling.md](compile_tooling.md) and [compile_validation_ratchet.md](compile_validation_ratchet.md).
+The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, the validation-suite ratchet, the differential compile fuzzer — are not audits in this sense and are not gated here; they live in [compile_tooling.md](compile_tooling.md) and [compile_validation_ratchet.md](compile_validation_ratchet.md). The compile fixtures are the one split case: their parity legs are pure Rust and gate in `check`, their oracle-freshness leg needs the sidecar and gates in `conformance`, so both are documented [below](#compile-fixture-validation-compilefixturesvalidate).
 
 **One seed resolution, one directory walk, and a vacuity floor that is not scope-dependent.** Every corpus-walking audit resolves its corpus through `resolve_seed_files` / `resolve_seed_files_named` (`tsv_debug`'s `cli/commands/profile.rs`): positional paths defaulting to `tests/fixtures`, one walk that prunes what `tsv format`'s own discovery prunes and keeps its extension set (`tsv_discover`'s safety nets, build-output heuristic, and `FORMATTABLE_EXTENSIONS` — so an audit's scope is the set the production formatter would process, not a hand-mirrored list beside it), then the audit's own subject filter, so an empty scan says "no `.svelte` files found" rather than a flattened message. **An empty scan is an error at every scope, and so is a run that resolves files but grades none of them** (`check_graded_nonzero` — the case where the corpus resolves fine and the parser rejects all of it). Each audit floors the count its own *verdict* rests on, not the count resolution returned: files formatted, files compared, boundary sites probed, render keys checked. The rule for picking it — count every outcome that carries a verdict, exclude only the ones that could not be evaluated. A trivially-clean outcome is a verdict (a no-op format renders identically by identity) and counts; "the parser rejected it" is not, and does not. The pinned minimums (`FIXTURES_FORMATTED_MIN`, `comments:audit`'s `REGISTERED_MIN`) are the stronger *default-corpus* guard layered above that floor: they catch a corpus that shrank rather than one that vanished, and only a default run can be held to a number, so they stay `default_paths`-gated. The two pins ask different questions — the file count catches a corpus that shrank or a skip policy that diverged, the comment count catches *registration* collapsing while every file still formats — so `comments:audit` passes both. Ignore files are deliberately **not** consulted by the walk — the root `.formatignore` prunes the fixture trees (they are data, not format fixed points), so a walk honoring them would resolve the audits' own default corpus to nothing.
 
@@ -23,6 +23,10 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Build fanout](#build-fanout-audit-fanoutaudit) | `fanout:audit` | exponential doc-node rebuild in nested layout candidates | `deno task check` |
 | [Raw-find scan](#raw-find-scan-audit-scanaudit) | `scan:audit` | new raw substring scans over source (comment-blind delimiter matching) | `deno task check` |
 | [Self-format](#self-format-audit-formataudit) | `format:audit` | tsv failing to format its OWN TS/JS — a would-change file (non-idempotency) or a parse error (over-rejection) | `deno task check` |
+| [Doc link](#doc-link-audit-docsaudit) | `docs:audit` | a doc-comment `[link]` that no longer resolves — a stale doc | `deno task check` |
+| [Wire-type drift](#wire-type-drift-check-checkast-types) | `check:ast-types` | the shipped `tsv_ast.d.ts` no longer describing what the wire-JSON writers emit | `deno task check` |
+| [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `deno task check` |
+| [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version; commit drift (warn) | `deno task conformance` (preflight) |
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check` |
 | [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` | formatted output the parser rejects (delimiter/structure corruption) | `deno task check` |
 | [Binding](#commenttoken-binding-audit-bindingaudit) | `binding:audit` | a glued comment re-bound to a different subtree by a migrating paren | `deno task check` |
@@ -35,6 +39,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Conformance audit](#conformance-audit-conformanceaudit) | `conformance:audit` | doc/fixture catalog + link integrity | `deno task check` |
 | [Compiler conformance](#compiler-conformance-audit-conformanceauditcompiler) | `conformance:audit:compiler` | compile-fixture divergence catalog + checklist ↔ `Refusal` drift | `deno task check` |
 | [Canonicalizer](#canonicalizer-audit-canonicalizeaudit) | `canonicalize:audit` | `canonicalize_js` non-idempotence / corrupt output / comment loss | `deno task check` |
+| [Compile fixtures](#compile-fixture-validation-compilefixturesvalidate) | `compile:fixtures:validate` | a stale compile expectation (oracle freshness) · tsv-vs-expected compile parity · expected-file idempotence | parity legs in `deno task check` (`cargo test`); freshness in `deno task conformance` |
 
 ## Line-Comment Swallow Audit (`swallow:audit`)
 
@@ -521,6 +526,124 @@ errors *beside* the dead link, and those needed reading, not the gate.
 **Build world.** `cargo doc` builds its own rmeta; it does not share the `--profile corpus`
 world the other `check` audits use, so it adds a short compile of its own.
 
+## Wire-Type Drift Check (`check:ast-types`)
+
+```bash
+# scripts/check_ast_types.ts — `tsv parse` a curated sample set, embed each JSON
+# output as a typed literal in a generated TS file, `deno check` it.
+deno task check:ast-types
+```
+
+**What it proves.** That `crates/tsv_wasm/types/tsv_ast.d.ts` still describes what the
+converter emits. That `.d.ts` is hand-maintained and it **ships** — `@fuzdev/tsv_parse_wasm`
+bundles it, so it is the wire contract consumers type against, and nothing in the Rust build
+knows it exists. TypeScript's excess-property checking on the generated object literals catches
+both directions of drift: a field the converter emits that the `.d.ts` lacks ("may only specify
+known properties"), and a field the `.d.ts` requires that the converter does not emit
+("Property 'X' is missing"). Renames and value-type changes fall out the same way.
+
+**Blind spots.** Coverage is the sample list, and it is small **by design** — each sample costs
+a parse invocation, so the goal is structural coverage, not fixture-style exhaustiveness. A
+node no sample reaches can drift freely; the per-field checklist in
+[crates/tsv_wasm/CLAUDE.md §TS Type Maintenance](../crates/tsv_wasm/CLAUDE.md#ts-type-maintenance)
+is what carries a writer change, and this gate is the backstop for the fields a sample happens
+to touch. Add one when an uncovered node regresses. It also asks only whether the two sides
+AGREE — never whether the shape they agree on is the one acorn / `parseCss` / Svelte actually
+produce, which is the parse conformance gates' remit.
+
+## Canonical-Pin Agreement Audit (`pins:audit`)
+
+```bash
+# scripts/check_canonical_pins.ts --pins. Read-only Deno, no build, no sidecar.
+deno task pins:audit
+```
+
+**What it proves.** That the canonical oracle is *one* version rather than five. The five
+pin sites that must be identical:
+
+1. `sidecar.ts` `VERSIONS` — what `tsv_debug check` reports;
+2. `sidecar.ts` static `npm:` import specifiers — what the sidecar actually runs;
+3. `benches/js/package.json` `dependencies` — what the bench and conformance gates run;
+4. `actor.rs`'s `deno_config` acorn import-map pin — the shared-acorn-instance pin;
+5. the sidecar lockfile `crates/tsv_debug/src/deno/deno.lock` — what deno ACTUALLY
+   resolves, so a literal the lock disagrees with is a lie.
+
+Drift here silently grades fixtures and corpora against a different oracle than the bench
+measures.
+
+**Why it gates early in `deno task check`.** It is a **repo fact**: nothing outside the repo
+can change the verdict, so it holds on a clean checkout — and its failure invalidates the
+fixture grading `cargo test` does later in the same chain, which is the cheapest thing to
+learn first.
+
+**`LOCKED_TRANSITIVE` — the pin with no sibling.** The lockfile also pins what no literal
+names: the oracle's own transitive dependencies, which float on THEIR declared ranges. Today
+that is `esrap`, the printer that emits the JS `svelte.compile()` returns and therefore the
+effective oracle for every compile fixture — which svelte depends on as `^2.2.12`, a caret.
+Before the lockfile the compile oracle's output could change with no version in this repo
+changing and no pin site able to see it, which is exactly what happened: esrap 2.3.1 stopped
+dropping a string-literal specifier's `as` alias and silently staled five committed fixtures
+while `deno task check` stayed green. Bumping one is a deliberate oracle move — regenerate the
+lock, re-run `deno task compile:fixtures:validate`, update the constant, all in one change.
+
+**Blind spots.**
+
+- **Agreement is not correctness.** It proves the sites say the same thing, never that the
+  thing they say is right or current. A wrong version pinned five times passes.
+- **`LOCKED_TRANSITIVE` names only `esrap`.** Every other transitive dependency is pinned by
+  the lock but unreviewed — a regeneration moves them silently unless someone diffs the lock.
+- **It cannot see oracle freshness.** A pin can be perfectly self-consistent and still grade
+  against stale committed expectations. That is `compile:fixtures:validate`'s job — the only
+  check that grades the committed expectations against a LIVE oracle — which is why `deno task
+  conformance` preflights it.
+
+**Maintenance counterpart: `deno task pins:lock`** (`scripts/regen_sidecar_lock.ts`), not an
+audit. The lock is frozen at runtime, so this is the only way it moves. `--check` reports
+drift without writing; `--allow-fresh` opts past deno's 24 h `minimumDependencyAge`
+supply-chain window, needed ONLY to take a version published in the last day (a lock made with
+it reproduces flag-free once that version ages out). `--check` is deliberately **not** gated:
+its verdict depends on what the registry offers at that moment, so it would go red the day
+upstream publishes — drift to decide about, not a broken build.
+
+## Checkout-Alignment Audit (`pins:audit:checkouts`)
+
+```bash
+# the same script's other mode (--checkouts). `--allow-run=git` is load-bearing:
+# without it every checkout reads as absent and the drift half is silently inert.
+deno task pins:audit:checkouts
+```
+
+**What it proves.** That this machine's `../svelte` and `../acorn-typescript` clones are the
+version the pins say they are. The fixtures gates grade INPUTS from those suites with the
+PINNED npm parser, and their SANCTIONED / KNOWN_GAPS ledgers are path-keyed against them, so a
+skewed checkout silently grades different inputs than the oracle version defines (and rots the
+ledgers). An ABSENT checkout is skipped with a note; a PRESENT-but-mismatched one FAILS. This
+is the hard half of the guard — the gates themselves only WARN on skew and catch it indirectly
+via their exact `scanned` count pins, which a skew that happens not to move the count slips
+past. `../prettier` is deliberately not gated: its suites' expected output is computed live per
+file (no path-keyed ledger to rot) and the checkout legitimately rides `-dev` versions —
+`doctor` reports it instead.
+
+**Why it is NOT in `deno task check`.** It is an **environment fact**, and nothing in `check`
+reads those clones — so a skew there cannot change a committed-tree verdict, and failing on it
+would be pure collateral damage: the chain halts and the real regressions go unrun. It
+preflights `deno task conformance` instead, whose legs do read them; `doctor` reports both
+modes ahead of time. Passing neither flag runs both, which is what `doctor` does.
+
+**Commit drift is warn-only, by design.** A version string only bumps at release, so upstream
+commits landing in between change a graded suite with no version signal at all — precisely how
+the count pins went stale unnoticed. Each checkout's HEAD is compared against the commit
+`GATE_CHECKOUT_COMMITS` records it was measured at ([gate_counts.md](gate_counts.md)) and a
+move is reported, never failed: the count pins are the gate, this is the diagnosis, so when one
+trips "the corpus moved" is distinguishable from "tsv regressed" at a glance rather than by
+reverse-engineering.
+
+**Blind spots.** Absent or non-git checkouts are skipped, so a machine without the clones
+passes vacuously. Alignment is a version-string comparison — it says the checkout is the pinned
+*release*, never that the pin is the right one — and, like
+[`pins:audit`](#canonical-pin-agreement-audit-pinsaudit), it cannot see whether the committed
+expectations that oracle produces are still fresh.
+
 ## Authoring-Independence Audit (`authoring:audit`)
 
 ```bash
@@ -876,3 +999,52 @@ cargo run -p tsv_debug canonicalize_audit tests/fixtures tests/fixtures_compile 
 cargo run -p tsv_debug canonicalize_audit ~/dev/zzz/src ~/dev/gro/src  # real-corpus sweep
 # Also: --json
 ```
+
+## Compile-Fixture Validation (`compile:fixtures:validate`)
+
+```bash
+# per fixture in tests/fixtures_compile — three checks, all gating. The oracle leg
+# needs the Deno sidecar. Also: --list, --json, positional filter patterns.
+deno task compile:fixtures:validate
+```
+
+**What it proves.** Per fixture:
+
+- **(a) oracle freshness** — `canonicalize_js(oracle(input.svelte))` equals the committed
+  `expected_server.js` byte-exact, and the oracle CSS matches `expected.css` (both absent
+  counts as a match);
+- **(b) ours** — `tsv_svelte_compile::compile` succeeds and its canonicalized JS + CSS equal
+  those same expectations (`parity`; a `mismatch` or `error` fails);
+- **(c) expected idempotence** — the committed `expected_server.js` is a `canonicalize_js`
+  fixed point.
+
+Expectations are always oracle-generated (`compile_fixture_init`), never hand-written, so a
+fixture records what Svelte does — declining to reproduce some behavior of it is a
+`_compiled_divergence` plus a catalog entry
+([conformance:audit:compiler](#compiler-conformance-audit-conformanceauditcompiler)), not an
+edit to an expected file.
+
+**Split gating, and the split is the point.** Checks (b) and (c) — plus "`input.svelte`
+parses" — need no sidecar, so they also run as `tests/compile_fixtures_tests.rs` in every
+`cargo test --workspace`: the offline parity gate inside `deno task check`. Check (a) cannot,
+because it calls the canonical compiler. `deno task conformance` therefore preflights the full
+command, and **that is the only place oracle freshness is graded anywhere.**
+
+**Why that split is load-bearing.** The sidecar-free slice compares tsv's output against the
+COMMITTED file — both inside the repo. When the oracle itself moves, neither side moves, so the
+slice stays green while the expectations quietly stop describing what Svelte compiles today.
+That is the same hole [`pins:audit`](#canonical-pin-agreement-audit-pinsaudit) has from the
+other end (a self-consistent pin set says nothing about freshness), and the lockfile's `esrap`
+pin exists because it was live: five committed fixtures staled with `deno task check` green
+throughout.
+
+**Blind spots.**
+
+- **Scope is `tests/fixtures_compile`** — a curated tree, so a compile bug in a shape no
+  fixture holds is invisible. The corpus-scale arms are `compile:corpus:compare` and the
+  validation-suite ratchet ([compile_tooling.md](compile_tooling.md),
+  [compile_validation_ratchet.md](compile_validation_ratchet.md)), neither gated in `check`.
+- **Parity is canonical-reprint parity, not byte parity.** Both sides are compared after
+  `canonicalize_js`, whose bar tolerates a comment-POSITION difference (`compare_canonical`) —
+  so a difference the canonicalizer erases is one this cannot see, and the canonicalizer itself
+  is guarded separately by [`canonicalize:audit`](#canonicalizer-audit-canonicalizeaudit).

@@ -2,7 +2,7 @@
 
 > The sidecar-dependent harnesses that grade `tsv_svelte_compile` against the canonical Svelte compiler — the wide-net corpus run, the differential fuzzer, and the type-eraser comment census. The `deno task` entry points are indexed in [CLAUDE.md §Fixtures](../CLAUDE.md#fixtures-rust--deno-based); this doc is the full reference.
 
-None of these run in `deno task check` — they need the Deno sidecar, and that gate is pure Rust. The two pure-Rust compiler audits (`conformance:audit:compiler`, `canonicalize:audit`) are gated there and live in [audits.md](audits.md); the validation-suite ratchet, which shares this pipeline but grades against a committed snapshot, has its own doc: [compile_validation_ratchet.md](compile_validation_ratchet.md).
+None of these run in `deno task check` — they need the Deno sidecar, and that gate is pure Rust. The two pure-Rust compiler audits (`conformance:audit:compiler`, `canonicalize:audit`) are gated there and live in [audits.md](audits.md), as does [`compile:fixtures:validate`](audits.md#compile-fixture-validation-compilefixturesvalidate) — split across both cadences, its parity legs pure Rust in `check` and its oracle-freshness leg sidecar-bound in `conformance`. The validation-suite ratchet, which shares this pipeline but grades against a committed snapshot, has its own doc: [compile_validation_ratchet.md](compile_validation_ratchet.md).
 
 ## Corpus Comparison (`compile:corpus:compare`)
 
