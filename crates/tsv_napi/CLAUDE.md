@@ -15,7 +15,7 @@ Build/usage commands live in [../../CLAUDE.md §JS Bindings](../../CLAUDE.md#js-
 ## Two-stage rollout
 
 - **(3a) measurement binding — done.** A single-platform local build (`deno task build:napi` → `cargo build -p tsv_napi --release`) drives the **Node** benchmark runner (`benches/js/lib/napi.ts` loads the built cdylib directly via `process.dlopen` — no `.node` rename). **No CI, no cross-platform matrix, no npm publish.**
-- **(3b) publish matrix — a fast-follow, decoupled from 0.2.** The cross-platform prebuilt `.node` artifacts (per-platform `optionalDependencies` under a thin `@fuzdev/tsv_napi` loader) + release CI are deferred. They need GitHub release infrastructure (tagged releases hosting the per-platform binaries) that the WASM/npm path doesn't — so N-API publish **must not block** the WASM package publish or the VS Code extension. It's queued immediately after 0.2 (landing as 0.3 if the GitHub setup slips), and is expected to eventually **subsume** the WASM path as tsv's primary native distribution. Do **not** bolt N-API onto the single-machine `deno task publish`.
+- **(3b) publish matrix — targets 0.4, decoupled from the WASM releases.** The cross-platform prebuilt `.node` artifacts (per-platform `optionalDependencies` under a thin `@fuzdev/tsv_napi` loader) + release CI are deferred. They need GitHub release infrastructure (tagged releases hosting the per-platform binaries) that the WASM/npm path doesn't — so N-API publish **must not block** the WASM package publish or the VS Code extension. It rides 0.4 (0.3 is the WASM-only confidence release), and is expected to eventually **subsume** the WASM path as tsv's primary native distribution. Do **not** bolt N-API onto the single-machine `deno task publish`.
 
 ## Features
 
@@ -39,7 +39,7 @@ JS export names are kept **snake_case** via `#[napi(js_name = "…")]` (napi-rs 
 
 napi-rs marshals the JS string into a Rust `String` and the returned `String` back out — **no raw pointers, no manual free** (unlike `tsv_ffi`). Engine errors are returned as `napi::Result::Err(napi::Error)`, which napi-rs converts to a **thrown JS error** — there is no `{"error": …}` envelope to inspect (the FFI shape); a throw just propagates.
 
-**Panic profile:** the published `[profile.release]` is `panic = "abort"`, so a Rust panic aborts the process (napi-rs can only catch panics under `panic = "unwind"`). The measurement binding ships release for native-vs-native parity with `tsv_ffi`; the bench corpus is curated so tsv doesn't panic. If a panic-tolerant build is needed, the `[profile.corpus]` (`panic = "unwind"`) precedent exists.
+**Panic profile:** the published `[profile.release]` is `panic = "abort"`, so a Rust panic aborts the process. Catching one needs BOTH `panic = "unwind"` and `#[napi(catch_unwind)]` on the export — unwind alone enables the catch, it does not perform it. The measurement binding ships release for native-vs-native parity with `tsv_ffi`; the bench corpus is curated so tsv doesn't panic. If a panic-tolerant build is needed, the `[profile.corpus]` (`panic = "unwind"`) precedent exists.
 
 ## Files
 

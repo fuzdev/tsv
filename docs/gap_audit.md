@@ -129,8 +129,9 @@ carry the block payloads too: there the injection merely reflowed the file and a
 *author* wrote does the swallowing, which is the same bug reached from further away.
 
 Cost: arming the check adds roughly **+10% CPU** to a run (measured over `tests/fixtures`:
-~146 s → ~160 s user, ~17 s → ~19 s wall), against a whole-`deno task check` budget of
-~137 s. The rejected alternative — running the full `f1_check` battery per injection — was
+~146 s → ~160 s user, ~17 s → ~19 s wall) — a couple of seconds on a whole-`deno
+task check` wall clock measured in minutes. The rejected alternative — running
+the full `f1_check` battery per injection — was
 measured at **>40x** baseline CPU, because it pays `tsv_parse_to_value` twice per accepted
 injection and, unlike `blank_audit`, gap injection has no absorbed-input fast path (an
 injected comment must appear in the output, so it is never absorbed).

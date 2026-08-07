@@ -227,7 +227,7 @@ Three binding crates for different use cases:
 
 - `tsv_ffi` (C ABI) — any FFI (Deno, Python, etc.); output: `libtsv_ffi.so` / `.dylib` / `.dll`
 - `tsv_wasm` (wasm-bindgen) — browser, Deno, Node; output: `.wasm` module (format / parse / all variants via cargo features)
-- `tsv_napi` (napi-rs) — Node.js / Bun native addon (`libtsv_napi.*`, loaded via `process.dlopen`). Currently **measurement-only** for the Node bench runner (`deno task build:napi` / `test:napi`); cross-platform publish as `@fuzdev/tsv_napi` is a fast-follow after 0.2 (needs GitHub release infra; expected to eventually subsume the WASM native path). See ./crates/tsv_napi/CLAUDE.md.
+- `tsv_napi` (napi-rs) — Node.js / Bun native addon (`libtsv_napi.*`, loaded via `process.dlopen`). Currently **measurement-only** for the Node bench runner (`deno task build:napi` / `test:napi`); cross-platform publish as `@fuzdev/tsv_napi` targets 0.4 (needs GitHub release infra; expected to eventually subsume the WASM native path). See ./crates/tsv_napi/CLAUDE.md.
 
 `tsv_wasm` produces three npm packages from one crate via the `format` + `parse` cargo features (default = both): `@fuzdev/tsv_format_wasm`, `@fuzdev/tsv_parse_wasm`, and `@fuzdev/tsv_wasm` (everything + the `tsv` CLI). Each variant has its own output directory.
 
@@ -426,7 +426,7 @@ tsv/
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
 │   ├── tsv_wasm/    # WASM bindings (the 3 published npm packages; bundles types/tsv_ast.d.ts + npm/locations.js; npm/cli.js is the tsv bin)
-│   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only until publish, after 0.2)
+│   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only until the 0.4 publish)
 ├── scripts/         # Publish orchestrator, npm package patcher, Node artifact + N-API tests, AST type drift check
 ├── tests/           # Integration tests (parser, formatter, CLI)
 │   ├── fixtures/    # Test fixtures organized by language/feature

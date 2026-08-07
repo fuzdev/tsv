@@ -29,8 +29,8 @@ tsv prioritizes, in order:
 4. extensibility (valued but deprioritized), modularity, and reusability
 
 See the [benchmarks](https://tsv.fuz.dev/docs/benchmarks) for stats.
-Compared to Oxc and Biome, tsv (v0.2, not yet published) is faster,
-smaller, and uses less memory to parse and format its supported languages.
+Compared to Oxc and Biome, tsv is faster, smaller,
+and uses less memory to parse and format its supported languages.
 One reason for tsv to exist is to help find the performance bonuses
 left on the table in the Web ecosystem's increasingly-native implementations.
 
@@ -47,7 +47,7 @@ It's a high-effort project that prioritizes quality.
 
 ## Status
 
-pre-alpha - v0.1 is for feedback only not production use; tsv v0.2 is closer but not yet published
+pre-alpha - not for production use; the published WASM packages are for feedback
 
 ## About
 
@@ -86,7 +86,7 @@ Future features (unknown order):
 
 ## Install
 
-tsv ships three WASM packages to npm (native builds will arrive with the v0.2 release):
+tsv ships three WASM packages to npm (native builds will arrive with the v0.4 release):
 
 - [`@fuzdev/tsv_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_wasm) - the full tool (formatter + parser) with a `tsv` CLI
 - [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm) - formatter only (smaller)
@@ -119,7 +119,7 @@ and package READMEs for the full API and CLI flags:
 - [crates/tsv_wasm/README_format.md](crates/tsv_wasm/README_format.md)
 - [crates/tsv_wasm/README_parse.md](crates/tsv_wasm/README_parse.md)
 
-Native builds will be published with v0.2, for v0.1 only WASM builds are published.
+Native builds will be published with v0.4; until then only WASM builds are published.
 
 ## Design
 
@@ -159,7 +159,7 @@ Native builds will be published with v0.2, for v0.1 only WASM builds are publish
 - Rust-only
   - implementation currently does not call or embed a JS runtime
     (open for discussion, needs research into the tradeoffs);
-    JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.2
+    JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.4
   - no C compiler needed to build tsv
 - optimal
   - prioritizes speed then binary size and memory usage
