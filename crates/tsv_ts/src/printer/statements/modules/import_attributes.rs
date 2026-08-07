@@ -188,11 +188,17 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether a comment in an attribute's `:`→value gap was authored on its OWN line —
-    /// isolated from both the `:` before it and the value after it
-    /// ([`Self::comment_isolated_from_neighbors`]). Such a comment can only keep its line
+    /// Whether a comment in an attribute's `:`→value gap was authored on its OWN line — a
+    /// newline both before and after it in source
+    /// ([`Self::comment_isolated_on_its_line`]). Such a comment can only keep its line
     /// if the value hangs, so it forces the same break-after-`:` layout a line comment
     /// does; collapsing it onto the `:` line would move it.
+    ///
+    /// ⚠️ The `:` is right *there* and still isn't the anchor to ask: a **glued run**
+    /// (`type:⏎/* c1 */ /* c2 */⏎'json'`) has each comment adjacent to the other, so
+    /// neither owns its line and prettier keeps the pair inline. An anchored reading sees
+    /// only the `:` on one side and the value on the other, calls the run own-line, and
+    /// hangs a value that fits.
     ///
     /// Asked here rather than by [`Self::has_own_line_attribute_comments`], which skips
     /// everything *inside* an attribute's span: a comment there expands that attribute,
@@ -200,13 +206,21 @@ impl<'a> Printer<'a> {
     /// the key→`:` gap is the other, and takes the inline-trailing path instead.
     fn has_own_line_value_gap_comment(&self, colon_pos: u32, value_start: u32) -> bool {
         tsv_lang::comments_in_source_range(self.comments, colon_pos + 1, value_start)
-            .any(|c| self.comment_isolated_from_neighbors(colon_pos, c, value_start))
+            .any(|c| self.comment_isolated_on_its_line(c))
     }
 
-    /// Whether any comment in the `with { … }` braces was authored on its OWN line —
-    /// isolated from both the attribute (or brace) before it and the one after
-    /// ([`Self::comment_isolated_from_neighbors`]). Such a comment can only keep its line if
+    /// Whether any comment in the `with { … }` braces was authored on its OWN line — a
+    /// newline both before and after it in source
+    /// ([`Self::comment_isolated_on_its_line`]). Such a comment can only keep its line if
     /// the list breaks, so it is an expansion trigger.
+    ///
+    /// ⚠️ This is a **comma-list** expansion gate, the fifth family spelling of the
+    /// question `docs/comments.md` §The element-comma seam states: the attribute list's
+    /// own comma is re-emitted structure no attribute span covers, so a reading anchored
+    /// on the previous attribute's end calls a comment sharing the comma's line
+    /// (`'json'⏎, /* c */⏎attr:`) own-line and expands a clause that fits — and a blank
+    /// injected before that comma then flips the layout, which `blanks:audit` caught as a
+    /// non-idempotent output.
     ///
     /// Spelled here rather than reusing `has_own_line_block_comments_in_bracket_list`: that
     /// predicate looks for the following element with a strict `>`, so a comment GLUED to the
@@ -226,18 +240,7 @@ impl<'a> Printer<'a> {
             if inside_attribute {
                 return false;
             }
-            let prev = attributes
-                .iter()
-                .map(|a| a.span.end)
-                .take_while(|&end| end <= c.span.start)
-                .last()
-                .unwrap_or(brace_start);
-            let next = attributes
-                .iter()
-                .map(|a| a.span.start)
-                .find(|&start| start >= c.span.end)
-                .unwrap_or(brace_close);
-            self.comment_isolated_from_neighbors(prev, c, next)
+            self.comment_isolated_on_its_line(c)
         })
     }
 

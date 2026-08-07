@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 684,
+	"end": 821,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -169,24 +169,72 @@
 					"column": 10
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " glued blocks are each adjacent to a neighbor, so the run stays inline",
+			"start": 676,
+			"end": 748,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 73
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 783,
+			"end": 791,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 34
+				},
+				"end": {
+					"line": 35,
+					"column": 42
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 792,
+			"end": 800,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 43
+				},
+				"end": {
+					"line": 35,
+					"column": 51
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 683,
+		"end": 820,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 674,
+			"end": 811,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 33,
+					"line": 36,
 					"column": 9
 				}
 			},
@@ -891,6 +939,143 @@
 							"value": " the own-line comment on a non-first attribute hangs that value only",
 							"start": 527,
 							"end": 597
+						}
+					]
+				},
+				{
+					"type": "ImportDeclaration",
+					"start": 750,
+					"end": 810,
+					"loc": {
+						"start": {
+							"line": 35,
+							"column": 1
+						},
+						"end": {
+							"line": 35,
+							"column": 61
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 757,
+							"end": 758,
+							"loc": {
+								"start": {
+									"line": 35,
+									"column": 8
+								},
+								"end": {
+									"line": 35,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 757,
+								"end": 758,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 8
+									},
+									"end": {
+										"line": 35,
+										"column": 9
+									}
+								},
+								"name": "f"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 764,
+						"end": 769,
+						"loc": {
+							"start": {
+								"line": 35,
+								"column": 15
+							},
+							"end": {
+								"line": 35,
+								"column": 20
+							}
+						},
+						"value": "./f",
+						"raw": "'./f'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 777,
+							"end": 807,
+							"loc": {
+								"start": {
+									"line": 35,
+									"column": 28
+								},
+								"end": {
+									"line": 35,
+									"column": 58
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 777,
+								"end": 781,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 28
+									},
+									"end": {
+										"line": 35,
+										"column": 32
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 801,
+								"end": 807,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 52
+									},
+									"end": {
+										"line": 35,
+										"column": 58
+									}
+								},
+								"value": "json",
+								"raw": "'json'",
+								"leadingComments": [
+									{
+										"type": "Block",
+										"value": " c1 ",
+										"start": 783,
+										"end": 791
+									},
+									{
+										"type": "Block",
+										"value": " c2 ",
+										"start": 792,
+										"end": 800
+									}
+								]
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " glued blocks are each adjacent to a neighbor, so the run stays inline",
+							"start": 676,
+							"end": 748
 						}
 					]
 				}
