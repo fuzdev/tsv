@@ -542,7 +542,9 @@ pins:audit:checkouts`), gated in `deno task conformance` and reported by `doctor
 present `../svelte` / `../acorn-typescript` checkout whose version differs from its
 pin FAILS (absent checkouts are skipped, so a machine without the clones still
 passes). Align the checkout to the pinned tag, or bump the pins deliberately. The
-two modes are split because they assert different KINDS of fact: pin agreement is a
+two modes are split because they assert different KINDS of fact (full reference:
+[audits.md §Canonical-Pin Agreement Audit](audits.md#canonical-pin-agreement-audit-pinsaudit)
+and [§Checkout-Alignment Audit](audits.md#checkout-alignment-audit-pinsauditcheckouts)): pin agreement is a
 **repo** fact that invalidates the fixture grading `cargo test` does, so it gates the
 committed tree; alignment is an **environment** fact about suites nothing in `deno
 task check` reads, so a skew there would halt that chain without invalidating a

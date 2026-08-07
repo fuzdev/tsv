@@ -111,7 +111,8 @@ that is the regression the pin exists to catch.
 
 ## Why both the pins AND the checkout alignment exist
 
-They guard different granularities. Checkout alignment (`pins:audit:checkouts`)
+They guard different granularities. Checkout alignment
+([`pins:audit:checkouts`](audits.md#checkout-alignment-audit-pinsauditcheckouts))
 compares `package.json` versions — but an upstream repo's version only bumps at
 release, so commits landing between releases change the SUITE without changing the
 version (proven on day one: a `../svelte` pull added one test fixture at the same
