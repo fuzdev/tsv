@@ -998,7 +998,7 @@ impl<'a> PartitionedComments<'a> {
     /// Unlike [`Self::emit_trailing_comments`] (which the caller invokes *after* pushing
     /// the comma, so every block lands after it), this keeps a before-comma block in
     /// its authored position. Shared by the `new`-argument non-last paths
-    /// (`build_new_doc_with_wrapping` and `build_args_with_blank_lines`) so they
+    /// (`build_new_doc_with_wrapping` and `build_call_args_with_blank_lines`) so they
     /// can't drift — both used to relocate the block past the comma.
     pub fn emit_trailing_comments_around_comma(&self, parts: &mut DocBuf, printer: &Printer<'_>) {
         let d = printer.d();
