@@ -183,29 +183,32 @@ impl<'a> Printer<'a> {
         }
     }
 
-    /// Whether a comment between two neighbors can't share a line with either — any
-    /// line comment (it runs to EOL), or a block comment isolated from *both* `prev`
-    /// (at the comment's start) and `next` (at its end): an adjacency on either side keeps
-    /// the comment inline (`a /* c */ b`), matching prettier, which collapses both
-    /// `a,⏎/* c */ b` and `a /* c */,⏎b` back to the inline form. The shared "isolated
-    /// from both neighbors" rule behind the union/intersection member break gates, the
-    /// import-attribute gaps, and the first-param leading-run collapse
-    /// (`build_param_leading_comments_doc`).
+    /// Whether a comment can't share a line with anything around it — any line comment
+    /// (it runs to EOL), or a block comment with a newline on **both** sides in source:
+    /// nothing before it on its line ([`Self::comment_follows_content_on_its_line`]) and
+    /// nothing glued after it ([`Self::comment_hugs_next`]). An adjacency on either side
+    /// keeps the comment inline (`a /* c */ b`), matching prettier, which collapses both
+    /// `a,⏎/* c */ b` and `a /* c */,⏎b` back to the inline form. The shared rule behind
+    /// the intersection member break gates, the import-attribute gaps, and the first-param
+    /// leading-run collapse (`build_param_leading_comments_doc`).
     ///
-    /// ⚠️ **Only for a gap that holds NO comma.** `prev` is an item boundary, and the two
-    /// kinds of text no item span covers — a list's own comma and a stripped paren shell's
-    /// `)` — are invisible to it, so a comment glued to either reads as isolated. A
-    /// comma-list expansion gate must ask the source instead
-    /// ([`Printer::comment_follows_content_on_its_line`]); the parameter list's
-    /// `has_own_line_comment_between` used to share this predicate and no longer can.
-    pub(crate) fn comment_isolated_from_neighbors(
-        &self,
-        prev: u32,
-        c: &Comment,
-        next: u32,
-    ) -> bool {
-        !c.is_block
-            || (!self.is_same_line(prev, c.span.start) && !self.is_same_line(c.span.end, next))
+    /// ⚠️ **Both halves read the SOURCE, and that is the whole predicate.** This is
+    /// prettier's `printLeadingComment` hardline condition transcribed —
+    /// `hasNewline(text, locEnd(comment)) && hasNewline(text, locStart(comment),
+    /// {backwards: true})` — so it asks about physical newlines, never about where the
+    /// neighboring *items* start and end. An item-boundary spelling
+    /// (`is_same_line(prev, c.start)` / `is_same_line(c.end, next)`) is blind to every
+    /// byte no item span covers — a list's comma, a stripped paren shell's `)`, an `&`
+    /// operator, **and another comment in the same gap** — each of which reads as
+    /// isolation that the author did not write. The last one is why the anchors could not
+    /// be kept even where the gap holds no structure at all: at the import-attribute
+    /// `:`→value gap, whose `prev` *is* the `:`, a glued run (`a:⏎/* c1 */ /* c2 */⏎'x'`)
+    /// still mis-read. The union keeps its own one-sided rule
+    /// ([`Self::is_own_line_comment`], no glue half) because prettier's union printer
+    /// genuinely expands a block adjacent to its member where the intersection collapses
+    /// it — see `union_has_own_line_member_comment`.
+    pub(crate) fn comment_isolated_on_its_line(&self, c: &Comment) -> bool {
+        !c.is_block || (!self.comment_follows_content_on_its_line(c) && !self.comment_hugs_next(c))
     }
 
     /// Whether a *block* comment is glued to what follows it (`/* c */ X` — nothing but

@@ -1593,15 +1593,21 @@ impl<'a> Printer<'a> {
     /// ⚠️ **The own-line half reads the source, not the previous param's end at `start`.**
     /// The two differ by exactly the text no param span covers — the list's own **comma**,
     /// which the author can push onto its own line (`fn(a⏎, /* c */⏎b)`), and a stripped
-    /// paren shell's `)`. An item-boundary reading (the shared
-    /// [`Printer::comment_isolated_from_neighbors`], which the operator and keyword gaps
-    /// still want) calls such a comment own-line and expands a list that fits — a third
-    /// fixed point neither the bare authoring nor prettier produces. A parameter list is
-    /// the container `docs/conformance_prettier.md` §Comment Position Philosophy names
-    /// outright: it flattens when it fits, so the author's break around a comma is layout,
-    /// not own-line-ness. Same question the bracketed-list gate
+    /// paren shell's `)`. An item-boundary reading calls such a comment own-line and
+    /// expands a list that fits — a third fixed point neither the bare authoring nor
+    /// prettier produces. A parameter list is the container
+    /// `docs/conformance_prettier.md` §Comment Position Philosophy names outright: it
+    /// flattens when it fits, so the author's break around a comma is layout, not
+    /// own-line-ness. Same question the bracketed-list gate
     /// ([`Printer::has_own_line_block_comments_in_bracket_list`]) and the element→comma
     /// seam ask.
+    ///
+    /// The **glue** half is the one place this still differs from the shared
+    /// [`Printer::comment_isolated_on_its_line`], which asks the source there too
+    /// ([`Printer::comment_hugs_next`]). Anchoring on `end` is blind to another comment
+    /// in the same gap: a glued run the author gave its own line (`f(⏎/* c1 */ /* c2 */⏎a)`)
+    /// reads as own-line and expands a list prettier keeps inline. A known residual, not a
+    /// deliberate difference — closing it is a behavior change of its own.
     fn has_own_line_comment_between(&self, start: u32, end: u32) -> bool {
         self.comments_on_page_between(start, end).any(|c| {
             if !c.is_block {
@@ -1741,20 +1747,15 @@ impl<'a> Printer<'a> {
             return d.empty();
         }
 
-        // Neighbor bounds for the comment at index `i`: its predecessor is the `(`
-        // (== `start`) for the first comment, else the previous comment's end; its
-        // successor is the next comment's start, else the param's rendered start.
+        // The predecessor of the comment at index `i`: the `(` (== `start`) for the first
+        // comment, else the previous comment's end — the anchor the *separator* between
+        // two comments is measured from (the isolation gate below reads the source).
         let prev_of = |i: usize| {
             if i == 0 {
                 start
             } else {
                 comments[i - 1].span.end
             }
-        };
-        let next_of = |i: usize| {
-            comments
-                .get(i + 1)
-                .map_or(param_render_start, |c| c.span.start)
         };
 
         // For the first param, prettier collapses leading block comment(s) inline
@@ -1768,8 +1769,7 @@ impl<'a> Printer<'a> {
         let force_expand = first_param
             && comments
                 .iter()
-                .enumerate()
-                .any(|(i, c)| self.comment_isolated_from_neighbors(prev_of(i), c, next_of(i)));
+                .any(|c| self.comment_isolated_on_its_line(c));
 
         let mut parts: DocBuf = DocBuf::new();
 

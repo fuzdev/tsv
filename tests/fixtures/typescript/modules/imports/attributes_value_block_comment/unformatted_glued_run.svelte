@@ -32,5 +32,7 @@
 	};
 
 	// glued blocks are each adjacent to a neighbor, so the run stays inline
-	import f from './f' with { type: /* c1 */ /* c2 */ 'json' };
+	import f from './f' with { type:
+		/* c1 */ /* c2 */
+		'json' };
 </script>

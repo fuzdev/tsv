@@ -21,7 +21,6 @@ use crate::printer::layout::hang_after_operator;
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
-use tsv_lang::source_scan::has_newline_after_position;
 
 /// Who emits an intersection's leading-`&` gap run (`[span.start, first.start)`) — the
 /// print-once seam between the leading-gap line-comment route and the body builders it
@@ -137,45 +136,69 @@ impl<'a> Printer<'a> {
     /// hardcoded a space, gluing a member onto a multi-line comment's `*/` line.
     /// Returns an empty doc when the range has no block comment.
     ///
-    /// Scoped to the first member on purpose: a block comment between two members
-    /// is a distinct divergence (Prettier relocates it to trail the previous
-    /// member), handled by the hardcoded-space path in `build_union_type_doc`.
-    fn build_member_leading_block_comments(&self, start: u32, end: u32) -> DocId {
+    /// Asked by the UNION only for its first member: a block between two union members
+    /// never reaches a hardcoded separator anyway — the union's one-sided gate
+    /// (`union_has_own_line_member_comment`) routes every comment that starts a line to
+    /// the multiline builder, leaving that path only comments glued after the `|`, whose
+    /// separator is a space either way. The INTERSECTION asks it at every boundary
+    /// (`build_intersection_member_body_doc`), because its two-sided gate deliberately
+    /// leaves a comment sharing the `&`'s line on the width-decided path, where the
+    /// author's break after the comment is exactly what the `line` carries.
+    ///
+    /// Returns the doc and whether a **breakable** separator went into it — the group
+    /// question the `line` implies, since only an enclosing group can decide one. Both
+    /// come from the same walk on purpose: a caller that re-derived the flag from the
+    /// source would be a second reading of one fact, free to drift from the emission.
+    fn build_member_leading_block_comments(&self, start: u32, end: u32) -> (DocId, bool) {
         let d = self.d();
         let mut parts = DocBuf::new();
+        let mut breaks = false;
         for comment in comments_to_emit_in_range(self.comments, start, end) {
             if !comment.is_block {
                 continue;
             }
             parts.push(self.build_comment_doc(comment));
-            if has_newline_after_position(self.source, comment.span.end) {
-                if self.is_own_line_comment(comment) {
-                    parts.push(d.hardline());
-                } else {
-                    parts.push(d.line());
-                }
-            } else {
+            // The three arms are the two source facts the gates read, in the same
+            // vocabulary: glued to what follows → space; the author broke after it →
+            // a `line` the group decides; isolated on its line (broke after AND nothing
+            // before it) → the author's own break. The last arm is what
+            // `intersection_has_isolated_member_comment` routes away from this path
+            // entirely, so for an intersection it is the union's first-member case only.
+            if self.comment_hugs_next(comment) {
                 parts.push(d.text(" "));
+            } else {
+                breaks = true;
+                parts.push(if self.comment_isolated_on_its_line(comment) {
+                    d.hardline()
+                } else {
+                    d.line()
+                });
             }
         }
-        d.concat(&parts)
+        (d.concat(&parts), breaks)
     }
 
-    /// Append the block comments sitting *after* the `|`/`&` separator and before the
-    /// member that follows it (`A | /* c */ B`), appending nothing when there are none.
+    /// Append the block comments sitting *after* the `|` separator and before the union
+    /// member that follows it (`A | /* c */ B`), each spaced, appending nothing when
+    /// there are none.
     ///
     /// The separator's source position is needed only to bound that range — the printed
-    /// `|`/`&` is static text — so the caller gates on its whole-union/intersection
-    /// window first and this runs only when a comment is actually in play.
+    /// `|` is static text — so the caller gates on its whole-union window first and this
+    /// runs only when a comment is actually in play.
+    ///
+    /// Union-only, and the hardcoded space is why: the union's one-sided gate sends every
+    /// comment that starts a line to the multiline builder, so what reaches here is glued
+    /// after the `|` and takes a space either way. The intersection, whose gate leaves a
+    /// comment sharing the `&`'s line on this path, needs the source-keyed separator
+    /// instead ([`Self::build_member_leading_block_comments`]).
     fn push_post_separator_block_comments(
         &self,
         parts: &mut DocBuf,
         prev_member_end: u32,
         member_start: u32,
-        separator: u8,
     ) {
         if let Some(sep_pos) =
-            find_separator_position(self.source, prev_member_end, member_start, separator)
+            find_separator_position(self.source, prev_member_end, member_start, b'|')
             && let Some(comments) = self.build_comments_between_filtered_opt(
                 sep_pos + 1,
                 member_start,
@@ -432,7 +455,9 @@ impl<'a> Printer<'a> {
             if !has_comments {
                 return self.build_type_doc_maybe_parens(member, member_parens);
             }
-            let leading =
+            // The union's own group decides the run's `line`, so the break flag is the
+            // caller's only where no group is guaranteed (the intersection's boundaries).
+            let (leading, _) =
                 self.build_member_leading_block_comments(union.span.start, member.span().start);
             let member_doc = self.build_type_doc_maybe_parens(member, member_parens);
             return d.concat(&[leading, member_doc]);
@@ -482,12 +507,7 @@ impl<'a> Printer<'a> {
                 // already-divergent form, not match Prettier.
                 if has_comments {
                     let prev_type_end = union.types[i - 1].span().end;
-                    self.push_post_separator_block_comments(
-                        &mut parts,
-                        prev_type_end,
-                        type_start,
-                        b'|',
-                    );
+                    self.push_post_separator_block_comments(&mut parts, prev_type_end, type_start);
                 }
             } else {
                 // A FROZEN first member emits its leading block comments (the own-line
@@ -497,9 +517,9 @@ impl<'a> Printer<'a> {
                 // trailing and losing the freeze next pass. The own-line block's own
                 // hardline forces the group broken, so the `if_break` `| ` appears.
                 if has_comments && frozen {
-                    parts.push(
-                        self.build_member_leading_block_comments(union.span.start, type_start),
-                    );
+                    let (run, _) =
+                        self.build_member_leading_block_comments(union.span.start, type_start);
+                    parts.push(run);
                 }
 
                 // First type: "| " when broken, nothing when flat
@@ -519,10 +539,9 @@ impl<'a> Printer<'a> {
                 // only the breaks inside it, so a run that hugs its member is unaffected.
                 // A frozen first member emitted its run before the `| ` above.
                 if has_comments && !frozen {
-                    parts.push(d.align(
-                        2,
-                        self.build_member_leading_block_comments(union.span.start, type_start),
-                    ));
+                    let (run, _) =
+                        self.build_member_leading_block_comments(union.span.start, type_start);
+                    parts.push(d.align(2, run));
                 }
             }
 
@@ -1060,17 +1079,26 @@ impl<'a> Printer<'a> {
     /// True when a comment between two consecutive intersection members forces the
     /// whole intersection one-member-per-line.
     ///
-    /// A **line** comment always forces it. A **block** comment forces it only when
-    /// it sits on its OWN line between the members — *not* inline-adjacent to the
-    /// previous member (`A /* c */⏎& B`) nor to the following one (`A &⏎/* c */ B`),
-    /// both of which prettier keeps inline (`A /* c */ & B`). Only a block isolated
-    /// from both neighbors (`A &⏎/* c */⏎B`) breaks (`intersection-type.js`).
+    /// A **line** comment always forces it. A **block** comment forces it only when it
+    /// OWNS its line in source — a newline both before and after it
+    /// ([`Printer::comment_isolated_on_its_line`], prettier's `printLeadingComment`
+    /// hardline condition). Anything sharing its line keeps it inline, whichever side:
+    /// the previous member (`A /* c */⏎& B`), the following one (`A &⏎/* c */ B`), the
+    /// `&` itself (`A⏎& /* c */⏎B` and `A⏎/* c */ &⏎B`), or another comment
+    /// (`A &⏎/* c1 */ /* c2 */⏎B`). Only the isolated block (`A &⏎/* c */⏎B`) breaks
+    /// (`intersection-type.js`).
+    ///
+    /// ⚠️ The `&` spellings are why this reads the SOURCE rather than the member spans:
+    /// the operator is re-emitted structure no member span covers, so an item-boundary
+    /// anchor calls a comment sharing the `&`'s line isolated and breaks an intersection
+    /// that fits — output tsv's own second pass then collapsed, the break having put the
+    /// comment back on the previous member's line.
     ///
     /// This deliberately differs from the union's `union_has_own_line_member_comment`
-    /// (which keys on `is_own_line_comment` — the preceding newline alone): prettier's
-    /// **union** printer expands a block adjacent to its member, but the
-    /// **intersection** printer collapses it, so keying on the preceding newline here
-    /// would over-expand the `A &⏎/* c */ B` case.
+    /// (which keys on `is_own_line_comment` — the preceding newline alone, no glue half):
+    /// prettier's **union** printer expands a block adjacent to its member, but the
+    /// **intersection** printer collapses it, so asking the glue half there would
+    /// under-expand the `A |⏎/* c */ B` case the union breaks.
     fn intersection_has_isolated_member_comment(
         &self,
         intersection: &TSIntersectionType<'_>,
@@ -1084,7 +1112,7 @@ impl<'a> Printer<'a> {
         intersection.types.windows(2).any(|pair| {
             let (prev_end, next_start) = (pair[0].span().end, pair[1].span().start);
             self.comments_on_page_between(prev_end, next_start)
-                .any(|c| self.comment_isolated_from_neighbors(prev_end, c, next_start))
+                .any(|c| self.comment_isolated_on_its_line(c))
         })
     }
 
@@ -1452,13 +1480,18 @@ impl<'a> Printer<'a> {
             };
 
             let mut member: DocBuf = smallvec![sep];
-            member.extend(self.build_intersection_member_body_doc(
+            let (body, run_breaks) = self.build_intersection_member_body_doc(
                 intersection,
                 i,
                 has_comments,
                 frozen,
                 member_parens,
-            ));
+            );
+            // A leading run the author broke after carries a breakable `line`, which only
+            // a group can decide — an object-adjacent boundary supplies no `line` of its
+            // own, so the group has to be asked for here.
+            needs_group |= run_breaks;
+            member.extend(body);
             if indent_member {
                 parts.push(d.indent(d.concat(&member)));
             } else {
@@ -1686,7 +1719,7 @@ impl<'a> Printer<'a> {
             if !should_break
                 && self
                     .comments_on_page_between(prev_end, cur_start)
-                    .any(|c| self.comment_isolated_from_neighbors(prev_end, c, cur_start))
+                    .any(|c| self.comment_isolated_on_its_line(c))
             {
                 should_break = true;
             }
@@ -1971,17 +2004,35 @@ impl<'a> Printer<'a> {
         has_comments: bool,
         frozen: bool,
         member_parens: fn(&TSType<'_>) -> bool,
-    ) -> DocBuf {
+    ) -> (DocBuf, bool) {
         let t = &intersection.types[i];
         let type_start = t.span().start;
         let type_end = t.span().end;
         let is_last = i == intersection.types.len() - 1;
         let mut parts = DocBuf::new();
 
-        // Leading block comments (after the `&` separator)
+        // Leading block comments (after the `&` separator), each followed by prettier's
+        // `printLeadingComment` separator — a space where the author glued the member to
+        // the comment, a breakable `line` where they broke after it. That `line` is what
+        // keeps a run the author gave its own line ON that line once the intersection
+        // breaks for width, while collapsing it when the intersection fits; a hardcoded
+        // space glued a member onto the run's `*/` line. Only the *hardline* case (a
+        // comment isolated on both sides) forces the break, and that one never reaches
+        // here — `intersection_needs_line_comment_layout` routes it to the multiline
+        // builder. The union's between-member path keeps its hardcoded space because its
+        // one-sided gate leaves it only comments glued after the `|`; the intersection's
+        // two-sided gate deliberately leaves the broke-after ones here.
+        let mut run_breaks = false;
         if has_comments {
             let prev_type_end = intersection.types[i - 1].span().end;
-            self.push_post_separator_block_comments(&mut parts, prev_type_end, type_start, b'&');
+            if let Some(sep_pos) =
+                find_separator_position(self.source, prev_type_end, type_start, b'&')
+            {
+                let (run, breaks) =
+                    self.build_member_leading_block_comments(sep_pos + 1, type_start);
+                parts.push(run);
+                run_breaks = breaks;
+            }
         }
 
         // Rule A member freeze (paren-transparent). The directive itself was emitted by
@@ -2014,6 +2065,6 @@ impl<'a> Printer<'a> {
             parts.push(trailing);
         }
 
-        parts
+        (parts, run_breaks)
     }
 }

@@ -1,0 +1,250 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 142,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a block comment after the comma stays there, inline",
+			"start": 10,
+			"end": 64,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 55
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 107,
+			"end": 114,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 42
+				},
+				"end": {
+					"line": 3,
+					"column": 49
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 141,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 132,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 4,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ImportDeclaration",
+					"start": 66,
+					"end": 131,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 66
+						}
+					},
+					"specifiers": [
+						{
+							"type": "ImportDefaultSpecifier",
+							"start": 73,
+							"end": 74,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 8
+								},
+								"end": {
+									"line": 3,
+									"column": 9
+								}
+							},
+							"local": {
+								"type": "Identifier",
+								"start": 73,
+								"end": 74,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 8
+									},
+									"end": {
+										"line": 3,
+										"column": 9
+									}
+								},
+								"name": "a"
+							}
+						}
+					],
+					"source": {
+						"type": "Literal",
+						"start": 80,
+						"end": 85,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 15
+							},
+							"end": {
+								"line": 3,
+								"column": 20
+							}
+						},
+						"value": "./a",
+						"raw": "'./a'"
+					},
+					"attributes": [
+						{
+							"type": "ImportAttribute",
+							"start": 93,
+							"end": 105,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 28
+								},
+								"end": {
+									"line": 3,
+									"column": 40
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 93,
+								"end": 97,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 28
+									},
+									"end": {
+										"line": 3,
+										"column": 32
+									}
+								},
+								"name": "type"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 99,
+								"end": 105,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 34
+									},
+									"end": {
+										"line": 3,
+										"column": 40
+									}
+								},
+								"value": "json",
+								"raw": "'json'"
+							},
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 107,
+									"end": 114
+								}
+							]
+						},
+						{
+							"type": "ImportAttribute",
+							"start": 115,
+							"end": 128,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 50
+								},
+								"end": {
+									"line": 3,
+									"column": 63
+								}
+							},
+							"key": {
+								"type": "Identifier",
+								"start": 115,
+								"end": 119,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 50
+									},
+									"end": {
+										"line": 3,
+										"column": 54
+									}
+								},
+								"name": "attr"
+							},
+							"value": {
+								"type": "Literal",
+								"start": 121,
+								"end": 128,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 56
+									},
+									"end": {
+										"line": 3,
+										"column": 63
+									}
+								},
+								"value": "value",
+								"raw": "'value'"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment after the comma stays there, inline",
+							"start": 10,
+							"end": 64
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
