@@ -93,7 +93,6 @@ mod script_ts_gate;
 mod snippet;
 mod snippet_emit;
 mod special_element_kind;
-mod specifier_normalize;
 mod store_rewrite;
 mod template_value;
 mod text_class;

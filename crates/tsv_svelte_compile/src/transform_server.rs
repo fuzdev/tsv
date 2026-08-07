@@ -1169,15 +1169,8 @@ pub(crate) fn compile_server<'arena>(
     for user_import in user_imports {
         import_body.push(user_import);
     }
-    // Reproduce esrap's specifier printing on the hoisted user imports: a string
-    // `imported` name (`import { 'a-b' as loc }`) drops its alias to the bare
-    // binding (`import { loc }`). The synthetic `$` namespace import is inert.
-    let import_body = crate::specifier_normalize::normalize_module_specifiers(
-        arena,
-        import_body.into_bump_slice(),
-    );
     let import_program = tsv_ts::ast::internal::Program {
-        body: import_body,
+        body: import_body.into_bump_slice(),
         comments: &[],
         span: Span::new(0, env.b.buffer.len() as u32),
         goal: tsv_ts::Goal::Module,
@@ -1210,22 +1203,11 @@ pub(crate) fn compile_server<'arena>(
     // statement (see `collect_module_script_comments`). Those carry at their
     // authored spans; `format_canonical` places them by span. `module_comments` is
     // non-empty only when a block precedes it, so only when `module_body` is too.
-    // Same esrap specifier normalization on the module body's imports and
-    // non-default exports (e.g. `export { x as 'notdefault' }` → `export { x }`).
-    // Spans are preserved, so `module_comments` (computed above on the same body)
-    // stays valid, and the length is unchanged so the emptiness guard still holds.
-    // The checked normalization refuses (rather than silently drops) a KEPT
-    // `module_comments` comment sitting in a collapsed specifier's skipped as-gap —
-    // the one lossy edge of the span collapse (see `specifier_normalize`).
     let module_program = if module_body.is_empty() {
         None
     } else {
         Some(tsv_ts::ast::internal::Program {
-            body: crate::specifier_normalize::normalize_module_specifiers_checked(
-                arena,
-                module_body,
-                &module_comments,
-            )?,
+            body: module_body,
             comments: arena.alloc_slice_copy(&module_comments),
             span: Span::new(0, env.b.buffer.len() as u32),
             goal: tsv_ts::Goal::Module,

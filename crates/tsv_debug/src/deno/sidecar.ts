@@ -8,12 +8,22 @@
 // These can't be DRYed: the release binary embeds this file as a string and runs it
 // WITHOUT that package.json, so it can't read the bench's pins at runtime.
 // Agreement across all the pin sites (these three + actor.rs's acorn import-map
-// pin) is enforced by `deno task pins:audit` (scripts/check_canonical_pins.ts,
-// gated in `deno task check`).
+// pin + the deno.lock beside it) is enforced by `deno task pins:audit`
+// (scripts/check_canonical_pins.ts, gated in `deno task check`).
+//
+// ⚠ These literals pin only what the sidecar imports DIRECTLY. The oracle's own
+// dependencies float on THEIR declared ranges, and one of them — `esrap`, which
+// PRINTS the JS `compile()` returns — is the effective oracle for every compile
+// fixture (svelte depends on it as `^2.2.12`, a caret). That is what
+// `crates/tsv_debug/src/deno/deno.lock` exists to pin: the sidecar resolves
+// against it FROZEN, so the whole transitive tree is fixed rather than just the
+// five names here.
 //
 // Bumping prettier / svelte / acorn / @sveltejs/acorn-typescript / prettier-plugin-svelte
 // is NOT a routine refresh — it re-baselines the entire fixture corpus (these tools define
-// every fixture's expected.json + output_prettier.*). After any bump: run
+// every fixture's expected.json + output_prettier.*). After any bump: REGENERATE the
+// lockfile (`deno task pins:lock`) and update `LOCKED_TRANSITIVE` in
+// scripts/check_canonical_pins.ts if a transitive pin moved with it, run
 // `deno task fixtures:update` and review the churn, run the two sidecar-dependent gates
 // `deno task check` cannot (`compile:validation`, `bench:harvest`), and grep the repo for
 // the OLD version string — prose that restates a pin goes silently stale, and nothing gates

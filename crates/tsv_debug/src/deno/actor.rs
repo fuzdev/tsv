@@ -8,6 +8,7 @@ use super::protocol::{WireRequest, WireResponse};
 use serde_json::Value;
 use std::collections::HashMap;
 use std::io::Write;
+use std::path::Path;
 use std::process::Stdio;
 use std::sync::OnceLock;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -24,11 +25,51 @@ const READ_TIMEOUT: Duration = Duration::from_secs(30);
 /// Embedded sidecar script
 pub(crate) const SIDECAR_SCRIPT: &str = include_str!("sidecar.ts");
 
-/// Deno config for import map (ensures acorn-typescript uses same acorn
-/// instance). `"lock": false` keeps concurrent sidecars (e.g. several test
-/// binaries under `cargo test --workspace`) from contending on a shared
-/// `deno.lock` next to the tempdir config files.
-const DENO_CONFIG: &str = r#"{"imports":{"acorn":"npm:acorn@8.16.0"},"lock":false}"#;
+/// Embedded lockfile pinning the sidecar's ENTIRE npm resolution — the
+/// transitive tree, not just the five versions `sidecar.ts` names.
+///
+/// The pinned literals in `sidecar.ts` cover only what the sidecar imports
+/// directly. Svelte's own dependencies float on their declared ranges, and one
+/// of them — `esrap`, which PRINTS the JS that `compile()` returns — is the
+/// oracle for every compile fixture. `svelte@5.56.8` depends on `esrap@^2.2.12`,
+/// so the compile oracle's output could change with no version in this repo
+/// changing, and no pin site could see it (that is exactly what happened: esrap
+/// 2.3.1 stopped dropping a string-literal specifier's `as` alias, silently
+/// staling five committed fixtures). This lockfile closes that hole by pinning
+/// the resolution itself; `deno task pins:audit` reads `esrap` back out of it.
+///
+/// Regenerate with `deno task pins:lock` after any canonical pin bump, then diff
+/// it — a package that moved WITHOUT being the one you bumped is the oracle
+/// shifting under you. Full ritual in `scripts/regen_sidecar_lock.ts`.
+const SIDECAR_LOCK: &str = include_str!("deno.lock");
+
+/// Deno config for the sidecar: an import map (ensures acorn-typescript uses the
+/// same acorn instance) plus the FROZEN lockfile above.
+///
+/// `frozen` is what makes a lockfile usable here at all. It was previously
+/// `"lock": false`, because concurrent sidecars (several test binaries under
+/// `cargo test --workspace`) contended on a shared `deno.lock` written next to
+/// the tempdir config files. A frozen lock is read-only — deno resolves against
+/// it and never writes it back — and each sidecar is handed its own tempfile
+/// copy, so there is no shared file to contend on in the first place.
+///
+/// Takes the lockfile's path because a relative `lock` resolves against the
+/// config file's directory, which here is a tempdir. Built through `serde_json`
+/// rather than string interpolation so a path needing JSON escaping (Windows
+/// backslashes) cannot produce a malformed config.
+///
+/// The path goes in lossily on purpose: serde serializes a bare `Path` as a
+/// string but ERRORS on non-UTF-8, and `json!` unwraps that error into a panic.
+/// A temp path is ASCII in practice, so this is unreachable either way — but a
+/// mangled path deno then fails to open is a better failure than aborting the
+/// process inside a macro.
+fn deno_config(lock_path: &Path) -> String {
+    serde_json::json!({
+        "imports": { "acorn": "npm:acorn@8.16.0" },
+        "lock": { "path": lock_path.to_string_lossy(), "frozen": true }
+    })
+    .to_string()
+}
 
 /// Request ID counter
 static NEXT_ID: AtomicU64 = AtomicU64::new(1);
@@ -97,10 +138,20 @@ impl DenoActor {
             .write_all(SIDECAR_SCRIPT.as_bytes())
             .map_err(DenoError::ScriptWrite)?;
 
-        // Write deno.json config for import map (ensures acorn version alignment)
+        // Write the frozen lockfile this sidecar resolves against. Its own
+        // tempfile (rather than a shared path) is what keeps concurrent
+        // sidecars from contending — see `SIDECAR_LOCK`.
+        let mut lock_file = NamedTempFile::new().map_err(DenoError::TempfileCreate)?;
+        lock_file
+            .write_all(SIDECAR_LOCK.as_bytes())
+            .map_err(DenoError::ScriptWrite)?;
+
+        // Write deno.json config for import map (ensures acorn version
+        // alignment) + the frozen lock above, referenced by absolute path
+        // because a relative one would resolve against the tempdir.
         let mut config_file = NamedTempFile::new().map_err(DenoError::TempfileCreate)?;
         config_file
-            .write_all(DENO_CONFIG.as_bytes())
+            .write_all(deno_config(lock_file.path()).as_bytes())
             .map_err(DenoError::ScriptWrite)?;
 
         // Bind the child process I/O and all three background tasks below to the
@@ -195,6 +246,7 @@ impl DenoActor {
             pending: HashMap::new(),
             _script_file: script_file, // Keep alive for process lifetime
             _config_file: config_file, // Keep alive for process lifetime
+            _lock_file: lock_file,     // Keep alive for process lifetime
         };
         tokio::spawn(run_actor(actor_state, rx));
 
@@ -267,6 +319,7 @@ struct ActorState {
     pending: HashMap<u64, oneshot::Sender<Result<Value, DenoError>>>,
     _script_file: NamedTempFile,
     _config_file: NamedTempFile,
+    _lock_file: NamedTempFile,
 }
 
 impl ActorState {

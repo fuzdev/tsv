@@ -19,17 +19,24 @@
  *
  * Passing neither flag runs both (what `doctor` does); passing both is the same.
  *
- * **1. Pin agreement** — the canonical versions must stay IDENTICAL across four
+ * **1. Pin agreement** — the canonical versions must stay IDENTICAL across five
  * places (the sync contract documented in `crates/tsv_debug/src/deno/sidecar.ts`
  * and `benches/js/package.json` `//canonical-sync`):
  *
  *   1. sidecar.ts `VERSIONS` object — what `tsv_debug check` reports
  *   2. sidecar.ts static `npm:` import specifiers — what the sidecar actually runs
  *   3. benches/js/package.json `dependencies` — what the bench + conformance gates run
- *   4. actor.rs `DENO_CONFIG` acorn import-map pin — the shared-acorn-instance pin
+ *   4. actor.rs `deno_config` acorn import-map pin — the shared-acorn-instance pin
+ *   5. the sidecar lockfile `crates/tsv_debug/src/deno/deno.lock` — what deno
+ *      ACTUALLY resolves, so a literal the lock disagrees with is a lie
  *
  * Drift here silently grades fixtures and corpora against a different oracle
  * than the bench measures.
+ *
+ * The lockfile also carries the pins nothing else can: the oracle's own
+ * transitive dependencies (`LOCKED_TRANSITIVE`). A version pinned by no literal
+ * — `esrap`, which prints svelte's compiled output — can otherwise move under a
+ * caret range with nothing in the repo changing.
  *
  * **2. Checkout alignment** — the graded-suite sibling checkouts must match the
  * pins they're graded against. The fixtures gates grade INPUTS from `../svelte`
@@ -91,6 +98,29 @@ const CANONICAL_PACKAGES = [
 const SIDECAR_PATH = 'crates/tsv_debug/src/deno/sidecar.ts';
 const ACTOR_PATH = 'crates/tsv_debug/src/deno/actor.rs';
 const BENCH_PKG_PATH = 'benches/js/package.json';
+const SIDECAR_LOCK_PATH = 'crates/tsv_debug/src/deno/deno.lock';
+
+/**
+ * Transitive npm packages the sidecar lockfile pins that NO literal pin site
+ * names — the oracle's own dependencies, which float on THEIR declared ranges.
+ *
+ * `esrap` is why this exists. It PRINTS the JS that svelte's `compile()`
+ * returns, so it is the effective oracle for every compile fixture, yet
+ * `svelte@5.56.8` depends on it as `^2.2.12` — a caret. Before the lockfile the
+ * compile oracle's output could change with no version in this repo changing and
+ * no pin site able to see it, which is exactly what happened: esrap 2.3.1
+ * stopped dropping a string-literal specifier's `as` alias and silently staled
+ * five committed fixtures while `deno task check` stayed green.
+ *
+ * Bumping one of these is a deliberate oracle move: regenerate the lockfile
+ * (`deno task pins:lock`), re-validate the compile fixtures
+ * (`deno task compile:fixtures:validate` — the only check that grades the
+ * committed expectations against a LIVE oracle), and update the version here in
+ * the same change.
+ */
+const LOCKED_TRANSITIVE: Record<string, string> = {
+	esrap: '2.3.2'
+};
 
 const escape_regex = (s: string): string => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 
@@ -100,6 +130,9 @@ const bench_pkg = JSON.parse(Deno.readTextFileSync(BENCH_PKG_PATH)) as {
 	dependencies?: Record<string, string>;
 };
 const bench_deps = bench_pkg.dependencies ?? {};
+const lock_npm =
+	(JSON.parse(Deno.readTextFileSync(SIDECAR_LOCK_PATH)) as { npm?: Record<string, unknown> }).npm ??
+	{};
 
 /** `name` → version per source, `null` when the source doesn't pin it. */
 interface PinSources {
@@ -112,6 +145,43 @@ const failures: string[] = [];
 const report: string[] = [];
 const checkout_notes: string[] = [];
 const drifted: string[] = [];
+
+/**
+ * Versions the sidecar lockfile resolves for `name`.
+ *
+ * Lock keys are `name@version`, optionally suffixed with the peer resolution
+ * that disambiguates a duplicate (`prettier-plugin-svelte@4.1.1_prettier@3.9.6_svelte@5.56.8`),
+ * and a scoped name carries its own leading `@`. Returns every match so the
+ * caller can distinguish absent (0) from a genuinely duplicated package (>1) —
+ * two copies of the oracle's printer in one tree would make "the pinned version"
+ * meaningless rather than merely wrong.
+ */
+const locked_versions = (name: string): string[] => {
+	const prefix = `${name}@`;
+	return Object.keys(lock_npm)
+		.filter((key) => key.startsWith(prefix))
+		.map((key) => key.slice(prefix.length).split('_')[0]);
+};
+
+/** Assert the lockfile resolves `name` to exactly `expected`, attributing the source. */
+const assert_locked = (name: string, expected: string, source: string): void => {
+	const found = locked_versions(name);
+	if (found.length === 0) {
+		failures.push(
+			`${name}: absent from ${SIDECAR_LOCK_PATH} — the sidecar does not resolve it; regenerate the lockfile`
+		);
+	} else if (found.length > 1) {
+		failures.push(
+			`${name}: ${SIDECAR_LOCK_PATH} resolves ${found.length} copies (${found.join(', ')}) — ` +
+				'the sidecar would run more than one, so no single version is "the" oracle'
+		);
+	} else if (found[0] !== expected) {
+		failures.push(
+			`${name}: ${SIDECAR_LOCK_PATH} resolves ${found[0]} but ${source} says ${expected} — ` +
+				'the sidecar runs the lockfile, so regenerate it or fix the pin'
+		);
+	}
+};
 
 // --- Pin agreement (see the header docstring, half 1) --------------------------
 
@@ -139,12 +209,16 @@ if (run_pins) {
 			failures.push(`${name}: missing pin in ${missing.join(', ')}`);
 			continue;
 		}
-		const distinct = new Set(entries.map(([, v]) => v));
+		// Non-null by the check above — asserted once here so the rest of the loop
+		// reads as plain strings rather than re-testing a field that cannot be null.
+		const versions = entries.map(([, v]) => v as string);
+		const distinct = new Set(versions);
 		if (distinct.size > 1) {
 			failures.push(`${name}: pins disagree — ${entries.map(([k, v]) => `${k}=${v}`).join(', ')}`);
 			continue;
 		}
-		report.push(`${name}@${pins.versions_object}`);
+		const pinned = versions[0];
+		report.push(`${name}@${pinned}`);
 
 		// The actor.rs import map pins acorn (so the ts plugin extends the same
 		// acorn instance) — it must ride along with the acorn pin.
@@ -152,12 +226,21 @@ if (run_pins) {
 			const actor_pin = /npm:acorn@(\d+\.\d+\.\d+)/.exec(actor)?.[1] ?? null;
 			if (actor_pin === null) {
 				failures.push(`acorn: missing npm:acorn@x.y.z import-map pin in ${ACTOR_PATH}`);
-			} else if (actor_pin !== pins.versions_object) {
-				failures.push(
-					`acorn: ${ACTOR_PATH} import-map pin ${actor_pin} disagrees with ${pins.versions_object}`
-				);
+			} else if (actor_pin !== pinned) {
+				failures.push(`acorn: ${ACTOR_PATH} import-map pin ${actor_pin} disagrees with ${pinned}`);
 			}
 		}
+
+		// The sidecar RESOLVES against its lockfile, so a literal pin the lock
+		// disagrees with is a lie: the sidecar would run one version while every
+		// pin site claims another. Checked per package rather than once, so the
+		// failure names which one drifted.
+		assert_locked(name, pinned, 'the canonical pin');
+	}
+
+	// The oracle's own transitive dependencies — pinned ONLY by the lockfile.
+	for (const [name, expected] of Object.entries(LOCKED_TRANSITIVE)) {
+		assert_locked(name, expected, 'LOCKED_TRANSITIVE in scripts/check_canonical_pins.ts');
 	}
 }
 
@@ -259,8 +342,15 @@ if (drifted.length > 0) {
 const done: string[] = [];
 if (run_pins) {
 	done.push(
-		'canonical pins agree across sidecar VERSIONS/imports, benches/js/package.json, actor.rs ' +
+		'canonical pins agree across sidecar VERSIONS/imports, benches/js/package.json, actor.rs, deno.lock ' +
 			`(${report.join(', ')})`
+	);
+	// Named separately: these are pinned ONLY by the lockfile, so a green line
+	// that didn't say so would leave the oracle's printer looking unguarded.
+	done.push(
+		`lockfile-only pins hold (${Object.entries(LOCKED_TRANSITIVE)
+			.map(([n, v]) => `${n}@${v}`)
+			.join(', ')})`
 	);
 }
 if (run_checkouts) {

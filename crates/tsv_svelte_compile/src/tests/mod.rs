@@ -30,7 +30,6 @@ mod runes_state;
 mod script_rewrite;
 mod slots_and_head;
 mod snippets;
-mod specifier_normalize;
 mod stores;
 mod style_directives;
 mod text_emission;
