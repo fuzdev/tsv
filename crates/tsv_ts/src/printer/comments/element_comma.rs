@@ -114,6 +114,89 @@ impl TrailingComments<'_> {
 }
 
 impl<'a> Printer<'a> {
+    /// `elem_end` advanced past the closers of a stripped paren shell — source the
+    /// element's doc CONSUMED but did not print, and which no span covers.
+    ///
+    /// For the callers that measure a *distance* across this gap rather than claim a
+    /// comment in it: a blank-line scan. Where the element node's span ends INSIDE its
+    /// shell (an array pattern's element is the bare `Identifier`), a scan anchored on the
+    /// span counts the shell's own line breaks as an author blank and FABRICATES one —
+    /// `[a, (⏎b⏎)⏎/* c */] = x` grew a blank line above `/* c */` that the bare authoring
+    /// (`[a, b⏎/* c */] = x`) does not. The fabricated form is stable once printed, so no
+    /// ratchet sees it: `fabrication:audit` grades pristine seeds only.
+    ///
+    /// ⚠️ **Not the seam's anchor**, which must stay at the element's own end so a comment
+    /// in the shell's INTERIOR still has a claimant (`docs/comments.md` §The element-comma
+    /// seam). The two coexist because this scan **stops at the first comment** (a `/`) and
+    /// steps over nothing but `)` and whitespace, so it can never advance past comment
+    /// text. It also returns the position just *after* the last closer, never past the
+    /// whitespace behind it — a blank line the author wrote below the `)` is authorship and
+    /// must still be measured. `bound` is the caller's region end (the closing delimiter,
+    /// or an annotation's start).
+    pub(in crate::printer) fn element_shell_end(&self, elem_end: u32, bound: u32) -> u32 {
+        let bytes = self.source.as_bytes();
+        let end = (bound as usize).min(bytes.len());
+        let mut i = elem_end as usize;
+        let mut shell_end = elem_end;
+        while i < end {
+            match bytes[i] {
+                b')' => {
+                    i += 1;
+                    shell_end = i as u32;
+                }
+                b' ' | b'\t' | b'\n' | b'\r' => i += 1,
+                _ => break,
+            }
+        }
+        shell_end
+    }
+
+    /// Where a list item's INLINE trailing run ends, for the width-layout emitters that
+    /// claim `[item_end, comma_pos)` wholesale and then resume the next item's leading scan
+    /// past the comma.
+    ///
+    /// [`Self::trailing_comment_run`] bounded at the separator, and the same partition:
+    /// the prefix of comments that FOLLOW CONTENT on their line trails this item; the first
+    /// one starting a line of its own LEADS the next item, and everything behind it goes
+    /// with it. Claiming the whole range instead trails a comment the author wrote on its
+    /// own line (`{ a⏎/* c */, b }` → `{ a /* c */, b }`), sliding it BACKWARD across the
+    /// item's own comma — the one direction `docs/comments.md` §The element-comma seam says
+    /// tsv refuses, and a rebinding every other list family (and prettier) declines to make.
+    ///
+    /// ⚠️ **The caller must resume its leading scan HERE, not past the comma.** The two
+    /// answers partition one gap: a comment this run leaves unclaimed has no other emitter
+    /// before the separator, so a `prev_end = comma_pos + 1` resume DROPS it.
+    pub(in crate::printer) fn inline_trailing_run_end(&self, item_end: u32, comma_pos: u32) -> u32 {
+        self.trailing_comment_run(item_end, comma_pos)
+            .last()
+            .map_or(item_end, |c| c.span.end)
+    }
+
+    /// Emit a non-last item's inline trailing run and return the caller's new `prev_end` —
+    /// the whole width-layout spelling of the seam in one call, so the emit range and the
+    /// resume anchor cannot be given different ends.
+    ///
+    /// The two halves are one decision ([`Self::inline_trailing_run_end`]): claiming
+    /// `[item_end, comma_pos)` wholesale drags an own-line comment BACKWARD across the
+    /// item's comma, and resuming past the comma DROPS whatever the run left behind. Every
+    /// caller that wrote them as separate statements had to restate that coupling in a
+    /// comment; here it is the signature. Shared by the specifier list, the tuple type and
+    /// the function-type parameter list — the width-laid-out (`d.line()`) families whose
+    /// trailing emitter is [`Self::append_trailing_inline_block_comments`]. The
+    /// type-parameter/argument lists emit the same run through
+    /// `build_comments_between_filtered` and so take the bare end.
+    pub(in crate::printer) fn push_item_trailing_run(
+        &self,
+        parts: &mut DocBuf,
+        item_end: u32,
+        next_start: u32,
+    ) -> u32 {
+        let comma_pos = self.find_list_comma(item_end, next_start);
+        let run_end = self.inline_trailing_run_end(item_end, comma_pos);
+        self.append_trailing_inline_block_comments(parts, item_end, run_end);
+        run_end
+    }
+
     /// The trailing RUN in a list element's gap: the prefix of `[start, end)`'s to-emit
     /// comments that FOLLOW CONTENT on their line, ending AT the first line comment.
     ///
@@ -146,7 +229,7 @@ impl<'a> Printer<'a> {
         &self,
         start: u32,
         end: u32,
-    ) -> impl Iterator<Item = &Comment> {
+    ) -> impl Iterator<Item = &'a Comment> + '_ {
         let mut past_line_comment = false;
         comments_to_emit_in_range(self.comments, start, end).take_while(move |c| {
             let claimed = !past_line_comment && self.comment_follows_content_on_its_line(c);

@@ -1568,9 +1568,7 @@ impl<'a> Printer<'a> {
             let elem_end = elem.span().end;
             prev_end = if i + 1 < t.element_types.len() {
                 let next_start = t.element_types[i + 1].span().start;
-                let comma_pos = self.find_list_comma(elem_end, next_start);
-                self.append_trailing_inline_block_comments(&mut parts, elem_end, comma_pos);
-                comma_pos + 1 // After comma
+                self.push_item_trailing_run(&mut parts, elem_end, next_start)
             } else {
                 let before_close = t.span.end - 1;
                 self.append_last_trailing_block_comments_split(

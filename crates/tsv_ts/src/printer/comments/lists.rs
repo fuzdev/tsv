@@ -242,37 +242,45 @@ impl<'a> Printer<'a> {
     /// Check if there's a block comment on its own line within a container.
     ///
     /// A "standalone" block comment is one that:
-    /// - Is not on the same line as the opening brace
-    /// - Is not on the same line as any item (start or end)
+    /// - Starts a line of its own in SOURCE ([`Printer::comment_follows_content_on_its_line`])
+    /// - Is not glued to a following item (`/* c */ item`)
     ///
     /// Used to force multiline formatting for objects/type literals.
+    ///
+    /// ⚠️ **The first half reads the SOURCE, never an item boundary.** The two differ by
+    /// exactly the text no item span covers — the container's own **comma**, which the
+    /// author can push onto its own line (`{ a: 1⏎, /* c */⏎b: 2 }`), the opening `{`, and
+    /// a stripped paren shell's `)`. Asking "is the comment on the same line as any item's
+    /// end?" calls a comment glued to any of those own-line and expands a container that
+    /// fits, a third fixed point neither the bare authoring nor prettier produces. It is
+    /// the same question the bracketed-list gate asks
+    /// ([`Printer::has_own_line_block_comments_in_bracket_list`]) and the same one the
+    /// element→comma seam partitions on, so the three cannot disagree about one gap.
+    /// A comment given a line **of its own** still expands the container, which is what
+    /// this predicate is for.
     pub(crate) fn has_standalone_block_comment(
         &self,
         container_start: u32,
         container_end: u32,
         item_spans: &[Span],
     ) -> bool {
-        let after_open_brace = container_start + 1;
         self.comments_on_page_between(container_start, container_end)
             .any(|c| {
                 if !c.is_block {
                     return false; // Line comments handled separately
                 }
-                // Must not be on same line as opening brace
-                if self.is_same_line(after_open_brace, c.span.start) {
+                // Anything before it on its line — an item, the `{`, a stripped `)`, the
+                // comma — makes it a trailing comment, not a standalone one.
+                if self.comment_follows_content_on_its_line(c) {
                     return false;
                 }
-                // Must not be on same line as any item. An item *before* the comment
-                // shares its line when the item's end and the comment's start match
-                // (`item /* c */`); an item *after* the comment shares its line when the
-                // comment's end and the item's start match (`/* c */ item`). Each
-                // `is_same_line` call must pass its earlier position first — the helper
-                // returns false for out-of-order args, so anchoring the leading-item check
-                // on `s.start` (which follows the comment) wrongly reported "standalone"
-                // for an inline-adjacent comment and force-expanded the container.
-                !item_spans.iter().any(|s| {
-                    self.is_same_line(s.end, c.span.start) || self.is_same_line(c.span.end, s.start)
-                })
+                // An item *after* the comment shares its line when the comment's end and
+                // the item's start match (`/* c */ item`); such a comment leads that item
+                // inline and forces nothing. `is_same_line` must take its earlier position
+                // first — the helper returns false for out-of-order args.
+                !item_spans
+                    .iter()
+                    .any(|s| self.is_same_line(c.span.end, s.start))
             })
     }
 
@@ -310,11 +318,12 @@ impl<'a> Printer<'a> {
     /// Whether `comment` was already emitted as the PREVIOUS item's trailing run — it
     /// shares `anchor`'s source line — so this leading / end-of-body run must skip it.
     ///
-    /// The single home for a question **six** emitters used to answer with their own
+    /// The single home for a question **eight** emitters used to answer with their own
     /// `is_same_line` call: the two statement-list leading runs (block body, switch
-    /// consequent), the class-member leading run, and the three end-of-body runs (program,
-    /// block, the shared [`Self::build_trailing_body_comments_doc`]). Answering it
-    /// independently is exactly what let them drift — see the
+    /// consequent), the class-member, type-literal-member and enum-member leading runs, and
+    /// the three end-of-body runs (program, block, the shared
+    /// [`Self::build_trailing_body_comments_doc`] — which the object literal now reaches
+    /// too). Answering it independently is exactly what let them drift — see the
     /// one-question-one-predicate rule the printer keeps re-learning.
     ///
     /// `anchor` is `None` when there is no previous item at all: nothing trailed, so
@@ -467,8 +476,10 @@ impl<'a> Printer<'a> {
     ///
     /// Used by every end-of-body run: class body, interface body, enum body, type literal,
     /// namespace body, block-statement bodies (function and bare blocks, via
-    /// [`Self::build_block_body_doc`]), and the `}`-less one — the end of the **program**,
-    /// where `body_end` is the source length.
+    /// [`Self::build_block_body_doc`]), the object literal (via
+    /// [`Self::build_trailing_closer_comments_doc`], the only caller whose container may
+    /// still collapse), and the `}`-less one — the end of the **program**, where `body_end`
+    /// is the source length.
     ///
     /// `claims_trailing` says this run owns the comments sharing `prev_end`'s source line.
     /// Normally the last item's trailing emitter took them, so they are skipped here; a
@@ -482,9 +493,43 @@ impl<'a> Printer<'a> {
         body_end: u32,
         claims_trailing: bool,
     ) -> DocBuf {
+        self.build_trailing_closer_comments_doc(
+            prev_end,
+            body_end,
+            claims_trailing,
+            self.d().hardline(),
+        )
+    }
+
+    /// [`Self::build_trailing_body_comments_doc`] with the run's separator supplied, for
+    /// the one container that may still COLLAPSE around its trailing run — the object
+    /// literal's inline form, whose separator is a soft `line` its group decides.
+    ///
+    /// It exists so that container does not keep a SECOND copy of this walk: the copy is
+    /// what let the two drift, and the stripped-shell blank scan below then had to be
+    /// fixed twice. Every other end-of-body run is already hard-broken, hence the
+    /// `hardline` default.
+    pub(crate) fn build_trailing_closer_comments_doc(
+        &self,
+        prev_end: u32,
+        body_end: u32,
+        claims_trailing: bool,
+        separator: DocId,
+    ) -> DocBuf {
         let d = self.d();
         let mut docs = DocBuf::new();
-        let mut last_pos = prev_end;
+        // The blank scan measures a DISTANCE, so it opens past the closers of a stripped
+        // paren shell the last item's doc consumed but did not print
+        // ([`Self::element_shell_end`]) — an enum member's `A = (⏎1⏎)⏎/* c */` otherwise
+        // reads the shell's own line breaks as an author blank and FABRICATES one. Inert
+        // for every caller whose `prev_end` is a `;`/`}`: the walk commits only when it
+        // actually steps over a `)`, and `body_end` keeps it inside the body.
+        //
+        // ⚠️ **The `anchor` below keeps the unshifted `prev_end`**, which is the opposite
+        // question — "did the last item's own emitter already trail this comment?" — asked
+        // of the item's line. Shifting it past the `)` would call a comment on the closer's
+        // line already-trailed and DROP it, since this run is the last chance to print one.
+        let mut last_pos = self.element_shell_end(prev_end, body_end);
         // `prev_end == 0` is the one caller with no previous item at all: a comments-only
         // file, where the run IS the output. Nothing trailed, so nothing is claimed
         // ([`Self::comment_already_trailed`]'s `None` anchor), and the first comment opens
@@ -505,7 +550,7 @@ impl<'a> Printer<'a> {
                 if self.has_blank_line_between(last_pos, comment.span.start) {
                     docs.push(d.literalline());
                 }
-                docs.push(d.hardline());
+                docs.push(separator);
             }
             docs.push(self.build_comment_doc(comment));
             last_pos = comment.span.end;
@@ -1083,6 +1128,23 @@ impl<'a> Printer<'a> {
         self.push_gap_comments(parts, start, sep_pos, false, true)
     }
 
+    /// Whether a separator-gap comment sits on the gap ANCHOR's line — the
+    /// classification [`Self::push_gap_comments`] partitions on, and the one every
+    /// caller that has to reason about the run it produced must re-ask.
+    ///
+    /// Named rather than open-coded because it is asked four times about one gap (the
+    /// partition itself, the deferred run's ends, and the after-comma same-line scan in
+    /// [`Self::emit_multiline_comma_with_comments`]), and a spelling that drifts from
+    /// this one hands a caller a run the emitter never produced.
+    ///
+    /// ⚠️ **An anchor reading, deliberately** — not the source reading
+    /// ([`Printer::comment_follows_content_on_its_line`]) the element→comma SEAM asks.
+    /// This gap's anchor is the element's own end and the question is which side of the
+    /// separator the comment renders on, not which element it binds to.
+    fn gap_comment_on_anchor_line(&self, anchor: u32, comment: &internal::Comment) -> bool {
+        self.is_same_line(anchor, comment.span.start)
+    }
+
     /// Core of the gap-comment partition, with the two policy axes decoupled:
     /// `block_after` moves a **same-line block** past the separator (deferred), and
     /// `preserve_blank` keeps a single blank line before a deferred **own-line** comment
@@ -1101,7 +1163,7 @@ impl<'a> Printer<'a> {
         let mut deferred = DocBuf::new();
         let mut prev = start;
         for comment in comments_to_emit_in_range(self.comments, start, sep_pos) {
-            if self.is_same_line(start, comment.span.start) {
+            if self.gap_comment_on_anchor_line(start, comment) {
                 if block_after && comment.is_block {
                     deferred.push(self.build_trailing_comment_doc(comment));
                 } else {
@@ -1213,12 +1275,15 @@ impl<'a> Printer<'a> {
     /// 4. Hardline separator
     ///
     /// Returns the new `prev_end` position.
-    /// `preserve_blank_before` keeps a blank line the author left *before* the next
-    /// element (or its own-line leading comment, `A,⏎⏎/* c */⏎B`). Prettier preserves
-    /// it for **tuples** and **function-type param lists** (function/constructor
-    /// types, method/call/construct signatures — same as regular function params) but
-    /// collapses it for type-parameter / type-argument lists, so those two caller
-    /// families pass `true` and the type-param/type-arg callers pass `false`.
+    ///
+    /// `blank_rule` keeps a blank line the author left *before* the next element (or its
+    /// own-line leading comment, `A,⏎⏎/* c */⏎B`), and says from WHERE it is measured — a
+    /// per-family fact, not a preference (see [`BlankRule`]). Prettier preserves the blank
+    /// for **tuples** ([`BlankRule::AfterComma`], measured past the comma) and
+    /// **function-type param lists** (function/constructor types, method/call/construct
+    /// signatures — [`BlankRule::NextLineEmpty`], measured from the element's end, same as
+    /// regular function params), and collapses it for type-parameter / type-argument lists
+    /// ([`BlankRule::None`]).
     pub(crate) fn emit_multiline_comma_with_comments(
         &self,
         parts: &mut DocBuf,
@@ -1236,7 +1301,39 @@ impl<'a> Printer<'a> {
         // See `split_separator_gap_comments`.
         let deferred_own_line =
             self.split_separator_gap_comments(parts, elem_end, comma_pos, false);
+        // A deferred run LEADS the next element, so its last comment takes the
+        // leading-comment separator, not this emitter's element hardline: a space when the
+        // author glued it to what follows on its line ([`Printer::comment_hugs_next`],
+        // prettier's `printLeadingComment`), which for a list is the comma the comment sits
+        // in front of (`[a⏎/* c */, b]`). Answering it with the element separator instead
+        // drops such a comment onto a line of its own — a third form, and one that puts
+        // this family at odds with the array literal, whose per-element group collapses
+        // the same soft `line` (`docs/comments.md` §Array family vs params family).
+        let deferred_hugs = !deferred_own_line.is_empty()
+            && comments_to_emit_in_range(self.comments, elem_end, comma_pos)
+                .filter(|c| !self.gap_comment_on_anchor_line(elem_end, c))
+                .last()
+                .is_some_and(|c| self.comment_hugs_next(c));
         parts.push(d.text(","));
+        if deferred_hugs {
+            // An author blank line belongs AHEAD of a hugging run, where it was written —
+            // between the element and the comment. The element separator below can only
+            // put it after, which for a glued run would split the comment from the item it
+            // leads.
+            //
+            // ⚠️ **WHICH blank counts is still the caller's list kind**, exactly as it is
+            // in the tail below: a hugging run moves where the `literalline` goes, not
+            // which region is measured. Answering `NextLineEmpty` for every family
+            // emitted a blank in the TUPLE (`[aaaa⏎⏎/* c */, bbbb]`) that prettier
+            // collapses — and the fabricated form is stable, so F1, the ledger and
+            // `blanks:audit` are all blind to it.
+            if self.separator_gap_has_blank(blank_rule, elem_end, comma_pos + 1, next_start) {
+                parts.push(d.literalline());
+            }
+            parts.extend(deferred_own_line);
+            parts.push(d.text(" "));
+            return comma_pos + 1;
+        }
         parts.extend(deferred_own_line);
 
         // Same-line trailing comments after comma (line comments that consume the line).
@@ -1245,7 +1342,7 @@ impl<'a> Printer<'a> {
         // `lineSuffix`). A block stays inline, width counted.
         let mut after_comma_end = comma_pos + 1;
         for comment in comments_to_emit_in_range(self.comments, comma_pos + 1, next_start) {
-            if self.is_same_line(elem_end, comment.span.start) {
+            if self.gap_comment_on_anchor_line(elem_end, comment) {
                 parts.push(self.build_trailing_comment_doc(comment));
                 after_comma_end = comment.span.end;
             }
@@ -1254,43 +1351,61 @@ impl<'a> Printer<'a> {
         // Hardline to separate from next element, optionally preserving an author blank line
         // before the next own-line leading comment. WHICH blank counts is the caller's list
         // kind, not this emitter's business — see [`BlankRule`].
-        if blank_rule != BlankRule::None {
-            // **in source**: `next_lead` bounds a raw blank-line scan, which cannot tell a
-            // comment's own newlines from an author's blank line — so it must stop at every
-            // comment in the gap, not just the ones this caller emits.
-            let next_lead = self
-                .comments_in_source_between(after_comma_end, next_start)
-                .find(|c| !self.is_same_line(elem_end, c.span.start))
-                .map_or(next_start, |c| c.span.start);
-            let has_blank = match blank_rule {
-                // Measured from the ELEMENT's end, so a blank the author put before the
-                // comma still counts — and one after a comma pushed onto its own line
-                // does not.
-                BlankRule::NextLineEmpty => self.is_next_line_empty(elem_end, next_lead),
-                // Measured from past the comma, prettier's array/tuple rule. **Strict**:
-                // the next element's span can begin inside a paren shell the printer
-                // strips (a tuple element's `[a,⏎(⏎/* c */⏎b)]`), and the newline before
-                // that `(` plus the one after it read as an author blank line to the
-                // table lookup — emitting a blank the reparse then reads back as real.
-                //
-                // Strict removes the FABRICATED blank, not every blank the shell touches:
-                // a blank the author actually typed inside the shell (`[a,⏎(⏎⏎/* c */⏎b)]`)
-                // still has a whitespace-only line to find, so it survives the strip and
-                // leads the element, where prettier drops it. Defensible — the author did
-                // write the blank, and the result is stable — but it is a divergence, not
-                // an equivalence.
-                BlankRule::AfterComma => {
-                    self.has_blank_line_between_strict(after_comma_end, next_lead)
-                }
-                // Bailed out above; spelled here so the match stays total.
-                BlankRule::None => false,
-            };
-            if has_blank {
-                parts.push(d.literalline());
-            }
+        if self.separator_gap_has_blank(blank_rule, elem_end, after_comma_end, next_start) {
+            parts.push(d.literalline());
         }
         parts.push(d.hardline());
 
         after_comma_end
+    }
+
+    /// Whether this element→element gap holds an author blank line the list **preserves**,
+    /// under the caller's family rule ([`BlankRule`]).
+    ///
+    /// Both of [`Self::emit_multiline_comma_with_comments`]'s separator arms ask it — the
+    /// hugging one, which emits the `literalline` ahead of the deferred run, and the tail,
+    /// which emits it after the comma. They differ only in where the region past the comma
+    /// opens (`from`); the RULE is the list kind and must not change with the arm. Asking
+    /// one arm's question in the other's spelling gave the TUPLE a blank prettier collapses
+    /// — stable output, so F1, the ledger and `blanks:audit` were all blind to it.
+    ///
+    /// **in source**: `next_lead` bounds a raw blank-line scan, which cannot tell a
+    /// comment's own newlines from an author's blank line — so it must stop at every
+    /// comment in the gap, not just the ones this caller emits.
+    fn separator_gap_has_blank(
+        &self,
+        blank_rule: BlankRule,
+        elem_end: u32,
+        from: u32,
+        next_start: u32,
+    ) -> bool {
+        if blank_rule == BlankRule::None {
+            return false;
+        }
+        let next_lead = self
+            .comments_in_source_between(from, next_start)
+            .find(|c| !self.gap_comment_on_anchor_line(elem_end, c))
+            .map_or(next_start, |c| c.span.start);
+        match blank_rule {
+            // Measured from the ELEMENT's end, so a blank the author put before the
+            // comma still counts — and one after a comma pushed onto its own line
+            // does not.
+            BlankRule::NextLineEmpty => self.is_next_line_empty(elem_end, next_lead),
+            // Measured from past the comma, prettier's array/tuple rule. **Strict**:
+            // the next element's span can begin inside a paren shell the printer
+            // strips (a tuple element's `[a,⏎(⏎/* c */⏎b)]`), and the newline before
+            // that `(` plus the one after it read as an author blank line to the
+            // table lookup — emitting a blank the reparse then reads back as real.
+            //
+            // Strict removes the FABRICATED blank, not every blank the shell touches:
+            // a blank the author actually typed inside the shell (`[a,⏎(⏎⏎/* c */⏎b)]`)
+            // still has a whitespace-only line to find, so it survives the strip and
+            // leads the element, where prettier drops it. Defensible — the author did
+            // write the blank, and the result is stable — but it is a divergence, not
+            // an equivalence.
+            BlankRule::AfterComma => self.has_blank_line_between_strict(from, next_lead),
+            // Bailed out above; spelled here so the match stays total.
+            BlankRule::None => false,
+        }
     }
 }
