@@ -425,9 +425,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                             // ...args, ...args?, ...args: type, or ...args?: type.
                             // The argument span stays name-only (`id_start..id_end`);
                             // any `?`/`: T` binds to the rest element (acorn's shape).
+                            // The name is a `BindingIdentifier` — the same channel the
+                            // non-rest parameters take, so a contextual type keyword is
+                            // legal (`function fn(...string: any[]) {}`). The FUNCTION-TYPE
+                            // rest path already went through it.
                             let (id_start, id_end) = self.current_pos();
-                            let name = self.current_ident_name();
-                            self.expect(&TokenKind::Identifier)?;
+                            let Some(name) = self.try_binding_name() else {
+                                return Err(self.error_expected("parameter name"));
+                            };
+                            self.advance()?;
                             let argument = Expression::Identifier(Identifier::simple(
                                 name,
                                 Span::new(id_start as u32, id_end as u32),

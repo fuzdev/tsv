@@ -287,8 +287,23 @@ Svelte ❌ / Prettier ✅ / tsv ✅ in every case below:
 - Import type options — [dynamic_attributes](../tests/fixtures/typescript/modules/imports/dynamic_attributes_svelte_divergence/)
 - An **invalid** v-flag regex (`/[a-z--[aeiou]]/v` — a range is not a `ClassSetOperand`, so V8 throws too): tsv accepts it by deferring the `IsValidRegularExpressionLiteral` early error, since regex bodies are opaque. Svelte is *correct* to reject; this is not a `v`-flag gap — [unicode_sets_advanced](../tests/fixtures/typescript/expressions/literals/regex/unicode_sets_advanced_svelte_divergence/)
 - `export default class implements I {}` (anonymous default class, implements-first heritage) — [export_default_implements](../tests/fixtures/typescript/declarations/class/export_default_implements_svelte_divergence/)
+- A **reversed** class-member modifier pair, `override abstract` — acorn rejects it outright (`'abstract' modifier must precede 'override' modifier`) and so does tsc (TS1029), while prettier parses it and reorders it to the canonical `abstract override`. tsv accepts and reorders identically, so the canonical spelling round-trips and the reversed one is silently corrected rather than refused. Pinned by the regular fixture [abstract_override](../tests/fixtures/typescript/declarations/class/abstract_override/): the canonical order as `input` (which acorn accepts, so `expected.json` matches), the reversed order as its `unformatted_reversed_modifier_order` variant, since an input tsv rewrites cannot be `input`. Flipping tsv to reject it is a reject-flip whose honest form is a modifier **loop** in `parse_class_member` — the shape tsc and acorn-typescript each use — not a third ordered probe
 - A cast as the left operand of `**` (`x as number ** 2`) — see below; the rejection itself is not pinnable
 - A `>=` following a `<` operand (`a < b >= d`) — see below — [relational_lt_greater_equal](../tests/fixtures/typescript/expressions/binary/relational_lt_greater_equal_svelte_divergence/)
+
+**Reserved word in a heritage clause** — the one entry here where tsv is *stricter* than acorn, and the one place all three oracles disagree in three different directions. A heritage element is a type **reference** (`TypeReference: TypeName`, `TypeName: IdentifierReference | NamespaceName . IdentifierReference`), so a reserved word can never head one. tsv follows that grammar, which is exactly prettier's line — its error states the rule outright ("Interface declaration can only extend an identifier/qualified name with optional type arguments") and tsv matches prettier on every element form tested:
+
+| heritage element | tsc parser | acorn | prettier | tsv |
+| --- | --- | --- | --- | --- |
+| `A` `number` `string` `any` `undefined` `A.B` `A<T>` | accept | accept | accept | **accept** |
+| `void` | **TS1109** | accept | reject | **reject** |
+| `null` `true` `this` | accept | accept | **reject** | **reject** |
+| `super` | **TS1034** | **accept** | reject | **reject** |
+| `1` `'s'` `(A)` `typeof A` `[A]` `A[]` `{a: 1}` | mostly accept | reject | reject | **reject** |
+
+The other two are lenient for structural reasons, not by decision: acorn reads the heritage name as a bare `IdentifierName`, so every reserved word slips through, while tsc parses heritage with its *expression* parser and defers primitive-ness to the checker — which is why literals and parenthesized expressions get in, and why `void` and `super` (not left-hand-side expressions either) are the two it still rejects. Per the oracle note above, "tsc's parser accepts" means only *not a grammar error*. Rejection pinned by [heritage_reserved_keyword](../tests/fixtures/typescript/types/interfaces/heritage_reserved_keyword_svelte_divergence/); the **contextual** type keywords are ordinary identifiers and are accepted, pinned by [heritage_type_keyword](../tests/fixtures/typescript/types/interfaces/heritage_type_keyword/). Same reserved-vs-contextual line as the qualified-name **head** below; the qualified **tail** after a `.` is the opposite case (a full `IdentifierName`, reserved words admitted — [reserved_keyword_qualified_tail](../tests/fixtures/typescript/types/reserved_keyword_qualified_tail/)).
+
+The rule is `ReservedWord`-shaped, not keyword-shaped, so `let` lands on the accepting side with the contextual type keywords: it is not a `ReservedWord`, and its only bar as a name is a strict-mode early error in *binding* positions, which a heritage element is not — pinned by [heritage_let](../tests/fixtures/typescript/types/interfaces/heritage_let/), and consistent with tsv reading `let` as an ordinary type name in every other type position (`let x: let`, `type T = let.Foo`, `typeof let`). `yield` and `await` stay on the rejecting side by the same rule: both **are** `ReservedWord`s, readmitted only by the `[~Yield]` / `[~Await]` productions, so under tsv's strict-only stance `yield` never qualifies and `await` qualifies only at `Goal::Script`. Prettier accepts all three — the one spot where its heritage line is looser than the rule its own error message states, and the one spot tsv declines to follow it.
 
 **`using` keyword-name comments**: tsv **accepts** a comment between `using` and the binding name (`using /* c */ x = fn()`) and round-trips it, which is correct — per ecma262 §sec-comments a comment "behave[s] like white space and [is] discarded", so any two tokens may be separated by one. A comment *containing a line terminator* is the exception the same clause names: it counts as a `LineTerminator`, which the `[no LineTerminator here]` in `await [no LT] using` and `using [no LT] BindingIdentifier` then demotes — so `await /* c⏎ */ using x = fn()` correctly fails to read as a declaration. acorn's verdict is not comparable here: it rejects `using` / `await using` outright (see the list above), so it never reaches the comment question.
 
@@ -595,11 +610,35 @@ as a `TSInstantiationExpression`; on one line it emits
 line break (its instantiation bail checks `hasPrecedingLineBreak`). tsv emits
 the same-line shape uniformly.
 
-**Lone surrogates in string values** (`lone_surrogate_value`): a lone UTF-16
-surrogate (`"\ud800"`) decodes to U+FFFD in tsv — Rust strings are UTF-8 and
-cannot represent WTF-16 lone surrogates — where acorn keeps the lone
-surrogate in the JS string value. `raw` is a source slice and unaffected.
-This is a representation limit, not a parse difference.
+**Lone surrogates in string values** (`lone_surrogate_value`): an **unpaired** UTF-16
+surrogate decodes to U+FFFD in tsv — Rust strings are UTF-8 and cannot represent
+WTF-16 lone surrogates — where acorn keeps the lone surrogate in the JS string value.
+Both escape spellings agree (`'\ud800'` and `'\u{D800}'`), and `raw` is a source
+slice, so the printed output is exact. This is a representation limit, not a parse
+difference.
+
+⚠️ **Only an UNPAIRED half.** A lead escape followed by a trail escape denotes one code
+point, and the pairing is a property of the code units rather than of how each half was
+spelled — so `'\uD83D\uDE00'`, `'\u{D83D}\u{DE00}'` and the two mixed forms all
+decode to `😀` exactly as acorn does, and none of them reach this divergence. That value
+IS representable, so a spelling that came out as two U+FFFDs would be a plain bug rather
+than this sanctioned limit — which is what the four spellings are pinned for in
+[unicode_lone_surrogate](../tests/fixtures/typescript/expressions/literals/string/escapes/unicode_lone_surrogate/).
+
+⚠️ **The divergence is real but deliberately UNPINNABLE by a fixture.** An
+`expected.json` is captured through the debug sidecar, and a lone surrogate
+cannot cross that boundary: `JSON.stringify` emits it, but the resulting document
+is not encodable text and `serde_json` rejects it outright ("lone leading
+surrogate"), so the whole response fails rather than the one value differing. The
+sidecar therefore substitutes U+FFFD *in the canonical capture* — matching what
+tsv's lexer already emits — which makes both sides of
+[unicode_lone_surrogate](../tests/fixtures/typescript/expressions/literals/string/escapes/unicode_lone_surrogate/)
+agree, so it is an ordinary fixture rather than a `_svelte_divergence` one. What
+that fixture pins is the *parse and print* of both spellings, not the value gap.
+The value gap is held by the **corpus** detector named above instead, whose
+canonical AST never crosses a Rust boundary and so keeps acorn's true value —
+see the ⚠️ note on `bigint_replacer` in `benches/js/corpus_compare_parse.ts`,
+which exists to keep it that way.
 
 **Parenthesized decorator subscript start**
 (`decorator_paren_subscript_start`): when a parenthesized decorator

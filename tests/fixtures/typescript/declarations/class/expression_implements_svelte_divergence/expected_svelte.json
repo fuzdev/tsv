@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 356,
+	"end": 552,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -57,24 +57,56 @@
 					"column": 38
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A contextual type keyword is an ordinary heritage name, and takes the same",
+			"start": 348,
+			"end": 425,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `id` omission (the shape tsc's own `classImplementsPrimitive.ts` writes)",
+			"start": 427,
+			"end": 502,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 76
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 355,
+		"end": 551,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 346,
+			"end": 542,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 13,
+					"line": 17,
 					"column": 9
 				}
 			},
@@ -668,6 +700,134 @@
 							"value": " Class expression as a `new` callee",
 							"start": 259,
 							"end": 296
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 504,
+					"end": 541,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 38
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 510,
+							"end": 540,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 16,
+									"column": 37
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 510,
+								"end": 511,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 8
+									}
+								},
+								"name": "E"
+							},
+							"init": {
+								"type": "ClassExpression",
+								"start": 514,
+								"end": 540,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 11
+									},
+									"end": {
+										"line": 16,
+										"column": 37
+									}
+								},
+								"superClass": null,
+								"implements": [
+									{
+										"type": "TSExpressionWithTypeArguments",
+										"start": 531,
+										"end": 537,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 28
+											},
+											"end": {
+												"line": 16,
+												"column": 34
+											}
+										},
+										"expression": {
+											"type": "Identifier",
+											"start": 531,
+											"end": 537,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 28
+												},
+												"end": {
+													"line": 16,
+													"column": 34
+												}
+											},
+											"name": "number"
+										}
+									}
+								],
+								"body": {
+									"type": "ClassBody",
+									"start": 538,
+									"end": 540,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 35
+										},
+										"end": {
+											"line": 16,
+											"column": 37
+										}
+									},
+									"body": []
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A contextual type keyword is an ordinary heritage name, and takes the same",
+							"start": 348,
+							"end": 425
+						},
+						{
+							"type": "Line",
+							"value": " `id` omission (the shape tsc's own `classImplementsPrimitive.ts` writes)",
+							"start": 427,
+							"end": 502
 						}
 					]
 				}

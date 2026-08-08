@@ -91,4 +91,42 @@
 		let string;
 		string = 'a';
 	}
+
+	// Ambient declaration name (the concrete `function string() {}` form above
+	// already parses — `declare` takes the same names)
+	declare function string(): void;
+	declare function never(): void;
+	declare function from<T>(): T[];
+
+	// Type-parameter name
+	function fn9<string>(x: string): string {
+		return x;
+	}
+	class A<never> {}
+	type T<unknown> = unknown;
+	interface I<object> {}
+
+	// Rest-parameter name, in every parameter list
+	function fn10(...string: any[]) {}
+	const fn11 = (...never: any[]) => never;
+	class B {
+		m(...unknown: any[]) {}
+	}
+	const obj3 = { m(...object: any[]) {} };
+	declare var a: { m(...bigint: any[]): void };
+
+	// A rest parameter in a FUNCTION TYPE already takes these names
+	type F = (...string: any[]) => void;
+
+	// Function EXPRESSION name — the declaration form above already parses,
+	// and a function expression's name is the same `BindingIdentifier`
+	const fn12 = function string() {};
+	const fn13 = async function never() {};
+	const fn14 = function* unknown() {};
+
+	// Import-equals module reference: its entity name is an ordinary name too
+	// (a RESERVED word after the `.` is not — see types/reserved_keyword_qualified_tail)
+	import eq1 = string;
+	import eq2 = number.inner;
+	export import eq3 = object.inner;
 </script>

@@ -309,9 +309,34 @@ interface Request {
 	options?: Record<string, unknown>;
 }
 
-// JSON replacer that converts BigInt to string (BigInt can't be serialized natively)
+/**
+ * Matches any UNPAIRED surrogate — a lead not followed by a trail, or a trail not
+ * preceded by a lead. Well-formed pairs are left alone.
+ */
+const LONE_SURROGATE = /[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/g;
+
+/**
+ * JSON replacer for values that `JSON.stringify` cannot round-trip to the Rust host.
+ *
+ * - **BigInt** has no JSON form at all — stringify throws — so it becomes its decimal string.
+ * - **Lone surrogates** stringify fine (as `\udXXX`) but produce a JSON document that is not
+ *   valid UTF-8-encodable text, and `serde_json` rejects it ("unexpected end of hex escape" /
+ *   "lone leading surrogate"). They reach us from a source like `'\u{D800}'`, whose AST `value`
+ *   acorn carries verbatim. Substituting U+FFFD keeps the response decodable and matches what
+ *   tsv's own lexer already emits on the 4-digit `\uD800` path (`char::REPLACEMENT_CHARACTER`),
+ *   so both sides of a fixture agree. The AST `value` divergence is documented in
+ *   `docs/conformance_svelte.md`; `raw` is unaffected, so the printed output is exact.
+ */
 function jsonReplacer(_key: string, value: unknown): unknown {
-	return typeof value === 'bigint' ? value.toString() : value;
+	if (typeof value === 'bigint') return value.toString();
+	if (typeof value === 'string' && LONE_SURROGATE.test(value)) {
+		// `test` on a `g` regex leaves `lastIndex` mid-string. `replace` zeroes it
+		// itself, so this is belt-and-braces against a future reader of the shared
+		// module-level regex, not a correctness requirement of the line below.
+		LONE_SURROGATE.lastIndex = 0;
+		return value.replace(LONE_SURROGATE, '\uFFFD');
+	}
+	return value;
 }
 
 interface Response {
