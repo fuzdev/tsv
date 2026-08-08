@@ -227,10 +227,12 @@ fn linearize_recursive<'a>(
                 if let Some(ChainNode::Base {
                     needs_parens: true,
                     paren_comment_end,
+                    followed_by_non_null,
                     ..
                 }) = nodes.last_mut()
                 {
                     *paren_comment_end = Some(non_null.span.end);
+                    *followed_by_non_null = true;
                 }
             }
             nodes.push(ChainNode::non_null());

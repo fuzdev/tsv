@@ -5,10 +5,10 @@
 use crate::ast::internal;
 use crate::printer::{CommentVec, Printer, template_literal_has_newlines};
 use smallvec::smallvec;
-use tsv_lang::INDENT;
 use tsv_lang::comments_to_emit_in_range;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
+use tsv_lang::{INDENT, Span};
 
 /// Check if an expression is a nullish coalescing expression (`??`)
 ///
@@ -63,7 +63,118 @@ fn is_multiline_template_literal(expr: &internal::Expression<'_>) -> bool {
     matches!(expr, internal::Expression::TemplateLiteral(t) if template_literal_has_newlines(t))
 }
 
+/// Prettier's `shouldExtraIndentForConditionalExpression` (`print/ternary.js`), asked
+/// top-down instead of bottom-up.
+///
+/// Prettier walks **up** from a ternary through the wrappers that keep it on the left
+/// spine — a member object, a call/`new` callee, a chain element, a non-null `!`, an
+/// instantiation — stepping once past a binary cast (`as` / `satisfies`), and asks
+/// whether it lands on one of a fixed set of value positions (`ancestorNameMap`:
+/// assignment RHS, declarator init, `return`/`throw`/`await`/`yield`/unary argument).
+/// tsv builds top-down and has no ancestor path, so the same question is asked by
+/// walking **down** from the value and stripping the same wrappers.
+///
+/// Returns the ternary's span when its enclosing parens should **expand**
+/// (`(⏎\tcond ? a : b⏎) as T`) rather than hang (`(cond⏎\t? a⏎\t: b) as T`).
+///
+/// `None` when the value **is** the ternary — prettier's `child === node` guard. That
+/// guard is not an edge case to smooth over: it is exactly why a bare
+/// `!(cond ? a : b)` keeps the hanging form in both formatters, while
+/// `!((cond ? a : b) as T)` expands.
+fn extra_indent_ternary_span(value: &internal::Expression<'_>) -> Option<Span> {
+    let (span, stepped) = spine_ternary(value)?;
+    stepped.then_some(span)
+}
+
+/// The ternary at the bottom of `expr`'s left-spine, plus whether reaching it took at
+/// least one step. Shared by [`extra_indent_ternary_span`] (which requires a step) and
+/// the chain-base query (which does not — a *sealed* base like `(c ? a : b)!` holds the
+/// wrapper inside its own parens, so the ternary is already one step down when the base
+/// is handed over).
+fn spine_ternary(expr: &internal::Expression<'_>) -> Option<(Span, bool)> {
+    let mut child = expr;
+    let mut stepped = false;
+    loop {
+        let next = match child {
+            internal::Expression::ConditionalExpression(cond) => {
+                return Some((cond.span, stepped));
+            }
+            internal::Expression::MemberExpression(m) => m.object,
+            internal::Expression::CallExpression(c) => c.callee,
+            internal::Expression::NewExpression(n) => n.callee,
+            internal::Expression::TSNonNullExpression(n) => n.expression,
+            internal::Expression::TSAsExpression(a) => a.expression,
+            internal::Expression::TSSatisfiesExpression(s) => s.expression,
+            internal::Expression::TSInstantiationExpression(i) => i.expression,
+            _ => return None,
+        };
+        stepped = true;
+        child = next;
+    }
+}
+
+/// What a chain base's left-spine ternary wants from the parens around it — see
+/// [`Printer::chain_base_ternary`].
+#[derive(Clone, Copy)]
+pub(in crate::printer) struct ChainBaseTernary {
+    /// The parens expand onto their own lines (`(⏎\tc ? a : b⏎).prop`).
+    pub expands: bool,
+    /// The base IS the ternary, so the member is its direct parent.
+    pub direct: bool,
+}
+
 impl<'a> Printer<'a> {
+    /// Record whether a ternary reached through `value`'s wrapper spine should take the
+    /// expanded-paren layout — call from the value positions in prettier's
+    /// `ancestorNameMap` (see [`extra_indent_ternary_span`]).
+    ///
+    /// Keyed by span and **not** consumed, like the sibling paren targets
+    /// (`expr_stmt_paren_target`): a chain that rebuilds its base across
+    /// conditional-group variants must answer the same way every time, and a
+    /// same-shaped ternary nested deeper (a call argument, an array element) never
+    /// matches the recorded span, so it keeps the hanging form prettier gives it.
+    pub(in crate::printer) fn mark_ternary_extra_indent(&self, value: &internal::Expression<'_>) {
+        self.ternary_hang_target
+            .set(extra_indent_ternary_span(value));
+    }
+
+    /// Does `expr` need the expanded-paren layout its parent is about to wrap it in?
+    ///
+    /// Asked at each site that supplies a ternary's parens (a binary cast's operand, a
+    /// non-null assertion's operand), against the span
+    /// [`Self::mark_ternary_extra_indent`] recorded.
+    pub(in crate::printer) fn ternary_takes_extra_indent(
+        &self,
+        expr: &internal::Expression<'_>,
+    ) -> bool {
+        matches!(expr, internal::Expression::ConditionalExpression(cond)
+            if self.ternary_hang_target.get() == Some(cond.span))
+    }
+
+    /// The chain-base form of [`Self::ternary_takes_extra_indent`]: does this base's
+    /// left-spine bottom out in a ternary, and if so is it the marked one?
+    ///
+    /// A ternary base that must NOT expand is the answer the plain query cannot give,
+    /// because a chain base may arrive already wrapped: a sealed `(c ? a : b)!` base
+    /// keeps the `!` inside its own parens, so the base node is the non-null, not the
+    /// ternary.
+    ///
+    /// `direct` reports whether the base IS the ternary, which decides the non-expanding
+    /// shape: prettier's `breakClosingParen` fires on a **member** parent, so a direct
+    /// ternary base drops its `)` to its own line (`(c⏎\t? a⏎\t: b⏎).prop`) while a
+    /// wrapped one keeps the `)` welded to the last arm (`(c⏎\t? a⏎\t: b)!.prop`) — there
+    /// the ternary's parent is the `!`, not the member.
+    pub(in crate::printer) fn chain_base_ternary(
+        &self,
+        expr: &internal::Expression<'_>,
+    ) -> Option<ChainBaseTernary> {
+        let (span, stepped) = spine_ternary(expr)?;
+        Some(ChainBaseTernary {
+            expands: self.ternary_hang_target.get() == Some(span),
+            direct: !stepped,
+        })
+    }
+
     /// Wrap a ternary consequent/alternate doc in clarity parens when its `expr`
     /// needs them. The single seam both layouts (inline + line-comment) route
     /// through, so a branch can't get parenthesized in one and bare in the other.

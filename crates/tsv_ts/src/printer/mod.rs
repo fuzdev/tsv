@@ -233,6 +233,14 @@ pub struct Printer<'a> {
     /// rebuilding its base across conditional-group variants wraps consistently; cleared
     /// once per statement in `build_expression_statement`.
     pub(crate) expr_stmt_paren_target: Cell<Option<Span>>,
+    /// Span of a ternary whose enclosing parens must **expand** onto their own lines
+    /// (`(⏎\tcond ? a : b⏎) as T`) instead of hanging — prettier's
+    /// `shouldExtraIndentForConditionalExpression`. Recorded by
+    /// `Printer::mark_ternary_extra_indent` at the value positions prettier's
+    /// `ancestorNameMap` lists, and read where the parens are supplied (a binary cast's
+    /// operand, a non-null assertion's operand). Keyed by span and not consumed, like
+    /// the two targets above.
+    pub(crate) ternary_hang_target: Cell<Option<Span>>,
     /// The parent context for a curried arrow-chain value, set by the enclosing
     /// printer (assignment chokepoint, call-argument printer, binary-operand
     /// printer) just before the chain is built. The arrow printer reads and
@@ -337,6 +345,7 @@ impl<'a> Printer<'a> {
             test_call_flat_params: Cell::new(false),
             arrow_body_object_parens_target: Cell::new(None),
             expr_stmt_paren_target: Cell::new(None),
+            ternary_hang_target: Cell::new(None),
             arrow_chain_context: Cell::new(ArrowChainContext::None),
             in_for_init: Cell::new(false),
             chain_arg_share_active: Cell::new(false),

@@ -1,0 +1,1208 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1219,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A call argument is not one of the value positions that expand the parens:",
+			"start": 20,
+			"end": 96,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the `?`/`:` arms hang under the `(` instead",
+			"start": 98,
+			"end": 144,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " An array element hangs the same way",
+			"start": 270,
+			"end": 308,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A property value hangs the same way",
+			"start": 440,
+			"end": 478,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 1
+				},
+				"end": {
+					"line": 17,
+					"column": 39
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A non-null assertion in a call argument hangs too",
+			"start": 615,
+			"end": 667,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 53
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Member base in a call argument: arms hang, and the `)` drops to its own line",
+			"start": 787,
+			"end": 866,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 1
+				},
+				"end": {
+					"line": 31,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " With a non-null between base and member the `)` stays welded to the last arm",
+			"start": 1007,
+			"end": 1086,
+			"loc": {
+				"start": {
+					"line": 39,
+					"column": 1
+				},
+				"end": {
+					"line": 39,
+					"column": 80
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1218,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1209,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 45,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 146,
+					"end": 267,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 146,
+						"end": 266,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 8,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 146,
+							"end": 150,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 5
+								}
+							},
+							"name": "fnnn"
+						},
+						"arguments": [
+							{
+								"type": "TSAsExpression",
+								"start": 154,
+								"end": 263,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 7,
+										"column": 43
+									}
+								},
+								"expression": {
+									"type": "ConditionalExpression",
+									"start": 155,
+									"end": 255,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 3
+										},
+										"end": {
+											"line": 7,
+											"column": 35
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 155,
+										"end": 183,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 3
+											},
+											"end": {
+												"line": 5,
+												"column": 31
+											}
+										},
+										"name": "cccccccccccccccccccccccccccc"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 189,
+										"end": 219,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 5
+											},
+											"end": {
+												"line": 6,
+												"column": 35
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 225,
+										"end": 255,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 5
+											},
+											"end": {
+												"line": 7,
+												"column": 35
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 260,
+									"end": 263,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 40
+										},
+										"end": {
+											"line": 7,
+											"column": 43
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 260,
+										"end": 263,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 40
+											},
+											"end": {
+												"line": 7,
+												"column": 43
+											}
+										},
+										"name": "Foo"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A call argument is not one of the value positions that expand the parens:",
+							"start": 20,
+							"end": 96
+						},
+						{
+							"type": "Line",
+							"value": " the `?`/`:` arms hang under the `(` instead",
+							"start": 98,
+							"end": 144
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 310,
+					"end": 437,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 316,
+							"end": 436,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 316,
+								"end": 317,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "ArrayExpression",
+								"start": 320,
+								"end": 436,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 11
+									},
+									"end": {
+										"line": 15,
+										"column": 2
+									}
+								},
+								"elements": [
+									{
+										"type": "TSAsExpression",
+										"start": 324,
+										"end": 433,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 14,
+												"column": 43
+											}
+										},
+										"expression": {
+											"type": "ConditionalExpression",
+											"start": 325,
+											"end": 425,
+											"loc": {
+												"start": {
+													"line": 12,
+													"column": 3
+												},
+												"end": {
+													"line": 14,
+													"column": 35
+												}
+											},
+											"test": {
+												"type": "Identifier",
+												"start": 325,
+												"end": 353,
+												"loc": {
+													"start": {
+														"line": 12,
+														"column": 3
+													},
+													"end": {
+														"line": 12,
+														"column": 31
+													}
+												},
+												"name": "cccccccccccccccccccccccccccc"
+											},
+											"consequent": {
+												"type": "Identifier",
+												"start": 359,
+												"end": 389,
+												"loc": {
+													"start": {
+														"line": 13,
+														"column": 5
+													},
+													"end": {
+														"line": 13,
+														"column": 35
+													}
+												},
+												"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+											},
+											"alternate": {
+												"type": "Identifier",
+												"start": 395,
+												"end": 425,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 5
+													},
+													"end": {
+														"line": 14,
+														"column": 35
+													}
+												},
+												"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+											}
+										},
+										"typeAnnotation": {
+											"type": "TSTypeReference",
+											"start": 430,
+											"end": 433,
+											"loc": {
+												"start": {
+													"line": 14,
+													"column": 40
+												},
+												"end": {
+													"line": 14,
+													"column": 43
+												}
+											},
+											"typeName": {
+												"type": "Identifier",
+												"start": 430,
+												"end": 433,
+												"loc": {
+													"start": {
+														"line": 14,
+														"column": 40
+													},
+													"end": {
+														"line": 14,
+														"column": 43
+													}
+												},
+												"name": "Foo"
+											}
+										}
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " An array element hangs the same way",
+							"start": 270,
+							"end": 308
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 480,
+					"end": 612,
+					"loc": {
+						"start": {
+							"line": 18,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 486,
+							"end": 611,
+							"loc": {
+								"start": {
+									"line": 18,
+									"column": 7
+								},
+								"end": {
+									"line": 22,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 486,
+								"end": 487,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 7
+									},
+									"end": {
+										"line": 18,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 490,
+								"end": 611,
+								"loc": {
+									"start": {
+										"line": 18,
+										"column": 11
+									},
+									"end": {
+										"line": 22,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 494,
+										"end": 608,
+										"loc": {
+											"start": {
+												"line": 19,
+												"column": 2
+											},
+											"end": {
+												"line": 21,
+												"column": 43
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 494,
+											"end": 497,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 2
+												},
+												"end": {
+													"line": 19,
+													"column": 5
+												}
+											},
+											"name": "kkk"
+										},
+										"value": {
+											"type": "TSAsExpression",
+											"start": 499,
+											"end": 608,
+											"loc": {
+												"start": {
+													"line": 19,
+													"column": 7
+												},
+												"end": {
+													"line": 21,
+													"column": 43
+												}
+											},
+											"expression": {
+												"type": "ConditionalExpression",
+												"start": 500,
+												"end": 600,
+												"loc": {
+													"start": {
+														"line": 19,
+														"column": 8
+													},
+													"end": {
+														"line": 21,
+														"column": 35
+													}
+												},
+												"test": {
+													"type": "Identifier",
+													"start": 500,
+													"end": 528,
+													"loc": {
+														"start": {
+															"line": 19,
+															"column": 8
+														},
+														"end": {
+															"line": 19,
+															"column": 36
+														}
+													},
+													"name": "cccccccccccccccccccccccccccc"
+												},
+												"consequent": {
+													"type": "Identifier",
+													"start": 534,
+													"end": 564,
+													"loc": {
+														"start": {
+															"line": 20,
+															"column": 5
+														},
+														"end": {
+															"line": 20,
+															"column": 35
+														}
+													},
+													"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+												},
+												"alternate": {
+													"type": "Identifier",
+													"start": 570,
+													"end": 600,
+													"loc": {
+														"start": {
+															"line": 21,
+															"column": 5
+														},
+														"end": {
+															"line": 21,
+															"column": 35
+														}
+													},
+													"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+												}
+											},
+											"typeAnnotation": {
+												"type": "TSTypeReference",
+												"start": 605,
+												"end": 608,
+												"loc": {
+													"start": {
+														"line": 21,
+														"column": 40
+													},
+													"end": {
+														"line": 21,
+														"column": 43
+													}
+												},
+												"typeName": {
+													"type": "Identifier",
+													"start": 605,
+													"end": 608,
+													"loc": {
+														"start": {
+															"line": 21,
+															"column": 40
+														},
+														"end": {
+															"line": 21,
+															"column": 43
+														}
+													},
+													"name": "Foo"
+												}
+											}
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A property value hangs the same way",
+							"start": 440,
+							"end": 478
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 669,
+					"end": 784,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 29,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 669,
+						"end": 783,
+						"loc": {
+							"start": {
+								"line": 25,
+								"column": 1
+							},
+							"end": {
+								"line": 29,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 669,
+							"end": 673,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 1
+								},
+								"end": {
+									"line": 25,
+									"column": 5
+								}
+							},
+							"name": "fnnn"
+						},
+						"arguments": [
+							{
+								"type": "TSNonNullExpression",
+								"start": 677,
+								"end": 780,
+								"loc": {
+									"start": {
+										"line": 26,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 37
+									}
+								},
+								"expression": {
+									"type": "ConditionalExpression",
+									"start": 678,
+									"end": 778,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 3
+										},
+										"end": {
+											"line": 28,
+											"column": 35
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 678,
+										"end": 706,
+										"loc": {
+											"start": {
+												"line": 26,
+												"column": 3
+											},
+											"end": {
+												"line": 26,
+												"column": 31
+											}
+										},
+										"name": "cccccccccccccccccccccccccccc"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 712,
+										"end": 742,
+										"loc": {
+											"start": {
+												"line": 27,
+												"column": 5
+											},
+											"end": {
+												"line": 27,
+												"column": 35
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 748,
+										"end": 778,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 5
+											},
+											"end": {
+												"line": 28,
+												"column": 35
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								}
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A non-null assertion in a call argument hangs too",
+							"start": 615,
+							"end": 667
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 868,
+					"end": 1004,
+					"loc": {
+						"start": {
+							"line": 32,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 868,
+						"end": 1003,
+						"loc": {
+							"start": {
+								"line": 32,
+								"column": 1
+							},
+							"end": {
+								"line": 37,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 868,
+							"end": 872,
+							"loc": {
+								"start": {
+									"line": 32,
+									"column": 1
+								},
+								"end": {
+									"line": 32,
+									"column": 5
+								}
+							},
+							"name": "fnnn"
+						},
+						"arguments": [
+							{
+								"type": "MemberExpression",
+								"start": 876,
+								"end": 1000,
+								"loc": {
+									"start": {
+										"line": 33,
+										"column": 2
+									},
+									"end": {
+										"line": 36,
+										"column": 8
+									}
+								},
+								"object": {
+									"type": "ConditionalExpression",
+									"start": 877,
+									"end": 991,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 3
+										},
+										"end": {
+											"line": 35,
+											"column": 39
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 877,
+										"end": 911,
+										"loc": {
+											"start": {
+												"line": 33,
+												"column": 3
+											},
+											"end": {
+												"line": 33,
+												"column": 37
+											}
+										},
+										"name": "cccccccccccccccccccccccccccccccccc"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 917,
+										"end": 951,
+										"loc": {
+											"start": {
+												"line": 34,
+												"column": 5
+											},
+											"end": {
+												"line": 34,
+												"column": 39
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 957,
+										"end": 991,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 5
+											},
+											"end": {
+												"line": 35,
+												"column": 39
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 996,
+									"end": 1000,
+									"loc": {
+										"start": {
+											"line": 36,
+											"column": 4
+										},
+										"end": {
+											"line": 36,
+											"column": 8
+										}
+									},
+									"name": "prop"
+								},
+								"computed": false,
+								"optional": false
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Member base in a call argument: arms hang, and the `)` drops to its own line",
+							"start": 787,
+							"end": 866
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 1088,
+					"end": 1208,
+					"loc": {
+						"start": {
+							"line": 40,
+							"column": 1
+						},
+						"end": {
+							"line": 44,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 1088,
+						"end": 1207,
+						"loc": {
+							"start": {
+								"line": 40,
+								"column": 1
+							},
+							"end": {
+								"line": 44,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 1088,
+							"end": 1092,
+							"loc": {
+								"start": {
+									"line": 40,
+									"column": 1
+								},
+								"end": {
+									"line": 40,
+									"column": 5
+								}
+							},
+							"name": "fnnn"
+						},
+						"arguments": [
+							{
+								"type": "MemberExpression",
+								"start": 1096,
+								"end": 1204,
+								"loc": {
+									"start": {
+										"line": 41,
+										"column": 2
+									},
+									"end": {
+										"line": 43,
+										"column": 42
+									}
+								},
+								"object": {
+									"type": "TSNonNullExpression",
+									"start": 1096,
+									"end": 1199,
+									"loc": {
+										"start": {
+											"line": 41,
+											"column": 2
+										},
+										"end": {
+											"line": 43,
+											"column": 37
+										}
+									},
+									"expression": {
+										"type": "ConditionalExpression",
+										"start": 1097,
+										"end": 1197,
+										"loc": {
+											"start": {
+												"line": 41,
+												"column": 3
+											},
+											"end": {
+												"line": 43,
+												"column": 35
+											}
+										},
+										"test": {
+											"type": "Identifier",
+											"start": 1097,
+											"end": 1125,
+											"loc": {
+												"start": {
+													"line": 41,
+													"column": 3
+												},
+												"end": {
+													"line": 41,
+													"column": 31
+												}
+											},
+											"name": "cccccccccccccccccccccccccccc"
+										},
+										"consequent": {
+											"type": "Identifier",
+											"start": 1131,
+											"end": 1161,
+											"loc": {
+												"start": {
+													"line": 42,
+													"column": 5
+												},
+												"end": {
+													"line": 42,
+													"column": 35
+												}
+											},
+											"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										},
+										"alternate": {
+											"type": "Identifier",
+											"start": 1167,
+											"end": 1197,
+											"loc": {
+												"start": {
+													"line": 43,
+													"column": 5
+												},
+												"end": {
+													"line": 43,
+													"column": 35
+												}
+											},
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1200,
+									"end": 1204,
+									"loc": {
+										"start": {
+											"line": 43,
+											"column": 38
+										},
+										"end": {
+											"line": 43,
+											"column": 42
+										}
+									},
+									"name": "prop"
+								},
+								"computed": false,
+								"optional": false
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " With a non-null between base and member the `)` stays welded to the last arm",
+							"start": 1007,
+							"end": 1086
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

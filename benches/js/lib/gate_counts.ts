@@ -195,10 +195,20 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	svelte: 7,
-	// 114 held across the test-call params change by coincidence, not stasis: two files
-	// entered from `partial` exactly as earlier drift had taken two out — see the note on
-	// `CORPUS_FORMAT_PARTIAL_PIN`.
-	typescript: 114,
+	// 109 records a drop of five from 114, in two steps, each verified by diffing the
+	// `unknown` lists before and after rather than by the count alone:
+	//   -2  a binary operand of an `as`/`satisfies` cast takes prettier's continuation
+	//       indent — clears `typescript/as/assignment2.ts` and
+	//       `typescript/satisfies-operators/assignment.ts`, the two mirror files.
+	//   -3  a ternary operand reached from one of prettier's `ancestorNameMap` value
+	//       positions expands its parens — clears `typescript/as/ternary.ts`,
+	//       `typescript/satisfies-operators/ternary.ts` and `typescript/ternaries/indent.ts`.
+	// Neither step added an unknown. `js/ternaries/indent-after-paren.js` stays unknown for
+	// an unrelated pre-existing reason (a parenthesized ternary CALLEE takes the flat-paren
+	// bare-callee path in `call_formatting.rs`, not the chain base), but shrank from
+	// 107/126 differing lines to 61/92; its `diff_summary` names a representative hunk, not
+	// a total, so that string growing is not the file getting worse.
+	typescript: 109,
 	css: 23
 };
 
