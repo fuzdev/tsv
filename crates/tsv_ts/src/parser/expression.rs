@@ -360,8 +360,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///
     /// Used in for-loop headers to distinguish `for (x in y)` from expressions.
     /// The `in` keyword is recognized as the for-in separator, not as a binary operator.
+    ///
+    /// Opening the `[~In]` region also pins `no_in_depth` to the CURRENT grouping
+    /// depth, which is the baseline the gate in `parse_expression_bp` measures
+    /// against. The depth a header starts at is not zero in general — the loop may
+    /// sit anywhere inside an enclosing expression's delimiters
+    /// (`fn(function () { for (k in o) {} })`, an object-literal method, an array
+    /// element, a template hole) — and only a grouping opened *inside* the header
+    /// restores `[+In]`.
     pub(super) fn parse_expression_no_in(&mut self) -> Result<Expression<'arena>, ParseError> {
-        self.with_context_flag(|p| &mut p.allow_in, false, Self::parse_expression)
+        let saved_depth = std::mem::replace(&mut self.no_in_depth, self.grouping_depth);
+        let result = self.with_context_flag(|p| &mut p.allow_in, false, Self::parse_expression);
+        // Every delimiter the header opened is closed again by the time it ends, so
+        // the gate's `==` can never be reached from below. The `enter_grouping` /
+        // `exit_grouping` pairs are hand-balanced across several early returns, and
+        // an unbalanced one would not error here — it would silently re-read a later
+        // `in` as the binary operator. (Not asserted on the error path: those
+        // propagate straight out of the parse without unwinding the depth.)
+        debug_assert!(
+            result.is_err() || self.grouping_depth == self.no_in_depth,
+            "grouping delimiters must balance across a for-header init"
+        );
+        self.no_in_depth = saved_depth;
+        result
     }
 
     /// Run `f` with the `[In]` grammar parameter forced to `[+In]` (`allow_in =
@@ -409,6 +430,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `as` is the Svelte `#each … as pattern` binding separator when type assertions
         // are disabled and we're outside grouping — leave it for the `#each` parser.
         // Inside grouping (`(x as T)`) it is always a type assertion.
+        //
+        // The literal `0` here is the baseline, and it differs from the `in` gate's
+        // (`no_in_depth`) on purpose: this region opens at the PARSE ROOT — a partial
+        // parse builds a fresh `Parser`, so `grouping_depth` starts at 0 and every
+        // delimiter counted is one the `#each` expression itself opened. The `[~In]`
+        // region opens MID-parse instead, at whatever depth the enclosing expression
+        // had reached, so it must carry its own baseline. Same field, two questions.
         if !self.allow_ts_type_assertions && self.grouping_depth == 0 {
             return Ok(false);
         }
@@ -493,8 +521,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             };
 
             // Skip `in` operator when allow_in is false (parsing for-loop headers),
-            // unless inside grouping delimiters where `in` is always a binary operator
-            if matches!(operator, BinaryOperator::In) && !self.allow_in && self.grouping_depth == 0
+            // unless a grouping delimiter opened SINCE the header began — inside one
+            // `in` is always a binary operator. The baseline is `no_in_depth`, not 0:
+            // the header itself may be nested in an outer expression's delimiters,
+            // whose depth says nothing about this header.
+            if matches!(operator, BinaryOperator::In)
+                && !self.allow_in
+                && self.grouping_depth == self.no_in_depth
             {
                 break;
             }
@@ -824,7 +857,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_call_arguments(
         &mut self,
     ) -> Result<(bumpalo::collections::Vec<'arena, Expression<'arena>>, usize), ParseError> {
-        self.grouping_depth += 1;
+        self.enter_grouping();
         let mut arguments = self.bvec();
 
         if !self.check(&TokenKind::ParenClose) {
@@ -842,7 +875,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let (_, paren_end) = self.current_pos();
         self.expect(&TokenKind::ParenClose)?;
-        self.grouping_depth -= 1;
+        self.exit_grouping();
         Ok((arguments, paren_end))
     }
 
@@ -1048,13 +1081,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         TokenKind::BracketOpen => {
                             // obj?.[expr] - optional computed access
                             self.advance()?; // consume '['
-                            self.grouping_depth += 1;
+                            self.enter_grouping();
 
                             let index = self.parse_expression_ref()?;
 
                             let (_, bracket_end) = self.current_pos();
                             self.expect(&TokenKind::BracketClose)?; // consume ']'
-                            self.grouping_depth -= 1;
+                            self.exit_grouping();
 
                             let span = Span::new(left.actual_start, bracket_end as u32);
                             left = ParsedExpr::with_start_end(
@@ -1130,13 +1163,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 TokenKind::BracketOpen => {
                     // Computed member access: arr[0]
                     self.advance()?; // consume '['
-                    self.grouping_depth += 1;
+                    self.enter_grouping();
 
                     let index = self.parse_expression_ref()?;
 
                     let (_, bracket_end) = self.current_pos();
                     self.expect(&TokenKind::BracketClose)?; // consume ']'
-                    self.grouping_depth -= 1;
+                    self.exit_grouping();
 
                     let span = Span::new(left.actual_start, bracket_end as u32);
                     left = ParsedExpr::with_start_end(
@@ -1650,13 +1683,13 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let cast_comment_idx = self.jsdoc_cast_comment_index(paren_start);
         self.expect(&TokenKind::ParenOpen)?; // consume '('
 
-        self.grouping_depth += 1;
+        self.enter_grouping();
         let parsed = self.parse_expression_bp(BP_COMMA)?;
 
         // Capture the end position of ')' before consuming it
         let (_, paren_end) = self.current_pos();
         self.expect(&TokenKind::ParenClose)?; // consume ')'
-        self.grouping_depth -= 1;
+        self.exit_grouping();
 
         // Grouping parens are normally discarded (the inner's own allocation flows
         // through, paren-free like acorn/Svelte). Two positions preserve them as an
@@ -2473,7 +2506,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // The argument list is a grouping delimiter — `in` is always the binary
         // operator inside it, even within a for-header init (the args are
         // `AssignmentExpression[+In]`). Mirrors `parse_call_arguments`.
-        self.grouping_depth += 1;
+        self.enter_grouping();
 
         self.reject_import_call_spread()?;
 
@@ -2499,7 +2532,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Capture end position before consuming ')'
         let (_, paren_end) = self.current_pos();
         self.expect(&TokenKind::ParenClose)?;
-        self.grouping_depth -= 1;
+        self.exit_grouping();
 
         Ok(Expression::ImportExpression(ImportExpression {
             source,

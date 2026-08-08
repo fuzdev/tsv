@@ -126,7 +126,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     span: Span::new(elem_start as u32, elem_end as u32),
                 });
 
-                self.grouping_depth += 1;
+                self.enter_grouping();
 
                 // Parse expressions and remaining template parts
                 loop {
@@ -201,7 +201,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     }
                 }
 
-                self.grouping_depth -= 1;
+                self.exit_grouping();
 
                 let end = quasis.last().map_or(start as u32, |q| q.span.end);
 
