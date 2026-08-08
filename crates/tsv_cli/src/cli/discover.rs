@@ -4,7 +4,7 @@ use std::fs;
 use std::path::{Component, Path, PathBuf};
 use tsv_discover::{
     DirVerdict, classify_dir, prettierignore_outside_repo_warning, prettierignore_shadowed_warning,
-    should_format_file,
+    should_format_file, unsupported_extension_error,
 };
 use tsv_ignore::IgnoreStack;
 
@@ -87,15 +87,21 @@ pub struct Discovered {
 /// Expand files and directories into a sorted, deduplicated list of files to format.
 ///
 /// All root arguments are validated upfront: any that don't resolve to a file or
-/// directory fail the whole run before anything is formatted (`Err` carries one
-/// message per bad argument). Traversal errors below a valid root are non-fatal —
-/// collected in `Discovered::errors` while the rest of the tree continues.
+/// directory, and any **file** argument whose extension tsv doesn't format
+/// ([`unsupported_extension_error`]), fail the whole run before anything is
+/// formatted (`Err` carries one message per bad argument). Traversal errors below
+/// a valid root are non-fatal — collected in `Discovered::errors` while the rest
+/// of the tree continues.
 ///
-/// Explicit file arguments are always included regardless of extension *and*
-/// regardless of the ignore files (the caller named them, so the ignore files —
-/// which govern *discovery* — don't apply). Directories recurse with the
-/// extension filter. Symlinks inside directories are not followed (cycle safety)
-/// — pass them explicitly to format their targets.
+/// Explicit file arguments are always included regardless of the ignore files (the
+/// caller named them, so the ignore files — which govern *discovery* — don't
+/// apply), but **not** regardless of extension: the parser dispatch behind them
+/// has no unknown arm, so an unsupported extension is an argument error rather
+/// than a silent TypeScript parse. A **directory** argument is a scope, not a
+/// target, so the extension check doesn't apply to it — its contents are filtered
+/// by the walk. Directories recurse with the extension filter. Symlinks inside
+/// directories are not followed (cycle safety) — pass them explicitly to format
+/// their targets.
 ///
 /// # Ignore semantics (two regimes, keyed on `.git`)
 ///
@@ -176,13 +182,25 @@ pub fn discover_into(
     paths: &[String],
     sink: &mut dyn FileSink,
 ) -> Result<Diagnostics, Vec<String>> {
+    // Both argument errors fail the run upfront, all reported, nothing written: a
+    // path that resolves to neither a file nor a directory, and a **file** argument
+    // tsv doesn't format. The extension check applies only to file arguments — a
+    // directory is a scope, and its contents are filtered by the walk — and it is
+    // the one thing a file argument does *not* get to bypass (see
+    // `unsupported_extension_error`: the parser dispatch behind it has no unknown
+    // arm, so an unsupported extension would be parsed as TypeScript).
     let bad: Vec<String> = paths
         .iter()
-        .filter(|p| {
+        .filter_map(|p| {
             let path = Path::new(p.as_str());
-            !path.is_file() && !path.is_dir()
+            if path.is_dir() {
+                None
+            } else if path.is_file() {
+                unsupported_extension_error(p)
+            } else {
+                Some(format!("{p}: not a file or directory"))
+            }
         })
-        .map(|p| format!("{p}: not a file or directory"))
         .collect();
     if !bad.is_empty() {
         return Err(bad);
@@ -203,7 +221,8 @@ pub fn discover_into(
     for path_str in paths {
         let path = PathBuf::from(path_str);
         if path.is_file() {
-            // explicit file argument — bypasses the ignore files
+            // explicit file argument — bypasses the ignore files (not the
+            // extension check, which the validation above already applied)
             out.files.push(path);
         } else {
             collect_root(&path, &cwd, &mut out);
