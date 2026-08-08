@@ -177,6 +177,18 @@ impl IgnoreStack {
         tsv_discover::is_path_pruned(rel, &self.inner)
     }
 
+    /// The argument error for an explicitly named **file** whose extension tsv
+    /// doesn't format, delegating to `tsv_discover::unsupported_extension_error`.
+    /// Returns `undefined` (the JS view of `None`) when the extension is
+    /// formattable. A method (not a free function) so it rides the `IgnoreStack`
+    /// class re-export through the package facade; the receiver is unused — an
+    /// argument check runs before any matcher exists. Single source of truth with
+    /// the native CLI, including the rendered extension list, so `npm/cli.js`
+    /// never hand-mirrors `FORMATTABLE_EXTENSIONS`.
+    pub fn unsupported_extension_error(&self, path: &str) -> Option<String> {
+        tsv_discover::unsupported_extension_error(path)
+    }
+
     /// The heuristic-shadow warning text for a pruned directory `dir`
     /// (format-root relative), delegating to `tsv_discover::heuristic_shadow_warning`.
     /// A method (not a free function) so it rides the `IgnoreStack` class

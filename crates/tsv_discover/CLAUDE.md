@@ -50,7 +50,18 @@ crates (the open-convention stance):
 - `is_formattable(name)` — extension check over the JS/TS family
   (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`, all parsed as TypeScript), `.svelte`,
   and `.css` (matches `Path::extension`; a bare `.ts` dotfile is a stem, not
-  formattable). `.jsx`/`.tsx` are absent — JSX is out of scope.
+  formattable). `.jsx`/`.tsx` are absent — JSX is out of scope. Accepts a bare
+  name or a whole path.
+- `unsupported_extension_error(path) -> Option<String>` — the argument error for
+  an explicitly named **file** whose extension tsv doesn't format, `None`
+  otherwise. A file argument bypasses the *ignore files*, but never this: the
+  parser dispatch behind a path has no unknown arm (everything that isn't
+  `.svelte` or `.css` goes to the TypeScript parser), so an unsupported extension
+  would be parsed as TypeScript — usually a baffling syntax error, and for a
+  top-level-array `.json` a *successful* rewrite into invalid JSON. Prettier draws
+  the same line ("No parser could be inferred"). The extension list in the message
+  renders from `FORMATTABLE_EXTENSIONS`, so a new language flows through; the text
+  is produced once here, like `heuristic_shadow_warning`.
 - `is_safety_net(name)` — whether a directory name is an always-pruned safety net.
   A **complete, context-free** decision (safety nets prune in every mode, no
   override), so a caller walking its own tree can short-circuit before building an
@@ -120,7 +131,10 @@ crates (the open-convention stance):
 
 ## Consumers
 
-- **`tsv_cli`** (`cli/discover.rs`) — natively, in `collect_recursive`: matches
+- **`tsv_cli`** (`cli/discover.rs`) — in `discover_into`'s upfront argument
+  validation, `unsupported_extension_error` rejects a named file tsv doesn't
+  format (alongside the not-a-file-or-directory check, so the run fails before
+  anything is written); and in `collect_recursive`: matches
   `classify_dir`'s `DirVerdict` and pushes any `PruneWithWarning` text into the
   `Discovered::warnings` channel; uses `should_format_file` for the file branch;
   pushes any `prettierignore_shadowed_warning` per directory; and, at the target
@@ -131,6 +145,7 @@ crates (the open-convention stance):
   `classify_dir(name, child_rel, heuristic_active) -> string`
   (`"descend"|"prune"|"prune_warn"`), `should_format_file(name, child_rel) ->
   bool`, `is_path_pruned(rel) -> bool`, `heuristic_shadow_warning(dir) -> string`,
+  `unsupported_extension_error(path) -> string | undefined`,
   `prettierignore_outside_repo_warning(dir, in_repo, has_prettierignore,
   has_formatignore) -> string | undefined`, and the sibling
   `prettierignore_shadowed_warning(dir, in_repo, has_prettierignore,
@@ -139,7 +154,9 @@ crates (the open-convention stance):
   `patch_npm_package.ts` change and allocates no JS class on the common
   descend path; the `prune_warn` arm fetches the text via the separate method.
   `npm/cli.js` calls the per-directory `classify_dir` (it does a real walk) and
-  keeps no policy of its own.
+  the per-argument `unsupported_extension_error` (through a throwaway stack — the
+  receiver is unused, an argument check running before any matcher exists), and
+  keeps no policy of its own: the extension list never appears in JS.
 - **VS Code extension** (`vscode_extension_tsv_format`) — assembles an
   `IgnoreStack` per open document and calls `is_ignored(rel, false) ||
   is_path_pruned(rel)`. It has no directory walk, so `is_path_pruned` is its entry
@@ -155,3 +172,12 @@ pinned against real `git check-ignore` (`tsv_ignore`'s `git_oracle`), and the
 heuristic-shadow CLI tests cover the warning — so a regression fails a pinned
 test, it isn't merely hoped against. The unit tests here additionally cover each
 verdict branch in isolation.
+
+Single-sourcing the *decision* only bounds drift to the **call sites**, so those
+are pinned in the same table: a case carries either `expected` (the in-scope set)
+or `error` (a substring of an argument error that must fail the run upfront), which
+is what holds both CLIs to rejecting a named unsupported file *and* to leaving a
+directory argument alone. The per-surface tests beside it pin the *write*
+consequence the `--list`-based table can't see — that a rejected argument leaves
+its file byte-identical, and that a directory run still formats its supported
+files while skipping the rest.

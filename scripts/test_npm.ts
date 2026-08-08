@@ -821,6 +821,42 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.match(result.stderr, /not a file or directory/);
 	});
 
+	// An explicitly named file bypasses the ignore files but not the extension
+	// check — otherwise the parser dispatch (no unknown arm) hands a `.json` file
+	// to the TypeScript parser, which for a top-level-array JSON *succeeds* and
+	// rewrites it into a TS expression statement. Mirrors the native CLI, message
+	// and all, via `tsv_discover::unsupported_extension_error`.
+	it('format on an explicit file with an unsupported extension exits 2 and writes nothing', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			const json = join(dir, 'list.json');
+			writeFileSync(json, '[1,   2,    3]\n');
+			const result = run_cli(['format', json]);
+			assert.equal(result.status, 2);
+			assert.match(result.stderr, /unsupported file extension/);
+			assert.match(result.stderr, /\.svelte/);
+			assert.equal(readFileSync(json, 'utf-8'), '[1,   2,    3]\n');
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
+	// A directory argument is a scope, not a target: its contents are filtered by
+	// the walk, so an unsupported file there is skipped rather than failing the run.
+	it('format on a directory skips unsupported extensions instead of failing', () => {
+		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
+		try {
+			writeFileSync(join(dir, 'a.ts'), 'const   x=1');
+			writeFileSync(join(dir, 'data.json'), '[1,   2,    3]\n');
+			const result = run_cli(['format', dir]);
+			assert.equal(result.status, 0);
+			assert.equal(readFileSync(join(dir, 'a.ts'), 'utf-8'), 'const x = 1;\n');
+			assert.equal(readFileSync(join(dir, 'data.json'), 'utf-8'), '[1,   2,    3]\n');
+		} finally {
+			rmSync(dir, { recursive: true, force: true });
+		}
+	});
+
 	it('format --content combined with a path exits 2', () => {
 		const result = run_cli(['format', '--content', 'const x = 1;', '--parser', 'ts', 'a.ts']);
 		assert.equal(result.status, 2);
@@ -891,7 +927,11 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		}
 	});
 
-	it('format trusts an explicit file arg regardless of extension', () => {
+	// An explicit file arg is trusted past the *ignore files*, not past the
+	// extension check — the two reach the same "not formatted" answer by different
+	// routes: traversal filters the file out of scope, the explicit arg is an
+	// argument error.
+	it('format trusts an explicit file arg past the ignore files, not past the extension', () => {
 		const dir = mkdtempSync(join(tmpdir(), 'tsv-cli-test-'));
 		try {
 			writeFileSync(join(dir, 'a.txt'), 'const   x=1');
@@ -899,10 +939,18 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 			const traversed = run_cli(['format', dir]);
 			assert.equal(traversed.status, 2);
 			assert.match(traversed.stderr, /No files to format/);
-			// …but the explicit arg is formatted (extension default: typescript)
+			// …and naming it is an argument error, not a TypeScript parse
 			const explicit = run_cli(['format', join(dir, 'a.txt')]);
-			assert.equal(explicit.status, 0);
-			assert.equal(readFileSync(join(dir, 'a.txt'), 'utf-8'), 'const x = 1;\n');
+			assert.equal(explicit.status, 2);
+			assert.match(explicit.stderr, /unsupported file extension/);
+			assert.equal(readFileSync(join(dir, 'a.txt'), 'utf-8'), 'const   x=1');
+
+			// the ignore files, though, really are bypassed by an explicit arg
+			writeFileSync(join(dir, '.formatignore'), 'b.ts\n');
+			writeFileSync(join(dir, 'b.ts'), 'const   x=1');
+			const ignored = run_cli(['format', join(dir, 'b.ts')]);
+			assert.equal(ignored.status, 0);
+			assert.equal(readFileSync(join(dir, 'b.ts'), 'utf-8'), 'const x = 1;\n');
 		} finally {
 			rmSync(dir, { recursive: true, force: true });
 		}
@@ -1009,11 +1057,22 @@ describe(`discovery parity (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, (
 			try {
 				materialize(root, scenario.tree);
 				const prefix = `${root}/`;
-				for (const { target, expected } of scenario.cases) {
+				for (const { target, expected, error } of scenario.cases) {
 					const arg = target === '' ? root : join(root, target);
 					const result = spawnSync(process.execPath, [cli_path, 'format', '--list', arg], {
 						encoding: 'utf-8'
 					});
+					// A case carries either `expected` (the in-scope set) or `error` (a
+					// substring of the argument error that must fail the run upfront).
+					if (error !== undefined) {
+						assert.equal(result.status, 2, `${scenario.name} [target=${target}]: expected exit 2`);
+						assert.ok(
+							result.stderr.includes(error),
+							`${scenario.name} [target=${target}]: expected stderr to contain ${JSON.stringify(error)}, got ${JSON.stringify(result.stderr)}`
+						);
+						assert.equal(result.stdout.trim(), '', `${scenario.name} [target=${target}]`);
+						continue;
+					}
 					assert.equal(result.status, 0, `${scenario.name} [${target}]: ${result.stderr}`);
 					const actual = result.stdout
 						.split('\n')

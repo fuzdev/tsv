@@ -717,6 +717,82 @@ fn test_format_nonexistent_path() {
     assert!(String::from_utf8_lossy(&output.stderr).contains("tsv_cli_test_path"));
 }
 
+/// An explicitly named file bypasses the ignore files, but **not** the extension
+/// check: the parser dispatch behind a path has no unknown arm, so without this
+/// gate a `.json` file is parsed as TypeScript — usually a baffling syntax error,
+/// and for a top-level-array JSON a *successful* rewrite into a TS expression
+/// statement (semicolon and all), which is no longer valid JSON.
+#[test]
+fn test_format_explicit_file_rejects_unsupported_extension() {
+    let dir = temp_dir("unsupported_extension");
+    let json = dir.join("list.json");
+    // valid TS as well as valid JSON — the case that used to be silently rewritten
+    fs::write(&json, "[1,   2,    3]\n").unwrap();
+
+    let output = tsv(&["format", json.to_str().unwrap()]);
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(
+        stderr.contains("unsupported file extension"),
+        "stderr: {stderr}"
+    );
+    // the message names what tsv does format
+    assert!(stderr.contains(".svelte"), "stderr: {stderr}");
+    // untouched
+    assert_eq!(fs::read_to_string(&json).unwrap(), "[1,   2,    3]\n");
+}
+
+/// The extension check is an *argument* error, so it fails the run upfront with
+/// nothing written — the same contract as an unresolvable path — and every bad
+/// argument is reported in one pass.
+#[test]
+fn test_format_unsupported_extension_fails_run_upfront() {
+    let dir = temp_dir("unsupported_extension_upfront");
+    let ts = dir.join("a.ts");
+    fs::write(&ts, UNFORMATTED_TS).unwrap();
+    let notes = dir.join("notes.md");
+    fs::write(&notes, "# notes\n").unwrap();
+
+    let output = tsv(&[
+        "format",
+        ts.to_str().unwrap(),
+        notes.to_str().unwrap(),
+        "/nonexistent/tsv_cli_upfront",
+    ]);
+    assert_eq!(output.status.code(), Some(2));
+    let stderr = String::from_utf8_lossy(&output.stderr);
+    assert!(stderr.contains("notes.md"), "stderr: {stderr}");
+    assert!(
+        stderr.contains("not a file or directory"),
+        "stderr: {stderr}"
+    );
+    // the valid sibling argument is not formatted — the run failed before any write
+    assert_eq!(fs::read_to_string(&ts).unwrap(), UNFORMATTED_TS);
+}
+
+/// A **directory** argument is a scope, not a target, so the extension check
+/// doesn't apply to it — its contents are filtered by the walk, which skips the
+/// unsupported files rather than failing the run.
+#[test]
+fn test_format_directory_arg_skips_unsupported_extensions() {
+    let dir = temp_dir("unsupported_extension_in_dir");
+    fs::write(dir.join("a.ts"), UNFORMATTED_TS).unwrap();
+    fs::write(dir.join("data.json"), "[1,   2,    3]\n").unwrap();
+
+    let output = tsv(&["format", dir.to_str().unwrap()]);
+    assert_eq!(
+        output.status.code(),
+        Some(0),
+        "stderr: {}",
+        String::from_utf8_lossy(&output.stderr)
+    );
+    assert_eq!(fs::read_to_string(dir.join("a.ts")).unwrap(), FORMATTED_TS);
+    assert_eq!(
+        fs::read_to_string(dir.join("data.json")).unwrap(),
+        "[1,   2,    3]\n"
+    );
+}
+
 #[test]
 fn test_format_parser_flag_with_paths_errors() {
     let dir = temp_dir("parser_with_paths");

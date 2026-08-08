@@ -81,7 +81,8 @@ Format source code in place (near-Prettier output).
 Paths are formatted in place (written only when the output differs) and
 changed paths print to stdout; directories recurse over .ts/.svelte/.css,
 honoring .gitignore (hierarchically, in a git tree) plus hierarchical
-.formatignore / .prettierignore. An explicitly named file is always formatted.
+.formatignore / .prettierignore. An explicitly named file skips the ignore
+files, but its extension must still be one tsv formats.
 --content/--stdin print formatted source to stdout.
 
 Options:
@@ -563,12 +564,13 @@ function ancestor_chain(format_root, leaf) {
 /**
  * Expand files and directories into a sorted, deduplicated list of files to
  * format, mirroring the native `discover_files`: root args are validated
- * upfront (any bad one fails the run with exit 2), explicit files are always
- * included regardless of extension *and* regardless of the ignore files (the
- * caller named them), and directories recurse with the extension filter.
- * Symlinks inside directories are not followed. Traversal errors below a valid
- * root are non-fatal and returned for reporting. See `collect_root` for the
- * gitignore-aware ignore semantics.
+ * upfront (any bad one fails the run with exit 2 — one that resolves to neither
+ * a file nor a directory, or a *file* whose extension tsv doesn't format),
+ * explicit files are always included regardless of the ignore files (the caller
+ * named them) but not regardless of extension, and directories recurse with the
+ * extension filter. Symlinks inside directories are not followed. Traversal
+ * errors below a valid root are non-fatal and returned for reporting. See
+ * `collect_root` for the gitignore-aware ignore semantics.
  */
 function discover_files(paths) {
 	const stats = paths.map((path) => {
@@ -578,11 +580,21 @@ function discover_files(paths) {
 			return null;
 		}
 	});
-	const bad = paths.filter((_, i) => !stats[i]?.isFile() && !stats[i]?.isDirectory());
+	// Both argument errors, reported together. The extension check applies only to
+	// *file* args (a directory is a scope, filtered by the walk) and comes from
+	// `tsv_discover` via the WASM binding, message and all, so this never
+	// hand-mirrors the native extension list. The receiver is unused there, so a
+	// throwaway stack is the whole cost of reaching it.
+	const arg_policy = new IgnoreStack();
+	const bad = paths
+		.map((path, i) => {
+			if (stats[i]?.isDirectory()) return undefined;
+			if (stats[i]?.isFile()) return arg_policy.unsupported_extension_error(path);
+			return `${path}: not a file or directory`;
+		})
+		.filter((message) => message !== undefined);
 	if (bad.length > 0) {
-		for (const path of bad) {
-			eprint(`error: ${path}: not a file or directory\n`);
-		}
+		for (const message of bad) eprint(`error: ${message}\n`);
 		process.exit(2);
 	}
 
@@ -599,7 +611,9 @@ function discover_files(paths) {
 	const warnings = [];
 	for (let i = 0; i < paths.length; i++) {
 		if (stats[i].isFile()) {
-			files.push(paths[i]); // explicit file bypasses the ignore files
+			// explicit file bypasses the ignore files (not the extension check,
+			// which the validation above already applied)
+			files.push(paths[i]);
 		} else {
 			collect_root(paths[i], cwd, files, errors, warnings);
 		}

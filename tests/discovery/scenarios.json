@@ -1,5 +1,5 @@
 {
-	"_doc": "Shared discovery-parity scenarios, run against BOTH discovery walkers: the native `tsv_cli::cli::discover::discover_files` (tests/discovery_parity.rs) and the WASM `cli.js` (scripts/test_npm.ts). One source of truth so the two implementations can't drift. The matcher itself is checked against real `git check-ignore` by tsv_ignore's git_oracle; this table pins the WALK (repo-root detection, hierarchical layering, the build-output heuristic, explicit-arg bypass, the .git boundary). Each scenario materializes `tree` in a fresh tempdir (string value = file, null = empty directory; `.git`/`repo/.git` entries make a dir look like a repo root without a real git binary), then for every case runs `format --list <root>/<target>` and asserts the in-scope files, relative to the tempdir root, in exact sorted order. Names are ASCII so Rust's PathBuf order and cli.js's compare_paths agree (see cli.js compare_paths for the astral-plane/Windows caveat).",
+	"_doc": "Shared discovery-parity scenarios, run against BOTH discovery walkers: the native `tsv_cli::cli::discover::discover_files` (tests/discovery_parity.rs) and the WASM `cli.js` (scripts/test_npm.ts). One source of truth so the two implementations can't drift. The matcher itself is checked against real `git check-ignore` by tsv_ignore's git_oracle; this table pins the WALK (repo-root detection, hierarchical layering, the build-output heuristic, explicit-arg bypass, argument rejection, the .git boundary). Each scenario materializes `tree` in a fresh tempdir (string value = file, null = empty directory; `.git`/`repo/.git` entries make a dir look like a repo root without a real git binary), then for every case runs `format --list <root>/<target>`. A case carries EITHER `expected` — the in-scope files, relative to the tempdir root, in exact sorted order — OR `error`, a substring of the argument error that must fail the run upfront (exit 2, nothing listed). Names are ASCII so Rust's PathBuf order and cli.js's compare_paths agree (see cli.js compare_paths for the astral-plane/Windows caveat).",
 	"scenarios": [
 		{
 			"name": "respects_prettierignore",
@@ -122,6 +122,22 @@
 			"cases": [
 				{"target": "", "expected": ["keep.ts"]},
 				{"target": "skip.ts", "expected": ["skip.ts"]}
+			]
+		},
+		{
+			"name": "explicit_file_does_not_bypass_the_extension",
+			"note": "the other half of explicit_file_bypasses_ignore: a named FILE skips the ignore files but not the extension check, because the parser dispatch behind a path has no unknown arm (everything that isn't .svelte/.css goes to the TypeScript parser) — a named .json would be parsed as TS, and a top-level-array one silently rewritten into invalid JSON. A DIRECTORY arg is a scope rather than a target, so the same files inside it are simply filtered out by the walk",
+			"tree": {
+				".git/": null,
+				"src/app.ts": "x",
+				"src/data.json": "[1, 2, 3]",
+				"notes.md": "x"
+			},
+			"cases": [
+				{"target": "", "expected": ["src/app.ts"]},
+				{"target": "src", "expected": ["src/app.ts"]},
+				{"target": "src/data.json", "error": "unsupported file extension"},
+				{"target": "notes.md", "error": "unsupported file extension"}
 			]
 		},
 		{

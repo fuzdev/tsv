@@ -15,8 +15,10 @@
 //! Each scenario materializes its `tree` in a fresh tempdir (string = file,
 //! null = empty dir; a `.git` entry makes a dir look like a repo root without
 //! a real git binary), then for each case calls `discover_files` on
-//! `<root>/<target>` and compares the discovered files — relative to the
-//! tempdir root, `/`-joined — to `expected`.
+//! `<root>/<target>`. A case carries **either** `expected` — the discovered
+//! files, relative to the tempdir root and `/`-joined — **or** `error`, a
+//! substring of the argument error that must fail the run upfront with nothing
+//! discovered.
 
 // Test harness: unwrap/expect/panic on setup failure is the desired behavior.
 #![allow(clippy::unwrap_used, clippy::expect_used, clippy::panic)]
@@ -52,25 +54,27 @@ fn materialize(root: &Path, tree: &serde_json::Map<String, Value>) {
     }
 }
 
-/// Run one case: discover under `<root>/<target>` and return the in-scope files
-/// as root-relative, `/`-joined strings in discovery (sorted) order.
-fn discover_case(root: &Path, target: &str) -> Vec<String> {
+/// Run one case: discover under `<root>/<target>`. `Ok` carries the in-scope
+/// files as root-relative, `/`-joined strings in discovery (sorted) order; `Err`
+/// carries the **argument** errors that failed the run upfront (an unresolvable
+/// path, or a named file whose extension tsv doesn't format), which an `error`
+/// case asserts against.
+fn discover_case(root: &Path, target: &str) -> Result<Vec<String>, Vec<String>> {
     let arg = if target.is_empty() {
         root.to_path_buf()
     } else {
         root.join(target)
     };
-    let discovered = discover_files(&[arg.to_string_lossy().into_owned()])
-        .expect("scenario args always resolve to a real path");
+    let discovered = discover_files(&[arg.to_string_lossy().into_owned()])?;
     let prefix = format!("{}/", root.to_string_lossy());
-    discovered
+    Ok(discovered
         .files
         .iter()
         .map(|p| {
             let s = p.to_string_lossy();
             s.strip_prefix(&prefix).unwrap_or(&s).replace('\\', "/")
         })
-        .collect()
+        .collect())
 }
 
 fn expected_list(case: &Value) -> Vec<String> {
@@ -102,12 +106,32 @@ fn discovery_matches_shared_scenarios() {
 
         for case in scenario["cases"].as_array().unwrap() {
             let target = case["target"].as_str().unwrap();
-            let expected = expected_list(case);
             let actual = discover_case(&root, target);
-            if actual != expected {
-                failures.push(format!(
-                    "[{name}] target={target:?}\n     expected: {expected:?}\n     actual:   {actual:?}"
-                ));
+            // A case carries either `expected` (the in-scope set) or `error` (a
+            // substring of the argument error that must fail the run upfront).
+            match (case.get("error").and_then(Value::as_str), actual) {
+                (Some(needle), Err(errors)) => {
+                    if !errors.iter().any(|e| e.contains(needle)) {
+                        failures.push(format!(
+                            "[{name}] target={target:?}\n     expected error containing: {needle:?}\n     actual errors:            {errors:?}"
+                        ));
+                    }
+                }
+                (Some(needle), Ok(files)) => failures.push(format!(
+                    "[{name}] target={target:?}\n     expected error containing: {needle:?}\n     actual: discovered {files:?}"
+                )),
+                (None, Err(errors)) => failures.push(format!(
+                    "[{name}] target={target:?}\n     expected: {:?}\n     actual: run failed with {errors:?}",
+                    expected_list(case)
+                )),
+                (None, Ok(files)) => {
+                    let expected = expected_list(case);
+                    if files != expected {
+                        failures.push(format!(
+                            "[{name}] target={target:?}\n     expected: {expected:?}\n     actual:   {files:?}"
+                        ));
+                    }
+                }
             }
         }
         let _ = fs::remove_dir_all(&root);
