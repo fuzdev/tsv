@@ -82,12 +82,29 @@ fn try_decode_unicode_escape(source: &str, start: usize) -> Option<(char, usize)
             }
             end += 1;
         }
-        if end >= bytes.len() || end == content_start || end - content_start > 6 {
+        if end >= bytes.len() || end == content_start {
             return None;
         }
-        let hex = &source[content_start..end];
-        let code = u32::from_str_radix(hex, 16).ok()?;
-        let ch = char::from_u32(code)?;
+        // `CodePoint :: HexDigits but only if MV of HexDigits ≤ 0x10FFFF` caps the
+        // VALUE, not the digit count — leading zeros are unbounded, so
+        // `\u{0000000000000061}` is a valid `a`. Accumulate in `u64` and stop once
+        // past the cap: an arbitrarily long escape then can't overflow, while the
+        // check below still reads it as out of range. `u32::from_str_radix` over the
+        // whole run cannot do this — it overflows to `None` at 9 digits, so dropping
+        // the digit-count test alone would have moved the over-rejection, not fixed
+        // it. Mirrors the string-literal path in `lexer/escapes.rs`.
+        let mut code: u64 = 0;
+        for &b in &bytes[content_start..end] {
+            if code <= 0x10FFFF {
+                code = code * 16 + u64::from((b as char).to_digit(16)?);
+            }
+        }
+        if code > 0x10FFFF {
+            return None;
+        }
+        // Unlike the string path, a lone surrogate is NOT substituted here: it is not
+        // an identifier character, so `None` (reject) is what acorn does too.
+        let ch = char::from_u32(code as u32)?;
         Some((ch, end + 1 - start)) // +1 for closing brace
     } else {
         // 4-digit format: \uXXXX

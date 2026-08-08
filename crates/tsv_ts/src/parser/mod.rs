@@ -721,6 +721,33 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
+    /// Whether the current token can head a **heritage** element (`interface A
+    /// extends X`, `class C implements X`) — the `IdentifierReference` at the head
+    /// of that clause's `TypeName`.
+    ///
+    /// Deliberately NOT [`Parser::at_binding_name`], which is one word narrower.
+    /// `let` is not a `ReservedWord`; the bar on it as a name is a strict-mode early
+    /// error, which tsv defers, and every oracle waives it here — acorn, prettier and
+    /// tsc all accept `interface A extends let {}`. tsv already reads `let` as an
+    /// ordinary type name everywhere else (`let x: let`, `type T = let.Foo`,
+    /// `typeof let`); heritage was the one site that disagreed.
+    ///
+    /// ⚠️ This is the ONE head that goes wider, so don't propagate it. The other
+    /// `IdentifierReference` head tsv guards — an import-equals module reference —
+    /// keeps `at_binding_name`, because acorn *does* enforce the reserved-word rule
+    /// there (`import x = let.y` is "The keyword 'let' is reserved").
+    ///
+    /// `yield` and `await` stay out, and that is the same rule, not an exception:
+    /// both ARE `ReservedWord`s, readmitted only by the `[~Yield]` / `[~Await]`
+    /// productions. tsv is strict-only, so `yield` never qualifies, and `await`
+    /// qualifies exactly when [`Parser::await_is_identifier`] says so (Script goal).
+    /// prettier accepts both — that leniency is not followed, see the
+    /// `types/interfaces/heritage_reserved_keyword_svelte_divergence` README.
+    pub(super) fn at_heritage_name(&self) -> bool {
+        matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Let))
+            || self.at_binding_name()
+    }
+
     pub(super) fn try_binding_name(&self) -> Option<IdentName<'arena>> {
         match self.current_kind() {
             TokenKind::Identifier => Some(self.current_ident_name()),

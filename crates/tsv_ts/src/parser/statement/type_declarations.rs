@@ -166,11 +166,23 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         loop {
             let start = self.current_pos().0;
 
-            if !matches!(self.current_kind(), TokenKind::Identifier) {
-                return Err(self.error_expected("interface name in extends clause"));
+            // A heritage element is a type REFERENCE, whose head is an
+            // `IdentifierReference` — so a contextual type keyword is an ordinary
+            // name here (`interface A extends number {}`, `class C implements string {}`),
+            // and primitive-ness is the checker's business, not the parser's. A bare
+            // `TokenKind::Identifier` test saw only the words the lexer never made a
+            // `Keyword`, rejecting every predefined-type name.
+            //
+            // The reserved words stay out: prettier states the same rule outright
+            // ("can only extend an identifier/qualified name with optional type
+            // arguments") and refuses `null` / `true` / `this`, and tsc rejects `void`
+            // at parse (TS1109) — see the `heritage_reserved_keyword_svelte_divergence`
+            // sibling, which pins the `void` line against acorn, who accepts all four.
+            if !self.at_heritage_name() {
+                return Err(self.error_expected("a type name in the heritage clause"));
             }
 
-            let expression = self.parse_entity_name()?;
+            let expression = self.parse_type_entity_name()?;
 
             // Check for type arguments
             let type_arguments = self.parse_optional_type_arguments()?;
@@ -326,13 +338,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Consume 'function' keyword
         self.advance()?;
 
-        // Parse function name
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
+        // Parse function name. The shared `BindingIdentifier` channel, so an ambient
+        // declaration takes the same names the concrete `function string() {}` form
+        // already does — a bare `TokenKind::Identifier` test sees only the words the
+        // lexer never made a `Keyword`, which is why `declare function get()` worked
+        // while `declare function string()` did not.
+        let Some(name) = self.try_function_name() else {
             return Err(self.error_expected("function name"));
-        }
+        };
 
         let (id_start, id_end) = self.current_pos();
-        let name = self.current_ident_name();
         self.advance()?;
 
         let id = Identifier::simple(name, Span::new(id_start as u32, id_end as u32));

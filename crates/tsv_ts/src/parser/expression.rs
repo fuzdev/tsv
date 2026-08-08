@@ -2272,12 +2272,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             match self.current_kind() {
                 TokenKind::Dot => {
                     self.advance()?; // consume '.'
-                    // Keywords are valid property names: new Foo.class()
-                    if !self.current_is_identifier_or_keyword() {
-                        return Err(self.error_expected_after("property name", "."));
-                    }
-                    let property = self.parse_identifier_name_node()?;
-                    let prop_end = property.span.end_usize();
+                    // The same seam the ordinary `.` / `?.` chains use, so a `new`
+                    // callee takes every property name they do — keywords
+                    // (`new Foo.class()`) and PRIVATE names (`new this.#f()`),
+                    // which only `parse_dot_property` knows about.
+                    let (property, prop_end) = self.parse_dot_property()?;
 
                     // actual_start covers a parenthesized callee's `(` (`new (a()).b`)
                     let span = Span::new(callee.actual_start, prop_end as u32);
@@ -2285,7 +2284,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         self.arena,
                         Expression::MemberExpression(MemberExpression {
                             object: callee.expr,
-                            property: arena.alloc(Expression::Identifier(property)),
+                            property: arena.alloc(property),
                             computed: false,
                             optional: false,
                             span,

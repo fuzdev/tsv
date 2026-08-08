@@ -179,7 +179,15 @@ impl KeywordKind {
                 | KeywordKind::String
                 | KeywordKind::Boolean
                 | KeywordKind::Any
-                | KeywordKind::Void
+                // ⚠️ `void` is deliberately NOT here, for the same reason
+                // [`KeywordKind::can_be_binding_name`] omits it: it is a genuine
+                // `ReservedWord`, so `Identifier : IdentifierName but not ReservedWord`
+                // excludes it at the PRODUCTION level — not a deferrable early error.
+                // tsc's parser rejects (`function void() {}` → TS1359/TS1109/TS1005) and
+                // so does acorn. It sat here once, and the only position that could see
+                // it was a function name, which reaches this predicate rather than the
+                // binding one — so `function void() {}` parsed while `var void = 1`,
+                // `class void {}` and `function f(void)` all correctly rejected.
                 | KeywordKind::Never
                 | KeywordKind::Unknown
                 | KeywordKind::Object

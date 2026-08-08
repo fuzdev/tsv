@@ -124,7 +124,7 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 214, both_accept: 191 };
  * provenance in `GATE_CHECKOUT_COMMITS` (../typescript). A rise on the pinned corpus is a parity
  * gain, not a suite refresh; a drop is a regression.
  */
-export const TS_REPO_PINS = { scanned: 768, accept_parity: 429 };
+export const TS_REPO_PINS = { scanned: 13685, accept_parity: 12292 };
 
 /**
  * corpus:compare:parse --all — MINIMUM per-language `compared` (both sides

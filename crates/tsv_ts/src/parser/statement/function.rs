@@ -289,10 +289,22 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // `[+Await]` (async), so `await` is a valid name in a non-async function
         // expression even inside a `[+Await]` enclosing scope (e.g. a static
         // block), but not in an async one.
+        //
+        // `try_function_name` is the same channel the DECLARATION path above takes,
+        // and carries that `await` rule itself. Reading the token kind here instead
+        // saw only the words the lexer never made a `Keyword`, so the declaration
+        // `function string() {}` parsed while the expression form did not.
+        //
+        // ⚠️ Sharing the channel inherits its width, deliberately: `can_be_identifier`
+        // also admits `let` / `yield`, whose bar is a strict-mode early error tsv defers
+        // (tsc's parser accepts them too). That is one question to answer in one place;
+        // re-narrowing here would mint a third name channel and restore the very
+        // asymmetry this call removed. `void` used to ride along and does NOT belong —
+        // it is a genuine `ReservedWord`, and this was the only position that could see
+        // the difference, which is why the fix went to `can_be_identifier` itself.
         let id = self.with_fn_context(is_async, is_generator, |p| {
-            if matches!(p.current_kind(), TokenKind::Identifier) || p.at_await_identifier() {
+            if let Some(name) = p.try_function_name() {
                 let (id_start, id_end) = p.current_pos();
-                let name = p.current_ident_name_or_await();
                 p.advance()?;
                 Ok(Some(Identifier::simple(
                     name,

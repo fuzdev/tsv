@@ -46,7 +46,8 @@ Foundation for all parsing.
 - ASCII identifiers (`foo`, `_private`, `$jquery`)
 - Unicode identifiers (`π`, `日本語`) — full `ID_Start`/`ID_Continue` per UAX #31, including the `Other_ID_*` and NFKC-excluded code points (`゛` U+309B, …) that `XID_*` drops
 - Escaped identifiers (`\u0041` = A)
-- Private identifiers (`#privateField`) - ES2022. `PrivateIdentifier :: # IdentifierName` is a single lexical token, so every reserved word is a valid name (`#default`, `#class`, `#true`) and nothing may sit between the `#` and the name (`# a` is not a private name). `#constructor` is the one reserved private name, by the `ClassElementName` early error
+- Private identifiers (`#privateField`) - ES2022. `PrivateIdentifier :: # IdentifierName` is a single lexical token, so every reserved word is a valid name (`#default`, `#class`, `#true`) and nothing may sit between the `#` and the name (`# a` is not a private name). `#constructor` is the one reserved private name, by the `ClassElementName` early error. A private name is a member like any other, including under `new` (`new this.#a()`, `new A.#b()`, and on through the chain — `new this.#a.c()`)
+- Contextual keywords as names — the type keywords (`string`, `number`, `boolean`, `any`, `unknown`, `never`, `object`, `symbol`, `bigint`, `undefined`) plus `async`/`from`/`as`/`satisfies` are ordinary `BindingIdentifier`s, so one names a variable, a `function` declaration OR expression, a `declare function`, a class, a type parameter, a rest parameter, and an import-equals module reference alike (`declare function string(): void`, `const f = function string() {}`, `class C { m<string>() {} }`, `function fn(...string: any[]) {}`, `import x = string`). `await` qualifies only at `Goal::Script`; `yield` never does. `let` is not a `ReservedWord`, so it names a **type** freely (`let x: let`, `type T = let.Foo`, `interface A extends let {}`), but its strict-mode early error keeps it out of the *binding* positions and of an import-equals module reference (`import x = let.y` is rejected, matching acorn)
 - Reserved word restrictions
 
 ---
@@ -71,7 +72,8 @@ Foundation for all parsing.
 - Escape sequences (`\n`, `\t`, `\\`, `\'`, `\"`)
 - Hex escapes (`\x41`)
 - Unicode 4-digit (`\u0041`)
-- Unicode codepoint (`\u{1F600}`)
+- Unicode codepoint (`\u{1F600}`) — the spec caps the code point's VALUE (≤ U+10FFFF), not its digit count, so leading zeros are unbounded in both a string (`'\u{0000000000000041}'`) and an identifier (`const \u{0000061} = 1`)
+- Surrogate pairs (`'\uD83D\uDE00'`) — a lead escape followed by a trail escape joins into one code point, and the pairing is a property of the code UNITS, so it is spelling-agnostic: the braced (`'\u{D83D}\u{DE00}'`) and mixed forms decode identically. An UNPAIRED half is well-formed grammar tsv cannot represent — see [conformance_svelte.md](./conformance_svelte.md#typescript-corrections)
 - Line continuation (`\` at EOL)
 - Null character (`\0`)
 
@@ -485,7 +487,7 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 
 **Other Features**:
 
-- `override` modifier - TS 4.3
+- `override` modifier - TS 4.3, including the `abstract override` pair. `abstract override` is tsc's canonical order and the only one it accepts; tsv prints that order (as prettier does) whichever way the source spells it
 - `accessor` keyword - ES2022/TS 4.9
 - Parameter properties (`constructor(public x: T)`) — all modifiers: `public`/`private`/`protected`, `override`, `readonly` (canonical order `accessibility → override → readonly`)
 
@@ -562,7 +564,7 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 ### Type References
 
 - Simple references (`SomeType`)
-- Qualified names (`Namespace.Type`)
+- Qualified names (`Namespace.Type`) — the HEAD is a word at minimum (`typeof 5` is a syntax error, not an `Identifier` named `"5"`), narrowed further per position; every segment after a `.` is a full `IdentifierName`, reserved words included (`ns.delete`, `A.false`, `typeof C.prototype.delete`, `typeof this.this`); tsc spells the same rule `parseEntityName(allowReservedWords: true)`. An import-equals **module reference** is the opposite (`import x = A.delete` is a syntax error)
 - Generic instantiation (`Array<T>`)
 
 ### Import Types
@@ -590,7 +592,7 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 ### Interfaces
 
 - `interface Foo { }`
-- `extends` clause
+- `extends` clause — a heritage element is a type **reference**, so its head is an `IdentifierReference`: the contextual type keywords and `let` are ordinary names there (`extends number`, `extends let`), reserved words are not (`extends void` / `null` / `true` / `this` / `super` reject — see [conformance_svelte.md](./conformance_svelte.md#typescript-corrections)). `class ... implements` shares the list and draws the same line
 - Multiple `extends`
 - Property signatures
 - Method signatures

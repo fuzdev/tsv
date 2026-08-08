@@ -1,0 +1,1 @@
+Expected a type name in the heritage clause

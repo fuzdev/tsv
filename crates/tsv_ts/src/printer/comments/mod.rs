@@ -35,7 +35,7 @@ mod paren;
 mod render;
 mod scan;
 
-pub(crate) use declarations::HeritageKeyword;
+pub(crate) use declarations::{ClassMemberModifiers, HeritageKeyword};
 pub(super) use element_comma::{block_is_before_comma, run_defers_line};
 pub(crate) use lists::BlankRule;
 pub(crate) use owned::OwnedCommentEffect;

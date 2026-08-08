@@ -3,9 +3,11 @@
  * the `conformance:ts-repo` gate (`diagnostics/ts_repo_compare.ts`) and the
  * tsc-corpus harvest (`harvest_ts_repo.ts`).
  *
- * They ask different questions of the same tree (the gate grades tsv per file
- * over the parser subtree; the harvest filters `conformance` + `compiler` into a
- * bench corpus), but they must agree on **what the corpus IS** and on **what
+ * They ask different questions of the same tree, over deliberately different roots
+ * (the gate grades tsv per file over the WHOLE `tests/cases`; the harvest filters
+ * `conformance` + `compiler` into a bench corpus — see `DEFAULT_ROOT` in
+ * `diagnostics/ts_repo_compare.ts` for why the gate takes the superset), but they
+ * must agree on **what the corpus IS** and on **what
  * tsc's baselines SAY** — otherwise the bench corpus and the gate silently grade
  * different populations against different oracles. Both answers live here rather
  * than as parallel copies:

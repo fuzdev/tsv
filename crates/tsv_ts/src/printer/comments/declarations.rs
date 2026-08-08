@@ -68,6 +68,16 @@ impl HeritageKeyword {
     }
 }
 
+/// The class-member modifiers that print as one canonical run, shared by properties
+/// and methods — see [`Printer::push_class_member_modifiers_doc`].
+#[derive(Debug, Clone, Copy)]
+pub(crate) struct ClassMemberModifiers {
+    pub accessibility: Option<internal::Accessibility>,
+    pub is_static: bool,
+    pub r#abstract: bool,
+    pub r#override: bool,
+}
+
 impl<'a> Printer<'a> {
     /// Emit a member keyword (modifier like `static ` / `readonly `, or
     /// accessor `get ` / `set `) preserving comments BEFORE it: the range
@@ -92,6 +102,46 @@ impl<'a> Printer<'a> {
             *cursor = kw_pos + keyword.len() as u32;
         }
         parts.push(self.d().text(kind_text));
+    }
+
+    /// Emit the modifier keywords a class **property** and a class **method** share,
+    /// in tsc's canonical order: `accessibility → static → abstract → override`.
+    ///
+    /// One emitter rather than two parallel chains, so the ordering rule and the hazard
+    /// below have a single home; the two member printers diverge only after this run
+    /// (`readonly`/`accessor` on a property, `async`/`*` on a method), and `declare` sits
+    /// ahead of it on the property alone — a method has no `declare` form.
+    ///
+    /// ⚠️ **`abstract` precedes `override`** — tsc's canonical order, the only one it
+    /// accepts (TS1029 otherwise), and what prettier emits. tsv's parser deliberately
+    /// takes the reversed spelling too, so this run *normalizes* it.
+    ///
+    /// TODO: [`Self::push_member_keyword_doc`] scans FORWARD from `cursor`, so on that
+    /// reversed `override abstract` source the `abstract` lookup runs first and the
+    /// `override` one then finds nothing. Harmless for the keywords themselves, but a
+    /// comment between the two relocates (`override /* c */ abstract x` →
+    /// `/* c */ abstract override x`, where prettier gives `abstract override /* c */ x`).
+    /// Fixing it needs this emitter to walk the modifiers in SOURCE order while printing
+    /// them in canonical order.
+    pub(crate) fn push_class_member_modifiers_doc(
+        &self,
+        parts: &mut DocBuf,
+        modifiers: ClassMemberModifiers,
+        cursor: &mut u32,
+        bound: u32,
+    ) {
+        if let Some(accessibility) = modifiers.accessibility {
+            self.push_member_keyword_doc(parts, accessibility.as_keyword(), cursor, bound);
+        }
+        if modifiers.is_static {
+            self.push_member_keyword_doc(parts, "static ", cursor, bound);
+        }
+        if modifiers.r#abstract {
+            self.push_member_keyword_doc(parts, "abstract ", cursor, bound);
+        }
+        if modifiers.r#override {
+            self.push_member_keyword_doc(parts, "override ", cursor, bound);
+        }
     }
 
     /// Emit comments between the last member keyword and the member name
