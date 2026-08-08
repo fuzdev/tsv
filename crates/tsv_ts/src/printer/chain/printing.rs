@@ -37,40 +37,58 @@ pub(crate) fn print_node_inner<'a>(
             expr,
             needs_parens,
             paren_comment_end,
+            followed_by_non_null,
         } => {
             if *needs_parens {
+                // Asked BEFORE the base's doc is built — building it can re-mark the
+                // target from a nested value position inside the ternary's own branches.
+                let base_ternary = printer.chain_base_ternary(expr);
                 let inner = printer.build_expression_doc(expr);
-                // Match Prettier: inner group handles indent-on-break,
-                // bare parens outside so chain conditionalGroup drives breaking
-                // Prettier's `group([indent([softline, content]), softline])`: the parens
-                // break onto their own lines and the content stays flat while it fits, so
-                // the chain's conditionalGroup can try flat first. Every base kind below
-                // takes this shape — await, binary, and everything else alike — so it is
-                // written once here rather than repeated per arm.
-                let hang = |content: DocId| {
-                    d.group(d.concat(&[d.indent(d.concat(&[d.softline(), content])), d.softline()]))
-                };
-                let inner_group = match expr {
-                    Expression::ArrowFunctionExpression(_) | Expression::FunctionExpression(_) => {
-                        // IIFE / function callee or arrow member-object: the parens
-                        // hug the function — its own body drives breaking, prettier
-                        // never breaks after the `(` here. `(() => {...})().catch()`,
-                        // `(function () {})().p`. Matches the bare-callee path
-                        // (`call_formatting.rs`), which wraps with hugging parens.
+                // The parens stay bare outside so the chain's conditionalGroup drives
+                // breaking; `build_expanding_parens_body_doc` is the shape every base kind
+                // below takes — await, binary, and everything else alike.
+                let hang = |content: DocId| printer.build_expanding_parens_body_doc(content);
+                // A ternary base is decided before the kind match: it can never be an
+                // arrow / function / binary, and its three shapes read better as one
+                // question than as a guard clause wedged among the kind arms.
+                let inner_group = if let Some(ternary) = base_ternary.filter(|t| !t.expands) {
+                    // Not one of prettier's `ancestorNameMap` value positions
+                    // (`shouldExtraIndentForConditionalExpression`) — a call argument, an
+                    // array element, a property value — so the `?`/`:` arms hang under the
+                    // `(` as the bare ternary does. Only when the member is the ternary's
+                    // DIRECT parent does the `)` additionally drop to its own line
+                    // (prettier's `breakClosingParen`); a `!` in between is the parent
+                    // instead, and there the `)` stays welded to the last arm.
+                    if ternary.direct && !*followed_by_non_null {
+                        d.group(d.concat(&[inner, d.softline()]))
+                    } else {
                         inner
                     }
-                    Expression::BinaryExpression(binary) => {
-                        // The chain-for-parens operand doc, so the whole operand chain is
-                        // what stays flat. Every operator family — arithmetic, logical
-                        // (`&&`/`||`), and nullish (`??`) — is laid out identically. A
-                        // logical base used to skip this wrapper and break at its own
-                        // operators instead, welding the closing `).member` onto the last
-                        // operand — a third layout matching neither tsv's arithmetic shape
-                        // nor prettier's. See conformance_prettier_ts.md §TypeScript
-                        // (Parenthesized binary member base).
-                        hang(printer.build_binary_chain_for_parens(binary))
+                } else {
+                    match expr {
+                        Expression::ArrowFunctionExpression(_)
+                        | Expression::FunctionExpression(_) => {
+                            // IIFE / function callee or arrow member-object: the parens
+                            // hug the function — its own body drives breaking, prettier
+                            // never breaks after the `(` here. `(() => {...})().catch()`,
+                            // `(function () {})().p`. Matches the bare-callee path
+                            // (`call_formatting.rs`), which wraps with hugging parens.
+                            inner
+                        }
+                        Expression::BinaryExpression(binary) => {
+                            // The chain-for-parens operand doc, so the whole operand chain is
+                            // what stays flat. Every operator family — arithmetic, logical
+                            // (`&&`/`||`), and nullish (`??`) — is laid out identically. A
+                            // logical base used to skip this wrapper and break at its own
+                            // operators instead, welding the closing `).member` onto the last
+                            // operand — a third layout matching neither tsv's arithmetic shape
+                            // nor prettier's. See conformance_prettier_ts.md §TypeScript
+                            // (Parenthesized binary member base).
+                            hang(printer.build_binary_chain_for_parens(binary))
+                        }
+                        // Every other base kind, and a ternary base that DOES expand.
+                        _ => hang(inner),
                     }
-                    _ => hang(inner),
                 };
                 // Preserve a comment from the stripped grouping parens inside them,
                 // before `)` (`(x + y /* c */)!.foo`) — prettier relocates it past

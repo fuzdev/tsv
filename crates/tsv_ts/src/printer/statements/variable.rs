@@ -59,6 +59,8 @@ impl<'a> Printer<'a> {
         if let Some(frozen) = frozen {
             return self.build_frozen_value_doc(init, frozen, ParenContext::VariableInit);
         }
+        // Declarator init — an `ancestorNameMap` value position.
+        self.mark_ternary_extra_indent(init);
         let inner = self.build_expression_doc_with_paren_comments(init, boundary_end);
         if needs_parens(init, ParenContext::VariableInit, self.in_for_init.get())
             && !self.init_keeps_own_parens(init, boundary_end)

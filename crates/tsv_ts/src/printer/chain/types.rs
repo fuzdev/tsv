@@ -47,6 +47,13 @@ pub enum ChainNode<'a> {
         expr: &'a internal::Expression<'a>,
         needs_parens: bool,
         paren_comment_end: Option<u32>,
+        /// A non-null `!` applies to this base before the chain continues, so the base
+        /// expression's immediate parent is that `!` and not the member access after it.
+        /// Kept separate from `paren_comment_end` — which happens to be `Some` in the
+        /// same shape — because the two answer different questions: that one bounds a
+        /// COMMENT scan, this one decides a LAYOUT (prettier's `breakClosingParen` fires
+        /// on a member parent, so a `!` in between suppresses it).
+        followed_by_non_null: bool,
     },
     /// Call expression: ()
     Call {
@@ -104,6 +111,7 @@ impl<'a> ChainNode<'a> {
             expr,
             needs_parens,
             paren_comment_end: None,
+            followed_by_non_null: false,
         }
     }
 
@@ -119,6 +127,7 @@ impl<'a> ChainNode<'a> {
             expr,
             needs_parens: true,
             paren_comment_end: Some(paren_comment_end),
+            followed_by_non_null: true,
         }
     }
 

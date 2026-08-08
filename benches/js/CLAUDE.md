@@ -565,7 +565,16 @@ the only hard dependency, so without node and/or bun run the per-runtime tasks y
 DO have — each writes its own sibling and `bench:compose` folds whatever exists.
 
 **Conformance measurement** is per-tool PARSE COVERAGE over the fixtures-only
-`conformance` view → `report.conformance.node.{json,md}`. **Coverage-only +
+`conformance` view → `report.conformance.node.{json,md}`. Two things are specific to
+this surface. **`tsc` is a row here and only here** (`lib/tsc.ts`): the language's
+own parser is a verdict, not a speed, so putting it in the published throughput
+tables would misread it — flipping it on for perf is a one-word change at its
+registration site. And the report carries a **per-source coverage table** under each
+group's aggregate line, because the aggregate blends corpora that answer different
+questions: on the tsc corpus `tsc` is the ORACLE (100% by construction — the harvest
+keeps exactly what it accepts), the way `svelte/compiler` is on the Svelte set,
+while on test262 and the prettier suites it is an independent parser. Read the
+source rows; the aggregate is a summary, not the finding. **Coverage-only +
 node-only by design** (`BENCH_COVERAGE_ONLY=1`): coverage is a pre-flight product,
 so the timed phase is skipped, and it's runtime-invariant (same parser engine — the
 site folds a tool's native/wasm variants into one per-engine row), so one node run
@@ -580,19 +589,22 @@ it; to investigate ad-hoc run `BENCH_CORPUS=conformance node benches/js/bench.ts
 ### Harvests
 
 ```bash
-deno task bench:harvest            # all four
+deno task bench:harvest            # all five
 deno task bench:harvest:wpt        # ../wpt/css <style> blocks → .cache/wpt_css
 deno task bench:harvest:test262    # graded positives → .cache/test262_files.json (runs cargo)
+deno task bench:harvest:ts-repo    # tsc-corpus valid + rejects lists → .cache/ts_repo_{files,rejects}.json
 deno task bench:harvest:svelte-rejects  # svelte/compiler-rejected Svelte files
                                         # → .cache/svelte_parse_rejects.json
 deno task bench:harvest:svelte-styles   # perf-view .svelte <style> blocks, concatenated per
                                         # repo → .cache/svelte_styles/<repo>.css
 ```
 
-Idempotent; warn-and-skip when the source checkout is absent. The first three are
+Idempotent; warn-and-skip when the source checkout is absent. The first four are
 FRESHNESS-STAMPED (`lib/harvest_stamp.ts`): a harvest whose stamped inputs — the
 source checkout COMMIT(s) + the pinned count + oracle pins — are unchanged skips
-instantly (the test262 leg saves a ~1 min release-mode grade); pass `--force` after
+instantly (the test262 leg saves a ~1 min release-mode grade; the ts-repo leg stamps
+the tsc VERSION too, since tsc is its oracle and a bump can move a file between its
+two lists with the checkout unchanged); pass `--force` after
 changing harvest/grading LOGIC, which the stamp can't see. `svelte-styles` is NOT
 stamped (its sources are the live dev repos; the walk is ~2 s, always re-harvests,
 rewrites only changed files) and is also chained at the start of `bench:perf` so
@@ -736,11 +748,26 @@ couldn't reproduce its own number).
 - **`conformance`** — the hard parse cases only: the `prettier_fixture` suites + the
   parse-conformance `suite` entries — Svelte's compiler tests (with the gate-aligned
   skips: `_`-prefixed segments, `migrate/`, `output.svelte` snapshots), the wpt-css
-  harvest cache, and the test262 graded-positive path list (a `files_from` entry).
+  harvest cache, the test262 graded-positive path list (a `files_from` entry), and
+  the **tsc-corpus** valid list (another `files_from`, from `harvest_ts_repo.ts`).
   Deliberately **excludes the `real` perf tier**, so the conformance coverage surface
   and the perf corpus are mutually exclusive: perf is the "every in-scope tool must
   fully process it" corpus, conformance is where sub-100% coverage is the metric.
   This is what `deno task bench:conformance` measures.
+
+  **The tsc corpus (`ts_repo_files.json`) is the TypeScript-specific set.** Without
+  it the `parse/typescript` group is ~95% test262 — ECMAScript — with prettier's ~800
+  format fixtures as its only TS, so a TS parse gap moved the headline by tenths of a
+  point. `../typescript/tests/cases/{conformance,compiler}` is the language's own
+  corpus, and it is already a release-required, commit-pinned checkout here (the
+  `conformance:ts-repo` gate reads its baselines). Its **validity filter is tsc
+  itself** — the `typescript` npm package's parser plus tsc's `.errors.txt`
+  baselines, both required to call a file well-formed — which keeps the filter
+  tool-neutral the way test262's own metadata does for that entry. Unlike test262 it
+  is NOT goal-tagged — tsc's module-vs-script reading is semantic and never gates
+  syntax, so handing it to parsers that take `sourceType` as a grammar switch costs
+  tsv 640 files it and tsc both accept to win back 25. Full rules, the measurement,
+  and why the two validity readings must AGREE: `harvest_ts_repo.ts`.
 
   **Canonical-reject exclusion (Svelte only, conformance view only).** The suite
   bundles deliberately-invalid fixtures (svelte's own `compiler-errors/`, `loose-*`
@@ -764,11 +791,11 @@ couldn't reproduce its own number).
 **Missing entries fail fast** — the loader checks every entry up front and throws
 listing the missing paths, so a partial checkout can't silently shrink a perf number
 or let a correctness gate pass while grading less than it claims. The only
-exceptions: the three derived harvest caches are `optional` (warn-and-skip —
-wpt/test262 because their source checkouts are legitimately machine-dependent,
-matching those harvests' `--if-present` posture; svelte_styles because it's
-generated from the always-required dev repos and just may not have been harvested
-yet), and `BENCH_ALLOW_MISSING=1` opts the bench into a partial corpus explicitly.
+exceptions: the four derived harvest caches are `optional` (warn-and-skip —
+wpt/test262/ts-repo because their source checkouts are legitimately
+machine-dependent, matching those harvests' `--if-present` posture; svelte_styles
+because it's generated from the always-required dev repos and just may not have been
+harvested yet), and `BENCH_ALLOW_MISSING=1` opts the bench into a partial corpus explicitly.
 Reports carry `corpus_sources` so any tolerated gap is disclosed rather than
 invisible.
 
@@ -785,6 +812,8 @@ benches/js/
 ├── deno.json              # nodeModulesDir: manual + lock: false (npm from package.json)
 ├── install_deps.ts        # `bench:install`: npm install + force-fetch the oxc wasi binding
 ├── harvest_test262.ts     # `bench:harvest:test262`: graded positives → .cache (Deno-only)
+├── harvest_ts_repo.ts     # `bench:harvest:ts-repo`: the tsc corpus's valid + rejects lists →
+│                          # .cache (Deno-only; tsc itself is the validity oracle)
 ├── bench.ts               # Benchmark entry point (runtime-neutral)
 ├── conformance.ts         # Single-process pre-release aggregate driver: all six legs, one
 │                          # module cache
@@ -824,6 +853,11 @@ benches/js/
     ├── report.ts          # Summary report generation
     ├── rsvelte.ts         # rsvelte-fmt wrapper (Svelte only; COVERAGE-ONLY, never timed)
     ├── runtime.ts         # Cross-runtime helpers: current_runtime / os / arch normalizers
+    ├── ts_repo.ts         # Shared `../typescript`-corpus vocabulary: discovery + the baseline
+    │                      # key/grammar-error rules (the ts-repo GATE and the harvest both read it,
+    │                      # so they can't drift on what the corpus is or what tsc's baselines say)
+    ├── tsc.ts             # tsc wrapper (parse-only, conformance surface only) + the shared
+    │                      # `typescript` loader and parse call the harvest reuses
     ├── types.ts           # Shared types + `BaseImplementation` (the language-support pair)
     ├── versions.ts        # Version loading from package.json
     ├── wasm.ts            # WASM module loader (WasmImplementation — deno/nodejs target)
@@ -979,6 +1013,7 @@ Six live here but are documented above: the parse-conformance gates
 | `corpus_stats.ts` | corpus/candidate-dir size + language + degenerate-case stats (reuses `lib/corpus.ts` filters via `stream_perf_candidate`) | `corpus:stats` |
 | `skip_triage.ts` | parse-**parity** gate: buckets every corpus file by *asymmetry* (`parity` / `sanctioned_over_rejection` / `over_acceptance` / `unexpected_over_rejection`), exiting 1 only on the last. Takes an optional corpus dir (defaults to the dev repos); point it at Svelte's adversarial `tests/` for the residual gap list | — |
 | `test262_compare.ts` | test262 differential, tsv vs oxc-parser, from `tsv_debug test262 --emit-manifest`. Surfaces positive tsv real-bug candidates + negative early-error gaps; numbers move with the pinned oxc version. No biome — its js-api has no parser to grade. See `docs/conformance_test262.md` §Differential | — |
+| `ts_repo_over_acceptance.ts` | per-tool OVER-ACCEPTANCE over the tsc corpus — the files tsc's own PARSER rejects (`.cache/ts_repo_rejects.json`). The axis coverage structurally cannot show: coverage counts accepts, so it can only reward permissiveness, and every conformance corpus is therefore filtered to VALID inputs. Read inverted (lower is better) and as a PROFILE, not a gate — a deferred early error is a documented tsv posture, and the per-file gate on tsv alone is `conformance:ts-repo`. The `tsc` row must read 0 (it built the list); anything else fails the run as a stale cache | `ts-repo:over-acceptance` |
 | `biome_oxfmt_diff.ts` | 4-way formatter differential (tsv vs prettier vs biome-wasm vs oxfmt) so a tsv-vs-prettier divergence can be bucketed *tsv alone* (candidate bug) vs *tsv + another agree* (candidate sanctioned divergence). Prettier is routed through the **typescript** parser, never babel | — |
 | `no_locations_parity.ts` | proves the `no-locations` wire is losslessly reconstructible (TS exact; two Svelte non-derivable cases classified, not failed). The reference reconstruction a consumer would use | — |
 | `reconstruct_vs_materialize.ts` | its **perf** sibling: is it faster to materialize `loc` in Rust or reconstruct it in JS? (Finding: reconstruct wins.) Feeds the committed report's consumer-side note | — |
