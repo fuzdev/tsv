@@ -461,6 +461,9 @@ impl<'a> Printer<'a> {
 
         let keyword_end = keyword_start + keyword.len() as u32;
 
+        // `return` / `throw` argument — both are `ancestorNameMap` value positions.
+        self.mark_ternary_extra_indent(arg);
+
         // A comment that must break takes the parenthesized form, which is what makes the
         // break legal; there the comment keeps the line the author gave it. That layout
         // owns its own trailing gap (the parens are retained, so the `)` — not the span

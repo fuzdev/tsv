@@ -120,13 +120,47 @@ impl<'a> Printer<'a> {
     /// (`{@const}`'s init, inheriting the host document's mode) stays Grouped: its
     /// assignment layout owns the indent, and ContinuationIndent would stack on top.
     ///
-    /// The chain builder does not prepend an owned leading comment (a JSDoc cast or
-    /// bundler annotation glued to the first operand) — `build_expression_doc` owns that
-    /// seam — so the direct-call arm replicates it.
+    /// Only the Embedded-root *question* lives here; the answer is
+    /// `build_continuation_indent_expression_doc`, shared with the cast operand.
     pub(crate) fn build_root_expression_doc(&self, expr: &Expression<'_>) -> DocId {
-        if self.embed.is_embedded()
-            && let Expression::BinaryExpression(binary) = expr
-        {
+        if self.embed.is_embedded() {
+            return self.build_continuation_indent_expression_doc(expr);
+        }
+        self.build_expression_doc(expr)
+    }
+
+    /// The body of a pair of parens that **expand** onto their own lines when the
+    /// content does not fit, keeping the content itself flat while it does:
+    /// `(⏎\tcontent⏎)`. Prettier's `group([indent([softline, content]), softline])`.
+    ///
+    /// The parens themselves stay OUTSIDE this doc, so a caller that already emits its
+    /// own `(` / `)` (a chain base, a cast operand) wraps this and nothing changes about
+    /// where the parens come from. Written once here because three sites need the exact
+    /// same shape and a hand-rolled fourth would drift.
+    pub(in crate::printer) fn build_expanding_parens_body_doc(&self, content: DocId) -> DocId {
+        let d = self.d();
+        d.group(d.concat(&[d.indent(d.concat(&[d.softline(), content])), d.softline()]))
+    }
+
+    /// `build_expression_doc` for a position whose binary chain takes **continuation
+    /// indent** — the positions where prettier's shouldNotIndent chain yields false
+    /// (binaryish.js:96-115), so the chain renders as `group([first, indent(rest)])` and
+    /// its continuation lines sit one level past the first operand.
+    ///
+    /// The two callers are a type assertion's operand (`(a ??\n\tb) as T` — without this
+    /// the continuation lands at the *statement's* own column, where it reads as a
+    /// sibling statement) and an Embedded expression root (a Svelte `{expr}` value,
+    /// where prettier reaches the same shape through its svelte expression-root
+    /// wrapper). A non-binary expression is unaffected and takes the ordinary path.
+    ///
+    /// ⚠️ The chain builder does **not** prepend an owned leading comment (a JSDoc cast
+    /// or bundler annotation glued to the first operand) — `build_expression_doc` owns
+    /// that seam — so calling it directly means replicating the prepend here, or the
+    /// comment is dropped (`docs/comments.md` hazard 1). That is the whole reason this
+    /// is a shared seam rather than two call sites: the obligation is easy to forget,
+    /// and every new continuation-indent position inherits it by construction.
+    fn build_continuation_indent_expression_doc(&self, expr: &Expression<'_>) -> DocId {
+        if let Expression::BinaryExpression(binary) = expr {
             let doc = self.build_binary_chain_doc_with_continuation_indent(binary);
             return self.prepend_owned_leading_comment(expr, doc);
         }
@@ -707,7 +741,21 @@ impl<'a> Printer<'a> {
             if needs_parens {
                 parts.push(d.text("("));
             }
-            parts.push(self.build_expression_doc(expression));
+            // A ternary operand reached from one of prettier's `ancestorNameMap` value
+            // positions expands its parens instead of hanging the `?`/`:` arms — the
+            // shape a member base already takes. See `mark_ternary_extra_indent`.
+            //
+            // Asked BEFORE the operand's doc is built: building it recurses into the
+            // ternary's own branches, and a nested value position there (a declarator in
+            // an arrow body, an inner `await`) re-marks the target, so a read afterwards
+            // would see the nested answer instead of this operand's.
+            let expands = needs_parens && self.ternary_takes_extra_indent(expression);
+            let operand = self.build_continuation_indent_expression_doc(expression);
+            parts.push(if expands {
+                self.build_expanding_parens_body_doc(operand)
+            } else {
+                operand
+            });
             if needs_parens {
                 parts.push(d.text(")"));
             }
@@ -962,8 +1010,18 @@ impl<'a> Printer<'a> {
         let core = if needs_parens {
             // For expressions that need parens, use a special doc structure
             // that indents continuations when breaking
+            // Same rule as the cast operand: a ternary reached from an `ancestorNameMap`
+            // value position expands these parens rather than hanging its arms. Without
+            // it `(t)!` and `(t)!.prop` disagree about the very same base. Asked BEFORE
+            // the operand is built, for the re-marking reason given at the cast site.
+            let expands = self.ternary_takes_extra_indent(non_null_expr.expression);
             let inner_doc =
                 self.build_expression_doc_with_indent_on_break(non_null_expr.expression);
+            let inner_doc = if expands {
+                self.build_expanding_parens_body_doc(inner_doc)
+            } else {
+                inner_doc
+            };
             let argument_end = non_null_expr.expression.span().end;
             // Keep comments from the stripped grouping parens INSIDE them, where the
             // author wrote them — leading before the operand (`(/* b */ x + y)!`),

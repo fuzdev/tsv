@@ -103,6 +103,8 @@ impl<'a> Printer<'a> {
         } else {
             AssignmentContext::None
         };
+        // Assignment RHS — an `ancestorNameMap` value position.
+        self.mark_ternary_extra_indent(assign.right);
         self.build_assignment_doc_with_context(assign, initial_context)
     }
 

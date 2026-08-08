@@ -39,8 +39,8 @@ enum BinaryChainStyle {
     UngroupedCondition,
     /// First operand at base indent, continuation lines indented — the positions
     /// where prettier's shouldNotIndent chain yields false (nested binary
-    /// operands, an Embedded expression root, ternary tests under
-    /// return/throw/call/new).
+    /// operands, a type assertion's operand, an Embedded expression root,
+    /// ternary tests under return/throw/call/new).
     ContinuationIndent,
     /// `ContinuationIndent` without the outer group wrapper, for contexts where
     /// the caller controls grouping (the comment-aware twin for inline-paren
@@ -158,6 +158,10 @@ impl<'a> Printer<'a> {
         let operator_end = unary.span.start + unary.operator.as_str().len() as u32;
         let argument_start = unary.argument.span().start;
         let argument_end = unary.argument.span().end;
+        // Unary argument — an `ancestorNameMap` value position. A BARE ternary operand
+        // records nothing (prettier's `child === node` guard), which is why `!(c ? a : b)`
+        // keeps the hanging form while `!((c ? a : b) as T)` expands.
+        self.mark_ternary_extra_indent(unary.argument);
         // A single-line block glued to the operator hugs the operand even across a
         // source newline (`!/* c */⏎x` → `!(/* c */ x)`), matching prettier.
         let leading_comments_opt = self.build_rhs_comments_glued_opt(operator_end, argument_start);
@@ -335,8 +339,16 @@ impl<'a> Printer<'a> {
     /// Contexts wanting a different style key it at the call site, mirroring
     /// prettier's parent-keyed shouldNotIndent chain (binaryish.js:97): call args
     /// and array elements take `build_binary_chain_doc_indented`, return/throw and
-    /// conditions the ungrouped variants, nested binary operands the continuation
-    /// style.
+    /// conditions the ungrouped variants, nested binary operands and a type
+    /// assertion's operand the continuation style.
+    ///
+    /// ⚠️ This default is the INVERSE of prettier's. There, the indent bucket is the
+    /// *fall-through* — a parent indents unless it is named in `shouldNotIndent` or
+    /// `shouldIndentIfInlining` — so a position nobody thought about lands on indent.
+    /// Here it lands on flat, which is the wrong answer for every parent outside those
+    /// two lists. A new binary-holding position therefore has to opt in explicitly;
+    /// check the parent against binaryish.js:96-115 rather than inheriting this default
+    /// by omission (the cast operand was flat for exactly that reason).
     ///
     /// When the chain exceeds print width, breaks after operators:
     /// ```text
@@ -401,7 +413,8 @@ impl<'a> Printer<'a> {
     ///
     /// The style for the positions where prettier's shouldNotIndent chain yields
     /// false: a nested binary operand (parenthesized or not,
-    /// `build_binary_operand_doc`), an Embedded expression root
+    /// `build_binary_operand_doc`), a type assertion's operand
+    /// (`build_continuation_indent_expression_doc` — `(a ??\n\tb) as T`), an Embedded expression root
     /// (`build_root_expression_doc`), and a ternary test under
     /// return/throw/call/new.
     pub(in crate::printer) fn build_binary_chain_doc_with_continuation_indent(
@@ -1109,6 +1122,8 @@ impl<'a> Printer<'a> {
 
         // Preserve comments from stripped grouping parens: `await (/** @type {T} */ expr)`
         let keyword_end = await_expr.span.start + "await".len() as u32;
+        // `await` argument — an `ancestorNameMap` value position.
+        self.mark_ternary_extra_indent(await_expr.argument);
         let argument_start = await_expr.argument.span().start;
         let argument_end = await_expr.argument.span().end;
         let comments_opt = self.build_keyword_operand_comments_opt(keyword_end, argument_start);
@@ -1167,6 +1182,8 @@ impl<'a> Printer<'a> {
         };
 
         let keyword_end = yield_expr.span.start + keyword.len() as u32;
+        // `yield` argument — an `ancestorNameMap` value position.
+        self.mark_ternary_extra_indent(arg);
         let argument_start = arg.span().start;
         let argument_end = arg.span().end;
 
