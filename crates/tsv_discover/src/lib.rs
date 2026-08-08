@@ -4,8 +4,9 @@
 //! format-root-relative path.
 //!
 //! This is the single home of the build-output heuristic, the always-pruned
-//! safety nets, the formattable-extension check, the heuristic-shadow warning
-//! text, the `.prettierignore`-shadowed warning, and the
+//! safety nets, the formattable-extension check (both as a discovery filter and
+//! as the unsupported-extension error for a named file argument), the
+//! heuristic-shadow warning text, the `.prettierignore`-shadowed warning, and the
 //! `.prettierignore`-outside-a-repo warning. The three discovery
 //! surfaces — the native CLI (`tsv_cli`), the
 //! WASM CLI (`tsv_wasm`'s `npm/cli.js`), and the VS Code extension — call it
@@ -87,12 +88,45 @@ pub enum DirVerdict {
 /// Whether a file name has a [formattable extension](FORMATTABLE_EXTENSIONS)
 /// (the JS/TS family, `.svelte`, `.css` — compound forms like `.svelte.ts` are
 /// covered by the `.ts` match). Matches `Path::extension`, so a bare dotfile like
-/// `.ts` is a stem with no extension and is **not** formattable.
+/// `.ts` is a stem with no extension and is **not** formattable. Accepts a bare
+/// name or a whole path — `Path::extension` reads the final component either way.
 pub fn is_formattable(name: &str) -> bool {
     Path::new(name)
         .extension()
         .and_then(|e| e.to_str())
         .is_some_and(|ext| FORMATTABLE_EXTENSIONS.contains(&ext))
+}
+
+/// The error for an **explicitly named file argument** whose extension tsv does
+/// not format, or `None` when [`is_formattable`] accepts it.
+///
+/// A file argument bypasses the *ignore files* — the caller named that file, and
+/// the ignore files govern discovery — but it does **not** bypass the extension
+/// check, because the parser dispatch behind it has no "unknown" arm: everything
+/// that isn't `.svelte` or `.css` is handed to the TypeScript parser. Without this
+/// gate a named `.json`/`.md`/extensionless file is parsed as TypeScript, which
+/// usually fails with a baffling syntax error and occasionally *succeeds* —
+/// rewriting a file tsv doesn't support (a top-level-array `.json` reprints as a
+/// TS expression statement, semicolon and all, which is no longer valid JSON).
+/// Prettier draws the same line, refusing with "No parser could be inferred".
+///
+/// Returned as an **argument** error, so the run fails upfront with nothing
+/// written, alongside the not-a-file-or-directory check. The extension list is
+/// rendered from [`FORMATTABLE_EXTENSIONS`], so a new language flows into the
+/// message. Produced **once**, here — like [`heuristic_shadow_warning`] — so the
+/// native CLI and the WASM CLI emit the identical text.
+pub fn unsupported_extension_error(path: &str) -> Option<String> {
+    (!is_formattable(path)).then(|| {
+        let mut list = String::new();
+        for ext in FORMATTABLE_EXTENSIONS {
+            if !list.is_empty() {
+                list.push_str(", ");
+            }
+            list.push('.');
+            list.push_str(ext);
+        }
+        format!("{path}: unsupported file extension (tsv formats {list})")
+    })
 }
 
 /// Whether a directory `name` is an always-pruned [safety net](SAFETY_NET_DIRS)
@@ -262,8 +296,10 @@ fn gitignore_above(anchors: &[String], dir: &str) -> bool {
 /// Whether a child **file** should be formatted: it has a formattable extension
 /// and the matcher does not ignore it. `name` is its final path segment;
 /// `child_rel` is its format-root-relative, `/`-separated path. Pure — no
-/// filesystem access. (An explicitly named file *argument* bypasses this — the
-/// ignore files govern *discovery*, which is what this drives.)
+/// filesystem access. (An explicitly named file *argument* bypasses the *matcher*
+/// half of this — the ignore files govern *discovery*, which is what this drives —
+/// but not the extension half, which is checked on the argument itself via
+/// [`unsupported_extension_error`].)
 ///
 /// Uses the leaf-only [`is_ignored_leaf`](tsv_ignore::IgnoreStack::is_ignored_leaf):
 /// the discovery walk only reaches a file whose ancestor directories are already
@@ -379,6 +415,42 @@ mod tests {
         assert!(!is_formattable("a")); // no extension
         assert!(!is_formattable(".ts")); // bare dotfile: a stem, no extension
         assert!(!is_formattable("Makefile"));
+    }
+
+    #[test]
+    fn unsupported_extension_error_mirrors_is_formattable() {
+        // every formattable extension is accepted (no error), on a bare name and
+        // on a path — `Path::extension` reads the final component either way
+        for ext in FORMATTABLE_EXTENSIONS {
+            assert!(
+                unsupported_extension_error(&format!("file.{ext}")).is_none(),
+                "{ext}"
+            );
+            assert!(
+                unsupported_extension_error(&format!("src/deep/file.{ext}")).is_none(),
+                "{ext}"
+            );
+        }
+        // the cases the TypeScript fall-through used to swallow
+        for path in [
+            "package-lock.json",
+            "notes.md",
+            "Makefile",
+            "a.pcss",
+            "a.tsx",
+        ] {
+            assert!(unsupported_extension_error(path).is_some(), "{path}");
+        }
+    }
+
+    #[test]
+    fn unsupported_extension_error_text_is_stable() {
+        // pinned verbatim — the native CLI and the WASM CLI emit this exact
+        // string, and the extension list is rendered from the constant
+        assert_eq!(
+            unsupported_extension_error("data.json").unwrap(),
+            "data.json: unsupported file extension (tsv formats .ts, .mts, .cts, .js, .mjs, .cjs, .svelte, .css)"
+        );
     }
 
     #[test]
