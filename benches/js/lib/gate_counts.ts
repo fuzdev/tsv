@@ -95,7 +95,10 @@ export const GATE_CHECKOUT_COMMITS: Record<string, { commit: string; pins: strin
 		pins: 'SVELTE_FIXTURES_PINS, CORPUS_FORMAT_*, CORPUS_PARSE_*'
 	},
 	'../acorn-typescript': { commit: '111d92a', pins: 'TS_FIXTURES_PINS' },
-	'../typescript': { commit: '637d5746b', pins: 'TS_REPO_PINS' },
+	'../typescript': {
+		commit: '637d5746b',
+		pins: 'TS_REPO_PINS, TS_REPO_CORPUS_PIN, TS_REPO_REJECTS_PIN'
+	},
 	'../kit': { commit: 'b27c82f9c', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
 	'../svelte.dev': { commit: '996bd63e4', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
 	'../prettier': { commit: '1dcd0b05d', pins: 'CORPUS_FORMAT_*, CORPUS_PARSE_*' },
@@ -237,6 +240,27 @@ export const WPT_CSS_HARVEST_PIN = 22_310;
  * `conformance:test262` release gate enforces — same positive count, keep the two in lockstep on a test262 pull.
  */
 export const TEST262_POSITIVES_PIN = 42_113;
+
+/**
+ * bench:harvest:ts-repo — exact size of the tsc-corpus VALID list: single-file
+ * `.ts` under `../typescript/tests/cases/{conformance,compiler}` that both tsc's
+ * parser and tsc's own `.errors.txt` baselines call well-formed. Measured
+ * 2026-08-07: ../typescript at 637d5746b, oracle tsc 6.0.3, over 9,447 single-file
+ * `.ts`. A move means a checkout pull, a tsc bump, or a grading change in
+ * `harvest_ts_repo.ts` — re-pin deliberately, never absorb. The full bucket
+ * breakdown is the harvest's own final line, not repeated here: a hand-copied
+ * tally goes stale silently, which is the failure this pin exists to prevent.
+ */
+export const TS_REPO_CORPUS_PIN = 8_129;
+
+/**
+ * bench:harvest:ts-repo — exact size of the tsc-corpus REJECTS list (files tsc's
+ * PARSER rejects), the corpus `diagnostics/ts_repo_over_acceptance.ts` grades
+ * over. Same measurement as {@link TS_REPO_CORPUS_PIN}. Deliberately NOT a corpus
+ * entry: accepting these is the failure, so folding them into a coverage
+ * denominator would score permissiveness as fidelity.
+ */
+export const TS_REPO_REJECTS_PIN = 519;
 
 /**
  * bench:harvest:svelte-rejects — exact reject count. Measured 2026-07-06:

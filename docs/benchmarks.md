@@ -98,8 +98,22 @@ Things the published numbers measure that aren't quite what they look like.
   `svelte/compiler`-rejected files removed, so Svelte coverage reads as fidelity
   on *valid* Svelte (svelte/compiler → 100%, the oracle) rather than raw success
   over the suite's deliberately-invalid error fixtures; a *higher* number is
-  better, not "more permissive." TS/CSS keep the full set (acorn-ts trails,
-  parseCss is lenient — neither is a validity oracle). The ad-hoc timed variant
+  better, not "more permissive." The **tsc corpus** is filtered the same way and by
+  the same argument, with tsc as the oracle that decides validity (its parser AND
+  its `.errors.txt` baselines must agree) — and `tsc` is a row on this surface, so
+  on that corpus it reads 100% by construction. The **prettier suites and the
+  remaining CSS** keep the full set (acorn-ts trails modern TS, parseCss is lenient
+  — neither is a validity oracle).
+
+  Because those corpora answer different questions, the report splits each group's
+  coverage **per corpus source** under the aggregate line. Read the source rows: a
+  TypeScript parse gap is tenths of a point on a group that is mostly test262, and
+  an oracle's 100% is not an achievement. The axis coverage cannot show at all —
+  over-ACCEPTANCE — has its own tool, `diagnostics/ts_repo_over_acceptance.ts`
+  (`deno task ts-repo:over-acceptance`), graded over the files tsc's parser rejects
+  and read inverted.
+
+  The ad-hoc timed variant
   (coverage flag unset) times the all-tools-pass intersection — an adversarial
   corpus's "easy" subset (`BENCH_MODE=union` audits what it hides). test262 files
   are parsed at the goal test262 **declares** (`SourceFile.goal`, from the
@@ -111,7 +125,11 @@ Things the published numbers measure that aren't quite what they look like.
   module goal and those tests depressed tsv's and acorn's TS coverage alike;
   oxc's filename inference hid it, making tsv read ~2 files behind on a goal
   artifact.) Only the conformance-coverage preflight is goal-aware — the perf
-  surface has no test262. The goal-aware per-test differential is
+  surface has no test262. The tsc corpus deliberately carries NO goal: tsc's
+  module-vs-script reading is a semantic classification, not the ES `sourceType`
+  switch, and mapping one onto the other scores a parser for syntax tsc itself
+  accepts either way (`benches/js/harvest_ts_repo.ts` carries the measurement).
+  The goal-aware per-test differential is
   `diagnostics/test262_compare.ts`; the graded pass/fail gates remain `tsv_debug
   test262` / `conformance:svelte-fixtures` — this surface measures coverage, it
   doesn't replace them.
@@ -320,6 +338,16 @@ prettier. Load-bearing on two axes:
 
 ### Alternative implementations
 
+- **tsc (`typescript`)** — the TypeScript compiler's own parser; TypeScript, JS,
+  parse-only, **conformance surface only**. Not a peer implementation but the
+  DEFINITION the other TS rows are measured against, which is why it earns a row on
+  the verdict surface and none on the throughput one. Two properties shape how it is
+  driven (`lib/tsc.ts`): its parser is **error-recovering** — `createSourceFile`
+  never throws, so an accept is defined as `parseDiagnostics.length === 0`, and a
+  row scoring "didn't throw" would report a fabricated 100% — and it **infers** the
+  parse goal from the file rather than accepting one, so the conformance corpus's
+  declared `goal` is ignored for this row alone. 6.x is the last JS implementation;
+  7.x is the Go port, whose npm package ships a binary with no in-process parser API.
 - **oxc-parser (NAPI)** — fast TypeScript parser; TypeScript, JS.
 - **oxfmt (NAPI)** — fast formatter; TypeScript, JS, CSS, Svelte (experimental).
   As of 0.57 the native Rust formatter handles **JS/TS *and* CSS**; only **Svelte**

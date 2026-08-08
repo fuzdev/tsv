@@ -17,6 +17,7 @@ import { WasmImplementation } from './wasm.ts';
 import { current_runtime } from './runtime.ts';
 import { OxcImplementation } from './oxc.ts';
 import { OxcWasmImplementation } from './oxc_wasm.ts';
+import { TscImplementation } from './tsc.ts';
 import { YukuImplementation } from './yuku.ts';
 import { BiomeImplementation } from './biome.ts';
 import { DprintImplementation } from './dprint.ts';
@@ -40,6 +41,8 @@ export interface InitializedImplementations {
 	oxc: OxcImplementation | undefined;
 	/** OXC WASM implementation (oxc-parser via wasm32-wasi) - undefined if not available */
 	oxc_wasm: OxcWasmImplementation | undefined;
+	/** tsc (the TypeScript compiler's own parser) - parse only; undefined if not available */
+	tsc: TscImplementation | undefined;
 	/** yuku-parser (N-API) - parse only; undefined if not available */
 	yuku: YukuImplementation | undefined;
 	/** yuku-parser (WASM) - parse only; undefined if not available */
@@ -159,6 +162,11 @@ export async function init_implementations(
 		'OXC WASM (oxc-parser)',
 		'OXC WASM'
 	);
+	const tsc_impl = await optional(
+		new TscImplementation(),
+		`tsc ${versions.tsc.typescript} (parse-only)`,
+		'tsc'
+	);
 	// One class, two bindings — see lib/yuku.ts.
 	const yuku_impl = await optional(
 		new YukuImplementation('yuku-parser', versions.yuku),
@@ -195,6 +203,7 @@ export async function init_implementations(
 		wasm: wasm_impl,
 		oxc: oxc_impl,
 		oxc_wasm: oxc_wasm_impl,
+		tsc: tsc_impl,
 		yuku: yuku_impl,
 		yuku_wasm: yuku_wasm_impl,
 		biome: biome_impl,
@@ -246,10 +255,11 @@ export interface BenchmarkTaskOptions {
 	 */
 	forced_async?: boolean;
 	/**
-	 * Which corpus/surface this run measures (default `perf`). Only one task reads
-	 * it — the `yuku-parser` N-API row, dropped on the `conformance` surface
-	 * because that corpus carries inputs its native binding cannot survive. See the
-	 * registration site and CLAUDE.md §Known Issues.
+	 * Which corpus/surface this run measures (default `perf`). Two tasks read it,
+	 * in opposite directions: the `yuku-parser` N-API row is DROPPED on the
+	 * `conformance` surface (that corpus carries inputs its native binding cannot
+	 * survive — CLAUDE.md §Known Issues), and the `tsc` row is added ONLY there (a
+	 * verdict row, not a speed row). Both registration sites carry the reasoning.
 	 */
 	corpus_kind?: 'perf' | 'conformance';
 }
@@ -375,6 +385,27 @@ export function get_benchmark_tasks(
 			'oxc-parser-wasm',
 			'oxc-wasm',
 			(source, _language, goal) => impls.oxc_wasm!.parse(source, language, goal)
+		);
+
+		// tsc (TypeScript/JS only) — the language's own parser, so this row is the
+		// DEFINITION the other TS rows are measured against, the way svelte/compiler
+		// is on the Svelte surface. Two properties decide where it belongs:
+		//
+		// 1. It is CONFORMANCE-ONLY. The value of a tsc row is a verdict, not a
+		//    speed: adding it to the perf surface would put a new row in the
+		//    published throughput tables (which tsv.fuz.dev renders) for a tool
+		//    nobody formats with. Flipping it on there is a one-word change here,
+		//    and a deliberate one.
+		// 2. On the tsc-corpus entry it is the ORACLE (100% by construction — the
+		//    harvest keeps exactly the files this parser accepts), while on test262
+		//    and the prettier suites it is an independent parser like any other. The
+		//    per-source coverage breakdown is what keeps those two readings apart;
+		//    the aggregate row alone would blend them. See lib/tsc.ts.
+		add(
+			impls.tsc?.supports_parse_language(language) && options.corpus_kind === 'conformance',
+			'tsc',
+			'tsc',
+			(source, _language, goal) => impls.tsc!.parse(source, language, goal)
 		);
 
 		// yuku-parser, N-API and WASM (TypeScript/JS only) — a Zig parser whose

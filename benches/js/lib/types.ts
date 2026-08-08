@@ -58,6 +58,15 @@ export interface SourceFile {
 	 */
 	reproducible?: boolean;
 	/**
+	 * Which `CORPUS_ENTRIES` entry this file came from (its `path`/`files_from`,
+	 * project-root-relative) — the key the conformance report's per-source coverage
+	 * breakdown groups by, so an entry whose reading is special (the tsc corpus,
+	 * where `tsc` is the oracle rather than a competitor) can be read on its own
+	 * instead of averaged into the group. Set by `DevReposLoader`; undefined for a
+	 * `DirectoryLoader` single-repo run.
+	 */
+	source?: string;
+	/**
 	 * The declared parse goal (test262 only; undefined = `module`). The
 	 * conformance preflight parses each tool at this goal so a script-goal
 	 * `await`-identifier test isn't scored as a failure against a module parse.
@@ -73,6 +82,7 @@ export type ImplementationName =
 	| 'wasm'
 	| 'oxc'
 	| 'oxc-wasm'
+	| 'tsc'
 	| 'yuku-parser'
 	| 'yuku-parser-wasm'
 	| 'biome-wasm'

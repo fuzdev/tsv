@@ -21,12 +21,14 @@
 		"@dprint/typescript": "0.96.1",
 		"oxc-parser": "0.140.0",
 		"oxfmt": "0.60.0",
+		"typescript": "6.0.3",
 		"yuku-parser": "0.8.1",
 		"@yuku-parser/wasm": "0.8.1",
 		"@rsvelte/fmt": "0.7.4",
 		"zod": "^4.4.3",
 		"@fuzdev/fuz_util": "0.65.2"
 	},
+	"//typescript": "tsc (the last JS implementation — 6.x; 7.x is the Go port, whose npm package ships a binary with no in-process parser API) plays two roles here, both PARSE-only: the validity ORACLE for the tsc-corpus harvest (harvest_ts_repo.ts) and a parser ROW in the TS bench group (lib/tsc.ts). One definitional asymmetry to remember: tsc's parser is ERROR-RECOVERING — `createSourceFile` never throws, it returns a SourceFile plus `parseDiagnostics` — so an accept here means `parseDiagnostics.length === 0`, not `didn't throw`. Not one of the canonical-5 (nothing in the fixture corpus is baselined against it), so it bumps independently; keep it in the same MAJOR as the ../typescript checkout the corpus comes from, since a version below the corpus rejects the syntax the newer tests were written for.",
 	"//types": "@types/node is types-only and dev-only (never ships, no runtime cost). It lets the shared harness's `node:` builtins type-check under `deno check` (and editors) when an npm package's .d.ts pulls in node types in npm-resolution mode — the portable-node:-builtins architecture's one new dev dep. NOT needed by the gated `deno task test:deno` (that's the dependency-free divergence suite — `node:assert` + relative imports, no node_modules).",
 	"devDependencies": {
 		"@types/node": "^24"
