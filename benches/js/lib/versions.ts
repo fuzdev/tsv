@@ -22,6 +22,15 @@ export interface OxcVersions {
 }
 
 /**
+ * TypeScript compiler version (the `tsc` parse row + the tsc-corpus harvest's
+ * validity oracle). 6.x is the last JS implementation — 7.x is the Go port, whose
+ * npm package ships a binary with no in-process parser API.
+ */
+export interface TscVersions {
+	typescript: string;
+}
+
+/**
  * yuku-parser implementation versions. Two npm packages, one Zig engine behind
  * two bindings — they version in lockstep upstream, but both are read so a
  * skewed local install shows up in the report instead of hiding.
@@ -57,6 +66,7 @@ export interface RsvelteVersions {
 export interface AllVersions {
 	canonical: CanonicalVersions;
 	oxc: OxcVersions;
+	tsc: TscVersions;
 	yuku: YukuVersions;
 	biome: BiomeVersions;
 	dprint: DprintVersions;
@@ -75,6 +85,9 @@ const DEFAULT_VERSIONS: AllVersions = {
 	oxc: {
 		'oxc-parser': 'unknown',
 		oxfmt: 'unknown'
+	},
+	tsc: {
+		typescript: 'unknown'
 	},
 	yuku: {
 		parser: 'unknown',
@@ -124,6 +137,9 @@ export async function load_all_versions(): Promise<AllVersions> {
 			oxc: {
 				'oxc-parser': clean_version(deps['oxc-parser']),
 				oxfmt: clean_version(deps['oxfmt'])
+			},
+			tsc: {
+				typescript: clean_version(deps['typescript'])
 			},
 			yuku: {
 				parser: clean_version(deps['yuku-parser']),

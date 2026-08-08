@@ -19,7 +19,11 @@ import {
 import { check_node_modules } from './lib/check_node_modules.ts';
 import { get_library_path } from './lib/ffi.ts';
 import { get_napi_library_path } from './lib/napi.ts';
-import { get_benchmark_tasks, init_implementations } from './lib/implementations.ts';
+import {
+	type BenchmarkTask,
+	get_benchmark_tasks,
+	init_implementations
+} from './lib/implementations.ts';
 import { current_runtime } from './lib/runtime.ts';
 import { type Language, LANGUAGES } from './lib/types.ts';
 
@@ -92,6 +96,30 @@ await check_node_modules();
 
 const impls = await init_implementations({ logger: () => {} });
 
+/**
+ * Every task for one operation+language, across BOTH corpus surfaces.
+ *
+ * `get_benchmark_tasks` takes a `corpus_kind` because two rows are
+ * surface-specific in opposite directions (yuku's N-API row is perf-only, `tsc` is
+ * conformance-only — see its `BenchmarkTaskOptions`), and a single-surface call
+ * here would leave whichever row the other surface owns un-smoked. That is the gap
+ * this file's one-registry rule exists to prevent, so take the union and dedupe by
+ * tracking key. Smoke's input is trivial and valid, so a row excluded from a corpus
+ * for that corpus's reasons is still meaningful to sanity-check here.
+ */
+function all_surface_tasks(operation: 'parse' | 'format', language: Language): BenchmarkTask[] {
+	const tasks: BenchmarkTask[] = [];
+	const seen = new Set<string>();
+	for (const corpus_kind of ['perf', 'conformance'] as const) {
+		for (const task of get_benchmark_tasks(impls, operation, language, { corpus_kind })) {
+			if (seen.has(task.tracking_key)) continue;
+			seen.add(task.tracking_key);
+			tasks.push(task);
+		}
+	}
+	return tasks;
+}
+
 //
 // Formatters
 //
@@ -105,7 +133,7 @@ console.log('Formatters:');
 // `(unsupported)` line name it — the signal that an impl LOADED but doesn't do this
 // language, as opposed to not loading at all.
 const format_tasks_by_language = new Map(
-	LANGUAGES.map((lang) => [lang, get_benchmark_tasks(impls, 'format', lang)] as const)
+	LANGUAGES.map((lang) => [lang, all_surface_tasks('format', lang)] as const)
 );
 const format_names = [
 	...new Set([...format_tasks_by_language.values()].flat().map((task) => task.name))
@@ -178,7 +206,7 @@ console.log('\nParsers:');
 for (const lang of LANGUAGES) {
 	console.log(`  ${lang}:`);
 	const input = INPUTS[lang];
-	const tasks = get_benchmark_tasks(impls, 'parse', lang);
+	const tasks = all_surface_tasks('parse', lang);
 
 	for (const task of tasks) {
 		try {

@@ -42,10 +42,13 @@
  *                            gap, and fixing it diverges tsv from acorn toward spec.
  *                            Reported, never gated.
  *
- * Scope: single-file `.ts` only — `.tsx` (JSX grammar) and `@filename` multi-file
- * tests are skipped and counted (feeding a multi-module test as one parse unit is
- * meaningless). Compiler-directive comments (`// @target`, `// @strict`) are inert
- * to a parser (they're `//` comments) so nothing is stripped.
+ * Scope: single-file `.ts` only — `.tsx` (JSX grammar), `.d.ts`, and `@filename`
+ * multi-file tests are skipped and counted (feeding a multi-module test as one
+ * parse unit is meaningless). Discovery and the baseline-reading rules are SHARED
+ * with the tsc-corpus harvest (`lib/ts_repo.ts`), so the gate and the bench corpus
+ * cannot drift on what the corpus IS. Compiler-directive comments (`// @target`,
+ * `// @strict`) are inert to a parser (they're `//` comments) so nothing is
+ * stripped.
  *
  * SEPARATE from the acorn-typescript-suite gate (`ts_fixtures_compare.ts`): that
  * gate's oracle is the live acorn parser over acorn's OWN curated `test/` suite;
@@ -80,10 +83,16 @@ import { basename, join } from 'node:path';
 import { init_compare_implementations } from '../lib/compare_cli.ts';
 import { TS_REPO_PINS } from '../lib/gate_counts.ts';
 import type { KnownGap } from '../lib/parse_sanctions.ts';
+import {
+	baseline_test_key,
+	discover_ts_cases,
+	empty_ts_case_skips,
+	has_grammar_error,
+	is_multi_file_test,
+	TS_BASELINE_DIR,
+	TS_REPO
+} from '../lib/ts_repo.ts';
 
-/** The official TypeScript checkout (baselines live at a fixed path under it). */
-const TS_REPO = '../typescript';
-const BASELINE_DIR = `${TS_REPO}/tests/baselines/reference`;
 const DEFAULT_ROOT = `${TS_REPO}/tests/cases/conformance/parser`;
 
 /**
@@ -99,24 +108,6 @@ const KNOWN_GAPS: KnownGap[] = [
 	// members now parse a `{` body like concrete members (acorn/tsc accept). A new
 	// tsc-accepted over-rejection surfaces here as an untracked `gap` (exits 1).
 ];
-
-async function* discover(dir: string): AsyncGenerator<string> {
-	let entries;
-	try {
-		entries = await readdir(dir, { withFileTypes: true });
-	} catch (e) {
-		console.error(`Cannot read ${dir}: ${e instanceof Error ? e.message : e}`);
-		return;
-	}
-	for (const entry of entries) {
-		const full = join(dir, entry.name);
-		if (entry.isDirectory()) {
-			if (entry.name !== 'node_modules') yield* discover(full);
-		} else if (entry.name.endsWith('.ts') && !entry.name.endsWith('.d.ts')) {
-			yield full;
-		}
-	}
-}
 
 function first_line(e: unknown): string {
 	return String(e instanceof Error ? e.message : e).split('\n')[0];
@@ -150,21 +141,17 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 		Deno.exit(1);
 	}
 
-	// Index of every `*.errors.txt` baseline, keyed by its **un-suffixed** test name.
-	// A test compiled under multiple settings (`// @target: es5, es2015`, `@module`, …)
-	// writes per-variant baselines `<name>(target=es5).errors.txt` rather than a plain
-	// `<name>.errors.txt` — ~700 of the ~768 corpus files carry such a directive. Reading
-	// only `<name>.errors.txt` therefore MISSES the suffixed baselines and mis-reads a
-	// tsc grammar rejection as a clean compile (e.g. `parserAccessors5` → TS1183 lives in
-	// `parserAccessors5(target=es5).errors.txt`). Index once so a lookup gathers every
-	// variant. Key = filename minus the trailing `(…)` group(s) and `.errors.txt`.
+	// Index of every `*.errors.txt` baseline, keyed by its **un-suffixed** test name
+	// (`baseline_test_key`, shared with the tsc-corpus harvest — ~700 of the ~768
+	// corpus files are compiled under multiple settings and so carry only per-variant
+	// baselines). Index once so a lookup gathers every variant.
 	const errors_baselines_by_test = new Map<string, string[]>();
 	let baseline_names: string[];
 	try {
-		baseline_names = await readdir(BASELINE_DIR);
+		baseline_names = await readdir(TS_BASELINE_DIR);
 	} catch (e) {
 		console.error(
-			`FAIL: cannot read ${BASELINE_DIR} (${e instanceof Error ? e.message : e}) — ` +
+			`FAIL: cannot read ${TS_BASELINE_DIR} (${e instanceof Error ? e.message : e}) — ` +
 				`the ${TS_REPO} checkout exists but its baselines are missing (partial/sparse checkout?). ` +
 				`The baselines ARE the oracle, so this run cannot grade anything.`
 		);
@@ -172,7 +159,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 	}
 	for (const name of baseline_names) {
 		if (!name.endsWith('.errors.txt')) continue;
-		const key = name.replace(/\.errors\.txt$/, '').replace(/\(.*\)$/, '');
+		const key = baseline_test_key(name);
 		(errors_baselines_by_test.get(key) ?? errors_baselines_by_test.set(key, []).get(key)!).push(
 			name
 		);
@@ -187,8 +174,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 		// A TS1xxx code = a syntax/grammar diagnostic → tsc's parser rejects. If ANY
 		// variant carries one, tsc rejects (grammar errors are target-independent).
 		for (const name of baselines) {
-			const errors = await readFile(join(BASELINE_DIR, name), 'utf8');
-			if (/error TS1\d{3}:/.test(errors)) return false;
+			if (has_grammar_error(await readFile(join(TS_BASELINE_DIR, name), 'utf8'))) return false;
 		}
 		return true;
 	}
@@ -203,15 +189,14 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 		gap_unexpected: [] as Gap[],
 		gap_beyond_acorn: [] as { path: string; tsv_error: string }[]
 	};
-	const skipped = { tsx: 0, multi_file: 0, unreadable: 0 };
+	// `.tsx` / `.d.ts` are filtered (and counted) inside discovery; the rest are
+	// content-level decisions this loop makes.
+	const discovery_skips = empty_ts_case_skips();
+	const skipped = { multi_file: 0, unreadable: 0 };
 	// Ledger-freshness tracking (see the stale check at the end).
 	const used_gaps = new Set<string>();
 
-	for await (const path of discover(root)) {
-		if (path.endsWith('.tsx')) {
-			skipped.tsx++;
-			continue;
-		}
+	for await (const path of discover_ts_cases(root, discovery_skips)) {
 		let content: string;
 		try {
 			content = await readFile(path, 'utf8');
@@ -219,8 +204,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 			skipped.unreadable++;
 			continue;
 		}
-		// Multi-file tests concatenate several virtual modules — not one parse unit.
-		if (/\/\/\s*@[Ff]ilename:/.test(content)) {
+		if (is_multi_file_test(content)) {
 			skipped.multi_file++;
 			continue;
 		}
@@ -296,9 +280,11 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 	}
 
 	console.error(`\nTypeScript-repo parse-conformance triage — root: ${root}`);
-	console.error(`  oracle: tsc baselines (${BASELINE_DIR})`);
+	console.error(`  oracle: tsc baselines (${TS_BASELINE_DIR})`);
 	console.error(
-		`  scanned: ${scanned} single-file .ts  (skipped ${skipped.multi_file} @filename, ${skipped.tsx} .tsx, ${skipped.unreadable} unreadable)\n`
+		`  scanned: ${scanned} single-file .ts  (skipped ${skipped.multi_file} @filename, ` +
+			`${discovery_skips.tsx} .tsx, ${discovery_skips.declaration} .d.ts, ` +
+			`${skipped.unreadable} unreadable)\n`
 	);
 	console.error(`  parity accept (tsv ok, tsc valid):     ${buckets.accept_parity}`);
 	console.error(
@@ -337,7 +323,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 			root,
 			oracle: 'tsc-baselines',
 			scanned,
-			skipped,
+			skipped: { ...skipped, ...discovery_skips },
 			accept_parity: buckets.accept_parity,
 			reject_parity: buckets.reject_parity,
 			over_acceptance: buckets.over_acceptance,

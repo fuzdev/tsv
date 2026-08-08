@@ -181,7 +181,7 @@ if (exists('../typescript/tests/baselines/reference')) {
 	warn(
 		'../typescript present but tests/baselines/reference missing — conformance:ts-repo will FAIL (partial checkout)'
 	);
-} else warn('../typescript checkout missing — conformance:ts-repo needs it');
+} else warn('../typescript checkout missing — conformance:ts-repo + bench:harvest:ts-repo need it');
 
 // Informational (NOT gated by pins:audit — see its docstring): the prettier
 // checkout is a reading reference + corpus-suite source whose oracle output is
