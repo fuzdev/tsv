@@ -26,22 +26,35 @@ their own table — and they split on the actual rule, not on the resemblance:
 
 | heritage element | acorn | prettier | tsv |
 | --- | --- | --- | --- |
-| `let` | accept | accept | **accept** |
-| `yield` `await` | accept | accept | **reject** |
+| `let` `yield` | accept | accept | **accept** |
+| `await` | accept | accept | **reject** (Module goal) |
 
-`let` is not a `ReservedWord` at all. The only bar on it as a name is a strict-mode
-early error in *binding* positions — which a heritage element is not, and which tsv
-defers regardless. tsv already reads `let` as an ordinary type name everywhere else
-(`let x: let`, `type T = let.Foo`, `typeof let`), so accepting it here is internal
-consistency; pinned by the sibling [heritage_let](../heritage_let/). `yield` and
-`await` **are** `ReservedWord`s, readmitted only by the `[~Yield]` / `[~Await]`
-productions: tsv is strict-only, so `yield` never qualifies and `await` qualifies
-only at Script goal. Prettier accepts both — the one place its heritage line is
-looser than the rule it states, and the one place tsv does not follow it.
+Neither `let` nor `yield` is barred here by the reserved-word rule. `let` is not a
+`ReservedWord` at all; `yield` is one, but `IdentifierReference[Yield]` readmits it
+under `[~Yield]`. What is left in both cases is the strict-mode early error of
+ecma262 §sec-identifiers-static-semantics-early-errors, which tsv defers — so
+accepting them is the same rule that already reads them as ordinary type names
+everywhere else (`let x: let`, `type T = yield.Foo`, `typeof let`). Pinned by the
+siblings [heritage_let](../heritage_let/) and [heritage_yield](../heritage_yield/).
+
+The `[~Yield]` / `[~Await]` guards do come along, though — this head really is an
+`IdentifierReference`, so inside a generator or async function the words are the
+operator and the name reading is unreachable: `function* g() { interface A extends
+yield {} }` rejects, as it does for tsc (TS1109, reached by parsing heritage with
+its *expression* parser). A plain type annotation is unaffected in both.
+
+`await` carries one more bar on top, and not the reserved-word one: the **goal**
+axis (`BindingIdentifier`/`IdentifierReference : await` is a Syntax Error when the
+goal is `Module`), which tsv enforces as a landed decision rather than defers. At
+`Goal::Script`, outside a `[+Await]` context, it is accepted like the other two.
+Prettier accepts it under both goals — the one place its heritage line is looser
+than the rule it states.
 
 No tsc column on that table: the compiler's own corpus carries no
 `interface … extends let` / `yield` case to read a baseline from, and its two
 `extends await` hits are value-position *class* heritage, a different production.
+Probed directly, tsc's parser accepts `interface A extends let {}` and
+`… extends yield {}`.
 
 The other two are lenient for structural reasons, not by decision. **acorn** reads
 the heritage name as a bare `IdentifierName`, so every reserved word slips through.

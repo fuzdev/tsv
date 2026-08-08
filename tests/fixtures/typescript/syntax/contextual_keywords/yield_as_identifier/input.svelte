@@ -1,5 +1,6 @@
 <script lang="ts">
-	// yield works in property positions only
+	// yield in property positions; it is a binding name too, but acorn rejects that
+	// and so cannot be a fixture — see tests/strict_reserved_word_as_name.rs
 	const obj = { yield: 'value' };
 
 	const obj2 = {
