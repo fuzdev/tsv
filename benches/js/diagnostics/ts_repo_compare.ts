@@ -113,8 +113,12 @@ import {
  * Scanning everything rather than `conformance` + `compiler` is deliberate: the full root
  * is a strict superset adding 4,238 files (`fourslash`, `projects`, `transpile`,
  * `unittests`) and **zero** new gaps, so the narrower pair would only be a second thing to
- * keep right. Cost is +2.6 s on a ~36 s `conformance` aggregate — a whole-corpus run is
- * ~3.6 s, not the "1–2 min" this was once believed to cost.
+ * keep right. Cost, measured warm on an otherwise-quiet machine: ~0.6 s for the narrow
+ * root against ~2.7 s for the whole one, so widening buys those trees for **~+2 s** on a
+ * `conformance` aggregate measured in tens of seconds — not the "1–2 min" this was once
+ * believed to cost. ⚠️ That wall clock moves several-fold with machine load (the same run
+ * takes ~5.5 s at load average 5), so re-measure before quoting rather than trusting a
+ * number recorded mid-session.
  *
  * ⚠️ The tsc-corpus **bench harvest** (`harvest_ts_repo.ts`) deliberately keeps the
  * narrower `conformance` + `compiler` pair. That is not drift: it is building a *corpus of

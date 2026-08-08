@@ -610,12 +610,20 @@ as a `TSInstantiationExpression`; on one line it emits
 line break (its instantiation bail checks `hasPrecedingLineBreak`). tsv emits
 the same-line shape uniformly.
 
-**Lone surrogates in string values** (`lone_surrogate_value`): a lone UTF-16
-surrogate decodes to U+FFFD in tsv — Rust strings are UTF-8 and
-cannot represent WTF-16 lone surrogates — where acorn keeps the lone
-surrogate in the JS string value. Both escape spellings agree (`'\ud800'` and
-`'\u{D800}'`), and `raw` is a source slice, so the printed output is exact.
-This is a representation limit, not a parse difference.
+**Lone surrogates in string values** (`lone_surrogate_value`): an **unpaired** UTF-16
+surrogate decodes to U+FFFD in tsv — Rust strings are UTF-8 and cannot represent
+WTF-16 lone surrogates — where acorn keeps the lone surrogate in the JS string value.
+Both escape spellings agree (`'\ud800'` and `'\u{D800}'`), and `raw` is a source
+slice, so the printed output is exact. This is a representation limit, not a parse
+difference.
+
+⚠️ **Only an UNPAIRED half.** A lead escape followed by a trail escape denotes one code
+point, and the pairing is a property of the code units rather than of how each half was
+spelled — so `'\uD83D\uDE00'`, `'\u{D83D}\u{DE00}'` and the two mixed forms all
+decode to `😀` exactly as acorn does, and none of them reach this divergence. That value
+IS representable, so a spelling that came out as two U+FFFDs would be a plain bug rather
+than this sanctioned limit — which is what the four spellings are pinned for in
+[unicode_lone_surrogate](../tests/fixtures/typescript/expressions/literals/string/escapes/unicode_lone_surrogate/).
 
 ⚠️ **The divergence is real but deliberately UNPINNABLE by a fixture.** An
 `expected.json` is captured through the debug sidecar, and a lone surrogate

@@ -4,7 +4,7 @@ use super::Printer;
 use crate::ast::internal;
 use crate::printer::class_common::{ClassHeaderLayout, ClassHeaderOptions};
 use crate::printer::expressions::assignment::RhsCommentInfo;
-use crate::printer::{CommentSpacing, CommentVec};
+use crate::printer::{ClassMemberModifiers, CommentSpacing, CommentVec};
 use smallvec::smallvec;
 use tsv_lang::Span;
 use tsv_lang::comments_to_emit_in_range;
@@ -466,43 +466,23 @@ impl<'a> Printer<'a> {
         let key_start = prop.key.span().start;
         let mut cursor = next_token_start;
 
-        // Declare modifier (comes first, before accessibility)
+        // Declare modifier (property-only, and first — ahead of accessibility)
         if prop.declare {
             self.push_member_keyword_doc(&mut parts, "declare ", &mut cursor, key_start);
         }
 
-        // Accessibility modifier
-        if let Some(accessibility) = &prop.accessibility {
-            self.push_member_keyword_doc(
-                &mut parts,
-                accessibility.as_keyword(),
-                &mut cursor,
-                key_start,
-            );
-        }
-
-        // Static modifier
-        if prop.is_static {
-            self.push_member_keyword_doc(&mut parts, "static ", &mut cursor, key_start);
-        }
-
-        // Abstract modifier — before `override`, tsc's canonical `abstract override`
-        // order (what prettier emits, and the only order tsc accepts).
-        // TODO: `push_member_keyword_doc` scans FORWARD from `cursor`, so on the
-        // reversed `override abstract` spelling (still parsed, see `parse_class_member`)
-        // this lookup runs first and the `override` one below then finds nothing —
-        // harmless for the keywords themselves, but a comment between the two relocates
-        // (`override /* c */ abstract x` → `/* c */ abstract override x`, where prettier
-        // gives `abstract override /* c */ x`). Fixing it needs the emitter to walk the
-        // modifiers in SOURCE order while printing them in canonical order.
-        if prop.r#abstract {
-            self.push_member_keyword_doc(&mut parts, "abstract ", &mut cursor, key_start);
-        }
-
-        // Override modifier
-        if prop.r#override {
-            self.push_member_keyword_doc(&mut parts, "override ", &mut cursor, key_start);
-        }
+        // Accessibility → static → abstract → override, the run shared with methods
+        self.push_class_member_modifiers_doc(
+            &mut parts,
+            ClassMemberModifiers {
+                accessibility: prop.accessibility,
+                is_static: prop.is_static,
+                r#abstract: prop.r#abstract,
+                r#override: prop.r#override,
+            },
+            &mut cursor,
+            key_start,
+        );
 
         // Readonly modifier
         if prop.readonly {
@@ -723,38 +703,19 @@ impl<'a> Printer<'a> {
         let key_start = method.key.span().start;
         let mut cursor = next_token_start;
 
-        // Accessibility modifier
-        if let Some(accessibility) = &method.accessibility {
-            self.push_member_keyword_doc(
-                &mut parts,
-                accessibility.as_keyword(),
-                &mut cursor,
-                key_start,
-            );
-        }
-
-        // Static modifier
-        if method.is_static {
-            self.push_member_keyword_doc(&mut parts, "static ", &mut cursor, key_start);
-        }
-
-        // Abstract modifier — before `override`, tsc's canonical `abstract override`
-        // order (what prettier emits, and the only order tsc accepts).
-        // TODO: `push_member_keyword_doc` scans FORWARD from `cursor`, so on the
-        // reversed `override abstract` spelling (still parsed, see `parse_class_member`)
-        // this lookup runs first and the `override` one below then finds nothing —
-        // harmless for the keywords themselves, but a comment between the two relocates
-        // (`override /* c */ abstract x` → `/* c */ abstract override x`, where prettier
-        // gives `abstract override /* c */ x`). Fixing it needs the emitter to walk the
-        // modifiers in SOURCE order while printing them in canonical order.
-        if method.r#abstract {
-            self.push_member_keyword_doc(&mut parts, "abstract ", &mut cursor, key_start);
-        }
-
-        // Override modifier
-        if method.r#override {
-            self.push_member_keyword_doc(&mut parts, "override ", &mut cursor, key_start);
-        }
+        // Accessibility → static → abstract → override, the run shared with properties
+        // (a method has no `declare` form, so the run starts at accessibility here)
+        self.push_class_member_modifiers_doc(
+            &mut parts,
+            ClassMemberModifiers {
+                accessibility: method.accessibility,
+                is_static: method.is_static,
+                r#abstract: method.r#abstract,
+                r#override: method.r#override,
+            },
+            &mut cursor,
+            key_start,
+        );
 
         // Async modifier
         if method.value.r#async {

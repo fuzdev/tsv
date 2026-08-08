@@ -714,16 +714,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// and acorn both accept these; tsc spells the same rule
     /// `parseEntityName(allowReservedWords: true)`.
     ///
-    /// The **head** segment is not widened by this — but it is not narrowed here either:
-    /// this reads whatever token is current, so what heads an entity name is entirely the
-    /// caller's question, and the four callers answer it differently. The heritage clause
-    /// guards with `at_heritage_name` (so `extends void` / `extends null` reject); a type
-    /// REFERENCE is reached only through `parse_primary_type`'s dispatch, where `void` and
-    /// `null` are their own keyword types, so `void.X` / `null.X` die on the trailing `.`
-    /// — see the `types/reserved_keyword_qualified_head_svelte_divergence` fixture. A type
-    /// QUERY and an import-type qualifier guard nothing, so `typeof void.x` and
-    /// `import('m').if` parse; acorn accepts both, so that leniency is parity, not a gap.
-    /// ⚠️ Don't restate this as one invariant — there isn't one.
+    /// The **head** segment is not widened by this, and each caller may narrow it
+    /// further, so what heads an entity name is largely the caller's question and the
+    /// four callers answer it differently. The heritage clause guards with
+    /// `at_heritage_name` (so `extends void` / `extends null` reject); a type REFERENCE
+    /// is reached only through `parse_primary_type`'s dispatch, where `void` and `null`
+    /// are their own keyword types, so `void.X` / `null.X` die on the trailing `.` — see
+    /// the `types/reserved_keyword_qualified_head_svelte_divergence` fixture. A type
+    /// QUERY and an import-type qualifier add no guard of their own, so `typeof void.x`
+    /// and `import('m').if` parse; acorn accepts both, so that leniency is parity, not a
+    /// gap. ⚠️ Don't restate this as one invariant — there isn't one.
+    ///
+    /// What IS common to all four is the floor `parse_entity_name_inner` enforces: the
+    /// head must be a word. Leaving even that to the callers is how `typeof 5` came to
+    /// parse as an `Identifier` NAMED `"5"` — a fabricated node acorn rejects outright.
     pub(crate) fn parse_type_entity_name(&mut self) -> Result<TSEntityName<'arena>, ParseError> {
         self.parse_entity_name_inner(true)
     }
@@ -742,6 +746,14 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         &mut self,
         allow_reserved_words: bool,
     ) -> Result<TSEntityName<'arena>, ParseError> {
+        // The head is an `IdentifierName` at minimum — a word. Callers that need a
+        // narrower head guard ahead of the call (see `parse_type_entity_name`); this
+        // is the floor none of them may fall through, since `current_ident_name`
+        // happily reads a literal's source text as a name.
+        if !self.current_is_identifier_or_keyword() {
+            return Err(self.error_expected("a type name"));
+        }
+
         let (id_start, id_end) = self.current_pos();
         let name = self.current_ident_name();
         self.advance()?;

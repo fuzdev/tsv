@@ -52,7 +52,8 @@ pub(crate) use analysis::{
     object_pattern_should_expand, template_literal_has_newlines,
 };
 pub(crate) use comments::{
-    CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue, OwnedCommentEffect,
+    ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
+    OwnedCommentEffect,
 };
 pub use expressions::assignment::should_inline_logical_expression;
 pub(crate) use expressions::assignment::{

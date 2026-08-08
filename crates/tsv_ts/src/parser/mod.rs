@@ -726,12 +726,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// of that clause's `TypeName`.
     ///
     /// Deliberately NOT [`Parser::at_binding_name`], which is one word narrower.
-    /// `let` is not a `ReservedWord`; the only bar on it as a name is a strict-mode
-    /// early error in **binding** positions, which a heritage element is not — so
-    /// `can_be_binding_name` excludes it correctly and this position must add it
-    /// back. tsv already reads `let` as an ordinary type name everywhere else
-    /// (`let x: let`, `type T = let.Foo`, `typeof let`); heritage was the one site
-    /// that disagreed. acorn and prettier both accept `interface A extends let {}`.
+    /// `let` is not a `ReservedWord`; the bar on it as a name is a strict-mode early
+    /// error, which tsv defers, and every oracle waives it here — acorn, prettier and
+    /// tsc all accept `interface A extends let {}`. tsv already reads `let` as an
+    /// ordinary type name everywhere else (`let x: let`, `type T = let.Foo`,
+    /// `typeof let`); heritage was the one site that disagreed.
+    ///
+    /// ⚠️ This is the ONE head that goes wider, so don't propagate it. The other
+    /// `IdentifierReference` head tsv guards — an import-equals module reference —
+    /// keeps `at_binding_name`, because acorn *does* enforce the reserved-word rule
+    /// there (`import x = let.y` is "The keyword 'let' is reserved").
     ///
     /// `yield` and `await` stay out, and that is the same rule, not an exception:
     /// both ARE `ReservedWord`s, readmitted only by the `[~Yield]` / `[~Await]`

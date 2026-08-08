@@ -11,11 +11,13 @@
 		}
 	}
 
-	// The chain may continue past the private name
+	// The chain may continue past the private name, through either subscript form
 	class B {
 		#a = { c: class {} };
+		#b = [class {}];
 		m() {
 			new this.#a.c();
+			new this.#b[0]();
 		}
 	}
 

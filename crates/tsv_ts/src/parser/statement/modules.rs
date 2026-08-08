@@ -1279,10 +1279,21 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 expression,
                 span: Span::new(ref_start as u32, ref_end as u32),
             })
-        } else if matches!(self.current_kind(), TokenKind::Identifier) {
-            // `A.B.C` (entity name) — must start with an identifier; a string /
-            // number / empty reference (`import x = 'foo'`, `import x = 5`,
-            // `import x =`) is a syntax error, matching acorn-typescript.
+        } else if self.at_binding_name() {
+            // `A.B.C` (entity name) — must start with a name; a string / number /
+            // empty reference (`import x = 'foo'`, `import x = 5`, `import x =`) is
+            // a syntax error, matching acorn-typescript.
+            //
+            // A contextual type keyword is an ordinary name here, like everywhere else
+            // (`import x = string`, `import x = number.inner`); a bare
+            // `TokenKind::Identifier` test saw only the words the lexer never made a
+            // `Keyword` and rejected them all. `at_binding_name` is reached for its
+            // SET, not its name: this head is an `IdentifierReference`, but in strict
+            // mode `let` / `yield` / `await` are barred from both reference and binding
+            // spellings alike, and acorn enforces exactly that here (`import x = let.y`
+            // is "The keyword 'let' is reserved"). The heritage head is the one
+            // position that goes wider — see `Parser::at_heritage_name`, where all
+            // three oracles accept `let` and tsv follows them.
             TSModuleReference::EntityName(self.parse_module_reference_entity_name()?)
         } else {
             return Err(self.error_expected("'require(...)' or a module reference after '='"));
