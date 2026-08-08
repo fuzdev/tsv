@@ -1,7 +1,7 @@
 /**
  * TypeScript-repo parse-conformance triage — runs tsv's TS parser against the
  * official `microsoft/typescript` compiler's own parser test corpus
- * (`../typescript/tests/cases/conformance/parser`, ~800 single-file `.ts`), using
+ * (`../typescript/tests/cases` — the WHOLE corpus, ~13.7k single-file `.ts`), using
  * **tsc's own baselines as the validity oracle** (L1) instead of a live parser.
  *
  * Why tsc baselines, not acorn: acorn-typescript is tsv's drop-in *target* but is
@@ -84,7 +84,43 @@ import type { KnownGap } from '../lib/parse_sanctions.ts';
 /** The official TypeScript checkout (baselines live at a fixed path under it). */
 const TS_REPO = '../typescript';
 const BASELINE_DIR = `${TS_REPO}/tests/baselines/reference`;
-const DEFAULT_ROOT = `${TS_REPO}/tests/cases/conformance/parser`;
+/**
+ * The WHOLE corpus, not the `conformance/parser` subtree the gate originally scanned.
+ *
+ * The narrow root was chosen on the reasoning that the parser tests are where parser
+ * bugs live. That reasoning is what kept **33 over-rejections hidden** across eight
+ * grammar families: the newly-swept trees are tsc's *checker and emitter* tests —
+ * syntactically ordinary TS written to trip semantic rules — and a parse gap surfacing
+ * in shallow test code is likelier reachable in real code than one buried in the parser
+ * torture suite.
+ *
+ * ⚠️ **33 and 32 are different quantities, not a typo.** 33 is the total the widened
+ * root exposed; one family (a for-in with an expression left side inside a grouping)
+ * landed on its own first, so the tree this gate's own re-pin was measured against
+ * already carried its fix and showed **32**. Both numbers appear in the lore record for
+ * the same reason. Measured: the narrow root was green at 768 files while the full root
+ * carried 32 untracked gaps, all 32 fixed in the same change that widened the root.
+ *
+ * Scanning everything rather than `conformance` + `compiler` is deliberate: the full root
+ * is a strict superset adding 4,238 files (`fourslash`, `projects`, `transpile`,
+ * `unittests`) and **zero** new gaps, so the narrower pair would only be a second thing to
+ * keep right. Cost is +2.6 s on a ~36 s `conformance` aggregate — a whole-corpus run is
+ * ~3.6 s, not the "1–2 min" this was once believed to cost.
+ */
+const DEFAULT_ROOT = `${TS_REPO}/tests/cases`;
+
+/**
+ * Whether `root` is the default corpus, for the full-corpus-only hygiene block.
+ *
+ * Normalized rather than compared with `===`: now that the default is a path a person
+ * plausibly types by hand, a trailing slash (`…/tests/cases/`) would silently skip BOTH
+ * the stale-`KNOWN_GAPS` check and the `TS_REPO_PINS` check — a run that looks like the
+ * full gate but grades strictly less.
+ */
+function is_default_root(root: string): boolean {
+	const strip = (p: string) => p.replace(/\/+$/, '');
+	return strip(root) === strip(DEFAULT_ROOT);
+}
 
 /**
  * tsv parse gaps confirmed against BOTH oracles (tsc-valid AND acorn-accepts),
@@ -153,7 +189,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 	// Index of every `*.errors.txt` baseline, keyed by its **un-suffixed** test name.
 	// A test compiled under multiple settings (`// @target: es5, es2015`, `@module`, …)
 	// writes per-variant baselines `<name>(target=es5).errors.txt` rather than a plain
-	// `<name>.errors.txt` — ~700 of the ~768 corpus files carry such a directive. Reading
+	// `<name>.errors.txt` — most corpus files carry such a directive. Reading
 	// only `<name>.errors.txt` therefore MISSES the suffixed baselines and mis-reads a
 	// tsc grammar rejection as a clean compile (e.g. `parserAccessors5` → TS1183 lives in
 	// `parserAccessors5(target=es5).errors.txt`). Index once so a lookup gathers every
@@ -358,7 +394,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 	}
 
 	// Full-corpus-only hygiene (a subtree run legitimately grades a slice):
-	if (root === DEFAULT_ROOT) {
+	if (is_default_root(root)) {
 		// Ledger freshness: a KNOWN_GAPS entry matching nothing means its gap was
 		// fixed (delete it) or upstream renamed the test (update it) — the list must
 		// mirror the live corpus, like scan_audit's ALLOW list.

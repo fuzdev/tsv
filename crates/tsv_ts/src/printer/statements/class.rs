@@ -486,14 +486,22 @@ impl<'a> Printer<'a> {
             self.push_member_keyword_doc(&mut parts, "static ", &mut cursor, key_start);
         }
 
+        // Abstract modifier — before `override`, tsc's canonical `abstract override`
+        // order (what prettier emits, and the only order tsc accepts).
+        // TODO: `push_member_keyword_doc` scans FORWARD from `cursor`, so on the
+        // reversed `override abstract` spelling (still parsed, see `parse_class_member`)
+        // this lookup runs first and the `override` one below then finds nothing —
+        // harmless for the keywords themselves, but a comment between the two relocates
+        // (`override /* c */ abstract x` → `/* c */ abstract override x`, where prettier
+        // gives `abstract override /* c */ x`). Fixing it needs the emitter to walk the
+        // modifiers in SOURCE order while printing them in canonical order.
+        if prop.r#abstract {
+            self.push_member_keyword_doc(&mut parts, "abstract ", &mut cursor, key_start);
+        }
+
         // Override modifier
         if prop.r#override {
             self.push_member_keyword_doc(&mut parts, "override ", &mut cursor, key_start);
-        }
-
-        // Abstract modifier
-        if prop.r#abstract {
-            self.push_member_keyword_doc(&mut parts, "abstract ", &mut cursor, key_start);
         }
 
         // Readonly modifier
@@ -730,14 +738,22 @@ impl<'a> Printer<'a> {
             self.push_member_keyword_doc(&mut parts, "static ", &mut cursor, key_start);
         }
 
+        // Abstract modifier — before `override`, tsc's canonical `abstract override`
+        // order (what prettier emits, and the only order tsc accepts).
+        // TODO: `push_member_keyword_doc` scans FORWARD from `cursor`, so on the
+        // reversed `override abstract` spelling (still parsed, see `parse_class_member`)
+        // this lookup runs first and the `override` one below then finds nothing —
+        // harmless for the keywords themselves, but a comment between the two relocates
+        // (`override /* c */ abstract x` → `/* c */ abstract override x`, where prettier
+        // gives `abstract override /* c */ x`). Fixing it needs the emitter to walk the
+        // modifiers in SOURCE order while printing them in canonical order.
+        if method.r#abstract {
+            self.push_member_keyword_doc(&mut parts, "abstract ", &mut cursor, key_start);
+        }
+
         // Override modifier
         if method.r#override {
             self.push_member_keyword_doc(&mut parts, "override ", &mut cursor, key_start);
-        }
-
-        // Abstract modifier
-        if method.r#abstract {
-            self.push_member_keyword_doc(&mut parts, "abstract ", &mut cursor, key_start);
         }
 
         // Async modifier

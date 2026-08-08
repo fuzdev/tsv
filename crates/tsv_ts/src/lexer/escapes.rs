@@ -24,7 +24,8 @@ use tsv_lang::ParseError;
 /// - Simple escapes: `\n`, `\t`, `\r`, `\b`, `\f`, `\v`, `\\`, `\'`, `\"`
 /// - Hex escapes: `\xHH` (2 hex digits)
 /// - Unicode escapes: `\uXXXX` (4 hex digits)
-/// - Codepoint escapes: `\u{XXXXXX}` (1-6 hex digits)
+/// - Codepoint escapes: `\u{X...}` (any number of hex digits, value ≤ U+10FFFF —
+///   the spec caps the VALUE, so leading zeros are unbounded)
 /// - Octal escapes: `\0` (null), legacy octals (`\101` → 'A')
 /// - Line continuations: `\<newline>` → empty string
 /// - Invalid escapes: `\z` → 'z' (backslash ignored per spec)
@@ -83,8 +84,15 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Parse
                     if chars.peek() == Some(&'{') {
                         // Codepoint escape: \u{X...XXXXXX}
                         chars.next(); // consume '{'
-                        let mut code: u32 = 0;
-                        let mut digits: usize = 0;
+                        // `CodePoint :: HexDigits but only if MV of HexDigits ≤ 0x10FFFF`
+                        // caps the VALUE, not the digit count — leading zeros are
+                        // unbounded, so `\u{0000000000000041}` is a valid `A`. Accumulate
+                        // in `u64` and stop once past the cap: an arbitrarily long escape
+                        // then can't overflow, while the check below still sees a value
+                        // greater than 0x10FFFF (and reports it unchanged for the
+                        // ordinary `\u{110000}` spelling).
+                        let mut code: u64 = 0;
+                        let mut any_digit = false;
                         loop {
                             match chars.peek() {
                                 Some(&'}') => {
@@ -94,13 +102,10 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Parse
                                 Some(&ch) => match ch.to_digit(16) {
                                     Some(d) => {
                                         chars.next();
-                                        // Accumulate the first 6 digits only; a 7th
-                                        // trips the length check below, so overlong
-                                        // input can't overflow `code`.
-                                        if digits < 6 {
-                                            code = code * 16 + d;
+                                        if code <= 0x10FFFF {
+                                            code = code * 16 + u64::from(d);
                                         }
-                                        digits += 1;
+                                        any_digit = true;
                                     }
                                     None => {
                                         return Err(ParseError::invalid_syntax(
@@ -120,21 +125,28 @@ pub fn decode_string_escapes_into(s: &str, out: &mut String) -> Result<(), Parse
                             }
                         }
 
-                        if digits == 0 || digits > 6 {
+                        if !any_digit {
                             return Err(ParseError::invalid_syntax(
                                 "Invalid unicode codepoint escape length".to_string(),
                                 0,
                             ));
                         }
 
-                        if let Some(ch) = char::from_u32(code) {
-                            result.push(ch);
-                        } else {
+                        if code > 0x10FFFF {
                             return Err(ParseError::invalid_syntax(
                                 format!("Invalid unicode codepoint: U+{code:X}"),
                                 0,
                             ));
                         }
+
+                        // `code` fits `u32` (capped just above), so the only value
+                        // `char::from_u32` refuses is a lone surrogate (U+D800..=U+DFFF)
+                        // — well-formed grammar that only the well-formed-unicode
+                        // proposals reject. Substitute U+FFFD exactly as the 4-digit
+                        // `\uD800` path below already does, so both spellings agree.
+                        result.push(
+                            char::from_u32(code as u32).unwrap_or(char::REPLACEMENT_CHARACTER),
+                        );
                     } else {
                         // Standard unicode escape: \uXXXX (4 digits → 0..=0xFFFF)
                         let code = read_hex_value(&mut chars, 4)?;
@@ -358,7 +370,37 @@ mod tests {
     #[test]
     fn test_codepoint_escape_length_and_range_errors() {
         assert!(decode_string_escapes("\\u{}").is_err()); // empty
-        assert!(decode_string_escapes("\\u{1234567}").is_err()); // > 6 digits
+        // `\u{1234567}` is rejected on its VALUE (0x1234567 > U+10FFFF), not on its
+        // digit count — `CodePoint :: HexDigits but only if MV of HexDigits ≤ 0x10FFFF`
+        // caps the value alone. See `test_codepoint_escape_leading_zeros_unbounded`.
+        assert!(decode_string_escapes("\\u{1234567}").is_err());
         assert!(decode_string_escapes("\\u{110000}").is_err()); // > U+10FFFF
+    }
+
+    #[test]
+    fn test_codepoint_escape_leading_zeros_unbounded() {
+        // Leading zeros carry no value, so an arbitrarily long escape is valid.
+        assert_eq!(decode_string_escapes("\\u{0041}").unwrap(), "A");
+        assert_eq!(decode_string_escapes("\\u{0000000000000041}").unwrap(), "A");
+        // Padding a value that is itself in range never pushes it out of range.
+        assert_eq!(
+            decode_string_escapes("\\u{00000010FFFF}").unwrap(),
+            "\u{10FFFF}"
+        );
+        // Accumulation stops once past the cap, so an absurd escape can't overflow
+        // the `u64` — it still reports as out of range.
+        let long = format!("\\u{{{}}}", "f".repeat(500));
+        assert!(decode_string_escapes(&long).is_err());
+    }
+
+    #[test]
+    fn test_braced_lone_surrogate_falls_back_to_replacement() {
+        // The braced spelling agrees with the 4-digit one: a lone surrogate is
+        // well-formed grammar that Rust's UTF-8 `char` cannot represent.
+        assert_eq!(decode_string_escapes("\\u{D800}").unwrap(), "\u{FFFD}");
+        assert_eq!(decode_string_escapes("\\u{DFFF}").unwrap(), "\u{FFFD}");
+        assert_eq!(decode_string_escapes("\\u{0000D800}").unwrap(), "\u{FFFD}");
+        // A code point just outside the surrogate range is unaffected.
+        assert_eq!(decode_string_escapes("\\u{E000}").unwrap(), "\u{E000}");
     }
 }

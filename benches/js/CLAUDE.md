@@ -370,8 +370,8 @@ AST-shape to a gate once the undocumented-group count hits 0 is a natural follow
 
 ### `conformance:ts-repo`
 
-tsv's TS parser over `../typescript/tests/cases/conformance/parser` (~800
-single-file `.ts`) using **tsc's OWN baselines as the validity oracle** — a
+tsv's TS parser over `../typescript/tests/cases` — the WHOLE corpus, ~13.7k
+single-file `.ts` — using **tsc's OWN baselines as the validity oracle** — a
 `tests/baselines/reference/<name>.errors.txt` with a `TS1xxx` code = tsc's parser
 rejects (→ tsv correctly stricter), no `TS1xxx` = tsc accepts (→ a tsv reject is a
 real gap). Entry: `diagnostics/ts_repo_compare.ts`.
@@ -383,7 +383,11 @@ needed), and acorn's verdict sub-labels each gap (`gap` = acorn-confirmed → ga
 surface → reported, not gated). In the blocking `conformance` aggregate (promoted
 once its baseline hit 0 untracked gaps), tracked separately from the acorn-suite
 gate (own `KNOWN_GAPS`, freshness-checked on full-corpus runs). `.tsx` and
-`@filename` multi-file tests are skipped. Baseline: 768 scanned, 0 untracked gaps. A
+`@filename` multi-file tests are skipped (5,120 of them — a filed coverage hole).
+Baseline: 13,685 scanned, 12,292 accept-parity, 0 untracked gaps. ⚠️ The root is the
+whole corpus deliberately: the old `conformance/parser` default was green at 768 files
+while 32 over-rejections sat untracked in the checker/emitter trees, whose ordinary TS is
+likelier reachable in real code than the parser torture suite. A
 missing checkout, a partial one (baselines or corpus subtree missing), or an empty
 scan all FAIL rather than green-skipping.
 

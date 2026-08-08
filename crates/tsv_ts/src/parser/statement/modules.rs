@@ -1283,7 +1283,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // `A.B.C` (entity name) — must start with an identifier; a string /
             // number / empty reference (`import x = 'foo'`, `import x = 5`,
             // `import x =`) is a syntax error, matching acorn-typescript.
-            TSModuleReference::EntityName(self.parse_entity_name()?)
+            TSModuleReference::EntityName(self.parse_module_reference_entity_name()?)
         } else {
             return Err(self.error_expected("'require(...)' or a module reference after '='"));
         };

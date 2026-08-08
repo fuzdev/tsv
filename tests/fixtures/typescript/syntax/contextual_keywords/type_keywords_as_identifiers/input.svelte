@@ -91,4 +91,30 @@
 		let string;
 		string = 'a';
 	}
+
+	// Ambient declaration name (the concrete `function string() {}` form above
+	// already parses — `declare` takes the same names)
+	declare function string(): void;
+	declare function never(): void;
+	declare function from<T>(): T[];
+
+	// Type-parameter name
+	function fn9<string>(x: string): string {
+		return x;
+	}
+	class A<never> {}
+	type T<unknown> = unknown;
+	interface I<object> {}
+
+	// Rest-parameter name, in every parameter list
+	function fn10(...string: any[]) {}
+	const fn11 = (...never: any[]) => never;
+	class B {
+		m(...unknown: any[]) {}
+	}
+	const obj3 = { m(...object: any[]) {} };
+	declare var a: { m(...bigint: any[]): void };
+
+	// A rest parameter in a FUNCTION TYPE already takes these names
+	type F = (...string: any[]) => void;
 </script>

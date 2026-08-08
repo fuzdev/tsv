@@ -645,6 +645,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Otherwise `abstract` itself is the property name: `abstract = 1;`
         let is_abstract = self.eat_modifier_keyword("abstract");
 
+        // Handle 'override' after abstract. `abstract override` is tsc's CANONICAL
+        // order, so probing `override` only before `abstract` rejected the valid
+        // spelling; the second probe mirrors the three-position `declare` idiom above.
+        // ⚠️ Deliberately widen-only: this leaves the reversed `override abstract`
+        // (which tsc flags TS1029 and acorn rejects) still accepted. Flipping that is
+        // a reject-flip, and the honest structure for both is a modifier LOOP — what
+        // tsc and acorn-typescript each do — which is a `parse_class_member` refactor.
+        let is_override = is_override || self.eat_modifier_keyword("override");
+
         // Handle 'readonly' contextual keyword - only if followed by a class member name
         // Otherwise `readonly` itself is the property name: `readonly = 1;`
         let readonly = self.eat_modifier_keyword("readonly");

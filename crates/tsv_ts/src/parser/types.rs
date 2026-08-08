@@ -593,7 +593,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse type reference: `Foo` or `Foo.Bar` or `Foo<T>`
     fn parse_type_reference(&mut self) -> Result<TSType<'arena>, ParseError> {
         let start = self.current_pos().0;
-        let type_name = self.parse_entity_name()?;
+        let type_name = self.parse_type_entity_name()?;
 
         // Check for type arguments: <T, U>. A line break before `<` ends the type
         // at `type_name` — the `<` is not consumed as type arguments (see
@@ -651,7 +651,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Optional qualifier: .Foo or .Foo.Bar
         let qualifier = if self.eat(TokenKind::Dot) {
-            Some(self.parse_entity_name()?)
+            Some(self.parse_type_entity_name()?)
         } else {
             None
         };
@@ -687,7 +687,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TSTypeQueryExprName::Import(self.alloc(import))
         } else {
             // Parse entity name: identifier or qualified name
-            let entity_name = self.parse_entity_name()?;
+            let entity_name = self.parse_type_entity_name()?;
             TSTypeQueryExprName::EntityName(entity_name)
         };
 
@@ -708,8 +708,40 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
-    /// Parse entity name: `Foo` or `Foo.Bar.Baz`
-    pub(crate) fn parse_entity_name(&mut self) -> Result<TSEntityName<'arena>, ParseError> {
+    /// Parse an entity name (`Foo` / `Foo.Bar.Baz`) in a **type** position, where every
+    /// segment after a `.` is a full `IdentifierName` — reserved words included
+    /// (`ns.delete`, `A.false`, `typeof C.prototype.delete`, `typeof this.this`). tsc
+    /// and acorn both accept these; tsc spells the same rule
+    /// `parseEntityName(allowReservedWords: true)`.
+    ///
+    /// The **head** segment is not widened by this — but it is not narrowed here either:
+    /// this reads whatever token is current, so what heads an entity name is entirely the
+    /// caller's question, and the four callers answer it differently. The heritage clause
+    /// guards with `at_heritage_name` (so `extends void` / `extends null` reject); a type
+    /// REFERENCE is reached only through `parse_primary_type`'s dispatch, where `void` and
+    /// `null` are their own keyword types, so `void.X` / `null.X` die on the trailing `.`
+    /// — see the `types/reserved_keyword_qualified_head_svelte_divergence` fixture. A type
+    /// QUERY and an import-type qualifier guard nothing, so `typeof void.x` and
+    /// `import('m').if` parse; acorn accepts both, so that leniency is parity, not a gap.
+    /// ⚠️ Don't restate this as one invariant — there isn't one.
+    pub(crate) fn parse_type_entity_name(&mut self) -> Result<TSEntityName<'arena>, ParseError> {
+        self.parse_entity_name_inner(true)
+    }
+
+    /// Parse an entity name in an import-equals **module reference**
+    /// (`import x = A.B.C`), where a reserved word after `.` is a syntax error —
+    /// `import x = A.delete` is TS1359 for tsc and rejected by acorn. tsc's
+    /// `parseEntityName(allowReservedWords: false)`.
+    pub(crate) fn parse_module_reference_entity_name(
+        &mut self,
+    ) -> Result<TSEntityName<'arena>, ParseError> {
+        self.parse_entity_name_inner(false)
+    }
+
+    fn parse_entity_name_inner(
+        &mut self,
+        allow_reserved_words: bool,
+    ) -> Result<TSEntityName<'arena>, ParseError> {
         let (id_start, id_end) = self.current_pos();
         let name = self.current_ident_name();
         self.advance()?;
@@ -720,9 +752,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
 
         while self.eat(TokenKind::Dot) {
-            let right_name = self
-                .try_ident_or_contextual_name()
-                .ok_or_else(|| self.error_expected_after("identifier", "."))?;
+            let right_name = if allow_reserved_words {
+                self.try_identifier_name()
+            } else {
+                self.try_ident_or_contextual_name()
+            }
+            .ok_or_else(|| self.error_expected_after("identifier", "."))?;
 
             let (right_start, right_end) = self.current_pos();
             self.advance()?;
@@ -1776,11 +1811,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let (id_start, id_end) = self.current_pos();
 
-        // Parse the type parameter name (must be an identifier)
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
+        // Parse the type parameter name — a `BindingIdentifier`, so a contextual
+        // type keyword is a legal name here (`class C { m<string>() {} }`), the
+        // same set the value-binding positions take.
+        let Some(ident_name) = self.try_binding_name() else {
             return Err(self.error_expected_found_at("type parameter name", id_start));
-        }
-        let ident_name = self.current_ident_name();
+        };
         self.advance()?;
         let name = Identifier::simple(ident_name, Span::new(id_start as u32, id_end as u32));
 
