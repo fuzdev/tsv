@@ -17,10 +17,13 @@ real move in a number is a deliberate, visible edit.
   --all` (minimum per-language `match` + EXACT per-language `unknown`/`partial`
   counts — the un-triaged divergence backlog is pinned, so a new unexplained
   divergence fails until fixed/cataloged and a shrink is re-pinned to record the
-  win), and the four harvests (wpt block count, test262 positive count,
-  svelte-rejects count — exact; svelte-styles block count — a live-corpus MINIMUM
-  with a drift band, since its source is the perf-view dev repos: a small shrink
-  warns and still writes, only a >10% collapse fails).
+  win), and the five harvests (wpt block count, test262 positive count, the
+  ts-repo corpus + rejects counts, svelte-rejects count — exact; svelte-styles block
+  count — a live-corpus MINIMUM with a drift band, since its source is the perf-view
+  dev repos: a small shrink warns and still writes, only a >10% collapse fails). The
+  ts-repo pair is graded by tsc itself, so its harvest stamps the **tsc version**
+  alongside the checkout commit — a tsc bump can move a file between the two lists
+  with the corpus unchanged.
 - **Rust-side counts are consts** — grep `REGRESSION PIN`. test262 (discovered +
   graded-manifest) and `fixtures_validate` (total fixtures — protecting the primary
   gate against a discovery collapse) live in their own commands, while the

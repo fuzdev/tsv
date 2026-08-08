@@ -470,6 +470,21 @@ const CORPUS_ENTRIES: CorpusEntry[] = [
 		tier: 'suite',
 		optional: true,
 		hint: 'run `deno task bench:harvest:test262` (needs ../test262)'
+	},
+	// The tsc corpus — TypeScript's own test cases, filtered to what tsc's parser
+	// AND tsc's `.errors.txt` baselines both call well-formed (harvest_ts_repo.ts).
+	// The TypeScript-SPECIFIC conformance inputs: without it the `parse/typescript`
+	// group is ~95% test262, i.e. ECMAScript, with prettier's ~800 format fixtures
+	// as its only TS. A bare path list, NOT goal-tagged like test262: tsc's
+	// module-vs-script reading is semantic and never gates syntax, so feeding it to
+	// parsers that take `sourceType` as a grammar switch would score them for
+	// something tsc doesn't do (the measurement is in the harvest). Its REJECTS
+	// sibling cache is deliberately not an entry — see the harvest.
+	{
+		files_from: 'benches/js/.cache/ts_repo_files.json',
+		tier: 'suite',
+		optional: true,
+		hint: 'run `deno task bench:harvest:ts-repo` (needs ../typescript)'
 	}
 ];
 
@@ -738,6 +753,7 @@ export class DevReposLoader {
 					count++;
 					by_language[file.language]++;
 					file.reproducible = reproducible;
+					file.source = entry_path;
 					yield file;
 				}
 			} else {
@@ -765,6 +781,7 @@ export class DevReposLoader {
 					count++;
 					by_language[file.language]++;
 					file.reproducible = reproducible;
+					file.source = entry_path;
 					yield file;
 				}
 			}

@@ -1073,6 +1073,73 @@ export function generate_coverage_only_markdown(
 	return lines;
 }
 
+/** One impl's coverage over one corpus source, for the conformance breakdown. */
+export interface SourceCoverageCell {
+	processed: number;
+	total: number;
+}
+
+/** Per-group, per-source, per-impl coverage: `group → source → impl name → cell`. */
+export type CoverageBySource = Map<string, Map<string, Map<string, SourceCoverageCell>>>;
+
+/**
+ * Per-SOURCE coverage tables for the conformance report — the aggregate
+ * `**Coverage:**` line split by corpus entry.
+ *
+ * Why it exists: a group's headline blends sources that answer different
+ * questions. `parse/typescript` is ~83% test262 (ECMAScript), so a TypeScript
+ * parse gap moves the aggregate by tenths of a point; and on the tsc corpus the
+ * `tsc` row is the ORACLE (100% by construction — the harvest keeps exactly what
+ * that parser accepts), which is only honest to read source by source. Same reason
+ * the report separates coverage from throughput rather than averaging them.
+ *
+ * A source is omitted for an impl that never saw it (a language it doesn't
+ * support), and a whole source is omitted when no impl has data. Rows are the
+ * sources in corpus order; columns are the impls in display order.
+ *
+ * The same-engine variant columns (`tsv-json` / `tsv-internal` /
+ * `tsv_wasm-*`, `oxc-parser` / `oxc-parser-wasm`) look redundant and are
+ * deliberately kept: they read identically only while the *bindings and payloads*
+ * agree, which is a claim, not a given — a wire-writer failure would show as
+ * `-json` trailing `-internal`, and a broken binding error surface as a native/wasm
+ * split (the oxc WASI consume-once bug, `bench.ts` `warn_variant_parity`). Folding
+ * the columns per engine would erase exactly that signal, per source, where it is
+ * most legible.
+ */
+export function generate_coverage_by_source_markdown(
+	languages: readonly Language[],
+	operations: readonly ('parse' | 'format')[],
+	coverage_by_source: CoverageBySource
+): string[] {
+	const lines: string[] = [];
+	for (const language of languages) {
+		for (const operation of operations) {
+			const group_name = `${operation}/${language}`;
+			const by_source = coverage_by_source.get(group_name);
+			if (!by_source || by_source.size === 0) continue;
+			const impl_names: string[] = [];
+			for (const cells of by_source.values()) {
+				for (const name of cells.keys()) if (!impl_names.includes(name)) impl_names.push(name);
+			}
+			if (impl_names.length === 0) continue;
+			lines.push(`### ${group_name} by corpus source\n`);
+			lines.push(`| Source | Files | ${impl_names.join(' | ')} |`);
+			lines.push(`| --- | ---: | ${impl_names.map(() => '---:').join(' | ')} |`);
+			for (const [source, cells] of by_source) {
+				const total = [...cells.values()][0]?.total ?? 0;
+				const columns = impl_names.map((name) => {
+					const cell = cells.get(name);
+					if (!cell) return '—';
+					return `${cell.processed} (${coverage_pct(cell.processed, cell.total)}%)`;
+				});
+				lines.push(`| \`${source}\` | ${total} | ${columns.join(' | ')} |`);
+			}
+			lines.push('');
+		}
+	}
+	return lines;
+}
+
 /**
  * One-line JSON serialization overhead note for parse groups.
  *

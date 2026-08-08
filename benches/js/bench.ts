@@ -84,9 +84,11 @@ import {
 	init_implementations
 } from './lib/implementations.ts';
 import {
+	type CoverageBySource,
 	type EffectiveCorpusEntry,
 	generate_comparison_markdown,
 	generate_comparison_summary,
+	generate_coverage_by_source_markdown,
 	generate_coverage_only_markdown,
 	generate_effective_corpus_report,
 	generate_group_bench_table_markdown,
@@ -101,6 +103,7 @@ import {
 	generate_summary_report,
 	generate_versions_info,
 	type GroupResults,
+	type SourceCoverageCell,
 	alternative_version_parts,
 	type ReportVersions
 } from './lib/report.ts';
@@ -678,6 +681,83 @@ function warn_variant_parity(): void {
 }
 
 /**
+ * Split each group's pre-flight coverage by CORPUS SOURCE — the conformance
+ * report's breakdown table.
+ *
+ * Pure post-processing over state pre-flight already produced (`successful_files`
+ * + each file's `source` tag), so it adds no parse work. Only the conformance
+ * surface renders it: the perf corpus is 100% by construction, where a per-source
+ * split would be a table of `100%`.
+ *
+ * A file with no `source` (a `DirectoryLoader` run) is skipped rather than bucketed
+ * under a placeholder — an unattributed row would read as a corpus entry that
+ * doesn't exist.
+ *
+ * Computed ONCE (`coverage_by_source`, below) and shared by the JSON and markdown
+ * halves of the report: two passes over the same live mutable state could report
+ * two different numbers for one published figure.
+ */
+function compute_coverage_by_source(): CoverageBySource {
+	const by_group: CoverageBySource = new Map();
+	for (const [group_name, task_tracking] of task_tracking_by_group) {
+		const [, language] = group_name.split('/') as ['parse' | 'format', Language];
+		const files = files_by_language[language];
+		const by_source = new Map<string, Map<string, SourceCoverageCell>>();
+		for (const [name, tracking_key] of task_tracking) {
+			const success = successful_files.get(tracking_key);
+			if (!success) continue;
+			for (const file of files) {
+				if (file.source === undefined) continue;
+				let cells = by_source.get(file.source);
+				if (!cells) {
+					cells = new Map();
+					by_source.set(file.source, cells);
+				}
+				let cell = cells.get(name);
+				if (!cell) {
+					cell = { processed: 0, total: 0 };
+					cells.set(name, cell);
+				}
+				cell.total++;
+				if (success.has(file.path)) cell.processed++;
+			}
+		}
+		if (by_source.size > 0) by_group.set(group_name, by_source);
+	}
+	return by_group;
+}
+
+/**
+ * The per-source coverage both report halves render, computed once after pre-flight
+ * and memoized — see `compute_coverage_by_source`.
+ */
+let coverage_by_source: CoverageBySource | null = null;
+function get_coverage_by_source(): CoverageBySource {
+	return (coverage_by_source ??= compute_coverage_by_source());
+}
+
+/**
+ * `compute_coverage_by_source` as plain JSON — `group → source → impl → {processed,
+ * total}` — for the committed report. Maps don't survive `JSON.stringify`, and the
+ * markdown tables alone would leave a consumer (tsv.fuz.dev, a diff at review time)
+ * reading percentages out of prose.
+ */
+function serialize_coverage_by_source(): Record<
+	string,
+	Record<string, Record<string, SourceCoverageCell>>
+> {
+	const out: Record<string, Record<string, Record<string, SourceCoverageCell>>> = {};
+	for (const [group, by_source] of get_coverage_by_source()) {
+		const sources: Record<string, Record<string, SourceCoverageCell>> = {};
+		for (const [source, cells] of by_source) {
+			sources[source] = Object.fromEntries(cells);
+		}
+		out[group] = sources;
+	}
+	return out;
+}
+
+/**
  * Iterate files and run `process_fn` for each. The iteration list is
  * pre-filtered to files this task succeeded on during pre-flight (or the
  * group's all-N intersection in `intersection` mode), so throws are real
@@ -1089,6 +1169,16 @@ interface Baseline {
 	 * produced on a partial machine would be indistinguishable from a full one.
 	 */
 	corpus_sources: CorpusSource[];
+	/**
+	 * Per-corpus-source coverage — `group → source → impl → {processed, total}`,
+	 * the machine-readable half of the report's per-source tables. Present on
+	 * COVERAGE-ONLY (conformance) runs only; `undefined` on the perf surface, where
+	 * every cell would read 100% by construction. Read these rather than a group's
+	 * aggregate: the aggregate blends corpora that answer different questions, and
+	 * on a corpus filtered by its own canonical parser that parser's row is 100% by
+	 * construction rather than by achievement.
+	 */
+	coverage_by_source?: Record<string, Record<string, Record<string, SourceCoverageCell>>>;
 	versions: BaselineVersions;
 	binary_sizes: BinarySize[];
 	entries: BaselineEntry[];
@@ -1245,10 +1335,12 @@ async function build_results_data(
 	}
 
 	return {
-		// Bumped 6 → 7 for the added top-level `machine` block (CPU model, OS/arch,
-		// runtime version). 5 → 6 added `corpus_kind` + `corpus_sources`; 4 → 5
-		// added the `runtime` field, top-level + per row.
-		version: 7,
+		// Bumped 7 → 8 for `coverage_by_source` (coverage-only runs; the markdown's
+		// per-source tables in machine-readable form). 6 → 7 added the top-level
+		// `machine` block (CPU model, OS/arch, runtime version); 5 → 6 added
+		// `corpus_kind` + `corpus_sources`; 4 → 5 added the `runtime` field, top-level
+		// and per row.
+		version: 8,
 		runtime: RUNTIME,
 		corpus_kind: CORPUS_MODE,
 		timestamp: new Date().toISOString(),
@@ -1256,6 +1348,10 @@ async function build_results_data(
 		machine: current_machine(),
 		corpus,
 		corpus_sources: corpus_loader.sources,
+		// Per-source coverage, the JSON half of the markdown tables. Coverage-only
+		// runs only: on the perf surface every cell would read 100% by construction
+		// (an unlisted per-file failure hard-fails the run instead).
+		coverage_by_source: COVERAGE_ONLY ? serialize_coverage_by_source() : undefined,
 		versions,
 		binary_sizes: binary_sizes,
 		entries,
@@ -1338,6 +1434,18 @@ function generate_markdown_report(
 				'The WASM binding runs the same engine and carries the row; both are measured on the perf ' +
 				'corpus.\n'
 		);
+		// The mirror-image disclosure: a row present ONLY here needs saying as much
+		// as one absent, and `tsc`'s reading changes by corpus source — it is the
+		// oracle on the corpus it filtered, an independent parser everywhere else.
+		lines.push(
+			'**Added here:** tsc — the TypeScript compiler’s own parser, a verdict rather than a ' +
+				'speed, so it carries no row on the throughput surface. Its parser is error-recovering ' +
+				'(`createSourceFile` never throws), so an accept means zero `parseDiagnostics`. On the ' +
+				'tsc corpus it is the ORACLE that selected those files — 100% by construction, like ' +
+				'svelte/compiler on the Svelte set — and an independent parser on every other source, ' +
+				'which is what the per-source tables below are for. Coverage counts accepts and so ' +
+				'cannot show over-acceptance; that axis is `deno task ts-repo:over-acceptance`.\n'
+		);
 	}
 
 	lines.push(
@@ -1353,7 +1461,8 @@ function generate_markdown_report(
 	// tables straight from pre-flight state (the timed loop below no-ops).
 	if (COVERAGE_ONLY) {
 		lines.push(
-			...generate_coverage_only_markdown(LANGUAGES, OPERATIONS, task_tracking, effective_size)
+			...generate_coverage_only_markdown(LANGUAGES, OPERATIONS, task_tracking, effective_size),
+			...generate_coverage_by_source_markdown(LANGUAGES, OPERATIONS, get_coverage_by_source())
 		);
 	}
 
