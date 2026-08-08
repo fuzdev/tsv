@@ -1,0 +1,595 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 361,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a LabelIdentifier is an ordinary identifier, so a contextual keyword names one",
+			"start": 20,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the predefined-type keywords are contextual too",
+			"start": 202,
+			"end": 252,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 51
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 360,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 351,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "LabeledStatement",
+					"start": 103,
+					"end": 131,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 29
+						}
+					},
+					"body": {
+						"type": "ForStatement",
+						"start": 110,
+						"end": 131,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 8
+							},
+							"end": {
+								"line": 3,
+								"column": 29
+							}
+						},
+						"init": null,
+						"test": null,
+						"update": null,
+						"body": {
+							"type": "BreakStatement",
+							"start": 119,
+							"end": 131,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 17
+								},
+								"end": {
+									"line": 3,
+									"column": 29
+								}
+							},
+							"label": {
+								"type": "Identifier",
+								"start": 125,
+								"end": 130,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 23
+									},
+									"end": {
+										"line": 3,
+										"column": 28
+									}
+								},
+								"name": "async"
+							}
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 103,
+						"end": 108,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 1
+							},
+							"end": {
+								"line": 3,
+								"column": 6
+							}
+						},
+						"name": "async"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a LabelIdentifier is an ordinary identifier, so a contextual keyword names one",
+							"start": 20,
+							"end": 101
+						}
+					]
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 134,
+					"end": 160,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 27
+						}
+					},
+					"body": {
+						"type": "ForStatement",
+						"start": 140,
+						"end": 160,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 7
+							},
+							"end": {
+								"line": 5,
+								"column": 27
+							}
+						},
+						"init": null,
+						"test": null,
+						"update": null,
+						"body": {
+							"type": "BreakStatement",
+							"start": 149,
+							"end": 160,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 16
+								},
+								"end": {
+									"line": 5,
+									"column": 27
+								}
+							},
+							"label": {
+								"type": "Identifier",
+								"start": 155,
+								"end": 159,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 22
+									},
+									"end": {
+										"line": 5,
+										"column": 26
+									}
+								},
+								"name": "from"
+							}
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 134,
+						"end": 138,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 1
+							},
+							"end": {
+								"line": 5,
+								"column": 5
+							}
+						},
+						"name": "from"
+					}
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 163,
+					"end": 199,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 37
+						}
+					},
+					"body": {
+						"type": "ForStatement",
+						"start": 174,
+						"end": 199,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 12
+							},
+							"end": {
+								"line": 7,
+								"column": 37
+							}
+						},
+						"init": null,
+						"test": null,
+						"update": null,
+						"body": {
+							"type": "BreakStatement",
+							"start": 183,
+							"end": 199,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 21
+								},
+								"end": {
+									"line": 7,
+									"column": 37
+								}
+							},
+							"label": {
+								"type": "Identifier",
+								"start": 189,
+								"end": 198,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 27
+									},
+									"end": {
+										"line": 7,
+										"column": 36
+									}
+								},
+								"name": "satisfies"
+							}
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 163,
+						"end": 172,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 10
+							}
+						},
+						"name": "satisfies"
+					}
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 254,
+					"end": 284,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 31
+						}
+					},
+					"body": {
+						"type": "ForStatement",
+						"start": 262,
+						"end": 284,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 9
+							},
+							"end": {
+								"line": 10,
+								"column": 31
+							}
+						},
+						"init": null,
+						"test": null,
+						"update": null,
+						"body": {
+							"type": "BreakStatement",
+							"start": 271,
+							"end": 284,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 18
+								},
+								"end": {
+									"line": 10,
+									"column": 31
+								}
+							},
+							"label": {
+								"type": "Identifier",
+								"start": 277,
+								"end": 283,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 24
+									},
+									"end": {
+										"line": 10,
+										"column": 30
+									}
+								},
+								"name": "string"
+							}
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 254,
+						"end": 260,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 7
+							}
+						},
+						"name": "string"
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the predefined-type keywords are contextual too",
+							"start": 202,
+							"end": 252
+						}
+					]
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 287,
+					"end": 311,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 25
+						}
+					},
+					"body": {
+						"type": "ForStatement",
+						"start": 292,
+						"end": 311,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 6
+							},
+							"end": {
+								"line": 12,
+								"column": 25
+							}
+						},
+						"init": null,
+						"test": null,
+						"update": null,
+						"body": {
+							"type": "BreakStatement",
+							"start": 301,
+							"end": 311,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 15
+								},
+								"end": {
+									"line": 12,
+									"column": 25
+								}
+							},
+							"label": {
+								"type": "Identifier",
+								"start": 307,
+								"end": 310,
+								"loc": {
+									"start": {
+										"line": 12,
+										"column": 21
+									},
+									"end": {
+										"line": 12,
+										"column": 24
+									}
+								},
+								"name": "any"
+							}
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 287,
+						"end": 290,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 1
+							},
+							"end": {
+								"line": 12,
+								"column": 4
+							}
+						},
+						"name": "any"
+					}
+				},
+				{
+					"type": "LabeledStatement",
+					"start": 314,
+					"end": 350,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 14,
+							"column": 37
+						}
+					},
+					"body": {
+						"type": "ForStatement",
+						"start": 325,
+						"end": 350,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 12
+							},
+							"end": {
+								"line": 14,
+								"column": 37
+							}
+						},
+						"init": null,
+						"test": null,
+						"update": null,
+						"body": {
+							"type": "BreakStatement",
+							"start": 334,
+							"end": 350,
+							"loc": {
+								"start": {
+									"line": 14,
+									"column": 21
+								},
+								"end": {
+									"line": 14,
+									"column": 37
+								}
+							},
+							"label": {
+								"type": "Identifier",
+								"start": 340,
+								"end": 349,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 27
+									},
+									"end": {
+										"line": 14,
+										"column": 36
+									}
+								},
+								"name": "undefined"
+							}
+						}
+					},
+					"label": {
+						"type": "Identifier",
+						"start": 314,
+						"end": 323,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 1
+							},
+							"end": {
+								"line": 14,
+								"column": 10
+							}
+						},
+						"name": "undefined"
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

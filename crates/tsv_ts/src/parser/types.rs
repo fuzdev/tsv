@@ -441,16 +441,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let start = self.current_pos().0;
         self.advance()?; // consume 'infer'
 
-        // Parse the type parameter name (must be an identifier)
-        if !matches!(self.current_kind(), TokenKind::Identifier) {
+        // Parse the type parameter name. `InferType : infer TypeParameter`, and a type
+        // parameter's name is a `BindingIdentifier` — so a contextual keyword names one
+        // (`infer string`, `infer any`, `infer from`) exactly as it does in every other
+        // binding position, and `let`/`yield` do too, their bar being the deferred
+        // strict-mode early error. A bare `TokenKind::Identifier` test saw only the
+        // words the lexer never made a `Keyword` and rejected the rest; acorn, tsc and
+        // prettier all accept them.
+        let Some(name) = self.take_binding_identifier()? else {
             return Err(self.error_expected("type parameter name after 'infer'"));
-        }
-
-        let (id_start, id_end) = self.current_pos();
-        let ident_name = self.current_ident_name();
-        self.advance()?;
-
-        let name = Identifier::simple(ident_name, Span::new(id_start as u32, id_end as u32));
+        };
 
         // Optional constraint: `infer U extends C`. The constraint is parsed
         // with conditionals disallowed and function types re-enabled (acorn
@@ -472,7 +472,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // newline the constraint is kept, and the enclosing context then
         // rejects the stray `?` — matching acorn, whose rolled-back re-parse
         // refuses the `extends` and rejects on the stray token.
-        let mut end = id_end as u32;
+        let name_start = name.span.start;
+        let mut end = name.span.end;
         let mut constraint = None;
         if self.check(&TokenKind::Keyword(KeywordKind::Extends)) {
             let extends_preceded_by_lt = self.had_line_terminator;
@@ -499,7 +500,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 is_const: false,
                 is_in: false,
                 is_out: false,
-                span: Span::new(id_start as u32, end),
+                span: Span::new(name_start, end),
             },
             span: Span::new(start as u32, end),
         }))
@@ -717,7 +718,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// The **head** segment is not widened by this, and each caller may narrow it
     /// further, so what heads an entity name is largely the caller's question and the
     /// four callers answer it differently. The heritage clause guards with
-    /// `at_heritage_name` (so `extends void` / `extends null` reject); a type REFERENCE
+    /// `at_binding_name` (so `extends void` / `extends null` reject); a type REFERENCE
     /// is reached only through `parse_primary_type`'s dispatch, where `void` and `null`
     /// are their own keyword types, so `void.X` / `null.X` die on the trailing `.` — see
     /// the `types/reserved_keyword_qualified_head_svelte_divergence` fixture. A type

@@ -200,17 +200,38 @@ impl KeywordKind {
 
     /// Returns true if this keyword can be used as a binding name (variable name, parameter).
     ///
-    /// This is more restrictive than `can_be_identifier()`. Some keywords like `await`,
-    /// `yield`, and `let` can be property names but NOT binding names.
+    /// Exactly [`KeywordKind::can_be_identifier`] minus `await`, and the difference
+    /// is load-bearing: `await`'s bar is *goal-dependent* (reserved under
+    /// `Goal::Module`, an ordinary identifier at `Goal::Script` `[~Await]`), so
+    /// every caller answers it with its own `Parser::await_is_identifier` arm
+    /// ordered **after** the arm that consults this predicate. Folding `await` in
+    /// here would make it a binding name at Module goal.
     ///
-    /// - `await` - cannot be a binding name (reserved in module code)
-    /// - `yield` - cannot be a binding name (reserved in strict mode)
-    /// - `let` - cannot be a binding name (reserved in strict mode)
+    /// `let` and `yield` ARE binding names. Neither is excluded by a *production*:
+    /// `let` is not a `ReservedWord` at all, and `BindingIdentifier[Yield, Await] :
+    /// Identifier | `yield` | `await`` admits `yield` unconditionally (ecma262
+    /// §sec-identifiers — the `[Yield]` bar is written as an early error, not a
+    /// production guard, so that ASI can't split `let ⏎ await 0;`). Their only bar
+    /// is the strict-mode Static Semantics bullet in
+    /// §sec-identifiers-static-semantics-early-errors, which tsv defers to the
+    /// diagnostics layer — the same bullet, and the same deferral, that already let
+    /// `implements` / `interface` / `package` / `private` / `static` be binding
+    /// names here (those lex as plain identifiers and never reach this predicate).
+    /// Real tsc's parser accepts both in every `BindingIdentifier` position and
+    /// prettier formats them.
+    ///
+    /// ⚠️ `void` is NOT here: it is a genuine `ReservedWord`, so `Identifier :
+    /// IdentifierName but not ReservedWord` excludes it in a production.
+    ///
+    /// ⚠️ Two callers read this set in an *expression* context, where `yield` may be
+    /// the operator instead — the single-param arrow start and object-literal
+    /// shorthand both re-gate it on the parser's `in_yield`. See
+    /// `Parser::parse_primary_expression`.
     ///
     /// Examples:
     /// - `const as = 1;` - valid, `as` can be a binding name
-    /// - `const await = 1;` - INVALID, `await` cannot be a binding name
-    /// - `function fn(yield: string) {}` - INVALID, `yield` cannot be a parameter
+    /// - `function fn(yield: string) {}` - valid, the strict early error is deferred
+    /// - `const await = 1;` - INVALID at Module goal, handled by the callers
     #[inline]
     pub const fn can_be_binding_name(self) -> bool {
         matches!(
@@ -220,6 +241,9 @@ impl KeywordKind {
                 | KeywordKind::From
                 | KeywordKind::As
                 | KeywordKind::Satisfies
+                // Strict-mode-reserved by an early error only, so tsv defers
+                | KeywordKind::Let
+                | KeywordKind::Yield
                 // Contextual type keywords are also valid binding names in value
                 // positions (`let string = 1`, `class any {}`). `void` is NOT among
                 // them — it is a reserved unary operator, not a contextual keyword, so
@@ -238,7 +262,8 @@ impl KeywordKind {
                 // restriction on `undefined` is a runtime concern, not parse-time.
                 | KeywordKind::Undefined
         )
-        // NOTE: Await, Yield, Let, Void are NOT included - they cannot be binding names
+        // NOTE: `await` is excluded (goal-dependent, resolved by each caller's own
+        // arm) and `void` is excluded (a `ReservedWord`, barred by a production).
     }
 }
 
@@ -340,10 +365,14 @@ pub enum TokenKind {
 
 impl TokenKind {
     /// Whether this token is a *binding-name word* — a plain identifier or a
-    /// contextual keyword valid as a binding name (`string`, `any`, …; see
-    /// [`KeywordKind::can_be_binding_name`]). Excludes `await` (a binding name
-    /// only at Script `[~Await]`, handled at the sites that care) and the
-    /// non-word binding starters (`[`, `{`, `...`, `this`).
+    /// keyword-lexed word valid as a binding name (see
+    /// [`KeywordKind::can_be_binding_name`]): the contextual keywords (`string`,
+    /// `any`, …) **and** `let` / `yield`, whose only bar is a strict-mode early
+    /// error tsv defers. Note the second group means a `ReservedWord` (`yield`)
+    /// passes — this predicate is keyed on the *name* set, not on reserved-ness.
+    /// Excludes `await` (a binding name only at Script `[~Await]`, handled at the
+    /// sites that care) and the non-word binding starters (`[`, `{`, `...`,
+    /// `this`).
     #[inline]
     pub fn is_binding_name_word(&self) -> bool {
         match self {

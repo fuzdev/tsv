@@ -122,15 +122,30 @@ ECMAScript), so they don't move the counts above, but each is pinned by a fixtur
 - **`export as namespace Foo`** — the TypeScript UMD global export declaration
   (`TSNamespaceExportDeclaration`), at the top level and inside `declare module`.
 
-`yield` is unaffected by the goal axis — a strict reserved word in both `Script` and
-`Module`. Out of scope (skipped, not graded as failures): **sloppy-mode-only**
+`yield` is unaffected by the goal axis — its strict-mode bar is identical under
+`Script` and `Module`. That bar is a **Static Semantics early error**, not a
+production (§sec-identifiers writes `BindingIdentifier[Yield, Await] : Identifier |
+`yield` | `await`` with no guard, and puts the `[Yield]` restriction in the early
+errors so ASI cannot split `let ⏎ await 0;`), so tsv defers it and parses `yield` —
+and `let`, barred by the same strict-mode bullet — as a name everywhere, in both the
+`BindingIdentifier` and the `IdentifierReference` spelling. `await`'s `[Await]`
+parameter is the same shape and likewise deferred; its **goal** bullet is the one
+early error in the family tsv enforces, which is what makes the goal axis
+observable. Together these are the single largest family of negative failures below.
+
+What tsv does *not* defer is the guards the same productions carry:
+`IdentifierReference` and `LabelIdentifier` both read `Identifier | [~Yield] yield |
+[~Await] await`, so inside a generator or async function the word is the operator
+and the name reading is unreachable rather than merely invalid. Out of scope
+(skipped, not graded as failures): **sloppy-mode-only**
 constructs (`with`, the AnnexB `f() = g()` / `for (var a = x in b)` forms, legacy
 octal — tsv is strict-only) and **plugin-gated syntax** not in the oracle config
 (some decorator forms).
 
 Most negative failures are the early-error under-enforcement noted above (duplicate
-parameter names, escaped reserved words, strict-mode-only restrictions) — tsv enforces
-the syntactic grammar; early-error enforcement is future diagnostics-layer work.
+parameter names, escaped reserved words, strict-mode-only restrictions — the largest
+single family being `let` / `yield` / `await` as names) — tsv enforces the
+syntactic grammar; early-error enforcement is future diagnostics-layer work.
 
 A smaller share are genuinely _syntactic_ over-acceptances — the grammar
 itself forbids the construct — which tsv rejects. The rest-element

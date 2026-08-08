@@ -344,15 +344,30 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
     /// Take an optional class name — a `BindingIdentifier`, so contextual type keywords
     /// (`class any {}`) are valid names and `await` is one only at Script `[~Await]` (both
-    /// handled by `take_binding_identifier`). `implements` (a strict-mode reserved word, but
-    /// a plain identifier token) can never be the name: directly after `class` it begins the
-    /// extends-less `implements` clause of an anonymous class (`class implements Foo {}`), so
-    /// it's excluded here (without advancing) and left for the heritage parser — where
-    /// acorn-typescript rejects it. Returns `Ok(None)` for both `implements` and a
-    /// non-binding token; the caller decides whether a missing name is an error (declaration)
-    /// or fine (expression / `export default`). Shared by both class paths.
+    /// handled by `take_binding_identifier`).
+    ///
+    /// `implements` is genuinely ambiguous directly after `class`: it may be the NAME
+    /// (`class implements {}` — a strict-mode-reserved word, but that bar is a deferred
+    /// early error like `package` or `static`) or the keyword opening the extends-less
+    /// heritage clause of an anonymous class (`export default class implements Foo {}`).
+    /// One token of lookahead separates them, and the rule is tsc's own
+    /// (`isImplementsClause`: `token() === ImplementsKeyword && lookAhead(nextTokenIsIdentifierOrKeyword)`):
+    /// **a following identifier-or-keyword makes it the clause, anything else makes it the
+    /// name.** So `class implements {}` / `class implements<T> {}` / `var v = class
+    /// implements {};` name the class, while `class implements Foo {}` opens a heritage
+    /// list. acorn rejects `implements` in both roles; tsc and prettier accept both.
+    ///
+    /// ⚠️ The lookahead deliberately does NOT try to be cleverer than tsc here. `class
+    /// implements extends B {}` puts a keyword next, so `implements` reads as the clause and
+    /// the declaration ends up nameless — a rejection. tsc "accepts" it only by *recovering*
+    /// with an empty heritage list, and prettier rejects it outright, so matching tsc's
+    /// recovery would buy a shape no formatter can print.
+    ///
+    /// Returns `Ok(None)` for the heritage reading and for a non-binding token; the caller
+    /// decides whether a missing name is an error (declaration) or fine (expression /
+    /// `export default`). Shared by both class paths.
     fn take_class_name(&mut self) -> Result<Option<Identifier<'arena>>, ParseError> {
-        if self.current_value() == "implements" {
+        if self.current_value() == "implements" && self.peek_is_identifier_or_keyword() {
             return Ok(None);
         }
         self.take_binding_identifier()

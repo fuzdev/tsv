@@ -1279,7 +1279,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 expression,
                 span: Span::new(ref_start as u32, ref_end as u32),
             })
-        } else if self.at_binding_name() {
+        } else if self.at_reference_name() {
             // `A.B.C` (entity name) — must start with a name; a string / number /
             // empty reference (`import x = 'foo'`, `import x = 5`, `import x =`) is
             // a syntax error, matching acorn-typescript.
@@ -1287,13 +1287,15 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // A contextual type keyword is an ordinary name here, like everywhere else
             // (`import x = string`, `import x = number.inner`); a bare
             // `TokenKind::Identifier` test saw only the words the lexer never made a
-            // `Keyword` and rejected them all. `at_binding_name` is reached for its
-            // SET, not its name: this head is an `IdentifierReference`, but in strict
-            // mode `let` / `yield` / `await` are barred from both reference and binding
-            // spellings alike, and acorn enforces exactly that here (`import x = let.y`
-            // is "The keyword 'let' is reserved"). The heritage head is the one
-            // position that goes wider — see `Parser::at_heritage_name`, where all
-            // three oracles accept `let` and tsv follows them.
+            // `Keyword` and rejected them all. `at_reference_name` names what this head
+            // IS, and its two guards are inert in practice — an import-equals cannot
+            // nest inside a generator or async function — so in strict
+            // mode the bar on `let` / `yield` is the same deferred early error in the
+            // reference and binding spellings alike, while `void` is excluded by the
+            // `Identifier` production in both. So `import x = let.y` parses (tsc and
+            // prettier accept it; acorn rejects, but it is the shape oracle only) and
+            // `import x = void.y` still rejects. The heritage head asks the same
+            // predicate for the same reason.
             TSModuleReference::EntityName(self.parse_module_reference_entity_name()?)
         } else {
             return Err(self.error_expected("'require(...)' or a module reference after '='"));

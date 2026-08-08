@@ -150,15 +150,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let name = self.current_raw_ident_name();
                     // A keyword is a valid bare shorthand only when it is a valid
                     // `IdentifierReference`. `await` is allowed at Script `[~Await]`;
-                    // otherwise the reference set is `can_be_binding_name()` — the
-                    // contextual/type keywords (`async`, `string`, …). This rejects
-                    // the strict-reserved (`yield`, `let`) AND the always-reserved
-                    // keywords (`class`, `true`, `void`, …) as shorthand — while
-                    // `{ public }` (only strict-reserved) stays deferred: `public`
-                    // lexes as an identifier, not a `KeywordKind`.
+                    // otherwise the reference set is
+                    // `keyword_is_expression_identifier` — the contextual/type
+                    // keywords (`async`, `string`, …) plus the strict-reserved
+                    // `let`/`yield`, whose bar is an early error tsv defers, minus
+                    // `yield` inside a generator, where it is the operator (real tsc
+                    // splits the same way). This rejects the always-reserved keywords
+                    // (`class`, `true`, `void`, …) as shorthand — while `{ public }`
+                    // was already deferred: `public` lexes as an identifier, not a
+                    // `KeywordKind`.
                     let restricted = match kw {
                         KeywordKind::Await => !self.await_is_identifier(),
-                        _ => !kw.can_be_binding_name(),
+                        _ => !self.keyword_is_expression_identifier(*kw),
                     };
                     self.advance()?;
                     (

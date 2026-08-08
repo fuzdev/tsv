@@ -585,7 +585,34 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
-    /// Parse break statement: `break;` or `break label;`
+    /// Take the optional `LabelIdentifier` of a `break` / `continue`, or `None`
+    /// when ASI ends the statement first (`break [no LineTerminator here]
+    /// LabelIdentifier`, so a newline means the label-less form).
+    ///
+    /// The label set is [`Parser::at_reference_name`] — plain identifiers, the contextual
+    /// keywords the lexer turns into `Keyword` tokens (`break async`, `continue
+    /// string`), `let` (barred only by the deferred strict-mode early error), `await`
+    /// exactly where the goal axis makes it an identifier (`break await` at Script
+    /// `[~Await]`, reserved at Module), and `yield` only outside a generator. A bare
+    /// `TokenKind::Identifier` test saw only the first group, so a label the
+    /// *declaration* site accepted could not be referenced.
+    ///
+    /// Shared by both statements so the two cannot drift. The *declaration* side
+    /// asks the same predicate, but at the statement dispatcher rather than inside
+    /// [`Parser::parse_labeled_statement`] — see that function's note.
+    fn take_optional_label_reference(&mut self) -> Result<Option<Identifier<'arena>>, ParseError> {
+        if self.can_insert_semicolon() || !self.at_reference_name() {
+            return Ok(None);
+        }
+        let (label_start, label_end) = self.current_pos();
+        let name = self.current_ident_name_or_await();
+        self.advance()?;
+        Ok(Some(Identifier::simple(
+            name,
+            Span::new(label_start as u32, label_end as u32),
+        )))
+    }
+
     pub(super) fn parse_break_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
@@ -596,23 +623,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
         self.advance()?;
 
-        // Check for optional label (no line terminator allowed)
-        // If ASI can apply, treat as no label
-        let label = if !self.can_insert_semicolon()
-            && (matches!(self.current_kind(), TokenKind::Identifier) || self.at_await_identifier())
-        {
-            let (label_start, label_end) = self.current_pos();
-            // Plain identifier, or `await` as a `LabelIdentifier` target at Script
-            // `[~Await]` (`break await` / `continue await`); reserved at Module.
-            let name = self.current_ident_name_or_await();
-            self.advance()?;
-            Some(Identifier::simple(
-                name,
-                Span::new(label_start as u32, label_end as u32),
-            ))
-        } else {
-            None
-        };
+        let label = self.take_optional_label_reference()?;
 
         let end = self.semicolon_end()?;
 
@@ -633,23 +644,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ));
         self.advance()?;
 
-        // Check for optional label (no line terminator allowed)
-        // If ASI can apply, treat as no label
-        let label = if !self.can_insert_semicolon()
-            && (matches!(self.current_kind(), TokenKind::Identifier) || self.at_await_identifier())
-        {
-            let (label_start, label_end) = self.current_pos();
-            // Plain identifier, or `await` as a `LabelIdentifier` target at Script
-            // `[~Await]` (`break await` / `continue await`); reserved at Module.
-            let name = self.current_ident_name_or_await();
-            self.advance()?;
-            Some(Identifier::simple(
-                name,
-                Span::new(label_start as u32, label_end as u32),
-            ))
-        } else {
-            None
-        };
+        let label = self.take_optional_label_reference()?;
 
         let end = self.semicolon_end()?;
 
@@ -680,9 +675,20 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_labeled_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, label_end) = self.current_pos();
 
-        // Parse label identifier. Normally a plain identifier; also `await` at
-        // Script `[~Await]` (a valid `LabelIdentifier`), which the statement
-        // dispatcher routes here as a keyword token.
+        // Parse the label identifier. The `LabelIdentifier` set is
+        // `Parser::at_reference_name` — plain identifiers plus every keyword-lexed word
+        // the lexer produces that may still be a name here (`async:`, `string:`,
+        // `let:`, `await:` at Script `[~Await]`, `yield:` only outside a generator).
+        //
+        // ⚠️ The gate lives at the *caller* — `parse_statement` dispatches here only
+        // when `at_reference_name()` holds — and `try_ident_or_contextual_name` below is
+        // a name-BUILDING channel, strictly wider: it applies neither the goal axis
+        // to `await` nor the `[~Yield]` production guard to `yield`. So a second
+        // caller that skipped the gate would accept `function* g() { yield: ; }`,
+        // which must reject. The assert pins that contract at the one caller there
+        // is (mirroring `expression_arrow.rs`'s `at_binding_name` assert);
+        // `at_reference_name` is a pure `&self` predicate, so it is safe here.
+        debug_assert!(self.at_reference_name());
         let name = self
             .try_ident_or_contextual_name()
             .ok_or_else(|| self.error_expected("label"))?;

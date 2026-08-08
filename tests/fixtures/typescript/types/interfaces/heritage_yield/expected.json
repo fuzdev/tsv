@@ -1,0 +1,543 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 436,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " `yield` heads a heritage type reference: a heritage element is an",
+			"start": 20,
+			"end": 88,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 69
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `IdentifierReference`, and outside a generator the only bar on `yield` there",
+			"start": 90,
+			"end": 169,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 80
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " is a strict-mode early error, which tsv defers",
+			"start": 171,
+			"end": 220,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " It qualifies and takes type arguments like any other heritage name",
+			"start": 282,
+			"end": 351,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 70
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 435,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 426,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 222,
+					"end": 250,
+					"loc": {
+						"start": {
+							"line": 5,
+							"column": 1
+						},
+						"end": {
+							"line": 5,
+							"column": 29
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 232,
+						"end": 233,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 11
+							},
+							"end": {
+								"line": 5,
+								"column": 12
+							}
+						},
+						"name": "A"
+					},
+					"extends": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 242,
+							"end": 247,
+							"loc": {
+								"start": {
+									"line": 5,
+									"column": 21
+								},
+								"end": {
+									"line": 5,
+									"column": 26
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 242,
+								"end": 247,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 21
+									},
+									"end": {
+										"line": 5,
+										"column": 26
+									}
+								},
+								"name": "yield"
+							}
+						}
+					],
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 248,
+						"end": 250,
+						"loc": {
+							"start": {
+								"line": 5,
+								"column": 27
+							},
+							"end": {
+								"line": 5,
+								"column": 29
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `yield` heads a heritage type reference: a heritage element is an",
+							"start": 20,
+							"end": 88
+						},
+						{
+							"type": "Line",
+							"value": " `IdentifierReference`, and outside a generator the only bar on `yield` there",
+							"start": 90,
+							"end": 169
+						},
+						{
+							"type": "Line",
+							"value": " is a strict-mode early error, which tsv defers",
+							"start": 171,
+							"end": 220
+						}
+					]
+				},
+				{
+					"type": "ClassDeclaration",
+					"start": 252,
+					"end": 279,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 28
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 258,
+						"end": 259,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 7
+							},
+							"end": {
+								"line": 6,
+								"column": 8
+							}
+						},
+						"name": "B"
+					},
+					"superClass": null,
+					"implements": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 271,
+							"end": 276,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 20
+								},
+								"end": {
+									"line": 6,
+									"column": 25
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 271,
+								"end": 276,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 20
+									},
+									"end": {
+										"line": 6,
+										"column": 25
+									}
+								},
+								"name": "yield"
+							}
+						}
+					],
+					"body": {
+						"type": "ClassBody",
+						"start": 277,
+						"end": 279,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 26
+							},
+							"end": {
+								"line": 6,
+								"column": 28
+							}
+						},
+						"body": []
+					}
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 353,
+					"end": 387,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 35
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 363,
+						"end": 364,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 11
+							},
+							"end": {
+								"line": 9,
+								"column": 12
+							}
+						},
+						"name": "C"
+					},
+					"extends": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 373,
+							"end": 384,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 21
+								},
+								"end": {
+									"line": 9,
+									"column": 32
+								}
+							},
+							"expression": {
+								"type": "TSQualifiedName",
+								"start": 373,
+								"end": 384,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 21
+									},
+									"end": {
+										"line": 9,
+										"column": 32
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 373,
+									"end": 378,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 21
+										},
+										"end": {
+											"line": 9,
+											"column": 26
+										}
+									},
+									"name": "yield"
+								},
+								"right": {
+									"type": "Identifier",
+									"start": 379,
+									"end": 384,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 27
+										},
+										"end": {
+											"line": 9,
+											"column": 32
+										}
+									},
+									"name": "Inner"
+								}
+							}
+						}
+					],
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 385,
+						"end": 387,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 33
+							},
+							"end": {
+								"line": 9,
+								"column": 35
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " It qualifies and takes type arguments like any other heritage name",
+							"start": 282,
+							"end": 351
+						}
+					]
+				},
+				{
+					"type": "TSInterfaceDeclaration",
+					"start": 389,
+					"end": 425,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 37
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 399,
+						"end": 400,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 11
+							},
+							"end": {
+								"line": 10,
+								"column": 12
+							}
+						},
+						"name": "D"
+					},
+					"extends": [
+						{
+							"type": "TSExpressionWithTypeArguments",
+							"start": 409,
+							"end": 422,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 21
+								},
+								"end": {
+									"line": 10,
+									"column": 34
+								}
+							},
+							"expression": {
+								"type": "Identifier",
+								"start": 409,
+								"end": 414,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 21
+									},
+									"end": {
+										"line": 10,
+										"column": 26
+									}
+								},
+								"name": "yield"
+							},
+							"typeParameters": {
+								"type": "TSTypeParameterInstantiation",
+								"start": 414,
+								"end": 422,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 26
+									},
+									"end": {
+										"line": 10,
+										"column": 34
+									}
+								},
+								"params": [
+									{
+										"type": "TSStringKeyword",
+										"start": 415,
+										"end": 421,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 27
+											},
+											"end": {
+												"line": 10,
+												"column": 33
+											}
+										}
+									}
+								]
+							}
+						}
+					],
+					"body": {
+						"type": "TSInterfaceBody",
+						"start": 423,
+						"end": 425,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 35
+							},
+							"end": {
+								"line": 10,
+								"column": 37
+							}
+						},
+						"body": []
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
