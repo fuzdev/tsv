@@ -612,10 +612,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Name channel for the current token, which the caller has already verified
-    /// is either a plain `Identifier` or `await` used as an identifier
-    /// (`at_await_identifier` — e.g. a class name, single-param arrow param, or
-    /// `break`/`continue` label at Script `[~Await]`). A plain identifier decodes
-    /// unicode escapes; `await` is a keyword token, verbatim by construction.
+    /// is a plain `Identifier` or a keyword-lexed word valid as a name here — the
+    /// [`Parser::at_binding_name`] set, so a contextual keyword or `await` at Script
+    /// `[~Await]` (e.g. a class name, single-param arrow param, or `break`/`continue`
+    /// label). A plain identifier decodes unicode escapes; a keyword token is never
+    /// escaped (the lexer re-classifies an escaped keyword as an `Identifier`), so it
+    /// is taken verbatim.
     pub(super) fn current_ident_name_or_await(&self) -> IdentName<'arena> {
         if matches!(self.current_kind(), TokenKind::Identifier) {
             self.current_ident_name()
@@ -667,11 +669,18 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         )
     }
 
-    /// Name channel for the current token as an identifier, accepting only the
-    /// **contextual** keywords — the ones `KeywordKind::can_be_identifier` admits
-    /// (`from`, `as`, `satisfies`, the type keywords, …). A reserved word is
-    /// rejected: these are positions where it would be read as a keyword instead
-    /// (a specifier local name, a label, a qualified type name's right side).
+    /// Name channel for the current token as an identifier — the set
+    /// `KeywordKind::can_be_identifier` admits (`from`, `as`, `satisfies`, the type
+    /// keywords, … plus `let` / `yield` / `await`). Used at positions where an
+    /// unconditionally-reserved word would be read as a keyword instead (a
+    /// specifier local name, a label, a qualified type name's right side).
+    ///
+    /// ⚠️ This is a **name-building** channel, not a gate: it is deliberately wider
+    /// than [`Parser::at_binding_name`] / [`Parser::at_reference_name`] and applies
+    /// neither the goal axis to `await` nor the `[~Yield]` guard to `yield`. Every
+    /// caller must already have decided the word is legal here — a label site, for
+    /// instance, is admitted by `at_reference_name` at the statement dispatcher, and
+    /// calling this without that gate would accept `yield:` inside a generator.
     ///
     /// Handles `TokenKind::Identifier` with unicode escape decoding. Returns `None`
     /// if the current token is not identifier-like.
@@ -686,66 +695,55 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }
     }
 
-    /// Name channel for the current token as a function declaration name. Like
-    /// [`Parser::try_ident_or_contextual_name`], but `await` is accepted only
-    /// where it is a valid identifier (Script `[~Await]`): at `Module` / `[+Await]`
-    /// it is a reserved `BindingIdentifier` (the goal-level and `[Await]` early
-    /// errors), so `function await(){}` / `export function await(){}` reject there,
-    /// matching acorn-as-module and the function-expression name path. Other
-    /// contextual keywords (`async`, `from`, type keywords) stay valid names.
+    /// Name channel for the current token as a function declaration name — a
+    /// `BindingIdentifier`, so it asks [`Parser::await_is_binding_name`]: `await`
+    /// names a function at `Goal::Script` (whatever the `[Await]` context, that bar
+    /// being a deferred early error) and is reserved at `Module`, so `function
+    /// await(){}` / `export function await(){}` reject there, matching
+    /// acorn-as-module. Other keyword-lexed names (`async`, `from`, `let`, `yield`,
+    /// the type keywords) stay valid.
     pub(super) fn try_function_name(&self) -> Option<IdentName<'arena>> {
         if matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Await))
-            && !self.await_is_identifier()
+            && !self.await_is_binding_name()
         {
             return None;
         }
         self.try_ident_or_contextual_name()
     }
 
-    /// Name channel for the current token as a binding name, accepting contextual
-    /// keywords.
-    ///
-    /// Like `try_ident_or_contextual_name` but uses `can_be_binding_name()`,
-    /// which excludes `await`, `yield`, and `let` (not valid as parameter/variable names).
     /// Whether the current token is binding-name-eligible — the allocation-free
     /// classification behind `try_binding_name().is_some()`, without building the
     /// name. Pure `&self` (no allocation), so it is safe inside a `debug_assert!`
     /// (the name-building path `try_binding_name` takes may arena-allocate an
     /// escaped name).
+    ///
+    /// The set is [`KeywordKind::can_be_binding_name`] plus `await` where the goal
+    /// axis makes it an identifier — so `let` and `yield` are in, their only bar
+    /// being a strict-mode early error tsv defers.
+    ///
+    /// This also guards the two **`IdentifierReference` heads** that tsv checks
+    /// before committing — a heritage element's `TypeName` (`interface A extends X`,
+    /// `class C implements X`) and an import-equals module reference (`import x =
+    /// A.B`) — which want the same set for the same reason: in strict mode the bar
+    /// on `let`/`yield` is an early error in the reference and binding spellings
+    /// alike, while a genuine `ReservedWord` (`void`) is excluded by the
+    /// `Identifier` production in both. tsc and prettier accept `let`/`yield` at
+    /// both heads; acorn accepts them at the heritage head and rejects them at the
+    /// module reference, but it is the shape oracle, not the validity one. The
+    /// heritage head once needed a wider predicate of its own purely because this
+    /// set was missing `let`.
+    ///
+    /// ⚠️ An *expression*-position reader wants
+    /// [`Parser::keyword_is_expression_identifier`] instead — inside a generator
+    /// `yield` is the operator there, which is a production guard rather than a
+    /// deferrable early error.
     pub(super) fn at_binding_name(&self) -> bool {
         match self.current_kind() {
             TokenKind::Identifier => true,
             TokenKind::Keyword(kw) if kw.can_be_binding_name() => true,
-            TokenKind::Keyword(KeywordKind::Await) => self.await_is_identifier(),
+            TokenKind::Keyword(KeywordKind::Await) => self.await_is_binding_name(),
             _ => false,
         }
-    }
-
-    /// Whether the current token can head a **heritage** element (`interface A
-    /// extends X`, `class C implements X`) — the `IdentifierReference` at the head
-    /// of that clause's `TypeName`.
-    ///
-    /// Deliberately NOT [`Parser::at_binding_name`], which is one word narrower.
-    /// `let` is not a `ReservedWord`; the bar on it as a name is a strict-mode early
-    /// error, which tsv defers, and every oracle waives it here — acorn, prettier and
-    /// tsc all accept `interface A extends let {}`. tsv already reads `let` as an
-    /// ordinary type name everywhere else (`let x: let`, `type T = let.Foo`,
-    /// `typeof let`); heritage was the one site that disagreed.
-    ///
-    /// ⚠️ This is the ONE head that goes wider, so don't propagate it. The other
-    /// `IdentifierReference` head tsv guards — an import-equals module reference —
-    /// keeps `at_binding_name`, because acorn *does* enforce the reserved-word rule
-    /// there (`import x = let.y` is "The keyword 'let' is reserved").
-    ///
-    /// `yield` and `await` stay out, and that is the same rule, not an exception:
-    /// both ARE `ReservedWord`s, readmitted only by the `[~Yield]` / `[~Await]`
-    /// productions. tsv is strict-only, so `yield` never qualifies, and `await`
-    /// qualifies exactly when [`Parser::await_is_identifier`] says so (Script goal).
-    /// prettier accepts both — that leniency is not followed, see the
-    /// `types/interfaces/heritage_reserved_keyword_svelte_divergence` README.
-    pub(super) fn at_heritage_name(&self) -> bool {
-        matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Let))
-            || self.at_binding_name()
     }
 
     pub(super) fn try_binding_name(&self) -> Option<IdentName<'arena>> {
@@ -754,9 +752,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             TokenKind::Keyword(kw) if kw.can_be_binding_name() => {
                 Some(self.current_raw_ident_name())
             }
-            // `await` is a valid `BindingIdentifier` only at Script goal in a
-            // `[~Await]` context (the two independent goal/`[Await]` early errors).
-            TokenKind::Keyword(KeywordKind::Await) if self.await_is_identifier() => {
+            // `await` is a valid `BindingIdentifier` at Script goal, whatever the
+            // `[Await]` context: the goal bullet is enforced, the `[Await]` one is a
+            // deferred early error like the `[Yield]` twin (`await_is_binding_name`).
+            TokenKind::Keyword(KeywordKind::Await) if self.await_is_binding_name() => {
                 Some(self.current_raw_ident_name())
             }
             _ => None,
@@ -786,22 +785,119 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         )))
     }
 
-    /// Whether `await` may be used as an ordinary identifier in the current
-    /// context: only at `Goal::Script` and outside any `[+Await]` context. This
-    /// is the conjunction of the two independent ECMAScript early errors —
-    /// `await`-as-identifier is a Syntax Error if the goal is `Module`, OR if the
-    /// production carries the `[Await]` parameter.
+    /// Whether `await` reads as a plain identifier at an **expression or label**
+    /// position: only at `Goal::Script` and outside any `[+Await]` context.
+    ///
+    /// Both halves are real here, for different reasons. The goal half is the early
+    /// error tsv enforces (`IdentifierReference : await` is a Syntax Error when the
+    /// goal is `Module`). The `!in_await` half is not a deferral question at all —
+    /// `IdentifierReference[Await] : [~Await] await` and `LabelIdentifier[Await] :
+    /// [~Await] await` carry the guard **in their productions**, and inside a
+    /// `[+Await]` context `await` is the operator, so the identifier reading is
+    /// unreachable rather than merely invalid. Exactly parallel to
+    /// [`Parser::yield_is_identifier`].
+    ///
+    /// ⚠️ A **binding** position wants [`Parser::await_is_binding_name`] instead —
+    /// there the `[Await]` bar is a deferrable early error, not a production guard.
     pub(super) fn await_is_identifier(&self) -> bool {
         self.goal == Goal::Script && !self.in_await
     }
 
-    /// Whether the current token is `await` *and* it may be an ordinary
-    /// identifier here (`await_is_identifier`) — i.e. it should be treated as a
-    /// `BindingIdentifier`/`IdentifierReference`/`LabelIdentifier` rather than an
-    /// await-expression or a reserved word.
-    pub(super) fn at_await_identifier(&self) -> bool {
-        matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Await))
-            && self.await_is_identifier()
+    /// Whether `await` may name a `BindingIdentifier` here: at `Goal::Script`,
+    /// whatever the `[Await]` context.
+    ///
+    /// [`Parser::await_is_identifier`] minus the `!in_await` half, and the
+    /// difference is the same one that lets `yield` be a binding name inside a
+    /// generator. §sec-identifiers gives `BindingIdentifier[Yield, Await] :
+    /// Identifier | `yield` | `await`` with **no** guard on either word, and writes
+    /// both context bars as early errors instead (so ASI cannot split `let ⏎ await
+    /// 0;`):
+    ///
+    /// ```text
+    /// BindingIdentifier[Yield, Await] : `await`
+    ///   It is a Syntax Error if this production has an [Await] parameter.
+    /// ```
+    ///
+    /// tsv defers that one, exactly as it defers the `[Yield]` twin — so `async
+    /// function h() { var await = 1; }` and `async function h(await) {}` parse at
+    /// Script goal. Deferring is what the repo's rule prescribes: prettier formats
+    /// both, and the bar needs non-local context (the enclosing function's
+    /// async-ness), which is the mode-dependent / non-local class tsv defers rather
+    /// than the unconditional-local class it rejects. tsc's parser agrees — its
+    /// `isBindingIdentifier` deliberately admits `await`/`yield` and leaves the bar
+    /// to the grammar checker (TS1359), the same bucket as TS1212 `let`. acorn
+    /// rejects, but it is the shape oracle, not the validity one.
+    ///
+    /// The **goal** bullet is a different early error and stays enforced: `await` is
+    /// a Syntax Error as a name when the goal is `Module`, which is what makes the
+    /// goal axis observable at all.
+    pub(super) fn await_is_binding_name(&self) -> bool {
+        self.goal == Goal::Script
+    }
+
+    /// Whether `yield` reads as a plain identifier here rather than as the operator:
+    /// outside a generator only.
+    ///
+    /// This is the `[~Yield]` guard that `IdentifierReference` and `LabelIdentifier`
+    /// carry **in their productions** — and that `BindingIdentifier` deliberately does
+    /// NOT (ecma262 §sec-identifiers gives it `Identifier | `yield` | `await`` with no
+    /// guard and writes the `[Yield]` bar as an early error instead, so ASI cannot
+    /// split `let ⏎ await 0;`). That asymmetry is the whole reason the three channels
+    /// differ: `function* g() { var yield = 1; }` parses (binding, deferred early
+    /// error) while `function* g() { o = { yield }; }` and `function* g() { yield: ; }`
+    /// reject (reference / label, production guard). Real tsc and test262 both draw the
+    /// line there. The `await` counterpart is [`Parser::await_is_identifier`].
+    pub(super) fn yield_is_identifier(&self) -> bool {
+        !self.in_yield
+    }
+
+    /// Whether `kw` reads as a plain identifier at an **expression** position —
+    /// [`KeywordKind::can_be_binding_name`] narrowed by the one word whose
+    /// expression reading differs from its binding reading (see
+    /// [`Parser::yield_is_identifier`]).
+    ///
+    /// `await` is outside this set entirely: its callers ask
+    /// [`Parser::await_is_identifier`] on arms of their own, ordered after the arm
+    /// that calls this.
+    pub(super) fn keyword_is_expression_identifier(&self, kw: KeywordKind) -> bool {
+        kw.can_be_binding_name()
+            && (!matches!(kw, KeywordKind::Yield) || self.yield_is_identifier())
+    }
+
+    /// Whether the current token may name an `IdentifierReference` **or** a
+    /// `LabelIdentifier` — one predicate because ecma262 gives the two productions
+    /// character-for-character identical guards:
+    ///
+    /// ```text
+    /// IdentifierReference[Yield, Await] : Identifier | [~Yield] `yield` | [~Await] `await`
+    /// LabelIdentifier[Yield, Await]     : Identifier | [~Yield] `yield` | [~Await] `await`
+    /// ```
+    ///
+    /// [`Parser::at_binding_name`] with both context guards *applied* rather than
+    /// deferred, and that is the whole difference between the two channels:
+    /// `BindingIdentifier` carries no guard and puts the same bars in the early
+    /// errors, which tsv defers. So inside a generator or async function the binding
+    /// channel admits `yield` / `await` (`function* g() { var yield = 1; }`) while
+    /// this one does not (`function* g() { yield: ; }`, `async function h() { await:
+    /// ; }`). A guard is not a deferrable early error: in a `[+Yield]` / `[+Await]`
+    /// context the word is the **operator**, so the name reading is unreachable, not
+    /// merely invalid.
+    ///
+    /// The two non-label callers are the `IdentifierReference` heads tsv checks
+    /// before committing — a heritage element's `TypeName` (`interface A extends X`,
+    /// `class C implements X`) and an import-equals module reference (`import x =
+    /// A.B`). tsc draws the same line by parsing heritage with its *expression*
+    /// parser, so `function* g() { interface A extends yield {} }` and `async
+    /// function h() { interface A extends await {} }` are TS1109 there — while a
+    /// plain type annotation (`function* g() { let x: yield; }`) is fine, since that
+    /// one never reaches an expression parser in either implementation.
+    pub(super) fn at_reference_name(&self) -> bool {
+        self.at_binding_name()
+            && match self.current_kind() {
+                TokenKind::Keyword(KeywordKind::Yield) => self.yield_is_identifier(),
+                TokenKind::Keyword(KeywordKind::Await) => self.await_is_identifier(),
+                _ => true,
+            }
     }
 
     /// Enter a grouping delimiter — `(…)`, `[…]`, `{…}`, `${…}` — having just
@@ -1182,17 +1278,47 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     /// Whether the peeked token is a same-line *declaration name word* — a plain
-    /// identifier or a contextual keyword valid as a binding name (`string`,
-    /// `number`, `any`, …; the set `KeywordKind::can_be_binding_name` accepts,
-    /// since these are not reserved words). Used by the `interface`/`namespace`/
-    /// `module` dispatch, which commits to a declaration only when a name follows
-    /// on the same line (tsc `nextTokenIsIdentifier…OnSameLine`, whose
-    /// `isIdentifier` is likewise true for contextual keywords). A genuinely
-    /// reserved word fails the gate, leaving the contextual keyword an ordinary
-    /// identifier. Mirrors the `try_binding_name` name-capture predicate the
-    /// declaration parsers use for the name itself.
+    /// identifier or a keyword-lexed word valid as a binding name (`string`,
+    /// `number`, `any`, … plus `let` / `yield`; the set
+    /// `KeywordKind::can_be_binding_name` accepts). Used by the
+    /// `interface`/`namespace`/`module` dispatch, which commits to a declaration
+    /// only when a name follows on the same line (tsc
+    /// `nextTokenIsIdentifier…OnSameLine`, whose `isBindingIdentifier` is likewise
+    /// true for the contextual keywords *and* for the strict-mode-reserved words it
+    /// defers). So `interface let {}` / `namespace let {}` commit, matching tsc; a
+    /// word barred by a *production* rather than an early error (`void`, `enum`)
+    /// fails the gate, leaving the contextual keyword an ordinary identifier.
+    /// Mirrors the `try_binding_name` name-capture predicate the declaration
+    /// parsers use for the name itself.
     pub(super) fn peek_is_same_line_name_word(&mut self) -> bool {
         self.peek_kind().is_binding_name_word() && !self.peek_preceded_by_line_terminator()
+    }
+
+    /// Whether a statement-initial `let` heads a `LexicalDeclaration` rather than an
+    /// `ExpressionStatement` — tsc's `isLetDeclaration`
+    /// (`nextTokenIsBindingIdentifierOrStartOfDestructuring`): a binding name, `{`,
+    /// or `[` follows.
+    ///
+    /// `let` is the one word that is neither a `ReservedWord` nor purely contextual:
+    /// `Identifier : IdentifierName but not ReservedWord` admits it, so `let` is a
+    /// perfectly good `IdentifierReference` (`let;`, `x = let`, `let.x = 1`,
+    /// `typeof let`), barred only by the strict-mode early error tsv defers. What
+    /// keeps the two readings apart is a *lookahead*, and ecma262 spells one half of
+    /// it out — `ExpressionStatement` carries `[lookahead ∉ { …, `let` `[` }]`, so
+    /// `let [` can never begin an expression statement. That is why `let[0] = 1` is
+    /// **not** an indexed assignment but a declaration with an invalid array binding
+    /// pattern, and stays a syntax error (tsc TS1181) even though `let.x = 1` parses.
+    ///
+    /// ⚠️ A **for-head** deliberately does NOT ask this: `for (let …)` commits to a
+    /// declaration on the keyword alone, which is exactly what tsc does
+    /// (`parseForOrForInOrForOfStatement` tests `token() === LetKeyword` with no
+    /// lookahead), so `for (let[0] of a)` and `for (let.x of a)` both stay rejected.
+    pub(super) fn at_let_declaration(&mut self) -> bool {
+        let kind = self.peek_kind();
+        kind.is_binding_name_word()
+            || matches!(kind, TokenKind::BraceOpen | TokenKind::BracketOpen)
+            || (matches!(kind, TokenKind::Keyword(KeywordKind::Await))
+                && self.await_is_binding_name())
     }
 
     /// Whether the peeked token is a same-line *binding word* for a `using`

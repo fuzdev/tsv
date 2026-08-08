@@ -49,6 +49,34 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     }
 
     pub(crate) fn parse_statement(&mut self) -> Result<Statement<'arena>, ParseError> {
+        // A labeled statement, checked before the keyword dispatch below because a
+        // `LabelIdentifier` may be a word the lexer turned into a `Keyword` token
+        // (`async: …`, `string: …`, `let: …`) — those never reach the `Identifier`
+        // arm, so the label reading was unreachable for every one of them while
+        // `foo: …` worked. At statement start a name followed by `:` can only be a
+        // label (a declaration never has one there, and an object literal starts
+        // with `{`), so one token of lookahead settles it with no ambiguity.
+        //
+        // The gate is `at_reference_name`: plain identifiers, the contextual keywords,
+        // `let` (barred only by the deferred strict-mode early error), `await` exactly
+        // where the goal axis makes it an identifier, and `yield` only OUTSIDE a
+        // generator — `LabelIdentifier[Yield] : [~Yield] `yield`` keeps that guard in
+        // the production, so `function* g() { yield: ; }` is a parse error even though
+        // the binding channel admits `yield` there. It short-circuits on a genuine
+        // reserved word, so no `peek` runs for `if` / `for` / `return` / `function` /
+        // … — only for tokens whose arms peek anyway. This is also the ONLY place the
+        // label set is decided: `parse_labeled_statement` builds the name through a
+        // wider channel that applies neither the goal axis nor `[~Yield]`, so the gate
+        // must stay here (it debug-asserts this predicate for that reason).
+        //
+        // ⚠️ This widens who may be labelled, never WHAT may be labelled:
+        // `LabelledItem : Statement | FunctionDeclaration`, so `label: let x = 1`
+        // still rejects — the body goes through `parse_statement`, which parses a
+        // lexical declaration and is then rejected by the labelled-item check.
+        if self.at_reference_name() && self.peek_kind() == TokenKind::Colon {
+            return self.parse_labeled_statement();
+        }
+
         // Check if this is a variable declaration
         match self.current_kind() {
             TokenKind::Keyword(kw) => match kw {
@@ -60,7 +88,19 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         self.parse_variable_declaration()
                     }
                 }
-                KeywordKind::Let | KeywordKind::Var => self.parse_variable_declaration(),
+                KeywordKind::Var => self.parse_variable_declaration(),
+                // `let` heads a declaration only when a binding follows (`let x`,
+                // `let [a]`, `let {a}`); otherwise it is an ordinary
+                // `IdentifierReference` and this is an expression statement (`let;`,
+                // `let = 1`, `let.x = 1`, `let++`). See `Parser::at_let_declaration`
+                // for the rule and for why `let [` still commits to the declaration.
+                KeywordKind::Let => {
+                    if self.at_let_declaration() {
+                        self.parse_variable_declaration()
+                    } else {
+                        self.parse_expression_statement()
+                    }
+                }
                 KeywordKind::Return => self.parse_return_statement(),
                 KeywordKind::Function => {
                     // A `function` inside a `declare namespace`/`module` body carries no
@@ -100,13 +140,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     }
                 }
                 KeywordKind::Await => {
-                    // Script `[~Await]`: `await` is an ordinary identifier — a
-                    // labeled statement (`await: …`) or an expression statement
-                    // (`await`, `await.x`, …), exactly like a plain identifier.
+                    // Script `[~Await]`: `await` is an ordinary identifier, so this is
+                    // an expression statement (`await`, `await.x`, …) exactly like a
+                    // plain identifier. The labeled form (`await: …`) was already
+                    // dispatched by the `at_reference_name` check at the top.
                     if self.await_is_identifier() {
-                        if self.peek_kind() == TokenKind::Colon {
-                            return self.parse_labeled_statement();
-                        }
                         return self.parse_expression_statement();
                     }
                     // Check for `await using` declaration (Explicit Resource
@@ -238,12 +276,8 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     let start = self.current_pos().0;
                     return self.parse_global_declaration(start, false);
                 }
-                // Check for labeled statement: `label: statement`
-                // peek_kind() skips comments: `label /* c */: statement`
-                if self.peek_kind() == TokenKind::Colon {
-                    return self.parse_labeled_statement();
-                }
-                // Regular expression statement
+                // Regular expression statement (a `label:` was already dispatched at
+                // the top of this function, for every identifier-shaped token alike)
                 self.parse_expression_statement()
             }
             TokenKind::Semicolon => {

@@ -708,14 +708,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             }
             // A single unparenthesized arrow parameter may be a contextual keyword
             // that is a valid `BindingIdentifier` (`any => x`, `async => x`,
-            // `from => x`). The byte scan requires `=>` *immediately* after the word,
-            // so `async x => …` / `async () => …` (a real async arrow) fall through to
-            // the `async` arm, and non-binding reserved words (`yield =>`, `await =>`
-            // at Module) are excluded by `can_be_binding_name` and reject downstream.
-            // This mirrors the plain-`Identifier` arrow check below; `await` at Script
-            // `[~Await]` keeps its dedicated handling in the `Await` arm.
+            // `from => x`, `let => x`). The byte scan requires `=>` *immediately*
+            // after the word, so `async x => …` / `async () => …` (a real async arrow)
+            // fall through to the `async` arm, and a reserved word (`void =>`) is
+            // excluded by `can_be_binding_name` and rejects downstream. This mirrors
+            // the plain-`Identifier` arrow check below; `await` at Script `[~Await]`
+            // keeps its dedicated handling in the `Await` arm, and `yield =>` is an
+            // arrow only outside a generator — inside one `yield` is the operator,
+            // which is what `keyword_is_expression_identifier` subtracts.
             TokenKind::Keyword(kw)
-                if kw.can_be_binding_name() && self.is_single_param_arrow_start() =>
+                if self.keyword_is_expression_identifier(*kw)
+                    && self.is_single_param_arrow_start() =>
             {
                 let expr = self.parse_single_param_arrow_function()?;
                 ParsedExpr::from_expr(self.arena, expr)
@@ -732,7 +735,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         ParsedExpr::from_expr(self.arena, self.parse_single_param_arrow_function()?)
                     } else {
                         // Script `[~Await]`: `await` is an ordinary `IdentifierReference`.
-                        self.parse_await_identifier_reference()?
+                        self.parse_keyword_identifier_reference()?
                     }
                 } else {
                     // Module `[~Await]`: `await` is reserved and there is no
@@ -742,9 +745,29 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     ));
                 }
             }
+            // `let` is not a `ReservedWord`, so it is an ordinary
+            // `IdentifierReference` wherever an expression is expected — the
+            // statement dispatcher has already decided this is not a declaration
+            // (`Parser::at_let_declaration`). Unlike `yield`/`await` it has no
+            // operator reading to lose, so the arm is unconditional.
+            TokenKind::Keyword(KeywordKind::Let) => self.parse_keyword_identifier_reference()?,
             TokenKind::Keyword(KeywordKind::Yield) => {
-                let expr = self.parse_yield_expression()?;
-                ParsedExpr::from_expr(self.arena, expr)
+                if self.yield_is_identifier() {
+                    // `[~Yield]`: `yield` is an ordinary `IdentifierReference`, exactly
+                    // like `await` at Script goal above — `IdentifierReference[Yield] :
+                    // [~Yield] yield`. Its remaining bar is the strict-mode early error
+                    // tsv defers, so `yield()`, `yield++`, `yield.foo` and `x = yield`
+                    // are all plain identifier expressions, as tsc and prettier parse
+                    // them. Building a `YieldExpression` here instead was a wrong wire
+                    // SHAPE, not just leniency: `yield.foo` came out as a
+                    // `MemberExpression` over a `YieldExpression`, a node the enclosing
+                    // function could not legally contain.
+                    self.parse_keyword_identifier_reference()?
+                } else {
+                    // `[+Yield]`: the operator.
+                    let expr = self.parse_yield_expression()?;
+                    ParsedExpr::from_expr(self.arena, expr)
+                }
             }
             TokenKind::Keyword(KeywordKind::Async) => {
                 // Could be async arrow function, async function expression, or just identifier
@@ -1463,11 +1486,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                     end,
                 ))
             }
-            // `await` as an ordinary `IdentifierReference` (Script `[~Await]`) —
-            // e.g. a `new` callee (`new await()`) or any primary reference.
+            // `await` / `yield` as an ordinary `IdentifierReference` (Script
+            // `[~Await]` / `[~Yield]`) — e.g. a `new` callee (`new await()`,
+            // `new yield()`) or any primary reference.
             TokenKind::Keyword(KeywordKind::Await) if self.await_is_identifier() => {
-                self.parse_await_identifier_reference()
+                self.parse_keyword_identifier_reference()
             }
+            TokenKind::Keyword(KeywordKind::Yield) if self.yield_is_identifier() => {
+                self.parse_keyword_identifier_reference()
+            }
+            TokenKind::Keyword(KeywordKind::Let) => self.parse_keyword_identifier_reference(),
             TokenKind::BraceOpen => Ok(ParsedExpr::from_expr(self.arena,self.parse_object_expression()?)),
             TokenKind::BracketOpen => Ok(ParsedExpr::from_expr(self.arena,self.parse_array_expression()?)),
             TokenKind::Keyword(KeywordKind::True) => {
@@ -2032,10 +2060,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         }))
     }
 
-    /// Consume the current `await` token as an ordinary `IdentifierReference`
-    /// (Script `[~Await]`). The caller must have verified `await_is_identifier()`
-    /// — used for a primary reference and a `new` callee (`new await()`).
-    fn parse_await_identifier_reference(&mut self) -> Result<ParsedExpr<'arena>, ParseError> {
+    /// Consume the current keyword token as an ordinary `IdentifierReference`.
+    ///
+    /// Word-agnostic — the name comes from `current_raw_ident_name` — and shared by
+    /// the two words whose reserved-ness is contextual: `await` at Script
+    /// `[~Await]` and `yield` at `[~Yield]`. The caller must have verified the
+    /// matching predicate (`await_is_identifier` / `yield_is_identifier`); reaching
+    /// here in a `[+Await]` / `[+Yield]` context would silently turn an operator
+    /// into a name. Used for a primary reference and a `new` callee (`new await()`,
+    /// `new yield()`).
+    fn parse_keyword_identifier_reference(&mut self) -> Result<ParsedExpr<'arena>, ParseError> {
         let (start, end) = self.current_pos();
         let name = self.current_raw_ident_name();
         self.advance()?;
@@ -2125,10 +2159,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             | TokenKind::Hash => true,
             // Most keywords can start expressions (as primaries, unary ops, or contextual identifiers).
             // Exclude only declaration/control-flow/binary-operator keywords that cannot.
+            //
+            // `let` is NOT excluded, unlike `const`/`var`: it is no `ReservedWord`, so
+            // it is an ordinary `IdentifierReference` and a perfectly good
+            // `AssignmentExpression` — which is what `YieldExpression : yield [no LT]
+            // AssignmentExpression` takes, so `function* g() { yield let; }` is `yield
+            // (let)`, as tsc and prettier read it. Only a keyword that can begin no
+            // expression at all belongs below.
             TokenKind::Keyword(kw) => !matches!(
                 kw,
                 KeywordKind::Const
-                    | KeywordKind::Let
                     | KeywordKind::Var
                     | KeywordKind::If
                     | KeywordKind::Else

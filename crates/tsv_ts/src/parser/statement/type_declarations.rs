@@ -178,7 +178,16 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // arguments") and refuses `null` / `true` / `this`, and tsc rejects `void`
             // at parse (TS1109) — see the `heritage_reserved_keyword_svelte_divergence`
             // sibling, which pins the `void` line against acorn, who accepts all four.
-            if !self.at_heritage_name() {
+            //
+            // `at_reference_name`, not `at_binding_name`: this head is an
+            // `IdentifierReference`, so `yield`/`await` keep the `[~Yield]`/`[~Await]`
+            // guards their production carries rather than the deferral the binding
+            // channel gets. tsc lands in the same place by a different route — it
+            // parses heritage with its *expression* parser, where both words are the
+            // operator — so `function* g() { interface A extends yield {} }` and
+            // `async function h() { interface A extends await {} }` are TS1109 for it
+            // and rejections here, while at the top level both names are fine.
+            if !self.at_reference_name() {
                 return Err(self.error_expected("a type name in the heritage clause"));
             }
 
