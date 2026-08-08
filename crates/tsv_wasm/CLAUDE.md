@@ -172,6 +172,12 @@ hierarchical), then queries:
 - `heuristic_shadow_warning(dir) -> string` — the one warning template (a method,
   not a free function, so it rides the class re-export; single source of truth
   with the native CLI, never re-templated in JS).
+- `unsupported_extension_error(path) -> string | undefined` — the argument error
+  for an explicitly named **file** tsv doesn't format, `undefined` when the
+  extension is formattable. Also a method for the class-re-export reason, and its
+  receiver is likewise unused (an argument check runs before any matcher exists).
+  It carries the rendered extension list, so `npm/cli.js` never hand-mirrors
+  `FORMATTABLE_EXTENSIONS`.
 - `is_ignored(path, is_dir)` / `is_empty()` — the raw matcher primitives, still
   exposed for direct consumers.
 

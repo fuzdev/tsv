@@ -19,8 +19,9 @@ use std::thread;
 /// change (`--check`), 2 errors. Directory discovery is gitignore-aware:
 /// inside a git repo it honors `.gitignore` (hierarchically, like git) plus
 /// hierarchical `.formatignore` / `.prettierignore`; outside one, only
-/// `.formatignore`. An explicitly named file is always formatted. `--list`
-/// prints the discovered in-scope files without formatting (path mode only).
+/// `.formatignore`. An explicitly named file skips the ignore files, but its
+/// extension must still be one tsv formats. `--list` prints the discovered
+/// in-scope files without formatting (path mode only).
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "format")]
 pub struct FormatCommand {
