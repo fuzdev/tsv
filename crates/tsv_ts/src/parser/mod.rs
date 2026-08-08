@@ -120,12 +120,20 @@ pub struct Parser<'a, 'arena> {
     /// Disabled in partial expression parsing for Svelte template contexts
     /// where `as` has different meaning (e.g., `{#each items as pattern}`).
     allow_ts_type_assertions: bool,
-    /// Nesting depth inside grouping delimiters (`(...)`, `[...]`, `{...}`, `${...}`).
+    /// Nesting depth inside grouping delimiters (`(...)`, `[...]`, `{...}`, `${...}`),
+    /// maintained by [`Parser::enter_grouping`] / [`Parser::exit_grouping`].
     /// Used to disambiguate context-sensitive keywords inside nested expressions:
     /// - `as`/`satisfies`: always type assertions when depth > 0, even when
     ///   `allow_ts_type_assertions` is false (Svelte `#each` partial parsing)
-    /// - `in`: always a binary operator when depth > 0, even when `allow_in` is
-    ///   false (for-loop header parsing)
+    /// - `in`: a binary operator once the depth rises above [`Parser::no_in_depth`],
+    ///   even when `allow_in` is false (for-loop header parsing)
+    ///
+    /// ⚠️ A reading of this counter is meaningless without a **baseline**, and the
+    /// two consumers above use different ones — a literal `0` for `as` (that region
+    /// opens at the parse root, where a fresh `Parser` starts at 0) and
+    /// `no_in_depth` for `in` (that region opens mid-parse, at whatever depth the
+    /// enclosing expression had reached). Copying one gate's baseline to the other
+    /// is the bug this split exists to prevent.
     grouping_depth: u32,
     /// When `true`, grouping parens `(expr)` are preserved as an internal
     /// `ParenthesizedExpression` node instead of being discarded. Off by default
@@ -152,6 +160,16 @@ pub struct Parser<'a, 'arena> {
     /// Whether to allow `in` as a binary operator.
     /// Set to false when parsing for-loop headers to distinguish `for (x in y)` from expressions.
     allow_in: bool,
+    /// The [`Parser::grouping_depth`] at which the current `[~In]` region began —
+    /// the baseline the `in`-is-a-binary-operator gate compares against, so the
+    /// question it asks is "has a grouping opened **since this for-header
+    /// started**?" rather than "is any grouping open anywhere?". Only meaningful
+    /// while `allow_in` is false; set (save/restore) by
+    /// [`Parser::parse_expression_no_in`]. A plain `== 0` test would read the
+    /// enclosing expression's delimiters — `fn(function () { for (k in o) {} })`
+    /// parses its header at depth 1 — and take the for-in separator for a
+    /// relational `in`.
+    no_in_depth: u32,
     /// The syntactic goal symbol (`Script` vs `Module`) this parse runs against.
     /// Fixed for the whole parse — embedders (Svelte) and the standalone
     /// `parse`/`format` default to `Module`; `parse_with_goal` overrides it.
@@ -339,6 +357,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             lexer_error: None,              // No stored lexer error
             peek_had_line_terminator: false, // No peek cached yet
             allow_in: true,                 // Allow `in` binary operator by default
+            no_in_depth: 0,                 // Only read while `allow_in` is false
             goal,
             // Module top level is `[+Await]` (`ModuleItem[+Await]`); Script top
             // level is `[~Await]` (`ScriptBody[~Await]`).
@@ -756,6 +775,35 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn at_await_identifier(&self) -> bool {
         matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::Await))
             && self.await_is_identifier()
+    }
+
+    /// Enter a grouping delimiter — `(…)`, `[…]`, `{…}`, `${…}` — having just
+    /// consumed its opener. Pairs with [`Parser::exit_grouping`] on the closer.
+    ///
+    /// The two calls are what maintain [`Parser::grouping_depth`], and every
+    /// consumer of that counter is documented on the field: a *baseline* decides
+    /// what a reading means, and the two questions it answers use different ones
+    /// ([`Parser::no_in_depth`] vs the parse root's literal 0). Nine pairs across
+    /// `expression.rs` / `expression_literals.rs` / `expression_template.rs` are
+    /// hand-balanced across early returns and are deliberately NOT unwound on the
+    /// error path — inert while the parser never backtracks, since a rejected
+    /// parse propagates straight out. Wrapping them in a combinator (so the pair
+    /// is balanced by construction) wants body extraction at several sites and is
+    /// its own change.
+    #[inline]
+    pub(super) fn enter_grouping(&mut self) {
+        self.grouping_depth += 1;
+    }
+
+    /// Leave a grouping delimiter, having just consumed its closer. See
+    /// [`Parser::enter_grouping`].
+    #[inline]
+    pub(super) fn exit_grouping(&mut self) {
+        debug_assert!(
+            self.grouping_depth > 0,
+            "exit_grouping without a matching enter_grouping"
+        );
+        self.grouping_depth -= 1;
     }
 
     /// Shared body of the `with_*` context combinators: run `f` with the

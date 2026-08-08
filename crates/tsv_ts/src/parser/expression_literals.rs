@@ -24,7 +24,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         let arena = self.arena;
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BraceOpen)?; // consume '{'
-        self.grouping_depth += 1;
+        self.enter_grouping();
 
         let mut properties = self.bvec();
         // Set when a trailing comma follows a final spread property (`{...a,}`):
@@ -35,7 +35,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if self.check(&TokenKind::BraceClose) {
             let (_, end) = self.current_pos();
             self.advance()?; // consume '}'
-            self.grouping_depth -= 1;
+            self.exit_grouping();
             return Ok(Expression::ObjectExpression(ObjectExpression {
                 properties: properties.into_bump_slice(),
                 spread_trailing_comma: false,
@@ -297,7 +297,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BraceClose)?; // consume '}'
-        self.grouping_depth -= 1;
+        self.exit_grouping();
 
         Ok(Expression::ObjectExpression(ObjectExpression {
             properties: properties.into_bump_slice(),
@@ -317,7 +317,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_array_expression(&mut self) -> Result<Expression<'arena>, ParseError> {
         let (start, _) = self.current_pos();
         self.expect(&TokenKind::BracketOpen)?; // consume '['
-        self.grouping_depth += 1;
+        self.enter_grouping();
 
         let mut elements = self.bvec();
         // Set when a trailing comma follows a final spread element (`[...a,]`):
@@ -328,7 +328,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         if self.check(&TokenKind::BracketClose) {
             let (_, end) = self.current_pos();
             self.advance()?; // consume ']'
-            self.grouping_depth -= 1;
+            self.exit_grouping();
             return Ok(Expression::ArrayExpression(ArrayExpression {
                 elements: elements.into_bump_slice(),
                 spread_trailing_comma: false,
@@ -382,7 +382,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         let (_, end) = self.current_pos();
         self.expect(&TokenKind::BracketClose)?; // consume ']'
-        self.grouping_depth -= 1;
+        self.exit_grouping();
 
         Ok(Expression::ArrayExpression(ArrayExpression {
             elements: elements.into_bump_slice(),
