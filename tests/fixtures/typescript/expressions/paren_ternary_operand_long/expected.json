@@ -1,0 +1,1270 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 1300,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " 100 chars — the whole cast fits, the ternary stays inline in its parens",
+			"start": 20,
+			"end": 94,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars — the parens expand and the ternary stays inline inside them",
+			"start": 197,
+			"end": 270,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars — satisfies shares the cast path",
+			"start": 379,
+			"end": 424,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 1
+				},
+				"end": {
+					"line": 10,
+					"column": 46
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " 101 chars — a non-null assertion expands its operand parens the same way",
+			"start": 533,
+			"end": 608,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 1
+				},
+				"end": {
+					"line": 15,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Too long for the member to simply break: the parens expand, member hugs the `)`",
+			"start": 717,
+			"end": 799,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 1
+				},
+				"end": {
+					"line": 20,
+					"column": 83
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Same shape without the non-null assertion",
+			"start": 931,
+			"end": 975,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A unary argument is the boundary of the rule: it hangs instead of expanding",
+			"start": 1106,
+			"end": 1184,
+			"loc": {
+				"start": {
+					"line": 34,
+					"column": 1
+				},
+				"end": {
+					"line": 34,
+					"column": 79
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 1299,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 1290,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 38,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 96,
+					"end": 194,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 99
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 102,
+							"end": 193,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 98
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 102,
+								"end": 103,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 8
+									}
+								},
+								"name": "a"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 106,
+								"end": 193,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 11
+									},
+									"end": {
+										"line": 3,
+										"column": 98
+									}
+								},
+								"expression": {
+									"type": "ConditionalExpression",
+									"start": 107,
+									"end": 185,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 12
+										},
+										"end": {
+											"line": 3,
+											"column": 90
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 107,
+										"end": 131,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 12
+											},
+											"end": {
+												"line": 3,
+												"column": 36
+											}
+										},
+										"name": "cccccccccccccccccccccccc"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 134,
+										"end": 158,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 39
+											},
+											"end": {
+												"line": 3,
+												"column": 63
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 161,
+										"end": 185,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 66
+											},
+											"end": {
+												"line": 3,
+												"column": 90
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 190,
+									"end": 193,
+									"loc": {
+										"start": {
+											"line": 3,
+											"column": 95
+										},
+										"end": {
+											"line": 3,
+											"column": 98
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 190,
+										"end": 193,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 95
+											},
+											"end": {
+												"line": 3,
+												"column": 98
+											}
+										},
+										"name": "Foo"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 100 chars — the whole cast fits, the ternary stays inline in its parens",
+							"start": 20,
+							"end": 94
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 272,
+					"end": 376,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 10
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 278,
+							"end": 375,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 8,
+									"column": 9
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 278,
+								"end": 279,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 8
+									}
+								},
+								"name": "b"
+							},
+							"init": {
+								"type": "TSAsExpression",
+								"start": 282,
+								"end": 375,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 11
+									},
+									"end": {
+										"line": 8,
+										"column": 9
+									}
+								},
+								"expression": {
+									"type": "ConditionalExpression",
+									"start": 286,
+									"end": 365,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 2
+										},
+										"end": {
+											"line": 7,
+											"column": 81
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 286,
+										"end": 310,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 2
+											},
+											"end": {
+												"line": 7,
+												"column": 26
+											}
+										},
+										"name": "cccccccccccccccccccccccc"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 313,
+										"end": 337,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 29
+											},
+											"end": {
+												"line": 7,
+												"column": 53
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 340,
+										"end": 365,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 56
+											},
+											"end": {
+												"line": 7,
+												"column": 81
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 372,
+									"end": 375,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 6
+										},
+										"end": {
+											"line": 8,
+											"column": 9
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 372,
+										"end": 375,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 6
+											},
+											"end": {
+												"line": 8,
+												"column": 9
+											}
+										},
+										"name": "Foo"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars — the parens expand and the ternary stays inline inside them",
+							"start": 197,
+							"end": 270
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 426,
+					"end": 530,
+					"loc": {
+						"start": {
+							"line": 11,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 17
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 432,
+							"end": 529,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 7
+								},
+								"end": {
+									"line": 13,
+									"column": 16
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 432,
+								"end": 433,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 7
+									},
+									"end": {
+										"line": 11,
+										"column": 8
+									}
+								},
+								"name": "c"
+							},
+							"init": {
+								"type": "TSSatisfiesExpression",
+								"start": 436,
+								"end": 529,
+								"loc": {
+									"start": {
+										"line": 11,
+										"column": 11
+									},
+									"end": {
+										"line": 13,
+										"column": 16
+									}
+								},
+								"expression": {
+									"type": "ConditionalExpression",
+									"start": 440,
+									"end": 512,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 2
+										},
+										"end": {
+											"line": 12,
+											"column": 74
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 440,
+										"end": 462,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 2
+											},
+											"end": {
+												"line": 12,
+												"column": 24
+											}
+										},
+										"name": "cccccccccccccccccccccc"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 465,
+										"end": 487,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 27
+											},
+											"end": {
+												"line": 12,
+												"column": 49
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 490,
+										"end": 512,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 52
+											},
+											"end": {
+												"line": 12,
+												"column": 74
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbb"
+									}
+								},
+								"typeAnnotation": {
+									"type": "TSTypeReference",
+									"start": 526,
+									"end": 529,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 13
+										},
+										"end": {
+											"line": 13,
+											"column": 16
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 526,
+										"end": 529,
+										"loc": {
+											"start": {
+												"line": 13,
+												"column": 13
+											},
+											"end": {
+												"line": 13,
+												"column": 16
+											}
+										},
+										"name": "Foo"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars — satisfies shares the cast path",
+							"start": 379,
+							"end": 424
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 610,
+					"end": 714,
+					"loc": {
+						"start": {
+							"line": 16,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 4
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 616,
+							"end": 713,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 7
+								},
+								"end": {
+									"line": 18,
+									"column": 3
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 616,
+								"end": 617,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 7
+									},
+									"end": {
+										"line": 16,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "TSNonNullExpression",
+								"start": 620,
+								"end": 713,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 11
+									},
+									"end": {
+										"line": 18,
+										"column": 3
+									}
+								},
+								"expression": {
+									"type": "ConditionalExpression",
+									"start": 624,
+									"end": 709,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 87
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 624,
+										"end": 650,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 2
+											},
+											"end": {
+												"line": 17,
+												"column": 28
+											}
+										},
+										"name": "cccccccccccccccccccccccccc"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 653,
+										"end": 679,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 31
+											},
+											"end": {
+												"line": 17,
+												"column": 57
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 682,
+										"end": 709,
+										"loc": {
+											"start": {
+												"line": 17,
+												"column": 60
+											},
+											"end": {
+												"line": 17,
+												"column": 87
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " 101 chars — a non-null assertion expands its operand parens the same way",
+							"start": 533,
+							"end": 608
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 801,
+					"end": 928,
+					"loc": {
+						"start": {
+							"line": 21,
+							"column": 1
+						},
+						"end": {
+							"line": 25,
+							"column": 9
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 807,
+							"end": 927,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 7
+								},
+								"end": {
+									"line": 25,
+									"column": 8
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 807,
+								"end": 808,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 7
+									},
+									"end": {
+										"line": 21,
+										"column": 8
+									}
+								},
+								"name": "e"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 811,
+								"end": 927,
+								"loc": {
+									"start": {
+										"line": 21,
+										"column": 11
+									},
+									"end": {
+										"line": 25,
+										"column": 8
+									}
+								},
+								"object": {
+									"type": "TSNonNullExpression",
+									"start": 811,
+									"end": 922,
+									"loc": {
+										"start": {
+											"line": 21,
+											"column": 11
+										},
+										"end": {
+											"line": 25,
+											"column": 3
+										}
+									},
+									"expression": {
+										"type": "ConditionalExpression",
+										"start": 815,
+										"end": 918,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 2
+											},
+											"end": {
+												"line": 24,
+												"column": 36
+											}
+										},
+										"test": {
+											"type": "Identifier",
+											"start": 815,
+											"end": 845,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 2
+												},
+												"end": {
+													"line": 22,
+													"column": 32
+												}
+											},
+											"name": "cccccccccccccccccccccccccccccc"
+										},
+										"consequent": {
+											"type": "Identifier",
+											"start": 851,
+											"end": 881,
+											"loc": {
+												"start": {
+													"line": 23,
+													"column": 5
+												},
+												"end": {
+													"line": 23,
+													"column": 35
+												}
+											},
+											"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+										},
+										"alternate": {
+											"type": "Identifier",
+											"start": 887,
+											"end": 918,
+											"loc": {
+												"start": {
+													"line": 24,
+													"column": 5
+												},
+												"end": {
+													"line": 24,
+													"column": 36
+												}
+											},
+											"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+										}
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 923,
+									"end": 927,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 4
+										},
+										"end": {
+											"line": 25,
+											"column": 8
+										}
+									},
+									"name": "prop"
+								},
+								"computed": false,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Too long for the member to simply break: the parens expand, member hugs the `)`",
+							"start": 717,
+							"end": 799
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 977,
+					"end": 1103,
+					"loc": {
+						"start": {
+							"line": 28,
+							"column": 1
+						},
+						"end": {
+							"line": 32,
+							"column": 8
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 983,
+							"end": 1102,
+							"loc": {
+								"start": {
+									"line": 28,
+									"column": 7
+								},
+								"end": {
+									"line": 32,
+									"column": 7
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 983,
+								"end": 984,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 7
+									},
+									"end": {
+										"line": 28,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "MemberExpression",
+								"start": 987,
+								"end": 1102,
+								"loc": {
+									"start": {
+										"line": 28,
+										"column": 11
+									},
+									"end": {
+										"line": 32,
+										"column": 7
+									}
+								},
+								"object": {
+									"type": "ConditionalExpression",
+									"start": 991,
+									"end": 1094,
+									"loc": {
+										"start": {
+											"line": 29,
+											"column": 2
+										},
+										"end": {
+											"line": 31,
+											"column": 36
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 991,
+										"end": 1021,
+										"loc": {
+											"start": {
+												"line": 29,
+												"column": 2
+											},
+											"end": {
+												"line": 29,
+												"column": 32
+											}
+										},
+										"name": "cccccccccccccccccccccccccccccc"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 1027,
+										"end": 1057,
+										"loc": {
+											"start": {
+												"line": 30,
+												"column": 5
+											},
+											"end": {
+												"line": 30,
+												"column": 35
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 1063,
+										"end": 1094,
+										"loc": {
+											"start": {
+												"line": 31,
+												"column": 5
+											},
+											"end": {
+												"line": 31,
+												"column": 36
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								},
+								"property": {
+									"type": "Identifier",
+									"start": 1098,
+									"end": 1102,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 3
+										},
+										"end": {
+											"line": 32,
+											"column": 7
+										}
+									},
+									"name": "prop"
+								},
+								"computed": false,
+								"optional": false
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Same shape without the non-null assertion",
+							"start": 931,
+							"end": 975
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1186,
+					"end": 1289,
+					"loc": {
+						"start": {
+							"line": 35,
+							"column": 1
+						},
+						"end": {
+							"line": 37,
+							"column": 33
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1192,
+							"end": 1288,
+							"loc": {
+								"start": {
+									"line": 35,
+									"column": 7
+								},
+								"end": {
+									"line": 37,
+									"column": 32
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1192,
+								"end": 1193,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 7
+									},
+									"end": {
+										"line": 35,
+										"column": 8
+									}
+								},
+								"name": "g"
+							},
+							"init": {
+								"type": "UnaryExpression",
+								"start": 1196,
+								"end": 1288,
+								"loc": {
+									"start": {
+										"line": 35,
+										"column": 11
+									},
+									"end": {
+										"line": 37,
+										"column": 32
+									}
+								},
+								"operator": "!",
+								"prefix": true,
+								"argument": {
+									"type": "ConditionalExpression",
+									"start": 1198,
+									"end": 1287,
+									"loc": {
+										"start": {
+											"line": 35,
+											"column": 13
+										},
+										"end": {
+											"line": 37,
+											"column": 31
+										}
+									},
+									"test": {
+										"type": "Identifier",
+										"start": 1198,
+										"end": 1224,
+										"loc": {
+											"start": {
+												"line": 35,
+												"column": 13
+											},
+											"end": {
+												"line": 35,
+												"column": 39
+											}
+										},
+										"name": "cccccccccccccccccccccccccc"
+									},
+									"consequent": {
+										"type": "Identifier",
+										"start": 1229,
+										"end": 1255,
+										"loc": {
+											"start": {
+												"line": 36,
+												"column": 4
+											},
+											"end": {
+												"line": 36,
+												"column": 30
+											}
+										},
+										"name": "aaaaaaaaaaaaaaaaaaaaaaaaaa"
+									},
+									"alternate": {
+										"type": "Identifier",
+										"start": 1260,
+										"end": 1287,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 4
+											},
+											"end": {
+												"line": 37,
+												"column": 31
+											}
+										},
+										"name": "bbbbbbbbbbbbbbbbbbbbbbbbbbb"
+									}
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A unary argument is the boundary of the rule: it hangs instead of expanding",
+							"start": 1106,
+							"end": 1184
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
