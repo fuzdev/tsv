@@ -615,66 +615,77 @@ function enforce_perf_coverage(): void {
 	exit(1);
 }
 
-/** The wasm-variant task name paired with a native task name, or `null` when no pairing exists. */
-const wasm_sibling_name = (name: string): string | null => {
+/**
+ * The task name that runs the SAME ENGINE as `name`, or `null` when it has no
+ * such sibling. Two shapes qualify, and the invariant is identical for both: one
+ * engine behind two BINDINGS (native/wasm), and one binding driven with two
+ * OPTIONS (rsvelte's default wire vs its `skipExpressionLoc` one). Neither can
+ * change which files parse, so a divergence is a broken binding or an option
+ * that does more than it claims.
+ */
+const same_engine_sibling_name = (name: string): string | null => {
 	if (name === 'oxc-parser') return 'oxc-parser-wasm';
 	if (name === 'yuku-parser') return 'yuku-parser-wasm';
+	if (name === 'rsvelte-parse') return 'rsvelte-parse-skip-expr-loc';
 	if (name === 'tsv' || name.startsWith('tsv-')) return name.replace(/^tsv/, 'tsv_wasm');
 	return null;
 };
 
-/** One same-engine native/wasm pair whose pre-flight accept sets disagree. */
+/** One same-engine pair whose pre-flight accept sets disagree. */
 interface VariantParityFinding {
 	group: string;
-	native: string;
-	wasm: string;
-	/** Files only the native variant accepted. */
-	native_only: number;
-	/** Files only the wasm variant accepted. */
-	wasm_only: number;
+	/** The base row of the pair (the native binding, or the default-option wire). */
+	impl: string;
+	/** Its same-engine sibling (the wasm binding, or the reduced-option wire). */
+	sibling: string;
+	/** Files only `impl` accepted. */
+	impl_only: number;
+	/** Files only `sibling` accepted. */
+	sibling_only: number;
 }
 
 /** Populated by `warn_variant_parity()` after pre-flight; lands in the report as `variant_parity`. */
 const variant_parity_findings: VariantParityFinding[] = [];
 
 /**
- * Warn when a same-engine native/wasm variant pair diverges in its pre-flight
- * accept set. Both bindings run the identical engine, so their accept sets
- * should agree file-for-file; a divergence usually means one binding's error
- * surface is broken, not that the engines disagree — the concrete case being
- * the oxc WASI binding's consume-once `errors` getter, which silently accepted
- * every file and fabricated a 100% coverage row while native oxc-parser
- * correctly rejected 245 (see lib/oxc_wasm.ts + CLAUDE.md §Known Issues).
- * Warning only (never fatal): the coverage numbers themselves are the product
- * in conformance mode, and perf mode has its own hard-fail. Findings also land
- * in the report JSON (`variant_parity`), so a divergence shows up in the
- * committed diff at review time, not just the terminal scroll.
+ * Warn when a same-engine pair diverges in its pre-flight accept set. Both rows
+ * run the identical engine (see `same_engine_sibling_name`), so their accept sets
+ * should agree file-for-file; a divergence means one binding's error surface is
+ * broken, or an option changed more than it claims — the concrete case being the
+ * oxc WASI binding's consume-once `errors` getter, which silently accepted every
+ * file and fabricated a 100% coverage row while native oxc-parser correctly
+ * rejected 245 (see lib/oxc_wasm.ts + CLAUDE.md §Known Issues). Warning only
+ * (never fatal): the coverage numbers themselves are the product in conformance
+ * mode, and perf mode has its own hard-fail. Findings also land in the report
+ * JSON (`variant_parity`), so a divergence shows up in the committed diff at
+ * review time, not just the terminal scroll.
  */
 function warn_variant_parity(): void {
 	for (const [group_name, task_tracking] of task_tracking_by_group) {
 		for (const [name, tracking_key] of task_tracking) {
-			const sibling_name = wasm_sibling_name(name);
+			const sibling_name = same_engine_sibling_name(name);
 			if (sibling_name === null) continue;
 			const sibling_key = task_tracking.get(sibling_name);
 			if (sibling_key === undefined) continue;
-			const native_set = successful_files.get(tracking_key) ?? new Set<string>();
-			const wasm_set = successful_files.get(sibling_key) ?? new Set<string>();
-			let native_only = 0;
-			for (const path of native_set) if (!wasm_set.has(path)) native_only++;
-			let wasm_only = 0;
-			for (const path of wasm_set) if (!native_set.has(path)) wasm_only++;
-			if (native_only === 0 && wasm_only === 0) continue;
+			const impl_set = successful_files.get(tracking_key) ?? new Set<string>();
+			const sibling_set = successful_files.get(sibling_key) ?? new Set<string>();
+			let impl_only = 0;
+			for (const path of impl_set) if (!sibling_set.has(path)) impl_only++;
+			let sibling_only = 0;
+			for (const path of sibling_set) if (!impl_set.has(path)) sibling_only++;
+			if (impl_only === 0 && sibling_only === 0) continue;
 			variant_parity_findings.push({
 				group: group_name,
-				native: name,
-				wasm: sibling_name,
-				native_only,
-				wasm_only
+				impl: name,
+				sibling: sibling_name,
+				impl_only,
+				sibling_only
 			});
 			console.error(
 				`⚠ variant parity (${group_name}): ${name} and ${sibling_name} accept different files ` +
-					`(${native_only} ${name}-only, ${wasm_only} ${sibling_name}-only). Same engine — a ` +
-					`divergence usually means one binding's error surface is broken, not an engine difference.`
+					`(${impl_only} ${name}-only, ${sibling_only} ${sibling_name}-only). Same engine — a ` +
+					`divergence means a broken binding or an option doing more than it claims, not an ` +
+					`engine difference.`
 			);
 		}
 	}
@@ -1191,7 +1202,8 @@ interface Baseline {
 	 */
 	suppressed_noise: Record<string, number>;
 	/**
-	 * Same-engine native/wasm variant pairs whose pre-flight accept sets
+	 * Same-engine pairs — one engine behind two bindings, or one binding under two
+	 * options — whose pre-flight accept sets
 	 * disagreed (see `warn_variant_parity`). Empty `[]` when every pair agrees
 	 * — the healthy state. JSON-only, like `suppressed_noise`: a non-empty list
 	 * in a committed report is a binding-boundary bug surfacing at review time.
@@ -1335,12 +1347,14 @@ async function build_results_data(
 	}
 
 	return {
-		// Bumped 7 → 8 for `coverage_by_source` (coverage-only runs; the markdown's
-		// per-source tables in machine-readable form). 6 → 7 added the top-level
-		// `machine` block (CPU model, OS/arch, runtime version); 5 → 6 added
-		// `corpus_kind` + `corpus_sources`; 4 → 5 added the `runtime` field, top-level
-		// and per row.
-		version: 8,
+		// Bumped 8 → 9 for `variant_parity`'s neutral pair keys (`impl`/`sibling` +
+		// their `_only` counts, was `native`/`wasm`): the check now also pairs one
+		// binding under two options, which those names described wrongly. 7 → 8 added
+		// `coverage_by_source` (coverage-only runs; the markdown's per-source tables in
+		// machine-readable form). 6 → 7 added the top-level `machine` block (CPU model,
+		// OS/arch, runtime version); 5 → 6 added `corpus_kind` + `corpus_sources`;
+		// 4 → 5 added the `runtime` field, top-level and per row.
+		version: 9,
 		runtime: RUNTIME,
 		corpus_kind: CORPUS_MODE,
 		timestamp: new Date().toISOString(),
@@ -1732,17 +1746,8 @@ async function compare_baseline(current: Baseline): Promise<void> {
 //
 
 // Collect binary sizes once (used by all output paths). Versions no longer
-// thread through — bindings live in node_modules (flat, no version dir). The
-// tsv napi `.node` row is existence-gated (omitted when unbuilt), so no flag.
-const binary_sizes = await collect_binary_sizes({
-	has_native: !!impls.native,
-	has_wasm: !!impls.wasm,
-	has_oxc: !!impls.oxc,
-	has_yuku: !!impls.yuku || !!impls.yuku_wasm,
-	has_biome: !!impls.biome,
-	has_dprint: !!impls.dprint,
-	has_rsvelte: !!impls.rsvelte
-});
+// thread through — bindings live in node_modules (flat, no version dir).
+const binary_sizes = await collect_binary_sizes(impls);
 
 // Build results data (used by all output paths and always saved)
 const corpus = {

@@ -87,7 +87,11 @@ export type ImplementationName =
 	| 'yuku-parser-wasm'
 	| 'biome-wasm'
 	| 'dprint-wasm'
-	| 'rsvelte-fmt';
+	| 'malva-wasm'
+	| 'postcss'
+	| 'rsvelte-fmt'
+	| 'rsvelte-parse'
+	| 'swc';
 
 /** Common interface for parser/formatter implementations */
 export interface TsvImplementation {

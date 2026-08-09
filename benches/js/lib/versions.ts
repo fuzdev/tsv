@@ -62,6 +62,32 @@ export interface RsvelteVersions {
 	fmt: string;
 }
 
+/**
+ * rsvelte parse versions — the N-API addon, a DIFFERENT package from
+ * `@rsvelte/fmt` above and versioned independently of it. Its `VERSION` export
+ * additionally names the upstream Svelte it targets, reported separately by
+ * `lib/rsvelte_parse.ts` so a drift from the harness's `svelte` pin is visible.
+ */
+export interface RsvelteParseVersions {
+	native: string;
+}
+
+/** swc version (`@swc/core` — the N-API parse row) */
+export interface SwcVersions {
+	core: string;
+}
+
+/** malva version (`dprint-plugin-malva`, over the shared `@dprint/formatter` host) */
+export interface MalvaVersions {
+	/** The CSS plugin itself — the version worth citing */
+	malva: string;
+}
+
+/** postcss version (the `parse/css` alternative engine) */
+export interface PostcssVersions {
+	postcss: string;
+}
+
 /** All implementation versions */
 export interface AllVersions {
 	canonical: CanonicalVersions;
@@ -71,6 +97,10 @@ export interface AllVersions {
 	biome: BiomeVersions;
 	dprint: DprintVersions;
 	rsvelte: RsvelteVersions;
+	rsvelte_parse: RsvelteParseVersions;
+	swc: SwcVersions;
+	malva: MalvaVersions;
+	postcss: PostcssVersions;
 }
 
 /** Default versions when loading fails */
@@ -103,6 +133,18 @@ const DEFAULT_VERSIONS: AllVersions = {
 	},
 	rsvelte: {
 		fmt: 'unknown'
+	},
+	rsvelte_parse: {
+		native: 'unknown'
+	},
+	swc: {
+		core: 'unknown'
+	},
+	malva: {
+		malva: 'unknown'
+	},
+	postcss: {
+		postcss: 'unknown'
 	}
 };
 
@@ -155,6 +197,18 @@ export async function load_all_versions(): Promise<AllVersions> {
 			},
 			rsvelte: {
 				fmt: clean_version(deps['@rsvelte/fmt'])
+			},
+			rsvelte_parse: {
+				native: clean_version(deps['@rsvelte/vite-plugin-svelte-native'])
+			},
+			swc: {
+				core: clean_version(deps['@swc/core'])
+			},
+			malva: {
+				malva: clean_version(deps['dprint-plugin-malva'])
+			},
+			postcss: {
+				postcss: clean_version(deps['postcss'])
 			}
 		};
 	} catch {

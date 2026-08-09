@@ -90,6 +90,23 @@ export const PERF_OMITS: PerfOmit[] = [
 		task: 'parse/typescript/canonical',
 		path: 'svelte/packages/svelte/src/ambient.d.ts',
 		reason: 'acorn-typescript enforces an early error tsv defers (arguments in class field init)'
+	},
+	// swc on the same two declaration-file shapes as the entries above. It differs
+	// from oxc and yuku in WHY: for those, the bench's synthetic `file.ts` name (or a
+	// pinned `lang: ts`) is what withholds declaration-file mode, so the tolerance is
+	// really about path threading. swc rejects these with `dts: true` passed
+	// EXPLICITLY — verified — so this is the parser's own limit, not a harness
+	// artifact, and no amount of path threading would change it.
+	{
+		task: 'parse/typescript/swc',
+		path: 'kit/packages/kit/src/runtime/app/env',
+		reason: 'swc rejects ambient const declarations even with its own `dts` mode enabled'
+	},
+	{
+		task: 'parse/typescript/swc',
+		path: 'svelte/packages/svelte/src/ambient.d.ts',
+		reason:
+			'swc enforces the strict-mode eval/arguments binding early error tsv defers (`export const arguments: never`)'
 	}
 ];
 
