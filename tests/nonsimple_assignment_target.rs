@@ -12,9 +12,16 @@
 //! layer so the formatter keeps formatting well-formed input — prettier formats all
 //! of these, so tsv must parse them.
 //!
-//! This can't be a fixture: acorn-typescript *rejects* these ("Assigning to
-//! rvalue"), so no `expected.json` oracle exists — the shape is pinned here against
-//! tsv itself and prettier's formatting.
+//! The four prettier-canonical shapes ARE a fixture —
+//! `typescript/expressions/assignment/nonsimple_target_svelte_divergence`. An
+//! acorn *rejection* is representable (`expected_ours.json` plus an
+//! `expected_svelte.json` holding `{"error": "failed to parse"}`), and it is the
+//! only form that pins the prettier side against a live oracle, so the formatting
+//! claim cannot go stale the way a hand-written expected string can. What stays
+//! here is what a fixture cannot assert: the **node types** below (an
+//! over-permissive parser can accept a widened form while building the wrong node
+//! for it), the `for`-head rejections, and the cast arms whose wire shape has no
+//! oracle at all.
 //!
 //! Contrast: a no-declaration `for`-in/of head is an
 //! `AssignmentTargetType`/`LeftHandSideExpression` position that is NOT an
@@ -210,10 +217,11 @@ fn object_destructuring_assignment_unaffected() {
 // nested *parenthesized* cast, are two more "invalid assignment target"
 // early-errors acorn rejects ("Assigning to rvalue") but prettier formats — so they
 // defer too. These previously lived as `input_invalid_*` variants under
-// `tests/fixtures/typescript/expressions/assignment/cast_target*`; because acorn
-// rejects them they can't be fixtures (no `expected.json` oracle), and now that they
-// parse they no longer belong in an `input_invalid_*` slot, so their coverage moved
-// here alongside the other deferred targets.
+// `tests/fixtures/typescript/expressions/assignment/cast_target*`, and no longer
+// belong in an `input_invalid_*` slot now that they parse. Unlike the plain targets
+// above they stay Rust tests on their own merit: the convert layer *unwraps* the cast
+// from the `=` left, so the assertion is about a wire shape acorn has no reading of —
+// a fixture would pin tsv's own output as if it were an oracle.
 
 /// `([a, b] as T) = c;` — a type-assertion wrapping a destructuring array. The cast
 /// arm only accepts a *simple* inner, so this falls through to the deferral; the

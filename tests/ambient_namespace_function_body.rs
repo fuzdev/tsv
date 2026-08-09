@@ -9,9 +9,14 @@
 //! formats it, so the formatter must parse it; tsv already accepts the sibling
 //! `export function f() {}` form, so the plain form must parse identically.
 //!
-//! This can't be a fixture: Svelte/acorn-typescript *reject* the input (TS1183), so
-//! no `expected.json` oracle exists — the shape is pinned here against tsv itself and
-//! prettier's formatting.
+//! ⚠️ This SHOULD be a fixture and is not yet. An acorn/Svelte rejection is
+//! representable — `expected_ours.json` plus an `expected_svelte.json` holding
+//! `{"error": "failed to parse"}`, in a `_svelte_divergence` dir (see
+//! `docs/fixture_overview.md`, and
+//! `typescript/expressions/assignment/nonsimple_target_svelte_divergence` for the
+//! shape). The input is already prettier-canonical, so it clears F1. Until migrated,
+//! the prettier half of the claim is pinned against a hand-written string rather than
+//! a live oracle, which is exactly how a formatting claim goes stale.
 //!
 //! Contrast: a *top-level* `declare function f() {}` HAS the `declare` keyword, which
 //! grammatically forces a bodiless signature — prettier rejects a body there, and tsv

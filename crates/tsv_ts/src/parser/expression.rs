@@ -911,18 +911,31 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     ///   are identifier names or private names (`DecoratorMemberExpression .
     ///   PrivateIdentifier` in the TC39 grammar),
     ///
-    /// each optionally followed by a **single** trailing call `(...)`.
+    /// each optionally followed by a **single** trailing call `(...)`, which may carry
+    /// explicit type arguments (`@g<number>()`), and with a postfix `!` permitted
+    /// anywhere in the chain (`@x!`, `@x.y!`, `@x!.y`).
     ///
     /// Deliberately narrower than a full `AssignmentExpression`: binary
     /// operators, computed/optional member access (`[…]`, `?.`), tagged
-    /// templates, `!`, and `++`/`--` are not part of the grammar. Leaving them
+    /// templates, and `++`/`--` are not part of the grammar. Leaving them
     /// unconsumed is what lets the construct *after* the decorator parse — e.g.
     /// the `*` of a decorated generator method (`@fn *a() {}`), which a
     /// full-expression parse would otherwise swallow as multiplication. A full
     /// expression must be parenthesized (`@(a + b)`).
+    ///
     /// Mirrors `@sveltejs/acorn-typescript`'s `parseDecorator`, except the
     /// `.#private` chain step, which acorn-typescript rejects (a lag behind the
-    /// TC39 grammar — see `docs/conformance_svelte.md` §TypeScript Corrections).
+    /// TC39 grammar).
+    ///
+    /// **The postfix `!` and the call's type arguments are accepted where acorn rejects
+    /// both**, because that narrowing argument does not reach either: a decorator is
+    /// followed by `class`, a class member, or a parameter, so neither a `!` nor a
+    /// `<` opening a type-argument list can be the *next construct's* token. tsc accepts
+    /// both with no diagnostic and prettier formats both — the accept test — and prints
+    /// `@(x!)` but a bare `@g<number>()`, which the printer already reproduces for free.
+    /// See `docs/conformance_svelte.md` §TypeScript Corrections. A member's own
+    /// definite-assignment `!` is unaffected (`@dec x!: number` binds the `!` to `x`,
+    /// since the decorator expression ends at `dec`).
     pub(in crate::parser) fn parse_decorator_expression(
         &mut self,
     ) -> Result<Expression<'arena>, ParseError> {
@@ -951,24 +964,52 @@ impl<'a, 'arena> Parser<'a, 'arena> {
             // liberal (keywords allowed: `@a.class`) and private names are part
             // of the grammar (`@C.#p`); computed `[…]` and optional `?.` access
             // are not.
-            while *self.current_kind() == TokenKind::Dot {
-                self.advance()?; // consume '.'
-                let (property, prop_end) = self.parse_dot_property()?;
-                let span = Span::new(expr.actual_start, prop_end as u32);
-                expr = ParsedExpr::with_start_end(
-                    self.arena,
-                    Expression::MemberExpression(MemberExpression {
-                        object: expr.expr,
-                        property: self.arena.alloc(property),
-                        computed: false,
-                        optional: false,
-                        span,
-                    }),
-                    expr.actual_start,
-                    prop_end,
-                );
+            //
+            // A postfix `!` INTERLEAVES with the chain rather than only closing it,
+            // which is why it shares this loop: `@x!`, `@x.y!` and `@x!.y` are all
+            // tsc shapes. (Why it is accepted at all: see the fn doc.)
+            loop {
+                match self.current_kind() {
+                    TokenKind::Dot => {
+                        self.advance()?; // consume '.'
+                        let (property, prop_end) = self.parse_dot_property()?;
+                        let span = Span::new(expr.actual_start, prop_end as u32);
+                        expr = ParsedExpr::with_start_end(
+                            self.arena,
+                            Expression::MemberExpression(MemberExpression {
+                                object: expr.expr,
+                                property: self.arena.alloc(property),
+                                computed: false,
+                                optional: false,
+                                span,
+                            }),
+                            expr.actual_start,
+                            prop_end,
+                        );
+                    }
+                    // same ASI gate as every other `wrap_non_null_assertion` caller:
+                    // a line terminator before `!` makes it a prefix `!`, not ours
+                    TokenKind::Bang if !self.had_line_terminator => {
+                        expr = self.wrap_non_null_assertion(expr)?;
+                    }
+                    _ => break,
+                }
             }
         }
+
+        // Explicit type arguments on the trailing call (`@g<number>()`, `@a.b<T>()`);
+        // a call is required, which is what the helper enforces. `LeftShift` is matched
+        // for the nested-generic spelling (`@g<<T>() => U>()`), whose leading `<<` the
+        // lexer emits as one token. (Why it is accepted at all: see the fn doc.)
+        let type_arguments = if matches!(
+            self.current_kind(),
+            TokenKind::LessThan | TokenKind::LeftShift
+        ) && self.is_type_arguments_start()
+        {
+            Some(self.parse_type_arguments_before_call("type arguments in a decorator")?)
+        } else {
+            None
+        };
 
         // A single optional trailing call (`@foo()`, `@a.b.c()`, `@(expr)()`).
         // Only one: `parseMaybeDecoratorArguments` runs once, so `@foo()()` and
@@ -985,7 +1026,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 self.arena,
                 Expression::CallExpression(CallExpression {
                     callee: expr.expr,
-                    type_arguments: None,
+                    type_arguments,
                     arguments,
                     optional: false,
                     span,
@@ -998,6 +1039,26 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Hand back an owned `Expression` (shallow clone — children are arena
         // refs), matching `parse_assignment_expression`'s by-value boundary.
         Ok(expr.expr.clone())
+    }
+
+    /// Parse an expression-position type-argument list that a call **must** follow, and
+    /// leave the `(` unconsumed for the caller.
+    ///
+    /// Two positions take type arguments that cannot stand alone — an optional call
+    /// (`a?.<T>()`) and a decorator (`@g<T>()`) — because in both the `<` would
+    /// otherwise read as a relational operator against whatever comes next. That is one
+    /// rule, so it is stated once; `context` only names the position in the error.
+    /// Type arguments that DO stand alone are a different production and go through
+    /// `parse_instantiation_expression` / the `new` callee arm instead.
+    fn parse_type_arguments_before_call(
+        &mut self,
+        context: &str,
+    ) -> Result<TSTypeParameterInstantiation<'arena>, ParseError> {
+        let type_args = self.parse_type_parameter_instantiation()?;
+        if *self.current_kind() != TokenKind::ParenOpen {
+            return Err(self.error_expected_after("'('", context));
+        }
+        Ok(type_args)
     }
 
     /// Wrap `expr` in a `TSNonNullExpression`, consuming the current `!` token. The
@@ -1151,13 +1212,9 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                         {
                             // obj?.<T>(args) - optional call with explicit type arguments;
                             // only a call may follow (`a?.<T>` without `(` is a syntax error)
-                            let type_args = self.parse_type_parameter_instantiation()?;
-                            if *self.current_kind() != TokenKind::ParenOpen {
-                                return Err(self.error_expected_after(
-                                    "'('",
-                                    "type arguments in optional call",
-                                ));
-                            }
+                            let type_args = self.parse_type_arguments_before_call(
+                                "type arguments in optional call",
+                            )?;
                             self.advance()?; // consume '('
                             let (arguments, paren_end) = self.parse_call_arguments()?;
                             let arguments = arguments.into_bump_slice();

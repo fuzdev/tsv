@@ -835,6 +835,33 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         Ok((imported, local, spec_end as u32))
     }
 
+    /// An ES `import` declaration is a `ModuleItem`, so it is a syntax error at
+    /// `Goal::Script` — but a TypeScript **import-equals** (`import x = A.B`,
+    /// `import x = require('y')`) is not an `ImportDeclaration` at all. It predates ES
+    /// modules, is how a script or a namespace aliases, and tsc accepts it in a
+    /// non-module file: its own `conformance/externalModules/topLevelAwait.2.ts`
+    /// asserts exactly that, commented *"await allowed in import=namespace when not a
+    /// module"*, and compiles with no `.errors.txt` baseline.
+    ///
+    /// So the gate cannot fire on the `import` keyword — it has to wait until the shape
+    /// is decided, which is why this is called from the two sites that build an
+    /// `ImportDeclaration` rather than at the top of `parse_import_declaration`. The
+    /// `await` binding in that seed follows for free: at `Script` goal `await` is an
+    /// ordinary identifier, so once import-equals is reachable the binding parses like
+    /// any other name.
+    ///
+    /// acorn rejects import-equals at script goal too, but that is base acorn's
+    /// ES-grammar check firing before the TS plugin ever sees the statement — a slip,
+    /// not a TypeScript judgement — so tsv follows tsc here and diverges from the
+    /// shape oracle. `position` is the `import` keyword, so the error still points at
+    /// the statement head rather than at whatever token ends it.
+    fn check_import_declaration_goal(&self, position: usize) -> Result<(), ParseError> {
+        if self.goal == crate::Goal::Module {
+            return Ok(());
+        }
+        Err(self.error_msg_at("'import' is only allowed in a module", position))
+    }
+
     /// Parse import declaration:
     /// - `import x from "y"` (default)
     /// - `import { a, b } from "y"` (named)
@@ -847,12 +874,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     pub(super) fn parse_import_declaration(&mut self) -> Result<Statement<'arena>, ParseError> {
         let (start, _) = self.current_pos();
 
-        // `import` declarations are reachable only via `ModuleItem`. (Dynamic
-        // `import(...)` and `import.meta` are expressions, parsed elsewhere — the
-        // statement dispatcher routes `import(`/`import.` there before here.)
-        if self.goal != crate::Goal::Module {
-            return Err(self.error_msg("'import' is only allowed in a module"));
-        }
+        // NOTE: the `Goal::Script` gate is NOT here, on the keyword — see
+        // `check_import_declaration_goal`, called at the two points that actually build
+        // an `ImportDeclaration`. (Dynamic `import(...)` and `import.meta` are
+        // expressions, parsed elsewhere — the statement dispatcher routes
+        // `import(`/`import.` there before here.)
 
         // Consume 'import' keyword
         debug_assert!(matches!(
@@ -888,6 +914,7 @@ impl<'a, 'arena> Parser<'a, 'arena> {
 
         // Check for side-effect import: `import "y"`
         if matches!(self.current_kind(), TokenKind::String) {
+            self.check_import_declaration_goal(start)?;
             let source = self.parse_string_literal()?;
             // Check for import attributes after source
             let attributes = self.parse_import_attributes()?;
@@ -984,6 +1011,12 @@ impl<'a, 'arena> Parser<'a, 'arena> {
                 default_needs_comma = true;
             }
         }
+
+        // Every remaining shape is a genuine ES `ImportDeclaration`, and every one
+        // passes through here: a default binding falls out of the block above (having
+        // already returned if it was an import-equals), while `* as ns` and `{ … }`
+        // never enter it, since `try_binding_name` declines their leading token.
+        self.check_import_declaration_goal(start)?;
 
         // Parse namespace import: `import * as ns from "y"`
         if matches!(self.current_kind(), TokenKind::Star) {

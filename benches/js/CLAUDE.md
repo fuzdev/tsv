@@ -383,10 +383,11 @@ needed), and acorn's verdict sub-labels each gap (`gap` = acorn-confirmed → ga
 surface → reported, not gated). In the blocking `conformance` aggregate (promoted
 once its baseline hit 0 untracked gaps), tracked separately from the acorn-suite
 gate (own `KNOWN_GAPS`, freshness-checked on full-corpus runs). `.tsx` and
-`@filename` multi-file tests are skipped (5,120 of them — a filed coverage hole);
+`@filename` multi-file tests are skipped (5,158 of them — a filed coverage hole; the
+directive rule mirrors tsc's own harness, which `is_multi_file_test` argues in full);
 `.d.ts` cases ARE graded (61 of them — a declaration file is ordinary TS to tsv, and
 the bench harvest skips them for a reason of its own, argued at each `DECLARATIONS`).
-Baseline: 13,746 scanned, 12,320 accept-parity, 0 untracked gaps. ⚠️ The root is the
+Baseline: 13,708 scanned, 12,283 accept-parity, 0 untracked gaps. ⚠️ The root is the
 whole corpus deliberately: the old `conformance/parser` default was green at 768 files
 while 32 over-rejections sat untracked in the checker/emitter trees, whose ordinary TS is
 likelier reachable in real code than the parser torture suite. A

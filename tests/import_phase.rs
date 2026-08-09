@@ -145,8 +145,9 @@ fn static_import_source_keyword_binding_rejected() {
 /// (`"import.source("`) scans neither and drops what's there — the punctuator-joined
 /// member of the multi-word-keyword class (`docs/conformance_prettier_ts_comments.md`
 /// §Comments inside a multi-word keyword). Prettier preserves these, so the "no divergence on the
-/// dynamic forms" claim in that doc depends on tsv preserving them too; there is no
-/// fixture to pin it with, because acorn rejects the syntax outright.
+/// dynamic forms" claim in that doc depends on tsv preserving them too. ⚠️ acorn
+/// rejecting the syntax is NOT what blocks a fixture here (that is representable —
+/// see this file's header); nobody has written one yet.
 #[test]
 fn dynamic_import_phase_dot_gap_comments_stable() {
     assert_ours_stable("<script lang=\"ts\">\n\timport /* c */.source('x');\n</script>\n");
