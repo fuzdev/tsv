@@ -227,11 +227,17 @@ jobs:
         with:
           node-version: '24.14.1'
 
+      # --no-fail-fast: cargo test stops at the first failing test BINARY by
+      # default, hiding every later suite — the platform burn-down wants all
+      # failures per run, not one per push.
       - name: Test
-        run: cargo test --workspace
+        run: cargo test --workspace --no-fail-fast
 
       # The real N-API JS boundary against this OS's release-profile cdylib
       # (per-OS naming — .dll / .dylib — handled by benches/js/lib/runtime.ts).
-      # This is the only automated build of tsv_napi anywhere in CI.
+      # This is the only automated build of tsv_napi anywhere in CI. Runs even
+      # when Test fails (independent signal during the burn-down; its own
+      # failure still fails the job).
       - name: N-API boundary test
+        if: ${{ !cancelled() }}
         run: deno task test:napi

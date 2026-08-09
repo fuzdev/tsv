@@ -66,13 +66,17 @@ fn discover_case(root: &Path, target: &str) -> Result<Vec<String>, Vec<String>> 
         root.join(target)
     };
     let discovered = discover_files(&[arg.to_string_lossy().into_owned()])?;
-    let prefix = format!("{}/", root.to_string_lossy());
+    // Normalize separators on BOTH sides before stripping: discovery emits
+    // native separators, so on Windows the root prefix ends in `\` where this
+    // pattern expects `/` — stripping the un-normalized string never matches
+    // and every case reads back absolute.
+    let prefix = format!("{}/", root.to_string_lossy().replace('\\', "/"));
     Ok(discovered
         .files
         .iter()
         .map(|p| {
-            let s = p.to_string_lossy();
-            s.strip_prefix(&prefix).unwrap_or(&s).replace('\\', "/")
+            let s = p.to_string_lossy().replace('\\', "/");
+            s.strip_prefix(&prefix).unwrap_or(&s).to_string()
         })
         .collect())
 }
