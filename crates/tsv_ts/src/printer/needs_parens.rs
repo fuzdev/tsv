@@ -113,7 +113,9 @@ pub enum ParenContext {
     /// parenthesized for clarity in all three (a sequence self-parenthesizes).
     ComputedPropertyKey,
 
-    /// Statement test condition: `if (<expr>)`, `while (<expr>)`, `for (;<expr>;)`, `do {} while (<expr>)`
+    /// Statement test condition: `if (<expr>)`, `while (<expr>)`, `for (;<expr>;)`,
+    /// `do {} while (<expr>)` — and a switch **case** test (`case (<expr>):`), which
+    /// asks the same question and takes the same answer.
     /// Assignment expressions need double-parens for clarity: `while ((x = y))`
     StatementTest,
 
@@ -583,39 +585,59 @@ fn needs_parens_expression_statement(expr: &Expression<'_>) -> bool {
 /// positions that print first (`.left`, `.object`, `.callee`, `.test`, …) and
 /// stops at IIFE callees/tags (already parenthesized) to match prettier.
 pub(crate) fn leftmost_no_lookahead<'a>(expr: &'a Expression<'a>) -> &'a Expression<'a> {
-    match expr {
-        // Binary and logical share `BinaryExpression` here — recurse into `.left`.
-        Expression::BinaryExpression(b) => leftmost_no_lookahead(b.left),
-        Expression::AssignmentExpression(a) => leftmost_no_lookahead(a.left),
-        Expression::MemberExpression(m) => leftmost_no_lookahead(m.object),
-        Expression::ConditionalExpression(c) => leftmost_no_lookahead(c.test),
-        Expression::SequenceExpression(s) => {
-            s.expressions.first().map_or(expr, leftmost_no_lookahead)
-        }
-        // IIFEs (`(function () {})()` / `` (function () {})`x` ``) are already
-        // parenthesized by their callee/tag, so prettier stops the walk there.
-        Expression::CallExpression(call) => {
-            if matches!(call.callee, Expression::FunctionExpression(_)) {
-                expr
-            } else {
-                leftmost_no_lookahead(call.callee)
+    leftmost_no_lookahead_reached(expr).0
+}
+
+/// [`leftmost_no_lookahead`], plus the one fact about *how* the walk arrived: whether
+/// the leftmost node is the OBJECT of a computed, non-optional member expression.
+///
+/// That is the shape `ExpressionStatement`'s `[lookahead ∉ { `let [` }]` restriction
+/// keys on, and the walk is the only place that knows it — by the time a caller holds
+/// the leftmost node the step that reached it is gone. One walk answers both questions
+/// so the two readings can't drift.
+pub(crate) fn leftmost_no_lookahead_reached<'a>(
+    expr: &'a Expression<'a>,
+) -> (&'a Expression<'a>, bool) {
+    fn walk<'a>(
+        expr: &'a Expression<'a>,
+        computed_member_object: bool,
+    ) -> (&'a Expression<'a>, bool) {
+        match expr {
+            // Binary and logical share `BinaryExpression` here — recurse into `.left`.
+            Expression::BinaryExpression(b) => walk(b.left, false),
+            Expression::AssignmentExpression(a) => walk(a.left, false),
+            Expression::MemberExpression(m) => walk(m.object, m.computed && !m.optional),
+            Expression::ConditionalExpression(c) => walk(c.test, false),
+            Expression::SequenceExpression(s) => s
+                .expressions
+                .first()
+                .map_or((expr, computed_member_object), |first| walk(first, false)),
+            // IIFEs (`(function () {})()` / `` (function () {})`x` ``) are already
+            // parenthesized by their callee/tag, so prettier stops the walk there.
+            Expression::CallExpression(call) => {
+                if matches!(call.callee, Expression::FunctionExpression(_)) {
+                    (expr, computed_member_object)
+                } else {
+                    walk(call.callee, false)
+                }
             }
-        }
-        Expression::TaggedTemplateExpression(t) => {
-            if matches!(t.tag, Expression::FunctionExpression(_)) {
-                expr
-            } else {
-                leftmost_no_lookahead(t.tag)
+            Expression::TaggedTemplateExpression(t) => {
+                if matches!(t.tag, Expression::FunctionExpression(_)) {
+                    (expr, computed_member_object)
+                } else {
+                    walk(t.tag, false)
+                }
             }
+            // Postfix update (`x++`) prints its argument first; prefix (`++x`) does not.
+            Expression::UpdateExpression(u) if !u.prefix => walk(u.argument, false),
+            Expression::TSAsExpression(e) => walk(e.expression, false),
+            Expression::TSSatisfiesExpression(e) => walk(e.expression, false),
+            Expression::TSNonNullExpression(e) => walk(e.expression, false),
+            Expression::TSInstantiationExpression(e) => walk(e.expression, false),
+            _ => (expr, computed_member_object),
         }
-        // Postfix update (`x++`) prints its argument first; prefix (`++x`) does not.
-        Expression::UpdateExpression(u) if !u.prefix => leftmost_no_lookahead(u.argument),
-        Expression::TSAsExpression(e) => leftmost_no_lookahead(e.expression),
-        Expression::TSSatisfiesExpression(e) => leftmost_no_lookahead(e.expression),
-        Expression::TSNonNullExpression(e) => leftmost_no_lookahead(e.expression),
-        Expression::TSInstantiationExpression(e) => leftmost_no_lookahead(e.expression),
-        _ => expr,
     }
+    walk(expr, false)
 }
 
 /// Whether `export default <expr>;` must wrap the expression in parens — true iff

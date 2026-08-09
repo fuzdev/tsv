@@ -267,7 +267,8 @@ impl TSKeywordKind {
             | KeywordKind::Yield
             // Declaration keywords (not type keywords)
             | KeywordKind::Enum
-            | KeywordKind::Debugger => None,
+            | KeywordKind::Debugger
+            | KeywordKind::With => None,
         }
     }
 }

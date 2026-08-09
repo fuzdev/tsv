@@ -1115,6 +1115,17 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         ParseError::invalid_syntax(format!("Unexpected keyword '{kw}'"), self.current_pos().0)
     }
 
+    /// Create an error for the `with` statement — sloppy-mode only, and tsv parses
+    /// strict mode only. Named rather than folded into `error_unexpected_keyword` so the
+    /// message says *why* the word is refused; a bare "unexpected keyword" reads like a
+    /// parser gap for a construct that is deliberately out of scope.
+    pub(super) fn error_with_statement(&self) -> ParseError {
+        ParseError::invalid_syntax(
+            "The 'with' statement is not allowed in strict mode".to_owned(),
+            self.current_pos().0,
+        )
+    }
+
     /// Create an error: "Expected 'X' or 'Y' after list element, found Z"
     pub(super) fn error_list_separator(
         &self,

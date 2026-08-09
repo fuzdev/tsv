@@ -70,6 +70,8 @@ pub enum KeywordKind {
     Yield = 48,
     // Debugger
     Debugger = 51,
+    // Sloppy-mode-only statement, reserved everywhere (see `KEYWORDS`)
+    With = 52,
 }
 
 impl KeywordKind {
@@ -129,6 +131,7 @@ impl KeywordKind {
             KeywordKind::Satisfies => "satisfies",
             KeywordKind::Yield => "yield",
             KeywordKind::Debugger => "debugger",
+            KeywordKind::With => "with",
         }
     }
 
@@ -576,6 +579,8 @@ static KEYWORDS: &[(&str, KeywordKind)] = &[
     ("yield", KeywordKind::Yield),
     // Debugger
     ("debugger", KeywordKind::Debugger),
+    // Sloppy-mode-only statement — a `ReservedWord`, so it can never be a name
+    ("with", KeywordKind::With),
     // TODO: Expand keyword list for:
     // - Type keywords: interface, type, namespace, etc.
 ];
@@ -700,6 +705,8 @@ fn keyword_swar(word: u64, len: usize) -> Option<KeywordKind> {
                 Some(Case)
             } else if word == const { keyword_encode("else") } {
                 Some(Else)
+            } else if word == const { keyword_encode("with") } {
+                Some(With)
             } else {
                 None
             }

@@ -1,0 +1,820 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 488,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " an assignment in a case test takes parens",
+			"start": 10,
+			"end": 54,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " other expressions follow their own rules: a sequence keeps its parens,",
+			"start": 155,
+			"end": 228,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a ternary and a comparison stay bare",
+			"start": 230,
+			"end": 269,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 1
+				},
+				"end": {
+					"line": 13,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the discriminant is the same position and already parenthesizes",
+			"start": 368,
+			"end": 434,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 67
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 487,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 478,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 28,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "SwitchStatement",
+					"start": 56,
+					"end": 152,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 64,
+						"end": 65,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 9
+							},
+							"end": {
+								"line": 3,
+								"column": 10
+							}
+						},
+						"name": "x"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 71,
+							"end": 94,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 2
+								},
+								"end": {
+									"line": 5,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 88,
+									"end": 94,
+									"loc": {
+										"start": {
+											"line": 5,
+											"column": 3
+										},
+										"end": {
+											"line": 5,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "AssignmentExpression",
+								"start": 77,
+								"end": 82,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 8
+									},
+									"end": {
+										"line": 4,
+										"column": 13
+									}
+								},
+								"operator": "=",
+								"left": {
+									"type": "Identifier",
+									"start": 77,
+									"end": 78,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 8
+										},
+										"end": {
+											"line": 4,
+											"column": 9
+										}
+									},
+									"name": "a"
+								},
+								"right": {
+									"type": "Literal",
+									"start": 81,
+									"end": 82,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 12
+										},
+										"end": {
+											"line": 4,
+											"column": 13
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						},
+						{
+							"type": "SwitchCase",
+							"start": 97,
+							"end": 121,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 2
+								},
+								"end": {
+									"line": 7,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 115,
+									"end": 121,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 3
+										},
+										"end": {
+											"line": 7,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "AssignmentExpression",
+								"start": 103,
+								"end": 109,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 8
+									},
+									"end": {
+										"line": 6,
+										"column": 14
+									}
+								},
+								"operator": "+=",
+								"left": {
+									"type": "Identifier",
+									"start": 103,
+									"end": 104,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 8
+										},
+										"end": {
+											"line": 6,
+											"column": 9
+										}
+									},
+									"name": "b"
+								},
+								"right": {
+									"type": "Literal",
+									"start": 108,
+									"end": 109,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 13
+										},
+										"end": {
+											"line": 6,
+											"column": 14
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						},
+						{
+							"type": "SwitchCase",
+							"start": 124,
+							"end": 149,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 2
+								},
+								"end": {
+									"line": 9,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 143,
+									"end": 149,
+									"loc": {
+										"start": {
+											"line": 9,
+											"column": 3
+										},
+										"end": {
+											"line": 9,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "AssignmentExpression",
+								"start": 130,
+								"end": 137,
+								"loc": {
+									"start": {
+										"line": 8,
+										"column": 8
+									},
+									"end": {
+										"line": 8,
+										"column": 15
+									}
+								},
+								"operator": "??=",
+								"left": {
+									"type": "Identifier",
+									"start": 130,
+									"end": 131,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 8
+										},
+										"end": {
+											"line": 8,
+											"column": 9
+										}
+									},
+									"name": "c"
+								},
+								"right": {
+									"type": "Literal",
+									"start": 136,
+									"end": 137,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 14
+										},
+										"end": {
+											"line": 8,
+											"column": 15
+										}
+									},
+									"value": 1,
+									"raw": "1"
+								}
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " an assignment in a case test takes parens",
+							"start": 10,
+							"end": 54
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 271,
+					"end": 365,
+					"loc": {
+						"start": {
+							"line": 14,
+							"column": 1
+						},
+						"end": {
+							"line": 21,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "Identifier",
+						"start": 279,
+						"end": 280,
+						"loc": {
+							"start": {
+								"line": 14,
+								"column": 9
+							},
+							"end": {
+								"line": 14,
+								"column": 10
+							}
+						},
+						"name": "x"
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 286,
+							"end": 308,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 302,
+									"end": 308,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 3
+										},
+										"end": {
+											"line": 16,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "SequenceExpression",
+								"start": 292,
+								"end": 296,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 8
+									},
+									"end": {
+										"line": 15,
+										"column": 12
+									}
+								},
+								"expressions": [
+									{
+										"type": "Identifier",
+										"start": 292,
+										"end": 293,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 8
+											},
+											"end": {
+												"line": 15,
+												"column": 9
+											}
+										},
+										"name": "a"
+									},
+									{
+										"type": "Identifier",
+										"start": 295,
+										"end": 296,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 11
+											},
+											"end": {
+												"line": 15,
+												"column": 12
+											}
+										},
+										"name": "b"
+									}
+								]
+							}
+						},
+						{
+							"type": "SwitchCase",
+							"start": 311,
+							"end": 336,
+							"loc": {
+								"start": {
+									"line": 17,
+									"column": 2
+								},
+								"end": {
+									"line": 18,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 330,
+									"end": 336,
+									"loc": {
+										"start": {
+											"line": 18,
+											"column": 3
+										},
+										"end": {
+											"line": 18,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "ConditionalExpression",
+								"start": 316,
+								"end": 325,
+								"loc": {
+									"start": {
+										"line": 17,
+										"column": 7
+									},
+									"end": {
+										"line": 17,
+										"column": 16
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 316,
+									"end": 317,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 7
+										},
+										"end": {
+											"line": 17,
+											"column": 8
+										}
+									},
+									"name": "a"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 320,
+									"end": 321,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 11
+										},
+										"end": {
+											"line": 17,
+											"column": 12
+										}
+									},
+									"name": "b"
+								},
+								"alternate": {
+									"type": "Identifier",
+									"start": 324,
+									"end": 325,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 15
+										},
+										"end": {
+											"line": 17,
+											"column": 16
+										}
+									},
+									"name": "c"
+								}
+							}
+						},
+						{
+							"type": "SwitchCase",
+							"start": 339,
+							"end": 362,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 2
+								},
+								"end": {
+									"line": 20,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 356,
+									"end": 362,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 3
+										},
+										"end": {
+											"line": 20,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "BinaryExpression",
+								"start": 344,
+								"end": 351,
+								"loc": {
+									"start": {
+										"line": 19,
+										"column": 7
+									},
+									"end": {
+										"line": 19,
+										"column": 14
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 344,
+									"end": 345,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 7
+										},
+										"end": {
+											"line": 19,
+											"column": 8
+										}
+									},
+									"name": "a"
+								},
+								"operator": "===",
+								"right": {
+									"type": "Identifier",
+									"start": 350,
+									"end": 351,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 13
+										},
+										"end": {
+											"line": 19,
+											"column": 14
+										}
+									},
+									"name": "b"
+								}
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " other expressions follow their own rules: a sequence keeps its parens,",
+							"start": 155,
+							"end": 228
+						},
+						{
+							"type": "Line",
+							"value": " a ternary and a comparison stay bare",
+							"start": 230,
+							"end": 269
+						}
+					]
+				},
+				{
+					"type": "SwitchStatement",
+					"start": 436,
+					"end": 477,
+					"loc": {
+						"start": {
+							"line": 24,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 2
+						}
+					},
+					"discriminant": {
+						"type": "AssignmentExpression",
+						"start": 445,
+						"end": 450,
+						"loc": {
+							"start": {
+								"line": 24,
+								"column": 10
+							},
+							"end": {
+								"line": 24,
+								"column": 15
+							}
+						},
+						"operator": "=",
+						"left": {
+							"type": "Identifier",
+							"start": 445,
+							"end": 446,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 10
+								},
+								"end": {
+									"line": 24,
+									"column": 11
+								}
+							},
+							"name": "a"
+						},
+						"right": {
+							"type": "Literal",
+							"start": 449,
+							"end": 450,
+							"loc": {
+								"start": {
+									"line": 24,
+									"column": 14
+								},
+								"end": {
+									"line": 24,
+									"column": 15
+								}
+							},
+							"value": 1,
+							"raw": "1"
+						}
+					},
+					"cases": [
+						{
+							"type": "SwitchCase",
+							"start": 457,
+							"end": 474,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 2
+								},
+								"end": {
+									"line": 26,
+									"column": 9
+								}
+							},
+							"consequent": [
+								{
+									"type": "BreakStatement",
+									"start": 468,
+									"end": 474,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 3
+										},
+										"end": {
+											"line": 26,
+											"column": 9
+										}
+									},
+									"label": null
+								}
+							],
+							"test": {
+								"type": "Literal",
+								"start": 462,
+								"end": 463,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 7
+									},
+									"end": {
+										"line": 25,
+										"column": 8
+									}
+								},
+								"value": 1,
+								"raw": "1"
+							}
+						}
+					],
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the discriminant is the same position and already parenthesizes",
+							"start": 368,
+							"end": 434
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

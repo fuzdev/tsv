@@ -779,6 +779,11 @@ Early errors that still parse (not yet enforced):
 - Octal escape sequences in strings (`'\07'`)
 - Duplicate parameter names (`function f(a, a) {}`)
 - Reserved words as identifiers — the strict-mode-reserved list of ecma262 §sec-identifiers-static-semantics-early-errors (`var public = 1`, `var let = 1`, `function f(yield) {}`)
+- A reserved word or string as an export specifier's LOCAL name with no `from` clause
+  (`export { class };`, `export { 'str' };`) — the `ReferencedBindings` early error. With a
+  `from` clause the same specifier is *valid* (`export { class } from 'm'` re-exports another
+  module's binding), which is why the production accepts any `ModuleExportName` and the
+  bar is an early error rather than a grammar rule
 - `delete` of a plain name (`delete x`)
 - Invalid regular expressions — an unknown or repeated flag (`/a/qqq`, `/a/gg`), or a body the
   Pattern grammar rejects (`/(?zz:a)/`, `/a{2,1}/u`). This is the `IsValidRegularExpressionLiteral`

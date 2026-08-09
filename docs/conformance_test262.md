@@ -17,9 +17,9 @@ changes — at minimum per release. Counts below are from a snapshot of ~49k
 discovered tests (46,544 graded after skips).
 
 - Positive (should parse) — 42,113 passed, 0 failed
-- Negative (should reject) — 2,151 passed, 2,280 failed
+- Negative (should reject) — 1,852 passed, 2,579 failed
 
-- **Overall**: 44,264/46,544 (95.1%)
+- **Overall**: 43,965/46,544 (94.5%)
 - **Positive pass rate**: 100% — every test tsv grades and that should parse does,
   graded at each test's declared goal (see [Goal axis](#design-decision-strict-mode-only-explicit-goal-axis))
 - **Skipped**: 2,592 (sloppy mode: 2,520, unimplemented feature: 0, runtime: 38, resolution: 34)
@@ -28,6 +28,14 @@ The remaining negative failures are early-error *under-enforcement* (programs th
 parse under the syntactic grammar but the spec rejects semantically — duplicate
 params, escaped reserved words, etc.), deferred to a future diagnostics layer by
 design, not parser bugs.
+
+**Read the negative number against what the parser DEFERS, not against its last
+snapshot.** It moves with deliberate permissiveness as much as with bugs: widening
+`let` / `yield` / `await` as names — the single largest deferred family, described
+below — has moved it by hundreds across releases with every positive still green,
+and refusing the `with` statement moved it the other way. A negative shift is a
+*finding* only when the construct is one tsv claims to reject; the positive side is
+what the release gate holds.
 
 **Release gate.** `deno task conformance:test262` (the `test262 --gate` mode,
 folded into `conformance:all` and run by `publish.ts` Step 3b) gates exactly the

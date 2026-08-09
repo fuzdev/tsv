@@ -122,9 +122,15 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 214, both_accept: 191 };
 /**
  * conformance:ts-repo — `scanned` corpus files + `accept_parity` (tsv/tsc-baseline agreement);
  * provenance in `GATE_CHECKOUT_COMMITS` (../typescript). A rise on the pinned corpus is a parity
- * gain, not a suite refresh; a drop is a regression.
+ * gain, not a suite refresh; a drop is USUALLY a regression — but read the other buckets before
+ * treating it as one, because `accept_parity` counts only the agreeing-ACCEPT half.
+ *
+ * 12292 → 12291 is the counter-example: one file left this bucket for `parity reject` — tsv now
+ * refuses the `with` statement it once misparsed as a call, which is what tsc's baseline says too.
+ * Agreement is unchanged; only which side of it moved. `GAPS UNEXPECTED` staying 0 is the reading
+ * that settles it — that is the bucket a real over-rejection lands in.
  */
-export const TS_REPO_PINS = { scanned: 13685, accept_parity: 12292 };
+export const TS_REPO_PINS = { scanned: 13685, accept_parity: 12291 };
 
 /**
  * corpus:compare:parse --all — MINIMUM per-language `compared` (both sides
@@ -206,12 +212,22 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	//   -3  a ternary operand reached from one of prettier's `ancestorNameMap` value
 	//       positions expands its parens — clears `typescript/as/ternary.ts`,
 	//       `typescript/satisfies-operators/ternary.ts` and `typescript/ternaries/indent.ts`.
+	// A third step takes it to 108: `js/empty-statement/body.js` leaves the bucket entirely,
+	// its `with (a);` now refused as the sloppy-mode statement it is rather than misparsed as
+	// a call, so the file lands in `errors`. The two `js/identifier/for-of/*.js` files left
+	// the same round by MATCHING (`match` 4269 → 4271) once a `let` heading a for-in/of head
+	// kept its parens.
+	// `js/identifier/parentheses/let.js` moves to `errors` in that round too (its last line is
+	// `with (let[0] = 1);`) but moves no pin: it was neither matching nor unknown before, which
+	// is what the flat +2 on `match` says. Four pinned files now land in `errors` for the same
+	// deliberate refusal, and `errors` is not itself pinned — so a real parse regression that
+	// dropped files there would move no count. That hole is pre-existing, not new here.
 	// Neither step added an unknown. `js/ternaries/indent-after-paren.js` stays unknown for
 	// an unrelated pre-existing reason (a parenthesized ternary CALLEE takes the flat-paren
 	// bare-callee path in `call_formatting.rs`, not the chain base), but shrank from
 	// 107/126 differing lines to 61/92; its `diff_summary` names a representative hunk, not
 	// a total, so that string growing is not the file getting worse.
-	typescript: 109,
+	typescript: 108,
 	css: 23
 };
 
@@ -223,7 +239,10 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
  */
 export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	svelte: 1,
-	typescript: 37,
+	// 37 → 34: the three `js/comments/between-head-and-body/*.js` files are `with`-statement
+	// comment tests, so all three now land in `errors` rather than being partially compared
+	// through a call-expression misparse.
+	typescript: 34,
 	css: 9
 };
 

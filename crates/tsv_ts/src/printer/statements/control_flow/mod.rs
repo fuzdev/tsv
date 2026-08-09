@@ -875,11 +875,28 @@ impl<'a> Printer<'a> {
             }
             _ => self.build_expression_doc(expr),
         };
+        self.wrap_statement_test_parens(expr, inner)
+    }
+
+    /// The clarity parens a **statement test** puts around an assignment (`while ((x = y))`),
+    /// applied to a doc the caller has already built.
+    ///
+    /// One question, one spelling. The three sites that ask it build their inner doc
+    /// differently and can't share more than this: [`Self::build_condition_doc`] (if / while /
+    /// for) takes the ungrouped binary form so the enclosing condition group drives the break,
+    /// the do-while takes the plain self-grouping one (it has no enclosing group, so the
+    /// ungrouped form would strand a broken `&&` chain), and a `case` test is emitted behind a
+    /// comment gap of its own. The predicate is
+    /// [`ParenContext::StatementTest`](super::ParenContext::StatementTest) in all three.
+    pub(in crate::printer) fn wrap_statement_test_parens(
+        &self,
+        expr: &Expression<'_>,
+        doc: DocId,
+    ) -> DocId {
         if self.needs_parens(expr, super::ParenContext::StatementTest) {
-            let d = self.d();
-            d.parens(inner)
+            self.d().parens(doc)
         } else {
-            inner
+            doc
         }
     }
 }
