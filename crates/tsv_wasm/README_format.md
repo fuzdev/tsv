@@ -20,6 +20,8 @@ Three formatting functions: `format_svelte`, `format_typescript`, `format_css`. 
 
 Each also takes an optional trailing options object. Formatting itself is non-configurable, so the only option is `format_typescript(source, {goal: 'script' | 'module'})` — the parse goal, where `'script'` makes `await` an ordinary identifier and turns `import`/`export`/`import.meta` into syntax errors. `format_svelte`/`format_css` **throw** on the key rather than ignoring it (Svelte's `<script>` is always a module, CSS has no goal), so code forwarding one options bag to whichever formatter should spell the inapplicable goal as `undefined` — a supported key set to `undefined` reads as its default. Unknown option keys throw, whatever their value.
 
+A second argument that isn't an object throws too, arrays included. That makes `sources.map(format_typescript)` an error, since `map` passes the index as the second argument — write `sources.map((s) => format_typescript(s))`.
+
 ### Node.js, Bun, Deno
 
 Zero config — WASM is initialized synchronously at import time:

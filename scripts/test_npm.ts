@@ -206,6 +206,11 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		// a non-object options argument is an error, arrays included
 		assert.throws(() => node_entry.format_typescript('x;', 'script'), /must be an object/);
 		assert.throws(() => node_entry.format_typescript('x;', ['script']), /must be an object/);
+		// `null` and `undefined` both mean all-defaults — `null` is the arm that
+		// would otherwise fall through to the non-object error, since it is
+		// `typeof 'object'`
+		assert.equal(node_entry.format_typescript('const   x=1', null), 'const x = 1;\n');
+		assert.equal(node_entry.format_typescript('const   x=1', undefined), 'const x = 1;\n');
 	});
 
 	it('format_* absent from the parse-only build', { skip: has_format }, () => {
@@ -308,7 +313,8 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		// `npm/cli.js` forwards one options bag to whichever parser and spells the
 		// inapplicable goal as `undefined` rather than branching the call. The goal
 		// arm must read `undefined` before its language rejection, or this breaks
-		// with `check` still green.
+		// with `check` still green. `ParseOptions` declares `goal?: undefined` so
+		// the same bag type-checks; see ../crates/tsv_wasm/CLAUDE.md.
 		assert.ok(node_entry.parse_svelte('<div>x</div>', { goal: undefined }));
 		assert.ok(node_entry.parse_css('a { color: red }', { goal: undefined }));
 		// an UNKNOWN key throws even at `undefined` — the typo guard has no
@@ -320,6 +326,11 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		// a non-object options argument is an error, arrays included
 		assert.throws(() => node_entry.parse_typescript('x;', 'locations'), /must be an object/);
 		assert.throws(() => node_entry.parse_typescript('x;', []), /must be an object/);
+		// `null` and `undefined` both mean all-defaults — `null` is the arm that
+		// would otherwise fall through to the non-object error, since it is
+		// `typeof 'object'`
+		assert.ok(node_entry.parse_typescript('x;', null).loc);
+		assert.ok(node_entry.parse_typescript('x;', undefined).loc);
 	});
 });
 

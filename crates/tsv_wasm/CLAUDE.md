@@ -40,8 +40,10 @@ wasm-bindgen can't express an options-dependent return type, and
 declare `loc` required), so that overload returns `any` and comes first (the
 more specific signature). The section also declares `ParseOptions` /
 `TypeScriptParseOptions`, which `scripts/patch_npm_package.ts` re-exports by
-name through the npm facade. A signature change in `lang_bindings!` must update
-`TS_PARSE_DECLS` in the same edit. The `export type * from "./tsv_ast"` header
+name through the npm facade; their exact shape — and why neither is empty and
+neither `extends` the other — is
+[The four option interfaces](#the-four-option-interfaces). A signature change in
+`lang_bindings!` must update `TS_PARSE_DECLS` in the same edit. The `export type * from "./tsv_ast"` header
 rides its own custom section, so consumers `import type` AST nodes directly.
 
 ## Panic Reporting
@@ -88,8 +90,12 @@ and format emits none — an inert spelling would let a caller believe they had
 asked a formatter for the narrower product. The forwarding argument that makes
 `goal` lenient doesn't reach it: nothing hands a *parse* bag to a format
 export (`npm/cli.js` builds each bag at its own call site), so the key is
-simply unknown, and `format_svelte`/`format_css` report that they take no
-options at all.
+simply unknown. On `format_svelte`/`format_css`, where no key is settable, the
+unknown-key error says so — `unknown format option 'locations' (this export
+takes no options)`. `goal` is the exception on those two: it matches its own
+arm first and reports `format option 'goal' is only supported for TypeScript`,
+which is the more useful message and the reason the key stays leniently
+`undefined`-tolerant there.
 
 Reading a bag needs `js_sys`, so `js-sys` rides the `format` feature too —
 **measured at under +0.2% raw and gzipped** on `@fuzdev/tsv_format_wasm`, two
@@ -109,15 +115,48 @@ whole usage) at compile time. It declares `FormatOptions` /
 name through the npm facade (checked against `tsv_ast.d.ts` and
 `locations.d.ts` for the TS2308 collision rule below).
 
-`FormatOptions` is deliberately **empty** rather than the tighter-looking
-`{goal?: never}`: with `never`, `TypeScriptFormatOptions` could no longer
-`extends` it (incompatible `goal`), and — the load-bearing half — a variable of
-that type would stop being assignable to a `FormatOptions` parameter, which is
-exactly the forwarding the whole change exists to enable. `ParseOptions` has
-the same shape for the same reason: it simply omits `goal`, so its TypeScript
-extension stays assignable to it. Both are therefore type-*stricter* than the
-runtime only for fresh object literals (excess-property checking) — a
-non-literal bag forwards.
+### The four option interfaces
+
+The non-TypeScript bags — `FormatOptions` (`format_svelte`/`format_css`) and
+`ParseOptions` (`parse_svelte`/`parse_css`) — both declare **`goal?: undefined`**.
+Neither may be `{}`, and neither may omit the key. Two independent reasons —
+the first bites `FormatOptions` alone, the second both:
+
+- **An empty interface guards nothing.** `{}` opts out of *both*
+  excess-property checking and weak-type detection, so it accepts every
+  non-nullish value: `format_svelte(src, {locatons: false})`,
+  `format_svelte(src, 'script')`, `format_css(src, ['script'])` would all
+  compile and all throw. That is the one shape where the types are *looser*
+  than the runtime rather than stricter. One declared key restores both checks.
+  (`ParseOptions` was never empty — it has `locations`.)
+- **Omitting the key breaks forwarding.** `npm/cli.js` builds
+  `{goal: <maybe undefined>}` and hands it to whichever export rather than
+  branching the call, and the runtime reads a `goal` set to `undefined` as its
+  default even on a language that rejects a *set* goal. A bag with a
+  `goal: undefined` key must therefore type-check on those exports —
+  which an omitted key rejects (excess property) and `goal?: never` rejects
+  under `exactOptionalPropertyTypes`. `undefined` is the spelling that works.
+
+The TypeScript bags — `TypeScriptFormatOptions` / `TypeScriptParseOptions` —
+are standalone interfaces, **not** `extends` of their base: a settable `goal`
+is incompatible with the undefined-only one. The assignability that `extends`
+would buy (handing a `TypeScriptParseOptions`-typed variable to `parse_svelte`)
+is unsound anyway, since it throws the moment `goal` is actually set; the only
+bag that forwards at runtime is one whose `goal` is `undefined`, which is
+exactly what these shapes accept. The cost is one duplicated `locations?` line
+in `TypeScriptParseOptions`.
+
+**Every key spells `| undefined` on top of `?`** — `locations?: boolean |
+undefined`, `goal?: 'script' | 'module' | undefined`. Same reason as above,
+applied to the settable keys: without it,
+`format_typescript(src, {goal: undefined})` — precisely what `npm/cli.js`
+builds when no `--goal` was passed — fails to type-check under
+`exactOptionalPropertyTypes` while working at runtime.
+
+The residual looseness is the usual TypeScript one: excess-property checking
+fires on fresh object literals, so a **non-literal** bag with an unknown key
+still forwards past the compiler and lands on the runtime's unknown-key error.
+That is the intended division of labor, not a gap.
 
 `npm/cli.js` routes `tsv format --goal` and `tsv parse --goal` through the same
 option; see [../../docs/cli.md §Input Handling](../../docs/cli.md).

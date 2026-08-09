@@ -270,10 +270,25 @@ export type * from "./tsv_ast";
 /// specific signature). A signature change in `lang_bindings!` must update
 /// this block too; `ParseOptions` / `TypeScriptParseOptions` are re-exported
 /// through the npm facade (`scripts/patch_npm_package.ts`).
+///
+/// Every option key spells `| undefined` on top of `?`, here and in
+/// `TS_FORMAT_DECLS`. That is not redundant: under a consumer's
+/// `exactOptionalPropertyTypes`, a bare `?` accepts an ABSENT key but rejects
+/// one explicitly set to `undefined` — and setting it to `undefined` is the
+/// documented forwarding idiom (`npm/cli.js` builds `{goal: <maybe undefined>}`
+/// and hands it to whichever export). Dropping the `| undefined` would leave
+/// the types contradicting the runtime for exactly the caller the option's
+/// leniency exists to serve.
 #[cfg(feature = "parse")]
 #[wasm_bindgen(typescript_custom_section)]
 const TS_PARSE_DECLS: &'static str = r#"
-/** Options accepted by every parse export. */
+/**
+ * Options accepted by `parse_svelte` / `parse_css` (and their `_json` /
+ * `_internal` siblings). The parse goal is TypeScript's alone, so it is
+ * declared here as `undefined`-only rather than omitted: a set `goal` throws,
+ * but spelling the inapplicable goal `undefined` forwards one bag to whichever
+ * parser, exactly as the runtime does.
+ */
 export interface ParseOptions {
 	/**
 	 * Emit per-node `loc` (line/column) — the drop-in acorn/svelte wire.
@@ -283,17 +298,24 @@ export interface ParseOptions {
 	 * has no `loc`) and for `parse_internal_*` (no wire at all).
 	 * @default true
 	 */
-	locations?: boolean;
+	locations?: boolean | undefined;
+	/**
+	 * Not accepted here — Svelte's `<script>` is always a module and CSS has no
+	 * goal, so a set `goal` throws. See `TypeScriptParseOptions`.
+	 */
+	goal?: undefined;
 }
 
-/** `ParseOptions` plus the TypeScript-only parse goal. */
-export interface TypeScriptParseOptions extends ParseOptions {
+/** The TypeScript parsers' bag: the same keys, with `goal` settable. */
+export interface TypeScriptParseOptions {
+	/** As `ParseOptions.locations`. @default true */
+	locations?: boolean | undefined;
 	/**
 	 * Parse goal: at `'script'`, `await` is an ordinary identifier and
 	 * `import`/`export`/`import.meta` are syntax errors.
 	 * @default 'module'
 	 */
-	goal?: 'script' | 'module';
+	goal?: 'script' | 'module' | undefined;
 }
 
 export function parse_svelte(source: string, options: ParseOptions & { locations: false }): any;
@@ -327,26 +349,55 @@ export function parse_internal_css(source: string, options?: ParseOptions): void
 /// change in `lang_bindings!` must update this block too; `FormatOptions` /
 /// `TypeScriptFormatOptions` are re-exported through the npm facade
 /// (`scripts/patch_npm_package.ts`).
+///
+/// `FormatOptions` declares `goal?: undefined` rather than being `{}`, and
+/// `ParseOptions` declares it rather than omitting it. Two reasons — the first
+/// bites `FormatOptions` alone, the second both:
+///
+/// 1. An EMPTY interface opts out of both excess-property checking and
+///    weak-type detection, so `{}` accepts every non-nullish value —
+///    `{locatons: false}`, `'script'`, `42` — leaving `format_svelte` /
+///    `format_css` with no compile-time guard at all while the runtime rejects
+///    each. (`ParseOptions` was never empty; it has `locations`.)
+/// 2. A declared `goal?: undefined` is what makes the FORWARDING idiom
+///    type-check: `npm/cli.js` builds `{goal: <maybe undefined>}` and hands it
+///    to whichever export, so a bag with a `goal` key set to `undefined` must
+///    be legal on the languages that reject a *set* goal. Omitting the key
+///    rejects that bag (excess property), `never` rejects it under
+///    `exactOptionalPropertyTypes`; `undefined` is the spelling that works.
+///
+/// The TypeScript interfaces therefore do NOT `extends` their base — a settable
+/// `goal` is incompatible with the undefined-only one — at the cost of one
+/// duplicated `locations` line. The assignability `extends` would buy is
+/// unsound anyway (`format_svelte(src, {goal: 'script'})` throws).
 #[cfg(feature = "format")]
 #[wasm_bindgen(typescript_custom_section)]
 const TS_FORMAT_DECLS: &'static str = r#"
 /**
- * Options accepted by every format export. Formatting itself is
- * non-configurable, so the bag carries no key of its own — the one axis is the
- * TypeScript-only parse goal, in `TypeScriptFormatOptions`. Every unknown key
- * throws, `locations` included: that option shapes the parse wire, and format
- * emits no wire.
+ * Options accepted by `format_svelte` / `format_css`. Formatting itself is
+ * non-configurable and the parse goal is TypeScript's alone, so these carry no
+ * settable key. Every unknown key throws, `locations` included: that option
+ * shapes the parse wire, and format emits no wire.
  */
-export interface FormatOptions {}
+export interface FormatOptions {
+	/**
+	 * Not accepted here — Svelte's `<script>` is always a module and CSS has no
+	 * goal, so a set `goal` throws. Declared (as `undefined`) rather than
+	 * omitted so one bag still forwards to whichever formatter: spell the
+	 * inapplicable goal `undefined` and this type accepts it, exactly as the
+	 * runtime does.
+	 */
+	goal?: undefined;
+}
 
-/** `FormatOptions` plus the TypeScript-only parse goal. */
-export interface TypeScriptFormatOptions extends FormatOptions {
+/** The TypeScript formatter's bag: the same key, settable. */
+export interface TypeScriptFormatOptions {
 	/**
 	 * Parse goal: at `'script'`, `await` is an ordinary identifier and
 	 * `import`/`export`/`import.meta` are syntax errors.
 	 * @default 'module'
 	 */
-	goal?: 'script' | 'module';
+	goal?: 'script' | 'module' | undefined;
 }
 
 export function format_svelte(source: string, options?: FormatOptions): string;

@@ -86,8 +86,8 @@ const BOUNDS = {
 	all: { min: 2_171_000, max: 2_549_000 }
 };
 
-// all = format + parse. `all − format` is the parse feature (parser convert
-// path; measured 241,764 B); `all − parse` is the format feature (printers + doc
+// all = format + parse. `all − format` is what the parse feature adds (parser
+// convert path); `all − parse` is what the format feature adds (printers + doc
 // builder, dropped from the parse-only build at link time; measured 1,472,114 B —
 // the gate-health signal). A delta near zero means a feature gate broke.
 //
@@ -95,6 +95,18 @@ const BOUNDS = {
 // the cut lands in the parser, which both variants link, so it leaves the *feature
 // boundary* where it was. That is the expected shape — a delta that moved with the
 // bundles would mean a feature gate had shifted, not that code got smaller.
+//
+// `all − format` then DID shift, by design: the format exports gained an options
+// bag, so `js-sys` moved from a parse-exclusive dep to one both variants link.
+// `all` already linked it, so the weight lands in `format` alone and shows up as
+// a smaller delta rather than a bundle-wide move — and the delta is no longer a
+// clean readout of "the parse feature", it is the parse feature minus whatever
+// the two now share. It stood at 241,764 B at the
+// 2026-07-27 center and measures 238,795 B now (format 2,144,940 B, all
+// 2,383,735 B); the shared `js-sys` is the only feature-boundary change between
+// those two points, but accumulated work moved both bundles too, so read the
+// ≈3 KB as attribution rather than a controlled A/B. Read a future move against
+// the current number.
 const DELTAS = {
 	format: { min: 222_000, max: 261_000 }, // all − format
 	parse: { min: 1_354_000, max: 1_590_000 } // all − parse

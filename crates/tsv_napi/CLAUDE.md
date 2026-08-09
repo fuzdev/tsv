@@ -33,7 +33,12 @@ The `lang_bindings!` macro generates three `#[napi]` functions per language (sve
 - `parse_internal_<lang>(source) -> void` — parses without converting (benchmark-only; `black_box` prevents elision)
 - `format_<lang>(source) -> string` — formatted source
 
-JS export names are kept **snake_case** via `#[napi(js_name = "…")]` (napi-rs would otherwise camelCase them) so the addon's names match `tsv_wasm`'s. The per-call parse axes are the one **shape** divergence from the WASM surface: here they are flat exports (`parse_<lang>_no_locations`, the TS `*_with_goal` variants), matching `tsv_ffi`'s C-style surface, where `tsv_wasm` takes an acorn-style `{locations?, goal?}` options object (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Parse Options & Typed Returns). When the publish matrix lands (3b), the `@fuzdev/tsv_napi` loader is the natural place to present that same options bag over these flat exports.
+JS export names are kept **snake_case** via `#[napi(js_name = "…")]` (napi-rs would otherwise camelCase them) so the addon's names match `tsv_wasm`'s. The per-call axes are where this surface diverges from `tsv_wasm`, in two ways:
+
+- **Shape**, on parse: here they are flat exports (`parse_<lang>_no_locations`, the TS `*_with_goal` variants), matching `tsv_ffi`'s C-style surface, where `tsv_wasm` takes an acorn-style `{locations?, goal?}` options object (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Parse Options & Typed Returns).
+- **Coverage**, on format: `format_<lang>(source)` has no goal axis at all, so a `Script`-goal format is unreachable here — `tsv_wasm`'s `format_typescript(source, {goal})` (see that doc's §Format Options) has no counterpart. Only `parse` grew the flat `*_with_goal` variants.
+
+When the publish matrix lands (3b), the `@fuzdev/tsv_napi` loader is the natural place to present that same options bag over these flat exports — and to close the format-goal gap, whether by a `format_typescript_with_goal` export beneath it or by threading the goal in the loader.
 
 ## Marshalling & errors
 

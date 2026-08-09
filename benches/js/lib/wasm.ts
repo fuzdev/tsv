@@ -24,17 +24,23 @@ interface WasmParseOptions {
 	goal?: ParseGoal;
 }
 
+/** The `{goal?}` bag the format exports take — format emits no wire, so
+ * `locations` is an unknown key there, and `goal` stays TypeScript-only. */
+interface WasmFormatOptions {
+	goal?: ParseGoal;
+}
+
 /** WASM module function signatures */
 interface WasmModule {
 	parse_svelte: (source: string, options?: WasmParseOptions) => unknown;
 	parse_internal_svelte: (source: string, options?: WasmParseOptions) => void;
-	format_svelte: (source: string) => string;
+	format_svelte: (source: string, options?: WasmFormatOptions) => string;
 	parse_typescript: (source: string, options?: WasmParseOptions) => unknown;
 	parse_internal_typescript: (source: string, options?: WasmParseOptions) => void;
-	format_typescript: (source: string) => string;
+	format_typescript: (source: string, options?: WasmFormatOptions) => string;
 	parse_css: (source: string, options?: WasmParseOptions) => unknown;
 	parse_internal_css: (source: string, options?: WasmParseOptions) => void;
-	format_css: (source: string) => string;
+	format_css: (source: string, options?: WasmFormatOptions) => string;
 }
 
 export class WasmImplementation extends BaseImplementation {
@@ -73,7 +79,10 @@ export class WasmImplementation extends BaseImplementation {
 		};
 	}
 
-	private get format_fns(): Record<Language, (source: string) => string> {
+	private get format_fns(): Record<
+		Language,
+		(source: string, options?: WasmFormatOptions) => string
+	> {
 		return {
 			svelte: this.module.format_svelte,
 			typescript: this.module.format_typescript,
