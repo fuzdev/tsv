@@ -33,6 +33,10 @@ The `lang_bindings!` macro generates three `#[napi]` functions per language (sve
 - `parse_internal_<lang>(source) -> void` — parses without converting (benchmark-only; `black_box` prevents elision)
 - `format_<lang>(source) -> string` — formatted source
 
+Plus, outside the macro, three goal-aware TypeScript parse exports taking a
+trailing goal string (`"script"` / `"module"`): `parse_typescript_with_goal`,
+`parse_typescript_no_locations_with_goal`, `parse_internal_typescript_with_goal`.
+
 JS export names are kept **snake_case** via `#[napi(js_name = "…")]` (napi-rs would otherwise camelCase them) so the addon's names match `tsv_wasm`'s. The per-call axes are where this surface diverges from `tsv_wasm`, in two ways:
 
 - **Shape**, on parse: here they are flat exports (`parse_<lang>_no_locations`, the TS `*_with_goal` variants), matching `tsv_ffi`'s C-style surface, where `tsv_wasm` takes an acorn-style `{locations?, goal?}` options object (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Parse Options & Typed Returns).

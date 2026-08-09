@@ -208,14 +208,40 @@ const locations_reexport_dts = has_parse_exports
 // `TS_FORMAT_DECLS` custom sections in crates/tsv_wasm/src/lib.rs) — re-exported
 // by NAME, so the tsv_ast/locations star exports can never ambiguate them away
 // (the TS2308 rule).
+const parse_option_types = has_parse_exports ? ['ParseOptions', 'TypeScriptParseOptions'] : [];
+const format_option_types = has_format_exports ? ['FormatOptions', 'TypeScriptFormatOptions'] : [];
 const options_reexport = (names: Array<string>) =>
-	`export type { ${names.join(', ')} } from '${dts_module}';\n`;
-const parse_options_reexport = has_parse_exports
-	? options_reexport(['ParseOptions', 'TypeScriptParseOptions'])
-	: '';
-const format_options_reexport = has_format_exports
-	? options_reexport(['FormatOptions', 'TypeScriptFormatOptions'])
-	: '';
+	names.length ? `export type { ${names.join(', ')} } from '${dts_module}';\n` : '';
+const parse_options_reexport = options_reexport(parse_option_types);
+const format_options_reexport = options_reexport(format_option_types);
+
+// Every name index.d.ts re-exports must actually be DECLARED in the generated
+// `tsv_wasm.d.ts`. Not a formality: every parse/format export is
+// `#[wasm_bindgen(skip_typescript)]`, so its declaration comes from a
+// hand-written `typescript_custom_section` rather than from wasm-bindgen, and
+// the only thing holding the two in sync is a "must update this block too"
+// comment. A name that drifts out does NOT fail loudly downstream — without
+// `skipLibCheck` it is a TS2614 *inside the shipped package*, and WITH it (the
+// common consumer config) the export silently degrades to `any`, so the package
+// keeps type-checking while checking nothing. Nothing in-repo type-checks the
+// merged `.d.ts` (`check:ast-types` covers `tsv_ast.d.ts` alone), so this is the
+// only place the drift can still fail a build.
+const generated_dts = Deno.readTextFileSync(`${pkg_root}/${dts_file}`);
+const undeclared = [
+	...fns.map((name) => ['function', name] as const),
+	...classes.map((name) => ['class', name] as const),
+	...[...parse_option_types, ...format_option_types].map((name) => ['interface', name] as const)
+].filter(([kind, name]) => !new RegExp(`^export ${kind} ${name}\\b`, 'm').test(generated_dts));
+if (undeclared.length) {
+	console.error(
+		`FAIL: ${dts_file} is missing ${undeclared.map(([kind, name]) => `${kind} \`${name}\``).join(', ')} — ` +
+			`index.d.ts re-exports the name${undeclared.length === 1 ? '' : 's'} anyway, which ships ` +
+			`untyped under a consumer's skipLibCheck. Add the declaration to TS_PARSE_DECLS / ` +
+			`TS_FORMAT_DECLS in crates/tsv_wasm/src/lib.rs.`
+	);
+	Deno.exit(1);
+}
+
 const index_dts = `${ast_reexport}${locations_reexport_dts}${parse_options_reexport}${format_options_reexport}export {
 ${[...fns, ...classes].map((f) => `\t${f},`).join('\n')}
 } from '${dts_module}';
