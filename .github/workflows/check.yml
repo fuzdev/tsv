@@ -10,7 +10,10 @@
 #               pins:audit:checkouts task, gated at conformance cadence where the
 #               sibling checkouts are actually read. The pinned-count guards that run
 #               in CI are the committed-tree ones (fixtures_validate via cargo test,
-#               swallow_audit).
+#               swallow_audit). Likewise roundtrip:audit:prettier warn-SKIPS here —
+#               it widens onto a ../prettier checkout, which this runner has no
+#               reason to clone — so a green CI run does not cover that leg; it
+#               gates on a dev machine and at conformance cadence (audit:corpus).
 #   artifacts — publish-parity: builds the WASM/npm packages, checks size
 #               bounds, runs the Node package tests (see the job comment).
 #

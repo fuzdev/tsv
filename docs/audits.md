@@ -28,7 +28,7 @@ The Svelte compiler's *sidecar-dependent* harnesses — the corpus comparison, t
 | [Pin agreement](#canonical-pin-agreement-audit-pinsaudit) | `pins:audit` | the five canonical-oracle pin sites disagreeing — including the lockfile, which alone pins the oracle's own transitive deps | `deno task check` |
 | [Checkout alignment](#checkout-alignment-audit-pinsauditcheckouts) | `pins:audit:checkouts` | a present `../svelte` / `../acorn-typescript` clone that is not the pinned version; commit drift (warn) | `deno task conformance` (preflight) |
 | [Authoring independence](#authoring-independence-audit-authoringaudit) | `authoring:audit` | two render-equivalent authorings settling on two fixed points; non-idempotency | `deno task check` |
-| [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` | formatted output the parser rejects (delimiter/structure corruption) | `deno task check` |
+| [Round-trip](#formatreparse-round-trip-audit-roundtripaudit) | `roundtrip:audit` · `roundtrip:audit:prettier` | formatted output the parser rejects (delimiter/structure corruption) | `deno task check` (fixtures always; the prettier suites when `../prettier` is present) |
 | [Binding](#commenttoken-binding-audit-bindingaudit) | `binding:audit` | a glued comment re-bound to a different subtree by a migrating paren | `deno task check` |
 | [Render equivalence](#render-equivalence-audit-renderaudit) | `render:audit` | `tsv format` changing what a Svelte component renders | `deno task conformance` (release) |
 | [Layout neutrality](#layout-neutrality-audit-neutrality_audit) | — | a layout gate reading comment *ownership* instead of page occupancy | dev tool (pre-ownership-change) |
@@ -719,12 +719,32 @@ cargo run -p tsv_debug roundtrip_audit ../prettier/tests/format/js ../zzz/src
 # --canonical-all confirms every file (also guards canonical_unreparseable: tsv's
 # parser accepting output the real parser rejects).
 cargo run -p tsv_debug roundtrip_audit --gate                       # the check gate (pure Rust, tests/fixtures)
+deno task roundtrip:audit:prettier                                 # the check gate's second scope (the prettier suites)
 cargo run -p tsv_debug roundtrip_audit --gate --canonical-all ../prettier/tests/format  # thorough
 # Also: --no-render, --verbose (AST diff per finding), --limit N, --json. The full
 # (non-gate) run is a diagnostic — the divergent bucket over tests/fixtures is
 # Svelte-reflow-noisy vs render_normalize's simpler whitespace model.
 cargo run -p tsv_debug roundtrip_audit --canonical-all --verbose ../prettier/tests/format/typescript
 ```
+
+### Two scopes in `check`, and why the second one is opportunistic
+
+`deno task check` runs the audit twice: over `tests/fixtures` (`roundtrip:audit`) and over the
+pinned Prettier format suites (`roundtrip:audit:prettier`, ~2,350 files in ~0.1 s on the binary
+the first leg already built). The second scope is not redundancy — it is the only corpus in
+`check` that is **not format-stable**. The fixture tree cannot contain the input shape that
+triggers a valid→unreparseable regression, which is how a statement-head paren strip
+(`for ((let) of foo);` → `for (let of foo);`, output tsv's own parser rejects) sat behind a green
+`check` for a whole PR while three prettier-suite files caught it on the first run.
+
+Its corpus is a **sibling checkout**, so it is read opportunistically: present ⇒ it gates,
+absent ⇒ a loud `NOT RUN` line and exit 0. That keeps `check` runnable on a bare clone (the CI
+`check` job has no sibling checkouts at all), and it is sound here in a way it would not be for
+a count-pinned gate — this audit asserts an invariant, so a finding fails wherever it occurs and
+a smaller corpus can only cost coverage, never soften a verdict. A *partial* `../prettier` (the
+checkout exists but a listed suite does not) warns per suite and audits the rest. The suite list
+is shared with [the corpus bundle](#the-corpus-bundle-auditcorpus) from
+`scripts/roundtrip_audit_prettier.ts`, so the cheap leg and the release-cadence one cannot drift.
 
 ## Comment↔Token Binding Audit (`binding:audit`)
 

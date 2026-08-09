@@ -8,6 +8,11 @@
  * the pinned framework source) plus the version-pinned Prettier format suites, so a robustness
  * regression fails loudly instead of shipping in the VS Code extension's format-on-save.
  *
+ * `check`'s `roundtrip:audit:prettier` leg now shares this driver's prettier suites (one list,
+ * exported by `scripts/roundtrip_audit_prettier.ts`), so the reparse question is asked on every
+ * commit. That does not move the bar stated above: it is ONE property over hand-written edge
+ * cases, while the legs below ask eight over real source.
+ *
  * Legs (all pure Rust, no sidecar; one `--profile corpus` binary — release + `panic = "unwind"`
  * so a formatter panic is caught and reported, not a process kill):
  *
@@ -62,6 +67,8 @@
 import { spawnSync } from 'node:child_process';
 import { existsSync } from 'node:fs';
 
+import { PRETTIER_ROUNDTRIP_SUITES } from '../../scripts/roundtrip_audit_prettier.ts';
+
 import { corpus_present_dirs } from './lib/corpus.ts';
 
 const log = (...args: unknown[]) => console.error(...args);
@@ -69,12 +76,10 @@ const log = (...args: unknown[]) => console.error(...args);
 // Real code: the live dev repos + the pinned framework source (the `perf` view).
 const real_dirs = await corpus_present_dirs('perf', log);
 
-// The version-pinned Prettier format suites (adversarial edge cases). Present-only.
-const prettier_suites = [
-	'../prettier/tests/format/typescript',
-	'../prettier/tests/format/js',
-	'../prettier/tests/format/css'
-].filter((p) => {
+// The version-pinned Prettier format suites (adversarial edge cases). Present-only. Shared
+// with the `roundtrip:audit:prettier` leg of `deno task check`, which audits the same suites
+// on every commit — one list, so the cheap leg and this bundle cannot drift apart.
+const prettier_suites = PRETTIER_ROUNDTRIP_SUITES.filter((p) => {
 	if (existsSync(p)) return true;
 	log(`  ⚠ prettier suite missing, skipped: ${p}`);
 	return false;
