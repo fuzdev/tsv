@@ -190,6 +190,7 @@ deno task docs:audit                 # doc-comment `[link]`s resolve — rustdoc
 deno task scan:audit                 # no new raw find/rfind/match_indices substring scans over source
 deno task fanout:audit               # no super-linear doc-node rebuild fanout (per-layout-candidate blowup)
 deno task roundtrip:audit            # format(tests/fixtures) must reparse — pure-Rust tripwire, real yield on external corpora
+deno task roundtrip:audit:prettier   # the same audit over the pinned prettier suites — `check`'s ONLY non-format-stable corpus, so the only leg there that can reach a valid→unreparseable regression. ~0.1 s; warn-skips when `../prettier` is absent (sibling checkout, so `check` still runs on a bare clone)
 deno task binding:audit              # comment↔token re-binding (HARD fails the gate, SOFT informational)
 deno task authoring:audit            # authoring-independence over Svelte boundary whitespace: one fixed point per document
 deno task fuzz:audit                 # seeded mutational fuzzer (fixed seed/iterations): no-panic + idempotency + structural reparse

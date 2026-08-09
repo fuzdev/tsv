@@ -25,13 +25,15 @@ grades); the reference halves live in `docs/`:
 ## Gate map
 
 > Which check runs which corpus/oracle, and when. `deno task check` needs only
-> this repo; every other gate needs sibling checkouts (`../svelte`,
+> this repo — its one sibling-checkout leg (`roundtrip:audit:prettier`) widens
+> onto `../prettier` when present and warn-skips when not, so a bare clone still
+> passes. Every other gate *requires* sibling checkouts (`../svelte`,
 > `../acorn-typescript`, `../typescript`, `../prettier`, `../test262`, `../wpt`),
 > so they run at dev/release cadence and CI runs only the committed-tree tier.
 
 | Gate | Composition | Corpus / oracle | Cadence |
 | --- | --- | --- | --- |
-| **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `conformance:audit` · `conformance:audit:compiler` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `ignore:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle | every commit; the CI `check` job |
+| **`deno task check`** | `cargo fmt --check` · `format:audit` · `pins:audit` · `docs:audit` · `typecheck` · `conformance:audit` · `conformance:audit:compiler` · `scan:audit` · `fanout:audit` · `roundtrip:audit` · `roundtrip:audit:prettier` · `canonicalize:audit` · `binding:audit` · `authoring:audit` · `fuzz:audit` · `test:deno` · `cargo test` (incl. fixtures) · `test:audits` · `swallow:audit` · `comments:audit` · `gaps:audit` · `blanks:audit` · `fabrication:audit` · `census:audit` · `ignore:audit` · `check:ast-types` · `clippy` | **committed tree only** — `tests/fixtures` + pure-Rust/Deno audits, no external oracle — save `roundtrip:audit:prettier`, which gates the pinned `../prettier` format suites when that checkout is present (a loud skip when not; ~0.1 s) | every commit; the CI `check` job |
 | **`deno task conformance:all`** | `pins:audit:checkouts` preflight, then `conformance` (one process, five FFI legs: `svelte-fixtures` · `ts-fixtures` · `ts-repo` · `corpus:compare:parse --all` · `corpus:compare:format --all`, plus `render:audit` as its one subprocess leg) **+** `conformance:test262` (pure Rust) | `../svelte`, `../acorn-typescript`, `../typescript` (tsc baselines), `../prettier`, `../test262`; the **`gates`** corpus view (~6,200) | release; `scripts/publish.ts` **Step 3b** |
 | **`deno task bench` / `bench:conformance`** | perf throughput ×3 runtimes + compose; parse-coverage report | **`perf`** view (~3,200; 100%-coverage invariant) / **`conformance`** view (fixtures + wpt/test262 harvests; coverage-only + node-only) | dev / release cadence; feeds tsv.fuz.dev |
 | **`deno task idempotency:sweep`** | `tsv_debug fuzz --iterations 0` over the corpus dirs — F1 (`format(format(x)) == format(x)`) + no-panic + structural reparse on every file **as authored** | **`perf`** view (real code; absent checkouts skipped with a warning) | after a printer change; conformance cadence |
@@ -63,6 +65,13 @@ loss vs prettier — needs the FFI + prettier sidecar) and **Step 3c**'s
 `//` swallows, comment re-binding, boundary-whitespace + F1 idempotency,
 whole-comment conservation, blank fabrication, no-panic). Every content-loss /
 non-idempotency bug this release cycle was found by one of these, never by `check`.
+
+`roundtrip:audit:prettier` narrows that gap without closing it: it puts one
+non-format-stable corpus inside `check`, which is enough to catch a
+valid→unreparseable regression at the branch (it would have caught the `let`
+statement-head paren strip), but the prettier suites are hand-written edge cases —
+no app code, no real Svelte components, and only the reparse question. The
+release-cadence gates above stay the bar for real-code robustness.
 
 Corpus **views** are defined in [§Corpus](#corpus); the pinned counts are
 [../../docs/gate_counts.md](../../docs/gate_counts.md).
