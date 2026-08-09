@@ -109,9 +109,10 @@ Things the published numbers measure that aren't quite what they look like.
   coverage **per corpus source** under the aggregate line. Read the source rows: a
   TypeScript parse gap is tenths of a point on a group that is mostly test262, and
   an oracle's 100% is not an achievement. The axis coverage cannot show at all —
-  over-ACCEPTANCE — has its own tool, `diagnostics/ts_repo_over_acceptance.ts`
-  (`deno task ts-repo:over-acceptance`), graded over the files tsc's parser rejects
-  and read inverted.
+  over-ACCEPTANCE — has a tool per surface, both read inverted:
+  `diagnostics/ts_repo_over_acceptance.ts` (`deno task ts-repo:over-acceptance`)
+  over the files tsc's parser rejects, and `diagnostics/css_over_acceptance.ts`
+  (`deno task css:over-acceptance`) over the files `parseCss` rejects.
 
   The ad-hoc timed variant
   (coverage flag unset) times the all-tools-pass intersection — an adversarial
@@ -372,8 +373,9 @@ prettier. Load-bearing on two axes:
   discovery, file IO, its own CSS/HTML/markdown plugins) is out of scope.
   `@dprint/typescript` matches `ts,tsx,js,jsx,mjs,cjs,mts,cts` and **rejects CSS and
   Svelte outright** (verified), so unlike oxfmt/biome it contributes no css or
-  svelte row; dprint's CSS (malva) and HTML plugins are separate Wasm plugins, not
-  wired up. Config is asserted to LAND: `lib/dprint.ts` fails init if
+  svelte row; dprint's CSS plugin is a separate Wasm plugin with its own row
+  (**malva**, below), and its HTML plugin stays unwired — it does not format
+  Svelte. Config is asserted to LAND: `lib/dprint.ts` fails init if
   `getConfigDiagnostics()` is non-empty, since dprint reports an unrecognized key as
   a diagnostic rather than throwing — without that check a renamed key would
   silently leave an option at its default and skew the row.
@@ -397,6 +399,94 @@ prettier. Load-bearing on two axes:
   there, and both rows run on perf.
 - **rsvelte-fmt (native binary)** — the other Rust-native Svelte formatter;
   **Svelte only**, and **coverage-only**. See below.
+- **rsvelte parse (N-API)** — rsvelte's Svelte **parser**, and the **only
+  third-party engine on the `parse/svelte` surface**: the rest of that group is
+  `svelte/compiler` (the oracle) and tsv's own variants, so without it tsv is
+  measured against its own reference and nothing else. Two rows. `rsvelte-parse` is matched
+  to `tsv-json` on **both** axes — mechanism (each returns a compact JSON string
+  the caller `JSON.parse`s, so both pay the identical serialize + boundary + parse
+  cost) and payload (within ~1.5% of `tsv-json`'s bytes on a real component) —
+  which earns it a curated comparison line, the only one the Svelte surface has.
+  Because rsvelte claims the same drop-in contract tsv does, the row is a
+  conformance datum too: on that same component its AST differs from
+  `svelte/compiler` **only in the embedded TypeScript layer**, and there on a
+  handful of node kinds (a `TSNamedTupleMember`/`TSTupleType` pair vanishing, a
+  `TSUnknownKeyword` appearing where the oracle has a concrete type), where tsv is
+  byte-exact by `corpus:compare:parse`'s deep diff. It parses the whole
+  conformance Svelte corpus without a host fault — worth stating because a native
+  addon on that corpus is exactly where yuku's N-API binding segfaults.
+  ⚠ `rsvelte-parse-skip-expr-loc` is named for the **option it passes**, not for
+  tsv's `no-locations` wire, because the reductions differ: tsv drops per-node
+  `loc` throughout, `skipExpressionLoc` drops only nested `loc` on embedded JS
+  expressions and keeps top-level `start`/`end`. Read the pair as "each
+  tool's own lighter wire", never as one payload measured twice — which is why it
+  is absent from the payload-matched lines. Package choice is deliberate and
+  documented in `lib/rsvelte_parse.ts`: `@rsvelte/compiler` also exists but is a
+  WASM bundle whose `parse_svelte` takes no options and **pretty-prints** its JSON
+  (formatted inside the wasm, so not opt-out-able), which would rank JSON
+  indentation rather than parse work.
+- **swc (`@swc/core`, N-API)** — the most widely deployed Rust TS/JS parser, and
+  the engine `parse/typescript` was missing while carrying two bindings each of
+  oxc and yuku. Parse-only (swc ships no formatter), on **both surfaces**. Its AST
+  is its own dialect — root `Module`, positions on a `span` rather than `loc`, node
+  kinds `Ts`-prefixed — so it carries the oxc-class payload disclosure and is *not*
+  an opponent for the span-only curated lines (it is not span-only-padded either).
+  Two properties shape `lib/swc.ts`: **config must land** — swc defaults
+  `decorators: false` and accepts unknown option keys silently, so a decorated
+  class fails with a bare "Expression expected" that reads as a parser limit (this
+  alone produced one phantom corpus rejection), and `init()` parses a decorator to
+  prove the option took effect; and it **throws** on invalid input, so an accept is
+  an accept — no correction needed like yuku's error-tolerance or tsc's
+  `parseDiagnostics`. Its goal axis is spelled `isModule`, **not** `script` (that
+  key is inert — verified in both directions), which is what lets it score
+  script-goal test262 files rather than counting them as module-goal failures. It
+  survives the whole conformance corpus with no host fault, unlike
+  yuku's native binding — which matters because swc has no WASM row to fall back
+  on. Its real-corpus rejections are catalogued in `lib/perf_omit.ts`, and
+  differ in kind from oxc's and yuku's: swc rejects the ambient consts even with
+  `dts: true` passed explicitly, so that tolerance is the parser's own limit rather
+  than the bench's missing path threading.
+- **malva (WASM)** — dprint's CSS formatter, loaded over the same
+  `@dprint/formatter` host as `@dprint/typescript`, so it adds a wasm-tier engine
+  to `format/css` for one more plugin wasm and no new machinery. The HTML plugin
+  stays out — it does not format Svelte. **CSS only, enforced by the plugin** — it rejects
+  `.svelte` and `.ts` with "unknown file extension", mirroring
+  `@dprint/typescript`'s rejection of CSS and Svelte, so the language list is not
+  a policy the wrapper could get wrong. It and `biome-wasm` are the group's two
+  wasm-tier engines.
+- **postcss (JS)** — the first third-party engine on `parse/css`, earned on one
+  argument: it is the parser behind prettier's CSS printer, i.e. behind the
+  `format/css` **baseline**, which the parse surface therefore could not see. Not
+  payload-matched (a CSSOM-ish `Root` with `nodes`/`raws`, not the `parseCss` shape
+  tsv is a drop-in for). **No native peer can be added to that group**: no Rust CSS
+  parser exposes an AST to JS at all — lightningcss ships `transform`/`bundle` only
+  (its `./ast` export is types for the `visitor` callback, a napi round-trip per
+  visited node rather than a parse product), biome's `js-api` exposes
+  `formatContent`/`lintContent`/`openProject`, malva is a formatter, and oxc's CSS
+  is `oxc_formatter_css` with no JS parse binding. So that surface's missing native
+  row is an **availability fact, not an omission**. `css-tree` was evaluated for
+  this slot and rejected: it parses an unclosed block without error even with
+  `onParseError` supplied, so its accept rate would read ~100% vacuously, where
+  postcss throws (as it does on unclosed strings and comments, unterminated
+  brackets, and a declaration missing its colon).
+
+  ⚠ **Read a `parse/css` coverage delta as grammar coverage, not conformance.**
+  Unlike `svelte/compiler` on the Svelte surface, `parseCss` is **not a validity
+  oracle in either direction**, so the reference row is not a ceiling. Measured
+  over the conformance CSS corpus, postcss lands marginally *above* it — and the
+  gap is two-sided: postcss **rejects** a handful of files `parseCss` accepts
+  (genuinely invalid CSS — `//` comments, a missing semicolon), and **accepts**
+  more that `parseCss` rejects, most of them valid modern CSS Svelte's parser
+  simply doesn't implement (`@supports selector(…)`, `css-mixins` dashed
+  functions) rather than anything malformed. A smaller share is preprocessor
+  syntax living in prettier's `.css` fixtures (SCSS `@extend`, `@apply`, the
+  `postcss-plugins/` cases), which postcss parses structurally because it does not
+  validate at-rule preludes at all. tsv is a drop-in for `parseCss` and tracks it
+  by design, so a postcss row above tsv is neither a tsv gap nor postcss laxity —
+  it is two different grammars, and the per-source coverage table is what keeps
+  them legible. `deno task css:over-acceptance` is the axis itself — every
+  `parse/css` tool scored over the files `parseCss` rejects, with the reject count
+  pinned so the reference row's grammar can't move unnoticed.
 
 ### Coverage-only rows
 
@@ -501,10 +591,21 @@ on-disk size** plus **gzipped size** (≈ npm-tarball wire size), grouped by kin
   bundle carrying the printers it would size a scope difference and read as an
   engine one. As for `oxc-parser` and `dprint`, that pairing is the reader's to
   make: the emitted `vs tsv` ratio anchors every row on the full build.
+- **malva**: WASM (`dprint-plugin-malva`'s `plugin.wasm` — the package ships only
+  `*.wasm`, with no JS entry and so no `getPath()` helper like `@dprint/typescript`
+  has). CSS-only scope, and tsv has no CSS-only build, so pair it against
+  `tsv_format_wasm` knowing malva formats one language where that build formats three.
 - **rsvelte-fmt**: the standalone executable from its platform package — the one
   native row not scope-matched to a tsv artifact (it carries a CLI plus the whole
   oxc formatter for JS/TS/CSS beside its Svelte engine, where `tsv (ffi)` is a bare
   library). Read it as "what that tool ships."
+- **rsvelte compiler**: the N-API addon behind the `rsvelte-parse` rows, and
+  unscope-matched for the same reason — it carries the whole compiler plus
+  `svelte2tsx`, HMR diffing and a resolver, where the rows measure only its parser.
+- **swc**: N-API binding, and the **least** scope-matched native entry in the table:
+  the `.node` is an entire compiler (transforms, minifier, bundler entry points)
+  where the row measures `parseSync` alone. Listed because a table that sizes every
+  other alternative would read as hiding it.
 
 The combined `oxc-parser+oxfmt (napi)` row sums both raw and gzipped sizes from the
 parts; the gzipped sum slightly overstates wire size because the streams don't share

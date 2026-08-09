@@ -20,6 +20,7 @@ import { execFile } from 'node:child_process';
 import { readdir, stat } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
 import { promisify } from 'node:util';
+import type { InitializedImplementations } from './implementations.ts';
 import { current_arch, current_os, current_runtime, native_library_filename } from './runtime.ts';
 import { rsvelte_binary_path } from './rsvelte.ts';
 
@@ -65,7 +66,10 @@ const LABELS = {
 	oxc_combined_napi: 'oxc-parser+oxfmt (napi)',
 	yuku_parser_napi: 'yuku-parser (napi)',
 	yuku_parser_wasm: 'yuku-parser (wasm)',
-	rsvelte_fmt_native: 'rsvelte-fmt (binary)'
+	malva_wasm: 'malva (wasm)',
+	rsvelte_fmt_native: 'rsvelte-fmt (binary)',
+	rsvelte_parse_napi: 'rsvelte compiler (napi)',
+	swc_napi: 'swc (napi)'
 } as const;
 
 /** Absolute path to the bench harness's `node_modules` (where the alternative
@@ -189,17 +193,17 @@ function napi_binding_dirs(
  * alongside raw size; gzip is shelled out and parallelized across all
  * collected entries, so adding it costs roughly the slowest single
  * compression (biome's 35 MB dominates).
+ *
+ * Takes the initialized REGISTRY rather than a parallel list of `has_*` booleans.
+ * That list was a second place to remember an impl, and the caller silently fell
+ * behind it — three rows shipped with flags nothing ever passed, so a tool whose
+ * init failed would still have been sized here (its package is installed either
+ * way) and printed a size row with no benchmark row beside it. Reading `impls`
+ * directly means an impl exists in exactly one place.
  */
-export async function collect_binary_sizes(options?: {
-	has_native?: boolean;
-	has_napi?: boolean;
-	has_wasm?: boolean;
-	has_oxc?: boolean;
-	has_yuku?: boolean;
-	has_biome?: boolean;
-	has_dprint?: boolean;
-	has_rsvelte?: boolean;
-}): Promise<BinarySize[]> {
+export async function collect_binary_sizes(
+	impls: InitializedImplementations
+): Promise<BinarySize[]> {
 	const project_root = fileURLToPath(new URL('../../..', import.meta.url));
 	const node_modules = node_modules_dir();
 
@@ -208,7 +212,7 @@ export async function collect_binary_sizes(options?: {
 
 	// tsv native (FFI shared library)
 	const ffi_lib = native_library_filename('tsv_ffi');
-	if (options?.has_native !== false) {
+	if (impls.native) {
 		await push_size(staged, LABELS.tsv_ffi, 'native', `${project_root}/target/release/${ffi_lib}`);
 		// tsv format-only native — the native mirror of @fuzdev/tsv_format_wasm:
 		// dropping the convert/JSON layer (and the parse exports) leaves a
@@ -237,21 +241,21 @@ export async function collect_binary_sizes(options?: {
 
 	// tsv N-API addon — the Node/Bun native path (the sibling of the FFI library
 	// Deno loads). Same engine, different binding boundary; sized from the built
-	// cdylib (the shipped `.node` is a byte-identical copy). Omitted when unbuilt.
-	if (options?.has_napi !== false) {
-		await push_size(
-			staged,
-			LABELS.tsv_napi,
-			'native',
-			`${project_root}/target/release/${native_library_filename('tsv_napi')}`
-		);
-	}
+	// cdylib (the shipped `.node` is a byte-identical copy). Existence-gated rather
+	// than registry-gated: `impls.napi` is undefined under Deno, which loads the FFI
+	// library instead, but the addon's size is worth reporting from either runtime.
+	await push_size(
+		staged,
+		LABELS.tsv_napi,
+		'native',
+		`${project_root}/target/release/${native_library_filename('tsv_napi')}`
+	);
 
 	// tsv WASM — three builds from one crate via the `format`/`parse` features:
 	// pkg/format/deno (format-only, @fuzdev/tsv_format_wasm), pkg/parse/deno
 	// (parse-only, @fuzdev/tsv_parse_wasm), and pkg/all/deno (both,
 	// @fuzdev/tsv_wasm — the bundle the bench executes).
-	if (options?.has_wasm !== false) {
+	if (impls.wasm) {
 		await push_size(
 			staged,
 			LABELS.tsv_format_wasm,
@@ -273,7 +277,7 @@ export async function collect_binary_sizes(options?: {
 	}
 
 	// biome WASM
-	if (options?.has_biome !== false) {
+	if (impls.biome) {
 		await push_resolved(
 			staged,
 			LABELS.biome_wasm,
@@ -285,7 +289,7 @@ export async function collect_binary_sizes(options?: {
 
 	// dprint WASM (the `dprint-plugin-typescript` plugin — TS/JS only, so this is
 	// scope-matched against the format-only builds, not the full tsv bundle)
-	if (options?.has_dprint !== false) {
+	if (impls.dprint) {
 		await push_resolved(
 			staged,
 			LABELS.dprint_wasm,
@@ -296,7 +300,7 @@ export async function collect_binary_sizes(options?: {
 	}
 
 	// oxc-parser + oxfmt
-	if (options?.has_oxc !== false) {
+	if (impls.oxc) {
 		const { os: npm_os, arch: npm_arch } = get_npm_platform();
 
 		await push_resolved(
@@ -335,7 +339,8 @@ export async function collect_binary_sizes(options?: {
 	// pair up, same as for `oxc-parser` and `dprint`. The wasm package is a plain dep
 	// on every host (no `cpu: wasm32` metadata), so unlike oxc's wasi binding it
 	// needs no force-fetch to be present.
-	if (options?.has_yuku !== false) {
+	// Either binding present means the engine ran — one pair of size rows covers both.
+	if (impls.yuku || impls.yuku_wasm) {
 		const { os: npm_os, arch: npm_arch } = get_npm_platform();
 
 		await push_resolved(
@@ -362,11 +367,54 @@ export async function collect_binary_sizes(options?: {
 	// Listed anyway because omitting the only other Rust Svelte formatter from a
 	// size table that lists every other alternative would read as an oversight;
 	// read it as "what that tool ships", not as an engine-size comparison.
-	if (options?.has_rsvelte !== false) {
+	if (impls.rsvelte) {
 		const rsvelte_bin = rsvelte_binary_path();
 		if (rsvelte_bin !== null) {
 			await push_size(staged, LABELS.rsvelte_fmt_native, 'native', rsvelte_bin);
 		}
+	}
+
+	// malva — dprint's CSS plugin wasm. Scope-matched to nothing tsv ships exactly
+	// (tsv has no CSS-only build), so pair it against `tsv_format_wasm` in the
+	// knowledge that malva formats one language where that build formats three.
+	if (impls.malva) {
+		await push_resolved(
+			staged,
+			LABELS.malva_wasm,
+			'wasm',
+			[`${node_modules}/dprint-plugin-malva`],
+			'.wasm'
+		);
+	}
+
+	// rsvelte's N-API addon — the artifact behind the `rsvelte-parse` rows, and like
+	// `rsvelte-fmt (binary)` NOT scope-matched to a tsv build: it carries the whole
+	// compiler plus `svelte2tsx`, HMR diffing and a resolver, where the rows measure
+	// only its parser. Read it as "what that addon ships".
+	if (impls.rsvelte_parse) {
+		const { os: npm_os, arch: npm_arch } = get_npm_platform();
+		await push_resolved(
+			staged,
+			LABELS.rsvelte_parse_napi,
+			'native',
+			napi_binding_dirs(node_modules, '@rsvelte/vite-plugin-svelte-native', npm_os, npm_arch),
+			'.node'
+		);
+	}
+
+	// swc — the same disclosure, more so: this `.node` is an entire compiler
+	// (transforms, minifier, bundler entry points) where the row measures `parseSync`
+	// alone, so it is the least scope-matched native entry in the table. Listed
+	// because a table that sizes every other alternative would read as hiding it.
+	if (impls.swc) {
+		const { os: npm_os, arch: npm_arch } = get_npm_platform();
+		await push_resolved(
+			staged,
+			LABELS.swc_napi,
+			'native',
+			napi_binding_dirs(node_modules, '@swc/core', npm_os, npm_arch),
+			'.node'
+		);
 	}
 
 	// Stage 2: gzip every collected file in parallel.

@@ -21,8 +21,9 @@
  *
  * Supports: TypeScript/JS only. `@dprint/typescript` matches
  * `ts,tsx,js,jsx,mjs,cjs,mts,cts` and rejects CSS/Svelte outright (verified), so
- * unlike `oxfmt`/`biome` this contributes no css or svelte row. dprint's CSS
- * (malva) and HTML plugins are separate Wasm plugins, deliberately not wired up.
+ * unlike `oxfmt`/`biome` this contributes no css or svelte row. dprint's CSS plugin
+ * is a separate Wasm plugin with a row of its own over this same formatter host —
+ * see `lib/malva.ts`; its HTML plugin stays unwired, since it does not format Svelte.
  */
 
 import { readFile } from 'node:fs/promises';
