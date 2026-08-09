@@ -71,12 +71,13 @@
  * documents. So the cache is a bare path list and every file is parsed at the
  * default module goal, like every other non-test262 corpus entry.
  *
- * Skips, every one counted and reported: `.d.ts`, `.tsx` (JSX is out of scope for
- * tsv), `@filename` multi-file tests (several virtual modules concatenated — not
- * one parse unit), and unreadable files. Discovery and the baseline-reading rules
- * are SHARED with `diagnostics/ts_repo_compare.ts` (`lib/ts_repo.ts`), so the gate
- * and the bench corpus cannot drift on what the corpus IS or on what tsc's
- * baselines say about it.
+ * Skips, every one counted and reported: `.d.ts` (see `DECLARATIONS` — the one place
+ * this harvest scopes itself more narrowly than the gate, and why), `.tsx` (JSX is
+ * out of scope for tsv), `@filename` multi-file tests (several virtual modules
+ * concatenated — not one parse unit), and unreadable files. The parse-unit rule and
+ * the baseline-reading rules are SHARED with `diagnostics/ts_repo_compare.ts`
+ * (`lib/ts_repo.ts`), so the gate and the bench corpus cannot drift on what a parse
+ * unit IS or on what tsc's baselines say about it.
  *
  * Flags: `--if-present` tolerates a missing `../typescript` checkout (warn +
  * exit 0), for the `bench:conformance` task chain. `--force` re-harvests despite a
@@ -112,6 +113,29 @@ import {
 import { load_typescript, tsc_parse } from './lib/tsc.ts';
 
 const ROOTS = [`${TS_REPO}/tests/cases/conformance`, `${TS_REPO}/tests/cases/compiler`];
+
+/**
+ * `.d.ts` cases are SKIPPED — a property of this corpus's consumers, not of the
+ * files. Everything measured over `ts_repo_files.json` receives file CONTENT under a
+ * synthetic `file.ts` name (the bench threads no real path — `lib/tsc.ts`,
+ * `lib/perf_omit.ts`), and some syntax is well-formed only *because* the file is a
+ * declaration file: `export const browser: boolean;` with no initializer is valid in
+ * a `.d.ts` and invalid in a `.ts`. acorn-typescript has no declaration mode at all,
+ * oxc and yuku have one they can only reach through the filename. Admitting such a
+ * file would score those rows for path plumbing rather than for parsing — the exact
+ * rigging the tool-neutral validity filter exists to prevent, and already the cause
+ * of every current `PERF_OMITS` entry on the other surface.
+ *
+ * The cost is nil, which is what makes the rule cheap to hold: of the 40 `.d.ts`
+ * under these two roots, 31 carry a `TS1xxx` baseline (ambient-context violations
+ * tsc's CHECKER reports — its parser accepts them, so the intersection filter drops
+ * them anyway) and the 9 the filter would keep are ~0.1% of an ~8.1k corpus, none of
+ * them currently ambient-only. So this guards a future upstream `.d.ts`, not a
+ * measurable coverage loss today. The `conformance:ts-repo` GATE reads the same tree
+ * and admits them — it grades tsv against tsc alone, where no filename is in play.
+ */
+const DECLARATIONS = 'skip' as const;
+
 const CACHE_DIR = 'benches/js/.cache';
 const FILES_PATH = `${CACHE_DIR}/ts_repo_files.json`;
 const REJECTS_PATH = `${CACHE_DIR}/ts_repo_rejects.json`;
@@ -203,7 +227,7 @@ let rejected_without_baseline = 0;
 let scanned = 0;
 
 for (const root of ROOTS) {
-	for await (const path of discover_ts_cases(root, discovery_skips)) {
+	for await (const path of discover_ts_cases(root, discovery_skips, DECLARATIONS)) {
 		let content: string;
 		try {
 			content = await readFile(path, 'utf8');

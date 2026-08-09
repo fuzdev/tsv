@@ -3,17 +3,20 @@
  * the `conformance:ts-repo` gate (`diagnostics/ts_repo_compare.ts`) and the
  * tsc-corpus harvest (`harvest_ts_repo.ts`).
  *
- * They ask different questions of the same tree, over deliberately different roots
- * (the gate grades tsv per file over the WHOLE `tests/cases`; the harvest filters
- * `conformance` + `compiler` into a bench corpus — see `DEFAULT_ROOT` in
- * `diagnostics/ts_repo_compare.ts` for why the gate takes the superset), but they
- * must agree on **what the corpus IS** and on **what
+ * They ask different questions of the same tree, so they scope themselves
+ * differently along exactly TWO declared axes — the **root** (the gate grades tsv
+ * per file over the WHOLE `tests/cases`; the harvest filters `conformance` +
+ * `compiler` into a bench corpus) and the **declaration policy** ({@link
+ * DeclarationPolicy}: the gate admits `.d.ts`, the harvest skips it). Each axis is
+ * argued where the consumer sets it — `DEFAULT_ROOT` and `DECLARATIONS` in
+ * `diagnostics/ts_repo_compare.ts`, `DECLARATIONS` in `harvest_ts_repo.ts`. Every
+ * OTHER answer must be the same on both sides: **what a parse unit is** and **what
  * tsc's baselines SAY** — otherwise the bench corpus and the gate silently grade
- * different populations against different oracles. Both answers live here rather
- * than as parallel copies:
+ * different populations against different oracles. Those live here rather than as
+ * parallel copies:
  *
  * - **Discovery** — which files are parse units at all (`discover_ts_cases`,
- *   `is_multi_file_test`).
+ *   `is_multi_file_test`), and the one knob it takes.
  * - **The baseline key rule + the grammar-error test** — how a `.errors.txt`
  *   filename maps to a test name, and which diagnostic codes mean *tsc's parser*
  *   rejected (`baseline_test_key`, `has_grammar_error`). The two callers index the
@@ -38,7 +41,7 @@ export const TS_BASELINE_DIR = `${TS_REPO}/tests/baselines/reference`;
  * reads as having covered everything.
  */
 export interface TsCaseSkips {
-	/** `.d.ts` declaration files — not parse tests for either consumer. */
+	/** `.d.ts` declaration files, dropped under a `'skip'` {@link DeclarationPolicy} (0 under `'include'`). */
 	declaration: number;
 	/** `.tsx` — JSX grammar, out of scope for tsv. */
 	tsx: number;
@@ -50,12 +53,28 @@ export function empty_ts_case_skips(): TsCaseSkips {
 }
 
 /**
- * Every `.ts` test case under `dir`, recursively — the corpus definition both
- * consumers share. `.d.ts` and `.tsx` are filtered here and counted into `skips`
- * (never silently), `node_modules` is pruned, and an unreadable directory is
- * reported and skipped rather than aborting the walk.
+ * Whether a consumer admits `.d.ts` declaration files as parse units.
+ *
+ * A `.d.ts` is ordinary TypeScript source to tsv — no declaration mode exists, the
+ * product formats one like any other `.ts`, and the live-code corpus admits them
+ * for exactly that reason (`lib/corpus.ts`). So the two consumers here differ not
+ * on whether the files are real, but on whether each one's *oracle* can grade
+ * them, which is a property of the consumer, not of the file. Required rather than
+ * defaulted so each side has to state its answer.
  */
-export async function* discover_ts_cases(dir: string, skips: TsCaseSkips): AsyncGenerator<string> {
+export type DeclarationPolicy = 'include' | 'skip';
+
+/**
+ * Every `.ts` test case under `dir`, recursively — the parse-unit rule both
+ * consumers share. `.tsx` is always filtered, `.d.ts` per `declarations`, both
+ * counted into `skips` (never silently); `node_modules` is pruned, and an
+ * unreadable directory is reported and skipped rather than aborting the walk.
+ */
+export async function* discover_ts_cases(
+	dir: string,
+	skips: TsCaseSkips,
+	declarations: DeclarationPolicy
+): AsyncGenerator<string> {
 	let entries;
 	try {
 		entries = await readdir(dir, { withFileTypes: true });
@@ -66,9 +85,10 @@ export async function* discover_ts_cases(dir: string, skips: TsCaseSkips): Async
 	for (const entry of entries) {
 		const full = join(dir, entry.name);
 		if (entry.isDirectory()) {
-			if (entry.name !== 'node_modules') yield* discover_ts_cases(full, skips);
+			if (entry.name !== 'node_modules') yield* discover_ts_cases(full, skips, declarations);
 		} else if (entry.name.endsWith('.d.ts')) {
-			skips.declaration++;
+			if (declarations === 'skip') skips.declaration++;
+			else yield full;
 		} else if (entry.name.endsWith('.tsx')) {
 			skips.tsx++;
 		} else if (entry.name.endsWith('.ts')) {
@@ -96,6 +116,11 @@ export function is_multi_file_test(content: string): boolean {
  * and mis-reads a tsc grammar rejection as a clean compile (e.g. `parserAccessors5`
  * → TS1183 lives in `parserAccessors5(target=es5).errors.txt`). Index by this key so
  * one lookup gathers every variant.
+ *
+ * A `.d.ts` case needs no special handling: the harness names its baseline
+ * `<name>.d.errors.txt`, which strips to `<name>.d` — exactly what a caller stripping
+ * the trailing `.ts` off `<name>.d.ts` asks for. The two halves of the rule meet on
+ * their own, so declaration cases key correctly wherever the walk admits them.
  */
 export function baseline_test_key(baseline_name: string): string {
 	return baseline_name.replace(/\.errors\.txt$/, '').replace(/\(.*\)$/, '');
