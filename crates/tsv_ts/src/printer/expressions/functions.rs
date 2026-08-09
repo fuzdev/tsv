@@ -1448,19 +1448,23 @@ impl<'a> Printer<'a> {
                 .then(|| self.find_comma_in_range(param.span().end, search_end))
                 .flatten();
 
-            // Collect same-line comments
-            let same_line_comments: CommentVec<'_> = if comments_present {
+            // The param's same-line **block** comments, split by side of the comma below.
+            // Line comments are deliberately not in here: their claim asks the comma as
+            // well as the param (`param_trailing_line_comment`), so a shared "same-line
+            // run" would read as answering for them too while quietly using the narrower
+            // anchor.
+            let same_line_blocks: CommentVec<'_> = if comments_present {
                 comments_to_emit_in_range(self.comments, param.span().end, search_end)
-                    .filter(|c| self.is_same_line(param.span().end, c.span.start))
+                    .filter(|c| c.is_block && self.is_same_line(param.span().end, c.span.start))
                     .collect()
             } else {
                 CommentVec::new()
             };
 
             // Block comments BEFORE comma go before comma
-            for comment in same_line_comments
+            for comment in same_line_blocks
                 .iter()
-                .filter(|c| c.is_block && comma_pos.is_none_or(|pos| c.span.start < pos))
+                .filter(|c| comma_pos.is_none_or(|pos| c.span.start < pos))
             {
                 inner_parts.push(d.text(" "));
                 inner_parts.push(self.build_comment_doc(comment));
@@ -1486,9 +1490,9 @@ impl<'a> Printer<'a> {
             // The last param has no trailing comma, so an after-comma block is deferred to
             // last_after_comma_docs (emitted after the loop, past where the comma was).
             if is_last {
-                let after: CommentVec<'_> = same_line_comments
+                let after: CommentVec<'_> = same_line_blocks
                     .iter()
-                    .filter(|c| c.is_block && comma_pos.is_some_and(|pos| c.span.start > pos))
+                    .filter(|c| comma_pos.is_some_and(|pos| c.span.start > pos))
                     .copied()
                     .collect();
                 for comment in after {
@@ -1497,10 +1501,33 @@ impl<'a> Printer<'a> {
                 }
             }
 
-            // Line comments (same-line) go after comma (excluded from width)
-            // Block comments AFTER comma are handled as leading for next param
-            for comment in same_line_comments.iter().filter(|c| !c.is_block) {
-                inner_parts.push(self.build_trailing_line_comment_doc(comment));
+            // Line comments trailing this param go after the comma (excluded from width).
+            // Block comments AFTER the comma are handled as leading for the next param.
+            //
+            // Scanned rather than filtered out of `same_line_blocks`: the claim's anchor
+            // is the COMMA as well as the param (`param_trailing_line_comment`), and a
+            // comment on a comma the author pushed onto its own line is not on the param's
+            // line at all. `leading_param_comments` excludes exactly this set, so the two
+            // partition the gap.
+            //
+            // ⚠️ **The comma anchor is passed only where a comma is EMITTED.** Under
+            // `trailingComma: 'none'` the last param's source comma is deleted, so "the
+            // comma's line" is not a position in the output and the anchor's argument — the
+            // printer pulls the comma back onto the param's line — does not reach it. The
+            // last param's leftover region belongs to the own-line loop below and to
+            // `last_after_comma_docs`; claiming into it here printed the comment TWICE.
+            let trailing_comma_anchor = if is_last { None } else { comma_pos };
+            if comments_present {
+                for comment in comments_to_emit_in_range(
+                    self.comments,
+                    param.span().end,
+                    search_end,
+                )
+                .filter(|c| {
+                    self.param_trailing_line_comment(c, param.span().end, trailing_comma_anchor)
+                }) {
+                    inner_parts.push(self.build_trailing_line_comment_doc(comment));
+                }
             }
 
             // Own-line comments (on their own line after last param, before `)`)
@@ -1671,10 +1698,17 @@ impl<'a> Printer<'a> {
                 // A stranded after-comma block (on the comma's line, newline before
                 // this param) trails the comma — emitted by the loop's
                 // `push_stranded_after_comma_blocks`, not led here.
-                if c.is_block
-                    && c.span.start >= comma
+                if c.span.start >= comma
                     && self.is_stranded_after_comma_block(c, comma, param_render_start)
                 {
+                    return false;
+                }
+                // A line comment trailing the previous param — on its line, or on the
+                // line of the comma that closes it — is emitted by the loop's
+                // trailing-line arm, so it never leads this one. The comma reading is
+                // what the item reading cannot give: an author who pushed the comma onto
+                // its own line (`a⏎, // c⏎ b`) wrote the comment against the comma.
+                if self.param_trailing_line_comment(c, start, Some(comma)) {
                     return false;
                 }
                 // Different line from prev param - definitely a leading comment
@@ -1682,10 +1716,49 @@ impl<'a> Printer<'a> {
                     return true;
                 }
                 // Same line as prev param: only keep block comments after the comma
-                // (line comments go in line_suffix, block comments before comma are trailing)
+                // (block comments before the comma are trailing)
                 c.is_block && c.span.start >= comma
             })
             .collect()
+    }
+
+    /// Whether a line comment in a param's `[param_end, next_start)` gap **trails that
+    /// param** — it sits on the param's own line, or on the line of the comma that closes
+    /// it. The one statement of that claim, asked by the trailing-line emitter and by
+    /// `leading_param_comments`'s exclusion: the two must PARTITION the gap, so a spelling
+    /// that drifts either drops the comment or prints it twice.
+    ///
+    /// The **comma** half is what an item-anchored reading cannot give. The comma is
+    /// re-emitted structure — the printer pulls it back onto the param's line whatever the
+    /// author did with it — so a `//` written after a comma the author pushed onto a line
+    /// of its own (`a⏎, // c⏎ b`) belongs to that comma, and reading only the param's line
+    /// hands it to the next param's leading run, re-binding it to a param it was never
+    /// written against. Block comments are not on this rule: they ask the hug question
+    /// instead ([`Printer::is_stranded_after_comma_block`]).
+    ///
+    /// ⚠️ **At most ONE can trail**, which is why the two anchors alone do not answer it:
+    /// the run ends at the first line comment in the gap, and the rest leads the next param
+    /// on its own line, as it does in prettier. That stop condition is
+    /// [`Printer::gap_emitted_line_comment_before`], shared with the type-side comma
+    /// emitter so the two can't disagree about a gap they answer the same way.
+    ///
+    /// `comma_pos` is the comma the printer **emits**, so the LAST param passes `None`:
+    /// under `trailingComma: 'none'` its source comma is deleted, and the anchor's whole
+    /// argument is that the printer pulls the comma back onto the param's line.
+    fn param_trailing_line_comment(
+        &self,
+        comment: &internal::Comment,
+        param_end: u32,
+        comma_pos: Option<u32>,
+    ) -> bool {
+        if comment.is_block {
+            return false;
+        }
+        let anchored = self.is_same_line(param_end, comment.span.start)
+            || comma_pos.is_some_and(|comma| {
+                comment.span.start >= comma && self.comment_on_comma_line(comma, comment)
+            });
+        anchored && !self.gap_emitted_line_comment_before(param_end, comment.span.start)
     }
 
     /// **on page**: where the param at `param_render_start`'s printed content begins in
