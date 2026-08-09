@@ -4,8 +4,8 @@
 use crate::fixtures::{
     AUDIT_SIGNATURE_FILENAME, EXPECTED_SVELTE_ERROR_JSON, Fixture, FixtureFiles,
     PRETTIER_NONCONVERGENT_FILENAME, PRETTIER_REJECTS_FILENAME, TSV_REJECTS_FILENAME,
-    determine_required_suffix, has_prettier_divergence_suffix, has_svelte_divergence_suffix,
-    read_file,
+    audit_signature_variant_suffix, determine_required_suffix, has_prettier_divergence_suffix,
+    has_svelte_divergence_suffix, read_file, unformatted_ours_filename,
 };
 
 /// Validate fixture structure and conventions
@@ -41,6 +41,9 @@ use crate::fixtures::{
 ///      AST), forbids `expected.json`/`expected_ours.json` (tsv emits no AST), and is
 ///      mutually exclusive with every format-claim file, `input_invalid_*`, and the
 ///      prettier no-oracle markers — handled entirely by `validate_tsv_rejects_structure`
+/// S21: `audit_signature_<suffix>.txt` requires its same-suffix
+///      `unformatted_ours_<suffix>` source — the chain it pins is anchored there,
+///      so an orphan pins nothing
 /// D1:  README.md required for divergences
 pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Result<(), String> {
     let fixture_dir = &fixture.path;
@@ -195,6 +198,25 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
         ));
     }
 
+    // S21: a per-variant signature pins the chain anchored at its same-suffix
+    // `unformatted_ours_*` source. Without that source it pins nothing, and the N12
+    // check would silently skip it.
+    for signature_name in &files.audit_signature_variant {
+        let Some(suffix) = audit_signature_variant_suffix(signature_name) else {
+            continue;
+        };
+        let source = unformatted_ours_filename(suffix, input_ext);
+        if !fixture_dir.join(&source).exists() {
+            return Err(format!(
+                "{signature_name} has no {source}.\n\
+                A per-variant signature pins prettier's chain anchored at the same-suffix\n\
+                unformatted_ours_* source; without it the file pins nothing. Either:\n\
+                - Add {source}, or\n\
+                - Delete {signature_name} (run: deno task fixtures:update:formatted)."
+            ));
+        }
+    }
+
     // S19: the two prettier no-oracle markers make incompatible claims and cannot
     // coexist — prettier either throws on the input or formats it forever without
     // a fixed point, never both.
@@ -234,6 +256,7 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
             .chain(&files.prettier_intermediate)
             .chain(&files.prettier_intermediate_to_variant)
             .chain(&files.prettier_intermediate_to_divergent_variant)
+            .chain(&files.audit_signature_variant)
         {
             conflicts.push(name.clone());
         }
@@ -242,7 +265,8 @@ pub fn validate_fixture_structure(fixture: &Fixture, files: &FixtureFiles) -> Re
                 "{marker} cannot coexist with prettier-claim files.\n\
                 The marker asserts prettier cannot serve as an oracle on this input, so no\n\
                 prettier-anchored claim (output_prettier.*, prettier_variant_*, variant_*,\n\
-                divergent_variant_*, unformatted_*, unformatted_prettier_*, prettier_intermediate_*) is expressible.\n\
+                divergent_variant_*, unformatted_*, unformatted_prettier_*, prettier_intermediate_*,\n\
+                audit_signature_<suffix>.txt) is expressible.\n\
                 Conflicting file(s): {}\n\
                 Either delete the marker (if prettier can format input now) or remove the claim files.",
                 conflicts.join(", ")
@@ -807,6 +831,7 @@ fn validate_tsv_rejects_structure(
         .chain(&files.prettier_intermediate_to_variant)
         .chain(&files.prettier_intermediate_to_divergent_variant)
         .chain(&files.input_invalid)
+        .chain(&files.audit_signature_variant)
     {
         conflicts.push(name.clone());
     }

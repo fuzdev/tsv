@@ -63,6 +63,7 @@ pub struct FixtureValidation {
     pub prettier_intermediate_count: usize,
     pub prettier_intermediate_to_variant_count: usize,
     pub prettier_intermediate_to_divergent_variant_count: usize,
+    pub audit_signature_variant_count: usize,
     pub invalid_syntax_count: usize,
     /// Input content for cross-fixture duplicate detection (populated during validation)
     pub input_content: Option<String>,
@@ -95,6 +96,15 @@ pub struct FixtureValidation {
 pub struct UndocumentedPrettierOutput {
     /// The unformatted_ours_* source file that produced this output
     pub source_file: String,
+    /// The variant file that would pin this output (`prettier_variant_hug.svelte`, …),
+    /// when prettier holds the output stable and our formatter gives it a marker. `None`
+    /// when no single form applies — prettier not idempotent on it, or tsv not idempotent
+    /// on `ours(V)` — where the chain, not a file, is the question.
+    ///
+    /// Resolved at the N10 site rather than left to `fixtures:audit`: the bytes and the
+    /// input extension are both in hand there, so sending the reader to a second, slower
+    /// command to learn which of three files to add is friction for nothing.
+    pub suggested_pin: Option<String>,
 }
 
 impl FixtureValidation {
@@ -112,6 +122,7 @@ impl FixtureValidation {
             prettier_intermediate_count: 0,
             prettier_intermediate_to_variant_count: 0,
             prettier_intermediate_to_divergent_variant_count: 0,
+            audit_signature_variant_count: 0,
             invalid_syntax_count: 0,
             input_content: None,
             input_file_name: None,
@@ -188,6 +199,7 @@ pub async fn validate_fixture(fixture: &Fixture, prettier_only: bool) -> Fixture
     result.prettier_intermediate_to_variant_count = files.prettier_intermediate_to_variant.len();
     result.prettier_intermediate_to_divergent_variant_count =
         files.prettier_intermediate_to_divergent_variant.len();
+    result.audit_signature_variant_count = files.audit_signature_variant.len();
     result.invalid_syntax_count = files.input_invalid.len();
 
     // Read input file

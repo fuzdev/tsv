@@ -6,14 +6,20 @@ mod model;
 pub mod validation;
 mod variants;
 
-pub use audit_signature::{AUDIT_SIGNATURE_FILENAME, AuditSignature};
+pub use audit_signature::{
+    AUDIT_SIGNATURE_FILENAME, AuditSignature, ChainAnchor, SingleFormPins,
+    audit_signature_variant_filename, audit_signature_variant_suffix,
+};
 pub use discovery::{find_input_file, walk_fixtures};
 pub use model::{
     EXPECTED_SVELTE_ERROR_JSON, Fixture, GOAL_FILENAME, InputType, PRETTIER_NONCONVERGENT_FILENAME,
     PRETTIER_REJECTS_FILENAME, TSV_REJECTS_FILENAME, determine_required_suffix,
     has_prettier_divergence_suffix, has_svelte_divergence_suffix,
 };
-pub use variants::FixtureFiles;
+pub use variants::{
+    FixtureFiles, StableFormMarker, classify_stable_form, unformatted_ours_filename,
+    unformatted_ours_suffix,
+};
 
 use std::fs;
 use std::path::Path;

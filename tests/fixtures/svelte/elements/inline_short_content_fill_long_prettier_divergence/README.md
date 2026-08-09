@@ -17,8 +17,13 @@ The two blocks pin the **100/101 boundary**:
   a word earlier (`…a little`, then `more text`).
 
 The **sole divergence** is print width: prettier keeps each run on a **single over-width line** (the
-inline-content hug, 101+ cols — see `output_prettier.svelte`), while tsv keeps printWidth a hard limit
-and wraps at a word boundary.
+inline-content hug, 101+ cols — see `prettier_variant_over_width.svelte`), while tsv keeps printWidth
+a hard limit and wraps at a word boundary.
+
+Prettier holds `input.svelte` itself stable, so there is no `output_prettier.svelte`: the over-width
+form is a *second* prettier fixed point, reached only from a compact or extra-spaced authoring. Both
+`unformatted_ours_*` variants land on it, so the one `prettier_variant_over_width.svelte` pins them
+both.
 
 ```
 tsv:       short element packs into the fill (≤100), wrapping at a word boundary

@@ -517,7 +517,9 @@ sibling makes a precise, validated claim — `expected_ours.json` / `expected_sv
 (parser divergence), `output_prettier.*` / `prettier_variant_*` / `variant_*` /
 `divergent_variant_*` / `prettier_intermediate_*` / `prettier_intermediate_to_variant_*` /
 `prettier_intermediate_to_divergent_variant_*` /
-`audit_signature.txt` (formatter divergence + prettier multi-pass pins),
+`audit_signature.txt` / `audit_signature_<suffix>.txt` (formatter divergence + prettier
+multi-pass pins — the two chain pins, anchored at `output_prettier.*` and at
+`unformatted_ours_<suffix>.*` respectively),
 `prettier_nonconvergent.txt` / `prettier_rejects.txt` / `tsv_rejects.txt` (no-oracle
 markers), `unformatted_*` / `unformatted_ours_*` / `unformatted_prettier_*`
 (normalization variants), `input_invalid_*` (must fail both parsers). Per-file semantics
@@ -540,6 +542,7 @@ and validation rules (F/S/R/D): ./docs/fixture_overview.md.
 - **Divergent variant (prettier keeps stable, ours → third form)**: Add `divergent_variant_*.*` files (requires `_prettier_divergence` suffix)
 - **Normalization to input divergence**: `unformatted_ours_*.*` normalizes to input with our formatter only
 - **Normalization to output_prettier**: `unformatted_prettier_*.*` normalizes to `output_prettier.*` with prettier
+- **Prettier's output from an `unformatted_ours_*` fits no single-form marker**: auto-generated `audit_signature_<suffix>.txt` pins the whole chain (N12) — the marker of last resort, for a chain with 2+ distinct intermediates or a stable form tsv can't format; `fixtures:update:formatted` decides, never hand-written
 - **Prettier never converges (no oracle)**: Add `prettier_nonconvergent.txt` + README (requires `_prettier_divergence` suffix; excludes all prettier-claim files)
 - **Prettier rejects/throws on input (no oracle)**: Add `prettier_rejects.txt` (trimmed content = expected-error substring) + README (requires `_prettier_divergence` suffix; excludes all prettier-claim files; mutually exclusive with `prettier_nonconvergent.txt`)
 - **tsv over-rejects but canonical accepts**: Add `tsv_rejects.txt` (trimmed content = expected tsv-error substring) + `expected_svelte.json` + README (requires `_svelte_divergence` suffix; no `expected.json`/`expected_ours.json`; excludes all format-claim files, `input_invalid_*`, and the prettier no-oracle markers)

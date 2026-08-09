@@ -16,10 +16,12 @@ before `:`; pass 2 moves it inside the brackets (one comment per pass, so a
 run takes 3 passes). The relocated landing is dual-stable — tsv preserves a
 comment *authored* inside the brackets — so the two authorings keep two fixed
 points, and only prettier moves between them. The run's chain is too long for
-a `prettier_intermediate_*` pin (two distinct intermediates), so the README
-records it and the fixture documents the divergence by normalization claim
-alone — the same shape as
-[key_colon_own_line_block_comment](../../../syntax/comments/key_colon_own_line_block_comment_prettier_divergence/).
+a `prettier_intermediate_*` pin (two distinct intermediates), so
+`audit_signature_own_line.txt` holds it instead — all three passes, byte-exact,
+checked live on every validation run. The same shape as
+[key_colon_own_line_block_comment](../../../syntax/comments/key_colon_own_line_block_comment_prettier_divergence/),
+which differs only in where its chain lands (back on `input`, not on a third
+form).
 
 - `unformatted_ours_own_line.svelte` — the own-line authoring: tsv normalizes it
   to input; prettier's chain lands on the in-bracket relocation instead (the

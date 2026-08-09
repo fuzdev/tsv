@@ -27,6 +27,13 @@ positions swallow vs. keep the markers raw) is cataloged as a Svelte compat beha
 - `unformatted_ours_wraps_rule` — `<!-- p { color: blue } -->` around a real rule; tsv drops the
   whole span, so `p { color: blue }` vanishes. The case where the swallow is actually observable.
 
+Prettier's mangled output for each is pinned in the sibling `audit_signature_top_level.txt` /
+`audit_signature_wraps_rule.txt` — a one-pass fixed point in both cases. It cannot be a
+`prettier_variant_*` (nor a `variant_*` / `divergent_variant_*`): every one of those markers
+asserts something about `ours(V)`, and **neither** parser accepts that output — tsv reports
+`Unterminated HTML comment`, Svelte's `parseCss` `Expected token -->`. Parity, not an
+over-rejection; the chain pin is the only form the claim can take.
+
 ## Reason
 
 See [conformance_prettier_css.md §CSS: HTML comments (CDO/CDC)](../../../../../docs/conformance_prettier_css.md#css-html-comments-cdocdc).

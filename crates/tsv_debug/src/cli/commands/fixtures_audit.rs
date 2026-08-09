@@ -1,6 +1,6 @@
 use crate::cli::CliError;
 use crate::deno::run_prettier;
-use crate::fixtures::{self, AuditSignature, Fixture, FixtureFiles, read_file};
+use crate::fixtures::{self, AuditSignature, Fixture, FixtureFiles, StableFormMarker, read_file};
 use argh::FromArgs;
 use futures_util::StreamExt;
 use std::collections::HashMap;
@@ -128,7 +128,7 @@ impl FixturesAuditCommand {
                 if let Some(ref suggestion) = file_audit.novel_suggestion {
                     let msg = format_suggestion(suggestion);
                     println!("    >> {msg}");
-                    if !matches!(suggestion, Suggestion::DocumentedMultiPass(_)) {
+                    if !suggestion.is_documented() {
                         novel_count += 1;
                     }
                 }
@@ -193,11 +193,27 @@ enum Suggestion {
     PrettierIntermediateToDivergentVariant(String),
     /// Prettier-chain from output_prettier is documented in audit_signature.txt (chain depth K)
     DocumentedMultiPass(usize),
+    /// Prettier-chain from this `unformatted_ours_*` source is documented in its
+    /// `audit_signature_<suffix>.txt` (chain depth K) — the marker of last resort, written
+    /// only where no single-form marker could express the output (N12)
+    DocumentedVariantChain(usize),
     /// Needs investigation
     Investigate(String),
 }
 
-/// Result of checking audit_signature.txt against the live prettier chain
+impl Suggestion {
+    /// Is this a chain already pinned by a signature file, rather than something to act on?
+    /// Both `Documented*` arms are informational — the validator checks them byte-for-byte,
+    /// so counting them as novel would put permanent noise in every audit run.
+    const fn is_documented(&self) -> bool {
+        matches!(
+            self,
+            Self::DocumentedMultiPass(_) | Self::DocumentedVariantChain(_)
+        )
+    }
+}
+
+/// Result of checking a signature file against the live prettier chain
 enum AuditSignatureCheck {
     /// Signature file exists and matches the live chain. Carries chain depth.
     MatchesRecorded(usize),
@@ -212,36 +228,53 @@ enum AuditSignatureCheck {
     NoSignature,
 }
 
-/// Check whether `output_prettier.*`'s prettier chain matches a recorded `audit_signature.txt`.
-///
-/// Reads the signature file (if present), walks prettier from `output_prettier.*` to its fixed
-/// point live, and byte-compares. This mirrors F4 validation but runs in audit context.
-async fn check_audit_signature(fixture: &Fixture) -> AuditSignatureCheck {
-    let signature_path = fixture.audit_signature_path();
+/// Check whether the live prettier chain from `anchor_content` matches the signature at
+/// `signature_path`. Mirrors the F4 / N12 validation checks in audit context; the anchor
+/// file (`output_prettier.*` or an `unformatted_ours_*` variant) is supplied by the caller.
+async fn check_chain_signature(
+    fixture: &Fixture,
+    signature_path: &std::path::Path,
+    signature_name: &str,
+    anchor_content: &str,
+) -> AuditSignatureCheck {
     if !signature_path.exists() {
         return AuditSignatureCheck::NoSignature;
     }
-    let raw = match read_file(&signature_path) {
+    let raw = match read_file(signature_path) {
         Ok(s) => s,
-        Err(e) => return AuditSignatureCheck::Error(format!("read audit_signature.txt: {e}")),
+        Err(e) => return AuditSignatureCheck::Error(format!("read {signature_name}: {e}")),
     };
     let recorded = match AuditSignature::parse(&raw) {
         Ok(s) => s,
-        Err(e) => return AuditSignatureCheck::Error(format!("parse audit_signature.txt: {e}")),
-    };
-    let output_prettier_path = fixture.output_prettier_path();
-    let output_prettier_content = match read_file(&output_prettier_path) {
-        Ok(s) => s,
-        Err(e) => return AuditSignatureCheck::Error(format!("read output_prettier: {e}")),
+        Err(e) => return AuditSignatureCheck::Error(format!("parse {signature_name}: {e}")),
     };
     let parser = fixture.input_type().prettier_parser();
-    match AuditSignature::walk(&output_prettier_content, parser).await {
+    match AuditSignature::walk(anchor_content, parser).await {
         Ok(Some(live)) if live.passes == recorded.passes => {
             AuditSignatureCheck::MatchesRecorded(live.passes.len())
         }
         Ok(_) => AuditSignatureCheck::Drift,
         Err(e) => AuditSignatureCheck::Error(format!("prettier chain walk: {e}")),
     }
+}
+
+/// [`check_chain_signature`] for the `output_prettier.*` anchor (`audit_signature.txt`, F4).
+async fn check_audit_signature(fixture: &Fixture) -> AuditSignatureCheck {
+    let signature_path = fixture.audit_signature_path();
+    if !signature_path.exists() {
+        return AuditSignatureCheck::NoSignature;
+    }
+    let output_prettier_content = match read_file(&fixture.output_prettier_path()) {
+        Ok(s) => s,
+        Err(e) => return AuditSignatureCheck::Error(format!("read output_prettier: {e}")),
+    };
+    check_chain_signature(
+        fixture,
+        &signature_path,
+        fixtures::AUDIT_SIGNATURE_FILENAME,
+        &output_prettier_content,
+    )
+    .await
 }
 
 /// Result of auditing one file within a fixture
@@ -307,6 +340,11 @@ fn format_suggestion(suggestion: &Suggestion) -> String {
         Suggestion::DocumentedMultiPass(depth) => {
             format!(
                 "documented: prettier non-idempotent on output_prettier (chain depth={depth}, pinned by audit_signature.txt)"
+            )
+        }
+        Suggestion::DocumentedVariantChain(depth) => {
+            format!(
+                "documented: prettier's chain from this source reaches no single-form marker (chain depth={depth}, pinned by audit_signature_<suffix>.txt)"
             )
         }
         Suggestion::Investigate(reason) => format!("investigate: {reason}"),
@@ -423,10 +461,10 @@ async fn audit_fixture(fixture: &Fixture) -> FixtureAudit {
         .await;
 
         if let Some(ref s) = novel_suggestion {
-            // DocumentedMultiPass is informational — covered by audit_signature.txt and
-            // checked byte-for-byte by F4. Don't mark the fixture as novel; it would
-            // surface noise on every audit run even though nothing is wrong.
-            if !matches!(s, Suggestion::DocumentedMultiPass(_)) {
+            // A documented chain is informational — pinned by a signature file and checked
+            // byte-for-byte by F4 / N12. Don't mark the fixture as novel; it would surface
+            // noise on every audit run even though nothing is wrong.
+            if !s.is_documented() {
                 has_novel = true;
             }
             suggestions.push(s.clone());
@@ -499,8 +537,38 @@ async fn classify_novel(
     };
 
     // Get the suffix from the filename — only auto-suggest for unformatted_* source files
-    let suffix = if let Some(rest) = filename.strip_prefix("unformatted_ours_") {
-        rest.strip_suffix(input_ext).unwrap_or(rest)
+    let suffix = if let Some(suffix) = fixtures::unformatted_ours_suffix(filename, input_ext) {
+        // A per-variant chain pin is written only where NO single-form marker can express
+        // this output, so a matching one is the final answer, not a placeholder — report it
+        // as documented instead of re-deriving a suggestion the updater already ruled out.
+        if use_prettier && let Ok(source_content) = read_file(&fixture.path.join(filename)) {
+            match check_chain_signature(
+                fixture,
+                &fixture.audit_signature_variant_path(suffix),
+                &fixtures::audit_signature_variant_filename(suffix),
+                &source_content,
+            )
+            .await
+            {
+                AuditSignatureCheck::MatchesRecorded(depth) => {
+                    return Some(Suggestion::DocumentedVariantChain(depth));
+                }
+                AuditSignatureCheck::Drift => {
+                    return Some(Suggestion::Investigate(format!(
+                        "audit_signature_{suffix}.txt drift — prettier's chain from {filename} no longer matches the recorded chain. Run: deno task fixtures:update:formatted"
+                    )));
+                }
+                AuditSignatureCheck::Error(reason) => {
+                    return Some(Suggestion::Investigate(format!(
+                        "audit_signature_{suffix}.txt check failed: {reason}"
+                    )));
+                }
+                AuditSignatureCheck::NoSignature => {
+                    // Fall through — classify below and suggest a single-form marker.
+                }
+            }
+        }
+        suffix
     } else if let Some(rest) = filename.strip_prefix("unformatted_") {
         rest.strip_suffix(input_ext).unwrap_or(rest)
     } else {
@@ -561,31 +629,19 @@ async fn classify_novel(
     let prettier_stable = second_pass == novel_output;
 
     if prettier_stable {
-        // Check what our formatter does with this novel output
-        match fixtures::format_with_our_formatter(&novel_output, &fixture.input_file) {
-            Ok(ours_of_novel) => {
-                if ours_of_novel == *input_content {
-                    // ours(V) == input -> prettier_variant_*
-                    Some(Suggestion::PrettierVariant(suffix.to_string()))
-                } else if ours_of_novel == novel_output {
-                    // ours keeps V verbatim (ours(V) == V) -> dual-stable variant_*
-                    Some(Suggestion::Variant(suffix.to_string()))
-                } else {
-                    // ours rewrites V to a distinct form (!= V, != input). If that third
-                    // form is itself stable it's a divergent_variant_*, else it's a genuine bug.
-                    match fixtures::format_with_our_formatter(&ours_of_novel, &fixture.input_file) {
-                        Ok(second) if second == ours_of_novel => {
-                            // ours(ours(V)) == ours(V) -> divergent_variant_*
-                            Some(Suggestion::DivergentVariant(suffix.to_string()))
-                        }
-                        _ => Some(Suggestion::Investigate(
-                            "prettier stable but our formatter not idempotent on novel output"
-                                .to_string(),
-                        )),
-                    }
-                }
+        // What our formatter does with V picks the marker — the shared three-way test.
+        match fixtures::classify_stable_form(&novel_output, input_content, &fixture.input_file) {
+            StableFormMarker::PrettierVariant => {
+                Some(Suggestion::PrettierVariant(suffix.to_string()))
             }
-            Err(_) => Some(Suggestion::Investigate(
+            StableFormMarker::Variant => Some(Suggestion::Variant(suffix.to_string())),
+            StableFormMarker::DivergentVariant => {
+                Some(Suggestion::DivergentVariant(suffix.to_string()))
+            }
+            StableFormMarker::OursNotIdempotent => Some(Suggestion::Investigate(
+                "prettier stable but our formatter not idempotent on novel output".to_string(),
+            )),
+            StableFormMarker::OursRejects => Some(Suggestion::Investigate(
                 "our formatter fails on novel output".to_string(),
             )),
         }

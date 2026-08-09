@@ -5,27 +5,29 @@ use thiserror::Error;
 
 use crate::fixtures::InputType;
 
-/// Why `audit_signature.txt` is stale.
+/// Why a prettier-chain signature is stale — shared by both anchors
+/// (`audit_signature.txt`, F4; `audit_signature_<suffix>.txt`, N12).
 ///
 /// Both cases are repaired by the same command (`fixtures:update:formatted`), but the user-facing
 /// remediation differs: drift is a routine regenerate, while a collapsed chain means prettier
-/// became idempotent on `output_prettier` since the signature was captured — the regenerate will
-/// delete the file, and the author should revisit whether the divergence still applies.
+/// became idempotent on the anchor since the signature was captured — the regenerate will delete
+/// the file, and the author should revisit whether the divergence still applies. The wording stays
+/// anchor-neutral; each error variant names its own file.
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum AuditSignatureStaleness {
     /// Live chain differs from recorded chain — prettier's pass-K output drifted.
     Drift,
-    /// Prettier is now idempotent on `output_prettier` — chain has collapsed to depth zero.
+    /// Prettier is now idempotent on the anchor — chain has collapsed to depth zero.
     Collapsed,
 }
 
 impl fmt::Display for AuditSignatureStaleness {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         match self {
-            Self::Drift => write!(f, "prettier-chain drift from output_prettier"),
+            Self::Drift => write!(f, "prettier-chain drift"),
             Self::Collapsed => write!(
                 f,
-                "prettier is now idempotent on output_prettier — chain collapsed"
+                "prettier is now idempotent on the anchor — chain collapsed"
             ),
         }
     }
@@ -236,6 +238,20 @@ pub enum ValidationError {
         "prettier output of {0} matches no documented form (output_prettier / prettier_variant_* / variant_* / divergent_variant_*) — prettier may have drifted, or the target is undocumented"
     )]
     UndocumentedPrettierOutput(String),
+
+    // Per-variant chain signature (N12): `audit_signature_<suffix>.txt` pins prettier's
+    // full chain from `unformatted_ours_<suffix>`, the pin for outputs no single-form
+    // marker can express.
+    #[error("{0} is out of date ({1})")]
+    VariantChainSignatureOutdated(String, AuditSignatureStaleness),
+    #[error("{0} is malformed: {1}")]
+    VariantChainSignatureMalformed(String, String),
+    #[error("{0} walk failed: {1}")]
+    VariantChainSignatureWalkFailed(String, String),
+    #[error(
+        "{0} is superseded: prettier's output from its source is now claimed by a documented form or intermediate marker"
+    )]
+    VariantChainSignatureSuperseded(String),
 
     // Render-equivalence (compile arm, authoritative): a whitespace variant
     // (unformatted_* / unformatted_ours_*) renders DIFFERENTLY from input. The
@@ -493,6 +509,21 @@ impl ValidationError {
             Self::UndocumentedPrettierOutput(_) => {
                 "Document prettier's output: add a variant_* / prettier_variant_* / divergent_variant_* (or prettier_intermediate*_*) sibling matching it, or update the existing one if prettier changed"
             }
+            Self::VariantChainSignatureOutdated(_, AuditSignatureStaleness::Drift) => {
+                "Run: deno task fixtures:update:formatted <pattern> (regenerates audit_signature_<suffix>.txt)"
+            }
+            Self::VariantChainSignatureOutdated(_, AuditSignatureStaleness::Collapsed) => {
+                "Prettier now holds the unformatted_ours_* source itself stable — the source is a prettier fixed point, so pin it as a prettier_variant_* / variant_* instead. Run: deno task fixtures:update:formatted <pattern> (deletes the signature)"
+            }
+            Self::VariantChainSignatureMalformed(_, _) => {
+                "Delete and regenerate: deno task fixtures:update:formatted <pattern>"
+            }
+            Self::VariantChainSignatureWalkFailed(_, _) => {
+                "Investigate prettier error or non-converging chain; check the source variant's syntax. Then: deno task fixtures:update:formatted <pattern>"
+            }
+            Self::VariantChainSignatureSuperseded(_) => {
+                "A single-form marker now expresses this output, so the chain pin is redundant. Run: deno task fixtures:update:formatted <pattern> (deletes the signature)"
+            }
             Self::DuplicateUnformattedWithinFixture(_)
             | Self::DuplicatePrettierVariantWithinFixture(_) => {
                 "Remove duplicate files (identical content)"
@@ -598,7 +629,11 @@ impl ValidationError {
             | Self::NormalizationPrettierIntermediateToDivergentVariantNotConverging(_)
             | Self::NormalizationPrettierIntermediateToDivergentVariantMissingSource(_)
             | Self::NormalizationPrettierIntermediateToDivergentVariantNoVariantTarget(_)
-            | Self::UndocumentedPrettierOutput(_) => "Normalization",
+            | Self::UndocumentedPrettierOutput(_)
+            | Self::VariantChainSignatureOutdated(_, _)
+            | Self::VariantChainSignatureMalformed(_, _)
+            | Self::VariantChainSignatureWalkFailed(_, _)
+            | Self::VariantChainSignatureSuperseded(_) => "Normalization",
 
             Self::RenderEquivalenceMismatch(_)
             | Self::RenderEquivalenceTransformMismatch(_)
@@ -649,6 +684,7 @@ pub enum ValidationSuccess {
     PrettierIntermediatesToDivergentVariantConverge(usize), // N7c
     UnformattedPrettierToOutput(usize),                     // N8
     PrettierOutputsPinned(usize),                           // N10
+    VariantChainSignaturesMatch(usize),                     // N12
     PrettierNonconvergenceVerified,                         // F5
     PrettierRejectionVerified,                              // F6
     TsvRejectionVerified,                                   // F7
@@ -720,6 +756,12 @@ impl fmt::Display for ValidationSuccess {
                 write!(
                     f,
                     "{n} unclaimed prettier outputs match documented forms (N10)"
+                )
+            }
+            Self::VariantChainSignaturesMatch(n) => {
+                write!(
+                    f,
+                    "{n} unformatted_ours_* prettier chains match their audit_signature_<suffix>.txt (N12)"
                 )
             }
             Self::PrettierNonconvergenceVerified => {
