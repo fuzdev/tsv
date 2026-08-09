@@ -12,6 +12,15 @@
 //! errors (`napi::Error`); `parse_internal_<lang>` parses without converting
 //! (benchmark-only, AST kept live via `black_box`).
 //!
+//! **Panic contract**: every export carries `#[napi(catch_unwind)]`, and the
+//! addon builds with the workspace `napi` profile (`release` + `panic =
+//! "unwind"`), so a Rust panic — always a tsv bug — surfaces as a thrown JS
+//! error rather than aborting the host process, and the per-thread arenas stay
+//! usable afterwards (`tsv_arena`'s take/park protocol leaves the slot empty
+//! while a call runs, so unwind and abort converge on the same state). The
+//! attribute is inert without the unwinding profile — both halves are required.
+//! Stack overflow is NOT catchable and still aborts the host.
+//!
 //! Built as a `cdylib` and loaded by Node as a `.node` addon. The `format` /
 //! `parse` cargo features gate which entry points are emitted (mirrors
 //! `tsv_ffi` / `tsv_wasm`).
@@ -77,7 +86,7 @@ macro_rules! lang_bindings {
     ) => {
         /// Parse source code and return its public JSON AST as a string.
         #[cfg(feature = "parse")]
-        #[napi(js_name = $parse_js)]
+        #[napi(js_name = $parse_js, catch_unwind)]
         pub fn $parse_fn(source: String) -> napi::Result<String> {
             parse_convert!($lang, convert_ast_json_string, &source)
         }
@@ -85,7 +94,7 @@ macro_rules! lang_bindings {
         /// Parse source and return its JSON AST string **without** per-node `loc`
         /// (the span-only `no-locations` wire). CSS is identical to `$parse_fn`.
         #[cfg(feature = "parse")]
-        #[napi(js_name = $parse_no_loc_js)]
+        #[napi(js_name = $parse_no_loc_js, catch_unwind)]
         pub fn $parse_no_loc_fn(source: String) -> napi::Result<String> {
             parse_convert!($lang, convert_ast_json_string_no_locations, &source)
         }
@@ -94,14 +103,14 @@ macro_rules! lang_bindings {
         /// serialization). Benchmark-only: `black_box` keeps the AST live so the
         /// parse can't be optimized away.
         #[cfg(feature = "parse")]
-        #[napi(js_name = $parse_internal_js)]
+        #[napi(js_name = $parse_internal_js, catch_unwind)]
         pub fn $parse_internal_fn(source: String) -> napi::Result<()> {
             parse_internal!($lang, &source)
         }
 
         /// Format source code and return the formatted string.
         #[cfg(feature = "format")]
-        #[napi(js_name = $format_js)]
+        #[napi(js_name = $format_js, catch_unwind)]
         pub fn $format_fn(source: String) -> napi::Result<String> {
             parse_format!($lang, &source)
         }
@@ -170,7 +179,7 @@ fn napi_goal(goal: &str) -> napi::Result<tsv_ts::Goal> {
 
 /// `parse_typescript` (JSON AST string) against an explicit goal.
 #[cfg(feature = "parse")]
-#[napi(js_name = "parse_typescript_with_goal")]
+#[napi(js_name = "parse_typescript_with_goal", catch_unwind)]
 pub fn parse_typescript_with_goal(source: String, goal: String) -> napi::Result<String> {
     let goal = napi_goal(&goal)?;
     with_ast_arena(|arena| {
@@ -182,7 +191,7 @@ pub fn parse_typescript_with_goal(source: String, goal: String) -> napi::Result<
 
 /// `parse_typescript_no_locations` (span-only JSON AST string) against an explicit goal.
 #[cfg(feature = "parse")]
-#[napi(js_name = "parse_typescript_no_locations_with_goal")]
+#[napi(js_name = "parse_typescript_no_locations_with_goal", catch_unwind)]
 pub fn parse_typescript_no_locations_with_goal(
     source: String,
     goal: String,
@@ -197,7 +206,7 @@ pub fn parse_typescript_no_locations_with_goal(
 
 /// `parse_internal_typescript` (parse-only, no serialization) against an explicit goal.
 #[cfg(feature = "parse")]
-#[napi(js_name = "parse_internal_typescript_with_goal")]
+#[napi(js_name = "parse_internal_typescript_with_goal", catch_unwind)]
 pub fn parse_internal_typescript_with_goal(source: String, goal: String) -> napi::Result<()> {
     let goal = napi_goal(&goal)?;
     with_ast_arena(|arena| {
@@ -206,6 +215,25 @@ pub fn parse_internal_typescript_with_goal(source: String, goal: String) -> napi
         std::hint::black_box(&ast);
         Ok(())
     })
+}
+
+/// Deliberately panic inside the binding — the panic-contract probe.
+///
+/// Compiled only under the test-only `panic_probe` feature (`deno task
+/// test:napi` builds with it; published artifacts never carry it).
+/// `scripts/test_napi.ts` drives it to prove the contract end to end: the panic
+/// unwinds into `catch_unwind`, surfaces as a thrown JS error, and the process
+/// plus the per-thread arenas stay usable afterwards. It panics *inside*
+/// `with_ast_arena` so the take/park recovery is exercised with an arena
+/// genuinely in flight.
+#[cfg(feature = "panic_probe")]
+#[napi(js_name = "__panic_probe", catch_unwind)]
+#[allow(clippy::panic)] // panicking is the export's entire purpose
+pub fn panic_probe() {
+    with_ast_arena(|arena| {
+        let _ = arena.alloc_str("doomed");
+        panic!("tsv_napi panic probe");
+    });
 }
 
 // Drive every entry point in-process so `cargo test` exercises the native
