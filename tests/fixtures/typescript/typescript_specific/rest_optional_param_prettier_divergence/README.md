@@ -10,8 +10,7 @@ type Fn = (...a?: unknown[]) => void;
 ```
 
 **Prettier** strips the `?` on every rest parameter (`(...a?)` → `(...a)`),
-silently deleting a token the source wrote — the same information-loss shape as
-its `import defer` phase-drop.
+silently deleting a token the source wrote.
 
 `(...a?)` is invalid TypeScript (tsc reports **TS1047** "a rest parameter cannot
 be optional"), but that is a *deferred grammar-check* error: tsc's own parser

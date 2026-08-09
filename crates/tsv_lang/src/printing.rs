@@ -143,9 +143,125 @@ pub fn is_same_line(source: &str, prev_end: u32, curr_start: u32) -> bool {
         return false;
     }
 
-    // Check if there's a newline between the positions
-    let between = &source[prev_end..curr_start];
-    !between.contains('\n')
+    // Check if there's a line terminator between the positions
+    !contains_line_terminator(&source[prev_end..curr_start])
+}
+
+/// The byte length of the ECMAScript `LineTerminatorSequence` beginning at
+/// `bytes[i]`, or `None` if none begins there.
+///
+/// The set is `<LF>`, `<CR>`, `<LS>` (U+2028) and `<PS>` (U+2029), with
+/// `<CR><LF>` counting as **one** sequence (ECMAScript §12.3, and acorn's
+/// `lineBreakG`). Every line question in this module goes through this one
+/// predicate rather than testing `'\n'` inline, because a narrower class here is
+/// not a cosmetic difference: the lexers end a `//` comment at *every* one of
+/// these terminators, so a printer that believes only `\n` ends a line places
+/// the comment and the token after it on one output line — and the emitted `//`
+/// then swallows that token, losing code. A wider class is equally unsound (it
+/// would fabricate line breaks inside string and template bodies), so this must
+/// stay exactly the ECMAScript set.
+///
+/// CSS's own terminator set differs (`<LF>`, `<CR>`, `<FF>` — CSS Syntax §3.3);
+/// `tsv_css` shares this table deliberately, since the two sets agree on
+/// everything CSS source realistically contains and the alternative is a second
+/// class to keep right.
+#[inline]
+fn line_terminator_len(bytes: &[u8], i: usize) -> Option<usize> {
+    match bytes[i] {
+        b'\n' => Some(1),
+        b'\r' => Some(if bytes.get(i + 1) == Some(&b'\n') {
+            2
+        } else {
+            1
+        }),
+        // U+2028 / U+2029 are `e2 80 a8` / `e2 80 a9` — the only 0xE2 leads that
+        // are terminators, so the two continuation bytes must both match.
+        0xE2 if bytes.get(i + 1) == Some(&0x80)
+            && matches!(bytes.get(i + 2), Some(0xA8 | 0xA9)) =>
+        {
+            Some(3)
+        }
+        _ => None,
+    }
+}
+
+/// Split `text` into lines on the ECMAScript line-terminator class
+/// ([`line_terminator_len`]) — `str::lines()` with the right class.
+///
+/// `str::lines()` splits on `\n` alone (stripping a trailing `\r` from the line
+/// it yields), so a source whose terminators are lone `<CR>` / `<LS>` / `<PS>`
+/// reads back as a **single** line. That is fine for tsv's own output, which is
+/// always LF, and wrong for anything scanning an author's *input* — a blank line
+/// the author spelled `\r\r` disappears, and a tool comparing input against
+/// output then reports the surviving blank as one the formatter invented.
+///
+/// Exported for exactly those input-scanning consumers (`tsv_debug`'s
+/// blank-fabrication audit); a second copy of the class is the drift this whole
+/// module exists to prevent.
+pub fn ecmascript_lines(text: &str) -> impl Iterator<Item = &str> {
+    let bytes = text.as_bytes();
+    let mut pos = 0usize;
+    let mut done = false;
+    core::iter::from_fn(move || {
+        // Matches `str::lines()`: no trailing empty line for a trailing
+        // terminator, and no items at all for an empty string.
+        if done || pos == bytes.len() {
+            return None;
+        }
+        let mut i = pos;
+        while i < bytes.len() {
+            if let Some(len) = line_terminator_len(bytes, i) {
+                let line = &text[pos..i];
+                pos = i + len;
+                done = pos == bytes.len();
+                return Some(line);
+            }
+            i += 1;
+        }
+        let line = &text[pos..];
+        done = true;
+        Some(line)
+    })
+}
+
+/// Whether `text` holds any ECMAScript line terminator ([`line_terminator_len`]).
+#[inline]
+fn contains_line_terminator(text: &str) -> bool {
+    let bytes = text.as_bytes();
+    // `\n` and `\r` are the overwhelmingly common cases and `memchr`-free
+    // `iter().position()` over them auto-vectorizes; the 0xE2 lead is checked in
+    // the same pass since a separate scan would cost a second walk.
+    (0..bytes.len()).any(|i| line_terminator_len(bytes, i).is_some())
+}
+
+/// Whether `bytes[i]` is the LAST byte of an ECMAScript line terminator — the
+/// backward-scan form of [`line_terminator_len`], for cursors walking towards a
+/// line start. `<LF>` answers for `<CR><LF>` too, since the pair ends on it.
+#[inline]
+fn ends_line_terminator(bytes: &[u8], i: usize) -> bool {
+    match bytes[i] {
+        b'\n' | b'\r' => true,
+        // The final byte of `<LS>` / `<PS>` (`e2 80 a8` / `e2 80 a9`).
+        0xA8 | 0xA9 => i >= 2 && bytes[i - 2] == 0xE2 && bytes[i - 1] == 0x80,
+        _ => false,
+    }
+}
+
+/// The number of ECMAScript line terminators in `text`, counting `<CR><LF>` once.
+fn count_line_terminators(text: &str) -> usize {
+    let bytes = text.as_bytes();
+    let mut count = 0;
+    let mut i = 0;
+    while i < bytes.len() {
+        match line_terminator_len(bytes, i) {
+            Some(len) => {
+                count += 1;
+                i += len;
+            }
+            None => i += 1,
+        }
+    }
+    count
 }
 
 /// Check if two spans are on the same line
@@ -235,9 +351,8 @@ pub fn has_blank_line_between(source: &str, prev_end: u32, curr_start: u32) -> b
         return false;
     }
 
-    // Check if there are 2+ newlines (blank line) between the positions
-    let between = &source[prev_end..curr_start];
-    between.matches('\n').count() >= 2
+    // Check if there are 2+ line terminators (blank line) between the positions
+    count_line_terminators(&source[prev_end..curr_start]) >= 2
 }
 
 /// Check if there's a truly blank line between two positions in source.
@@ -274,21 +389,26 @@ pub fn has_blank_line_between_strict(source: &str, prev_end: u32, curr_start: u3
     }
 
     let between = &source[prev_end..curr_start];
+    let bytes = between.as_bytes();
     let mut found_first_newline = false;
     let mut line_start = 0;
 
-    for (i, byte) in between.bytes().enumerate() {
-        if byte == b'\n' {
-            if found_first_newline {
-                // Check if the line between previous newline and this one is blank
-                let line = &between[line_start..i];
-                if line.bytes().all(|b| b == b' ' || b == b'\t' || b == b'\r') {
-                    return true;
-                }
+    let mut i = 0;
+    while i < bytes.len() {
+        let Some(len) = line_terminator_len(bytes, i) else {
+            i += 1;
+            continue;
+        };
+        if found_first_newline {
+            // Check if the line between previous terminator and this one is blank
+            let line = &between[line_start..i];
+            if line.bytes().all(|b| b == b' ' || b == b'\t') {
+                return true;
             }
-            found_first_newline = true;
-            line_start = i + 1;
         }
+        found_first_newline = true;
+        i += len;
+        line_start = i;
     }
 
     false
@@ -329,7 +449,7 @@ pub fn has_newline_between(source: &str, start: u32, end: u32) -> bool {
         return false;
     }
 
-    source[start..end].contains('\n')
+    contains_line_terminator(&source[start..end])
 }
 
 //
@@ -518,9 +638,20 @@ pub fn build_line_breaks_into(source: &str, breaks: &mut Vec<u32>) {
     // chain (a no-op once the parked table is warm). Capacity-only — never
     // affects the recorded values.
     breaks.reserve(source.len() / 32);
-    for (pos, ch) in source.bytes().enumerate() {
-        if ch == b'\n' {
-            breaks.push(pos as u32);
+    let bytes = source.as_bytes();
+    let mut i = 0;
+    while i < bytes.len() {
+        match line_terminator_len(bytes, i) {
+            // The recorded offset is the sequence's LAST byte, which is what the
+            // LF-only builder recorded for both `\n` and `\r\n`. Every consumer
+            // (`is_same_line_fast`, `has_blank_line_between_fast`) reads the table
+            // as "one entry per line ending", so a multi-byte sequence must push
+            // exactly once — two entries for a `\r\n` would read as a blank line.
+            Some(len) => {
+                breaks.push((i + len - 1) as u32);
+                i += len;
+            }
+            None => i += 1,
         }
     }
 }
@@ -555,9 +686,13 @@ pub fn build_line_breaks_into(source: &str, breaks: &mut Vec<u32>) {
 pub fn strip_comment_indentation(source: &str, content: &str, comment_start: u32) -> String {
     let comment_start = comment_start as usize;
 
-    // Find start of line where comment begins
+    // Find start of line where comment begins. Walking back a byte at a time is
+    // safe for the multi-byte terminators too: their trailing bytes (0xA8/0xA9,
+    // 0x80) are UTF-8 continuations, so the scan only stops once it reaches the
+    // sequence's own last byte.
+    let bytes = source.as_bytes();
     let mut line_start = comment_start;
-    while line_start > 0 && source.as_bytes()[line_start - 1] != b'\n' {
+    while line_start > 0 && !ends_line_terminator(bytes, line_start - 1) {
         line_start -= 1;
     }
 
@@ -998,6 +1133,154 @@ mod tests {
                     "input {s:?} tab_width {tw}"
                 );
             }
+        }
+    }
+
+    /// The four ECMAScript `LineTerminatorSequence`s, as `(source form, byte length)`.
+    const TERMINATORS: [(&str, usize); 5] = [
+        ("\n", 1),
+        ("\r", 1),
+        ("\r\n", 2),
+        ("\u{2028}", 3),
+        ("\u{2029}", 3),
+    ];
+
+    #[test]
+    fn test_every_line_terminator_ends_a_line() {
+        // The whole class must answer alike: the LF-only reading put a `//`
+        // comment and the token after a `<CR>` / `<LS>` / `<PS>` on one output
+        // line, where the emitted comment swallowed that token.
+        for (term, _) in TERMINATORS {
+            let source = format!("a{term}b");
+            let b = (1 + term.len()) as u32;
+            assert!(!is_same_line(&source, 1, b), "is_same_line across {term:?}");
+            assert!(
+                has_newline_between(&source, 1, b),
+                "has_newline_between across {term:?}"
+            );
+
+            let breaks = build_line_breaks(&source);
+            assert!(
+                !is_same_line_fast(&breaks, 1, b),
+                "is_same_line_fast across {term:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_line_break_table_records_each_terminator_once() {
+        // One entry per line ending, at the sequence's LAST byte. A `\r\n`
+        // recorded twice would read as a blank line to every consumer.
+        for (term, len) in TERMINATORS {
+            let source = format!("a{term}b");
+            assert_eq!(
+                build_line_breaks(&source),
+                vec![len as u32],
+                "table for {term:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_blank_line_needs_two_terminators_of_any_kind() {
+        for (term, len) in TERMINATORS {
+            let one = format!("a{term}b");
+            let two = format!("a{term}{term}b");
+            let end_one = (1 + term.len()) as u32;
+            let end_two = (1 + 2 * term.len()) as u32;
+
+            assert!(!has_blank_line_between(&one, 1, end_one), "one {term:?}");
+            assert!(has_blank_line_between(&two, 1, end_two), "two {term:?}");
+            assert!(
+                !has_blank_line_between_strict(&one, 1, end_one),
+                "strict one {term:?}"
+            );
+            assert!(
+                has_blank_line_between_strict(&two, 1, end_two),
+                "strict two {term:?}"
+            );
+
+            let breaks_two = build_line_breaks(&two);
+            assert_eq!(breaks_two.len(), 2, "two {term:?} = two entries");
+            assert!(
+                has_blank_line_between_fast(&breaks_two, 1, end_two),
+                "fast two {term:?}"
+            );
+
+            // `<CR><LF>` is the trap: one sequence, two bytes, never a blank line.
+            let _ = len;
+        }
+    }
+
+    #[test]
+    fn test_lone_cr_and_ls_are_not_blank_line_filler() {
+        // A `\r` inside a "blank" line can only be a terminator in its own right,
+        // so the filler test never sees one — `a\r\rb` is a blank line, not a
+        // single CRLF-ish break with `\r` padding.
+        assert!(has_blank_line_between_strict("a\r\rb", 1, 3));
+        assert!(!has_blank_line_between_strict("a\r\nb", 1, 3));
+        // Real filler (spaces / tabs) still makes the line blank.
+        assert!(has_blank_line_between_strict("a\n \t\nb", 1, 5));
+        assert!(!has_blank_line_between_strict("a\n x \nb", 1, 6));
+    }
+
+    #[test]
+    fn test_ecmascript_lines_matches_str_lines_on_lf_input() {
+        // The whole point is a WIDER class, so the narrow reference must still
+        // agree everywhere it is correct — otherwise the widening also changed
+        // the LF behavior every existing consumer depends on.
+        for s in [
+            "",
+            "a",
+            "a\n",
+            "a\nb",
+            "a\n\nb",
+            "\n",
+            "\n\n",
+            "\na",
+            "a\n\n\n",
+            "a\r\nb\r\n",
+        ] {
+            let got: Vec<&str> = ecmascript_lines(s).collect();
+            let want: Vec<&str> = s.lines().collect();
+            assert_eq!(got, want, "ecmascript_lines vs str::lines on {s:?}");
+        }
+    }
+
+    #[test]
+    fn test_ecmascript_lines_splits_the_terminators_str_lines_misses() {
+        // `str::lines()` reads each of these as ONE line; that is the blindness
+        // that made the fabrication audit report an authored blank as invented.
+        for (term, _) in TERMINATORS {
+            let s = format!("a{term}{term}b");
+            assert_eq!(
+                ecmascript_lines(&s).collect::<Vec<_>>(),
+                vec!["a", "", "b"],
+                "blank run spelled with {term:?}"
+            );
+        }
+    }
+
+    #[test]
+    fn test_a_bare_0xe2_lead_is_not_a_terminator() {
+        // `<LS>`/`<PS>` are the only 0xE2 leads that terminate a line; every other
+        // three-byte character starting 0xE2 (here U+2010 HYPHEN, `e2 80 90`)
+        // must not, or the class fabricates breaks inside ordinary text.
+        let source = "a\u{2010}b";
+        assert!(is_same_line(source, 1, 4));
+        assert!(build_line_breaks(source).is_empty());
+    }
+
+    #[test]
+    fn test_strip_comment_indentation_finds_line_start_after_any_terminator() {
+        for (term, _) in TERMINATORS {
+            let source = format!("x{term}\t/* a\n\t   b */");
+            let comment_start = (1 + term.len() + 1) as u32;
+            assert_eq!(
+                strip_comment_indentation(&source, " a\n\t   b ", comment_start),
+                " a\n   b ",
+                "indent stripped after {term:?}"
+            );
         }
     }
 

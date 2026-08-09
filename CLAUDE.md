@@ -534,7 +534,7 @@ and validation rules (F/S/R/D): ./docs/fixture_overview.md.
 **Quick Pattern Selection:**
 
 - **Parser matches Svelte**: `input.svelte` + `expected.json`
-- **Parser differs intentionally**: Add `expected_ours.json` + `expected_svelte.json` (requires `_svelte_divergence` suffix)
+- **Parser differs intentionally**: Add `expected_ours.json` + `expected_svelte.json` (requires `_svelte_divergence` suffix) — including when the canonical parser **rejects** and only tsv parses (a tsv over-acceptance), where `expected_svelte.json` is `{"error": "failed to parse"}`
 - **Formatter matches prettier**: Add `unformatted_*.*` variants
 - **Formatter differs intentionally**: Add `output_prettier.*` (requires `_prettier_divergence` suffix)
 - **Prettier has stable variants (ours normalizes)**: Add `prettier_variant_*.*` files (requires `_prettier_divergence` suffix)

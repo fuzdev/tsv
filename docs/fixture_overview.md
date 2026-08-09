@@ -207,6 +207,8 @@ No exceptions — save one deliberate opt-out: a `tsv_rejects.txt` fixture, whos
 Need to test parser?
 ├─ Our parser matches Svelte → use expected.json (default)
 ├─ Intentional AST difference (both parsers accept) → use expected_ours.json + expected_svelte.json
+├─ The canonical parser REJECTS but tsv accepts (a tsv over-acceptance) → the same pair, with
+│    expected_svelte.json = {"error": "failed to parse"} (see below)
 └─ tsv REJECTS but the canonical parser ACCEPTS (a tsv over-rejection) → tsv_rejects.txt + expected_svelte.json (F7/S20)
 ```
 

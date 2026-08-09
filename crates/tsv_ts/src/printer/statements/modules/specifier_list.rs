@@ -101,10 +101,20 @@ impl<'a> Printer<'a> {
     ) -> u32 {
         let is_type = decl.import_kind == internal::ImportKind::Type;
         let base = self.module_header_end(is_type, decl.span.start, search_end);
-        // Skip the phase keyword (`source `/`defer `) for the import-phase proposals
-        // so the default-binding / namespace comment scan starts after it. Derives
-        // from `ImportPhase::as_str` (single source of truth) plus its trailing space.
-        base + decl.phase.as_str().map_or(0, |kw| kw.len() as u32 + 1)
+        // Skip the phase keyword (`source`/`defer`) for the import-phase proposals so
+        // the default-binding / namespace comment scan starts after it.
+        //
+        // Located by SCANNING, for the same reason `type` is (see `module_header_end`):
+        // adding `kw.len() + 1` assumes the keyword sits exactly one space past
+        // `import`, which a comment in the `import`→phase gap falsifies. The stale
+        // offset then lands mid-gap, so the specifier scan starts BEFORE a comment the
+        // phase gap already emitted and prints it twice.
+        match decl.phase.as_str() {
+            Some(kw) => self
+                .find_keyword_in_range(base, search_end, kw)
+                .map_or(base, |start| start + kw.len() as u32),
+            None => base,
+        }
     }
 
     /// Position just past the leading keyword(s) of an export named declaration:

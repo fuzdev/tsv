@@ -647,8 +647,19 @@ impl<'a> Printer<'a> {
         // Phase keyword for the import-phase proposals: `import source …` (binding)
         // / `import defer …` (namespace). Mutually exclusive with `type`. The
         // keyword spelling is `ImportPhase::as_str`'s — the single source of truth.
+        //
+        // The `import`→phase-keyword gap is scanned for exactly the same reason the
+        // `type` branch below scans its own: it is a position an author can comment in,
+        // and emitting the keyword as a bare fixed text scans none of it, so the comment
+        // reaches no emitter and is DROPPED. Prettier relocates a comment here past the
+        // keyword; tsv preserves it, matching what `type` already does in this same
+        // header slot — `phase_keyword_comment_svelte_prettier_divergence`.
         if let Some(kw) = decl.phase.as_str() {
-            parts.push(d.text(kw));
+            let kw_end = decl.span.start + MODULE_KW_LEN;
+            let phase_start = self
+                .find_keyword_in_range(kw_end, decl.source.span.start, kw)
+                .unwrap_or(kw_end);
+            parts.push(self.gap_comment_continuation_tail(kw_end, phase_start, d.text(kw)));
             parts.push(d.text(" "));
         }
 

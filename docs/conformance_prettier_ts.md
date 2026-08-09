@@ -49,7 +49,7 @@ tsv treats these like any other function call—no special-casing for module pat
 
 **Empty-object comment bracket spacing**: An empty object whose sole body content is an interior comment keeps its bracket spacing in tsv — `{ /* c */ }` — where Prettier 3.9.5 tightens it to `{/* c */}`. The padding is the only difference; the comment itself stays exactly where the author wrote it in both formatters. tsv applies bracket spacing uniformly: any brace body kept on one line gets the ` … ` padding, a comment-only body included (a comment is content), so it is not special-cased on emptiness — a truly empty `{}`, with no content to space, stays tight in both. Bracket spacing is hardcoded in tsv, so this is a fixed design choice, not a configurable gap. The rule holds across every brace position, each pinned by a fixture: an object literal ([empty_block_comment](../tests/fixtures/typescript/expressions/objects/empty_block_comment_prettier_divergence/)), a destructuring pattern ([empty_comment](../tests/fixtures/typescript/expressions/destructuring/empty_comment_prettier_divergence/)), an enum body ([empty_comment](../tests/fixtures/typescript/declarations/enum/body_empty_comment_prettier_divergence/)), a type-alias body ([literal_body_empty](../tests/fixtures/typescript/types/comments/literal_body_empty_prettier_divergence/) — a line-comment body breaks multiline in both, no divergence there), a union/intersection member ([union_empty_object_member](../tests/fixtures/typescript/types/union_empty_object_member_prettier_divergence/) — a bare-`{}` member with no comment agrees in both and lives in the sibling non-divergence fixture), and a call/`new` type argument ([call_type_arg_empty_comment](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_prettier_divergence/)). All six route through the same builder (`build_empty_braces_inline_with_comments_doc`), so the padding is decided in one place. The type-argument case also pins a convergence: Prettier ≤3.9.4 broke a comment-bearing curly type argument's whole `<…>` list onto its own indented lines while tsv hugged it (`fn<{ … }>()`); Prettier 3.9.5 now hugs like tsv, so the only remaining difference there is the same block-comment bracket spacing (a line-comment body hugs in both).
 
-**Optional rest parameter `?`**: A rest parameter written with an optional `?` marker (`(...a?)`, in a value signature, an interface call / construct signature, or a function type) is invalid TypeScript — tsc reports **TS1047** "a rest parameter cannot be optional". But that is a *deferred grammar-check* error, not a parse rejection: tsc's own parser stores the `?` on the parameter node regardless of the `...` and reports TS1047 later during checking (`checker.ts` `checkGrammarParameterList`), exactly like the already-deferred **TS1051** (`set x(a?)`). Per tsv's permissive-parser stance it accepts the syntax and preserves the token; acorn-typescript's AST likewise carries `optional: true` on the `RestElement` (never on `argument`). Prettier instead **strips** the `?` on every rest parameter (`(...a?)` → `(...a)`), silently deleting a token the source wrote — the same information-loss shape as its `import defer` phase-drop below. tsv preserves the author's `?`; plain rest (`...b`) is unaffected. A comment in the binding→`?` gap (`(...a /* c */?)`) stays before the marker in both formatters — the rest parameter takes the same comment landings the plain identifier parameter does — so the dropped `?` stays the only difference; prettier is non-idempotent on its own output there, pinned by the fixture's `audit_signature.txt`. Fixture: [rest_optional_param](../tests/fixtures/typescript/typescript_specific/rest_optional_param_prettier_divergence/).
+**Optional rest parameter `?`**: A rest parameter written with an optional `?` marker (`(...a?)`, in a value signature, an interface call / construct signature, or a function type) is invalid TypeScript — tsc reports **TS1047** "a rest parameter cannot be optional". But that is a *deferred grammar-check* error, not a parse rejection: tsc's own parser stores the `?` on the parameter node regardless of the `...` and reports TS1047 later during checking (`checker.ts` `checkGrammarParameterList`), exactly like the already-deferred **TS1051** (`set x(a?)`). Per tsv's permissive-parser stance it accepts the syntax and preserves the token; acorn-typescript's AST likewise carries `optional: true` on the `RestElement` (never on `argument`). Prettier instead **strips** the `?` on every rest parameter (`(...a?)` → `(...a)`), silently deleting a token the source wrote. tsv preserves the author's `?`; plain rest (`...b`) is unaffected. A comment in the binding→`?` gap (`(...a /* c */?)`) stays before the marker in both formatters — the rest parameter takes the same comment landings the plain identifier parameter does — so the dropped `?` stays the only difference; prettier is non-idempotent on its own output there, pinned by the fixture's `audit_signature.txt`. Fixture: [rest_optional_param](../tests/fixtures/typescript/typescript_specific/rest_optional_param_prettier_divergence/).
 
 **ES2015+ identifier property keys**: A property key that is a valid identifier renders unquoted (`{ 𐊧: 1 }`, not `{ '𐊧': 1 }`). tsv's identifier test uses the Unicode `ID_Start`/`ID_Continue` sets the ECMAScript grammar names (ecma262 §12.7 — `IdentifierName :: IdentifierStart`, `IdentifierStart :: UnicodeIDStart`; a well-formed `IdentifierName` is a `LiteralPropertyName` per §13.2.5), so it unquotes every key valid in **ES2015+**. Prettier unquotes only keys valid under **ES5** (a frozen legacy table), so it keeps an astral letter like `𐊧` (U+102A7 CARIAN LETTER, a valid `ID_Start` absent from ES5's table) quoted. The rule is position-scoped and never over-unquotes: object-literal keys, type-literal members, and interface members unquote; a key that is not a valid identifier (`'0a'`) stays quoted. tsv matches Biome. Fixture: [property_key_es2015_ident](../tests/fixtures/typescript/expressions/objects/property_key_es2015_ident_prettier_divergence/).
 
@@ -61,23 +61,32 @@ The **source-phase imports** and **import defer** proposals (`import source x
 from 'mod'` / `import.source('mod')`, `import defer * as ns from 'mod'` /
 `import.defer('mod')`) are a tsv-native parser divergence — acorn rejects them, so
 they are **not** in the "Prettier rejects valid input" set above (that set is keyed
-on acorn *accepting* the input). Prettier diverges two ways:
+on acorn *accepting* the input). Prettier diverges one way:
 
-- **`import defer` — phase dropped (information loss).** Prettier formats `import
-  defer * as ns from 'mod'` to `import * as ns from 'mod'`, silently deleting the
-  `defer` phase keyword and changing the import's semantics. tsv preserves it.
 - **`import source` — printer throws.** Prettier's `typescript` parser reads
   `source` as a binding name and throws (`'=' expected`). tsv parses and keeps the
   statement stable.
 
+⚠️ **A second divergence used to be listed here and is GONE — `import defer` phase
+drop.** Prettier once formatted `import defer * as ns from 'mod'` to `import * as ns
+from 'mod'`, deleting the phase keyword and changing the import's semantics. At the
+pinned prettier (3.9.6) it preserves the phase exactly, so the entry was a standing
+false claim and is deleted rather than reworded. Two lessons the deletion is worth
+keeping for: the entry was **documented-only by deliberate choice** — a live check was
+declined as too costly — and a documented-only claim about an external oracle has no
+gate, so it rots silently; and it rotted *behind* the "none of these can be fixtures"
+belief below, which is what kept the fixture that would have caught it from existing.
+
 The dynamic `import.source(…)` / `import.defer(…)` forms have no divergence —
-prettier formats them identically to tsv. None of these can be fixtures (acorn,
-the fixture parse oracle, rejects the syntax; prettier, the format oracle, drops or
-throws), so the printer's round-trips are covered by `tests/import_phase.rs` and
-the parser by the test262 suite. The `import source` throw is also live-pinned in
-`tests/prettier_error_bugs.rs`; the `import defer` phase-drop is documented-only
-(a live "prettier succeeds with wrong output" check would gate the suite on a
-sidecar call under load). See
+prettier formats them identically to tsv. ⚠️ **"None of these can be fixtures" was
+also wrong** and is corrected in
+[conformance_svelte.md §Import-phase proposals](./conformance_svelte.md#import-phase-proposals):
+a canonical-parser *rejection* is representable (`expected_ours.json` +
+`expected_svelte.json` holding the parse-failure marker), and
+[phase_keyword_comment](../tests/fixtures/typescript/modules/imports/phase_keyword_comment_svelte_prettier_divergence/)
+is one. The remaining printer round-trips stay in `tests/import_phase.rs` and the
+parser in the test262 suite. The `import source` throw is live-pinned in
+`tests/prettier_error_bugs.rs`. See
 [conformance_svelte.md §Import-phase proposals](./conformance_svelte.md#import-phase-proposals)
 and [conformance_test262.md](./conformance_test262.md). **Upstream candidate**:
 prettier import-phase support — promote to fixtures once it lands.

@@ -12,7 +12,10 @@ real move in a number is a deliberate, visible edit.
 
 - **`benches/js/lib/gate_counts.ts`** — every Deno-side count, one per consumer:
   the fixtures gates (`scanned` + `both_accept`), ts-repo (`scanned` +
-  `accept_parity`), `corpus:compare:parse --all` (minimum per-language `compared`
+  `accept_parity` + `over_acceptance` — the last one pins the WIDENING axis the
+  other two structurally cannot see, since they fix only how many tsc-VALID files
+  tsv accepts and leave the split of the rest free),
+  `corpus:compare:parse --all` (minimum per-language `compared`
   + EXACT per-language tsv-side parse-failure counts), `corpus:compare:format
   --all` (minimum per-language `match` + EXACT per-language `unknown`/`partial`
   counts — the un-triaged divergence backlog is pinned, so a new unexplained

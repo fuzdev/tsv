@@ -3,27 +3,27 @@
 	// clarity parens.
 
 	// Nullish `??` in the alternate
-	const a = cond
-		? x
-		: // c
-			(y ?? z);
+	const a = cond ? x : (
+		// c
+		y ?? z
+	);
 
 	// Nullish `??` in the consequent
-	const b = cond
-		? // c
-			(y ?? z)
-		: w;
+	const b = cond ? (
+		// c
+		y ?? z
+	) : w;
 
 	// `as` cast in the consequent
-	const c = cond
-		? // c
-			(x as T)
-		: w;
+	const c = cond ? (
+		// c
+		x as T
+	) : w;
 
 	// A trailing comment beside the leading one survives too — in the alternate,
 	// where the paren shell is the construct the trailing comment sits inside
-	const d = cond
-		? x
-		: // c
-			(y ?? z); // t
+	const d = cond ? x : (
+		// c
+		y ?? z // t
+	);
 </script>
