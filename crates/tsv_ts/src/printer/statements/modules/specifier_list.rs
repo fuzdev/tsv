@@ -581,7 +581,7 @@ impl<'a> Printer<'a> {
         d.concat(&[
             d.text("{"),
             d.concat(&brace_line_prefix),
-            d.indent(d.concat(&[d.hardline(), inner_doc])),
+            d.indent_hardline(inner_doc),
             d.hardline(),
             d.text("}"),
         ])

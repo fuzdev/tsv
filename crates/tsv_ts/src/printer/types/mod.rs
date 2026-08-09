@@ -553,7 +553,7 @@ impl<'a> Printer<'a> {
                     }
                     inner.push(index_doc);
                     self.push_trailing_comments_in_range(&mut inner, gap_start, i.span.end);
-                    parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&inner)])));
+                    parts.push(d.indent_hardline(d.concat(&inner)));
                     parts.push(d.hardline());
                 } else {
                     if let Some(c) = index_comments {
@@ -1090,7 +1090,7 @@ impl<'a> Printer<'a> {
             // Line / own-line comments force the parens to break across lines.
             d.concat(&[
                 d.text("import("),
-                d.indent(d.concat(&[d.hardline(), inner])),
+                d.indent_hardline(inner),
                 d.hardline(),
                 d.text(")"),
             ])
@@ -1286,7 +1286,7 @@ impl<'a> Printer<'a> {
             self.push_trailing_comments_in_range(&mut inner, inner_end, paren_close);
             return d.concat(&[
                 d.text("("),
-                d.indent(d.concat(&[d.hardline(), d.concat(&inner)])),
+                d.indent_hardline(d.concat(&inner)),
                 d.hardline(),
                 d.text(")"),
             ]);

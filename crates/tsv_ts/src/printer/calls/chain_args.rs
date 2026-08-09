@@ -466,7 +466,7 @@ fn build_chain_args_force_expand(
             parts.push(d.text(prefix));
             parts.push(sig_doc);
             parts.push(d.text(" =>"));
-            parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
+            parts.push(d.indent_hardline(body_doc));
             parts.push(d.hardline());
             parts.push(d.text(")"));
             return d.concat(&parts);
@@ -616,7 +616,7 @@ fn build_chain_args_force_expand(
     // No trailing comma after the last arg (trailingComma: 'none') — the last-arg
     // comment emit trails same-line comments after the arg and emits no comma, so
     // nothing is appended here.
-    parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&arg_parts)])));
+    parts.push(d.indent_hardline(d.concat(&arg_parts)));
     parts.push(d.hardline());
     parts.push(d.text(")"));
     d.concat(&parts)
@@ -683,7 +683,7 @@ fn build_chain_args_single(
             d.text(prefix),
             sig_doc,
             d.text(" =>"),
-            d.indent(d.concat(&[d.hardline(), body_doc])),
+            d.indent_hardline(body_doc),
             d.hardline(),
             d.text(")"),
         ]);
@@ -751,7 +751,7 @@ fn build_chain_args_single(
             d.text(prefix),
             sig_doc,
             d.text(" =>"),
-            d.indent(d.concat(&[d.hardline(), body_doc])),
+            d.indent_hardline(body_doc),
             d.hardline(),
             d.text(")"),
         ]);
@@ -763,7 +763,7 @@ fn build_chain_args_single(
                 d.hardline(),
                 sig_doc,
                 d.text(" =>"),
-                d.indent(d.concat(&[d.hardline(), body_doc])),
+                d.indent_hardline(body_doc),
             ])),
             d.hardline(),
             d.text(")"),
@@ -893,7 +893,7 @@ fn build_chain_args_single(
     if template_on_own_line {
         let arg_doc = printer.build_expression_doc(arg);
         parts.push(d.text(prefix));
-        parts.push(d.indent(d.concat(&[d.hardline(), arg_doc])));
+        parts.push(d.indent_hardline(arg_doc));
         parts.push(d.hardline());
         parts.push(d.text(")"));
         return d.concat(&parts);
@@ -924,7 +924,7 @@ fn build_chain_args_single(
     {
         let state_expand = d.concat(&[
             d.text(prefix),
-            d.indent(d.concat(&[d.hardline(), arg_with_comments])),
+            d.indent_hardline(arg_with_comments),
             d.hardline(),
             d.text(")"),
         ]);
@@ -1224,7 +1224,7 @@ fn build_chain_args_multi(
             }
             all_parts.push(second_arg_doc);
             parts.push(d.text(prefix));
-            parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&all_parts)])));
+            parts.push(d.indent_hardline(d.concat(&all_parts)));
             parts.push(d.hardline());
             parts.push(d.text(")"));
             return d.concat(&parts);

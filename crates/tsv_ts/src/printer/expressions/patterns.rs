@@ -718,7 +718,7 @@ impl<'a> Printer<'a> {
         let mut result_parts: DocBuf = smallvec![
             d.text("{"),
             d.concat(&brace_line_prefix),
-            d.indent(d.concat(&[d.hardline(), d.concat(&prop_parts)])),
+            d.indent_hardline(d.concat(&prop_parts)),
             d.hardline(),
             d.text("}"),
         ];
@@ -1127,7 +1127,7 @@ impl<'a> Printer<'a> {
         let mut result_parts: DocBuf = smallvec![
             d.text("["),
             d.concat(&bracket_line_prefix),
-            d.indent(d.concat(&[d.hardline(), d.concat(&parts)])),
+            d.indent_hardline(d.concat(&parts)),
             d.hardline(),
             d.text("]"),
         ];

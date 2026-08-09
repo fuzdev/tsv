@@ -1,0 +1,82 @@
+# Auto-generated prettier chain signature. Do not edit manually.
+# Regenerate: deno task fixtures:update:formatted <pattern>
+#
+# Each %%PASS=N%% section is exactly prettier^N(output_prettier.<ext>).
+# This file exists when prettier is non-idempotent on output_prettier.* — it pins
+# the full chain so the audit recognizes the case and the validator catches drift.
+# See docs/fixture_overview.md (rule F4) and crates/tsv_debug/src/fixtures/audit_signature.rs.
+
+%%PASS=2%%
+<script lang="ts">
+	// Line comment between the namespace header and the body `{` — `{` drops to the next line
+	namespace N1 {
+		// c1
+		const a = 1;
+	}
+
+	// Empty body — the collapsed braces still drop below the comment
+	namespace N2 {} // c2
+
+	// Multiple line comments, each kept on its own line (not merged)
+	namespace N3 { // c4 // c3
+		const b = 2;
+	}
+
+	// `module` takes the same rule
+	module M1 {
+		// c5
+		const c = 3;
+	}
+
+	// `declare global` — `global` is both keyword and name, so the gap follows it
+	declare global {} // c6
+
+	// A dotted name — the gap is after the innermost segment
+	namespace N4.Inner {
+		// c7
+		const d = 4;
+	}
+
+	// A single-line block comment collapses onto the header line and `{` hugs it
+	namespace N5 /* c8 */ {
+		const e = 5;
+	}
+</script>
+
+%%PASS=3 (fixed point)%%
+<script lang="ts">
+	// Line comment between the namespace header and the body `{` — `{` drops to the next line
+	namespace N1 {
+		// c1
+		const a = 1;
+	}
+
+	// Empty body — the collapsed braces still drop below the comment
+	namespace N2 {} // c2
+
+	// Multiple line comments, each kept on its own line (not merged)
+	namespace N3 {
+		// c4 // c3
+		const b = 2;
+	}
+
+	// `module` takes the same rule
+	module M1 {
+		// c5
+		const c = 3;
+	}
+
+	// `declare global` — `global` is both keyword and name, so the gap follows it
+	declare global {} // c6
+
+	// A dotted name — the gap is after the innermost segment
+	namespace N4.Inner {
+		// c7
+		const d = 4;
+	}
+
+	// A single-line block comment collapses onto the header line and `{` hugs it
+	namespace N5 /* c8 */ {
+		const e = 5;
+	}
+</script>

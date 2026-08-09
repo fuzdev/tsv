@@ -15,6 +15,7 @@ use crate::printer::HeritageKeyword;
 use crate::printer::Printer;
 use crate::printer::class_expr_has_decorators;
 use smallvec::smallvec;
+use tsv_lang::Span;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
 
@@ -321,6 +322,34 @@ impl<'a> Printer<'a> {
         } else {
             d.text(" ")
         }
+    }
+
+    /// A braced-body declaration's header→`{` gap, answered in one call: the pre-`{` doc
+    /// (the gap's comments plus the separator) and the format-ignore verdict for the body.
+    ///
+    /// ⚠️ The two answers must come from **one** resolution of the gap. The header needs
+    /// it to keep an honored directive on its own line — a header-trailing placement is
+    /// inert, so following the ordinary relocation would lose the freeze on tsv's own
+    /// second pass — and the body needs the span to emit verbatim. Resolving it twice is
+    /// two sources of truth for one question.
+    ///
+    /// `interface`, `enum` and `namespace`/`module` take this. The **class** resolves the
+    /// same pair by hand, because its header is assembled inside a group
+    /// ([`Printer::build_class_header_doc`]) and the verdict has to travel there as
+    /// `ClassHeaderOptions::body_frozen`.
+    ///
+    /// A `body` span whose `start` precedes `header_end` — no `{` where one was expected —
+    /// yields the bare `" "` and no freeze: both lookups read the gap as a source range,
+    /// and an inverted range holds nothing.
+    pub(in crate::printer) fn build_declaration_pre_body_doc(
+        &self,
+        header_end: u32,
+        body: Span,
+    ) -> (DocId, Option<Span>) {
+        let frozen = self.gap_frozen_span(header_end, body);
+        let pre_body =
+            self.build_header_pre_body_doc(true, header_end, body.start, frozen.is_some());
+        (pre_body, frozen)
     }
 
     /// Assemble the class header and wrap it in the header group.

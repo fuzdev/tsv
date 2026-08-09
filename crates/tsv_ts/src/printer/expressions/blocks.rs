@@ -149,7 +149,7 @@ impl<'a> Printer<'a> {
                 }
                 return d.concat(&[
                     d.text("{"),
-                    d.indent(d.concat(&[d.hardline(), d.concat(&all_content)])),
+                    d.indent_hardline(d.concat(&all_content)),
                     d.hardline(),
                     d.text("}"),
                 ]);
@@ -214,7 +214,7 @@ impl<'a> Printer<'a> {
         d.concat(&[
             d.text("{"),
             d.concat(&brace_line_prefix),
-            d.indent(d.concat(&[d.hardline(), d.concat(&body_parts)])),
+            d.indent_hardline(d.concat(&body_parts)),
             d.hardline(),
             d.text("}"),
         ])

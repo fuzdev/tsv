@@ -704,13 +704,13 @@ impl<'a> Printer<'a> {
                     {
                         parts.push(inline);
                     }
-                    parts.push(d.indent(d.concat(&[d.hardline(), init_value_doc()])));
+                    parts.push(d.indent_hardline(init_value_doc()));
                 } else if is_curried_arrow {
                     // Curried arrow with return type: mandatory break after `=`
                     // The arrow expression formatter handles the rest of the breaking
                     push_lhs(&mut parts, id_doc);
                     parts.push(d.text(" ="));
-                    parts.push(d.indent(d.concat(&[d.hardline(), init_value_doc()])));
+                    parts.push(d.indent_hardline(init_value_doc()));
                 } else if is_curried_arrow_chain(init) {
                     // Untyped curried arrow chain: fluid break after `=`. The chain's
                     // signature heads break only when they don't fit on the operator

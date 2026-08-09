@@ -441,12 +441,7 @@ impl<'a> Printer<'a> {
             Some(comment) => d.concat(&[d.text(keyword), d.text(" ( "), comment]),
             None => d.concat(&[d.text(keyword), d.text(" (")]),
         };
-        d.concat(&[
-            open,
-            d.indent(d.concat(&[d.hardline(), body])),
-            d.hardline(),
-            d.text(")"),
-        ])
+        d.concat(&[open, d.indent_hardline(body), d.hardline(), d.text(")")])
     }
 
     /// Shared logic for return/throw with binaryish arguments.

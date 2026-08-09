@@ -576,7 +576,7 @@ fn try_single_arg_comment_paths(
             callee,
             d.text("("),
             d.concat(&paren_line_prefix),
-            d.indent(d.concat(&[d.hardline(), d.concat(&inner)])),
+            d.indent_hardline(d.concat(&inner)),
             d.hardline(),
             d.text(")"),
         ]));
@@ -922,7 +922,7 @@ fn build_ternary_arrow_hug_states(
         d.text("("),
         sig_doc,
         d.text(" =>"),
-        d.indent(d.concat(&[d.hardline(), body_doc])),
+        d.indent_hardline(body_doc),
         d.hardline(),
         d.text(")"),
     ]);
@@ -957,7 +957,7 @@ fn build_ternary_arrow_hug_states(
             d.hardline(),
             sig_doc,
             d.text(" =>"),
-            d.indent(d.concat(&[d.hardline(), body_doc])),
+            d.indent_hardline(body_doc),
         ])),
         d.hardline(),
         d.text(")"),
@@ -1553,7 +1553,7 @@ fn build_call_with_arg_comments(
             callee,
             d.text("("),
             d.concat(&paren_line_prefix_parts),
-            d.group_break(d.concat(&[d.indent(d.concat(&[d.hardline(), arg_doc])), d.hardline()])),
+            d.group_break(d.concat(&[d.indent_hardline(arg_doc), d.hardline()])),
             d.text(")"),
         ]));
     }

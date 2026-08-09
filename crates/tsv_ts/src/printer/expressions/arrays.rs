@@ -1204,7 +1204,7 @@ impl<'a> Printer<'a> {
 
         d.concat(&[
             d.text("["),
-            d.indent(d.concat(&[d.hardline(), d.concat(&parts)])),
+            d.indent_hardline(d.concat(&parts)),
             d.hardline(),
             d.text("]"),
         ])

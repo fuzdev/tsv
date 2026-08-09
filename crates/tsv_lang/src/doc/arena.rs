@@ -1878,6 +1878,19 @@ impl DocArena {
         self.indent(self.concat(&[sl, inner]))
     }
 
+    /// Indent with leading hardline — the always-broken sibling of
+    /// [`Self::indent_softline`].
+    ///
+    /// The shape every exploded container hangs its contents with: a body block's `{`,
+    /// a declaration body, a broken argument or element list. Named here because it was
+    /// hand-spelled at ~50 sites across the language printers, where the nesting hid
+    /// which of the three `indent_*` forms a given container had actually chosen.
+    #[inline]
+    pub fn indent_hardline(&self, inner: DocId) -> DocId {
+        let hl = self.hardline();
+        self.indent(self.concat(&[hl, inner]))
+    }
+
     /// Comma followed by line break.
     #[inline]
     pub fn comma_line(&self) -> DocId {

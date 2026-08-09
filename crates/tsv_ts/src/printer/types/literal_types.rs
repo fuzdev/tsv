@@ -255,7 +255,7 @@ impl<'a> Printer<'a> {
                     // both, as it does for a width-driven break.
                     InterpolationLayout::Expanded => d.concat(&[
                         d.text("${"),
-                        d.indent(d.concat(&[d.hardline(), comments_doc, type_doc])),
+                        d.indent_hardline(d.concat(&[comments_doc, type_doc])),
                         d.hardline(),
                         d.text("}"),
                     ]),
@@ -272,7 +272,7 @@ impl<'a> Printer<'a> {
                     InterpolationLayout::Forced => d.concat(&[
                         d.text("${"),
                         comments_doc,
-                        d.indent(d.concat(&[d.hardline(), type_doc])),
+                        d.indent_hardline(type_doc),
                         d.hardline(),
                         d.text("}"),
                     ]),

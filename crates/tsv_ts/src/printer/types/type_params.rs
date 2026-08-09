@@ -818,7 +818,7 @@ impl<'a> Printer<'a> {
         d.concat(&[
             d.text("<"),
             d.concat(&angle_line_prefix),
-            d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])),
+            d.indent_hardline(d.concat(&inner_parts)),
             d.hardline(),
             d.text(">"),
         ])

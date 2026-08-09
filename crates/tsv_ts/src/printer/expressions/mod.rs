@@ -90,7 +90,7 @@ impl<'a> Printer<'a> {
         let d = self.d();
         d.concat(&[
             d.text("("),
-            d.indent(d.concat(&[d.hardline(), inner])),
+            d.indent_hardline(inner),
             d.hardline(),
             d.text(")"),
         ])
