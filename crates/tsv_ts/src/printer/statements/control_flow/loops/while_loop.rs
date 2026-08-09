@@ -177,13 +177,9 @@ impl<'a> Printer<'a> {
             // matching if/while/for. Unlike those, keep the plain (self-grouping)
             // expression doc — the do-while condition has no enclosing group, so the
             // ungrouped-binary path would strand a broken `&&` chain.
-            let test_doc =
-                if self.needs_parens(&stmt.test, crate::printer::ParenContext::StatementTest) {
-                    self.d().parens(self.build_expression_doc(&stmt.test))
-                } else {
-                    self.build_expression_doc(&stmt.test)
-                };
-            parts.push(test_doc);
+            parts.push(
+                self.wrap_statement_test_parens(&stmt.test, self.build_expression_doc(&stmt.test)),
+            );
         }
 
         // Comments between the condition's `)` and the do-while's terminating `;`,

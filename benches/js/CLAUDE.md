@@ -384,7 +384,7 @@ surface → reported, not gated). In the blocking `conformance` aggregate (promo
 once its baseline hit 0 untracked gaps), tracked separately from the acorn-suite
 gate (own `KNOWN_GAPS`, freshness-checked on full-corpus runs). `.tsx` and
 `@filename` multi-file tests are skipped (5,120 of them — a filed coverage hole).
-Baseline: 13,685 scanned, 12,292 accept-parity, 0 untracked gaps. ⚠️ The root is the
+Baseline: 13,685 scanned, 12,291 accept-parity, 0 untracked gaps. ⚠️ The root is the
 whole corpus deliberately: the old `conformance/parser` default was green at 768 files
 while 32 over-rejections sat untracked in the checker/emitter trees, whose ordinary TS is
 likelier reachable in real code than the parser torture suite. A

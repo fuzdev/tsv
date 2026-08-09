@@ -3,7 +3,9 @@
 // Switch head, case labels, and case-body layout with comment handling.
 
 use crate::ast::internal::{self, Statement};
-use crate::printer::{CommentVec, LeadingGlue, Printer, next_printed_stmt_start};
+use crate::printer::{
+    CommentFilter, CommentSpacing, CommentVec, LeadingGlue, Printer, next_printed_stmt_start,
+};
 use smallvec::smallvec;
 use tsv_lang::doc::DocBuf;
 use tsv_lang::doc::arena::DocId;
@@ -224,7 +226,39 @@ impl<'a> Printer<'a> {
 
         if let Some(test) = &case.test {
             parts.push(d.text("case "));
-            parts.push(self.build_expression_doc(test));
+            // An assignment takes clarity parens here exactly as it does in a statement
+            // test — prettier parenthesizes an `AssignmentExpression` in every position
+            // outside its own allowlist (a for init/update, an expression statement, an
+            // object-pattern property value, …), and a case test is not on it. The
+            // parens are recomputed, not preserved, so `case a = 1:` gains them too.
+            let test_doc = self.wrap_statement_test_parens(test, self.build_expression_doc(test));
+            // The `case`→test gap needs its own emitter (`docs/comments.md` hazard 4): the
+            // only comment here that survives on the test's own doc is the innermost block
+            // GLUED to it, which ownership carries inside. Anything else has no owner at
+            // all — a block sitting before a paren shell the printer strips
+            // (`case /* c */ (a, b):`), or an earlier block in a run
+            // (`case /* p */ /* q */ b:`) — so without this it is dropped. Emitted ahead of
+            // any paren this position synthesizes, which is prettier's placement too.
+            //
+            // TODO: a LINE comment in this gap is still dropped (the whole gap is skipped
+            // when one is present, so a mixed run is never reordered). Emitting it inline
+            // would swallow the test and its `:`, so it needs the forced-continuation-indent
+            // treatment the head→`:` gap below uses — and prettier instead keeps the test at
+            // the case's own indent, so the fix owes a `_prettier_divergence` fixture and a
+            // catalog entry rather than being a straight match.
+            let test_gap_start = case.span.start + "case".len() as u32;
+            let test_start = test.span().start;
+            if !has_line_comments_in_range(self.comments, test_gap_start, test_start)
+                && let Some(comments) = self.build_comments_between_filtered_opt(
+                    test_gap_start,
+                    test_start,
+                    CommentSpacing::Trailing,
+                    CommentFilter::All,
+                )
+            {
+                parts.push(comments);
+            }
+            parts.push(test_doc);
         } else {
             parts.push(d.text("default"));
         }
