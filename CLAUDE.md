@@ -103,7 +103,7 @@ deno task build            # workspace dev build
 deno task build:release    # workspace optimized build
 deno task build:all        # release + ffi + build:packages (everything)
 deno task build:packages   # the 6 publishable WASM bundles (npm + deno) — single source of truth shared by CI + publish.ts
-deno task build:bench      # the artifact set `bench`/`smoke` measure (ffi×3 + the 3 wasm:deno variants)
+deno task build:bench      # the artifact set `bench`/`smoke` measure (ffi×3 + the 3 wasm:deno variants + the node half: napi + wasm:all:nodejs)
 deno task build:ffi        # C FFI library (:format / :parse size-only variants; :all builds all three)
 deno task build:wasm:deno  # deno-target WASM bundle (requires wasm-pack; :parse:deno / :all:deno for the other variants)
 deno task clean            # clean build artifacts
@@ -228,7 +228,7 @@ Three binding crates for different use cases:
 
 - `tsv_ffi` (C ABI) — any FFI (Deno, Python, etc.); output: `libtsv_ffi.so` / `.dylib` / `.dll`
 - `tsv_wasm` (wasm-bindgen) — browser, Deno, Node; output: `.wasm` module (format / parse / all variants via cargo features)
-- `tsv_napi` (napi-rs) — Node.js / Bun native addon (`libtsv_napi.*`, loaded via `process.dlopen`). Currently **measurement-only** for the Node bench runner (`deno task build:napi` / `test:napi`); cross-platform publish as `@fuzdev/tsv_napi` targets 0.4 (needs GitHub release infra; expected to eventually subsume the WASM native path). See ./crates/tsv_napi/CLAUDE.md.
+- `tsv_napi` (napi-rs) — Node.js / Bun native addon (`libtsv_napi.*`, loaded via `process.dlopen`). Builds with the `napi` profile (`release` + `panic = "unwind"` → `target/napi/`; every export is `catch_unwind`, so a panic throws a JS error instead of aborting the host). Currently **measurement-only** for the Node bench runner (`deno task build:napi` / `test:napi`); cross-platform publish as `@fuzdev/tsv_napi` targets 0.3 (needs GitHub release infra; expected to eventually subsume the WASM native path). See ./crates/tsv_napi/CLAUDE.md.
 
 `tsv_wasm` produces three npm packages from one crate via the `format` + `parse` cargo features (default = both): `@fuzdev/tsv_format_wasm`, `@fuzdev/tsv_parse_wasm`, and `@fuzdev/tsv_wasm` (everything + the `tsv` CLI). Each variant has its own output directory.
 
@@ -319,7 +319,7 @@ deno task divergence:audit         # audit divergence pattern coverage (--json)
 deno task corpus:stats             # corpus/candidate-dir sizes + language + degenerate-case stats (diagnostic; ./benches/js/CLAUDE.md)
 ```
 
-The corpus comparison builds with `--profile corpus` (optimized + `panic = "unwind"`, no LTO — panics in our code are caught and reported; also the single build world every `deno task check` audit shares, trading LTO for build time, measurably free at runtime per the profile's comment in `Cargo.toml`). Benchmarks use `--release` (panic=abort, LTO) for maximum performance.
+The corpus comparison builds with `--profile corpus` (optimized + `panic = "unwind"`, no LTO — panics in our code are caught and reported; also the single build world every `deno task check` audit shares, trading LTO for build time, measurably free at runtime per the profile's comment in `Cargo.toml`). Benchmarks use `--release` (panic=abort, LTO) for maximum performance — except the N-API artifact, which builds with the `napi` profile (`release` + `panic = "unwind"`, the shipped panic contract), so its bench rows measure the artifact that actually ships.
 
 Divergence detection identifies known differences documented in the `conformance_prettier*.md` family (safety checks, pattern detection, traceability). See ./benches/js/CLAUDE.md and ./docs/divergence_detector.md.
 
@@ -428,7 +428,7 @@ tsv/
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
 │   ├── tsv_wasm/    # WASM bindings (the 3 published npm packages; bundles types/tsv_ast.d.ts + npm/locations.js; npm/cli.js is the tsv bin)
-│   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only until the 0.4 publish)
+│   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only until the npm publish lands)
 ├── scripts/         # Publish orchestrator, npm package patcher, Node artifact + N-API tests, AST type drift check
 ├── tests/           # Integration tests (parser, formatter, CLI)
 │   ├── fixtures/    # Test fixtures organized by language/feature

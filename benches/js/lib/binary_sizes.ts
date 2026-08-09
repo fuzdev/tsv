@@ -248,7 +248,7 @@ export async function collect_binary_sizes(
 		staged,
 		LABELS.tsv_napi,
 		'native',
-		`${project_root}/target/release/${native_library_filename('tsv_napi')}`
+		`${project_root}/target/napi/${native_library_filename('tsv_napi')}`
 	);
 
 	// tsv WASM — three builds from one crate via the `format`/`parse` features:

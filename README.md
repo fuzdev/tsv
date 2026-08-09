@@ -119,7 +119,7 @@ and package READMEs for the full API and CLI flags:
 - [crates/tsv_wasm/README_format.md](crates/tsv_wasm/README_format.md)
 - [crates/tsv_wasm/README_parse.md](crates/tsv_wasm/README_parse.md)
 
-Native builds will be published with v0.4; until then only WASM builds are published.
+Native builds will be published with v0.3; until then only WASM builds are published.
 
 ## Design
 
@@ -159,7 +159,7 @@ Native builds will be published with v0.4; until then only WASM builds are publi
 - Rust-only
   - implementation currently does not call or embed a JS runtime
     (open for discussion, needs research into the tradeoffs);
-    JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.4
+    JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.3
   - no C compiler needed to build tsv
 - optimal
   - prioritizes speed then binary size and memory usage

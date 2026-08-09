@@ -280,7 +280,7 @@ const napi_lib = native_library_filename('tsv_napi');
 const artifacts: [string, string][] = [
 	[`target/release/${ffi_lib}`, 'deno task build:ffi'],
 	[`target/corpus/${ffi_lib}`, 'deno task build:ffi:corpus (conformance gates)'],
-	[`target/release/${napi_lib}`, 'deno task build:napi (bench:node/bun)'],
+	[`target/napi/${napi_lib}`, 'deno task build:napi (bench:node/bun)'],
 	['crates/tsv_wasm/pkg/all/deno', 'deno task build:wasm:all:deno (bench:deno)'],
 	['crates/tsv_wasm/pkg/all/nodejs', 'deno task build:wasm:all:nodejs (bench:node/bun)'],
 	['crates/tsv_wasm/pkg/all/npm', 'deno task build:npm:all (publish)']

@@ -38,6 +38,11 @@ default = ["format", "parse"]
 # Pulls the reusable doc arena (`tsv_arena::with_doc_arena`, which pulls tsv_lang).
 format = ["tsv_arena/format"]
 parse = ["tsv_ts/convert", "tsv_css/convert", "tsv_svelte/convert"]
+# Test-only: compiles the `__panic_probe` export that `deno task test:napi`
+# drives to prove the panic contract end to end (panic → thrown JS error →
+# addon still usable). Never enabled by a published build; `test_napi.ts` skips
+# the contract test when the export is absent.
+panic_probe = []
 
 # `napi-derive` generates unsafe code. Cargo replaces the whole [lints] table on
 # override (no partial inherit), so the workspace lints are re-declared verbatim

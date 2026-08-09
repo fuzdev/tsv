@@ -76,8 +76,8 @@ Things the published numbers measure that aren't quite what they look like.
   standalone native flagship (the bare `@fuzdev/tsv` binary) is planned to ship
   with profile-guided optimization: native-only, a measured ~17–19% wall-time
   win, **byte-identical** output, **Linux-only first** on that single-target
-  build (the cross-platform prebuilt `.node` binaries stay standard-release until
-  matrix PGO is a later step). When that row lands the policy is: **(1) both
+  build (the cross-platform prebuilt `.node` binaries stay non-PGO — the `napi`
+  profile — until matrix PGO is a later step). When that row lands the policy is: **(1) both
   rows** — a standard-release native row *and* a PGO one, never PGO silently
   folded into the single native number; **(2) measure what ships** — publish PGO
   numbers only once a shipped artifact carries the recipe, labeled with which
@@ -578,7 +578,10 @@ on-disk size** plus **gzipped size** (≈ npm-tarball wire size), grouped by kin
   both features — what the perf rows load), `tsv format (ffi)`
   (`target/ffi-format/release`, no convert layer — scope-matched to `oxfmt
   (napi)`), and `tsv parse (ffi)` (`target/ffi-parse/release`, printers dropped —
-  scope-matched to `oxc-parser (napi)`). `tsv (napi)` is the Node/Bun native path.
+  scope-matched to `oxc-parser (napi)`). `tsv (napi)` is the Node/Bun native path,
+  built with the `napi` profile (`release` + `panic = "unwind"` → `target/napi/`,
+  the shipped panic contract), so its size carries unwind tables the abort-profile
+  FFI rows don't.
   Native-kind labels name the binding (`ffi`/`napi`), not just "native". `deno task
   bench` builds all of them; subset rows are omitted if those builds haven't run.
 - **biome**: WASM from node_modules.

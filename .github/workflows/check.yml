@@ -233,11 +233,12 @@ jobs:
       - name: Test
         run: cargo test --workspace --no-fail-fast
 
-      # The real N-API JS boundary against this OS's release-profile cdylib
-      # (per-OS naming — .dll / .dylib — handled by benches/js/lib/runtime.ts).
-      # This is the only automated build of tsv_napi anywhere in CI. Runs even
-      # when Test fails (independent signal during the burn-down; its own
-      # failure still fails the job).
+      # The real N-API JS boundary against this OS's napi-profile cdylib
+      # (release + unwind, built with the test-only panic probe so the
+      # panic-contract test runs; per-OS naming — .dll / .dylib — handled by
+      # benches/js/lib/runtime.ts). This is the only automated build of
+      # tsv_napi anywhere in CI. Runs even when Test fails (independent signal
+      # during the burn-down; its own failure still fails the job).
       - name: N-API boundary test
         if: ${{ !cancelled() }}
         run: deno task test:napi
