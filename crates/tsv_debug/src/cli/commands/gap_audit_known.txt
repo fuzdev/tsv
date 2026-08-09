@@ -14,14 +14,8 @@
 # the gate rather than being pinned.
 #
 # Format: KIND<TAB>SHAPE<TAB>PAYLOADS
-# shapes: 426
-DROPPED	!))⟨⟩)	annotation,block,jsdoc_cast,line,multiline
+# shapes: 418
 DROPPED	!)⟨⟩!.	annotation,block,jsdoc_cast
-DROPPED	!)⟨⟩)	annotation,block,jsdoc_cast,line,multiline
-DROPPED	!)⟨⟩))	annotation,block,jsdoc_cast,line,multiline
-DROPPED	!⟨⟩)	annotation,block,jsdoc_cast,line,multiline
-DROPPED	!⟨⟩))	annotation,block,jsdoc_cast,line,multiline
-DROPPED	!⟨⟩)))	annotation,block,jsdoc_cast,line,multiline
 DROPPED	&&⟨⟩␣	annotation,block,jsdoc_cast,multiline
 DROPPED	&⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	',⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
@@ -43,7 +37,6 @@ DROPPED	():⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	()⟨⟩!	annotation,block,jsdoc_cast
 DROPPED	()⟨⟩!.	annotation,block,jsdoc_cast
 DROPPED	()⟨⟩!?.	annotation,block,jsdoc_cast
-DROPPED	()⟨⟩)	annotation,block,jsdoc_cast,line,multiline
 DROPPED	()⟨⟩));	annotation,block,jsdoc_cast,line,multiline
 DROPPED	()⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	()⟨⟩␣	annotation,block,jsdoc_cast,multiline
@@ -58,7 +51,6 @@ DROPPED	(⟨⟩[	annotation,block,jsdoc_cast,line,multiline
 DROPPED	(⟨⟩async	line
 DROPPED	(⟨⟩{	annotation,block,jsdoc_cast,multiline
 DROPPED	(⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
-DROPPED	)()⟨⟩)	annotation,block,jsdoc_cast,line,multiline
 DROPPED	))⟨⟩);	annotation,block,jsdoc_cast,line,multiline
 DROPPED	))⟨⟩␣	annotation,block,jsdoc_cast,line,multiline
 DROPPED	),⟨⟩␣	multiline

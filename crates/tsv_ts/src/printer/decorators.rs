@@ -39,11 +39,26 @@ impl<'a> Printer<'a> {
     /// Push a decorator's "head" — `@`, any comment authored between `@` and the
     /// decorator expression (`@/* c */ dec`, including inside stripped parens
     /// `@(/* c */ dec)`; dropping it is content loss, and it hugs the expression
-    /// inline or drops to its own line per the author), and the expression itself —
-    /// into `parts`. Shared by the class-level (`build_decorators_doc`),
+    /// inline or drops to its own line per the author), the expression itself, and any
+    /// comment authored between the expression and the decorator's end (`@(dec
+    /// /* c */)`) — into `parts`. Shared by the class-level (`build_decorators_doc`),
     /// class-member (`build_class_member_decorators_doc`), and parameter
     /// (`build_param_decorators_doc`) printers, which each append their own
     /// trailing-comment and separator handling.
+    ///
+    /// The trailing run lands **outside** the printed parens, so an author who wrote
+    /// the comment inside them converges on the fixed point an author who wrote it
+    /// outside already had: `@(a + b /* c */)` and `@(a + b) /* c */` both print as the
+    /// latter. That is one fixed point rather than two, it needs no forced-open shell
+    /// for a `//` (the decorator's own trailing break ends the line), and the parens are
+    /// the printer's to synthesize — `build_decorator_expression_doc` adds or omits them
+    /// from the expression's shape, never from the author's spelling, so a position
+    /// defined relative to them carries no authorial signal to preserve.
+    ///
+    /// The range is empty for a decorator the printer leaves bare (`@fn`, `@fn()`),
+    /// where `decorator.span` ends at the expression — so a comment the author wrote
+    /// *after* the decorator stays the following gap's to emit, and cannot be
+    /// double-printed here.
     fn push_decorator_head(&self, parts: &mut DocBuf, decorator: &internal::Decorator<'_>) {
         let d = self.d();
         parts.push(d.text("@"));
@@ -53,6 +68,11 @@ impl<'a> Printer<'a> {
             parts.push(c);
         }
         parts.push(self.build_decorator_expression_doc(decorator));
+        self.push_trailing_comments_in_range(
+            parts,
+            decorator.expression.span().end,
+            decorator.span.end,
+        );
     }
 
     /// Build the run of consecutive own-line leading comments authored between a
