@@ -25,9 +25,14 @@
 //! (`(interface) as never;`). Bare, tsv's parser commits to a declaration reading and
 //! errors, so the parens must survive there too.
 //!
-//! This can't be a fixture: acorn-typescript enforces the strict-mode early error that
-//! bars `let` / `interface` as names and **rejects every input below**, so no
-//! `expected.json` oracle exists (same reason as
+//! ⚠️ The round-trip half SHOULD be a fixture and is not yet. acorn rejecting every
+//! input below is representable — `expected_ours.json` plus an `expected_svelte.json`
+//! holding `{"error": "failed to parse"}`, in a `_svelte_divergence` dir (see
+//! `docs/fixture_overview.md`, and
+//! `typescript/expressions/assignment/nonsimple_target_svelte_divergence` for the
+//! shape); `(let)[a] = 1;` is already prettier-canonical, so it clears F1. The
+//! node-type assertions below would stay here regardless — that is what this file
+//! uniquely holds (same shape as
 //! [`strict_reserved_word_as_name`](./strict_reserved_word_as_name.rs)). The expected
 //! strings are prettier's own output — these shapes are prettier's
 //! `tests/format/js/identifier/{parentheses,for-of}/` suite, which

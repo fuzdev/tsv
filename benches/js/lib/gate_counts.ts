@@ -141,7 +141,7 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 214, both_accept: 191 };
  * over-rejection fix: the new acceptance arrives unguarded. A rise here is not automatically wrong
  * (tsv defers early errors by policy), but it must be a decision, not a side effect.
  */
-export const TS_REPO_PINS = { scanned: 13746, accept_parity: 12320, over_acceptance: 487 };
+export const TS_REPO_PINS = { scanned: 13708, accept_parity: 12284, over_acceptance: 486 };
 
 /**
  * corpus:compare:parse --all — MINIMUM per-language `compared` (both sides
@@ -285,13 +285,13 @@ export const TEST262_POSITIVES_PIN = 42_113;
  * bench:harvest:ts-repo — exact size of the tsc-corpus VALID list: single-file
  * `.ts` under `../typescript/tests/cases/{conformance,compiler}` that both tsc's
  * parser and tsc's own `.errors.txt` baselines call well-formed. Measured
- * 2026-08-07: ../typescript at 637d5746b, oracle tsc 6.0.3, over 9,447 single-file
+ * 2026-08-09: ../typescript at 637d5746b, oracle tsc 6.0.3, over 9,414 single-file
  * `.ts`. A move means a checkout pull, a tsc bump, or a grading change in
  * `harvest_ts_repo.ts` — re-pin deliberately, never absorb. The full bucket
  * breakdown is the harvest's own final line, not repeated here: a hand-copied
  * tally goes stale silently, which is the failure this pin exists to prevent.
  */
-export const TS_REPO_CORPUS_PIN = 8_129;
+export const TS_REPO_CORPUS_PIN = 8_097;
 
 /**
  * bench:harvest:ts-repo — exact size of the tsc-corpus REJECTS list (files tsc's

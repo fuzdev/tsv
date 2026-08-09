@@ -101,9 +101,28 @@ export async function* discover_ts_cases(
  * Whether a test case is a multi-file test — several virtual modules concatenated
  * behind `// @filename:` directives, which is not one parse unit. Both consumers
  * skip these; feeding one to a parser as a single source is meaningless.
+ *
+ * Mirrors tsc's own harness rule (`optionRegex` in `src/harness/harnessIO.ts`,
+ * consumed per line by `makeUnitsFromTest`), which differs from the naive reading on
+ * both axes and gets 44 files wrong between them:
+ *
+ * - **The directive name is case-INSENSITIVE** — the harness lowercases it before
+ *   comparing (`metaDataName !== "filename"`), so `@fileName` and `@FILENAME` split
+ *   units exactly like `@filename`. Admitting only two casings graded **41**
+ *   concatenations as single parse units.
+ * - **The `//` is ANCHORED to line start, and is exactly two slashes** — the harness
+ *   regex is `/^\/{2}\s*@(\w+)\s*:/`. An unanchored match also fires inside a
+ *   fourslash `////` body, where the text is a virtual file's *content*
+ *   (`fourslashImpl.ts` tests `line.substr(0, 4) === "////"` first, before it ever
+ *   looks for a directive) — so a commented-out `//// // @Filename:` skipped **3**
+ *   files that are one parse unit under both harnesses.
+ *
+ * Interior whitespace stays horizontal-only: the harness's `\s*` can cross a newline
+ * when run over whole content, but `makeUnitsFromTest` applies it per line, and the
+ * cross-line reading matches no file in the corpus.
  */
 export function is_multi_file_test(content: string): boolean {
-	return /\/\/\s*@[Ff]ilename:/.test(content);
+	return /^\/\/[^\S\r\n]*@filename[^\S\r\n]*:/im.test(content);
 }
 
 /**

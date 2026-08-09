@@ -40,10 +40,14 @@
 //! (heritage clause, parameter accessibility modifier) that swallowed them. Both
 //! now resolve the way tsc resolves them.
 //!
-//! This can't be a fixture: acorn-typescript enforces the early error and *rejects*
-//! every case, so no `expected.json` oracle exists — the shapes are pinned here
-//! against tsv itself, the way `keyword_type_reference.rs` pins the type-space
-//! names acorn is over-strict about. The halves acorn *does* accept are fixtures
+//! ⚠️ The accept half SHOULD be a fixture and is not yet. An acorn rejection is
+//! representable — `expected_ours.json` plus an `expected_svelte.json` holding
+//! `{"error": "failed to parse"}`, in a `_svelte_divergence` dir (see
+//! `docs/fixture_overview.md`, and
+//! `typescript/expressions/assignment/nonsimple_target_svelte_divergence` for the
+//! shape); `var let = 1;` is already prettier-canonical, so it clears F1. What would
+//! stay here regardless is the node-type half below, which no fixture asserts. The
+//! halves acorn *does* accept are already fixtures
 //! (`statements/labeled/contextual_keyword_name`,
 //! `types/infer/contextual_keyword_name`, `types/interfaces/heritage_yield`).
 //!

@@ -7,9 +7,14 @@
 //! tsc and prettier both accept `let x: break;` (prettier formats it), so tsv must
 //! parse it as a `TSTypeReference` whose `typeName` is a plain `Identifier`.
 //!
-//! This can't be a fixture: acorn-typescript is over-strict in type position and
-//! *rejects* these ("Expected type"), so no `expected.json` oracle exists — the
-//! shape is pinned here against tsv itself and prettier's formatting.
+//! ⚠️ These SHOULD be a fixture and are not yet. An acorn rejection is representable
+//! — `expected_ours.json` plus an `expected_svelte.json` holding
+//! `{"error": "failed to parse"}`, in a `_svelte_divergence` dir (see
+//! `docs/fixture_overview.md`, and
+//! `typescript/expressions/assignment/nonsimple_target_svelte_divergence` for the
+//! shape). `let x: break;` is already prettier-canonical, so it clears F1. Until
+//! migrated, the prettier half of the claim is pinned against a hand-written string
+//! rather than a live oracle, which is exactly how a formatting claim goes stale.
 //!
 //! Contrast: the keywords that head their own type production stay on that
 //! production and do NOT collapse to a bare type reference — `void`/`null`/`string`
