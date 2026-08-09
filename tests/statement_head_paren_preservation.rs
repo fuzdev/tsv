@@ -25,15 +25,16 @@
 //! (`(interface) as never;`). Bare, tsv's parser commits to a declaration reading and
 //! errors, so the parens must survive there too.
 //!
-//! ⚠️ The round-trip half SHOULD be a fixture and is not yet. acorn rejecting every
-//! input below is representable — `expected_ours.json` plus an `expected_svelte.json`
-//! holding `{"error": "failed to parse"}`, in a `_svelte_divergence` dir (see
-//! `docs/fixture_overview.md`, and
-//! `typescript/expressions/assignment/nonsimple_target_svelte_divergence` for the
-//! shape); `(let)[a] = 1;` is already prettier-canonical, so it clears F1. The
-//! node-type assertions below would stay here regardless — that is what this file
-//! uniquely holds (same shape as
-//! [`strict_reserved_word_as_name`](./strict_reserved_word_as_name.rs)). The expected
+//! The round-trip half is pinned by the fixture
+//! `typescript/statements/expression/statement_head_paren_svelte_divergence` (an acorn
+//! rejection is representable: `expected_ours.json` plus an `expected_svelte.json`
+//! holding `{"error": "failed to parse"}`), with the paren-placement normalizations as
+//! its `unformatted_paren_placement` variant. The **node-type** assertions stay here,
+//! and they are the point: the re-meaning failure mode — `(let[a] = 1);` printed as
+//! `let[a] = 1;`, which reparses as a `VariableDeclaration` instead of an assignment —
+//! is valid, idempotent and comment-clean, so a byte-comparing fixture, round-trip, F1,
+//! the ledger, the census and the fuzzer are all blind to it. Same shape as
+//! [`strict_reserved_word_as_name`](./strict_reserved_word_as_name.rs). The expected
 //! strings are prettier's own output — these shapes are prettier's
 //! `tests/format/js/identifier/{parentheses,for-of}/` suite, which
 //! `corpus:compare:format` grades from the other side.

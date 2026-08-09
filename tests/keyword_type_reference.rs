@@ -7,14 +7,14 @@
 //! tsc and prettier both accept `let x: break;` (prettier formats it), so tsv must
 //! parse it as a `TSTypeReference` whose `typeName` is a plain `Identifier`.
 //!
-//! ⚠️ These SHOULD be a fixture and are not yet. An acorn rejection is representable
-//! — `expected_ours.json` plus an `expected_svelte.json` holding
-//! `{"error": "failed to parse"}`, in a `_svelte_divergence` dir (see
-//! `docs/fixture_overview.md`, and
-//! `typescript/expressions/assignment/nonsimple_target_svelte_divergence` for the
-//! shape). `let x: break;` is already prettier-canonical, so it clears F1. Until
-//! migrated, the prettier half of the claim is pinned against a hand-written string
-//! rather than a live oracle, which is exactly how a formatting claim goes stale.
+//! The accepts, the AST shapes and the prettier formatting are pinned by the fixture
+//! `typescript/types/keyword_type_reference_svelte_divergence` (an acorn rejection is
+//! representable: `expected_ours.json` plus an `expected_svelte.json` holding
+//! `{"error": "failed to parse"}`), which is where the prettier claim belongs — against
+//! a live oracle rather than a hand-written string. What remains here is the
+//! **regression matrix** the fixture cannot express: the keyword list as a loop, and
+//! the contrast guards for keywords that head their own type production — those acorn
+//! *accepts*, so they cannot share a divergence fixture.
 //!
 //! Contrast: the keywords that head their own type production stay on that
 //! production and do NOT collapse to a bare type reference — `void`/`null`/`string`

@@ -40,14 +40,17 @@
 //! (heritage clause, parameter accessibility modifier) that swallowed them. Both
 //! now resolve the way tsc resolves them.
 //!
-//! ⚠️ The accept half SHOULD be a fixture and is not yet. An acorn rejection is
-//! representable — `expected_ours.json` plus an `expected_svelte.json` holding
-//! `{"error": "failed to parse"}`, in a `_svelte_divergence` dir (see
-//! `docs/fixture_overview.md`, and
-//! `typescript/expressions/assignment/nonsimple_target_svelte_divergence` for the
-//! shape); `var let = 1;` is already prettier-canonical, so it clears F1. What would
-//! stay here regardless is the node-type half below, which no fixture asserts. The
-//! halves acorn *does* accept are already fixtures
+//! A representative slice — each word in a binding and a parameter, plus the
+//! competing-role resolutions — is pinned by the fixture
+//! `typescript/declarations/variable/strict_reserved_name_svelte_divergence` (an acorn
+//! rejection is representable: `expected_ours.json` plus an `expected_svelte.json`
+//! holding `{"error": "failed to parse"}`), which is where the prettier claim belongs —
+//! against a live oracle rather than a hand-written string. What stays here is what a
+//! fixture cannot express: the **cross-product** below (nine words × ~45 positions), the
+//! three-channel `BindingIdentifier` / `IdentifierReference` / `LabelIdentifier`
+//! distinction, and the node-TYPE assertions — an over-permissive parser can accept a
+//! widened word while building the wrong node for it, which an accept/reject or a
+//! byte-comparison cannot see. The halves acorn *does* accept are their own fixtures
 //! (`statements/labeled/contextual_keyword_name`,
 //! `types/infer/contextual_keyword_name`, `types/interfaces/heritage_yield`).
 //!

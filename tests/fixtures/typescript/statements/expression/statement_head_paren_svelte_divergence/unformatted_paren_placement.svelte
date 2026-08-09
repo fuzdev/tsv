@@ -1,0 +1,37 @@
+<script lang="ts">
+	(let)[a] = 1;
+	(let)[a].b.c.e = 1;
+	(let)[let[a]] = 1;
+	(let)[a] ??= 1;
+	(let)[0] = 1;
+	(let)['a'] = 1;
+	(let)[x].foo();
+	(let)[2];
+	foo[let[a]] = 1;
+	foo = let[a];
+	a = let[x].foo();
+	[let[a]] = 1;
+	a[1] + (let[2] = 2);
+	let.let[x].foo();
+	foo(let)[a] = 1;
+	((let)[0] = 1) || 2;
+	((let)[0] = 1) ? a : b;
+	((let)[0] = 1)();
+	((let)[0] = 1).toString;
+	((let)[0] = 1)?.toString;
+	while (true) (let)[0] = 1;
+	alert((let[0] = 1));
+	var a = (let[0] = 1);
+	void (let[0] = 1);
+	throw (let[0] = 1);
+	[...(let[0] = 1)];
+	for ((let)[0] in {});
+	for ((let)[0] of []);
+	for ((let) of foo);
+	for ((let.a) of foo);
+	for ((let[a]) of foo);
+	for ((let)().a of foo);
+	for ((let.a) in foo);
+	for (foo of let);
+	for (foo of let.a);
+</script>
