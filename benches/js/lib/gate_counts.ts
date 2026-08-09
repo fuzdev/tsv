@@ -123,14 +123,17 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 214, both_accept: 191 };
  * conformance:ts-repo — `scanned` corpus files + `accept_parity` (tsv/tsc-baseline agreement);
  * provenance in `GATE_CHECKOUT_COMMITS` (../typescript). A rise on the pinned corpus is a parity
  * gain, not a suite refresh; a drop is USUALLY a regression — but read the other buckets before
- * treating it as one, because `accept_parity` counts only the agreeing-ACCEPT half.
+ * treating it as one, because `accept_parity` counts only the agreeing-ACCEPT half. A file leaving
+ * for `parity reject` — tsv learning to refuse something tsc's baseline refuses too — drops this
+ * number with agreement unchanged; only which side of it moved. `GAPS UNEXPECTED` staying 0 is the
+ * reading that settles it, since that is the bucket a real over-rejection lands in.
  *
- * 12292 → 12291 is the counter-example: one file left this bucket for `parity reject` — tsv now
- * refuses the `with` statement it once misparsed as a call, which is what tsc's baseline says too.
- * Agreement is unchanged; only which side of it moved. `GAPS UNEXPECTED` staying 0 is the reading
- * that settles it — that is the bucket a real over-rejection lands in.
+ * `scanned` includes 61 `.d.ts` cases, which this gate grades (`DECLARATIONS` in
+ * `diagnostics/ts_repo_compare.ts` argues why, and why the bench harvest does not). They are also
+ * where 29 of the over-acceptances come from — statements in an ambient context, tsc's TS1036: an
+ * early error tsv defers by policy, not a gap.
  */
-export const TS_REPO_PINS = { scanned: 13685, accept_parity: 12291 };
+export const TS_REPO_PINS = { scanned: 13746, accept_parity: 12320 };
 
 /**
  * corpus:compare:parse --all — MINIMUM per-language `compared` (both sides

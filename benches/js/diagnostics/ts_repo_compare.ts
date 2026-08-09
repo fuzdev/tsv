@@ -42,13 +42,13 @@
  *                            gap, and fixing it diverges tsv from acorn toward spec.
  *                            Reported, never gated.
  *
- * Scope: single-file `.ts` only — `.tsx` (JSX grammar), `.d.ts`, and `@filename`
- * multi-file tests are skipped and counted (feeding a multi-module test as one
- * parse unit is meaningless). Discovery and the baseline-reading rules are SHARED
- * with the tsc-corpus harvest (`lib/ts_repo.ts`), so the gate and the bench corpus
- * cannot drift on what the corpus IS. Compiler-directive comments (`// @target`,
- * `// @strict`) are inert to a parser (they're `//` comments) so nothing is
- * stripped.
+ * Scope: single-file sources, `.d.ts` INCLUDED (see `DECLARATIONS`) — `.tsx` (JSX
+ * grammar) and `@filename` multi-file tests are skipped and counted (feeding a
+ * multi-module test as one parse unit is meaningless). Discovery and the
+ * baseline-reading rules are SHARED with the tsc-corpus harvest (`lib/ts_repo.ts`),
+ * so the gate and the bench corpus cannot drift on what a parse unit IS.
+ * Compiler-directive comments (`// @target`, `// @strict`) are inert to a parser
+ * (they're `//` comments) so nothing is stripped.
  *
  * SEPARATE from the acorn-typescript-suite gate (`ts_fixtures_compare.ts`): that
  * gate's oracle is the live acorn parser over acorn's OWN curated `test/` suite;
@@ -106,8 +106,8 @@ import {
  * ⚠️ **33 and 32 are different quantities, not a typo.** 33 is the total the widened
  * root exposed; one family (a for-in with an expression left side inside a grouping)
  * landed on its own first, so the tree this gate's own re-pin was measured against
- * already carried its fix and showed **32**. Both numbers appear in the lore record for
- * the same reason. Measured: the narrow root was green at 768 files while the full root
+ * already carried its fix and showed **32**. Both numbers are therefore real, and both
+ * get quoted. Measured: the narrow root was green at 768 files while the full root
  * carried 32 untracked gaps, all 32 fixed in the same change that widened the root.
  *
  * Scanning everything rather than `conformance` + `compiler` is deliberate: the full root
@@ -124,9 +124,37 @@ import {
  * narrower `conformance` + `compiler` pair. That is not drift: it is building a *corpus of
  * valid TS* to measure coverage on, where the extra trees add fixture noise, while this
  * gate is hunting *over-rejections*, where a superset can only help. `lib/ts_repo.ts` is
- * what the two must agree on — the corpus definition and the baseline rules — not the root.
+ * what the two must agree on — the parse-unit rule and the baseline rules — not the scope.
  */
 const DEFAULT_ROOT = `${TS_REPO}/tests/cases`;
+
+/**
+ * `.d.ts` cases are GRADED here, by the same argument that took the root to the whole
+ * corpus: this gate hunts over-rejections, and a declaration file is ordinary
+ * TypeScript to tsv — no declaration mode exists, `tsv format` discovers a `.d.ts`
+ * like any other `.ts`, so a parse gap in one ships. Excluding them was never argued
+ * on its own; it rode along with `.tsx`, which has a real reason (JSX is out of
+ * scope). The bench harvest keeps skipping them for a reason of its OWN — its
+ * consumers get content with no path (`harvest_ts_repo.ts` `DECLARATIONS`).
+ *
+ * Nothing else moves to admit them: `baseline_test_key` already keys `<name>.d.ts` to
+ * its `<name>.d.errors.txt` baseline, so the oracle reads them unchanged.
+ *
+ * ⚠️ They do sharpen a pre-existing soft spot in the oracle. "No `.errors.txt` ⇒
+ * tsc-valid" holds only where the harness compiles each case and baselines it; under
+ * `tests/cases/projects/` a DIFFERENT harness compiles whole scenarios, writing
+ * `baselines/reference/project/<Scenario>/{amd,node}/` baselines keyed on the scenario
+ * and only for its declared `inputFiles` — so a file no scenario names is silently
+ * ungraded, and absence there means "nobody asked", not "tsc accepts". That is
+ * `projects/declarations_GlobalImport/useModule.d.ts`, a stale TS-1.x emit artifact
+ * (`import x = module("y")`, syntax removed years ago) that no test compiles: tsc's
+ * parser rejects it (TS1005, confirmed in-process), acorn rejects it, and tsv rejects
+ * it correctly — but the baseline rule calls it valid, so it lands in the mixed
+ * `gap_beyond_acorn` triage bucket rather than in `reject_parity`. Reported, never
+ * gated, which is why one mislabeled entry is tolerable and a special case is not; the
+ * 23 no-baseline files already in that bucket sit there on the same technicality.
+ */
+const DECLARATIONS = 'include' as const;
 
 /**
  * Whether `root` is the default corpus, for the full-corpus-only hygiene block.
@@ -230,19 +258,26 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 	const buckets = {
 		accept_parity: 0,
 		reject_parity: 0,
-		over_acceptance: [] as { path: string; tsv_error: string }[],
+		// Paths only: tsv ACCEPTED these, so there is no tsv-side error to carry. The
+		// sibling gates put the ORACLE's rejection message in that slot; tsc's lives in
+		// a `.errors.txt` this tool reads as a boolean, so there is nothing to pass on.
+		over_acceptance: [] as { path: string }[],
 		gap_known: [] as Gap[],
 		gap_unexpected: [] as Gap[],
 		gap_beyond_acorn: [] as { path: string; tsv_error: string }[]
 	};
-	// `.tsx` / `.d.ts` are filtered (and counted) inside discovery; the rest are
-	// content-level decisions this loop makes.
+	// `.tsx` is filtered (and counted) inside discovery, which admits `.d.ts` here
+	// (`DECLARATIONS`); the rest are content-level decisions this loop makes.
 	const discovery_skips = empty_ts_case_skips();
 	const skipped = { multi_file: 0, unreadable: 0 };
+	// Reported, not skipped: `.d.ts` is graded here (`DECLARATIONS`), and a run that
+	// shows only its skips can't show that. Counted post-content so it matches the
+	// graded population, not the discovered one.
+	let declarations_graded = 0;
 	// Ledger-freshness tracking (see the stale check at the end).
 	const used_gaps = new Set<string>();
 
-	for await (const path of discover_ts_cases(root, discovery_skips)) {
+	for await (const path of discover_ts_cases(root, discovery_skips, DECLARATIONS)) {
 		let content: string;
 		try {
 			content = await readFile(path, 'utf8');
@@ -254,6 +289,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 			skipped.multi_file++;
 			continue;
 		}
+		if (path.endsWith('.d.ts')) declarations_graded++;
 
 		let tsv_err: string | null = null;
 		try {
@@ -265,7 +301,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 
 		if (!tsv_err) {
 			if (tsc_valid) buckets.accept_parity++;
-			else buckets.over_acceptance.push({ path, tsv_error: '' });
+			else buckets.over_acceptance.push({ path });
 			continue;
 		}
 		// tsv rejects.
@@ -328,8 +364,8 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 	console.error(`\nTypeScript-repo parse-conformance triage — root: ${root}`);
 	console.error(`  oracle: tsc baselines (${TS_BASELINE_DIR})`);
 	console.error(
-		`  scanned: ${scanned} single-file .ts  (skipped ${skipped.multi_file} @filename, ` +
-			`${discovery_skips.tsx} .tsx, ${discovery_skips.declaration} .d.ts, ` +
+		`  scanned: ${scanned} single-file .ts, incl. ${declarations_graded} .d.ts  ` +
+			`(skipped ${skipped.multi_file} @filename, ${discovery_skips.tsx} .tsx, ` +
 			`${skipped.unreadable} unreadable)\n`
 	);
 	console.error(`  parity accept (tsv ok, tsc valid):     ${buckets.accept_parity}`);
@@ -369,6 +405,7 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 			root,
 			oracle: 'tsc-baselines',
 			scanned,
+			declarations_graded,
 			skipped: { ...skipped, ...discovery_skips },
 			accept_parity: buckets.accept_parity,
 			reject_parity: buckets.reject_parity,
