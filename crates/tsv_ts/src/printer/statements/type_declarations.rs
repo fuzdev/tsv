@@ -745,17 +745,18 @@ impl<'a> Printer<'a> {
         } else {
             decl.id.span.end
         };
-        let body_start = decl.body.span.start;
-        // Comments between the header and body `{`, plus the pre-brace spacing.
-        // Shared with the class printer: each comment is kept on its own line (a
-        // line comment doesn't absorb a following one), and a line comment forces
-        // the brace onto the next line. See heritage_last_item_line_comment.
-        let mut parts: DocBuf = smallvec![
-            header_doc,
-            self.build_header_pre_body_doc(true, header_end, body_start, false),
-        ];
+        // Comments between the header and body `{`, plus the pre-brace spacing, plus the
+        // body's format-ignore verdict. Shared with the class printer: each comment is
+        // kept on its own line (a line comment doesn't absorb a following one), and a
+        // line comment forces the brace onto the next line. See
+        // heritage_last_item_line_comment.
+        let (pre_body, frozen_body) =
+            self.build_declaration_pre_body_doc(header_end, decl.body.span);
+        let mut parts: DocBuf = smallvec![header_doc, pre_body];
 
-        if decl.body.body.is_empty() {
+        if let Some(frozen) = frozen_body {
+            parts.push(self.build_frozen_span_doc(frozen));
+        } else if decl.body.body.is_empty() {
             parts.push(self.build_empty_body_with_comments_doc(decl.body.span));
         } else {
             // A comment trailing the opening `{` on its own line is kept on the
@@ -1079,19 +1080,23 @@ impl<'a> Printer<'a> {
         // Use comment-aware search to skip `{` inside comments.
         let enum_body_brace =
             self.find_char_outside_comments(decl.id.span.end, decl.span.end, b'{');
-        if let Some(brace) = enum_body_brace
-            && self.has_comments_to_emit_between(decl.id.span.end, brace)
-        {
-            parts.push(self.build_inline_comments_between_doc(decl.id.span.end, brace));
-        }
-        parts.push(d.text(" "));
 
         // Find body start (after '{')
         let body_start = enum_body_brace.map_or(decl.span.start, |b| b + 1);
         let body_end = decl.span.end.saturating_sub(1); // Before '}'
         let body_span = Span::new(body_start - 1, decl.span.end); // Include '{' and '}'
 
-        if decl.members.is_empty() {
+        // The header→`{` gap: its comments plus the pre-`{` spacing, and the body's
+        // format-ignore verdict. A line comment drops the brace to the next line —
+        // emitting the gap inline and appending a bare `" "` let the `//` swallow it
+        // (`enum E // c {`), output that does not reparse.
+        let (pre_body, frozen_body) =
+            self.build_declaration_pre_body_doc(decl.id.span.end, body_span);
+        parts.push(pre_body);
+
+        if let Some(frozen) = frozen_body {
+            parts.push(self.build_frozen_span_doc(frozen));
+        } else if decl.members.is_empty() {
             // Empty enum body - handle comments inside (a fitting block comment
             // stays inline as `enum E {/* c */}`).
             parts.push(self.build_empty_braces_inline_with_comments_doc(body_span));
@@ -1195,7 +1200,7 @@ impl<'a> Printer<'a> {
                     .extend(self.build_trailing_body_comments_doc(prev_end, body_end, false));
             }
 
-            parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&member_parts)])));
+            parts.push(d.indent_hardline(d.concat(&member_parts)));
             parts.push(d.hardline());
             parts.push(d.text("}"));
         }
@@ -1395,17 +1400,24 @@ impl<'a> Printer<'a> {
         match &decl.body {
             Some(internal::TSModuleDeclarationBody::TSModuleBlock(block)) => {
                 // Handle comments between name and body: namespace D /* comment */ {
+                // `decl.id` is the name, or `global` where that keyword is both.
                 let name_end = decl.id.span().end;
-                if self.has_comments_to_emit_between(name_end, block.span.start) {
-                    parts.push(self.build_inline_comments_between_doc(name_end, block.span.start));
-                }
-                parts.push(d.text(" "));
+
+                // The header→`{` gap: its comments plus the pre-`{` spacing, and the
+                // body's format-ignore verdict. A line comment drops the brace to the
+                // next line — emitting the gap inline and appending a bare `" "` let the
+                // `//` swallow it (`namespace D // c {`), output that does not reparse.
+                let (pre_body, frozen_body) =
+                    self.build_declaration_pre_body_doc(name_end, block.span);
+                parts.push(pre_body);
 
                 // Comments attached to a body whose only statements are
                 // dropped `EmptyStatement`s are still picked up by
                 // `build_empty_body_with_comments_doc`, which scans the full
                 // brace range rather than the statement list.
-                if is_effectively_empty_body(block.body) {
+                if let Some(frozen) = frozen_body {
+                    parts.push(self.build_frozen_span_doc(frozen));
+                } else if is_effectively_empty_body(block.body) {
                     // Empty namespace body - handle comments inside
                     parts.push(self.build_empty_body_with_comments_doc(block.span));
                 } else {
@@ -1447,7 +1459,7 @@ impl<'a> Printer<'a> {
                         tail.claims_trailing,
                     ));
 
-                    parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&stmt_parts)])));
+                    parts.push(d.indent_hardline(d.concat(&stmt_parts)));
                     parts.push(d.hardline());
                     parts.push(d.text("}"));
                 }

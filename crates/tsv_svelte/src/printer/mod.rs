@@ -470,7 +470,7 @@ impl<'a> Printer<'a> {
     /// after the break.
     pub(in crate::printer) fn indent_frozen_head(&self, content: DocId) -> DocId {
         let d = self.d();
-        d.indent(d.concat(&[d.hardline(), content]))
+        d.indent_hardline(content)
     }
 
     /// A braced head's assembled content wearing whatever **indents** it — the one ladder

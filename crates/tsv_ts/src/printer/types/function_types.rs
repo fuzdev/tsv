@@ -1158,7 +1158,7 @@ impl<'a> Printer<'a> {
 
         parts.push(d.text("("));
         parts.push(d.concat(&paren_prefix));
-        parts.push(d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])));
+        parts.push(d.indent_hardline(d.concat(&inner_parts)));
         parts.push(d.hardline());
         parts.push(d.text(")"));
         parts

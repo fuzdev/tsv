@@ -87,12 +87,7 @@ fn wrap_import_group(d: &DocArena, open: DocId, inner: DocId) -> DocId {
 /// `inner` + hardline + `)`. Used whenever a line comment (which runs to EOL) or an
 /// own-line comment forces the parens open.
 fn wrap_import_hardline(d: &DocArena, open: DocId, inner: DocId) -> DocId {
-    d.concat(&[
-        open,
-        d.indent(d.concat(&[d.hardline(), inner])),
-        d.hardline(),
-        d.text(")"),
-    ])
+    d.concat(&[open, d.indent_hardline(inner), d.hardline(), d.text(")")])
 }
 
 /// Build a Doc for a dynamic import expression: `import('module')` or `import('module', options)`

@@ -1,0 +1,1124 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 779,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " Line comment between the namespace header and the body `{` — `{` drops to the next line",
+			"start": 20,
+			"end": 110,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c1",
+			"start": 125,
+			"end": 130,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 14
+				},
+				"end": {
+					"line": 3,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Empty body — the collapsed braces still drop below the comment",
+			"start": 154,
+			"end": 219,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c2",
+			"start": 234,
+			"end": 239,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 14
+				},
+				"end": {
+					"line": 9,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " Multiple line comments, each kept on its own line (not merged)",
+			"start": 246,
+			"end": 311,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 66
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 326,
+			"end": 331,
+			"loc": {
+				"start": {
+					"line": 13,
+					"column": 14
+				},
+				"end": {
+					"line": 13,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c4",
+			"start": 333,
+			"end": 338,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `module` takes the same rule",
+			"start": 362,
+			"end": 393,
+			"loc": {
+				"start": {
+					"line": 19,
+					"column": 1
+				},
+				"end": {
+					"line": 19,
+					"column": 32
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c5",
+			"start": 405,
+			"end": 410,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 11
+				},
+				"end": {
+					"line": 20,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " `declare global` — `global` is both keyword and name, so the gap follows it",
+			"start": 434,
+			"end": 512,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 1
+				},
+				"end": {
+					"line": 25,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c6",
+			"start": 529,
+			"end": 534,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 16
+				},
+				"end": {
+					"line": 26,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A dotted name — the gap is after the innermost segment",
+			"start": 541,
+			"end": 598,
+			"loc": {
+				"start": {
+					"line": 29,
+					"column": 1
+				},
+				"end": {
+					"line": 29,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c7",
+			"start": 619,
+			"end": 624,
+			"loc": {
+				"start": {
+					"line": 30,
+					"column": 20
+				},
+				"end": {
+					"line": 30,
+					"column": 25
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " A single-line block comment collapses onto the header line and `{` hugs it",
+			"start": 648,
+			"end": 725,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c8 ",
+			"start": 740,
+			"end": 748,
+			"loc": {
+				"start": {
+					"line": 36,
+					"column": 14
+				},
+				"end": {
+					"line": 36,
+					"column": 22
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 778,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 769,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 39,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSModuleDeclaration",
+					"start": 112,
+					"end": 151,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 122,
+						"end": 124,
+						"loc": {
+							"start": {
+								"line": 3,
+								"column": 11
+							},
+							"end": {
+								"line": 3,
+								"column": 13
+							}
+						},
+						"name": "N1",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c1",
+								"start": 125,
+								"end": 130
+							}
+						]
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 132,
+						"end": 151,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 6,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 136,
+								"end": 148,
+								"loc": {
+									"start": {
+										"line": 5,
+										"column": 2
+									},
+									"end": {
+										"line": 5,
+										"column": 14
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 142,
+										"end": 147,
+										"loc": {
+											"start": {
+												"line": 5,
+												"column": 8
+											},
+											"end": {
+												"line": 5,
+												"column": 13
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 142,
+											"end": 143,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 8
+												},
+												"end": {
+													"line": 5,
+													"column": 9
+												}
+											},
+											"name": "a"
+										},
+										"init": {
+											"type": "Literal",
+											"start": 146,
+											"end": 147,
+											"loc": {
+												"start": {
+													"line": 5,
+													"column": 12
+												},
+												"end": {
+													"line": 5,
+													"column": 13
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								],
+								"kind": "const"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Line comment between the namespace header and the body `{` — `{` drops to the next line",
+							"start": 20,
+							"end": 110
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 221,
+					"end": 243,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 231,
+						"end": 233,
+						"loc": {
+							"start": {
+								"line": 9,
+								"column": 11
+							},
+							"end": {
+								"line": 9,
+								"column": 13
+							}
+						},
+						"name": "N2",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c2",
+								"start": 234,
+								"end": 239
+							}
+						]
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 241,
+						"end": 243,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 3
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Empty body — the collapsed braces still drop below the comment",
+							"start": 154,
+							"end": 219
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 313,
+					"end": 359,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 323,
+						"end": 325,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 11
+							},
+							"end": {
+								"line": 13,
+								"column": 13
+							}
+						},
+						"name": "N3",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c3",
+								"start": 326,
+								"end": 331
+							}
+						]
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 340,
+						"end": 359,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 1
+							},
+							"end": {
+								"line": 17,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 344,
+								"end": 356,
+								"loc": {
+									"start": {
+										"line": 16,
+										"column": 2
+									},
+									"end": {
+										"line": 16,
+										"column": 14
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 350,
+										"end": 355,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 8
+											},
+											"end": {
+												"line": 16,
+												"column": 13
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 350,
+											"end": 351,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 8
+												},
+												"end": {
+													"line": 16,
+													"column": 9
+												}
+											},
+											"name": "b"
+										},
+										"init": {
+											"type": "Literal",
+											"start": 354,
+											"end": 355,
+											"loc": {
+												"start": {
+													"line": 16,
+													"column": 12
+												},
+												"end": {
+													"line": 16,
+													"column": 13
+												}
+											},
+											"value": 2,
+											"raw": "2"
+										}
+									}
+								],
+								"kind": "const"
+							}
+						],
+						"leadingComments": [
+							{
+								"type": "Line",
+								"value": " c4",
+								"start": 333,
+								"end": 338
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " Multiple line comments, each kept on its own line (not merged)",
+							"start": 246,
+							"end": 311
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 395,
+					"end": 431,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 402,
+						"end": 404,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 8
+							},
+							"end": {
+								"line": 20,
+								"column": 10
+							}
+						},
+						"name": "M1",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c5",
+								"start": 405,
+								"end": 410
+							}
+						]
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 412,
+						"end": 431,
+						"loc": {
+							"start": {
+								"line": 21,
+								"column": 1
+							},
+							"end": {
+								"line": 23,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 416,
+								"end": 428,
+								"loc": {
+									"start": {
+										"line": 22,
+										"column": 2
+									},
+									"end": {
+										"line": 22,
+										"column": 14
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 422,
+										"end": 427,
+										"loc": {
+											"start": {
+												"line": 22,
+												"column": 8
+											},
+											"end": {
+												"line": 22,
+												"column": 13
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 422,
+											"end": 423,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 8
+												},
+												"end": {
+													"line": 22,
+													"column": 9
+												}
+											},
+											"name": "c"
+										},
+										"init": {
+											"type": "Literal",
+											"start": 426,
+											"end": 427,
+											"loc": {
+												"start": {
+													"line": 22,
+													"column": 12
+												},
+												"end": {
+													"line": 22,
+													"column": 13
+												}
+											},
+											"value": 3,
+											"raw": "3"
+										}
+									}
+								],
+								"kind": "const"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `module` takes the same rule",
+							"start": 362,
+							"end": 393
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 514,
+					"end": 538,
+					"loc": {
+						"start": {
+							"line": 26,
+							"column": 1
+						},
+						"end": {
+							"line": 27,
+							"column": 3
+						}
+					},
+					"global": true,
+					"id": {
+						"type": "Identifier",
+						"start": 522,
+						"end": 528,
+						"loc": {
+							"start": {
+								"line": 26,
+								"column": 9
+							},
+							"end": {
+								"line": 26,
+								"column": 15
+							}
+						},
+						"name": "global",
+						"trailingComments": [
+							{
+								"type": "Line",
+								"value": " c6",
+								"start": 529,
+								"end": 534
+							}
+						]
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 536,
+						"end": 538,
+						"loc": {
+							"start": {
+								"line": 27,
+								"column": 1
+							},
+							"end": {
+								"line": 27,
+								"column": 3
+							}
+						},
+						"body": []
+					},
+					"declare": true,
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " `declare global` — `global` is both keyword and name, so the gap follows it",
+							"start": 434,
+							"end": 512
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 600,
+					"end": 645,
+					"loc": {
+						"start": {
+							"line": 30,
+							"column": 1
+						},
+						"end": {
+							"line": 33,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 610,
+						"end": 612,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 11
+							},
+							"end": {
+								"line": 30,
+								"column": 13
+							}
+						},
+						"name": "N4"
+					},
+					"body": {
+						"type": "TSModuleDeclaration",
+						"start": 613,
+						"end": 645,
+						"loc": {
+							"start": {
+								"line": 30,
+								"column": 14
+							},
+							"end": {
+								"line": 33,
+								"column": 2
+							}
+						},
+						"id": {
+							"type": "Identifier",
+							"start": 613,
+							"end": 618,
+							"loc": {
+								"start": {
+									"line": 30,
+									"column": 14
+								},
+								"end": {
+									"line": 30,
+									"column": 19
+								}
+							},
+							"name": "Inner",
+							"trailingComments": [
+								{
+									"type": "Line",
+									"value": " c7",
+									"start": 619,
+									"end": 624
+								}
+							]
+						},
+						"body": {
+							"type": "TSModuleBlock",
+							"start": 626,
+							"end": 645,
+							"loc": {
+								"start": {
+									"line": 31,
+									"column": 1
+								},
+								"end": {
+									"line": 33,
+									"column": 2
+								}
+							},
+							"body": [
+								{
+									"type": "VariableDeclaration",
+									"start": 630,
+									"end": 642,
+									"loc": {
+										"start": {
+											"line": 32,
+											"column": 2
+										},
+										"end": {
+											"line": 32,
+											"column": 14
+										}
+									},
+									"declarations": [
+										{
+											"type": "VariableDeclarator",
+											"start": 636,
+											"end": 641,
+											"loc": {
+												"start": {
+													"line": 32,
+													"column": 8
+												},
+												"end": {
+													"line": 32,
+													"column": 13
+												}
+											},
+											"id": {
+												"type": "Identifier",
+												"start": 636,
+												"end": 637,
+												"loc": {
+													"start": {
+														"line": 32,
+														"column": 8
+													},
+													"end": {
+														"line": 32,
+														"column": 9
+													}
+												},
+												"name": "d"
+											},
+											"init": {
+												"type": "Literal",
+												"start": 640,
+												"end": 641,
+												"loc": {
+													"start": {
+														"line": 32,
+														"column": 12
+													},
+													"end": {
+														"line": 32,
+														"column": 13
+													}
+												},
+												"value": 4,
+												"raw": "4"
+											}
+										}
+									],
+									"kind": "const"
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A dotted name — the gap is after the innermost segment",
+							"start": 541,
+							"end": 598
+						}
+					]
+				},
+				{
+					"type": "TSModuleDeclaration",
+					"start": 727,
+					"end": 768,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 38,
+							"column": 2
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 737,
+						"end": 739,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 11
+							},
+							"end": {
+								"line": 36,
+								"column": 13
+							}
+						},
+						"name": "N5",
+						"trailingComments": [
+							{
+								"type": "Block",
+								"value": " c8 ",
+								"start": 740,
+								"end": 748
+							}
+						]
+					},
+					"body": {
+						"type": "TSModuleBlock",
+						"start": 749,
+						"end": 768,
+						"loc": {
+							"start": {
+								"line": 36,
+								"column": 23
+							},
+							"end": {
+								"line": 38,
+								"column": 2
+							}
+						},
+						"body": [
+							{
+								"type": "VariableDeclaration",
+								"start": 753,
+								"end": 765,
+								"loc": {
+									"start": {
+										"line": 37,
+										"column": 2
+									},
+									"end": {
+										"line": 37,
+										"column": 14
+									}
+								},
+								"declarations": [
+									{
+										"type": "VariableDeclarator",
+										"start": 759,
+										"end": 764,
+										"loc": {
+											"start": {
+												"line": 37,
+												"column": 8
+											},
+											"end": {
+												"line": 37,
+												"column": 13
+											}
+										},
+										"id": {
+											"type": "Identifier",
+											"start": 759,
+											"end": 760,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 8
+												},
+												"end": {
+													"line": 37,
+													"column": 9
+												}
+											},
+											"name": "e"
+										},
+										"init": {
+											"type": "Literal",
+											"start": 763,
+											"end": 764,
+											"loc": {
+												"start": {
+													"line": 37,
+													"column": 12
+												},
+												"end": {
+													"line": 37,
+													"column": 13
+												}
+											},
+											"value": 5,
+											"raw": "5"
+										}
+									}
+								],
+								"kind": "const"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A single-line block comment collapses onto the header line and `{` hugs it",
+							"start": 648,
+							"end": 725
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

@@ -390,7 +390,7 @@ impl<'a> Printer<'a> {
         // leading `| `), or glued after the operator's space.
         let hang = |inner: DocId| {
             if on_new_line {
-                d.indent(d.concat(&[d.hardline(), inner]))
+                d.indent_hardline(inner)
             } else {
                 d.concat(&[d.text(" "), d.indent(self.prepend_opt(run, inner))])
             }
@@ -1654,7 +1654,7 @@ impl<'a> Printer<'a> {
         d.concat(&[
             d.text("["),
             d.concat(&bracket_line_prefix),
-            d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])),
+            d.indent_hardline(d.concat(&inner_parts)),
             d.hardline(),
             d.text("]"),
         ])

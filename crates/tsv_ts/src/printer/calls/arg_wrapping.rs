@@ -139,7 +139,7 @@ fn wrap_call(d: &DocArena, callee: DocId, args: DocId, style: CallBreakStyle) ->
         CallBreakStyle::Hard => d.concat(&[
             callee,
             d.text("("),
-            d.indent(d.concat(&[d.hardline(), args])),
+            d.indent_hardline(args),
             d.hardline(),
             d.text(")"),
         ]),
@@ -185,7 +185,7 @@ pub(crate) fn wrap_call_with_hard_breaks_paren_line(
         callee,
         d.text("("),
         d.concat(paren_line),
-        d.indent(d.concat(&[d.hardline(), args])),
+        d.indent_hardline(args),
         d.hardline(),
         d.text(")"),
     ])
@@ -720,7 +720,7 @@ pub(crate) fn build_break_body_state(
         d.concat(head_parts),
         sig_doc,
         d.text(" =>"),
-        d.indent(d.concat(&[d.hardline(), body_doc])),
+        d.indent_hardline(body_doc),
         d.hardline(),
         d.text(")"),
     ])
@@ -784,7 +784,7 @@ pub(crate) fn build_arrow_call_body_states(
             d.text("("),
             sig_doc,
             d.text(" =>"),
-            d.indent(d.concat(&[d.hardline(), body_doc])),
+            d.indent_hardline(body_doc),
             d.hardline(),
             d.text(")"),
         ]),

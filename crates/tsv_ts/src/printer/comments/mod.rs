@@ -1400,7 +1400,7 @@ impl<'a> Printer<'a> {
             Some(d.concat(&[
                 d.text(" ="),
                 d.concat(&trailing),
-                d.indent(d.concat(&[d.hardline(), d.concat(&leading), build_value()])),
+                d.indent_hardline(d.concat(&[d.concat(&leading), build_value()])),
             ]))
         } else if self
             .comments_on_page_between(eq_pos + 1, value_start)
