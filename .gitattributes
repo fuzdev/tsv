@@ -1,3 +1,16 @@
+# Working-tree line endings are LF on every platform. The fixture suite is
+# byte-exact (expected.json / output_prettier.* / unformatted_* record exact
+# bytes), so a CRLF-converting checkout — e.g. GitHub's Windows runners, which
+# default core.autocrlf=true — would fail every fixture before any real bug
+# gets a chance to. text=auto leaves binary files alone.
+* text=auto eol=lf
+
+# CR / CRLF line-terminator fixtures — the CR bytes ARE the test payload;
+# exempt from all conversion (renormalization would silently corrupt them).
+# Any future fixture carrying deliberate CR bytes needs an entry here.
+unformatted_cr.svelte -text
+unformatted_crlf.svelte -text
+
 # Recorded oracle outputs — committed on purpose, but generated:
 # collapse in GitHub diffs and exclude from language stats.
 tests/fixtures/**/expected*.json linguist-generated
