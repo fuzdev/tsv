@@ -208,9 +208,10 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		assert.throws(() => node_entry.format_typescript('x;', ['script']), /must be an object/);
 		// `null` and `undefined` both mean all-defaults — `null` is the arm that
 		// would otherwise fall through to the non-object error, since it is
-		// `typeof 'object'`
+		// `typeof 'object'` — and so does `{}`, the zero-key object path
 		assert.equal(node_entry.format_typescript('const   x=1', null), 'const x = 1;\n');
 		assert.equal(node_entry.format_typescript('const   x=1', undefined), 'const x = 1;\n');
+		assert.equal(node_entry.format_typescript('const   x=1', {}), 'const x = 1;\n');
 	});
 
 	it('format_* absent from the parse-only build', { skip: has_format }, () => {
@@ -328,9 +329,10 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		assert.throws(() => node_entry.parse_typescript('x;', []), /must be an object/);
 		// `null` and `undefined` both mean all-defaults — `null` is the arm that
 		// would otherwise fall through to the non-object error, since it is
-		// `typeof 'object'`
+		// `typeof 'object'` — and so does `{}`, the zero-key object path
 		assert.ok(node_entry.parse_typescript('x;', null).loc);
 		assert.ok(node_entry.parse_typescript('x;', undefined).loc);
+		assert.ok(node_entry.parse_typescript('x;', {}).loc);
 	});
 });
 
