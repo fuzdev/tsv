@@ -533,17 +533,22 @@ statement **list** — a `switch` body's `{`→first-case and between-case gaps,
 node span, exactly as it already does in a program body and a block body. A statement **head**
 — the `)`→consequent and `else`→alternate gaps, every loop's →body gap (`while`, C-style `for`,
 for-in / for-of, and `do`, which introduces its body with no `)` of its own), a `label:`→body
-gap, the `}`→`catch` / `}`→`finally` gap, and a class head's →`{` gap — freezes the single
-statement, clause or body that follows it. The slice is that node's own span, so a `case` label
-rides inside its own frozen case while the sibling cases normalize, and a class name and
-`extends` clause stay parent-owned while the body freezes. A **block** body freezes with its
-braces, and a loop's collapsed-empty-block form (`for (…) {}`) yields to the verbatim slice.
+gap, the `}`→`catch` / `}`→`finally` gap, and the →`{` gap of every braced-body **declaration**
+head (`class`, `interface`, `enum` / `const enum`, and `namespace` / `module` / `declare
+global`) — freezes the single statement, clause or body that follows it. The slice is that
+node's own span, so a `case` label rides inside its own frozen case while the sibling cases
+normalize, and a declaration's name, type parameters and `extends` clause stay parent-owned
+while the body freezes. A **block** body freezes with its braces, and a loop's
+collapsed-empty-block form (`for (…) {}`) yields to the verbatim slice.
 
-Two of those heads relocate an ordinary own-line comment — a labeled statement's trails the
-label (`lll: // c`) and a class head's trails the heritage (`class Aaa // c`) — and there, as
-at the declaration headers of §On module and declarator lists, an **honored directive keeps its
-own line** instead: the trailing placement is inert under the floor, so following the
-relocation would lose the freeze on tsv's own second pass.
+Those heads relocate an ordinary own-line comment — a labeled statement's trails the label
+(`lll: // c`), and a declaration head's trails its last token (`class Aaa // c`,
+`enum Aaa // c`, `namespace Aaa // c`) — and there, as at the declaration headers of §On module
+and declarator lists, an **honored directive keeps its own line** instead: the trailing
+placement is inert under the floor, so following the relocation would lose the freeze on tsv's
+own second pass. The four declaration heads answer both questions on one pair of seams —
+`Printer::gap_frozen_span` resolves the slice, `Printer::build_header_pre_body_doc` places the
+run and picks the pre-`{` separator.
 
 Prettier agrees at the list positions and at the `if` heads — including the freeze's SCOPE
 there, which the fixtures' `unformatted_spaces` variants pin by perturbing the head outside the
@@ -558,9 +563,17 @@ slice — so the ordinary fixtures `statements/switch/case_prettier_ignore_head`
   is already sanctioned at
   [catch_between_comment](../tests/fixtures/typescript/statements/try/catch_between_comment_prettier_divergence/) —
   [handler head](../tests/fixtures/typescript/statements/try/handler_prettier_ignore_head_prettier_divergence/)
-- **Class body** — ◆comment_preservation — prettier pulls the `{` up onto the head line, moves
-  the directive inside the body and freezes the **first member**; tsv freezes the whole body —
-  [class body head](../tests/fixtures/typescript/class/body_prettier_ignore_head_prettier_divergence/)
+- **Declaration body** — ◆comment_preservation — tsv freezes the whole body at all four heads.
+  Prettier splits: at `class` and `interface` it pulls the `{` up onto the head line, moves the
+  directive inside the body and freezes the **first member**; at `enum` and `namespace` it
+  relocates the directive onto the *header* line, where the freeze does not survive its own
+  second pass — pass 1 keeps the body verbatim under `enum Aaa // prettier-ignore`, pass 2
+  normalizes it, so the authored directive ends up affecting nothing. That is the same
+  second-pass loss tsv's own-line placement exists to avoid, one formatter over —
+  [class body head](../tests/fixtures/typescript/class/body_prettier_ignore_head_prettier_divergence/),
+  [interface body head](../tests/fixtures/typescript/declarations/interface/body_prettier_ignore_head_prettier_divergence/),
+  [enum body head](../tests/fixtures/typescript/declarations/enum/body_prettier_ignore_head_prettier_divergence/),
+  [namespace body head](../tests/fixtures/typescript/declarations/namespace/body_prettier_ignore_head_prettier_divergence/)
 - **Labeled body** — ◆design_choice — a SCOPE difference rather than a relocation: prettier
   freezes the whole labeled statement (its comment attaches to the `LabeledStatement`, since a
   `:` begins no node), so a spaced label survives; tsv freezes the body the directive actually

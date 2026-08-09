@@ -154,10 +154,7 @@ impl<'a> Printer<'a> {
         let body_doc = if case_parts.is_empty() {
             d.hardline()
         } else {
-            d.concat(&[
-                d.indent(d.concat(&[d.hardline(), d.concat(&case_parts)])),
-                d.hardline(),
-            ])
+            d.concat(&[d.indent_hardline(d.concat(&case_parts)), d.hardline()])
         };
 
         let mut switch_parts: DocBuf = DocBuf::new();

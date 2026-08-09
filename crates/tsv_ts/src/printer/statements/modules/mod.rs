@@ -1023,7 +1023,7 @@ impl<'a> Printer<'a> {
             inner.push(value_doc);
             return d.concat(&[
                 d.text("require("),
-                d.indent(d.concat(&[d.hardline(), d.concat(&inner)])),
+                d.indent_hardline(d.concat(&inner)),
                 d.hardline(),
                 d.text(")"),
             ]);

@@ -619,7 +619,7 @@ impl<'a> Printer<'a> {
         };
         Some(d.concat(&[
             open_doc,
-            d.indent(d.concat(&[d.hardline(), d.concat(&body)])),
+            d.indent_hardline(d.concat(&body)),
             d.hardline(),
             d.text(")"),
         ]))

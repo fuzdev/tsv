@@ -172,6 +172,17 @@ impl<'a> Printer<'a> {
         // answer (keep the run's own line) and the body builder needs the span.
         let frozen_body = self.gap_frozen_span(positions.header_end, decl.body.span);
 
+        // The named and anonymous paths differ only in the header `parts` they hand the
+        // builder, so the options — including the freeze verdict above — are resolved once
+        // here. Carries no `DocId`, so hoisting it past the header doc is arena-neutral.
+        let header_options = ClassHeaderOptions {
+            body_is_empty: decl.body.body.is_empty(),
+            body_start: decl.body.span.start,
+            layout: ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments),
+            emit_pre_body_comments: true,
+            body_frozen: frozen_body.is_some(),
+        };
+
         if let Some(id) = &decl.id {
             // Named: collect the name + type params + heritage + body into one
             // continuation so a *line* comment in the `class`→name gap indents the
@@ -196,13 +207,7 @@ impl<'a> Printer<'a> {
                 extends_doc,
                 implements_doc,
                 decl.implements,
-                ClassHeaderOptions {
-                    body_is_empty: decl.body.body.is_empty(),
-                    body_start: decl.body.span.start,
-                    layout: ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments),
-                    emit_pre_body_comments: true,
-                    body_frozen: frozen_body.is_some(),
-                },
+                header_options,
             );
             let continuation = d.concat(&[
                 header_doc,
@@ -227,13 +232,7 @@ impl<'a> Printer<'a> {
             extends_doc,
             implements_doc,
             decl.implements,
-            ClassHeaderOptions {
-                body_is_empty: decl.body.body.is_empty(),
-                body_start: decl.body.span.start,
-                layout: ClassHeaderLayout::from_flags(group_mode, has_heritage_line_comments),
-                emit_pre_body_comments: true,
-                body_frozen: frozen_body.is_some(),
-            },
+            header_options,
         );
 
         d.concat(&[
@@ -390,7 +389,7 @@ impl<'a> Printer<'a> {
         d.concat(&[
             d.text("{"),
             d.concat(&brace_line_prefix),
-            d.indent(d.concat(&[d.hardline(), d.concat(&member_parts)])),
+            d.indent_hardline(d.concat(&member_parts)),
             d.hardline(),
             d.text("}"),
         ])

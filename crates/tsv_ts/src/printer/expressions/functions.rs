@@ -425,7 +425,7 @@ impl<'a> Printer<'a> {
             //     (b, // c) =>
             //     (c, // c) => {}
             let body_doc = self.build_with_in_curried(true, || self.build_arrow_body_doc(expr));
-            parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
+            parts.push(d.indent_hardline(body_doc));
         } else if self.in_curried_typed_arrow.get() {
             // Innermost arrow in curried chain - body is NOT another arrow.
             // This needs indent since it's the final expression.
@@ -433,7 +433,7 @@ impl<'a> Printer<'a> {
             // treated as part of the curried chain; restore to `true` (its value on
             // entry, since this arm is reached only when the flag is set) afterward.
             let body_doc = self.build_with_in_curried(false, || self.build_arrow_body_doc(expr));
-            parts.push(d.indent(d.concat(&[d.hardline(), body_doc])));
+            parts.push(d.indent_hardline(body_doc));
         } else if matches!(expr, internal::Expression::ConditionalExpression(_))
             && !has_leftmost_object_expression(expr)
         {
@@ -1535,7 +1535,7 @@ impl<'a> Printer<'a> {
             // No trailing comma (trailingComma: 'none'); a preserved after-comma block
             // comment on the last param still lands past where the comma was.
             inner_parts.append(&mut last_after_comma_docs);
-            result.push(d.indent(d.concat(&[d.hardline(), d.concat(&inner_parts)])));
+            result.push(d.indent_hardline(d.concat(&inner_parts)));
             result.push(d.hardline());
         } else if flat_list {
             // No indent and no softlines: the list itself offers no break point, exactly as

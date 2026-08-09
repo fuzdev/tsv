@@ -403,7 +403,7 @@ impl<'a> Printer<'a> {
                 parts.push(consequent_doc);
             } else {
                 parts.push(d.text(")"));
-                parts.push(d.indent(d.concat(&[d.hardline(), consequent_doc])));
+                parts.push(d.indent_hardline(consequent_doc));
             }
         }
 

@@ -467,7 +467,7 @@ impl<'a> Printer<'a> {
     fn indent_body_expand(&self, body: DocId, multiline: bool) -> DocId {
         let d = self.d();
         if multiline {
-            d.indent(d.concat(&[d.hardline(), body]))
+            d.indent_hardline(body)
         } else {
             d.indent(body)
         }

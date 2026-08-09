@@ -263,7 +263,7 @@ impl<'a> Printer<'a> {
                                 d.text("("),
                                 sig_doc,
                                 d.text(" =>"),
-                                d.indent(d.concat(&[d.hardline(), body_doc])),
+                                d.indent_hardline(body_doc),
                                 d.hardline(),
                                 d.text(")"),
                             ]);
@@ -288,7 +288,7 @@ impl<'a> Printer<'a> {
                                     d.hardline(),
                                     sig_doc,
                                     d.text(" =>"),
-                                    d.indent(d.concat(&[d.hardline(), body_doc])),
+                                    d.indent_hardline(body_doc),
                                 ])),
                                 d.hardline(),
                                 d.text(")"),
@@ -773,7 +773,7 @@ impl<'a> Printer<'a> {
                     callee_with_types,
                     d.text("("),
                     d.concat(&paren_line_prefix),
-                    d.indent(d.concat(&[d.hardline(), d.concat(&inner)])),
+                    d.indent_hardline(d.concat(&inner)),
                     d.hardline(),
                     d.text(")"),
                 ]);

@@ -774,7 +774,7 @@ impl<'a> Printer<'a> {
         // (`build_nodes_doc_multiline` == `build_nodes_doc_trimmed(nodes, true, breakable,
         // true)`); rebuilding here per level is what made deeply-nested content O(2^depth).
         let opening_tag = self.build_opening_tag(parts.name, attr_docs, ctx.has_multiline_attr);
-        let indent_inner = d.indent(d.concat(&[d.hardline(), children_doc]));
+        let indent_inner = d.indent_hardline(children_doc);
         d.concat(&[
             opening_tag,
             d.text(">"),
