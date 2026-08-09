@@ -65,19 +65,18 @@ const SANCTIONED: Sanction[] = [
 		reason:
 			'legacy `assert {…}` import attributes — abandoned pre-spec form; tsv is `with`-only per ecma262'
 	},
-	// IE property/selector hacks — proprietary syntax outside the CSS grammar, a
-	// PERMANENT non-goal (docs/conformance_svelte.md §CSS Parser Scope). tsv is
-	// spec-only; this never becomes valid, so it's a true sanction, not a gap.
+	// IE hacks that are UNGRAMMATICAL — the star-html selector (`* html p`) and the
+	// `*`/`+` property prefixes (`*zoom`, `+color`), which no CSS production admits.
+	// A PERMANENT non-goal (docs/conformance_svelte.md §CSS Parser Scope): tsv is
+	// spec-only, so this never becomes valid — a true sanction, not a gap.
+	// ⚠ Deliberately narrow: the file's OTHER hacks are ordinary CSS and tsv parses
+	// them fine (`_height: 1px` — `_` is a valid ident-start; `color: red\9` — an
+	// ordinary ident escape). Only their MEANING is proprietary, and meaning is not
+	// the parser's business, so "IE hacks" is not itself a rejection reason.
 	{
 		pattern: 'tests/format/css/stylefmt-repo/ie-hacks/',
 		reason:
-			'IE property/selector hacks — proprietary syntax outside the CSS grammar; tsv is spec-only (permanent non-goal)'
-	},
-	// Not a Svelte component — an HTML conformance file the corpus loader feeds
-	// to the Svelte parser; svelte/compiler happens to tolerate its raw `[`.
-	{
-		pattern: 'tests/format/html/tags/tags.html',
-		reason: '.html file, not Svelte — raw template `[` svelte tolerates; out of tsv scope'
+			'ungrammatical IE hacks (`* html` selector, `*`/`+` property prefixes) — outside the CSS grammar; tsv is spec-only (permanent non-goal)'
 	}
 ];
 
@@ -165,12 +164,6 @@ const KNOWN_GAPS: KnownGap[] = [
 		category: 'css-error-recovery',
 		reason:
 			'`//` line comment inside a keyframe block (not valid CSS) — parseCss lenient/recovers; tsv hard-fails'
-	},
-	{
-		pattern: 'wpt_css/css-variables/variable-declaration-59__0.css',
-		category: 'css-error-recovery',
-		reason:
-			'unbalanced `)` in a custom-property value (`--a: red)`) — <declaration-value> disallows an unmatched `)`; parseCss lenient'
 	},
 	{
 		pattern: 'wpt_css/css-conditional/at-supports-030__0.css',
