@@ -42,6 +42,8 @@ Every parser accepts an optional second argument, like acorn:
 
 Unknown option keys throw, whatever their value — a typo like `{locatons: false}` (or `{locatons: undefined}`) fails loudly instead of silently handing back the full wire.
 
+A second argument that isn't an object throws too, arrays included. That makes `sources.map(parse_typescript)` an error, since `map` passes the index as the second argument — write `sources.map((s) => parse_typescript(s))`.
+
 ### Reconstructing line/column
 
 Need `loc` back? The package ships a pure-JS helper that derives it from the span-only wire + your source — no re-parse:

@@ -31,7 +31,15 @@ default = ["format", "parse"]
 # `format_*` exports + the `IgnoreStack` discovery matcher and its
 # `tsv_discover` verdict methods (@fuzdev/tsv_format_wasm when alone).
 # `tsv_arena/format` adds the reusable doc arena (`with_doc_arena`).
-format = ["dep:tsv_ignore", "dep:tsv_discover", "tsv_arena/format"]
+# `js-sys` reads the format exports' options bag — one shared reader with the
+# parse exports, so the two families can't drift (measured cost of adding it
+# here: +0.19% raw / +0.18% gzipped on the format-only package).
+format = [
+    "dep:tsv_ignore",
+    "dep:tsv_discover",
+    "tsv_arena/format",
+    "dep:js-sys",
+]
 # `parse_*` exports + convert layer (@fuzdev/tsv_parse_wasm when alone).
 # The parse-only build drops the printers via link-level dead-code
 # elimination — no printer feature gates in the language crates.
@@ -59,9 +67,10 @@ tsv_ignore = { workspace = true, optional = true }
 # IgnoreStack wrapper's verdict methods. Format-only, like tsv_ignore.
 tsv_discover = { workspace = true, optional = true }
 wasm-bindgen = "0.2"
-# Engine-native JSON.parse for the parse_* exports: the AST crosses the
-# boundary as one JSON string instead of a serde_wasm_bindgen-built object
-# graph (measurably faster materialization).
+# Two uses, one per feature: engine-native JSON.parse for the parse_* exports
+# (the AST crosses the boundary as one JSON string instead of a
+# serde_wasm_bindgen-built object graph — measurably faster materialization),
+# and `Object.keys`/`Reflect::get` for reading either family's options bag.
 js-sys = { version = "0.3", optional = true }
 
 # WASM-only global allocator (see the `#[global_allocator]` in lib.rs): a

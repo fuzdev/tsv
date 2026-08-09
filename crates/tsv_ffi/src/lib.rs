@@ -298,12 +298,19 @@ lang_bindings!(
 // Goal-aware TypeScript parse (script vs module)
 //
 // The parse goal is TypeScript-only (Svelte `<script>` is always a module; CSS
-// has no goal), so — like `tsv_wasm` — these live outside `lang_bindings!`
-// rather than threading a meaningless goal through svelte/css. The goalless
-// `tsv_parse_typescript*` exports remain the `Module` default; these mirror them
-// against an explicit goal code (`0` = Module, anything else = Script). At Script
-// goal, `await` is an ordinary identifier and `import`/`export`/`import.meta` are
-// syntax errors. See `tsv parse --goal` and `tsv_ts::parse_with_goal`.
+// has no goal), so these live outside `lang_bindings!` rather than threading a
+// meaningless goal through svelte/css. The goalless `tsv_parse_typescript*`
+// exports remain the `Module` default; these mirror them against an explicit
+// goal code (`0` = Module, anything else = Script). At Script goal, `await` is
+// an ordinary identifier and `import`/`export`/`import.meta` are syntax errors.
+// See `tsv parse --goal` and `tsv_ts::parse_with_goal`.
+//
+// `tsv_wasm` no longer shares this shape: there the goal is one key of a
+// per-call options bag threaded through its own `lang_bindings!`, and it reaches
+// the FORMAT exports as well. Here only parse is goal-aware, so a Script-goal
+// format has no counterpart over the C ABI (`tsv format --goal` and
+// `format_typescript(src, {goal})` both do). See `crates/tsv_wasm/CLAUDE.md`
+// §Format Options.
 
 /// Map the C-ABI goal code to `tsv_ts::Goal` (`0` = Module, else Script).
 #[cfg(feature = "parse")]

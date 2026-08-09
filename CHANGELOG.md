@@ -9,9 +9,13 @@ non-empty and carry a `<!-- bump: patch|minor|major -->` marker; `deno task publ
 `## Unreleased` (reset to `bump: patch`) for the next cycle.
 
 ## Unreleased
+<!-- bump: minor -->
 
 - many formatting fixes
-- feat: rework the API to take an options object ([#645](https://github.com/fuzdev/tsv/pull/645))
+- **breaking** feat: every WASM export now takes an optional acorn-style options object —
+  `parse_*(source, {locations?, goal?})` and `format_*(source, {goal?})`,
+  replacing the flat `*_no_locations` / `*_with_goal` / `*_with_goal_no_locations` names
+  ([#645](https://github.com/fuzdev/tsv/pull/645), [#713](https://github.com/fuzdev/tsv/pull/713))
 - feat: more formatting choices to take advantage of Svelte 5 whitespace changes
   ([#558](https://github.com/fuzdev/tsv/pull/558), [#600](https://github.com/fuzdev/tsv/pull/600),
   [#601](https://github.com/fuzdev/tsv/pull/601), [#607](https://github.com/fuzdev/tsv/pull/607))

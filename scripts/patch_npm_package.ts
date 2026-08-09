@@ -14,8 +14,13 @@
  *
  * The exported function list is extracted from the generated `tsv_wasm.js`
  * (every `export function format_*` / `parse_*`), so adding a language to
- * `lang_bindings!` flows through with no changes here. `parse_internal_*`
- * exports are bench-only and excluded from the wrappers.
+ * `lang_bindings!` flows through the JS wrappers with no changes here.
+ * `parse_internal_*` exports are bench-only and excluded from the wrappers.
+ * Its TYPES do not flow through — every parse/format export is
+ * `skip_typescript`, so a new language also needs a declaration hand-added to
+ * `TS_PARSE_DECLS` / `TS_FORMAT_DECLS`. This script fails the build when one is
+ * missing (the declaration check alongside the export validations), because the
+ * omission is otherwise silent all the way to a consumer.
  *
  * For the variants with parse exports (`parse`, `all`), also copies
  * `crates/tsv_wasm/types/tsv_ast.d.ts` into the package root alongside the
@@ -55,6 +60,8 @@ const has_parse_exports = variant !== 'format';
 const pkg_root = `crates/tsv_wasm/pkg/${variant}/npm`;
 const main_js = 'tsv_wasm.js';
 const dts_file = 'tsv_wasm.d.ts';
+/** `dts_file` as an import specifier — what the generated `index.d.ts` re-exports from. */
+const dts_module = `./${dts_file.replace(/\.d\.ts$/, '')}`;
 const wasm_file = 'tsv_wasm_bg.wasm';
 const cli_file = 'cli.js';
 // The pure-JS `no-locations` line/column reconstruction helper (`npm/locations.js`
@@ -121,6 +128,41 @@ if (has_format_exports) {
 }
 console.log(`Exports: ${[...fns, ...classes].join(', ')}`);
 
+// Each family's hand-written option types (the `TS_PARSE_DECLS` /
+// `TS_FORMAT_DECLS` custom sections in crates/tsv_wasm/src/lib.rs). index.d.ts
+// re-exports them by NAME, so the tsv_ast/locations star exports can never
+// ambiguate them away (the TS2308 rule).
+const parse_option_types = has_parse_exports ? ['ParseOptions', 'TypeScriptParseOptions'] : [];
+const format_option_types = has_format_exports ? ['FormatOptions', 'TypeScriptFormatOptions'] : [];
+
+// Every name index.d.ts will re-export must actually be DECLARED in the
+// generated `tsv_wasm.d.ts`. Not a formality: every parse/format export is
+// `#[wasm_bindgen(skip_typescript)]`, so its declaration comes from a
+// hand-written `typescript_custom_section` rather than from wasm-bindgen, and
+// the only thing holding the two in sync is a "must update this block too"
+// comment. A name that drifts out does NOT fail loudly downstream — without
+// `skipLibCheck` it is a TS2614 *inside the shipped package*, and WITH it (the
+// common consumer config) the export silently degrades to `any`, so the package
+// keeps type-checking while checking nothing. Nothing in-repo type-checks the
+// merged `.d.ts` (`check:ast-types` covers `tsv_ast.d.ts` alone), so this is the
+// only place the drift can still fail a build. Checked here, with the other
+// export validations, so a failure leaves no half-patched package behind.
+const generated_dts = Deno.readTextFileSync(`${pkg_root}/${dts_file}`);
+const undeclared = [
+	...fns.map((name) => ['function', name] as const),
+	...classes.map((name) => ['class', name] as const),
+	...[...parse_option_types, ...format_option_types].map((name) => ['interface', name] as const)
+].filter(([kind, name]) => !new RegExp(`^export ${kind} ${name}\\b`, 'm').test(generated_dts));
+if (undeclared.length) {
+	console.error(
+		`FAIL: ${dts_file} is missing ${undeclared.map(([kind, name]) => `${kind} \`${name}\``).join(', ')} — ` +
+			`index.d.ts re-exports the name${undeclared.length === 1 ? '' : 's'} anyway, which ships ` +
+			`untyped under a consumer's skipLibCheck. Add the declaration to TS_PARSE_DECLS / ` +
+			`TS_FORMAT_DECLS in crates/tsv_wasm/src/lib.rs.`
+	);
+	Deno.exit(1);
+}
+
 // 2. Create index.js — Node.js/Bun entry: auto-init via readFileSync + initSync.
 // WASM is initialized synchronously at import time, so no init guard needed.
 
@@ -178,9 +220,9 @@ export function init_sync(...args) {
 
 ${fns
 	.map(
-		// Arity-agnostic passthrough: the exports take differing extra args
-		// (parse_* an options object, format_typescript_with_goal a goal string),
-		// so the guard must forward every argument, not a fixed parameter list.
+		// Arity-agnostic passthrough: every export takes an optional trailing
+		// options object, so the guard must forward every argument, not a fixed
+		// parameter list.
 		(f) =>
 			`export function ${f}(...args) {
 	_check();
@@ -202,15 +244,13 @@ const ast_reexport = has_parse_exports ? `export type * from './tsv_ast';\n` : '
 const locations_reexport_dts = has_parse_exports
 	? `export * from './${locations_dts.replace(/\.d\.ts$/, '')}';\n`
 	: '';
-// The parse exports' hand-written option types (the `TS_PARSE_DECLS` custom
-// section in crates/tsv_wasm/src/lib.rs) — named, so tsv_ast/locations star
-// exports can never ambiguate them away (the TS2308 rule).
-const parse_options_reexport = has_parse_exports
-	? `export type { ParseOptions, TypeScriptParseOptions } from './${dts_file.replace(/\.d\.ts$/, '')}';\n`
-	: '';
-const index_dts = `${ast_reexport}${locations_reexport_dts}${parse_options_reexport}export {
+const options_reexport = (names: Array<string>) =>
+	names.length ? `export type { ${names.join(', ')} } from '${dts_module}';\n` : '';
+const parse_options_reexport = options_reexport(parse_option_types);
+const format_options_reexport = options_reexport(format_option_types);
+const index_dts = `${ast_reexport}${locations_reexport_dts}${parse_options_reexport}${format_options_reexport}export {
 ${[...fns, ...classes].map((f) => `\t${f},`).join('\n')}
-} from './${dts_file.replace(/\.d\.ts$/, '')}';
+} from '${dts_module}';
 /** Initialize the WASM module. Required in browsers before calling any other export. No-op if already initialized. */
 export declare function init(module_or_path?: {
 	module_or_path: RequestInfo | URL | Response | BufferSource | WebAssembly.Module;
