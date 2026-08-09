@@ -1132,10 +1132,15 @@ impl<'a> Printer<'a> {
     /// classification [`Self::push_gap_comments`] partitions on, and the one every
     /// caller that has to reason about the run it produced must re-ask.
     ///
-    /// Named rather than open-coded because it is asked four times about one gap (the
-    /// partition itself, the deferred run's ends, and the after-comma same-line scan in
-    /// [`Self::emit_multiline_comma_with_comments`]), and a spelling that drifts from
-    /// this one hands a caller a run the emitter never produced.
+    /// Named rather than open-coded because it is asked three times about one gap (the
+    /// partition itself, the deferred run's ends, and the blank-line scan's terminal), and
+    /// a spelling that drifts from this one hands a caller a run the emitter never
+    /// produced.
+    ///
+    /// ⚠️ **Scoped to the region BEFORE the comma.** Past the comma the anchor is the
+    /// comma itself ([`Printer::comment_on_comma_line`]) — the author may have pushed the
+    /// separator onto a line of its own, and the printer pulls it back, so an
+    /// element-anchored reading there re-binds the comment to the next item.
     ///
     /// ⚠️ **An anchor reading, deliberately** — not the source reading
     /// ([`Printer::comment_follows_content_on_its_line`]) the element→comma SEAM asks.
@@ -1301,6 +1306,13 @@ impl<'a> Printer<'a> {
         // See `split_separator_gap_comments`.
         let deferred_own_line =
             self.split_separator_gap_comments(parts, elem_end, comma_pos, false);
+
+        // The before-comma gap's final own-line comment — the one whose glue decides this
+        // emitter's separator, below.
+        let last_deferred = comments_to_emit_in_range(self.comments, elem_end, comma_pos)
+            .filter(|c| !self.gap_comment_on_anchor_line(elem_end, c))
+            .last();
+
         // A deferred run LEADS the next element, so its last comment takes the
         // leading-comment separator, not this emitter's element hardline: a space when the
         // author glued it to what follows on its line ([`Printer::comment_hugs_next`],
@@ -1310,10 +1322,7 @@ impl<'a> Printer<'a> {
         // this family at odds with the array literal, whose per-element group collapses
         // the same soft `line` (`docs/comments.md` §Array family vs params family).
         let deferred_hugs = !deferred_own_line.is_empty()
-            && comments_to_emit_in_range(self.comments, elem_end, comma_pos)
-                .filter(|c| !self.gap_comment_on_anchor_line(elem_end, c))
-                .last()
-                .is_some_and(|c| self.comment_hugs_next(c));
+            && last_deferred.is_some_and(|c| self.comment_hugs_next(c));
         parts.push(d.text(","));
         if deferred_hugs {
             // An author blank line belongs AHEAD of a hugging run, where it was written —
@@ -1336,13 +1345,44 @@ impl<'a> Printer<'a> {
         }
         parts.extend(deferred_own_line);
 
-        // Same-line trailing comments after comma (line comments that consume the line).
-        // A line comment goes through `line_suffix` (zero width) so it never forces the
-        // preceding element to break; it flushes at the hardline below (prettier's
-        // `lineSuffix`). A block stays inline, width counted.
+        // Trailing comments after the comma, claimed by kind. A line comment goes through
+        // `line_suffix` (zero width) so it never forces the preceding element to break;
+        // it flushes at the hardline below (prettier's `lineSuffix`). A block stays
+        // inline, width counted.
+        //
+        // ⚠️ **The block arm asks the HUG question, not a trailing one.** A block the
+        // author glued to the next item (`A, /* c */ B`) is that item's leading comment at
+        // every other site and in prettier, so claiming it here tears it off the item it
+        // was written against — which an anchor-line test does, since the next item sits
+        // on a later line in this forced-multiline layout. `is_stranded_after_comma_block`
+        // is the single spelling of the split (§Comment relocation): stranded stays
+        // trailing the comma, hugging leads the next item. A block ahead of a same-line
+        // `//` is stranded by that predicate and stays claimed — the line comment defers
+        // through `line_suffix`, so a block left to lead the next item would render after
+        // it and the authored pair would come back reversed.
+        //
+        // A **line** comment on the comma's line is claimed: nothing can follow a `//` on
+        // its line, so it has no hug question to ask. Its anchor is the comma, not the
+        // element — an author who pushed the comma onto its own line (`a⏎, // c⏎ b`) wrote
+        // the comment against the comma, and the printer pulls the comma back onto the
+        // element's line, so an element-anchored reading led it onto the NEXT item.
+        //
+        // ⚠️ **The claimed run ENDS at the first `//` this gap has already emitted** —
+        // including one from *before* the comma (`a // c1⏎, // c2⏎ b` folds two source
+        // lines onto one output line), which is why the scan opens at `elem_end` rather
+        // than at the comma. See [`Printer::gap_emitted_line_comment_before`] for what a
+        // claim past that point welds or reorders.
         let mut after_comma_end = comma_pos + 1;
         for comment in comments_to_emit_in_range(self.comments, comma_pos + 1, next_start) {
-            if self.gap_comment_on_anchor_line(elem_end, comment) {
+            if self.gap_emitted_line_comment_before(elem_end, comment.span.start) {
+                break;
+            }
+            let claimed = if comment.is_block {
+                self.is_stranded_after_comma_block(comment, comma_pos, next_start)
+            } else {
+                self.comment_on_comma_line(comma_pos, comment)
+            };
+            if claimed {
                 parts.push(self.build_trailing_comment_doc(comment));
                 after_comma_end = comment.span.end;
             }

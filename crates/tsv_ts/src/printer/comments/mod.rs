@@ -515,11 +515,12 @@ impl<'a> Printer<'a> {
         // only a *line* comment can trail the comma, since a block there would be
         // the caller's block-only path.
         //
-        // Comment-adjacency read (real even in canonical mode): an own-line line
-        // comment must drop below the comma, not merge into the `line_suffix` run.
-        let trails_comma = comments.get(first_line_idx).is_some_and(|c| {
-            !c.is_block && !self.comment_has_newline_between(comma_pos, c.span.start)
-        });
+        // The comma was just emitted AHEAD of this comment rather than at its authored
+        // offset, so a comment written before `comma_pos` still trails the printed comma
+        // — the side `comment_on_comma_line` deliberately answers `true` for.
+        let trails_comma = comments
+            .get(first_line_idx)
+            .is_some_and(|c| !c.is_block && self.comment_on_comma_line(comma_pos, c));
         let run_start = if trails_comma {
             parts.push(self.build_trailing_comment_doc(comments[first_line_idx]));
             first_line_idx + 1
@@ -535,6 +536,59 @@ impl<'a> Printer<'a> {
             LeadingGlue::Adjacent,
             continuation,
         );
+    }
+
+    /// Whether a gap comment sits on the **comma's** line — the anchor every question about
+    /// that gap reads, since the comma is re-emitted structure that the printer pulls back
+    /// onto the previous item's line whatever the author did with it.
+    ///
+    /// Deliberately not the *item*'s line: an author who pushed the comma onto a line of
+    /// its own (`a⏎, /* c */⏎ b`) wrote the comment against the comma, and an item-anchored
+    /// reading calls it own-line and hands it to the next item's leading run — re-binding it
+    /// to an item it was never written against.
+    ///
+    /// ⚠️ **A comment-classification read, so it takes the COMMENT line-break table**
+    /// ([`Printer::comment_has_newline_between`], not the layout one). It decides whether a
+    /// `//` is emitted as a trailing `line_suffix` or falls to the next item's leading run,
+    /// and that role must stay real in the canonical reprint — where `layout_line_breaks`
+    /// is empty and every comment in the gap would read as on the comma's line, re-binding
+    /// an own-line comment the author wrote against the NEXT item onto the comma. Outside
+    /// [`Printer::set_canonical`] the two tables are the same slice, so the normal path is
+    /// byte-identical either way.
+    ///
+    /// ⚠️ **A comment BEFORE `comma_pos` reads as on the comma's line**, and that is the
+    /// answer rather than a short-circuit to guard against: a caller in that position emits
+    /// the comma *ahead* of the comment instead of at its authored offset, so the comment
+    /// does trail the printed comma ([`Self::push_inter_item_line_comment_gap`] asks exactly
+    /// that). A caller that instead needs the **side of the authored comma** must test
+    /// `span.start >= comma_pos` itself — the parameter list does, at both ends of its
+    /// partition, because an own-line comment before the comma there belongs to a different
+    /// emitter entirely.
+    pub(crate) fn comment_on_comma_line(&self, comma_pos: u32, comment: &Comment) -> bool {
+        !self.comment_has_newline_between(comma_pos, comment.span.start)
+    }
+
+    /// Whether the gap opening at `gap_start` has already put a `//` on the output line by
+    /// the time it reaches `pos` — the point at which a claim past the separator must stop.
+    ///
+    /// A `//` ends its output line whichever way the gap emitted it (an anchor-line one
+    /// leaves as a `line_suffix`, an own-line one as a deferred hardline run), so a second
+    /// comment claimed onto that line welds onto the first — the second delimiter becoming
+    /// text, the comment ceasing to exist and the code behind it swallowed — and an inline
+    /// block claimed after one comes out REORDERED ahead of it. Everything past that point
+    /// falls to the next item's leading run, on its own line, which is where prettier puts
+    /// it too.
+    ///
+    /// ⚠️ **The question is the comment's KIND, never its anchor line.** Asking it with an
+    /// anchor reading misses an own-line `//` (`a /* x⏎y */ // c1⏎, // c2⏎ b`, where the
+    /// block's `*/` pushes `// c1` off the anchor's line) and welds the pair.
+    ///
+    /// One spelling for both emitters that claim past a comma —
+    /// [`Printer::emit_multiline_comma_with_comments`] and
+    /// [`Printer::param_trailing_line_comment`] — since a drift between them is a weld at
+    /// whichever one drifted, and the weld is lossless-looking to every structural guard.
+    pub(crate) fn gap_emitted_line_comment_before(&self, gap_start: u32, pos: u32) -> bool {
+        comments_to_emit_in_range(self.comments, gap_start, pos).any(|c| !c.is_block)
     }
 
     /// A block comment after the comma that sits on the comma's own line (no
@@ -553,7 +607,7 @@ impl<'a> Printer<'a> {
         next_start: u32,
     ) -> bool {
         comment.is_block
-            && !self.has_newline_between(comma_pos, comment.span.start)
+            && self.comment_on_comma_line(comma_pos, comment)
             && !self.is_same_line(comment.span.end, next_start)
     }
 
