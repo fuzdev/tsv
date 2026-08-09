@@ -610,6 +610,27 @@ impl<'a> Printer<'a> {
         }
         q_parts.push(alternate_doc);
 
+        // The alternate's OWN trailing gap — everything between the alternate's inner end
+        // and the ternary's end. Nothing else scans it, and the consequent's twin gap is
+        // covered only by accident: the `:`-gap scan above runs
+        // `[consequent_end, alternate_start]`, which already spans the consequent's
+        // stripped paren shell and any comment inside it. The alternate has no following
+        // gap, so without this the region is emitted by nobody and the comment is DROPPED
+        // (`c ? a : (⏎// c⏎b // t⏎)` lost `// t` entirely). The two scans partition the
+        // construct — see docs/comments.md §Trailing and dangling runs.
+        //
+        // The range is keyed on the alternate's own span, which for a parenthesized branch
+        // stops INSIDE the stripped shell, so the shell's `)` and anything the author put
+        // before it fall in here rather than nowhere
+        // (docs/comments.md §A stripped-paren interior is a partition too). A nested
+        // conditional alternate emits its own tail recursively and its span ends where
+        // this one does, leaving the range empty.
+        self.push_trailing_comments_in_range(
+            &mut q_parts,
+            cond.alternate.span().end,
+            cond.span.end,
+        );
+
         parts.push(d.indent(d.concat(&q_parts)));
 
         d.concat(&parts)

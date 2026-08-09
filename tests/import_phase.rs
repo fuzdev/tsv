@@ -6,17 +6,25 @@
 //! (`import defer * as ns …` / `import.defer(…)`).
 //!
 //! The *parser* is graded by the test262 suite (see `docs/conformance_test262.md`);
-//! these tests cover the *printer*, which test262 never exercises. acorn rejects
-//! this syntax, so there is no fixture parse oracle, and prettier either drops the
-//! phase (`import defer`) or throws (`import source`) — so these can't be fixtures
-//! either. Each test asserts a single-pass stable round-trip plus idempotency.
+//! these tests cover the *printer*, which test262 never exercises. Each test asserts
+//! a single-pass stable round-trip plus idempotency.
+//!
+//! ⚠️ **"acorn rejects this syntax, so these can't be fixtures" — the reason these
+//! tests exist — is FALSE, and two stale claims grew behind it.** A canonical-parser
+//! rejection IS representable: `expected_ours.json` plus an `expected_svelte.json`
+//! holding `{"error": "failed to parse"}`, in a `_svelte_divergence` dir (see
+//! `docs/fixture_overview.md`). `import defer`'s comment handling is now fixtured that
+//! way — `tests/fixtures/typescript/modules/imports/phase_keyword_comment_svelte_prettier_divergence`.
+//! And because no fixture existed, nothing regenerated an `output_prettier.*`, so the
+//! cataloged "prettier drops the `import defer` phase" divergence went stale unnoticed:
+//! at the pinned prettier (3.9.6) the phase is preserved. That entry is deleted.
+//! `import source` (prettier throws) is still real and live-pinned in
+//! `tests/prettier_error_bugs.rs`. What remains here is the round-trip coverage that
+//! genuinely wants a Rust test — the `import.source(…)` / `import.defer(…)` dynamic
+//! forms and the binding-shape rejections. The rest could migrate to fixtures.
 //!
 //! The prettier divergences are cataloged in `docs/conformance_prettier_ts.md` and
-//! `docs/conformance_svelte.md`. The `import source` form (prettier throws) is
-//! also live-pinned in `tests/prettier_error_bugs.rs`; the `import defer` form
-//! (prettier silently drops the phase) is documented-only — a live "prettier
-//! succeeds with wrong output" assertion would gate the suite on a sidecar call
-//! under load, which is needless fragility for a niche proposal-only divergence.
+//! `docs/conformance_svelte.md`.
 //!
 //! One test also pins a *parser* divergence the fixture path can't reach: a
 //! source-phase binding whose name lexes as a contextual keyword (the spec-valid

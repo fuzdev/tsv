@@ -132,8 +132,16 @@ export const TS_FIXTURES_PINS: GatePins = { scanned: 214, both_accept: 191 };
  * `diagnostics/ts_repo_compare.ts` argues why, and why the bench harvest does not). They are also
  * where 29 of the over-acceptances come from — statements in an ambient context, tsc's TS1036: an
  * early error tsv defers by policy, not a gap.
+ *
+ * `over_acceptance` (tsv accepts, tsc's baseline says invalid) is pinned for the axis the other two
+ * cannot see. `scanned` and `accept_parity` together fix how many files tsv accepts *among the
+ * tsc-valid ones*; the reject / over-accept / beyond-acorn split of the remainder is free. So a
+ * parser WIDENING — a fix that also starts accepting something tsc rejects — moves only this
+ * number, and without a pin nothing anywhere reports it. That is the standing hazard of every
+ * over-rejection fix: the new acceptance arrives unguarded. A rise here is not automatically wrong
+ * (tsv defers early errors by policy), but it must be a decision, not a side effect.
  */
-export const TS_REPO_PINS = { scanned: 13746, accept_parity: 12320 };
+export const TS_REPO_PINS = { scanned: 13746, accept_parity: 12320, over_acceptance: 487 };
 
 /**
  * corpus:compare:parse --all — MINIMUM per-language `compared` (both sides

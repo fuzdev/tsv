@@ -346,11 +346,23 @@ pub(super) fn is_constrained_infer(ts_type: &TSType<'_>) -> bool {
 /// `TSInferType` carrying an `extends` constraint. The nesting matters:
 /// `() => () => infer U extends C` trails the same trailing-`?` ambiguity through
 /// every arrow, so the outermost function type still needs parens.
+///
+/// ⚠️ **Every descent unwraps parens, and tsv needs that where prettier does not.**
+/// Prettier reads `node.returnType.typeAnnotation` straight (`needs-parentheses.js`,
+/// the `extendsType` arm) because typescript-estree has no `TSParenthesizedType`
+/// node at all — `() => (infer U extends C)` and `() => infer U extends C` are one
+/// AST to it. tsv keeps the paren node, so a direct read sees a
+/// `TSType::Parenthesized` where prettier sees the infer, answers `false`, and the
+/// caller strips the parens the enclosing function type needs — after which the
+/// infer's `extends` greedily swallows the conditional's `?` and the output does
+/// not reparse. Pinned by `types/infer/constrained_extends_parens`'s
+/// `unformatted_inner_parens` variant, which authors the parens on the *infer*
+/// rather than on the function type.
 fn return_type_is_constrained_infer(return_type: &internal::TSTypeAnnotation<'_>) -> bool {
-    let mut ty = return_type.type_annotation;
+    let mut ty = unwrap_parenthesized(return_type.type_annotation);
     if let TSType::TypePredicate(pred) = ty {
         match pred.type_annotation {
-            Some(inner) => ty = inner,
+            Some(inner) => ty = unwrap_parenthesized(inner),
             None => return false,
         }
     }

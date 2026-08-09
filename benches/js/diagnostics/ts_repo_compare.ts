@@ -450,6 +450,15 @@ export async function run_ts_repo_compare(argv: string[] = Deno.args): Promise<v
 				: null,
 			buckets.accept_parity !== TS_REPO_PINS.accept_parity
 				? `accept-parity ${buckets.accept_parity} ≠ pinned ${TS_REPO_PINS.accept_parity}`
+				: null,
+			// The WIDENING axis, which the two above structurally cannot see: together they
+			// fix how many tsc-VALID files tsv accepts, leaving the reject / over-accept /
+			// beyond-acorn split of the remainder free. So a fix that ALSO starts accepting
+			// something tsc rejects moves only this number, and nothing reports it. Being
+			// reported-not-gated is right for the bucket's CONTENT (a deferred early error is
+			// policy, not a bug); its SIZE still has to move deliberately.
+			buckets.over_acceptance.length !== TS_REPO_PINS.over_acceptance
+				? `over-acceptance ${buckets.over_acceptance.length} ≠ pinned ${TS_REPO_PINS.over_acceptance}`
 				: null
 		].filter((f): f is string => f !== null);
 		if (pin_failures.length > 0) {

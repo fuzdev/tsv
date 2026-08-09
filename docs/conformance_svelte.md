@@ -603,12 +603,23 @@ parser grader), so it doesn't dent the 100% positive rate. Pinned in
 `static_import_source_single_binding_enforced`). The identifier-named-`source`
 binding (`import source source from 'mod'`) parses fine.
 
-**No `_svelte_divergence` fixture** (the fixture pipeline needs acorn to produce
-`expected.json`, and acorn rejects the syntax). The parser is graded instead by the
+⚠️ **This paragraph used to claim "No `_svelte_divergence` fixture — the fixture
+pipeline needs acorn to produce `expected.json`, and acorn rejects the syntax." That is
+WRONG, and the belief was load-bearing:** a canonical-parser rejection IS representable —
+`expected_ours.json` + an `expected_svelte.json` holding `{"error": "failed to parse"}`,
+in a `_svelte_divergence` dir (23 fixtures already do this;
+[fixture_overview.md](./fixture_overview.md) states it). Because the belief said no
+fixture was possible, none was written, and the prettier-side claim next door
+(`import defer` phase drop) went stale unnoticed for want of an `output_prettier.*` to
+regenerate. `import defer`'s comment handling is now fixtured as
+[phase_keyword_comment](../tests/fixtures/typescript/modules/imports/phase_keyword_comment_svelte_prettier_divergence/);
+the rest of the syntax could be too.
+
+The parser is additionally graded by the
 test262 suite — ~396 graded files, all passing; see
-[conformance_test262.md](./conformance_test262.md). Prettier diverges too (it drops
-`import defer`'s phase and throws on `import source`), so the *printer* is covered by
-`tests/import_phase.rs` rather than a fixture; the prettier side is cataloged in
+[conformance_test262.md](./conformance_test262.md). Prettier throws on `import source`
+(it no longer drops `import defer`'s phase), so the remaining *printer* round-trips are
+covered by `tests/import_phase.rs`; the prettier side is cataloged in
 [conformance_prettier_ts.md](./conformance_prettier_ts.md#import-phase-proposals).
 **Upstream candidate**: acorn-typescript import-phase support — drop the divergence
 and promote to fixtures once it lands.
@@ -694,6 +705,7 @@ All corrections exist because of upstream bugs. If fixed upstream, tsv would rem
 - Async generic arrow param decorator — `async <T>(@dec a) => a` accepted, where every other arrow form correctly rejects
 - Decorated class modifier line break — `canHaveLeadingDecorator`'s `isDeclareClass` / `isAbstractClass` lookaheads skip line terminators, so `@dec⏎declare⏎class A {}` admits a decorator whose modifier then fails to bind, yielding two overlapping sibling nodes
 - `using` / `await using` — Explicit Resource Management declarations not recognized
+- `import defer` / `import source` — import-phase declarations not recognized (`Unexpected token` at the phase keyword). tsv parses both; prettier accepts `defer` and rejects `source`, so only the `defer` form has a formatting oracle — [phase_keyword_comment](../tests/fixtures/typescript/modules/imports/phase_keyword_comment_svelte_prettier_divergence/)
 - `const` type params — `const` modifier on class type params
 - Import type options — `import()` type assertion options
 - Anonymous class-expression `id` — omitted for implements-first heritage

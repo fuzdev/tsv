@@ -19,4 +19,11 @@
 		? // c
 			x as T
 		: w;
+
+	// A trailing comment beside the leading one survives too — in the alternate,
+	// where the paren shell is the construct the trailing comment sits inside
+	const d = cond
+		? x
+		: // c
+			y ?? z; // t
 </script>

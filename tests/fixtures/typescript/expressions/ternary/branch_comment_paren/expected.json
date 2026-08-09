@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 363,
+	"end": 568,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -137,24 +137,88 @@
 					"column": 8
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " A trailing comment beside the leading one survives too — in the alternate,",
+			"start": 355,
+			"end": 432,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 1
+				},
+				"end": {
+					"line": 23,
+					"column": 78
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " where the paren shell is the construct the trailing comment sits inside",
+			"start": 434,
+			"end": 508,
+			"loc": {
+				"start": {
+					"line": 24,
+					"column": 1
+				},
+				"end": {
+					"line": 24,
+					"column": 75
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 535,
+			"end": 539,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 4
+				},
+				"end": {
+					"line": 27,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " t",
+			"start": 553,
+			"end": 557,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 13
+				},
+				"end": {
+					"line": 28,
+					"column": 17
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 362,
+		"end": 567,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 353,
+			"end": 558,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 22,
+					"line": 29,
 					"column": 9
 				}
 			},
@@ -662,6 +726,180 @@
 							"value": " `as` cast in the consequent",
 							"start": 278,
 							"end": 308
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 510,
+					"end": 552,
+					"loc": {
+						"start": {
+							"line": 25,
+							"column": 1
+						},
+						"end": {
+							"line": 28,
+							"column": 12
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 516,
+							"end": 551,
+							"loc": {
+								"start": {
+									"line": 25,
+									"column": 7
+								},
+								"end": {
+									"line": 28,
+									"column": 11
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 516,
+								"end": 517,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 7
+									},
+									"end": {
+										"line": 25,
+										"column": 8
+									}
+								},
+								"name": "d"
+							},
+							"init": {
+								"type": "ConditionalExpression",
+								"start": 520,
+								"end": 551,
+								"loc": {
+									"start": {
+										"line": 25,
+										"column": 11
+									},
+									"end": {
+										"line": 28,
+										"column": 11
+									}
+								},
+								"test": {
+									"type": "Identifier",
+									"start": 520,
+									"end": 524,
+									"loc": {
+										"start": {
+											"line": 25,
+											"column": 11
+										},
+										"end": {
+											"line": 25,
+											"column": 15
+										}
+									},
+									"name": "cond"
+								},
+								"consequent": {
+									"type": "Identifier",
+									"start": 529,
+									"end": 530,
+									"loc": {
+										"start": {
+											"line": 26,
+											"column": 4
+										},
+										"end": {
+											"line": 26,
+											"column": 5
+										}
+									},
+									"name": "x"
+								},
+								"alternate": {
+									"type": "LogicalExpression",
+									"start": 544,
+									"end": 550,
+									"loc": {
+										"start": {
+											"line": 28,
+											"column": 4
+										},
+										"end": {
+											"line": 28,
+											"column": 10
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 544,
+										"end": 545,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 4
+											},
+											"end": {
+												"line": 28,
+												"column": 5
+											}
+										},
+										"name": "y"
+									},
+									"operator": "??",
+									"right": {
+										"type": "Identifier",
+										"start": 549,
+										"end": 550,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 9
+											},
+											"end": {
+												"line": 28,
+												"column": 10
+											}
+										},
+										"name": "z"
+									},
+									"leadingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 535,
+											"end": 539
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A trailing comment beside the leading one survives too — in the alternate,",
+							"start": 355,
+							"end": 432
+						},
+						{
+							"type": "Line",
+							"value": " where the paren shell is the construct the trailing comment sits inside",
+							"start": 434,
+							"end": 508
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Line",
+							"value": " t",
+							"start": 553,
+							"end": 557
 						}
 					]
 				}

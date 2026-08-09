@@ -246,8 +246,15 @@ struct BlankRun<'a> {
 ///
 /// Runs, not lines: collapsing `a⏎⏎⏎⏎b` to `a⏎⏎b` removes blank *lines* but not the blank
 /// *run*, and the author's signal is "there is a break here", not how many newlines spell it.
+///
+/// Lines are split on the ECMAScript terminator class, not `str::lines()`'s `\n`. This walk
+/// reads the INPUT as well as the output, and an input whose terminators are lone `<CR>` /
+/// `<LS>` / `<PS>` is one single line to `str::lines()` — so a blank run the author wrote as
+/// `\r\r` counts as 0 on the input side and 1 on the (LF) output side, and the audit reports
+/// a fabrication that is really its own blindness. Same class as the printer's, from the same
+/// definition, for the same reason.
 fn for_each_blank_run(s: &str, mut visit: impl FnMut(BlankRun<'_>)) {
-    let lines: Vec<&str> = s.lines().collect();
+    let lines: Vec<&str> = tsv_lang::printing::ecmascript_lines(s).collect();
     let mut i = 0;
     while i < lines.len() {
         if !is_blank_line(lines[i]) {
