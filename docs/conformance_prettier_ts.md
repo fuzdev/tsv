@@ -19,6 +19,7 @@ governs every entry here live in [conformance_prettier.md](./conformance_prettie
 - Arrow type param trailing comma — ◆design_choice — [single_type_param](../tests/fixtures/typescript/expressions/arrow/generic/single_type_param_prettier_divergence/)
 - Empty-object comment bracket spacing — ◆design_choice — [empty_block_comment](../tests/fixtures/typescript/expressions/objects/empty_block_comment_prettier_divergence/), [destructure empty_comment](../tests/fixtures/typescript/expressions/destructuring/empty_comment_prettier_divergence/), [enum empty_comment](../tests/fixtures/typescript/declarations/enum/body_empty_comment_prettier_divergence/), [literal_body_empty](../tests/fixtures/typescript/types/comments/literal_body_empty_prettier_divergence/), [union_empty_object_member](../tests/fixtures/typescript/types/union_empty_object_member_prettier_divergence/), [call_type_arg_empty_comment](../tests/fixtures/typescript/typescript_specific/generics/call_type_arg_empty_comment_prettier_divergence/)
 - Optional rest parameter `?` — ◆design_choice — [rest_optional_param](../tests/fixtures/typescript/typescript_specific/rest_optional_param_prettier_divergence/)
+- Comment in the name→`?` gap of an **unannotated, non-rest** optional parameter (`function fn(a /* c */?) {}`, and the arrow spelling) — ◆prettier_bug — prettier's TypeScript printer loses the comment and **throws** `Comment "c" was not printed`, so no oracle output exists; the fixture's `prettier_rejects.txt` pins the throw live, so a prettier release that fixes it fails the fixture rather than going unnoticed. tsv parses and keeps the comment before the marker. With an annotation, or on the *rest* spelling (the entry above, where prettier survives but strips the `?`), prettier does not crash — [optional_param_comment](../tests/fixtures/typescript/statements/function/optional_param_comment_prettier_divergence/)
 - ES2015+ identifier property keys — ◆design_choice ◆spec_precedence — [property_key_es2015_ident](../tests/fixtures/typescript/expressions/objects/property_key_es2015_ident_prettier_divergence/)
 - Non-null optional-chain bare strip — ◆design_choice — [optional_paren_non_null_bare](../tests/fixtures/typescript/expressions/chain/optional_paren_non_null_bare_prettier_divergence/)
 - Class field key unquoting — ◆design_choice — [field_key_unquote](../tests/fixtures/typescript/declarations/class/field_key_unquote_prettier_divergence/)
@@ -85,8 +86,11 @@ a canonical-parser *rejection* is representable (`expected_ours.json` +
 `expected_svelte.json` holding the parse-failure marker), and
 [phase_keyword_comment](../tests/fixtures/typescript/modules/imports/phase_keyword_comment_svelte_prettier_divergence/)
 is one. The remaining printer round-trips stay in `tests/import_phase.rs` and the
-parser in the test262 suite. The `import source` throw is live-pinned in
-`tests/prettier_error_bugs.rs`. See
+parser in the test262 suite. The `import source` throw is live-pinned by
+[source_phase](../tests/fixtures/typescript/modules/imports/source_phase_svelte_prettier_divergence/),
+whose `prettier_rejects.txt` carries the expected-error substring while
+`expected_svelte.json` carries acorn's rejection — both oracles failing in one fixture.
+See
 [conformance_svelte.md §Import-phase proposals](./conformance_svelte.md#import-phase-proposals)
 and [conformance_test262.md](./conformance_test262.md). **Upstream candidate**:
 prettier import-phase support — promote to fixtures once it lands.

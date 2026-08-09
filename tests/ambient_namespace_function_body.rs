@@ -9,18 +9,21 @@
 //! formats it, so the formatter must parse it; tsv already accepts the sibling
 //! `export function f() {}` form, so the plain form must parse identically.
 //!
-//! ⚠️ This SHOULD be a fixture and is not yet. An acorn/Svelte rejection is
-//! representable — `expected_ours.json` plus an `expected_svelte.json` holding
-//! `{"error": "failed to parse"}`, in a `_svelte_divergence` dir (see
-//! `docs/fixture_overview.md`, and
-//! `typescript/expressions/assignment/nonsimple_target_svelte_divergence` for the
-//! shape). The input is already prettier-canonical, so it clears F1. Until migrated,
-//! the prettier half of the claim is pinned against a hand-written string rather than
-//! a live oracle, which is exactly how a formatting claim goes stale.
+//! The accept, the AST shape and the prettier formatting are pinned by the fixture
+//! `typescript/declarations/namespace/function_body_svelte_divergence` (an acorn
+//! rejection is representable: `expected_ours.json` plus an `expected_svelte.json`
+//! holding `{"error": "failed to parse"}`), which is where the prettier claim belongs
+//! — against a live oracle rather than a hand-written string. What remains here is the
+//! **equivalence** the fixture cannot state: that the plain form's function node and
+//! the `export function` form's are the same node, which is a relation between two
+//! parses rather than a property of one.
 //!
 //! Contrast: a *top-level* `declare function f() {}` HAS the `declare` keyword, which
-//! grammatically forces a bodiless signature — prettier rejects a body there, and tsv
-//! keeps rejecting it (`bodiless_*` guards below).
+//! grammatically forces a bodiless signature — prettier rejects a body there and so
+//! does tsv, pinned as the fixture's `input_invalid_top_level_declare_body.svelte`. The
+//! bodiless-signature guard below stays here because it asserts a node TYPE
+//! (`TSDeclareFunction`, not `FunctionDeclaration`), which is the distinction an
+//! over-permissive parser would blur while still accepting.
 
 use serde_json::Value;
 
@@ -28,44 +31,6 @@ fn parse_json(source: &str) -> Value {
     let arena = bumpalo::Bump::new();
     let program = tsv_ts::parse(source, &arena).expect("parse failed");
     tsv_ts::convert_ast_json(&program, source)
-}
-
-fn format(source: &str) -> String {
-    let arena = bumpalo::Bump::new();
-    let program = tsv_ts::parse(source, &arena).expect("parse failed");
-    tsv_ts::format(&program, source)
-}
-
-/// `declare namespace N { function f() {} }` parses, and the inner function is a
-/// `FunctionDeclaration` with a `BlockStatement` body (NOT a bodiless
-/// `TSDeclareFunction`) — the same node the `export function f() {}` form yields.
-#[test]
-fn namespace_function_body_parses_as_function_declaration() {
-    let json = parse_json("declare namespace N { function f() {} }");
-    let f = "/body/0/body/body/0";
-    assert_eq!(
-        json.pointer(&format!("{f}/type")).and_then(Value::as_str),
-        Some("FunctionDeclaration"),
-        "plain ambient function with a body is a FunctionDeclaration: {json}"
-    );
-    assert_eq!(
-        json.pointer(&format!("{f}/body/type"))
-            .and_then(Value::as_str),
-        Some("BlockStatement"),
-        "the body is preserved (not dropped as a signature): {json}"
-    );
-}
-
-/// The `module` keyword spelling behaves identically.
-#[test]
-fn ambient_module_function_body_parses_as_function_declaration() {
-    let json = parse_json("declare module M { function f() {} }");
-    assert_eq!(
-        json.pointer("/body/0/body/body/0/type")
-            .and_then(Value::as_str),
-        Some("FunctionDeclaration"),
-        "plain ambient module function with a body is a FunctionDeclaration: {json}"
-    );
 }
 
 /// The plain form's function node matches the `export function` form's (minus the
@@ -89,19 +54,6 @@ fn namespace_function_body_matches_export_form() {
     );
 }
 
-/// prettier formats the plain form to the tab-indented body form; tsv must match and
-/// be idempotent (no data loss — the body survives the round-trip).
-#[test]
-fn namespace_function_body_formats_to_prettier_canonical() {
-    let expected = "declare namespace N {\n\tfunction f() {}\n}\n";
-    assert_eq!(
-        format("declare namespace N { function f() {} }"),
-        expected,
-        "compact input formats to the canonical body form"
-    );
-    assert_eq!(format(expected), expected, "idempotent");
-}
-
 /// Regression guard: a *bodiless* signature inside a namespace stays a
 /// `TSDeclareFunction` (the existing `declarations/namespace/declare` fixture form).
 #[test]
@@ -112,16 +64,5 @@ fn bodiless_namespace_signature_stays_tsdeclarefunction() {
             .and_then(Value::as_str),
         Some("TSDeclareFunction"),
         "a `;`-terminated signature is still a bodiless TSDeclareFunction: {json}"
-    );
-}
-
-/// Regression guard: a *top-level* `declare function f() {}` (the `declare` keyword
-/// grammatically forces bodiless) still REJECTS a body — prettier rejects it too.
-#[test]
-fn top_level_declare_function_body_still_rejected() {
-    let arena = bumpalo::Bump::new();
-    assert!(
-        tsv_ts::parse("declare function f() {}", &arena).is_err(),
-        "top-level `declare function` with a body stays a parse error"
     );
 }

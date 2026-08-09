@@ -19,7 +19,9 @@
 //! cataloged "prettier drops the `import defer` phase" divergence went stale unnoticed:
 //! at the pinned prettier (3.9.6) the phase is preserved. That entry is deleted.
 //! `import source` (prettier throws) is still real and live-pinned in
-//! `tests/prettier_error_bugs.rs`. What remains here is the round-trip coverage that
+//! the `modules/imports/source_phase_svelte_prettier_divergence` fixture, whose
+//! `prettier_rejects.txt` pins prettier's throw and whose `expected_svelte.json` pins
+//! acorn's rejection. What remains here is the round-trip coverage that
 //! genuinely wants a Rust test — the `import.source(…)` / `import.defer(…)` dynamic
 //! forms and the binding-shape rejections. The rest could migrate to fixtures.
 //!
