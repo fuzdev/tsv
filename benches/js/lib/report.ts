@@ -196,39 +196,32 @@ export function generate_summary_report(
 			);
 		}
 
-		// Curated payload-matched lines: tsv's span-only `no-locations` wire is the
-		// apples-to-apples comparison with the span-only default ASTs oxc and yuku
-		// emit (plain `tsv-json` carries the richer loc-bearing drop-in AST both
-		// omit; yuku pads `decorators`/`typeAnnotation`/`optional` exactly as oxc
-		// does, so the two opponents are payload-matched to each other too). Emitted
-		// only where both rows exist (TS/JS — neither parses svelte/css).
-		for (const [noloc, opponent] of [
-			['tsv-json-no-locations', 'oxc-parser'],
-			['tsv-json-no-locations', 'yuku-parser'],
-			['tsv_wasm-json-no-locations', 'oxc-parser-wasm'],
-			['tsv_wasm-json-no-locations', 'yuku-parser-wasm']
+		// Curated apples-to-apples lines: each pair is a tsv wire beside the ONE
+		// opponent whose product it actually matches, with the note naming what makes
+		// the match. Emitted only where both rows exist, so a pair costs nothing on a
+		// surface neither runs on.
+		//
+		// - The span-only pairs: tsv's `no-locations` wire against the span-only
+		//   default ASTs oxc and yuku emit (plain `tsv-json` carries the richer
+		//   loc-bearing drop-in AST both omit; yuku pads
+		//   `decorators`/`typeAnnotation`/`optional` exactly as oxc does, so the two
+		//   opponents are payload-matched to each other too). TS/JS only — neither
+		//   parses svelte or css.
+		// - The Svelte pair: rsvelte's parser is the only third-party engine there,
+		//   and it matches `tsv-json` on BOTH axes — mechanism (each returns a compact
+		//   JSON string the caller parses, so both pay the identical serialize +
+		//   boundary + JSON.parse cost) and payload (within ~1.5% of tsv's bytes on a
+		//   real component). Deliberately NOT paired with the no-locations rows:
+		//   `skipExpressionLoc` is a different reduction from tsv's span-only wire
+		//   (see lib/rsvelte_parse.ts), which is also why that row is named for its
+		//   option rather than for tsv's.
+		for (const [ours, opponent, note] of [
+			['tsv-json-no-locations', 'oxc-parser', 'payload-matched, span-only'],
+			['tsv-json-no-locations', 'yuku-parser', 'payload-matched, span-only'],
+			['tsv_wasm-json-no-locations', 'oxc-parser-wasm', 'payload-matched, span-only'],
+			['tsv_wasm-json-no-locations', 'yuku-parser-wasm', 'payload-matched, span-only'],
+			['tsv-json', 'rsvelte-parse', 'mechanism- and payload-matched, full AST']
 		] as const) {
-			const noloc_result = results.find((r) => r.name === noloc);
-			const opponent_result = results.find((r) => r.name === opponent);
-			if (noloc_result && opponent_result) {
-				lines.push(
-					`      ↳ ${noloc} vs ${opponent}: ${format_comparison(
-						opponent_result.stats.mean_ns,
-						noloc_result.stats.mean_ns
-					)} (payload-matched, span-only)`
-				);
-			}
-		}
-
-		// The Svelte surface's own apples-to-apples pair: rsvelte's parser is the
-		// only third-party engine there, and it is matched to `tsv-json` on BOTH
-		// axes — mechanism (each returns a compact JSON string the caller parses,
-		// so both pay the identical serialize + boundary + JSON.parse cost) and
-		// payload (77,561 vs 76,509 bytes on a real component, within 1.4%). It is
-		// deliberately NOT paired with the no-locations rows: `skipExpressionLoc` is
-		// a different reduction from tsv's span-only wire (see lib/rsvelte_parse.ts),
-		// which is also why that row is named for its option rather than for tsv's.
-		for (const [ours, opponent] of [['tsv-json', 'rsvelte-parse']] as const) {
 			const ours_result = results.find((r) => r.name === ours);
 			const opponent_result = results.find((r) => r.name === opponent);
 			if (ours_result && opponent_result) {
@@ -236,7 +229,7 @@ export function generate_summary_report(
 					`      ↳ ${ours} vs ${opponent}: ${format_comparison(
 						opponent_result.stats.mean_ns,
 						ours_result.stats.mean_ns
-					)} (mechanism- and payload-matched, full AST)`
+					)} (${note})`
 				);
 			}
 		}

@@ -35,8 +35,8 @@
  * a module-goal failure (the same trap documented for the other parsers in
  * docs/benchmarks.md §Fairness caveats).
  *
- * Three real-corpus files it rejects are catalogued in `lib/perf_omit.ts`; all
- * three are `.d.ts` files already tolerated there for other tools.
+ * The real-corpus files it rejects are catalogued in `lib/perf_omit.ts`; all are
+ * `.d.ts` files already tolerated there for other tools.
  */
 
 import { createRequire } from 'node:module';
@@ -75,9 +75,12 @@ export class SwcImplementation extends BaseImplementation {
 		this.versions = versions;
 	}
 
+	// deno-lint-ignore require-await
 	async init(): Promise<void> {
-		// Lazy require for the same reason as the other native bindings — a missing
-		// platform `.node` must be a skipped impl, not a dead registry.
+		// `require` for the same reason as lib/rsvelte_parse.ts — a CJS entry resolving
+		// a platform-specific `.node`, whose ESM-namespace shape the three runtimes
+		// don't agree on. Loading here rather than statically is what makes a missing
+		// platform binding a skipped impl instead of a dead registry.
 		const require = createRequire(import.meta.url);
 		const swc = require('@swc/core') as SwcModule;
 		if (typeof swc.parseSync !== 'function') {
@@ -88,15 +91,42 @@ export class SwcImplementation extends BaseImplementation {
 		// option keys silently, so a renamed key in a future version would leave
 		// decorators off and turn every decorated file into a fabricated rejection —
 		// scoring tsv's corpus against a misconfigured opponent.
-		swc.parseSync('@dec class C {}', this._options('typescript', 'module'));
+		swc.parseSync('@dec class C {}', this._options('module'));
+
+		// Assert the GOAL axis still swings, in both directions — the same silent-key
+		// hazard, on the option that decides how the conformance surface SCORES this
+		// row. At script goal `await` is an ordinary identifier and `import` is an
+		// error; at module goal the reverse. An inert `isModule` (which is what
+		// `script: true` already is here) would mark every script-goal test262 file a
+		// module-goal failure and read as a parser gap.
+		const accepts = (source: string, goal: ParseGoal): boolean => {
+			try {
+				swc.parseSync(source, this._options(goal));
+				return true;
+			} catch {
+				return false;
+			}
+		};
+		if (
+			!accepts('var await = 1;', 'script') ||
+			accepts('var await = 1;', 'module') ||
+			accepts('import x from "y";', 'script') ||
+			!accepts('import x from "y";', 'module')
+		) {
+			throw new Error("swc's `isModule` no longer selects the parse goal");
+		}
 
 		this._swc = swc;
-		await Promise.resolve();
 	}
 
-	private _options(syntax: 'typescript' | 'ecmascript', goal: ParseGoal): SwcParseOptions {
+	/**
+	 * `syntax` is always `typescript` — the superset for everything in scope, and
+	 * what every call site here wants (see `parse`). The option exists on swc's
+	 * side; pinning it in one place keeps the two call sites from drifting.
+	 */
+	private _options(goal: ParseGoal): SwcParseOptions {
 		return {
-			syntax,
+			syntax: 'typescript',
 			target: 'esnext',
 			decorators: true,
 			// `isModule` is the goal switch (`script: true` is NOT it — verified
@@ -115,7 +145,7 @@ export class SwcImplementation extends BaseImplementation {
 		// synthetic treatment lib/dprint.ts and lib/biome.ts give the language. TS is
 		// the superset for everything in scope here (no JSX: tsv rejects it by
 		// design, so the corpus carries none).
-		return this._swc.parseSync(source, this._options('typescript', goal));
+		return this._swc.parseSync(source, this._options(goal));
 	}
 
 	dispose(): void {

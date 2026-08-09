@@ -109,9 +109,10 @@ Things the published numbers measure that aren't quite what they look like.
   coverage **per corpus source** under the aggregate line. Read the source rows: a
   TypeScript parse gap is tenths of a point on a group that is mostly test262, and
   an oracle's 100% is not an achievement. The axis coverage cannot show at all —
-  over-ACCEPTANCE — has its own tool, `diagnostics/ts_repo_over_acceptance.ts`
-  (`deno task ts-repo:over-acceptance`), graded over the files tsc's parser rejects
-  and read inverted.
+  over-ACCEPTANCE — has a tool per surface, both read inverted:
+  `diagnostics/ts_repo_over_acceptance.ts` (`deno task ts-repo:over-acceptance`)
+  over the files tsc's parser rejects, and `diagnostics/css_over_acceptance.ts`
+  (`deno task css:over-acceptance`) over the files `parseCss` rejects.
 
   The ad-hoc timed variant
   (coverage flag unset) times the all-tools-pass intersection — an adversarial
@@ -398,29 +399,32 @@ prettier. Load-bearing on two axes:
   there, and both rows run on perf.
 - **rsvelte-fmt (native binary)** — the other Rust-native Svelte formatter;
   **Svelte only**, and **coverage-only**. See below.
-- **rsvelte parse (N-API)** — rsvelte's Svelte **parser**, and the **first
-  third-party engine on the `parse/svelte` surface**: before it that group held
-  only `svelte/compiler` (the oracle) and tsv's own variants, so tsv was measured
-  against its own reference and nothing else. Two rows. `rsvelte-parse` is matched
+- **rsvelte parse (N-API)** — rsvelte's Svelte **parser**, and the **only
+  third-party engine on the `parse/svelte` surface**: the rest of that group is
+  `svelte/compiler` (the oracle) and tsv's own variants, so without it tsv is
+  measured against its own reference and nothing else. Two rows. `rsvelte-parse` is matched
   to `tsv-json` on **both** axes — mechanism (each returns a compact JSON string
   the caller `JSON.parse`s, so both pay the identical serialize + boundary + parse
-  cost) and payload (77,561 vs 76,509 bytes on a real component, within 1.4%) —
+  cost) and payload (within ~1.5% of `tsv-json`'s bytes on a real component) —
   which earns it a curated comparison line, the only one the Svelte surface has.
   Because rsvelte claims the same drop-in contract tsv does, the row is a
   conformance datum too: on that same component its AST differs from
-  `svelte/compiler` on **11 node kinds, all in the embedded TypeScript layer**
-  (a `TSNamedTupleMember`/`TSTupleType` pair vanishing, a `TSUnknownKeyword`
-  appearing), where tsv is byte-exact by `corpus:compare:parse`'s deep diff.
+  `svelte/compiler` **only in the embedded TypeScript layer**, and there on a
+  handful of node kinds (a `TSNamedTupleMember`/`TSTupleType` pair vanishing, a
+  `TSUnknownKeyword` appearing where the oracle has a concrete type), where tsv is
+  byte-exact by `corpus:compare:parse`'s deep diff. It parses the whole
+  conformance Svelte corpus without a host fault — worth stating because a native
+  addon on that corpus is exactly where yuku's N-API binding segfaults.
   ⚠ `rsvelte-parse-skip-expr-loc` is named for the **option it passes**, not for
   tsv's `no-locations` wire, because the reductions differ: tsv drops per-node
-  `loc` throughout (~46%), `skipExpressionLoc` drops only nested `loc` on embedded
-  JS expressions and keeps top-level `start`/`end` (−34%). Read the pair as "each
+  `loc` throughout, `skipExpressionLoc` drops only nested `loc` on embedded JS
+  expressions and keeps top-level `start`/`end`. Read the pair as "each
   tool's own lighter wire", never as one payload measured twice — which is why it
   is absent from the payload-matched lines. Package choice is deliberate and
   documented in `lib/rsvelte_parse.ts`: `@rsvelte/compiler` also exists but is a
   WASM bundle whose `parse_svelte` takes no options and **pretty-prints** its JSON
-  (267,010 bytes for the same 76,221 of content — formatted inside the wasm, so
-  not opt-out-able), which would rank JSON indentation rather than parse work.
+  (formatted inside the wasm, so not opt-out-able), which would rank JSON
+  indentation rather than parse work.
 - **swc (`@swc/core`, N-API)** — the most widely deployed Rust TS/JS parser, and
   the engine `parse/typescript` was missing while carrying two bindings each of
   oxc and yuku. Parse-only (swc ships no formatter), on **both surfaces**. Its AST
@@ -436,21 +440,20 @@ prettier. Load-bearing on two axes:
   `parseDiagnostics`. Its goal axis is spelled `isModule`, **not** `script` (that
   key is inert — verified in both directions), which is what lets it score
   script-goal test262 files rather than counting them as module-goal failures. It
-  survives the whole conformance corpus (50,242 files, no host fault), unlike
+  survives the whole conformance corpus with no host fault, unlike
   yuku's native binding — which matters because swc has no WASM row to fall back
-  on. Its three real-corpus rejections are catalogued in `lib/perf_omit.ts`, and
+  on. Its real-corpus rejections are catalogued in `lib/perf_omit.ts`, and
   differ in kind from oxc's and yuku's: swc rejects the ambient consts even with
   `dts: true` passed explicitly, so that tolerance is the parser's own limit rather
   than the bench's missing path threading.
 - **malva (WASM)** — dprint's CSS formatter, loaded over the same
   `@dprint/formatter` host as `@dprint/typescript`, so it adds a wasm-tier engine
-  to `format/css` for one more plugin wasm and no new machinery. It closes the
-  omission the dprint entry above still describes; the HTML plugin stays out (it
-  does not format Svelte). **CSS only, enforced by the plugin** — it rejects
+  to `format/css` for one more plugin wasm and no new machinery. The HTML plugin
+  stays out — it does not format Svelte. **CSS only, enforced by the plugin** — it rejects
   `.svelte` and `.ts` with "unknown file extension", mirroring
   `@dprint/typescript`'s rejection of CSS and Svelte, so the language list is not
-  a policy the wrapper could get wrong. Before this row the group's only wasm-tier
-  engine was `biome-wasm`.
+  a policy the wrapper could get wrong. It and `biome-wasm` are the group's two
+  wasm-tier engines.
 - **postcss (JS)** — the first third-party engine on `parse/css`, earned on one
   argument: it is the parser behind prettier's CSS printer, i.e. behind the
   `format/css` **baseline**, which the parse surface therefore could not see. Not
@@ -464,7 +467,26 @@ prettier. Load-bearing on two axes:
   row is an **availability fact, not an omission**. `css-tree` was evaluated for
   this slot and rejected: it parses an unclosed block without error even with
   `onParseError` supplied, so its accept rate would read ~100% vacuously, where
-  postcss throws.
+  postcss throws (as it does on unclosed strings and comments, unterminated
+  brackets, and a declaration missing its colon).
+
+  ⚠ **Read a `parse/css` coverage delta as grammar coverage, not conformance.**
+  Unlike `svelte/compiler` on the Svelte surface, `parseCss` is **not a validity
+  oracle in either direction**, so the reference row is not a ceiling. Measured
+  over the conformance CSS corpus, postcss lands marginally *above* it — and the
+  gap is two-sided: postcss **rejects** a handful of files `parseCss` accepts
+  (genuinely invalid CSS — `//` comments, a missing semicolon), and **accepts**
+  more that `parseCss` rejects, most of them valid modern CSS Svelte's parser
+  simply doesn't implement (`@supports selector(…)`, `css-mixins` dashed
+  functions) rather than anything malformed. A smaller share is preprocessor
+  syntax living in prettier's `.css` fixtures (SCSS `@extend`, `@apply`, the
+  `postcss-plugins/` cases), which postcss parses structurally because it does not
+  validate at-rule preludes at all. tsv is a drop-in for `parseCss` and tracks it
+  by design, so a postcss row above tsv is neither a tsv gap nor postcss laxity —
+  it is two different grammars, and the per-source coverage table is what keeps
+  them legible. `deno task css:over-acceptance` is the axis itself — every
+  `parse/css` tool scored over the files `parseCss` rejects, with the reject count
+  pinned so the reference row's grammar can't move unnoticed.
 
 ### Coverage-only rows
 

@@ -2,15 +2,10 @@
  * malva implementation wrapper (via WASM)
  *
  * `dprint-plugin-malva` is dprint's CSS formatter, loaded in-process as its Wasm
- * plugin through the same `@dprint/formatter` host `lib/dprint.ts` uses. It gives
- * `format/css` a second wasm-tier engine — before this row the only one was
- * `biome-wasm`, a 38.6 MB artifact and the slowest row in the group, so a
- * wasm-vs-wasm read on CSS had a single data point.
- *
- * This is the row the dprint wrapper's own doc used to defer ("dprint's CSS
- * (malva) and HTML plugins are separate Wasm plugins, deliberately not wired up").
- * The HTML plugin stays out: tsv's Svelte formatting is a superset job, and
- * dprint's HTML plugin does not format Svelte.
+ * plugin through the same `@dprint/formatter` host `lib/dprint.ts` uses — so it
+ * costs one more plugin wasm and no new machinery. It is one of two wasm-tier
+ * engines on `format/css`, the other being `biome-wasm`. dprint's HTML plugin
+ * stays unwired: it does not format Svelte.
  *
  * **CSS only, and enforced by the plugin itself.** malva matches CSS/SCSS/Less
  * extensions and rejects anything else outright with "unknown file extension"

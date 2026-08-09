@@ -221,6 +221,21 @@ export async function init_implementations(
 		'rsvelte parse (N-API, svelte)',
 		'rsvelte parse'
 	);
+	// The addon targets a specific upstream Svelte, and the row it feeds sits beside
+	// `svelte/compiler` — the oracle — on `parse/svelte`. When those drift apart the
+	// two rows are parsing to different language versions, which is a comparison
+	// caveat, not a broken setup: WARN and keep the row (the same posture
+	// `lib/fixtures_gate.ts` takes on checkout↔pin skew). The report renders both
+	// versions either way; this is what makes the disclosure active.
+	const rsvelte_svelte_target = rsvelte_parse_impl?.upstream_svelte_version;
+	if (rsvelte_svelte_target && rsvelte_svelte_target !== versions.canonical.svelte) {
+		logger(
+			`  ⚠ rsvelte parse targets svelte@${rsvelte_svelte_target}, but the harness pins ` +
+				`svelte@${versions.canonical.svelte} — its parse/svelte rows are graded against a ` +
+				`different language version than the svelte/compiler oracle beside them.`
+		);
+	}
+
 	const swc_impl = await optional(new SwcImplementation(versions.swc), 'swc (N-API)', 'swc');
 	const postcss_impl = await optional(
 		new PostcssImplementation(versions.postcss),
@@ -472,9 +487,9 @@ export function get_benchmark_tasks(
 			(source, _language, goal) => impls.yuku_wasm!.parse(source, language, goal)
 		);
 
-		// rsvelte's parser (Svelte only) — the FIRST third-party engine on this
-		// surface, which until now held only `svelte/compiler` (the oracle) and tsv's
-		// own variants. `parse()` returns JSON the caller parses, exactly the
+		// rsvelte's parser (Svelte only) — the ONLY third-party engine on this surface;
+		// the rest of the group is `svelte/compiler` (the oracle) and tsv's own
+		// variants. `parse()` returns JSON the caller parses, exactly the
 		// mechanism `tsv-json` measures, so the two are apples-to-apples. It also
 		// claims tsv's own drop-in contract, which makes the row a conformance datum
 		// as much as a speed one. See lib/rsvelte_parse.ts.

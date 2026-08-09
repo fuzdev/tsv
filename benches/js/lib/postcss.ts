@@ -1,14 +1,14 @@
 /**
  * postcss implementation wrapper (JS)
  *
- * The first third-party engine on the `parse/css` surface, which until now held
- * only `svelte/compiler`'s `parseCss` (the oracle) and tsv's own variants.
+ * The only third-party engine on the `parse/css` surface — the rest of that group
+ * is `svelte/compiler`'s `parseCss` (the reference row) and tsv's own variants.
  *
  * **It earns the row on one argument**: postcss is the parser behind prettier's
- * CSS printer, and prettier is the `format/css` baseline — so the baseline's own
- * parser was the one thing the parse surface couldn't see. (This is a standalone
- * install, not the copy prettier bundles, so treat it as "the postcss engine at
- * the pinned version", not as prettier's internals.)
+ * CSS printer, and prettier is the `format/css` baseline — so this is the parse
+ * surface's counterpart to that baseline. (A standalone install, not the copy
+ * prettier bundles, so read it as "the postcss engine at the pinned version",
+ * not as prettier's internals.)
  *
  * **Why there is no native peer on this surface.** No Rust CSS parser exposes an
  * AST to JS at all: lightningcss ships `transform`/`bundle` only (its `./ast`
@@ -59,6 +59,7 @@ export class PostcssImplementation extends BaseImplementation {
 		this.versions = versions;
 	}
 
+	// deno-lint-ignore require-await
 	async init(): Promise<void> {
 		const require = createRequire(import.meta.url);
 		const postcss = require('postcss') as PostcssModule;
@@ -67,7 +68,6 @@ export class PostcssImplementation extends BaseImplementation {
 		}
 		postcss.parse('a{color:red}');
 		this._postcss = postcss;
-		await Promise.resolve();
 	}
 
 	parse(source: string, language: Language): unknown {
