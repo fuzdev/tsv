@@ -309,7 +309,7 @@ lang_bindings!(
 // per-call options bag threaded through its own `lang_bindings!`, and it reaches
 // the FORMAT exports as well. Here only parse is goal-aware, so a Script-goal
 // format has no counterpart over the C ABI (`tsv format --goal` and
-// `format_typescript(src, {goal})` both do). See ../tsv_wasm/CLAUDE.md
+// `format_typescript(src, {goal})` both do). See `crates/tsv_wasm/CLAUDE.md`
 // §Format Options.
 
 /// Map the C-ABI goal code to `tsv_ts::Goal` (`0` = Module, else Script).

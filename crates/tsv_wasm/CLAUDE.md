@@ -42,7 +42,7 @@ more specific signature). The section also declares `ParseOptions` /
 `TypeScriptParseOptions`, which `scripts/patch_npm_package.ts` re-exports by
 name through the npm facade; their exact shape — and why neither is empty and
 neither `extends` the other — is
-[The four option interfaces](#the-four-option-interfaces). A signature change in
+[The Four Option Interfaces](#the-four-option-interfaces). A signature change in
 `lang_bindings!` must update `TS_PARSE_DECLS` in the same edit. The `export type * from "./tsv_ast"` header
 rides its own custom section, so consumers `import type` AST nodes directly.
 
@@ -115,7 +115,7 @@ whole usage) at compile time. It declares `FormatOptions` /
 name through the npm facade (checked against `tsv_ast.d.ts` and
 `locations.d.ts` for the TS2308 collision rule below).
 
-### The four option interfaces
+## The Four Option Interfaces
 
 The non-TypeScript bags — `FormatOptions` (`format_svelte`/`format_css`) and
 `ParseOptions` (`parse_svelte`/`parse_css`) — both declare **`goal?: undefined`**.
