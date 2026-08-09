@@ -258,6 +258,20 @@ panic = "unwind"
 lto = false
 codegen-units = 16
 
+# The N-API artifact's profile: full `release` optimization plus an unwinding
+# panic strategy. `tsv_napi`'s exports carry `#[napi(catch_unwind)]`, converting
+# a Rust panic into a thrown JS error — but only an unwinding profile makes the
+# catch reachable (under `panic = "abort"` the attribute is inert and a panic
+# kills the HOST process: the consumer's dev server, CI step, or editor). It's a
+# named profile because `panic` cannot be overridden per-package, and flipping
+# `[profile.release]` itself would perturb the size-bounded WASM bundles and the
+# FFI/CLI artifacts, which keep abort. Everything napi builds with it — bench,
+# test:napi, publish — so the measured artifact is the shipped one. Stack
+# overflow remains uncatchable under any strategy (aborts the host).
+[profile.napi]
+inherits = "release"
+panic = "unwind"
+
 [profile.profiling]
 inherits = "release"
 debug = true
