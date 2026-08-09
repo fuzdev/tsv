@@ -17,7 +17,8 @@ The end states agree, so this is a pass-count divergence, not an end-state one:
 one-pass claim; prettier's first pass lands elsewhere), and no
 `output_prettier.svelte` exists because input is prettier-stable. The run's
 chain is too long for a `prettier_intermediate_*` pin (two distinct
-intermediates), so the README records it — the same shape as
+intermediates), so `audit_signature_own_line.txt` holds it instead — all three
+passes, byte-exact, checked live on every validation run. The same shape as
 [key_colon_own_line_block_comment](../../../syntax/comments/key_colon_own_line_block_comment_prettier_divergence/).
 Contrast the class-property and declarator siblings
 ([property_before_eq_own_line_block_comment](../../class/property_before_eq_own_line_block_comment_prettier_divergence/),

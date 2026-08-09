@@ -2,7 +2,7 @@
 //! divergence-suffix naming rules.
 
 use crate::deno::PrettierParser;
-use crate::fixtures::AUDIT_SIGNATURE_FILENAME;
+use crate::fixtures::{AUDIT_SIGNATURE_FILENAME, audit_signature_variant_filename};
 use std::path::PathBuf;
 use tsv_cli::cli::input::ParserType;
 use tsv_ts::Goal;
@@ -214,6 +214,12 @@ impl Fixture {
     /// Get the full path to audit_signature.txt (sibling of output_prettier.*)
     pub fn audit_signature_path(&self) -> PathBuf {
         self.path.join(AUDIT_SIGNATURE_FILENAME)
+    }
+
+    /// Get the full path to `audit_signature_<suffix>.txt` (sibling of
+    /// `unformatted_ours_<suffix>.*`, whose prettier chain it pins).
+    pub fn audit_signature_variant_path(&self, suffix: &str) -> PathBuf {
+        self.path.join(audit_signature_variant_filename(suffix))
     }
 
     /// Get the full path to the prettier non-convergence marker file

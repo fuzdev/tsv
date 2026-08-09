@@ -14,7 +14,11 @@ is removed at compile, so `<span>text…`, `<span> text…`, and a newline bound
 document**. tsv converges all three on one form; prettier produces a different stable form for each.
 The `unformatted_ours_*` variants are those authorings — `_hug` (no boundary whitespace) and
 `_space` (a space boundary) — both of which tsv normalizes to the block-style input while prettier
-does not.
+does not. Prettier's two stable forms are pinned beside them:
+`prettier_variant_hug.svelte` (both delimiters dangle — `<span⏎>text`, `</span⏎>`) and
+`prettier_variant_space.svelte` (the opening tag stays intact, the closer dangles wherever the
+author hugged it). tsv normalizes each of those back to input, so they are `prettier_variant_*`
+rather than a third fixed point.
 
 Preserving the space here is not merely a divergence but a defect: emitted at line-start it renders
 as nothing, re-parses as indentation, and is dropped on the next pass — a non-idempotent format.

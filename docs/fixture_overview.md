@@ -262,6 +262,7 @@ Tip: Use `deno task fixtures:audit <pattern>` to classify novel prettier outputs
 - `prettier_intermediate_to_variant_*.svelte` — Prettier's unstable first-pass output (from `unformatted_ours_*`, converges to a `variant_*`/`prettier_variant_*`)
 - `prettier_intermediate_to_divergent_variant_*.svelte` — Prettier's unstable first-pass output (from `unformatted_ours_*`, converges to a `divergent_variant_*` — the target N7/N7b can't accept; see N7c)
 - `audit_signature.txt` — Pins prettier's multi-pass chain from `output_prettier.*` to fixed point (auto-generated; see F4)
+- `audit_signature_<suffix>.txt` — Pins prettier's chain from `unformatted_ours_<suffix>.*` to fixed point; the marker of **last resort**, written only where no single-form marker can express the output (auto-generated; see N12)
 - `prettier_nonconvergent.txt` — Prettier never reaches a fixed point on input (no oracle exists); claim live-verified (see F5/S18)
 - `prettier_rejects.txt` — Prettier throws on the input (parse rejection or printer crash; no oracle exists); the file's trimmed content is the expected-error substring, claim live-verified (see F6/S19)
 - `tsv_rejects.txt` — tsv over-rejects an input the canonical parser accepts (a tsv-rejects/canonical-accepts divergence the fixture path can otherwise not express); the file's trimmed content is the expected tsv-error substring, `expected_svelte.json` holds the canonical AST, claim live-verified (see F7/S20)
@@ -342,8 +343,9 @@ All fixtures use `input.svelte` as canonical source.
 13. **S12**: `_svelte_divergence` or `_svelte_prettier_divergence` suffix required when `expected_ours.json`/`expected_svelte.json` exist
 14. **S13–S17**: the svelte-divergence-dir counterparts — a `_svelte_divergence` dir must have BOTH `expected_ours.json` AND `expected_svelte.json` (S13; except `tsv_rejects.txt` fixtures, S20), those two files may ONLY appear in svelte-divergence dirs (S14/S15), such a dir cannot carry `expected.json` (S16), and the two ASTs must actually differ (S17)
 15. **S18**: `prettier_nonconvergent.txt` CANNOT coexist with prettier-claim files (`output_prettier.*`, `unformatted_*`, `unformatted_prettier_*`, `prettier_variant_*`, `variant_*`, `divergent_variant_*`, `prettier_intermediate_*`) — prettier has no fixed point, so no prettier-anchored claim is expressible. `unformatted_ours_*` stays allowed (it claims only our formatter's normalization)
-16. **S19**: `prettier_rejects.txt` follows the same claim-file rules as S18 (prettier throws, so no prettier-anchored claim is expressible; `unformatted_ours_*` stays allowed) AND is mutually exclusive with `prettier_nonconvergent.txt` (prettier either throws or oscillates, never both)
+16. **S19**: `prettier_rejects.txt` follows the same claim-file rules as S18 (prettier throws, so no prettier-anchored claim is expressible; `unformatted_ours_*` stays allowed) AND is mutually exclusive with `prettier_nonconvergent.txt` (prettier either throws or oscillates, never both). Both markers also exclude `audit_signature_<suffix>.txt` — a pinned chain is a prettier-anchored claim
 17. **S20**: `tsv_rejects.txt` (tsv over-rejects an input the canonical parser accepts) requires the `_svelte_divergence` suffix + a README + `expected_svelte.json` (the canonical AST); FORBIDS `expected.json` / `expected_ours.json` (tsv emits no AST); and is mutually exclusive with every format-claim file, `input_invalid_*`, and the prettier no-oracle markers (`prettier_rejects.txt` / `prettier_nonconvergent.txt`). An `expected_svelte.json` holding the parse-failure marker is rejected (the canonical parser must *accept* — else convert to `input_invalid_*`)
+18. **S21**: `audit_signature_<suffix>.txt` requires its same-suffix `unformatted_ours_<suffix>.*` source — the chain it pins is anchored there, so an orphan pins nothing (`fixtures:update:formatted` deletes orphans)
 
 Per-input-type parser/formatter oracles and variant extensions: see
 [Standalone Fixture Differences](#standalone-fixture-differences) above (`input.svelte.ts`
@@ -433,9 +435,13 @@ on real codebases.
   - **N11c**: `ours(file) != file` (else it's dual-stable — should be `variant_*`)
   - **N11d**: `ours(ours(file)) == ours(file)` (the rewritten third form is itself a fixed point)
 - **N10**: Cross-path discovery — pin Prettier's output of every `unformatted_ours_*`:
-  - After N7, unclaimed Prettier outputs from `unformatted_ours_*` (those not == input and not consumed by a `prettier_intermediate*_*`) are checked against the fixture's documented stable forms (`output_prettier.*`, `prettier_variant_*.*`, `variant_*.*`)
+  - After N7 and N12, unclaimed Prettier outputs from `unformatted_ours_*` (those not == input, not consumed by a `prettier_intermediate*_*`, and not pinned by an `audit_signature_<suffix>.txt`) are checked against the fixture's documented stable forms (`output_prettier.*`, `prettier_variant_*.*`, `variant_*.*`, `divergent_variant_*.*`)
   - **Blocking** when the fixture documents stable forms but the output matches none of them — `ValidationError::UndocumentedPrettierOutput`. This means Prettier drifted, or the target is undocumented; add/update a matching `variant_*`/`prettier_variant_*`/`divergent_variant_*` (or a `prettier_intermediate*_*` for multi-pass). This is what pins Prettier's _specific_ one-pass-stable output for a normalization divergence (the analogue of N8 for `output_prettier` and N7b for multi-pass convergence).
-  - **Informational** only when the fixture documents the divergence by README alone (no `output_prettier`/`prettier_variant_*`/`variant_*` files): novel outputs are NOTEs suggesting investigation via `deno task fixtures:audit`
+  - **Informational** only when the fixture documents the divergence by README alone (no `output_prettier`/`prettier_variant_*`/`variant_*`/`divergent_variant_*` files). The NOTE **names the file to add** — the `ours(V)` test that picks between `prettier_variant_*` / `variant_*` / `divergent_variant_*` is pure Rust and N10 has the bytes, so it runs there. It falls back to "investigate via `deno task fixtures:audit`" only when prettier isn't idempotent on the output, where the chain rather than a single form is the question
+- **N12**: `audit_signature_<suffix>.txt` byte-matches prettier's live chain from `unformatted_ours_<suffix>.*` — the **marker of last resort**, auto-generated, for the outputs no single-form marker reaches:
+  - Each `%%PASS=N%%` section is exactly `prettier^N(unformatted_ours_<suffix>.*)`, numbered from **1** (unlike F4's `audit_signature.txt`, which starts at pass 2 because F2 already pins its pass 1); the last section is the fixed point. Every pass is compared byte-exact, so prettier-version drift anywhere along the chain fails here
+  - Written only when **both** hold: prettier's first-pass output matches no documented form (when it lands on one, that hop is pinned by N10's own byte comparison and the rest of the chain by whatever it landed on — F4 for `output_prettier`, N1/N9a/N11a for a variant), **and** no single-form marker can express it — either a chain with two or more distinct intermediates (`prettier_intermediate*_*` pins exactly one unstable pass), or a stable first pass **tsv cannot format** (every variant marker asserts something about `ours(V)`, so all are unreachable). A stable first pass tsv *can* format is left unpinned on purpose, so `fixtures:audit` keeps suggesting the more informative `prettier_variant_*` / `variant_*` / `divergent_variant_*`
+  - Its suffixes are what N10 then treats as documented; a signature a single-form marker later covers fails as `VariantChainSignatureSuperseded`, and one whose source became a prettier fixed point fails as `Collapsed` (pin it as a `prettier_variant_*` / `variant_*` instead)
 
 **Render-equivalence validations (R)** — a whitespace variant must *render* like input:
 
@@ -882,8 +888,9 @@ Each file kind's checks are defined once in [All Validation Rules](#all-validati
 N1/N2 for `prettier_variant_*` (plus C3: differs from input), N5/N6 for
 `unformatted_ours_*`, N3/N4 for `unformatted_*`, N7/N7b for the intermediates (each
 requires its same-suffix `unformatted_ours_*` source), N8 for `unformatted_prettier_*`,
-N9 for `variant_*`, N11 for `divergent_variant_*`, N10 for cross-path discovery, and
-F2 for `output_prettier.*` (which skips F3 — see
+N9 for `variant_*`, N11 for `divergent_variant_*`, N12 for
+`audit_signature_<suffix>.txt` (which likewise requires its same-suffix source), N10 for
+cross-path discovery, and F2 for `output_prettier.*` (which skips F3 — see
 [Implicit Skip Behavior](#implicit-skip-behavior)).
 
 **For `audit_signature.txt` (auto-generated; only when `output_prettier.*` exists AND prettier is non-idempotent on it):**
@@ -893,6 +900,13 @@ F2 for `output_prettier.*` (which skips F3 — see
 - F4 byte-equality-checks the file against the live chain every validation run, catching drift in any intermediate pass that F2 (pass-1 only) would miss
 - The audit (`fixtures:audit`) recognizes fixtures with a matching signature and stops flagging them as novel; signature drift surfaces in audit output as a regenerate prompt
 - Format: header comments, then `%%PASS=N%%` (or `%%PASS=N (fixed point)%%`) section headers separating exact pass content. Do not edit by hand — regenerate with `fixtures:update:formatted`
+
+**For `audit_signature_<suffix>.txt` (auto-generated; the marker of last resort — see N12 for exactly when it is written):**
+
+- Pins each step of prettier's chain from `unformatted_ours_<suffix>.*`, numbered from pass 1, up to and including the fixed point
+- Same file format and the same `fixtures:update:formatted` lifecycle as `audit_signature.txt`; only the anchor and the numbering differ. Several may sit in one directory, one per `unformatted_ours_*` source
+- N12 byte-equality-checks it every validation run; N10 then treats the suffix as documented, which is what turns a standing "novel stable form" NOTE into a verified claim
+- The two cases that reach it: a chain with two or more distinct intermediates (`prettier_intermediate*_*` pins exactly one), and a stable first pass tsv cannot format (so no `prettier_variant_*` / `variant_*` / `divergent_variant_*` is expressible). Everything else keeps a single-form marker
 
 **Example:**
 

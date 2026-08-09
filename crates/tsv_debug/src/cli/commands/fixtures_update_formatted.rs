@@ -1,9 +1,13 @@
 use crate::cli::CliError;
-use crate::fixtures::{self, AUDIT_SIGNATURE_FILENAME, AuditSignature, FixtureFiles};
+use crate::fixtures::{
+    self, AUDIT_SIGNATURE_FILENAME, AuditSignature, ChainAnchor, FixtureFiles, SingleFormPins,
+    StableFormMarker, audit_signature_variant_filename, audit_signature_variant_suffix,
+    unformatted_ours_filename, unformatted_ours_suffix,
+};
 use argh::FromArgs;
 use futures_util::StreamExt;
 
-/// Regenerate output_prettier.*, prettier_intermediate_*, and audit_signature.txt.
+/// Regenerate output_prettier.*, prettier_intermediate_*, and the audit signatures.
 #[derive(FromArgs, Debug)]
 #[argh(subcommand, name = "fixtures_update_formatted")]
 pub struct FixturesUpdateFormattedCommand {
@@ -181,7 +185,7 @@ async fn run(filters: &[String]) -> Result<(), CliError> {
                 }
                 FormattedResult::Removed => {
                     println!(
-                        "✓ Removed {}/{} (no intermediate needed)",
+                        "✓ Removed {}/{} (no longer needed)",
                         fixture.relative_path, filename
                     );
                     intermediate_removed += 1;
@@ -224,7 +228,7 @@ async fn run(filters: &[String]) -> Result<(), CliError> {
     }
     if intermediate_created > 0 || intermediate_updated > 0 || intermediate_removed > 0 {
         println!(
-            "⚠️  Updated prettier_intermediate_* / prettier_intermediate_to_variant_* / prettier_intermediate_to_divergent_variant_* files"
+            "⚠️  Updated prettier_intermediate_* / prettier_intermediate_to_variant_* / prettier_intermediate_to_divergent_variant_* / audit_signature_<suffix>.txt files"
         );
     }
     if signature_created > 0 || signature_updated > 0 || signature_removed > 0 {
@@ -320,13 +324,7 @@ async fn update_audit_signature(fixture: &fixtures::Fixture) -> FormattedResult 
 
     // No output_prettier → no chain anchor → remove any stale signature
     if !output_prettier_path.exists() {
-        if signature_path.exists() {
-            return match fixtures::delete_file_if_exists(&signature_path) {
-                Ok(()) => FormattedResult::Removed,
-                Err(e) => FormattedResult::Failed(e),
-            };
-        }
-        return FormattedResult::NotNeeded;
+        return remove_signature(&signature_path);
     }
 
     let output_prettier_content = match fixtures::read_file(&output_prettier_path) {
@@ -341,34 +339,39 @@ async fn update_audit_signature(fixture: &fixtures::Fixture) -> FormattedResult 
     };
 
     match chain {
-        None => {
-            // Prettier idempotent — no signature needed. Remove stale file if any.
-            if signature_path.exists() {
-                match fixtures::delete_file_if_exists(&signature_path) {
-                    Ok(()) => FormattedResult::Removed,
-                    Err(e) => FormattedResult::Failed(e),
-                }
-            } else {
-                FormattedResult::NotNeeded
-            }
-        }
-        Some(sig) => {
-            let serialized = sig.serialize();
-            let existing = fixtures::read_file(&signature_path).ok();
-            if existing.as_deref() == Some(serialized.as_str()) {
-                FormattedResult::Unchanged
-            } else if existing.is_none() {
-                match fixtures::write_file(&signature_path, &serialized) {
-                    Ok(()) => FormattedResult::Created,
-                    Err(e) => FormattedResult::Failed(e),
-                }
-            } else {
-                match fixtures::write_file(&signature_path, &serialized) {
-                    Ok(()) => FormattedResult::Updated,
-                    Err(e) => FormattedResult::Failed(e),
-                }
-            }
-        }
+        // Prettier idempotent — no signature needed. Remove stale file if any.
+        None => remove_signature(&signature_path),
+        Some(sig) => write_signature(&signature_path, &sig, ChainAnchor::OutputPrettier),
+    }
+}
+
+/// Write a serialized signature, reporting Created / Updated / Unchanged.
+fn write_signature(
+    path: &std::path::Path,
+    signature: &AuditSignature,
+    anchor: ChainAnchor,
+) -> FormattedResult {
+    let serialized = signature.serialize(anchor);
+    let existing = fixtures::read_file(path).ok();
+    if existing.as_deref() == Some(serialized.as_str()) {
+        return FormattedResult::Unchanged;
+    }
+    let created = existing.is_none();
+    match fixtures::write_file(path, &serialized) {
+        Ok(()) if created => FormattedResult::Created,
+        Ok(()) => FormattedResult::Updated,
+        Err(e) => FormattedResult::Failed(e),
+    }
+}
+
+/// Remove a signature file if present, reporting Removed / NotNeeded.
+fn remove_signature(path: &std::path::Path) -> FormattedResult {
+    if !path.exists() {
+        return FormattedResult::NotNeeded;
+    }
+    match fixtures::delete_file_if_exists(path) {
+        Ok(()) => FormattedResult::Removed,
+        Err(e) => FormattedResult::Failed(e),
     }
 }
 
@@ -447,12 +450,15 @@ enum ChainShape {
     FirstPassUnparseable(String),
 }
 
-/// Update prettier_intermediate_*{,_to_variant_*} files for a fixture.
+/// Update prettier_intermediate_*{,_to_variant_*} files and the per-variant chain
+/// signatures for a fixture.
 ///
 /// For each `unformatted_ours_*` file, classifies what prettier does over one or two passes
 /// (see `ChainShape`), then either removes any stale intermediate files or writes the
-/// correct one. The `UnstableNotConverging` case is the interaction point with
-/// `audit_signature.txt` — those fixtures pin their chain there instead.
+/// correct one. Where no single-form marker can express prettier's output —
+/// `UnstableNotConverging` (two or more distinct intermediates), or a stable first pass tsv
+/// cannot ingest — the chain goes into `audit_signature_<suffix>.txt` instead, the marker of
+/// last resort (N12).
 async fn update_intermediate_files(
     fixture: &fixtures::Fixture,
     input_ext: &str,
@@ -471,6 +477,7 @@ async fn update_intermediate_files(
     };
 
     let files = FixtureFiles::scan(fixture);
+    let pins = SingleFormPins::collect(fixture, input_ext, &files);
 
     // Pre-load convergence-target contents to distinguish "converges to input" from
     // "converges to a documented variant" / "…to a documented divergent_variant" on the
@@ -488,12 +495,10 @@ async fn update_intermediate_files(
         }
     }
 
+    remove_orphan_chain_signatures(fixture, input_ext, &files, &mut results);
+
     for variant_name in &files.unformatted_ours {
-        // Extract suffix: unformatted_ours_X.svelte -> X
-        let suffix = variant_name
-            .strip_prefix("unformatted_ours_")
-            .and_then(|s| s.strip_suffix(input_ext))
-            .unwrap_or("");
+        let suffix = unformatted_ours_suffix(variant_name, input_ext).unwrap_or("");
 
         let plain_filename = format!("prettier_intermediate_{suffix}{input_ext}");
         let to_variant_filename = format!("prettier_intermediate_to_variant_{suffix}{input_ext}");
@@ -522,6 +527,49 @@ async fn update_intermediate_files(
             }
         };
 
+        let chain_signature_filename = audit_signature_variant_filename(suffix);
+        let chain_signature_path = fixture.audit_signature_variant_path(suffix);
+        // A chain pin is the marker of LAST RESORT, written only where the chain is
+        // genuinely unpinned. Two conditions, both required.
+        //
+        // First: prettier's FIRST-pass output must match no documented form. When it lands
+        // on one, that hop is already pinned byte-exactly (N10 compares the same bytes) and
+        // the rest of the chain is pinned by whichever form it landed on — `output_prettier`
+        // by F4, a `prettier_variant_*` / `variant_*` / `divergent_variant_*` by
+        // N1 / N9a / N11a asserting prettier holds it stable, which ends the chain. Skipping
+        // this check pins ~30 chains that are already covered, most of them a second copy of
+        // an `audit_signature.txt` the fixture already carries.
+        let first_pass_unpinned = !pins.matches_documented_form(&formatted, &input);
+        // Second: no single-form marker must be able to express it. Writing a chain wherever
+        // the output happens to be unclaimed would silence the audit's `prettier_variant_*` /
+        // `variant_*` / `divergent_variant_*` suggestion — the more informative pin — on
+        // every fixture that still wants one.
+        //
+        // A stable first pass is a candidate for one of those three, decided by the shared
+        // `ours(V)` test; only `OursRejects` leaves every marker unreachable (each asserts
+        // something about `ours(V)`). `OursNotIdempotent` is a tsv bug, not a marker choice —
+        // pinning its chain would paper over it, so that arm declines too.
+        let stable_form = (first_pass_unpinned && matches!(shape, ChainShape::StableFirstPass))
+            .then(|| fixtures::classify_stable_form(&formatted, &input, &fixture.input_file));
+        let no_single_form_marker = match shape {
+            // Two or more distinct intermediates; `prettier_intermediate*_*` pins exactly one.
+            ChainShape::UnstableNotConverging => true,
+            ChainShape::StableFirstPass => stable_form == Some(StableFormMarker::OursRejects),
+            _ => false,
+        };
+        let needs_chain_pin = first_pass_unpinned && no_single_form_marker;
+
+        // Say what was declined and why — an unpinned output that regenerates silently reads
+        // as "nothing to do" when the answer is a one-file addition the tool already knows.
+        if let Some(marker) = stable_form
+            && let Some(prefix) = marker.file_prefix()
+        {
+            results.push(IntermediateOutput::Note(format!(
+                "- {}/{variant_name}: prettier's output is a stable form no sibling holds — add {prefix}{suffix}{input_ext} (not auto-generated: it is a claim about tsv, not a prettier chain)",
+                fixture.relative_path
+            )));
+        }
+
         match shape {
             ChainShape::NormalizesToInput | ChainShape::StableFirstPass => {
                 remove_stale_intermediates(
@@ -534,10 +582,16 @@ async fn update_intermediate_files(
                 );
             }
             ChainShape::UnstableNotConverging => {
-                // Make the skip visible — silently doing nothing here masks the (intentional)
-                // interaction between prettier_intermediate_* and audit_signature.txt.
+                // Make the routing visible — silently doing nothing here masks the
+                // (intentional) handoff from prettier_intermediate_* to whatever pins the
+                // chain instead.
+                let captor = if needs_chain_pin {
+                    chain_signature_filename.clone()
+                } else {
+                    format!("{AUDIT_SIGNATURE_FILENAME} (first pass lands on a documented form)")
+                };
                 results.push(IntermediateOutput::Note(format!(
-                    "- {}/{}: chain doesn't converge to input or any variant — captured by audit_signature.txt instead",
+                    "- {}/{}: chain doesn't converge to input or any variant — captured by {captor} instead",
                     fixture.relative_path, variant_name
                 )));
                 remove_stale_intermediates(
@@ -605,9 +659,65 @@ async fn update_intermediate_files(
                 );
             }
         }
+
+        let signature_result = if needs_chain_pin {
+            let variant_content = match fixtures::read_file(&fixture.path.join(variant_name)) {
+                Ok(s) => s,
+                Err(e) => {
+                    results.push(IntermediateOutput::File(
+                        chain_signature_filename,
+                        FormattedResult::Failed(e),
+                    ));
+                    continue;
+                }
+            };
+            let parser = fixture.input_type().prettier_parser();
+            match AuditSignature::walk(&variant_content, parser).await {
+                Ok(Some(sig)) => {
+                    write_signature(&chain_signature_path, &sig, ChainAnchor::UnformattedOurs)
+                }
+                // Prettier holds the source itself stable, so there is no chain to record.
+                Ok(None) => remove_signature(&chain_signature_path),
+                Err(e) => FormattedResult::Failed(e),
+            }
+        } else {
+            remove_signature(&chain_signature_path)
+        };
+        if !matches!(signature_result, FormattedResult::NotNeeded) {
+            results.push(IntermediateOutput::File(
+                chain_signature_filename,
+                signature_result,
+            ));
+        }
     }
 
     results
+}
+
+/// Delete `audit_signature_<suffix>.txt` files whose `unformatted_ours_<suffix>` source is
+/// gone. `update_intermediate_files` iterates the sources, so it only ever visits suffixes
+/// that still have one — without this sweep an orphan would survive every regeneration and
+/// fail S21 forever.
+fn remove_orphan_chain_signatures(
+    fixture: &fixtures::Fixture,
+    input_ext: &str,
+    files: &FixtureFiles,
+    results: &mut Vec<IntermediateOutput>,
+) {
+    for signature_name in &files.audit_signature_variant {
+        let Some(suffix) = audit_signature_variant_suffix(signature_name) else {
+            continue;
+        };
+        let source = unformatted_ours_filename(suffix, input_ext);
+        if files.unformatted_ours.contains(&source) {
+            continue;
+        }
+        let result = match fixtures::delete_file_if_exists(&fixture.path.join(signature_name)) {
+            Ok(()) => FormattedResult::Removed,
+            Err(e) => FormattedResult::Failed(e),
+        };
+        results.push(IntermediateOutput::File(signature_name.clone(), result));
+    }
 }
 
 /// Classify prettier's chain from a single `unformatted_ours_*` variant.

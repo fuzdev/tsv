@@ -16,7 +16,8 @@ The end states agree, so this is a pass-count divergence, not an end-state one:
 one-pass claim; prettier's first pass lands elsewhere), and no
 `output_prettier.svelte` exists because input is prettier-stable. The chain is
 too long for a `prettier_intermediate_*` pin (two distinct intermediates), so
-the README records it.
+`audit_signature_own_line.txt` holds it instead — all three passes, byte-exact,
+checked live on every validation run.
 
 The same-gap **line** comment (which forces the break → continuation indent) is
 [key_colon_line_comment](../key_colon_line_comment_prettier_divergence/); the

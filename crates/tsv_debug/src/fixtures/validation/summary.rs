@@ -53,6 +53,7 @@ pub struct ValidationSummary {
     pub total_prettier_intermediate: usize,
     pub total_prettier_intermediate_to_variant: usize,
     pub total_prettier_intermediate_to_divergent_variant: usize,
+    pub total_audit_signature_variant: usize,
     pub total_invalid_syntax: usize,
     pub results: Vec<FixtureValidation>,
     pub cross_fixture_duplicates: Vec<Vec<String>>,
@@ -89,6 +90,7 @@ impl ValidationSummary {
             result.prettier_intermediate_to_variant_count;
         self.total_prettier_intermediate_to_divergent_variant +=
             result.prettier_intermediate_to_divergent_variant_count;
+        self.total_audit_signature_variant += result.audit_signature_variant_count;
         self.total_invalid_syntax += result.invalid_syntax_count;
         self.total_undocumented_prettier += result.undocumented_prettier_outputs.len();
         self.total_render_equiv_compile += result.render_equiv_verified_compile;
@@ -326,6 +328,12 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
                 summary.total_prettier_intermediate_to_divergent_variant
             ));
         }
+        if summary.total_audit_signature_variant > 0 {
+            variant_parts.push(format!(
+                "{} audit_signature_<suffix>.txt",
+                summary.total_audit_signature_variant
+            ));
+        }
         if summary.total_invalid_syntax > 0 {
             variant_parts.push(format!("{} input_invalid_*", summary.total_invalid_syntax));
         }
@@ -346,13 +354,23 @@ pub fn print_validation_results(summary: &ValidationSummary, verbose: bool) {
                     println!("  {}/", result.fixture_path);
                     let source = &undoc.source_file;
                     println!("    Prettier({source}) produces a novel stable form");
-                    // Extract fixture name for command suggestion
-                    let fixture_name = result
-                        .fixture_path
-                        .rsplit('/')
-                        .next()
-                        .unwrap_or(&result.fixture_path);
-                    println!("    Investigate: deno task fixtures:audit {fixture_name}");
+                    // N10 classified it, so state the verdict here. The fallback line still
+                    // points at `fixtures:audit` for the case it can't name — prettier not
+                    // idempotent on the output, where the chain, not a single form, is the
+                    // question.
+                    match &undoc.suggested_pin {
+                        Some(pin) => {
+                            println!("    Pin it: add {pin} holding that output");
+                        }
+                        None => {
+                            let fixture_name = result
+                                .fixture_path
+                                .rsplit('/')
+                                .next()
+                                .unwrap_or(&result.fixture_path);
+                            println!("    Investigate: deno task fixtures:audit {fixture_name}");
+                        }
+                    }
                 }
             }
         }

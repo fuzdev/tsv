@@ -1,12 +1,16 @@
 //! N-phase normalization validation (N* rules: variant normalization, prettier intermediates).
 
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 
 use crate::deno::run_prettier;
 use crate::diff;
-use crate::fixtures::{self, Fixture, FixtureFiles, read_file};
+use crate::fixtures::{
+    self, AuditSignature, ChainAnchor, Fixture, FixtureFiles, SingleFormPins, StableFormMarker,
+    audit_signature_variant_suffix, classify_stable_form, read_file, unformatted_ours_filename,
+    unformatted_ours_suffix,
+};
 
-use super::super::errors::{ValidationError, ValidationSuccess};
+use super::super::errors::{AuditSignatureStaleness, ValidationError, ValidationSuccess};
 use super::super::{FixtureValidation, UndocumentedPrettierOutput};
 
 /// Find the first `prettier_variant_*` file whose content equals `content`.
@@ -437,7 +441,7 @@ pub(in crate::fixtures::validation) fn validate_normalization_ours(
     }
 }
 
-/// N1, N3, N6, N7, N7b, N8, N9a, N10, N11a: Validate prettier normalization behavior
+/// N1, N3, N6, N7, N7b, N8, N9a, N10, N11a, N12: Validate prettier normalization behavior
 ///
 /// Orchestrates the per-rule helpers below. Each rule lives in its own function
 /// so a skip or early return inside one rule can't silently disable the rules
@@ -483,14 +487,29 @@ pub(in crate::fixtures::validation) async fn validate_normalization_prettier(
     )
     .await;
     validate_n8_unformatted_prettier(result, fixture, files).await;
-    validate_n10_cross_path_discovery(
+    // N12 before N10: the chain signatures it verifies are exactly what N10 must not
+    // report as undocumented.
+    let pins = SingleFormPins::collect(fixture, input_ext, files);
+    let chain_pinned = validate_n12_variant_chain_signatures(
         result,
         fixture,
         input,
         input_ext,
         files,
         &unformatted_ours_outputs,
-    );
+        &pins,
+    )
+    .await;
+    validate_n10_cross_path_discovery(
+        result,
+        fixture,
+        input,
+        input_ext,
+        &unformatted_ours_outputs,
+        &pins,
+        &chain_pinned,
+    )
+    .await;
 }
 
 /// Shared body for the "prettier preserves this stable-form file verbatim" checks
@@ -700,12 +719,8 @@ async fn validate_n6_unformatted_ours(
                         ),
                     );
                 } else {
-                    // Store for prettier_intermediate_* validation
-                    // Extract suffix: unformatted_ours_X.svelte -> X
-                    let suffix = variant_name
-                        .strip_prefix("unformatted_ours_")
-                        .and_then(|s| s.strip_suffix(input_ext))
-                        .unwrap_or("");
+                    // Store for prettier_intermediate_* / N12 validation, keyed by suffix.
+                    let suffix = unformatted_ours_suffix(variant_name, input_ext).unwrap_or("");
                     unformatted_ours_prettier_outputs.insert(suffix.to_string(), formatted);
                 }
             }
@@ -1213,93 +1228,33 @@ async fn validate_n8_unformatted_prettier(
 
 /// N10: Cross-path discovery — find undocumented Prettier outputs
 ///
-/// After N7, check which unformatted_ours_* prettier outputs weren't consumed by
-/// prettier_intermediate_*, then check if those outputs match any known file content
-/// (output_prettier, prettier_variant_*, variant_*, divergent_variant_*).
-fn validate_n10_cross_path_discovery(
+/// The last word on every `unformatted_ours_*` prettier output: whatever N7/N7b/N7c did not
+/// claim by suffix, N12 did not pin as a chain, and no documented stable form holds
+/// (`SingleFormPins`) is reported here. Blocking when the fixture documents any stable form
+/// at all — an unmatched output then means prettier drifted or the target is undocumented —
+/// and informational when it documents the divergence by README alone.
+async fn validate_n10_cross_path_discovery(
     result: &mut FixtureValidation,
     fixture: &Fixture,
     input: &str,
     input_ext: &str,
-    files: &FixtureFiles,
     unformatted_ours_prettier_outputs: &HashMap<String, String>,
+    pins: &SingleFormPins,
+    chain_pinned_suffixes: &HashSet<String>,
 ) {
-    let fixture_dir = &fixture.path;
-
-    // Build set of suffixes claimed by prettier_intermediate_* and prettier_intermediate_to_variant_*
-    let mut claimed_suffixes: std::collections::HashSet<String> = std::collections::HashSet::new();
-    for intermediate_name in &files.prettier_intermediate {
-        let suffix = intermediate_name
-            .strip_prefix("prettier_intermediate_")
-            .and_then(|s| s.strip_suffix(input_ext))
-            .unwrap_or("")
-            .to_string();
-        claimed_suffixes.insert(suffix);
-    }
-    for intermediate_name in &files.prettier_intermediate_to_variant {
-        let suffix = intermediate_name
-            .strip_prefix("prettier_intermediate_to_variant_")
-            .and_then(|s| s.strip_suffix(input_ext))
-            .unwrap_or("")
-            .to_string();
-        claimed_suffixes.insert(suffix);
-    }
-    for intermediate_name in &files.prettier_intermediate_to_divergent_variant {
-        let suffix = intermediate_name
-            .strip_prefix("prettier_intermediate_to_divergent_variant_")
-            .and_then(|s| s.strip_suffix(input_ext))
-            .unwrap_or("")
-            .to_string();
-        claimed_suffixes.insert(suffix);
-    }
-
     // Also claim suffixes where prettier(unformatted_ours_*) == input (those got N6 errors, not novel)
     // These are already not in unformatted_ours_prettier_outputs (they were flagged as errors)
-
-    // Build known content set from output_prettier, prettier_variant_*, variant_*,
-    // divergent_variant_*. Read failures are tolerated here without an error: F2/N1/N9a/N11a
-    // own these files and report unreadable ones loudly, so a silent skip here can't
-    // hide a gap.
-    let mut known_contents: Vec<String> = Vec::new();
-
-    // output_prettier content
-    let output_prettier_path = fixture.output_prettier_path();
-    if output_prettier_path.exists()
-        && let Ok(content) = read_file(&output_prettier_path)
-    {
-        known_contents.push(content);
-    }
-
-    // prettier_variant_* contents
-    for pv_name in &files.prettier_variant {
-        let pv_path = fixture_dir.join(pv_name);
-        if let Ok(content) = read_file(&pv_path) {
-            known_contents.push(content);
-        }
-    }
-
-    // variant_* contents
-    for stable_name in &files.variant {
-        let stable_path = fixture_dir.join(stable_name);
-        if let Ok(content) = read_file(&stable_path) {
-            known_contents.push(content);
-        }
-    }
-
-    // divergent_variant_* contents — a prettier-stable form our formatter rewrites; it is
-    // a documented target for an unformatted_ours_* whose prettier output lands on
-    // it (e.g. the heritage own-line form), so include it in the known set.
-    for tw_name in &files.divergent_variant {
-        let tw_path = fixture_dir.join(tw_name);
-        if let Ok(content) = read_file(&tw_path) {
-            known_contents.push(content);
-        }
-    }
 
     // Check unclaimed outputs
     let mut pinned = 0;
     for (suffix, prettier_output) in unformatted_ours_prettier_outputs {
-        if claimed_suffixes.contains(suffix) {
+        if pins.claims_suffix(suffix) {
+            continue;
+        }
+
+        // N12 pinned this output as a full chain — the case no single-form marker can
+        // express. Already verified byte-exact there, so it is not undocumented.
+        if chain_pinned_suffixes.contains(suffix) {
             continue;
         }
 
@@ -1309,21 +1264,35 @@ fn validate_n10_cross_path_discovery(
         }
 
         // Check against known contents
-        let is_known = known_contents.iter().any(|c| c == prettier_output);
-        if !is_known {
-            let source_file = format!("unformatted_ours_{suffix}{input_ext}");
+        if !pins.matches_stable_form(prettier_output) {
+            let source_file = unformatted_ours_filename(suffix, input_ext);
             // When the fixture documents prettier's stable forms (it has
             // output_prettier / prettier_variant_* / variant_* / divergent_variant_*
             // files), every unformatted_ours_* prettier output must match one — an
             // unmatched output means prettier drifted or the target is
             // undocumented, so block. Fixtures that document the divergence by
             // README alone (no stable-form files) keep this informational.
-            if known_contents.is_empty() {
+            if pins.has_documented_forms() {
+                result.add_error(ValidationError::UndocumentedPrettierOutput(source_file));
+            } else {
+                // Name the file to add rather than punting to `fixtures:audit`: the bytes
+                // are in hand and the `ours(V)` test is pure Rust. Only prettier's
+                // idempotence on the output needs the oracle — one pass, and only for an
+                // output that reached this arm, which by construction is rare.
+                let prettier_stable = matches!(
+                    run_prettier(prettier_output, fixture.input_type().prettier_parser()).await,
+                    Ok(second) if second == *prettier_output
+                );
+                let suggested_pin = prettier_stable
+                    .then(|| classify_stable_form(prettier_output, input, &fixture.input_file))
+                    .and_then(StableFormMarker::file_prefix)
+                    .map(|prefix| format!("{prefix}{suffix}{input_ext}"));
                 result
                     .undocumented_prettier_outputs
-                    .push(UndocumentedPrettierOutput { source_file });
-            } else {
-                result.add_error(ValidationError::UndocumentedPrettierOutput(source_file));
+                    .push(UndocumentedPrettierOutput {
+                        source_file,
+                        suggested_pin,
+                    });
             }
         } else {
             pinned += 1;
@@ -1333,4 +1302,136 @@ fn validate_n10_cross_path_discovery(
     if pinned > 0 {
         result.add_success(ValidationSuccess::PrettierOutputsPinned(pinned));
     }
+}
+
+/// N12: `audit_signature_<suffix>.txt` byte-matches prettier's live chain from
+/// `unformatted_ours_<suffix>`.
+///
+/// The pin for the outputs no single-form marker reaches: a chain with two or more distinct
+/// intermediates (`prettier_intermediate*_*` captures exactly one unstable pass), or a
+/// one-pass fixed point that is not a documented stable form — including one tsv cannot
+/// ingest, where `prettier_variant_*`'s N2 could never hold. Every pass is compared
+/// byte-exact, so prettier-version drift anywhere along the chain fails here.
+///
+/// Returns the suffixes whose signature verified, which N10 then treats as documented.
+async fn validate_n12_variant_chain_signatures(
+    result: &mut FixtureValidation,
+    fixture: &Fixture,
+    input: &str,
+    input_ext: &str,
+    files: &FixtureFiles,
+    unformatted_ours_prettier_outputs: &HashMap<String, String>,
+    pins: &SingleFormPins,
+) -> HashSet<String> {
+    let mut verified: HashSet<String> = HashSet::new();
+    let mut matched = 0;
+    let parser = fixture.input_type().prettier_parser();
+
+    for signature_name in &files.audit_signature_variant {
+        let Some(suffix) = audit_signature_variant_suffix(signature_name) else {
+            continue;
+        };
+        // S21 already rejected a signature with no source. A source that exists but is
+        // missing from the map failed under N6 (unreadable, prettier errored, or prettier
+        // normalized it to input) — that rule owns the report; adding one here would
+        // double-report the same defect.
+        let Some(prettier_output) = unformatted_ours_prettier_outputs.get(suffix) else {
+            continue;
+        };
+
+        if pins.covers(suffix, prettier_output, input) {
+            result.add_error(ValidationError::VariantChainSignatureSuperseded(
+                signature_name.clone(),
+            ));
+            continue;
+        }
+
+        let recorded_raw = match read_file(&fixture.audit_signature_variant_path(suffix)) {
+            Ok(s) => s,
+            Err(e) => {
+                result.add_error(ValidationError::VariantChainSignatureMalformed(
+                    signature_name.clone(),
+                    e,
+                ));
+                continue;
+            }
+        };
+        let recorded = match AuditSignature::parse(&recorded_raw) {
+            Ok(s) => s,
+            Err(e) => {
+                result.add_error(ValidationError::VariantChainSignatureMalformed(
+                    signature_name.clone(),
+                    e,
+                ));
+                continue;
+            }
+        };
+
+        let source_name = unformatted_ours_filename(suffix, input_ext);
+        let source_content = match read_file(&fixture.path.join(&source_name)) {
+            Ok(s) => s,
+            Err(e) => {
+                result.add_error(ValidationError::FileReadError(e));
+                continue;
+            }
+        };
+
+        let live = match AuditSignature::walk(&source_content, parser).await {
+            Ok(Some(s)) => s,
+            Ok(None) => {
+                // Prettier holds the source itself stable, so there is no chain — the
+                // source is a prettier fixed point and wants a single-form pin instead.
+                result.add_error(ValidationError::VariantChainSignatureOutdated(
+                    signature_name.clone(),
+                    AuditSignatureStaleness::Collapsed,
+                ));
+                continue;
+            }
+            Err(e) => {
+                // Distinct from `Malformed`: the signature parsed fine, but walking the
+                // live chain failed (prettier error or non-converging chain). Investigate
+                // the failure rather than blindly regenerating.
+                result.add_error(ValidationError::VariantChainSignatureWalkFailed(
+                    signature_name.clone(),
+                    e,
+                ));
+                continue;
+            }
+        };
+
+        if live.passes == recorded.passes {
+            verified.insert(suffix.to_string());
+            matched += 1;
+            continue;
+        }
+
+        result.add_error(ValidationError::VariantChainSignatureOutdated(
+            signature_name.clone(),
+            AuditSignatureStaleness::Drift,
+        ));
+        // Diff the first differing pass for actionable output.
+        let max_len = recorded.passes.len().max(live.passes.len());
+        for i in 0..max_len {
+            let recorded_step = recorded.passes.get(i).map_or("", String::as_str);
+            let live_step = live.passes.get(i).map_or("", String::as_str);
+            if recorded_step != live_step {
+                let pass_num = i + ChainAnchor::UnformattedOurs.first_pass_number();
+                result.add_diff(
+                    &format!(
+                        "{signature_name} drift (pass={pass_num}): {}/{signature_name}",
+                        fixture.relative_path
+                    ),
+                    recorded_step,
+                    live_step,
+                    &diff::DiffOptions::freshness(),
+                );
+                break;
+            }
+        }
+    }
+
+    if matched > 0 {
+        result.add_success(ValidationSuccess::VariantChainSignaturesMatch(matched));
+    }
+    verified
 }
