@@ -23,7 +23,7 @@ use super::ParenContext;
 use super::class_expr_has_decorators;
 use super::expressions::literals::format_directive;
 use super::is_string_literal;
-use super::needs_parens::leftmost_no_lookahead;
+use super::needs_parens::{leftmost_no_lookahead, leftmost_no_lookahead_reached};
 use crate::ast::internal::{self, Expression, Statement};
 use smallvec::smallvec;
 use tsv_lang::Span;
@@ -61,13 +61,28 @@ fn strip_statement_casts<'a>(expr: &'a Expression<'a>) -> Option<&'a Expression<
 /// unreparseable, so the parens are kept.
 ///
 /// This is deliberately tsv's reject-set, NOT prettier's full identifier list
-/// (parentheses/identifier.js also lists `await`/`interface`/`yield`/`let`/`component`/
-/// `hook`, which tsv's parser rejects even bare-as-an-expression, so they never reach
-/// the formatter). `using` is excluded on purpose: tsv **accepts** bare `using as T`
-/// (a cast, per its acorn oracle) and keeps it bare — a deliberate divergence pinned by
-/// `typescript_specific/using/cast_prettier_divergence`. Wrapping it would break that.
+/// (parentheses/identifier.js also lists `await`/`yield`/`component`/`hook`).
+/// ⚠️ **The membership test is whether the parser rejects the word BARE at statement
+/// position — a rejection is the reason to KEEP the parens, not a reason the shape never
+/// reaches the formatter.** Only `await` is out for the strong reason: it never arrives
+/// at all (tsv rejects `(await)` itself at `Goal::Module`). `using` is out on purpose —
+/// tsv **accepts** bare `using as T` (a cast, per its acorn oracle) and keeps it bare, a
+/// deliberate divergence pinned by
+/// `typescript_specific/using/cast_prettier_divergence`; wrapping it would break that.
+///
+/// TODO: `yield` / `component` / `hook` are out only because their bare cast *reparses*
+/// — which is not the same as agreeing with prettier, and tsv does not: prettier keeps
+/// those parens, tsv strips them (`(yield) as never;` → `yield as never;`). That is an
+/// uncataloged divergence in either direction. Match prettier by adding the three
+/// (nothing else changes — they are ordinary identifiers), or sanction the strip with a
+/// `_prettier_divergence` fixture and a catalog entry.
+///
+/// `let` is in the set for the cast position only; its other three positions are
+/// lookahead restrictions on the statement grammar rather than a declaration-starter
+/// ambiguity, and live in [`Printer::let_bracket_head_target`] /
+/// [`Printer::for_in_of_let_head_target`].
 fn is_statement_ambiguous_keyword(name: &str) -> bool {
-    matches!(name, "type" | "module")
+    matches!(name, "type" | "module" | "interface" | "let")
 }
 
 /// What a leading-comment gap opens at — the axis that decides whether a comment inside it
@@ -352,9 +367,10 @@ impl<'a> Printer<'a> {
 
     /// The nested span an *unwrapped* expression statement must parenthesize around
     /// ITSELF, or `None` when nothing does — the leftmost object / function / class
-    /// (`(class {}).foo`, `({}).foo`, `(class {}) + 1`), or a contextual keyword heading
-    /// an `as` / `satisfies` cast (`(type) as T;` / `(module) satisfies U;`, which
-    /// reparse as a `type` / `module` declaration without the parens).
+    /// (`(class {}).foo`, `({}).foo`, `(class {}) + 1`), a `let` heading a computed
+    /// member (`(let)[a] = 1;`), or a contextual keyword heading an `as` / `satisfies`
+    /// cast (`(type) as T;` / `(module) satisfies U;`, which reparse as a `type` /
+    /// `module` declaration without the parens).
     ///
     /// Asked only where the whole expression isn't already wrapped. Two callers, one
     /// question: the ordinary path hands the span to `expr_stmt_paren_target` for the
@@ -370,10 +386,63 @@ impl<'a> Printer<'a> {
         ) {
             return Some(leftmost.span());
         }
+        if let Some(span) = self.let_bracket_head_target(expression) {
+            return Some(span);
+        }
         match strip_statement_casts(expression) {
             Some(Expression::Identifier(id))
                 if self.with_ident_name(id, is_statement_ambiguous_keyword) =>
             {
+                Some(id.span)
+            }
+            _ => None,
+        }
+    }
+
+    /// The `let` identifier that must keep its parens because the statement it heads
+    /// would otherwise be read as a **declaration**, or `None`.
+    ///
+    /// `ExpressionStatement : [lookahead ∉ { `{`, `function`, `async function`, `class`,
+    /// `let [` }] Expression ;` — so `let[a] = 1;` is a `VariableDeclaration` binding the
+    /// array pattern `[a]`, while `(let)[a] = 1;` assigns to the member `let[a]`. Dropping
+    /// the parens does not merely relocate a token: it changes what the statement IS, and
+    /// (for a non-binding index like `let[0]`) produces text that no longer parses.
+    ///
+    /// The restriction is on the statement's first two tokens, so the `let` must be the
+    /// **leftmost** node and the bracket must be its own — a computed, non-optional
+    /// member whose object it is. `let.a = 1;`, `let()[a] = 1;` and `foo[let[a]] = 1;`
+    /// are all unrestricted and stay bare, matching prettier's
+    /// `shouldAddParenthesesToIdentifier` clause for `key === "object"`.
+    ///
+    /// Shared by the three positions the same restriction covers: an expression
+    /// statement, a `for` init, and a for-in left (the for-of / for-in LEFT takes the
+    /// wider [`Printer::for_in_of_let_head_target`] instead).
+    pub(in crate::printer) fn let_bracket_head_target(
+        &self,
+        expression: &Expression<'_>,
+    ) -> Option<Span> {
+        let (leftmost, is_computed_member_object) = leftmost_no_lookahead_reached(expression);
+        let Expression::Identifier(id) = leftmost else {
+            return None;
+        };
+        (is_computed_member_object && self.with_ident_name(id, |name| name == "let"))
+            .then_some(id.span)
+    }
+
+    /// The `let` identifier a for-in / for-of LEFT must keep its parens around, or `None`.
+    ///
+    /// Wider than [`Printer::let_bracket_head_target`] by design: the for-of head carries
+    /// its own `[lookahead ∉ { `let` }]`, so a bare `for (let of foo);` is a syntax error
+    /// however the head continues — `(let)`, `(let).a`, `(let)[a]` and `(let)().a` all
+    /// need the parens, not just the bracket form. Prettier draws the same line (its
+    /// `startsWithNoLookaheadToken` clause finds any enclosing for-in/of), which is why
+    /// it *moves* an author's `(let.a)` onto the identifier as `(let).a`.
+    pub(in crate::printer) fn for_in_of_let_head_target(
+        &self,
+        expression: &Expression<'_>,
+    ) -> Option<Span> {
+        match leftmost_no_lookahead(expression) {
+            Expression::Identifier(id) if self.with_ident_name(id, |name| name == "let") => {
                 Some(id.span)
             }
             _ => None,

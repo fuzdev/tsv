@@ -1406,4 +1406,23 @@ impl<'a> Printer<'a> {
     ) -> R {
         self.with_ident_name_at(id.ident_name(), id.span.start, f)
     }
+
+    /// Run `f` with [`Self::expr_stmt_paren_target`] set to `target`, restoring whatever
+    /// was there before.
+    ///
+    /// Restore, not clear: a statement-head position can nest inside another one
+    /// (a `for` header inside an expression statement whose own target is still live),
+    /// so clearing would strand the outer wrap. Scoped rather than open-coded because the
+    /// callers have early returns above them, and a restore skipped by one leaks a paren
+    /// onto the next sibling — a shape the fixtures don't reach.
+    pub(in crate::printer) fn with_expr_stmt_paren_target<R>(
+        &self,
+        target: Option<Span>,
+        f: impl FnOnce() -> R,
+    ) -> R {
+        let saved = self.expr_stmt_paren_target.replace(target);
+        let result = f();
+        self.expr_stmt_paren_target.set(saved);
+        result
+    }
 }

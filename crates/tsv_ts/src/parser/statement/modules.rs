@@ -730,28 +730,25 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     /// Parse an export specifier: `local`, `local as exported`, or `default`.
     ///
     /// Returns (local, exported, spec_end_pos).
-    /// Accepts contextual keywords as local names and any keyword as exported names.
+    ///
+    /// BOTH names are a `ModuleExportName` — a string or **any `IdentifierName`**,
+    /// reserved words included, since a re-export names another module's binding
+    /// rather than referencing one here (`export { with } from 'm'`, `export { class
+    /// as C } from 'm'`). Without a `from` clause the local *is* an
+    /// `IdentifierReference`, and a reserved word there is a Static Semantics early
+    /// error (`ReferencedBindings`) — deferred like the rest, and like the string and
+    /// `default` locals this production has always accepted.
     fn parse_export_specifier_names(
         &mut self,
     ) -> Result<(ModuleExportName<'arena>, ModuleExportName<'arena>, u32), ParseError> {
         // Parse local name: a `ModuleExportName` — string (re-export, e.g.
-        // `export { 'str' } from`), identifier, contextual keyword, or 'default'.
+        // `export { 'str' } from`) or any `IdentifierName`.
         let local = if matches!(self.current_kind(), TokenKind::String) {
             ModuleExportName::Literal(self.parse_string_literal()?)
         } else {
             let (local_start, local_end) = self.current_pos();
-            let local_name = if matches!(
-                self.current_kind(),
-                TokenKind::Keyword(KeywordKind::Default)
-            ) {
-                self.current_raw_ident_name()
-            } else {
-                match self.try_ident_or_contextual_name() {
-                    Some(name) => name,
-                    None => {
-                        return Err(self.error_expected("identifier in export specifier"));
-                    }
-                }
+            let Some(local_name) = self.try_identifier_name() else {
+                return Err(self.error_expected("identifier in export specifier"));
             };
             self.advance()?;
             ModuleExportName::Identifier(Identifier::simple(
@@ -1135,8 +1132,10 @@ impl<'a, 'arena> Parser<'a, 'arena> {
     fn parse_import_attributes(
         &mut self,
     ) -> Result<Option<&'arena [ImportAttribute<'arena>]>, ParseError> {
-        // Check for 'with' keyword (contextual - it's an identifier, not a keyword)
-        if !matches!(self.current_kind(), TokenKind::Identifier) || self.current_value() != "with" {
+        // The `WithClause`'s own `with` token. It is the reserved word (a `ReservedWord`
+        // barred from every name position — see `KeywordKind::With`), spelled out by this
+        // production rather than read as an identifier, so match the keyword token.
+        if !matches!(self.current_kind(), TokenKind::Keyword(KeywordKind::With)) {
             return Ok(None);
         }
         self.advance()?; // consume 'with'

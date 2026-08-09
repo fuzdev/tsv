@@ -1814,8 +1814,14 @@ impl<'a> Printer<'a> {
                 // e.g., `for (i = 0, j = 0; ...)` not `for ((i = 0, j = 0); ...)`.
                 // Same dispatch as build_for_update_doc, but each operand is `[~In]`
                 // wrapped (`wrap_for_init_in`).
-                self.build_for_expr_clause(expr, |e| {
-                    self.wrap_for_init_in(e, self.build_expression_doc(e))
+                //
+                // The init is a statement-head position for the `let [` lookahead
+                // restriction too (`for ((let)[0] = 1; ;)`), so a `let` heading it keeps
+                // its parens.
+                self.with_expr_stmt_paren_target(self.let_bracket_head_target(expr), || {
+                    self.build_for_expr_clause(expr, |e| {
+                        self.wrap_for_init_in(e, self.build_expression_doc(e))
+                    })
                 })
             }
         };
@@ -1857,12 +1863,36 @@ impl<'a> Printer<'a> {
         spans: &ForInOfSpans,
     ) -> DocId {
         let d = self.d();
+        // A `let` heading the clause keeps its parens. Both head forms restrict it, and
+        // prettier draws one line across them, so tsv does too: the for-of head's own
+        // `[lookahead ∉ { let }]` makes a bare `for (let of x)` a syntax error, and a
+        // for-in head — restricted only on `let [` — takes the same paren, matching
+        // prettier's `startsWithNoLookaheadToken` clause, which finds ANY enclosing
+        // for-in/of. Unlike `(async)`, the paren can belong to a node *inside* the clause
+        // (`for ((let).a of x)`), so it is handed to that node rather than wrapped here.
+        let let_target = match left {
+            internal::ForInOfLeft::Pattern(expr) => self.for_in_of_let_head_target(expr),
+            internal::ForInOfLeft::VariableDeclaration(_) => None,
+        };
         if let Some(open) = spans.open_paren
             && let Some(frozen) =
                 self.value_head_frozen_span(open + 1, Span::new(spans.left_start, spans.left_end))
         {
+            // A frozen slice is verbatim, so there is no interior to hand the target to:
+            // the parens go around the WHOLE slice, as the expression statement's
+            // nested-target path does for the same reason. Only when the target IS the
+            // whole slice, though — a `let` heading a member or call is not the leftmost
+            // BYTE of its node, whose span opens at the author's own `(`
+            // (`for ((let).a of x)` freezes as `(let).a`), and wrapping that again would
+            // double the paren INSIDE an ignored region. `(async)` never hits this: an
+            // identifier's span stops at the word, so the shell really is the printer's.
             let doc = self.build_frozen_node_doc(frozen);
-            return if wrap_async_paren { d.parens(doc) } else { doc };
+            let wrap_let_paren = let_target.is_some_and(|target| target.start == frozen.start);
+            return if wrap_async_paren || wrap_let_paren {
+                d.parens(doc)
+            } else {
+                doc
+            };
         }
         match left {
             internal::ForInOfLeft::VariableDeclaration(decl) => {
@@ -1890,7 +1920,8 @@ impl<'a> Printer<'a> {
             // (the caller decides via `wrap_async_paren` — a non-await for-of, where
             // bare `for (async of x)` is a syntax error).
             internal::ForInOfLeft::Pattern(expr) => {
-                let doc = self.build_expression_doc(expr);
+                let doc = self
+                    .with_expr_stmt_paren_target(let_target, || self.build_expression_doc(expr));
                 if wrap_async_paren { d.parens(doc) } else { doc }
             }
         }
