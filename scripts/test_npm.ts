@@ -141,6 +141,73 @@ describe(`node entry (index.js): ${pkg_dir}`, () => {
 		assert.throws(() => node_entry.format_typescript('const ='));
 	});
 
+	it('format options: goal switches the TypeScript parse goal', { skip: !has_format }, () => {
+		// at the script goal `await` is an ordinary identifier, so it parses as an
+		// arrow parameter (and prints parenthesized)
+		assert.equal(
+			node_entry.format_typescript('await => 1;', { goal: 'script' }),
+			'(await) => 1;\n'
+		);
+		// module goal (default and explicit) reserves `await`
+		assert.throws(() => node_entry.format_typescript('await => 1;'));
+		assert.throws(() => node_entry.format_typescript('await => 1;', { goal: 'module' }));
+		assert.throws(() => node_entry.format_typescript('x;', { goal: 'bogus' }), /invalid goal/);
+		assert.throws(
+			() => node_entry.format_typescript('x;', { goal: 42 }),
+			/'goal' must be 'script' or 'module'/
+		);
+	});
+
+	it('format options: unknown keys and misapplied goal error', { skip: !has_format }, () => {
+		assert.throws(
+			() => node_entry.format_typescript('x;', { gaol: 'script' }),
+			/unknown format option 'gaol'/
+		);
+		// `locations` shapes the parse WIRE and format emits none, so it is an
+		// unknown key here rather than an accepted-and-inert one — an inert
+		// spelling would let a caller believe they had asked a formatter for the
+		// narrower product
+		assert.throws(
+			() => node_entry.format_typescript('x;', { locations: false }),
+			/unknown format option 'locations'/
+		);
+		// svelte/css formatting is non-configurable and the goal is TypeScript's
+		// alone, so their bags carry no key at all
+		assert.throws(
+			() => node_entry.format_svelte('<div>x</div>', { goal: 'script' }),
+			/only supported for TypeScript/
+		);
+		assert.throws(
+			() => node_entry.format_svelte('<div>x</div>', { locations: false }),
+			/takes no options/
+		);
+		// a supported key explicitly set to `undefined` means that key's default
+		// (omitted-key convention) — including the TS-only key on a language that
+		// REJECTS it, which is what lets `npm/cli.js` hand one bag to whichever
+		// formatter instead of branching the call
+		assert.equal(
+			node_entry.format_typescript('const   x=1', { goal: undefined }),
+			'const x = 1;\n'
+		);
+		assert.equal(
+			node_entry.format_svelte('<div   >x</div   >', { goal: undefined }),
+			'<div>x</div>\n'
+		);
+		assert.equal(
+			node_entry.format_css('a{color:red}', { goal: undefined }),
+			'a {\n\tcolor: red;\n}\n'
+		);
+		// an UNKNOWN key throws even at `undefined` — the typo guard has no
+		// undefined-valued hole
+		assert.throws(
+			() => node_entry.format_typescript('x;', { gaol: undefined }),
+			/unknown format option 'gaol'/
+		);
+		// a non-object options argument is an error, arrays included
+		assert.throws(() => node_entry.format_typescript('x;', 'script'), /must be an object/);
+		assert.throws(() => node_entry.format_typescript('x;', ['script']), /must be an object/);
+	});
+
 	it('format_* absent from the parse-only build', { skip: has_format }, () => {
 		assert.equal(node_entry.format_typescript, undefined);
 	});
@@ -489,8 +556,8 @@ describe(`browser entry (browser.js): ${pkg_dir}`, () => {
 		assert.equal('loc' in program, false);
 	});
 
-	it('the init guard forwards extra args (format goal)', { skip: !has_format }, () => {
-		assert.equal(browser.format_typescript_with_goal('await => 1;', 'script'), '(await) => 1;\n');
+	it('the init guard forwards extra args (format options)', { skip: !has_format }, () => {
+		assert.equal(browser.format_typescript('await => 1;', { goal: 'script' }), '(await) => 1;\n');
 	});
 
 	it('init is idempotent after init_sync', async () => {

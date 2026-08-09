@@ -55,6 +55,8 @@ const has_parse_exports = variant !== 'format';
 const pkg_root = `crates/tsv_wasm/pkg/${variant}/npm`;
 const main_js = 'tsv_wasm.js';
 const dts_file = 'tsv_wasm.d.ts';
+/** `dts_file` as an import specifier — what the generated `index.d.ts` re-exports from. */
+const dts_module = `./${dts_file.replace(/\.d\.ts$/, '')}`;
 const wasm_file = 'tsv_wasm_bg.wasm';
 const cli_file = 'cli.js';
 // The pure-JS `no-locations` line/column reconstruction helper (`npm/locations.js`
@@ -178,9 +180,9 @@ export function init_sync(...args) {
 
 ${fns
 	.map(
-		// Arity-agnostic passthrough: the exports take differing extra args
-		// (parse_* an options object, format_typescript_with_goal a goal string),
-		// so the guard must forward every argument, not a fixed parameter list.
+		// Arity-agnostic passthrough: every export takes an optional trailing
+		// options object, so the guard must forward every argument, not a fixed
+		// parameter list.
 		(f) =>
 			`export function ${f}(...args) {
 	_check();
@@ -202,15 +204,21 @@ const ast_reexport = has_parse_exports ? `export type * from './tsv_ast';\n` : '
 const locations_reexport_dts = has_parse_exports
 	? `export * from './${locations_dts.replace(/\.d\.ts$/, '')}';\n`
 	: '';
-// The parse exports' hand-written option types (the `TS_PARSE_DECLS` custom
-// section in crates/tsv_wasm/src/lib.rs) — named, so tsv_ast/locations star
-// exports can never ambiguate them away (the TS2308 rule).
+// Each family's hand-written option types (the `TS_PARSE_DECLS` /
+// `TS_FORMAT_DECLS` custom sections in crates/tsv_wasm/src/lib.rs) — re-exported
+// by NAME, so the tsv_ast/locations star exports can never ambiguate them away
+// (the TS2308 rule).
+const options_reexport = (names: Array<string>) =>
+	`export type { ${names.join(', ')} } from '${dts_module}';\n`;
 const parse_options_reexport = has_parse_exports
-	? `export type { ParseOptions, TypeScriptParseOptions } from './${dts_file.replace(/\.d\.ts$/, '')}';\n`
+	? options_reexport(['ParseOptions', 'TypeScriptParseOptions'])
 	: '';
-const index_dts = `${ast_reexport}${locations_reexport_dts}${parse_options_reexport}export {
+const format_options_reexport = has_format_exports
+	? options_reexport(['FormatOptions', 'TypeScriptFormatOptions'])
+	: '';
+const index_dts = `${ast_reexport}${locations_reexport_dts}${parse_options_reexport}${format_options_reexport}export {
 ${[...fns, ...classes].map((f) => `\t${f},`).join('\n')}
-} from './${dts_file.replace(/\.d\.ts$/, '')}';
+} from '${dts_module}';
 /** Initialize the WASM module. Required in browsers before calling any other export. No-op if already initialized. */
 export declare function init(module_or_path?: {
 	module_or_path: RequestInfo | URL | Response | BufferSource | WebAssembly.Module;

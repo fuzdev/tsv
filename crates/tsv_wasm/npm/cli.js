@@ -23,7 +23,6 @@ import {
 	format_css,
 	format_svelte,
 	format_typescript,
-	format_typescript_with_goal,
 	IgnoreStack,
 	parse_css_json,
 	parse_svelte_json,
@@ -193,6 +192,16 @@ function resolve_goal(goal, code) {
 	process.exit(code);
 }
 
+/** The WASM `goal` option for `parser`. The option is TypeScript-only in the
+ * WASM API (svelte's `<script>` is always a module, css has no goal), so a
+ * validated-but-inert `--goal` on the other languages is spelled `undefined`
+ * rather than passed — a supported key set to `undefined` reads as its default,
+ * which is what lets one bag serve whichever parser or formatter (native-CLI
+ * parity, since there too the goal only reaches TypeScript). */
+function goal_option(parser, goal) {
+	return parser === 'typescript' ? goal : undefined;
+}
+
 /** Extension-based parser detection, mirroring the native `ParserType::from_extension`. */
 function parser_from_extension(path) {
 	if (path.endsWith('.svelte')) return 'svelte';
@@ -258,12 +267,8 @@ function format_single(values, positionals, parser, goal) {
 	const input = values.content !== undefined ? values.content : read_stdin(2);
 	let formatted;
 	try {
-		// --goal applies only to the TypeScript parser (svelte is always a module,
-		// css has no goal); svelte/css ignore it, matching the native CLI.
-		formatted =
-			parser === 'typescript' && goal !== undefined
-				? format_typescript_with_goal(input, goal)
-				: FORMATTERS[parser](input);
+		// one bag, handed to whichever formatter
+		formatted = FORMATTERS[parser](input, { goal: goal_option(parser, goal) });
 	} catch (error) {
 		eprint(`Parse error: ${error.message}\n`);
 		process.exit(2);
@@ -428,15 +433,14 @@ function run_parse(args) {
 
 	// --no-locations drops per-node `loc` (span-only wire; svelte also `name_loc`,
 	// a no-op for css); orthogonal to --goal (goal drives the TS parser,
-	// no-locations the writer), so they compose. The `goal` option is
-	// TypeScript-only in the WASM API, so a validated-but-inert --goal on the
-	// other parsers is withheld rather than passed (native-CLI parity).
+	// no-locations the writer), so they compose. `locations` is a parse-only
+	// option — format emits no wire and rejects the key.
 	const no_locations = values['no-locations'] === true;
 	let json;
 	try {
 		json = PARSERS[parser](input, {
 			locations: !no_locations,
-			goal: parser === 'typescript' ? goal : undefined
+			goal: goal_option(parser, goal)
 		});
 	} catch (error) {
 		eprint(`Parse error: ${error.message}\n`);
