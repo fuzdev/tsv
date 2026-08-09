@@ -80,10 +80,15 @@ const DISPLAY_ORDER = [
 	// Third-party alternatives (alphabetical)
 	'biome-wasm',
 	'dprint-wasm',
+	'malva-wasm',
 	'oxc-parser',
 	'oxc-parser-wasm',
 	'oxfmt',
+	'postcss',
 	'rsvelte-fmt',
+	'rsvelte-parse',
+	'rsvelte-parse-skip-expr-loc',
+	'swc',
 	'yuku-parser',
 	'yuku-parser-wasm'
 ];
@@ -211,6 +216,27 @@ export function generate_summary_report(
 						opponent_result.stats.mean_ns,
 						noloc_result.stats.mean_ns
 					)} (payload-matched, span-only)`
+				);
+			}
+		}
+
+		// The Svelte surface's own apples-to-apples pair: rsvelte's parser is the
+		// only third-party engine there, and it is matched to `tsv-json` on BOTH
+		// axes — mechanism (each returns a compact JSON string the caller parses,
+		// so both pay the identical serialize + boundary + JSON.parse cost) and
+		// payload (77,561 vs 76,509 bytes on a real component, within 1.4%). It is
+		// deliberately NOT paired with the no-locations rows: `skipExpressionLoc` is
+		// a different reduction from tsv's span-only wire (see lib/rsvelte_parse.ts),
+		// which is also why that row is named for its option rather than for tsv's.
+		for (const [ours, opponent] of [['tsv-json', 'rsvelte-parse']] as const) {
+			const ours_result = results.find((r) => r.name === ours);
+			const opponent_result = results.find((r) => r.name === opponent);
+			if (ours_result && opponent_result) {
+				lines.push(
+					`      ↳ ${ours} vs ${opponent}: ${format_comparison(
+						opponent_result.stats.mean_ns,
+						ours_result.stats.mean_ns
+					)} (mechanism- and payload-matched, full AST)`
 				);
 			}
 		}
@@ -413,7 +439,18 @@ export interface AlternativeVersionInfo {
 	yuku_parser_wasm?: string;
 	biome?: string;
 	dprint?: string;
+	malva?: string;
+	postcss?: string;
 	rsvelte_fmt?: string;
+	rsvelte_parse?: string;
+	/**
+	 * The upstream Svelte version rsvelte's parse addon targets (its own `VERSION`
+	 * export), which is NOT its package version. Rendered alongside it because a
+	 * drift from the harness's `svelte` pin means that row parses to a different
+	 * Svelte than the `svelte/compiler` oracle it sits next to.
+	 */
+	rsvelte_parse_svelte_target?: string;
+	swc?: string;
 }
 
 /** Everything the versions blocks render. */
@@ -452,7 +489,19 @@ export function alternative_version_parts(versions: AlternativeVersionInfo): str
 	parts.push(...yuku_version_parts(versions));
 	if (versions.biome) parts.push(`@biomejs/wasm-bundler@${versions.biome}`);
 	if (versions.dprint) parts.push(`@dprint/typescript@${versions.dprint}`);
+	if (versions.malva) parts.push(`dprint-plugin-malva@${versions.malva}`);
+	if (versions.postcss) parts.push(`postcss@${versions.postcss}`);
 	if (versions.rsvelte_fmt) parts.push(`@rsvelte/fmt@${versions.rsvelte_fmt}`);
+	if (versions.rsvelte_parse) {
+		// The addon's version plus the upstream Svelte it targets — see
+		// `AlternativeVersionInfo.rsvelte_parse_svelte_target`.
+		const target = versions.rsvelte_parse_svelte_target;
+		parts.push(
+			`@rsvelte/vite-plugin-svelte-native@${versions.rsvelte_parse}` +
+				(target ? ` (targets svelte@${target})` : '')
+		);
+	}
+	if (versions.swc) parts.push(`@swc/core@${versions.swc}`);
 	return parts;
 }
 

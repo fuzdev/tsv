@@ -65,7 +65,10 @@ const LABELS = {
 	oxc_combined_napi: 'oxc-parser+oxfmt (napi)',
 	yuku_parser_napi: 'yuku-parser (napi)',
 	yuku_parser_wasm: 'yuku-parser (wasm)',
-	rsvelte_fmt_native: 'rsvelte-fmt (binary)'
+	malva_wasm: 'malva (wasm)',
+	rsvelte_fmt_native: 'rsvelte-fmt (binary)',
+	rsvelte_parse_napi: 'rsvelte compiler (napi)',
+	swc_napi: 'swc (napi)'
 } as const;
 
 /** Absolute path to the bench harness's `node_modules` (where the alternative
@@ -198,7 +201,10 @@ export async function collect_binary_sizes(options?: {
 	has_yuku?: boolean;
 	has_biome?: boolean;
 	has_dprint?: boolean;
+	has_malva?: boolean;
 	has_rsvelte?: boolean;
+	has_rsvelte_parse?: boolean;
+	has_swc?: boolean;
 }): Promise<BinarySize[]> {
 	const project_root = fileURLToPath(new URL('../../..', import.meta.url));
 	const node_modules = node_modules_dir();
@@ -367,6 +373,49 @@ export async function collect_binary_sizes(options?: {
 		if (rsvelte_bin !== null) {
 			await push_size(staged, LABELS.rsvelte_fmt_native, 'native', rsvelte_bin);
 		}
+	}
+
+	// malva — dprint's CSS plugin wasm. Scope-matched to nothing tsv ships exactly
+	// (tsv has no CSS-only build), so pair it against `tsv_format_wasm` in the
+	// knowledge that malva formats one language where that build formats three.
+	if (options?.has_malva !== false) {
+		await push_resolved(
+			staged,
+			LABELS.malva_wasm,
+			'wasm',
+			[`${node_modules}/dprint-plugin-malva`],
+			'.wasm'
+		);
+	}
+
+	// rsvelte's N-API addon — the artifact behind the `rsvelte-parse` rows, and like
+	// `rsvelte-fmt (binary)` NOT scope-matched to a tsv build: it carries the whole
+	// compiler plus `svelte2tsx`, HMR diffing and a resolver, where the rows measure
+	// only its parser. Read it as "what that addon ships".
+	if (options?.has_rsvelte_parse !== false) {
+		const { os: npm_os, arch: npm_arch } = get_npm_platform();
+		await push_resolved(
+			staged,
+			LABELS.rsvelte_parse_napi,
+			'native',
+			napi_binding_dirs(node_modules, '@rsvelte/vite-plugin-svelte-native', npm_os, npm_arch),
+			'.node'
+		);
+	}
+
+	// swc — the same disclosure, more so: this `.node` is an entire compiler
+	// (transforms, minifier, bundler entry points) where the row measures `parseSync`
+	// alone, so it is the least scope-matched native entry in the table. Listed
+	// because a table that sizes every other alternative would read as hiding it.
+	if (options?.has_swc !== false) {
+		const { os: npm_os, arch: npm_arch } = get_npm_platform();
+		await push_resolved(
+			staged,
+			LABELS.swc_napi,
+			'native',
+			napi_binding_dirs(node_modules, '@swc/core', npm_os, npm_arch),
+			'.node'
+		);
 	}
 
 	// Stage 2: gzip every collected file in parallel.

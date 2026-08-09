@@ -856,15 +856,20 @@ benches/js/
     ├── gate_counts.ts     # Pinned gate counts — see ../../docs/gate_counts.md
     ├── harvest_stamp.ts   # Harvest freshness stamps (source commit + pins)
     ├── implementations.ts # Implementation registry (branches native FFI vs N-API by runtime)
+    ├── malva.ts           # malva WASM wrapper (CSS only; dprint's CSS plugin, shared formatter host)
     ├── napi.ts            # process.dlopen bindings (NapiImplementation — Node/Bun native)
     ├── oxc.ts             # OXC native wrappers (oxc-parser + oxfmt)
     ├── oxc_wasm.ts        # OXC WASM wrapper (oxc-parser via wasm32-wasi; per-runtime entry)
     ├── parse_sanctions.ts # Shared parse-parity vocabulary: Sanction (keep) + KnownGap (fix)
     ├── perf_omit.ts       # PERF_OMITS — the only excused per-file failures on the perf view
+    ├── postcss.ts         # postcss wrapper (parse-only, CSS — the parser behind prettier's CSS printer)
     ├── prettier_cache.ts  # Content-addressed prettier-output cache for the format comparison
     ├── report.ts          # Summary report generation
     ├── rsvelte.ts         # rsvelte-fmt wrapper (Svelte only; COVERAGE-ONLY, never timed)
+    ├── rsvelte_parse.ts   # rsvelte PARSE wrapper (N-API addon — a DIFFERENT package from rsvelte.ts,
+    │                      # and unlike it in-process, so it IS timed; 2 rows on parse/svelte)
     ├── runtime.ts         # Cross-runtime helpers: current_runtime / os / arch normalizers
+    ├── swc.ts             # swc wrapper (parse-only, TS/JS; both surfaces — goal axis is `isModule`)
     ├── ts_repo.ts         # Shared `../typescript`-corpus vocabulary: discovery + the baseline
     │                      # key/grammar-error rules (the ts-repo GATE and the harvest both read it,
     │                      # so they can't drift on what a parse unit is or what tsc's baselines say;

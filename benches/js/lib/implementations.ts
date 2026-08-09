@@ -21,7 +21,11 @@ import { TscImplementation } from './tsc.ts';
 import { YukuImplementation } from './yuku.ts';
 import { BiomeImplementation } from './biome.ts';
 import { DprintImplementation } from './dprint.ts';
+import { MalvaImplementation } from './malva.ts';
+import { PostcssImplementation } from './postcss.ts';
 import { RsvelteImplementation } from './rsvelte.ts';
+import { RsvelteParseImplementation } from './rsvelte_parse.ts';
+import { SwcImplementation } from './swc.ts';
 import type { AlternativeVersionInfo } from './report.ts';
 import { type AllVersions, load_all_versions } from './versions.ts';
 
@@ -51,12 +55,24 @@ export interface InitializedImplementations {
 	biome: BiomeImplementation | undefined;
 	/** dprint implementation (via WASM; the engine `deno fmt` runs) - undefined if not available */
 	dprint: DprintImplementation | undefined;
+	/** malva (via WASM; dprint's CSS plugin) - format only; undefined if not available */
+	malva: MalvaImplementation | undefined;
+	/** postcss - parse only, CSS; undefined if not available */
+	postcss: PostcssImplementation | undefined;
 	/**
 	 * rsvelte-fmt implementation (native binary, one process per file) - undefined
 	 * if this platform has no prebuilt binary. Coverage-only: it has no in-process
 	 * API, so it is never timed (see `get_benchmark_tasks`).
 	 */
 	rsvelte: RsvelteImplementation | undefined;
+	/**
+	 * rsvelte's Svelte PARSER (N-API addon) - parse only; undefined if not
+	 * available. A different package from `rsvelte` above, and unlike it this one
+	 * has an in-process API, so it IS timed (see `lib/rsvelte_parse.ts`).
+	 */
+	rsvelte_parse: RsvelteParseImplementation | undefined;
+	/** swc (`@swc/core`, N-API) - parse only, TypeScript/JS; undefined if not available */
+	swc: SwcImplementation | undefined;
 }
 
 /** Options for implementation initialization */
@@ -188,10 +204,28 @@ export async function init_implementations(
 		'dprint (WASM)',
 		'dprint'
 	);
+	const malva_impl = await optional(
+		new MalvaImplementation(versions.malva),
+		'malva (WASM, CSS)',
+		'malva'
+	);
 	const rsvelte_impl = await optional(
 		new RsvelteImplementation(versions.rsvelte),
 		'rsvelte-fmt (native binary, coverage-only)',
 		'rsvelte-fmt'
+	);
+	// A different package from rsvelte-fmt above — the N-API addon, which unlike
+	// the fmt CLI does have an in-process API. See lib/rsvelte_parse.ts.
+	const rsvelte_parse_impl = await optional(
+		new RsvelteParseImplementation(versions.rsvelte_parse),
+		'rsvelte parse (N-API, svelte)',
+		'rsvelte parse'
+	);
+	const swc_impl = await optional(new SwcImplementation(versions.swc), 'swc (N-API)', 'swc');
+	const postcss_impl = await optional(
+		new PostcssImplementation(versions.postcss),
+		'postcss (CSS)',
+		'postcss'
 	);
 
 	logger('');
@@ -208,7 +242,11 @@ export async function init_implementations(
 		yuku_wasm: yuku_wasm_impl,
 		biome: biome_impl,
 		dprint: dprint_impl,
-		rsvelte: rsvelte_impl
+		malva: malva_impl,
+		postcss: postcss_impl,
+		rsvelte: rsvelte_impl,
+		rsvelte_parse: rsvelte_parse_impl,
+		swc: swc_impl
 	};
 }
 
@@ -433,6 +471,50 @@ export function get_benchmark_tasks(
 			'yuku-wasm',
 			(source, _language, goal) => impls.yuku_wasm!.parse(source, language, goal)
 		);
+
+		// rsvelte's parser (Svelte only) — the FIRST third-party engine on this
+		// surface, which until now held only `svelte/compiler` (the oracle) and tsv's
+		// own variants. `parse()` returns JSON the caller parses, exactly the
+		// mechanism `tsv-json` measures, so the two are apples-to-apples. It also
+		// claims tsv's own drop-in contract, which makes the row a conformance datum
+		// as much as a speed one. See lib/rsvelte_parse.ts.
+		add(
+			impls.rsvelte_parse?.supports_parse_language(language),
+			'rsvelte-parse',
+			'rsvelte-parse',
+			(source) => impls.rsvelte_parse!.parse(source, language)
+		);
+		// ⚠ Named for the OPTION it passes, not for tsv's `no-locations` wire: the two
+		// reductions differ (tsv drops per-node `loc` throughout, ~46%; rsvelte drops
+		// only nested expression `loc` and keeps top-level start/end, -34%), so this
+		// row is NOT payload-matched to `tsv-json-no-locations` and is deliberately
+		// absent from report.ts's curated payload-matched lines.
+		add(
+			impls.rsvelte_parse?.supports_parse_language(language),
+			'rsvelte-parse-skip-expr-loc',
+			'rsvelte-parse-skip-expr-loc',
+			(source) => impls.rsvelte_parse!.parse_skip_expression_loc(source, language)
+		);
+
+		// swc (TypeScript/JS only) — the most widely deployed Rust TS parser. Its AST
+		// is its own dialect (root `Module`, `span` not `loc`, `Ts`-prefixed kinds), so
+		// it carries the oxc-class payload disclosure and is NOT an opponent for the
+		// span-only curated lines. Goal-aware via `isModule` (see lib/swc.ts), which is
+		// what lets it join the conformance surface without scoring script-goal
+		// test262 files as module-goal failures. Three real-corpus `.d.ts` rejections
+		// are catalogued in lib/perf_omit.ts.
+		add(impls.swc?.supports_parse_language(language), 'swc', 'swc', (source, _language, goal) =>
+			impls.swc!.parse(source, language, goal)
+		);
+
+		// postcss (CSS only) — the first third-party engine on `parse/css`, and the
+		// parser behind prettier's CSS printer, i.e. behind the `format/css` baseline.
+		// No native peer exists to add here: no Rust CSS parser exposes an AST to JS
+		// (lightningcss is transform-only, biome's js-api exposes no parse, malva is a
+		// formatter, oxc has no CSS parse binding). See lib/postcss.ts.
+		add(impls.postcss?.supports_parse_language(language), 'postcss', 'postcss', (source) =>
+			impls.postcss!.parse(source, language)
+		);
 	} else {
 		// Canonical formatter (prettier) - async
 		add_async(true, 'prettier', 'canonical', (source) =>
@@ -467,6 +549,13 @@ export function get_benchmark_tasks(
 		// dprint formatter (TypeScript/JS only — the engine `deno fmt` runs)
 		add(impls.dprint?.supports_format_language(language), 'dprint-wasm', 'dprint', (source) =>
 			impls.dprint!.format(source, language)
+		);
+
+		// malva formatter (CSS only) — dprint's CSS plugin, over the same
+		// `@dprint/formatter` host. Gives format/css a second wasm-tier engine (the
+		// only other one is biome-wasm). See lib/malva.ts.
+		add(impls.malva?.supports_format_language(language), 'malva-wasm', 'malva', (source) =>
+			impls.malva!.format(source, language)
 		);
 
 		// rsvelte-fmt (Svelte only) — COVERAGE-ONLY. It ships no in-process format
@@ -523,6 +612,15 @@ export function get_alternative_versions(
 		// The plugin version is the one worth citing — `@dprint/formatter` is just
 		// the Wasm host, the TS/JS formatting behavior lives in the plugin.
 		dprint: impls.dprint?.versions.typescript,
-		rsvelte_fmt: impls.rsvelte?.versions.fmt
+		// Same reasoning as dprint: the CSS plugin, not the shared host.
+		malva: impls.malva?.versions.malva,
+		postcss: impls.postcss?.versions.postcss,
+		rsvelte_fmt: impls.rsvelte?.versions.fmt,
+		// Two facts, both reported: the addon's own version, and the upstream Svelte
+		// it targets — a drift of the latter from the harness's `svelte` pin means the
+		// row is parsing to a different Svelte than the oracle it's compared against.
+		rsvelte_parse: impls.rsvelte_parse?.versions.native,
+		rsvelte_parse_svelte_target: impls.rsvelte_parse?.upstream_svelte_version,
+		swc: impls.swc?.versions.core
 	};
 }
