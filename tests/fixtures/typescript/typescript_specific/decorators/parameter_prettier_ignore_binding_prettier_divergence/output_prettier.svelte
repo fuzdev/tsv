@@ -16,5 +16,12 @@
 			:   {x:   1},
 			d: U
 		) {}
+
+		// the frozen slice prints the binding's source verbatim, redundant parens and the
+		// comment inside them included, so the parameter list's own trailing run claims
+		// nothing there and the comment is printed once
+		n(@dec
+			// prettier-ignore
+			e = (1   /* c */), f: U) {}
 	}
 </script>

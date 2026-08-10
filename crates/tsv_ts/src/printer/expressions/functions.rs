@@ -890,14 +890,19 @@ impl<'a> Printer<'a> {
         trailing_comments_end: Option<u32>,
     ) -> bool {
         params.iter().enumerate().any(|(i, param)| {
+            // The PRINTED end, the same anchor the loop's trailing arms claim from: a `//`
+            // inside a stripped-paren shell (`a = (1 // c⏎)`) is in the gap they emit, so a
+            // gate that starts past the shell lets that comment defer out of a list that
+            // never breaks — past the `)` and the body, swallowing whatever follows.
+            let param_end = param.printed_end();
             let trailing_end = self.param_trailing_end(params, i, trailing_comments_end);
-            if self.has_line_comments_between(param.span().end, trailing_end) {
+            if self.has_line_comments_between(param_end, trailing_end) {
                 return true;
             }
             // For the last param, also check for own-line block comments before `)`
             if i == params.len() - 1 {
-                self.comments_on_page_between(param.span().end, trailing_end)
-                    .any(|c| c.is_block && !self.is_same_line(param.span().end, c.span.start))
+                self.comments_on_page_between(param_end, trailing_end)
+                    .any(|c| c.is_block && !self.is_same_line(param_end, c.span.start))
             } else {
                 false
             }
@@ -1189,14 +1194,17 @@ impl<'a> Printer<'a> {
     /// parameter `i`'s leading gap freezes the parameter verbatim (Rule A); one written
     /// between its decorators and its binding freezes just the binding. The type-side
     /// twin is `build_function_type_param_item_doc`.
+    ///
+    /// `list_frozen` is the caller's already-resolved outer freeze
+    /// ([`Printer::param_frozen_span`]) rather than a lookup of its own: the caller needs
+    /// the same answer for the comment seam's claim anchor, and one lookup shared is what
+    /// keeps the doc and the anchor from disagreeing about what was printed.
     fn build_function_parameter_item_doc(
         &self,
-        params_start: Option<u32>,
-        params: &[internal::Expression<'_>],
-        i: usize,
+        list_frozen: Option<Span>,
+        param: &internal::Expression<'_>,
     ) -> DocId {
-        let param = &params[i];
-        if let Some(frozen) = self.param_frozen_span(params_start, params, i) {
+        if let Some(frozen) = list_frozen {
             return self.build_frozen_span_doc(frozen);
         }
         self.build_frozen_param_binding_doc(param)
@@ -1353,18 +1361,31 @@ impl<'a> Printer<'a> {
         // and iteration `i-1` already located it as its own `comma_pos`. Scanning it again
         // as this iteration's `prev_comma_pos` would ask the same source range twice.
         let mut prev_comma_pos: Option<u32> = None;
+        // The previous param's claim anchor (`Printer::element_claim_anchor`), carried for
+        // the same reason as `prev_comma_pos`: it is one answer about one gap, and the
+        // trailing side has already computed it.
+        let mut prev_param_end: Option<u32> = None;
         for (i, param) in params.iter().enumerate() {
             let param_start = param.span().start;
             let is_last = i == params.len() - 1;
 
-            // Check for leading comments before this param
-            let search_start = if i == 0 {
-                // First param: search from after '(' (position + 1)
+            // Where this param's leading gap opens: the previous param's CLAIM anchor
+            // ([`Printer::element_claim_anchor`]), which its span end overshoots by a
+            // stripped-paren shell (`a = (1 /* c */)`) whose interior would then belong to
+            // no emitter at all (`docs/comments.md` §The element-comma seam). Carried from
+            // the previous iteration rather than recomputed, so the two sides of the gap
+            // cannot disagree — in particular about the FREEZE arm, where the anchor stays
+            // at the frozen slice's end and a printed-end reading here would re-emit a
+            // comment that slice already printed.
+            //
+            // Every question in this iteration opens here, the blank-line one included: it
+            // takes the DISTANCE anchor derived from this position (`element_shell_end`,
+            // below), never the raw span end, so the shell is peeled with a comment inside
+            // it left measurable.
+            let gap_start = prev_param_end.unwrap_or_else(|| {
+                // First param: from just after `(`.
                 params_start.map_or(param_start, |pos| pos + 1)
-            } else {
-                // Subsequent params: search from after the previous param
-                params[i - 1].span().end
-            };
+            });
 
             // The three facts that decide which comments lead this param, derived ONCE and
             // shared by the separator and the leading-comment emitter below. They are the
@@ -1384,19 +1405,24 @@ impl<'a> Printer<'a> {
                 if force_break {
                     // Preserve a blank line the author left before this param's printed
                     // content — prettier keeps one blank line in the expanded list.
-                    // `search_start` is the previous param's end — the SAME `from` the break
-                    // gate (`has_blank_line_between_params`) measures from, through the SAME
-                    // predicate, so the gate and this emitter cannot disagree about whether a
-                    // blank is there. When they did, the list broke with the blank dropped and
-                    // the next pass collapsed it.
+                    //
+                    // The DISTANCE anchor: the previous param's shell end
+                    // (`Printer::element_shell_end`), the same peel every list that shares
+                    // the item separator takes (`Printer::push_item_blank_separator`). With
+                    // no comment in the shell it lands on the span end, which is where the
+                    // break gate (`has_blank_line_between_params`) measures from, so the
+                    // gate and this emitter still cannot disagree about a bare blank — and
+                    // where they could, a comment in the shell, that comment has already
+                    // forced the break on its own.
                     //
                     // The scan stops at this param's content start, and `is_next_line_empty`
                     // steps past the previous param's same-line trailing comment (`a, // x`)
                     // rather than treating it as the boundary, so a blank line *after* it
                     // still counts.
+                    let blank_start = self.element_shell_end(gap_start, param_start);
                     let content_start = if comments_present {
                         self.param_content_start(
-                            search_start,
+                            gap_start,
                             param_render_start,
                             prev_comma_pos,
                             skip_delim,
@@ -1407,7 +1433,7 @@ impl<'a> Printer<'a> {
                     };
                     self.push_next_line_empty_hardline(
                         &mut inner_parts,
-                        search_start,
+                        blank_start,
                         content_start,
                     );
                 } else if flat_list {
@@ -1421,14 +1447,27 @@ impl<'a> Printer<'a> {
             // Use proper line breaks for line comments on their own line
             if comments_present {
                 inner_parts.push(self.build_leading_param_comments(
-                    search_start,
+                    gap_start,
                     param_render_start,
                     prev_comma_pos,
                     skip_delim,
                 ));
             }
 
-            inner_parts.push(self.build_function_parameter_item_doc(params_start, params, i));
+            // A parameter has TWO freeze positions and the item doc takes whichever fired
+            // — the list gap first, then the decorators→binding gap. Resolved here rather
+            // than inside that builder because the claim anchor below needs the same
+            // answer, and the second position is the one an outer-only reading misses.
+            let list_frozen = self.param_frozen_span(params_start, params, i);
+            inner_parts.push(self.build_function_parameter_item_doc(list_frozen, param));
+
+            // Where this param's doc STOPS PRINTING. Every comment question in this
+            // iteration takes it, so the trailing arms and the next param's leading run
+            // partition one gap from one anchor.
+            let param_end = Self::element_claim_anchor(
+                list_frozen.or_else(|| self.param_binding_frozen_span(param)),
+                param.printed_end(),
+            );
 
             // Handle trailing same-line comments
             let search_end = if is_last {
@@ -1445,7 +1484,7 @@ impl<'a> Printer<'a> {
             // hazard the element-comma collector names (`collect_trailing_comments`).
             // Consumed only by comment placement, so the zero-comment gate skips the scan.
             let comma_pos = comments_present
-                .then(|| self.find_comma_in_range(param.span().end, search_end))
+                .then(|| self.find_comma_in_range(param_end, search_end))
                 .flatten();
 
             // The param's same-line **block** comments, split by side of the comma below.
@@ -1454,8 +1493,8 @@ impl<'a> Printer<'a> {
             // run" would read as answering for them too while quietly using the narrower
             // anchor.
             let same_line_blocks: CommentVec<'_> = if comments_present {
-                comments_to_emit_in_range(self.comments, param.span().end, search_end)
-                    .filter(|c| c.is_block && self.is_same_line(param.span().end, c.span.start))
+                comments_to_emit_in_range(self.comments, param_end, search_end)
+                    .filter(|c| c.is_block && self.is_same_line(param_end, c.span.start))
                     .collect()
             } else {
                 CommentVec::new()
@@ -1518,14 +1557,11 @@ impl<'a> Printer<'a> {
             // `last_after_comma_docs`; claiming into it here printed the comment TWICE.
             let trailing_comma_anchor = if is_last { None } else { comma_pos };
             if comments_present {
-                for comment in comments_to_emit_in_range(
-                    self.comments,
-                    param.span().end,
-                    search_end,
-                )
-                .filter(|c| {
-                    self.param_trailing_line_comment(c, param.span().end, trailing_comma_anchor)
-                }) {
+                for comment in comments_to_emit_in_range(self.comments, param_end, search_end)
+                    .filter(|c| {
+                        self.param_trailing_line_comment(c, param_end, trailing_comma_anchor)
+                    })
+                {
                     inner_parts.push(self.build_trailing_line_comment_doc(comment));
                 }
             }
@@ -1533,10 +1569,9 @@ impl<'a> Printer<'a> {
             // Own-line comments (on their own line after last param, before `)`)
             // Only for the last param - non-last param comments are handled as leading for next param
             if is_last && comments_present {
-                let mut prev_own = param.span().end;
-                for comment in
-                    comments_to_emit_in_range(self.comments, param.span().end, search_end)
-                        .filter(|c| !self.is_same_line(param.span().end, c.span.start))
+                let mut prev_own = param_end;
+                for comment in comments_to_emit_in_range(self.comments, param_end, search_end)
+                    .filter(|c| !self.is_same_line(param_end, c.span.start))
                 {
                     // Preserve an author blank line before the own-line trailing comment.
                     self.push_blank_preserving_hardline(
@@ -1550,6 +1585,7 @@ impl<'a> Printer<'a> {
             }
 
             prev_comma_pos = comma_pos;
+            prev_param_end = Some(param_end);
         }
 
         // No group - outer signature group controls breaking
@@ -1588,6 +1624,13 @@ impl<'a> Printer<'a> {
     /// (`build_function_params_doc`) and the type-level one (`function_types`), so the two
     /// cannot disagree about the same gap. See [`Self::has_own_line_comment_between`] for the
     /// per-gap rule.
+    ///
+    /// The gap opens at the previous param's PRINTED end, like every other gate over this
+    /// seam (`docs/comments.md` §The element-comma seam): a comment inside a stripped paren
+    /// shell (`a = (1⏎/* c */)`) sits before the span end, so a span-anchored gate calls the
+    /// list comment-free while the leading-run emitter prints the comment anyway. The list
+    /// then breaks on that comment's own hardline with `force_break` still false — and the
+    /// separator, which is the only thing that preserves an author blank, never runs.
     pub(in crate::printer) fn has_leading_own_line_comment_in_params(
         &self,
         params: &[internal::Expression<'_>],
@@ -1597,7 +1640,7 @@ impl<'a> Printer<'a> {
             let search_start = if i == 0 {
                 params_start.map_or_else(|| param.span().start, |pos| pos + 1)
             } else {
-                params[i - 1].span().end
+                params[i - 1].printed_end()
             };
 
             // Check if there's a line comment on its own line before this param

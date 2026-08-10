@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 370,
+	"end": 662,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -73,24 +73,104 @@
 					"column": 21
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " the frozen slice prints the binding's source verbatim, redundant parens and the",
+			"start": 360,
+			"end": 442,
+			"loc": {
+				"start": {
+					"line": 20,
+					"column": 2
+				},
+				"end": {
+					"line": 20,
+					"column": 84
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment inside them included, so the parameter list's own trailing run claims",
+			"start": 445,
+			"end": 525,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 82
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " nothing there and the comment is printed once",
+			"start": 528,
+			"end": 576,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 50
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 593,
+			"end": 611,
+			"loc": {
+				"start": {
+					"line": 25,
+					"column": 3
+				},
+				"end": {
+					"line": 25,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 624,
+			"end": 631,
+			"loc": {
+				"start": {
+					"line": 26,
+					"column": 12
+				},
+				"end": {
+					"line": 26,
+					"column": 19
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 369,
+		"end": 661,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 360,
+			"end": 652,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 20,
+					"line": 30,
 					"column": 9
 				}
 			},
@@ -98,14 +178,14 @@
 				{
 					"type": "ClassDeclaration",
 					"start": 182,
-					"end": 359,
+					"end": 651,
 					"loc": {
 						"start": {
 							"line": 4,
 							"column": 1
 						},
 						"end": {
-							"line": 19,
+							"line": 29,
 							"column": 2
 						}
 					},
@@ -129,14 +209,14 @@
 					"body": {
 						"type": "ClassBody",
 						"start": 190,
-						"end": 359,
+						"end": 651,
 						"loc": {
 							"start": {
 								"line": 4,
 								"column": 9
 							},
 							"end": {
-								"line": 19,
+								"line": 29,
 								"column": 2
 							}
 						},
@@ -789,6 +869,256 @@
 										"body": []
 									}
 								}
+							},
+							{
+								"type": "MethodDefinition",
+								"start": 579,
+								"end": 648,
+								"loc": {
+									"start": {
+										"line": 23,
+										"column": 2
+									},
+									"end": {
+										"line": 28,
+										"column": 6
+									}
+								},
+								"static": false,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 579,
+									"end": 580,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 23,
+											"column": 3
+										}
+									},
+									"name": "n"
+								},
+								"kind": "method",
+								"value": {
+									"type": "FunctionExpression",
+									"start": 580,
+									"end": 648,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 3
+										},
+										"end": {
+											"line": 28,
+											"column": 6
+										}
+									},
+									"id": null,
+									"expression": false,
+									"generator": false,
+									"async": false,
+									"params": [
+										{
+											"type": "AssignmentPattern",
+											"start": 615,
+											"end": 632,
+											"loc": {
+												"start": {
+													"line": 26,
+													"column": 3
+												},
+												"end": {
+													"line": 26,
+													"column": 20
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 615,
+												"end": 616,
+												"loc": {
+													"start": {
+														"line": 26,
+														"column": 3
+													},
+													"end": {
+														"line": 26,
+														"column": 4
+													}
+												},
+												"name": "e"
+											},
+											"right": {
+												"type": "Literal",
+												"start": 620,
+												"end": 621,
+												"loc": {
+													"start": {
+														"line": 26,
+														"column": 8
+													},
+													"end": {
+														"line": 26,
+														"column": 9
+													}
+												},
+												"value": 1,
+												"raw": "1",
+												"trailingComments": [
+													{
+														"type": "Block",
+														"value": " c ",
+														"start": 624,
+														"end": 631
+													}
+												]
+											},
+											"decorators": [
+												{
+													"type": "Decorator",
+													"start": 585,
+													"end": 589,
+													"loc": {
+														"start": {
+															"line": 24,
+															"column": 3
+														},
+														"end": {
+															"line": 24,
+															"column": 7
+														}
+													},
+													"expression": {
+														"type": "Identifier",
+														"start": 586,
+														"end": 589,
+														"loc": {
+															"start": {
+																"line": 24,
+																"column": 4
+															},
+															"end": {
+																"line": 24,
+																"column": 7
+															}
+														},
+														"name": "dec"
+													}
+												}
+											],
+											"leadingComments": [
+												{
+													"type": "Line",
+													"value": " prettier-ignore",
+													"start": 593,
+													"end": 611
+												}
+											]
+										},
+										{
+											"type": "Identifier",
+											"start": 637,
+											"end": 641,
+											"loc": {
+												"start": {
+													"line": 27,
+													"column": 3
+												},
+												"end": {
+													"line": 27,
+													"column": 7
+												}
+											},
+											"name": "f",
+											"typeAnnotation": {
+												"type": "TSTypeAnnotation",
+												"start": 638,
+												"end": 641,
+												"loc": {
+													"start": {
+														"line": 27,
+														"column": 4
+													},
+													"end": {
+														"line": 27,
+														"column": 7
+													}
+												},
+												"typeAnnotation": {
+													"type": "TSTypeReference",
+													"start": 640,
+													"end": 641,
+													"loc": {
+														"start": {
+															"line": 27,
+															"column": 6
+														},
+														"end": {
+															"line": 27,
+															"column": 7
+														}
+													},
+													"typeName": {
+														"type": "Identifier",
+														"start": 640,
+														"end": 641,
+														"loc": {
+															"start": {
+																"line": 27,
+																"column": 6
+															},
+															"end": {
+																"line": 27,
+																"column": 7
+															}
+														},
+														"name": "U"
+													}
+												}
+											}
+										}
+									],
+									"body": {
+										"type": "BlockStatement",
+										"start": 646,
+										"end": 648,
+										"loc": {
+											"start": {
+												"line": 28,
+												"column": 4
+											},
+											"end": {
+												"line": 28,
+												"column": 6
+											}
+										},
+										"body": []
+									}
+								},
+								"leadingComments": [
+									{
+										"type": "Line",
+										"value": " the frozen slice prints the binding's source verbatim, redundant parens and the",
+										"start": 360,
+										"end": 442
+									},
+									{
+										"type": "Line",
+										"value": " comment inside them included, so the parameter list's own trailing run claims",
+										"start": 445,
+										"end": 525
+									},
+									{
+										"type": "Line",
+										"value": " nothing there and the comment is printed once",
+										"start": 528,
+										"end": 576
+									}
+								]
 							}
 						]
 					},

@@ -1,0 +1,920 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 447,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a block comment glued to a defaulted element binds to that element, once",
+			"start": 10,
+			"end": 85,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 76
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 94,
+			"end": 101,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 8
+				},
+				"end": {
+					"line": 3,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same at a non-first element",
+			"start": 117,
+			"end": 151,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 35
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 164,
+			"end": 171,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 12
+				},
+				"end": {
+					"line": 6,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a nested pattern as the default's left side",
+			"start": 187,
+			"end": 233,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 1
+				},
+				"end": {
+					"line": 8,
+					"column": 47
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 242,
+			"end": 249,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 8
+				},
+				"end": {
+					"line": 9,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the array pattern in a parameter position",
+			"start": 267,
+			"end": 311,
+			"loc": {
+				"start": {
+					"line": 11,
+					"column": 1
+				},
+				"end": {
+					"line": 11,
+					"column": 45
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 326,
+			"end": 333,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 14
+				},
+				"end": {
+					"line": 12,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the object pattern's twin, which binds it the same way",
+			"start": 348,
+			"end": 405,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 1
+				},
+				"end": {
+					"line": 14,
+					"column": 58
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 415,
+			"end": 422,
+			"loc": {
+				"start": {
+					"line": 15,
+					"column": 9
+				},
+				"end": {
+					"line": 15,
+					"column": 16
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 446,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 437,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 16,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "VariableDeclaration",
+					"start": 87,
+					"end": 114,
+					"loc": {
+						"start": {
+							"line": 3,
+							"column": 1
+						},
+						"end": {
+							"line": 3,
+							"column": 28
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 93,
+							"end": 113,
+							"loc": {
+								"start": {
+									"line": 3,
+									"column": 7
+								},
+								"end": {
+									"line": 3,
+									"column": 27
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 93,
+								"end": 109,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 7
+									},
+									"end": {
+										"line": 3,
+										"column": 23
+									}
+								},
+								"elements": [
+									{
+										"type": "AssignmentPattern",
+										"start": 102,
+										"end": 108,
+										"loc": {
+											"start": {
+												"line": 3,
+												"column": 16
+											},
+											"end": {
+												"line": 3,
+												"column": 22
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 102,
+											"end": 104,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 16
+												},
+												"end": {
+													"line": 3,
+													"column": 18
+												}
+											},
+											"name": "a1"
+										},
+										"right": {
+											"type": "Literal",
+											"start": 107,
+											"end": 108,
+											"loc": {
+												"start": {
+													"line": 3,
+													"column": 21
+												},
+												"end": {
+													"line": 3,
+													"column": 22
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 94,
+												"end": 101
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 112,
+								"end": 113,
+								"loc": {
+									"start": {
+										"line": 3,
+										"column": 26
+									},
+									"end": {
+										"line": 3,
+										"column": 27
+									}
+								},
+								"name": "x"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment glued to a defaulted element binds to that element, once",
+							"start": 10,
+							"end": 85
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 153,
+					"end": 184,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 32
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 159,
+							"end": 183,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 7
+								},
+								"end": {
+									"line": 6,
+									"column": 31
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 159,
+								"end": 179,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 7
+									},
+									"end": {
+										"line": 6,
+										"column": 27
+									}
+								},
+								"elements": [
+									{
+										"type": "Identifier",
+										"start": 160,
+										"end": 162,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 8
+											},
+											"end": {
+												"line": 6,
+												"column": 10
+											}
+										},
+										"name": "a2",
+										"trailingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 164,
+												"end": 171
+											}
+										]
+									},
+									{
+										"type": "AssignmentPattern",
+										"start": 172,
+										"end": 178,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 20
+											},
+											"end": {
+												"line": 6,
+												"column": 26
+											}
+										},
+										"left": {
+											"type": "Identifier",
+											"start": 172,
+											"end": 174,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 20
+												},
+												"end": {
+													"line": 6,
+													"column": 22
+												}
+											},
+											"name": "b2"
+										},
+										"right": {
+											"type": "Literal",
+											"start": 177,
+											"end": 178,
+											"loc": {
+												"start": {
+													"line": 6,
+													"column": 25
+												},
+												"end": {
+													"line": 6,
+													"column": 26
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										}
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 182,
+								"end": 183,
+								"loc": {
+									"start": {
+										"line": 6,
+										"column": 30
+									},
+									"end": {
+										"line": 6,
+										"column": 31
+									}
+								},
+								"name": "x"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same at a non-first element",
+							"start": 117,
+							"end": 151
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 235,
+					"end": 264,
+					"loc": {
+						"start": {
+							"line": 9,
+							"column": 1
+						},
+						"end": {
+							"line": 9,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 241,
+							"end": 263,
+							"loc": {
+								"start": {
+									"line": 9,
+									"column": 7
+								},
+								"end": {
+									"line": 9,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "ArrayPattern",
+								"start": 241,
+								"end": 259,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 7
+									},
+									"end": {
+										"line": 9,
+										"column": 25
+									}
+								},
+								"elements": [
+									{
+										"type": "AssignmentPattern",
+										"start": 250,
+										"end": 258,
+										"loc": {
+											"start": {
+												"line": 9,
+												"column": 16
+											},
+											"end": {
+												"line": 9,
+												"column": 24
+											}
+										},
+										"left": {
+											"type": "ArrayPattern",
+											"start": 250,
+											"end": 254,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 16
+												},
+												"end": {
+													"line": 9,
+													"column": 20
+												}
+											},
+											"elements": [
+												{
+													"type": "Identifier",
+													"start": 251,
+													"end": 253,
+													"loc": {
+														"start": {
+															"line": 9,
+															"column": 17
+														},
+														"end": {
+															"line": 9,
+															"column": 19
+														}
+													},
+													"name": "a3"
+												}
+											]
+										},
+										"right": {
+											"type": "Literal",
+											"start": 257,
+											"end": 258,
+											"loc": {
+												"start": {
+													"line": 9,
+													"column": 23
+												},
+												"end": {
+													"line": 9,
+													"column": 24
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 242,
+												"end": 249
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 262,
+								"end": 263,
+								"loc": {
+									"start": {
+										"line": 9,
+										"column": 28
+									},
+									"end": {
+										"line": 9,
+										"column": 29
+									}
+								},
+								"name": "x"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a nested pattern as the default's left side",
+							"start": 187,
+							"end": 233
+						}
+					]
+				},
+				{
+					"type": "FunctionDeclaration",
+					"start": 313,
+					"end": 345,
+					"loc": {
+						"start": {
+							"line": 12,
+							"column": 1
+						},
+						"end": {
+							"line": 12,
+							"column": 33
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 322,
+						"end": 324,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 10
+							},
+							"end": {
+								"line": 12,
+								"column": 12
+							}
+						},
+						"name": "fn"
+					},
+					"expression": false,
+					"generator": false,
+					"async": false,
+					"params": [
+						{
+							"type": "ArrayPattern",
+							"start": 325,
+							"end": 341,
+							"loc": {
+								"start": {
+									"line": 12,
+									"column": 13
+								},
+								"end": {
+									"line": 12,
+									"column": 29
+								}
+							},
+							"elements": [
+								{
+									"type": "AssignmentPattern",
+									"start": 334,
+									"end": 340,
+									"loc": {
+										"start": {
+											"line": 12,
+											"column": 22
+										},
+										"end": {
+											"line": 12,
+											"column": 28
+										}
+									},
+									"left": {
+										"type": "Identifier",
+										"start": 334,
+										"end": 336,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 22
+											},
+											"end": {
+												"line": 12,
+												"column": 24
+											}
+										},
+										"name": "a4"
+									},
+									"right": {
+										"type": "Literal",
+										"start": 339,
+										"end": 340,
+										"loc": {
+											"start": {
+												"line": 12,
+												"column": 27
+											},
+											"end": {
+												"line": 12,
+												"column": 28
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									},
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 326,
+											"end": 333
+										}
+									]
+								}
+							]
+						}
+					],
+					"body": {
+						"type": "BlockStatement",
+						"start": 343,
+						"end": 345,
+						"loc": {
+							"start": {
+								"line": 12,
+								"column": 31
+							},
+							"end": {
+								"line": 12,
+								"column": 33
+							}
+						},
+						"body": []
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the array pattern in a parameter position",
+							"start": 267,
+							"end": 311
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 407,
+					"end": 436,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 15,
+							"column": 30
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 413,
+							"end": 435,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 7
+								},
+								"end": {
+									"line": 15,
+									"column": 29
+								}
+							},
+							"id": {
+								"type": "ObjectPattern",
+								"start": 413,
+								"end": 431,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 7
+									},
+									"end": {
+										"line": 15,
+										"column": 25
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 423,
+										"end": 429,
+										"loc": {
+											"start": {
+												"line": 15,
+												"column": 17
+											},
+											"end": {
+												"line": 15,
+												"column": 23
+											}
+										},
+										"method": false,
+										"shorthand": true,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 423,
+											"end": 425,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 17
+												},
+												"end": {
+													"line": 15,
+													"column": 19
+												}
+											},
+											"name": "a5"
+										},
+										"value": {
+											"type": "AssignmentPattern",
+											"start": 423,
+											"end": 429,
+											"loc": {
+												"start": {
+													"line": 15,
+													"column": 17
+												},
+												"end": {
+													"line": 15,
+													"column": 23
+												}
+											},
+											"left": {
+												"type": "Identifier",
+												"start": 423,
+												"end": 425,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 17
+													},
+													"end": {
+														"line": 15,
+														"column": 19
+													}
+												},
+												"name": "a5"
+											},
+											"right": {
+												"type": "Literal",
+												"start": 428,
+												"end": 429,
+												"loc": {
+													"start": {
+														"line": 15,
+														"column": 22
+													},
+													"end": {
+														"line": 15,
+														"column": 23
+													}
+												},
+												"value": 1,
+												"raw": "1"
+											}
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Block",
+												"value": " c ",
+												"start": 415,
+												"end": 422
+											}
+										]
+									}
+								]
+							},
+							"init": {
+								"type": "Identifier",
+								"start": 434,
+								"end": 435,
+								"loc": {
+									"start": {
+										"line": 15,
+										"column": 28
+									},
+									"end": {
+										"line": 15,
+										"column": 29
+									}
+								},
+								"name": "x"
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the object pattern's twin, which binds it the same way",
+							"start": 348,
+							"end": 405
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}
