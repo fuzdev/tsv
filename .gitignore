@@ -15,6 +15,12 @@ node_modules
 /crates/tsv_wasm/pkg
 /crates/tsv_napi/pkg
 
+# The release workflow's container-build homes (mounted into docker runs,
+# carried by actions/cache) — only ever exist in CI workspaces or when
+# reproducing those builds locally.
+/.container-cargo
+/.container-rustup
+
 # Publish retry sentinel (scripts/publish.ts)
 /.publish-in-progress
 

@@ -12,12 +12,14 @@
  * One platform per invocation by design: a machine can only have built its own
  * triple, and the release workflow runs this once per matrix target
  * (`--triple` + `--artifact` name the cross-built binary; defaults are the
- * host triple and `target/napi/`). The cargo build itself is the
- * `build:napi` task, chained by `deno task build:napi:packages` — this script
- * only stages files.
+ * host triple and `target/napi/`). `--loader-only` skips the platform half
+ * entirely — the release workflow's publish job stages the loader beside
+ * downloaded platform artifacts, on a machine that built nothing. The cargo
+ * build itself is the `build:napi` task, chained by
+ * `deno task build:napi:packages` — this script only stages files.
  *
  * Usage: deno run --allow-read --allow-write=crates/tsv_napi/pkg \
- *          scripts/build_napi_packages.ts [--triple <t>] [--artifact <path>]
+ *          scripts/build_napi_packages.ts [--triple <t>] [--artifact <path>] [--loader-only]
  */
 
 import { parseArgs } from 'node:util';
@@ -25,7 +27,8 @@ import { parseArgs } from 'node:util';
 const { values: args } = parseArgs({
 	options: {
 		triple: { type: 'string' },
-		artifact: { type: 'string' }
+		artifact: { type: 'string' },
+		'loader-only': { type: 'boolean' }
 	}
 });
 
@@ -148,6 +151,10 @@ write_pkg(loader_dir, {
 	)
 });
 console.log(`Staged ${loader_dir}: @fuzdev/tsv_napi ${version}`);
+
+if (args['loader-only']) {
+	Deno.exit(0);
+}
 
 // --- the platform package ---------------------------------------------------
 

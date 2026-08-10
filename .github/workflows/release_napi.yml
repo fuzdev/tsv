@@ -1,0 +1,275 @@
+# Release workflow for the N-API npm packages — the @fuzdev/tsv_napi loader +
+# the five @fuzdev/tsv_napi-<triple> platform packages. This is the per-platform
+# matrix the single-machine scripts/publish.ts deliberately does NOT own:
+# publish.ts releases the WASM set and pushes the annotated v* tag, and that tag
+# triggers this workflow. The tag is also the assertion that the local
+# external-oracle conformance gates (publish Step 3b) ran — they read sibling
+# checkouts this runner has no reason to clone, so they are NOT re-run here.
+#
+# Per target: build the napi-profile cdylib (release + panic=unwind — the
+# shipped panic contract), stage the platform package, gate it (glibc floor /
+# musl purity, size bounds, the npm-shape test over the real artifact), upload.
+# The publish job downloads all five, stages the loader, and publishes
+# platforms-then-loader idempotently (scripts/publish_napi.ts) — a partial
+# matrix never publishes anything.
+#
+# Linux builds run inside containers via explicit `docker run` steps, not
+# job-level `container:`: the gnu rows build in almalinux:8 so the artifact's
+# glibc floor is 2.28 — Node's own binary floor, i.e. every machine that can
+# run modern Node can load tsv_napi (covers RHEL 8, Amazon Linux 2, and
+# everything newer) — and the musl row builds in rust:alpine (with
+# -crt_static off: a cdylib must link musl dynamically). Staging (Deno) and
+# tests run on the runner HOST, where current toolchains exist (Deno's own
+# binaries need a newer glibc than 2.28, so a job-level almalinux container
+# can't host them); the 2.28-floor artifact loads fine on the host's newer
+# glibc. The musl artifact CANNOT load into the host's glibc Node, so its
+# npm-shape test runs in a node:alpine container instead — which is also the
+# real deployment environment it exists for.
+#
+# Auth: NPM_TOKEN secret (granular, publish-only) for the bootstrap releases —
+# npm trusted publishing is only configurable on packages that already exist.
+# Once the six packages are live, configure Trusted Publishers and switch this
+# to OIDC, dropping the token. `id-token: write` is already scoped on the
+# publish job for `npm --provenance`.
+#
+# workflow_dispatch runs the whole matrix and gates with `npm publish
+# --dry-run` by default — the pre-tag rehearsal; set dry_run=false for a real
+# publish without a tag (the recovery path for a failed tag run).
+
+name: release_napi
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      dry_run:
+        description: 'Build and gate everything; npm publish --dry-run'
+        type: boolean
+        default: true
+
+permissions:
+  contents: read
+
+# Never cancel a release mid-publish; queue instead.
+concurrency:
+  group: release-napi-${{ github.ref }}
+
+defaults:
+  run:
+    # Uniform scripting across the matrix (bash exists on the windows runners).
+    shell: bash
+
+jobs:
+  build:
+    strategy:
+      # Publish requires ALL five artifacts (a partial set never publishes),
+      # but let every target report — a one-target failure with four green
+      # uploads means a re-run only rebuilds what changed.
+      fail-fast: false
+      matrix:
+        include:
+          - triple: linux-x64-gnu
+            runner: ubuntu-24.04
+            build: gnu-container
+          - triple: linux-arm64-gnu
+            runner: ubuntu-24.04-arm
+            build: gnu-container
+          - triple: linux-x64-musl
+            runner: ubuntu-24.04
+            build: musl-container
+          - triple: darwin-arm64
+            runner: macos-15
+            build: native
+          - triple: win32-x64
+            runner: windows-2025
+            build: native
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+
+    steps:
+      # persist-credentials: false keeps the GITHUB_TOKEN out of .git/config (no step here pushes via git).
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      # Toolchain for the native rows; the container rows bring their own rust.
+      - name: Install Rust
+        if: matrix.build == 'native'
+        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master (no semver tags; bump manually)
+        with:
+          toolchain: 1.94.1
+
+      - uses: Swatinem/rust-cache@c19371144df3bb44fab255c43d04cbc2ab54d1c4 # v2.9.1
+        if: matrix.build == 'native'
+
+      # The container rows' cache: cargo/rustup homes + target live under the
+      # workspace (mounted into the container) so actions/cache can carry them.
+      - uses: actions/cache@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+        if: matrix.build != 'native'
+        with:
+          path: |
+            .container-cargo
+            .container-rustup
+            target
+          key: napi-${{ matrix.triple }}-${{ hashFiles('Cargo.lock') }}
+          restore-keys: napi-${{ matrix.triple }}-
+
+      # Staging (scripts/build_napi_packages.ts) runs on the host.
+      - name: Install Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          # Pinned to match the check workflow / local. Bump deliberately.
+          deno-version: 2.8.0
+
+      # For the npm-shape test (`node --test` executes the .ts directly via
+      # native type stripping, >= 22.18). Pinned to match check.yml.
+      - name: Install Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24.14.1'
+
+      - name: Build (native)
+        if: matrix.build == 'native'
+        run: cargo build -p tsv_napi --profile napi
+
+      - name: Build (almalinux:8 — glibc 2.28 floor)
+        if: matrix.build == 'gnu-container'
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work \
+            -e CARGO_HOME=/work/.container-cargo \
+            -e RUSTUP_HOME=/work/.container-rustup \
+            almalinux:8 bash -ec '
+              dnf install -y -q gcc curl
+              curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.94.1
+              export PATH="/work/.container-cargo/bin:$PATH"
+              cargo build -p tsv_napi --profile napi'
+
+      - name: Build (rust:alpine — musl)
+        if: matrix.build == 'musl-container'
+        # -crt_static off: rust's musl target defaults to a static CRT, and a
+        # cdylib addon must link musl dynamically (it loads into Alpine Node).
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work \
+            -e CARGO_HOME=/work/.container-cargo \
+            -e RUSTFLAGS='-C target-feature=-crt_static' \
+            rust:1.94.1-alpine sh -ec '
+              apk add --no-cache musl-dev
+              cargo build -p tsv_napi --profile napi'
+
+      # The measured floor: the highest versioned glibc symbol the artifact
+      # references must not exceed 2.28 — the gate that keeps the container
+      # choice honest (a build accidentally run on the host would fail here).
+      - name: glibc floor gate (gnu, <= 2.28)
+        if: matrix.build == 'gnu-container'
+        run: |
+          max=$(objdump -T target/napi/libtsv_napi.so | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sort -uV | tail -1)
+          echo "max versioned glibc symbol: ${max:-none}"
+          top=$(printf '%s\nGLIBC_2.28\n' "$max" | sort -V | tail -1)
+          if [ "$top" != "GLIBC_2.28" ]; then
+            echo "FAIL: glibc floor exceeded ($max > 2.28) — was the build run outside the container?"
+            exit 1
+          fi
+
+      # The musl twin: a musl artifact must reference NO versioned glibc
+      # symbols at all (any GLIBC_ ref means a glibc contamination the alpine
+      # load test might even survive via compat shims — fail it here).
+      - name: musl purity gate
+        if: matrix.build == 'musl-container'
+        run: |
+          if objdump -T target/napi/libtsv_napi.so | grep -q 'GLIBC_'; then
+            echo 'FAIL: musl artifact references GLIBC_ symbols'
+            exit 1
+          fi
+
+      - name: Stage platform package
+        run: deno run --allow-read --allow-write=crates/tsv_napi/pkg scripts/build_napi_packages.ts --triple ${{ matrix.triple }}
+
+      - name: Size bounds
+        run: deno run --allow-read scripts/validate_napi_artifact.ts --triple ${{ matrix.triple }}
+
+      # The npm-shape test over the REAL artifact: loader platform-resolution,
+      # the wasm-parity options surface, the packaged .node. (The panic-contract
+      # probe test runs per OS in check.yml's platforms job on every PR; it
+      # needs a separate probe build, and the contract is profile+attribute
+      # determined — identical across targets — so it is not re-proven here.)
+      - name: npm-shape test
+        if: matrix.build != 'musl-container'
+        run: node --test scripts/test_napi_npm.ts
+
+      # The musl artifact can't load into the host's glibc Node — test it in
+      # the environment it exists for.
+      - name: npm-shape test (node:alpine)
+        if: matrix.build == 'musl-container'
+        run: |
+          docker run --rm -v "$PWD:/work" -w /work node:24.14.1-alpine \
+            node --test scripts/test_napi_npm.ts
+
+      - uses: actions/upload-artifact@330a01c490aca151604b8cf639adc76d48f6c5d4 # v5.0.0
+        with:
+          name: napi-${{ matrix.triple }}
+          path: crates/tsv_napi/pkg/${{ matrix.triple }}
+          if-no-files-found: error
+
+  publish:
+    needs: build
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    permissions:
+      contents: read
+      id-token: write # npm --provenance
+
+    steps:
+      # persist-credentials: false keeps the GITHUB_TOKEN out of .git/config (no step here pushes via git).
+      - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
+        with:
+          persist-credentials: false
+
+      - name: Install Deno
+        uses: denoland/setup-deno@667a34cdef165d8d2b2e98dde39547c9daac7282 # v2.0.4
+        with:
+          deno-version: 2.8.0
+
+      # registry-url writes the .npmrc that reads NODE_AUTH_TOKEN at publish.
+      - name: Install Node
+        uses: actions/setup-node@48b55a011bda9f5d6aeb4c2d9c7362e8dae4041e # v6.4.0
+        with:
+          node-version: '24.14.1'
+          registry-url: 'https://registry.npmjs.org'
+
+      # Each artifact extracts to pkg/napi-<triple>/; rename to the pkg/<triple>
+      # layout the staging/publish scripts share.
+      - uses: actions/download-artifact@018cc2cf5baa6db3ef3c5f8a56943fffe632ef53 # v6.0.0
+        with:
+          pattern: napi-*
+          path: crates/tsv_napi/pkg
+
+      - name: Arrange platform packages
+        run: |
+          for d in crates/tsv_napi/pkg/napi-*; do
+            mv "$d" "crates/tsv_napi/pkg/${d##*/napi-}"
+          done
+          ls crates/tsv_napi/pkg
+
+      - name: Stage loader package
+        run: deno run --allow-read --allow-write=crates/tsv_napi/pkg scripts/build_napi_packages.ts --loader-only
+
+      # Completeness (all five platforms, versions in lockstep), tag↔version
+      # agreement, platforms-then-loader order, and skip-if-already-published
+      # idempotency all live in the script. A missing NPM_TOKEN secret yields
+      # an EMPTY token, which `npm view` (public) and `npm publish --dry-run`
+      # both tolerate — so the dry-run rehearsal works before the secret exists.
+      - name: Publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+          DRY_RUN: ${{ inputs.dry_run }}
+        run: |
+          flags=()
+          if [ "$GITHUB_EVENT_NAME" = "push" ]; then
+            flags+=(--expect-tag "$GITHUB_REF_NAME" --provenance)
+          elif [ "$DRY_RUN" = "true" ]; then
+            flags+=(--dry-run)
+          else
+            flags+=(--provenance)
+          fi
+          deno run --allow-read --allow-env --allow-run=npm scripts/publish_napi.ts "${flags[@]}"

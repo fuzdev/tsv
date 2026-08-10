@@ -140,6 +140,8 @@
 		"test:napi:run": "node --test scripts/test_napi.ts",
 		"test:napi:npm": "deno task build:napi:packages && deno task test:napi:npm:run",
 		"test:napi:npm:run": "node --test scripts/test_napi_npm.ts",
+		"publish:napi": "deno run --allow-read --allow-env --allow-run=npm scripts/publish_napi.ts",
+		"validate:napi": "deno run --allow-read scripts/validate_napi_artifact.ts",
 		"validate:artifacts": "deno run --allow-read scripts/validate_artifacts.ts",
 
 		"publish": "deno run --allow-read --allow-write --allow-run --allow-env --allow-net scripts/publish.ts"
