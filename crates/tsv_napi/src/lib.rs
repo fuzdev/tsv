@@ -162,13 +162,15 @@ lang_bindings!(
 // and `import`/`export`/`import.meta` are syntax errors. See `tsv parse --goal`
 // and `tsv_ts::parse_with_goal`.
 //
-// `tsv_wasm` no longer shares this shape: there the goal is one key of a
-// per-call options bag threaded through its own `lang_bindings!`, and it reaches
-// the FORMAT exports as well. Here only parse is goal-aware — see this crate's
-// CLAUDE.md §Public API for that divergence and where the loader would close it.
+// `tsv_wasm` doesn't share this SHAPE: there the goal is one key of a per-call
+// options bag threaded through its own `lang_bindings!`. Coverage matches,
+// though — `format_typescript_with_goal` below is the flat counterpart of
+// `tsv_wasm`'s `format_typescript(source, {goal})`, and the `@fuzdev/tsv_napi`
+// loader presents the same options bag over all of these flat exports (see this
+// crate's CLAUDE.md §Public API).
 
 /// Parse a goal string (`"script"` / `"module"`) for the goal-aware TS exports.
-#[cfg(feature = "parse")]
+#[cfg(any(feature = "parse", feature = "format"))]
 fn napi_goal(goal: &str) -> napi::Result<tsv_ts::Goal> {
     tsv_ts::Goal::from_source_type(goal).ok_or_else(|| {
         napi::Error::from_reason(format!(
@@ -214,6 +216,23 @@ pub fn parse_internal_typescript_with_goal(source: String, goal: String) -> napi
             .map_err(|e| napi::Error::from_reason(e.to_string()))?;
         std::hint::black_box(&ast);
         Ok(())
+    })
+}
+
+/// `format_typescript` against an explicit goal — the flat counterpart of
+/// `tsv_wasm`'s `format_typescript(source, {goal})`. The goal shapes only the
+/// parse the formatter runs (at `'script'`, `await` is an ordinary identifier);
+/// formatting itself is non-configurable.
+#[cfg(feature = "format")]
+#[napi(js_name = "format_typescript_with_goal", catch_unwind)]
+pub fn format_typescript_with_goal(source: String, goal: String) -> napi::Result<String> {
+    let goal = napi_goal(&goal)?;
+    with_ast_arena(|arena| {
+        let ast = tsv_ts::parse_with_goal(&source, goal, arena)
+            .map_err(|e| napi::Error::from_reason(e.to_string()))?;
+        Ok(with_doc_arena(|doc_arena| {
+            tsv_ts::format_in(&ast, &source, doc_arena)
+        }))
     })
 }
 
@@ -314,8 +333,16 @@ mod tests {
         );
         assert!(parse_internal_typescript_with_goal(src.to_owned(), "script".to_owned()).is_ok());
         assert!(parse_internal_typescript_with_goal(src.to_owned(), "module".to_owned()).is_err());
+        // The format twin: the goal shapes the parse the formatter runs.
+        assert_eq!(
+            format_typescript_with_goal("var   await=1".to_owned(), "script".to_owned()).unwrap(),
+            "var await = 1;\n",
+            "script-goal format"
+        );
+        assert!(format_typescript_with_goal(src.to_owned(), "module".to_owned()).is_err());
         // An invalid goal string is a thrown error, not a silent module fallback.
         assert!(parse_typescript_with_goal(src.to_owned(), "sloppy".to_owned()).is_err());
+        assert!(format_typescript_with_goal(src.to_owned(), "sloppy".to_owned()).is_err());
     }
 
     // --- parse_internal: parses without converting (Ok, no JSON), every language ---

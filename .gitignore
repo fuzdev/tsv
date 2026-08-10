@@ -13,6 +13,7 @@ node_modules
 
 # WASM build output
 /crates/tsv_wasm/pkg
+/crates/tsv_napi/pkg
 
 # Publish retry sentinel (scripts/publish.ts)
 /.publish-in-progress

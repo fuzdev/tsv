@@ -19,7 +19,12 @@ Every parse export shares one uniform signature — `(source, options?)` with an
 acorn-style `{locations?, goal?}` bag, read in Rust (`read_options` in
 `src/lib.rs`, via `js_sys` `Object.keys` + `Reflect::get`; the same reader
 serves the format exports, so the two families can't drift — see
-[Format Options](#format-options)).
+[Format Options](#format-options)). ⚠️ A **third copy** of these semantics
+lives in [../tsv_napi/npm/index.js](../tsv_napi/npm/index.js) — the
+`@fuzdev/tsv_napi` loader mirrors this reader key for key, error string for
+error string, as its parity contract (asserted by `scripts/test_napi_npm.ts`'s
+exact-string tests). A semantics or message change here must update that
+mirror and its tests in the same edit.
 `locations` (default `true`) selects the wire: the loc-bearing drop-in
 contract, or the span-only variant (see below); it is accepted everywhere and
 inert where nothing reads it (CSS emits no `loc`; `parse_internal_*` emits no

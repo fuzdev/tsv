@@ -17,8 +17,9 @@
 #   artifacts — publish-parity: builds the WASM/npm packages, checks size
 #               bounds, runs the Node package tests (see the job comment).
 #   platforms — macOS + Windows confidence for the native builds: the full
-#               `cargo test --workspace` suite plus the N-API JS-boundary test,
-#               per OS (see the job comment). Linux is covered by `check`.
+#               `cargo test --workspace` suite plus the N-API JS-boundary and
+#               npm-package tests, per OS (see the job comment). Linux is
+#               covered by `check`.
 #
 # `check` needs Rust *and* Deno: the fixture suite drives prettier + svelte
 # through a Deno sidecar (npm: specifiers pinned in
@@ -242,3 +243,10 @@ jobs:
       - name: N-API boundary test
         if: ${{ !cancelled() }}
         run: deno task test:napi
+
+      # The staged npm shape on this OS: loader platform-resolution (per-OS
+      # triple detection), the wasm-parity options surface, and the packaged
+      # .node — what a real `npm i @fuzdev/tsv_napi` consumer executes.
+      - name: N-API npm package test
+        if: ${{ !cancelled() }}
+        run: deno task test:napi:npm

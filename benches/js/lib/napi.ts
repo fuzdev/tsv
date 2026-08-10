@@ -42,10 +42,12 @@ export interface NapiAddon {
 	// span-only wire — svelte + typescript only (CSS emits no `loc`)
 	parse_svelte_no_locations: (source: string) => string;
 	parse_typescript_no_locations: (source: string) => string;
-	// goal-aware TS parse (`'script'`/`'module'`) — the conformance surface's test262 files
+	// goal-aware TS (`'script'`/`'module'`) — parse for the conformance surface's
+	// test262 files; format is the flat counterpart of tsv_wasm's `{goal}` bag
 	parse_typescript_with_goal: (source: string, goal: string) => string;
 	parse_typescript_no_locations_with_goal: (source: string, goal: string) => string;
 	parse_internal_typescript_with_goal: (source: string, goal: string) => void;
+	format_typescript_with_goal: (source: string, goal: string) => string;
 	// test-only panic-contract probe — present only when built with the
 	// `panic_probe` cargo feature (`deno task test:napi`); absent in published
 	// builds, so `test_napi.ts` skips its contract test when undefined
