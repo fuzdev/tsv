@@ -88,6 +88,17 @@ surface with exact error strings, package.json coherence (pins, selection
 fields, `files`, the loader-`SUPPORTED`-vs-optionalDependencies agreement),
 and the unsupported-platform error. Runs per OS in CI (the `platforms` job).
 
+**Release**: `.github/workflows/release_napi.yml`, triggered by the v\* tag
+`scripts/publish.ts` pushes (or `workflow_dispatch` as a dry-run rehearsal).
+Per target: container-pinned build (gnu rows in almalinux:8 → glibc 2.28
+floor, measured by the workflow's floor gate; musl in rust:alpine with
+`-crt_static` off, gated GLIBC-free), size bounds
+(`scripts/validate_napi_artifact.ts`), and the npm-shape test over the real
+artifact (node:alpine for musl). The publish job gathers all five, stages the
+loader (`--loader-only`), and runs `scripts/publish_napi.ts` — completeness
+and version-lockstep checks, platforms-then-loader order, idempotent
+skip-if-published. See the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
+
 ## Marshalling & errors
 
 napi-rs marshals the JS string into a Rust `String` and the returned `String` back out — **no raw pointers, no manual free** (unlike `tsv_ffi`). Engine errors are returned as `napi::Result::Err(napi::Error)`, which napi-rs converts to a **thrown JS error** — there is no `{"error": …}` envelope to inspect (the FFI shape); a throw just propagates.
