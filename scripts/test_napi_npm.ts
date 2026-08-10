@@ -68,8 +68,18 @@ const stage = (with_platform: boolean): string => {
 const staged = stage(true);
 const staged_bare = stage(false);
 after(() => {
-	rmSync(staged, { recursive: true, force: true });
-	rmSync(staged_bare, { recursive: true, force: true });
+	// Best-effort: on Windows the loaded addon stays mapped into the process,
+	// so its .node file — and therefore `staged` — is undeletable until exit
+	// (EPERM). A leaked temp staging is harmless (ephemeral CI runners, OS
+	// temp); a cleanup failure must not fail an otherwise-green suite. The
+	// bare staging loads nothing and deletes everywhere.
+	for (const dir of [staged, staged_bare]) {
+		try {
+			rmSync(dir, { recursive: true, force: true });
+		} catch {
+			// leaked — see above
+		}
+	}
 });
 
 const loader_path = join(staged, 'node_modules', '@fuzdev', 'tsv_napi', 'index.js');
