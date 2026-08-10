@@ -23,7 +23,10 @@ real move in a number is a deliberate, visible edit.
   win), and the five harvests (wpt block count, test262 positive count, the
   ts-repo corpus + rejects counts, svelte-rejects count — exact; svelte-styles block
   count — a live-corpus MINIMUM with a drift band, since its source is the perf-view
-  dev repos: a small shrink warns and still writes, only a >10% collapse fails). The
+  dev repos: a small shrink warns and still writes, only a >10% collapse fails), plus
+  the CSS reject count `diagnostics/css_over_acceptance.ts` grades over — derived
+  live from pinned inputs rather than harvested, and the one pin whose list filters
+  nothing (see `CSS_REJECTS_PIN`). The
   ts-repo pair is graded by tsc itself, so its harvest stamps the **tsc version**
   alongside the checkout commit — a tsc bump can move a file between the two lists
   with the corpus unchanged.

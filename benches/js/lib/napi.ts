@@ -4,14 +4,19 @@
  * The runtime sibling of `ffi.ts` (Deno's `Deno.dlopen` C-FFI path): same engine
  * (`tsv_napi`, built from the same language crates), different binding boundary.
  * Loaded with `process.dlopen`, which accepts the built cdylib directly
- * (`target/release/libtsv_napi.so`) as an N-API addon — no `.node` rename, so
- * `build:napi` is just `cargo build -p tsv_napi --release`.
+ * (`target/napi/libtsv_napi.so`) as an N-API addon — no `.node` rename, so
+ * `build:napi` is just `cargo build -p tsv_napi --profile napi` (the workspace's
+ * unwinding release profile — the same artifact that ships, so the bench
+ * measures the shipped panic contract).
  *
  * Unlike FFI there are no raw pointers and no manual free: napi-rs marshals the
  * JS string in and the returned `String` out. `parse_<lang>` returns a JSON
  * string (parity with FFI/WASM — the host `JSON.parse`s it), and engine errors
  * surface as thrown JS errors (napi-rs converts the `napi::Error`), so there is
- * no `{"error": …}` envelope to inspect — a throw just propagates.
+ * no `{"error": …}` envelope to inspect — a throw just propagates. A Rust PANIC
+ * surfaces the same way: every export carries `catch_unwind` and the `napi`
+ * profile unwinds, so a panic throws instead of aborting the host (stack
+ * overflow excepted — that still aborts).
  *
  * Only instantiated under Node/Bun (see `implementations.ts`); importing this
  * module under Deno is harmless because `process.dlopen` is only touched in
@@ -41,12 +46,18 @@ export interface NapiAddon {
 	parse_typescript_with_goal: (source: string, goal: string) => string;
 	parse_typescript_no_locations_with_goal: (source: string, goal: string) => string;
 	parse_internal_typescript_with_goal: (source: string, goal: string) => void;
+	// test-only panic-contract probe — present only when built with the
+	// `panic_probe` cargo feature (`deno task test:napi`); absent in published
+	// builds, so `test_napi.ts` skips its contract test when undefined
+	__panic_probe?: () => void;
 }
 
-/** Path to the built `tsv_napi` cdylib (loaded directly as an N-API addon). */
+/** Path to the built `tsv_napi` cdylib (loaded directly as an N-API addon).
+ * `target/napi/` is the workspace `napi` profile's output — release + unwind,
+ * the shipped panic contract. */
 export function get_napi_library_path(): string {
 	const project_root = fileURLToPath(new URL('../../../', import.meta.url));
-	return `${project_root}target/release/${native_library_filename('tsv_napi')}`;
+	return `${project_root}target/napi/${native_library_filename('tsv_napi')}`;
 }
 
 export class NapiImplementation extends BaseImplementation {

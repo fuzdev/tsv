@@ -14,7 +14,10 @@
  * (requires Node >= 22.18; erasable syntax only).
  *
  * Usage: node --test scripts/test_napi.ts   (or `deno task test:napi`)
- * Prerequisite: deno task build:napi (cargo build -p tsv_napi --release)
+ * Prerequisite: deno task build:napi:probe (the `napi` profile — release +
+ * unwind — with the test-only `panic_probe` feature, whose export drives the
+ * panic-contract test below). Also runs against a plain `build:napi` artifact
+ * (the shipped shape, no probe): the contract test then reports as skipped.
  */
 
 import { describe, it } from 'node:test';
@@ -66,4 +69,32 @@ describe('tsv_napi addon (real N-API JS boundary)', () => {
 		// Re-formatting is stable (idempotent) across the boundary.
 		assert.equal(addon.format_typescript(formatted), formatted);
 	});
+
+	// The panic contract: every export carries `catch_unwind` and the addon
+	// builds with the unwinding `napi` profile, so a Rust panic — always a tsv
+	// bug — must surface as a thrown JS error with the process AND the
+	// per-thread arenas still usable, never abort the host. Driven through the
+	// test-only `__panic_probe` export (the `panic_probe` cargo feature, which
+	// `deno task test:napi` builds; a published artifact has no probe, so this
+	// test skips against one). The probe panics INSIDE `with_ast_arena`, so the
+	// calls after it also prove the take/park arena recovery across the real
+	// boundary.
+	it(
+		'a panic surfaces as a thrown JS error and the addon stays usable',
+		{ skip: addon.__panic_probe === undefined && 'panic_probe feature not built' },
+		() => {
+			assert.throws(() => addon.__panic_probe!(), /panic/i, 'panic must throw');
+			// Repeatable: a second panic must also throw, not abort.
+			assert.throws(() => addon.__panic_probe!(), /panic/i, 'second panic must throw');
+			// The process survived and the arenas recovered: parse (AST arena)
+			// and format (AST + doc arenas) still produce correct output.
+			const ast = JSON.parse(addon.parse_typescript('const x = 1;'));
+			assert.equal(ast.type, 'Program', 'parse must work after a panic');
+			assert.equal(
+				addon.format_typescript('const   x=1'),
+				'const x = 1;\n',
+				'format must work after a panic'
+			);
+		}
+	);
 });

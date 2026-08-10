@@ -312,3 +312,20 @@ export const TS_REPO_REJECTS_PIN = 519;
  * would corrupt the published coverage number.
  */
 export const SVELTE_REJECTS_PIN = 142;
+
+/**
+ * The conformance CSS corpus's REJECT count — files `svelte/compiler`'s `parseCss`
+ * refuses — which `diagnostics/css_over_acceptance.ts` grades every `parse/css`
+ * tool over. Deterministic given the pins that build the corpus: ../prettier's
+ * checkout commit ({@link GATE_CHECKOUT_COMMITS}), {@link WPT_CSS_HARVEST_PIN},
+ * and the svelte oracle version.
+ *
+ * Unlike {@link SVELTE_REJECTS_PIN} this list filters NOTHING — `parseCss` is not
+ * a validity oracle in either direction (it accepts malformed CSS and rejects
+ * valid modern CSS it doesn't implement), so excluding its rejects would drop
+ * files tsv also fails and flatter tsv's own coverage. The list exists to give
+ * the CSS surface the over-acceptance axis coverage can't show, and the pin is
+ * what makes the reference row's grammar moving VISIBLE instead of silently
+ * reshaping the published `parse/css` numbers.
+ */
+export const CSS_REJECTS_PIN = 239;
