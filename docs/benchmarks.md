@@ -73,7 +73,9 @@ Things the published numbers measure that aren't quite what they look like.
   harvest bytes are also timed inside the svelte rows (rows are never summed, so
   this is disclosure, not distortion), and CSS per-file ratios stay the noisiest.
 - **PGO native flagship (forthcoming — policy; no such row ships today).** The
-  standalone native flagship (the bare `@fuzdev/tsv` binary) is planned to ship
+  standalone native flagship (the `tsv` binary — it joins the bare `@fuzdev/tsv`
+  name the N-API set already publishes under, rather than minting a second one)
+  is planned to ship
   with profile-guided optimization: native-only, a measured ~17–19% wall-time
   win, **byte-identical** output, **Linux-only first** on that single-target
   build (the cross-platform prebuilt `.node` binaries stay non-PGO — the `napi`
