@@ -4,24 +4,27 @@
  * A thin loader over the per-platform prebuilt addons
  * (`@fuzdev/tsv-<triple>`, installed as optionalDependencies — the
  * package manager selects by their `os`/`cpu`/`libc` fields; this file only
- * resolves the matching name). The API mirrors `@fuzdev/tsv_wasm` export for
- * export — same names, same `(source, options?)` bags, same error strings —
- * minus the bench-only `parse_internal_*` family, so the two packages are
- * drop-in swaps: this one is the fast native path, that one the universal
- * fallback (browsers + unsupported platforms).
+ * resolves the matching name). The formatter and parser API mirrors
+ * `@fuzdev/tsv_wasm` — same names, same `(source, options?)` bags, same error
+ * strings — so the two are drop-in swaps: this one is the fast native path,
+ * that one the universal fallback (browsers + unsupported platforms). Only
+ * `init()` is absent, having nothing to initialize.
  *
- * CommonJS on purpose (the native-addon loader norm): `require`-able on every
- * Node this supports, while ESM named imports work through Node's CJS interop
- * — the `exports.<name> =` assignments below are statically analyzable, which
- * is why they stay spelled out rather than generated in a loop.
+ * ESM, the same module system as `@fuzdev/tsv_wasm` — one dialect across tsv's
+ * whole npm surface, which is what lets the shared `locations.js` and `cli.js`
+ * sources load unchanged in either package. `.node` binaries have no ESM
+ * loader, so the platform addon itself is always `require`d, through
+ * `createRequire`; that shim is the only CommonJS left here.
  *
  * A Rust panic — always a tsv bug — surfaces as a thrown JS error (the addon
  * builds with an unwinding profile and `catch_unwind` on every export); stack
  * overflow is the one crash that still aborts the host.
  */
-'use strict';
 
-const { readdirSync } = require('node:fs');
+import { readdirSync } from 'node:fs';
+import { createRequire } from 'node:module';
+
+const require = createRequire(import.meta.url);
 
 /** The platform packages that exist — what the load error reports. Keep in
  * sync with `scripts/build_napi_packages.ts`'s `SUPPORTED_TRIPLES`
@@ -133,34 +136,40 @@ const ts_parse_json = (source, opts) =>
 const svelte_parse_json = (source, opts) =>
 	opts.locations ? addon.parse_svelte(source) : addon.parse_svelte_no_locations(source);
 
-exports.parse_svelte = (source, options) =>
+export const parse_svelte = (source, options) =>
 	JSON.parse(svelte_parse_json(source, read_options(options, 'parse', true, false)));
-exports.parse_svelte_json = (source, options) =>
+export const parse_svelte_json = (source, options) =>
 	svelte_parse_json(source, read_options(options, 'parse', true, false));
 
-exports.parse_typescript = (source, options) =>
+export const parse_typescript = (source, options) =>
 	JSON.parse(ts_parse_json(source, read_options(options, 'parse', true, true)));
-exports.parse_typescript_json = (source, options) =>
+export const parse_typescript_json = (source, options) =>
 	ts_parse_json(source, read_options(options, 'parse', true, true));
 
 // `locations` is accepted and inert for CSS — its wire carries no `loc`
 // (parity with the WASM package, whose `parse_css` reads the same bag).
-exports.parse_css = (source, options) => {
+export const parse_css = (source, options) => {
 	read_options(options, 'parse', true, false);
 	return JSON.parse(addon.parse_css(source));
 };
-exports.parse_css_json = (source, options) => {
+export const parse_css_json = (source, options) => {
 	read_options(options, 'parse', true, false);
 	return addon.parse_css(source);
 };
 
-exports.format_svelte = (source, options) => {
+export const format_svelte = (source, options) => {
 	read_options(options, 'format', false, false);
 	return addon.format_svelte(source);
 };
-exports.format_typescript = (source, options) =>
+export const format_typescript = (source, options) =>
 	addon.format_typescript_with_goal(source, read_options(options, 'format', false, true).goal);
-exports.format_css = (source, options) => {
+export const format_css = (source, options) => {
 	read_options(options, 'format', false, false);
 	return addon.format_css(source);
 };
+
+// The discovery matcher, re-exported straight off the addon — it takes no
+// options bag, so there is nothing to wrap. Same class name and method surface
+// as `@fuzdev/tsv_wasm`'s, including `undefined` (not `null`) from the three
+// maybe-a-warning methods, so `cli.js` drives either package's copy unchanged.
+export const IgnoreStack = addon.IgnoreStack;

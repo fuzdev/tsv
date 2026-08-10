@@ -41,6 +41,7 @@
  *   all    → crates/tsv_wasm/pkg/all/npm/    → @fuzdev/tsv_wasm
  */
 
+import { NPM_SHARED_METADATA } from './npm_metadata.ts';
 import { format_size, gzip_size } from './size.ts';
 
 const variant = Deno.args[0];
@@ -70,7 +71,18 @@ const cli_file = 'cli.js';
 // it. Needs no WASM init (pure computation over an already-parsed AST).
 const locations_file = 'locations.js';
 const locations_dts = 'locations.d.ts';
-const locations_exports = ['create_locator', 'loc_of', 'reconstruct_locations'];
+// Extracted from the helper, not listed here: `scripts/build_napi_packages.ts`
+// re-exports the same file from `@fuzdev/tsv`, and a hand-kept list in each
+// script is how a fourth entry point reaches one package and misses the other.
+const locations_exports = [
+	...Deno.readTextFileSync(`crates/tsv_wasm/npm/${locations_file}`).matchAll(
+		/^export function (\w+)/gm
+	)
+].map((m) => m[1]);
+if (!locations_exports.length) {
+	console.error(`FAIL: no exports found in ${locations_file} — did the helper change shape?`);
+	Deno.exit(1);
+}
 // A plain re-export line (no init guard — pure JS), shared by index.js + browser.js.
 const locations_reexport = has_parse_exports
 	? `export { ${locations_exports.join(', ')} } from './${locations_file}';\n`
@@ -336,19 +348,10 @@ pkg.keywords = [
 	'wasm',
 	'webassembly'
 ];
-pkg.homepage = 'https://github.com/fuzdev/tsv';
-pkg.author = {
-	name: 'Ryan Atkinson',
-	email: 'mail@ryanatkn.com',
-	url: 'https://www.ryanatkn.com/'
-};
-pkg.repository = {
-	type: 'git',
-	url: 'git+https://github.com/fuzdev/tsv.git'
-};
-pkg.bugs = 'https://github.com/fuzdev/tsv/issues';
-pkg.funding = 'https://www.ryanatkn.com/funding';
-pkg.engines = { node: '>=20' };
+// The registry-identity fields shared with the N-API set (license included —
+// wasm-pack derives the same MIT from Cargo.toml, but the module is the
+// authority so every published tsv package presents identically).
+Object.assign(pkg, NPM_SHARED_METADATA);
 // wasm-pack emits `sideEffects: ["./snippets/*"]`, declaring index.js
 // side-effect-free — but its top-level readFileSync + initSync IS the side
 // effect. Without this, a tree-shaking bundler on the `node` condition may

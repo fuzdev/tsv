@@ -36,6 +36,8 @@ import {
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 
+import { register_discovery_parity_suite } from './discovery_parity_suite.ts';
+
 const pkg_dir = process.env.PKG_DIR;
 if (!pkg_dir) {
 	console.error('Usage: PKG_DIR=<pkg-dir> node --test scripts/test_npm.ts');
@@ -1104,65 +1106,12 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 	});
 });
 
-// Discovery parity — the WASM CLI half of the shared scenario table. The native
-// half (tests/discovery_parity.rs) runs the SAME `tests/discovery/scenarios.json`
-// through `discover_files`, so the two discovery walkers can't drift: a
-// divergence fails one side or the other. Each scenario materializes its `tree`
-// in a tempdir (string = file, null = empty dir; a `.git` entry fakes a repo
-// root with no real git binary), then asserts `format --list <root>/<target>`
-// reports `expected` (root-relative, exact sorted order). The `all` variant is
-// the only one shipping cli.js.
-describe(`discovery parity (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
-	const cli_path = new URL(`../${pkg_dir}/cli.js`, import.meta.url).pathname;
-	const table = JSON.parse(
-		readFileSync(new URL('../tests/discovery/scenarios.json', import.meta.url), 'utf-8')
-	);
-
-	/** Materialize a scenario `tree`: string = file (parents created), null = empty dir. */
-	const materialize = (root: string, tree: Record<string, string | null>) => {
-		for (const [rel, value] of Object.entries(tree)) {
-			const path = join(root, rel);
-			if (value === null) {
-				mkdirSync(path, { recursive: true });
-			} else {
-				mkdirSync(dirname(path), { recursive: true });
-				writeFileSync(path, value);
-			}
-		}
-	};
-
-	for (const scenario of table.scenarios) {
-		it(scenario.name, () => {
-			const root = mkdtempSync(join(tmpdir(), 'tsv-parity-'));
-			try {
-				materialize(root, scenario.tree);
-				const prefix = `${root}/`;
-				for (const { target, expected, error } of scenario.cases) {
-					const arg = target === '' ? root : join(root, target);
-					const result = spawnSync(process.execPath, [cli_path, 'format', '--list', arg], {
-						encoding: 'utf-8'
-					});
-					// A case carries either `expected` (the in-scope set) or `error` (a
-					// substring of the argument error that must fail the run upfront).
-					if (error !== undefined) {
-						assert.equal(result.status, 2, `${scenario.name} [target=${target}]: expected exit 2`);
-						assert.ok(
-							result.stderr.includes(error),
-							`${scenario.name} [target=${target}]: expected stderr to contain ${JSON.stringify(error)}, got ${JSON.stringify(result.stderr)}`
-						);
-						assert.equal(result.stdout.trim(), '', `${scenario.name} [target=${target}]`);
-						continue;
-					}
-					assert.equal(result.status, 0, `${scenario.name} [${target}]: ${result.stderr}`);
-					const actual = result.stdout
-						.split('\n')
-						.filter((line) => line !== '')
-						.map((line) => (line.startsWith(prefix) ? line.slice(prefix.length) : line));
-					assert.deepEqual(actual, expected, `${scenario.name} [target=${target}]`);
-				}
-			} finally {
-				rmSync(root, { recursive: true, force: true });
-			}
-		});
-	}
-});
+// Discovery parity — the wasm-package consumer of the shared scenario table
+// (see `scripts/discovery_parity_suite.ts`; `scripts/test_napi_npm.ts` runs the
+// same suite over the native package's cli.js). The `all` variant is the only
+// one shipping cli.js.
+register_discovery_parity_suite(
+	`discovery parity (cli.js): ${pkg_dir}`,
+	new URL(`../${pkg_dir}/cli.js`, import.meta.url).pathname,
+	{ skip: variant !== 'all' }
+);

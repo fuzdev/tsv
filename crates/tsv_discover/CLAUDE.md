@@ -141,7 +141,8 @@ crates (the open-convention stance):
   root only, pushes any `prettierignore_outside_repo_warning` into the same
   channel. The FS walk, format-root resolution, and ignore-file reading stay
   there.
-- **`tsv_wasm`** — the `format`-gated `IgnoreStack` wrapper exposes
+- **`tsv_wasm`** (and **`tsv_napi`**, whose `format`-gated `#[napi]` wrapper is a
+  method-for-method twin) — the `format`-gated `IgnoreStack` wrapper exposes
   `classify_dir(name, child_rel, heuristic_active) -> string`
   (`"descend"|"prune"|"prune_warn"`), `should_format_file(name, child_rel) ->
   bool`, `is_path_pruned(rel) -> bool`, `heuristic_shadow_warning(dir) -> string`,
@@ -166,8 +167,10 @@ crates (the open-convention stance):
 
 This crate is a **behavior-preserving extraction** of the decision that lived
 inline in `discover.rs` / `cli.js`. The shared discovery-parity table
-(`tests/discovery/scenarios.json`) runs through both walkers
-(`tests/discovery_parity.rs` native, `scripts/test_npm.ts` WASM), the matcher is
+(`tests/discovery/scenarios.json`) runs through every walker
+(`tests/discovery_parity.rs` native; `scripts/discovery_parity_suite.ts` drives
+cli.js over the WASM and N-API bindings for `test_npm.ts` /
+`test_napi_npm.ts`), the matcher is
 pinned against real `git check-ignore` (`tsv_ignore`'s `git_oracle`), and the
 heuristic-shadow CLI tests cover the warning — so a regression fails a pinned
 test, it isn't merely hoped against. The unit tests here additionally cover each

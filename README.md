@@ -86,40 +86,42 @@ Future features (unknown order):
 
 ## Install
 
-tsv ships three WASM packages to npm (native builds arrive with the v0.4 release, as `@fuzdev/tsv`):
+tsv ships to npm as a native package for Node and Bun, plus three WASM
+packages for browsers, Deno, and platforms without a prebuilt binary:
 
-- [`@fuzdev/tsv_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_wasm) - the full tool (formatter + parser) with a `tsv` CLI
+- [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) - the full tool (formatter + parser) with a `tsv` CLI, as a prebuilt native N-API addon
+- [`@fuzdev/tsv_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_wasm) - the full tool with the same `tsv` CLI, as WASM
 - [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm) - formatter only (smaller)
 - [`@fuzdev/tsv_parse_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_parse_wasm) - parser + JSON AST only (smallest)
 
 ```bash
-npm i @fuzdev/tsv_wasm
-npx tsv format src                # if installed locally
-npx @fuzdev/tsv_wasm format src   # or without installing first
+npm i @fuzdev/tsv
+npx tsv format src            # if installed locally
+npx @fuzdev/tsv format src    # or without installing first
 ```
 
 ```typescript
-import {format_svelte} from '@fuzdev/tsv_wasm';
+import {format_svelte} from '@fuzdev/tsv';
 const formatted = format_svelte('<script>\nconst   x=1\n</script>');
 ```
 
 ```typescript
-import {parse_svelte, type Root} from '@fuzdev/tsv_wasm';
+import {parse_svelte, type Root} from '@fuzdev/tsv';
 const ast: Root = parse_svelte('<script>const x = 1;</script>');
 ```
 
-Both `parse_svelte` and `format_svelte` import the same way
-from `@fuzdev/tsv_format_wasm` and `@fuzdev/tsv_parse_wasm`.
-As with other WASM packages, it works without setup in Node.js/Bun/Deno,
-but browsers must call `await init()`.
+`@fuzdev/tsv` and `@fuzdev/tsv_wasm` are drop-in swaps.
+The native package are prebuilt
+for Linux (x64 gnu and musl, arm64 gnu), macOS arm64, and Windows x64.
+As with other wasm packages, browsers must call `await init()`.
+
 See the [website docs](https://tsv.fuz.dev/docs)
 and package READMEs for the full API and CLI flags:
 
+- [crates/tsv_napi/npm/README.md](crates/tsv_napi/npm/README.md)
 - [crates/tsv_wasm/README_all.md](crates/tsv_wasm/README_all.md)
 - [crates/tsv_wasm/README_format.md](crates/tsv_wasm/README_format.md)
 - [crates/tsv_wasm/README_parse.md](crates/tsv_wasm/README_parse.md)
-
-Native builds will be published with v0.3; until then only WASM builds are published.
 
 ## Design
 
@@ -159,7 +161,7 @@ Native builds will be published with v0.3; until then only WASM builds are publi
 - Rust-only
   - implementation currently does not call or embed a JS runtime
     (open for discussion, needs research into the tradeoffs);
-    JS reaches tsv through the WASM bindings, and native N-API bindings will be published with v0.3
+    JS reaches tsv through the WASM and native N-API bindings
   - no C compiler needed to build tsv
 - optimal
   - prioritizes speed then binary size and memory usage
