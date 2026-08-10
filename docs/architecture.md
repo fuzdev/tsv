@@ -96,10 +96,10 @@ tsv/
 functions). `tsv_discover` is a thin policy layer whose only `tsv_*` dep is
 `tsv_ignore` — it owns the build-output heuristic + safety-net pruning *decision*
 (the matcher stays a pure gitignore(5) matcher). Both are consumed by `tsv_cli`
-directly and by `tsv_wasm` under its `format` feature (the matcher exposed as the
-`IgnoreStack` class, the policy as that class's verdict methods), so the CLI, the
-WASM CLI, and the VS Code extension all share one discovery matcher *and* one
-prune decision. `tsv_discover` is file-*scope* policy — the one sanctioned config
+directly and by `tsv_wasm` and `tsv_napi` under their `format` features (the
+matcher exposed as the `IgnoreStack` class, the policy as that class's verdict
+methods), so the CLI, the WASM CLI, the native npm package, and the VS Code
+extension all share one discovery matcher *and* one prune decision. `tsv_discover` is file-*scope* policy — the one sanctioned config
 carve-out — not a language abstraction (no `Language` trait, registry, or
 dispatch), so it doesn't bear on the closed-scope/open-convention stance below.
 
@@ -172,7 +172,7 @@ independent conversion. Each of the three has a `_no_locations` sibling
 same wire minus every line/column object — the per-node `loc`, plus Svelte's
 `name_loc` — so only `start`/`end` offsets remain. Line/column is a pure function
 of an offset plus source, so the variant derives it lazily consumer-side rather
-than emitting it (the parse WASM packages ship that derivation as a pure-JS
+than emitting it (every package that parses ships that derivation as a pure-JS
 `reconstruct_locations` helper); it's an opt-in span-only product mirroring
 acorn's `locations: false`, not a second encoding of the drop-in wire, which
 stays byte-identical. Each writer is a faithful emission of the acorn /

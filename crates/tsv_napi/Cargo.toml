@@ -18,6 +18,11 @@ tsv_css = { workspace = true }
 # doesn't pull tsv_lang (the doc-arena helper's dep); the `format` feature below
 # re-enables it.
 tsv_arena = { workspace = true }
+# The discovery matcher behind the `IgnoreStack` class and its verdict methods,
+# the same pair `tsv_wasm` exposes — format-only, since discovery exists to feed
+# the formatter.
+tsv_ignore = { workspace = true, optional = true }
+tsv_discover = { workspace = true, optional = true }
 napi = { workspace = true }
 napi-derive = { workspace = true }
 
@@ -35,8 +40,9 @@ serde_json.workspace = true
 # the parsers plus the wire-JSON convert layer they emit through. The
 # default both-features build is what the Node bench loads.
 default = ["format", "parse"]
-# Pulls the reusable doc arena (`tsv_arena::with_doc_arena`, which pulls tsv_lang).
-format = ["tsv_arena/format"]
+# Pulls the reusable doc arena (`tsv_arena::with_doc_arena`, which pulls
+# tsv_lang), plus the `IgnoreStack` discovery matcher and its verdict methods.
+format = ["tsv_arena/format", "dep:tsv_ignore", "dep:tsv_discover"]
 parse = ["tsv_ts/convert", "tsv_css/convert", "tsv_svelte/convert"]
 # Test-only: compiles the `__panic_probe` export that `deno task test:napi`
 # drives to prove the panic contract end to end (panic → thrown JS error →

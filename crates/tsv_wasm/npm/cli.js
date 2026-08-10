@@ -1,9 +1,11 @@
 #!/usr/bin/env node
 /**
- * `tsv` bin for `@fuzdev/tsv_wasm` — mirrors the native `tsv_cli` contract
- * (subcommands, flags, exit codes, output streams, traversal rules) over the
- * WASM build. Single-threaded — `--jobs` is accepted for drop-in parity and
- * ignored; the native CLI is the fast path for large trees.
+ * The `tsv` bin — mirrors the native `tsv_cli` contract (subcommands, flags,
+ * exit codes, output streams, traversal rules) over whichever engine
+ * `./index.js` resolves to: one source shipped verbatim in both
+ * `@fuzdev/tsv_wasm` (WASM) and the native `@fuzdev/tsv` (N-API).
+ * Single-threaded — `--jobs` is accepted for drop-in parity and ignored; the
+ * Rust `tsv_cli` binary is the fast path for large trees.
  *
  * Exit codes: `format` — 0 clean, 1 would-change (`--check`), 2 errors;
  * `parse` — 0 ok, 1 error. Argument-parsing errors exit 1 (both commands).
@@ -63,7 +65,7 @@ const PARSER_NAMES = new Set(['svelte', 'typescript', 'css']);
 
 const HELP = `Usage: tsv <command> [<args>]
 
-formatter and parser for Svelte, TypeScript, and CSS (WASM build)
+formatter and parser for Svelte, TypeScript, and CSS
 
 Commands:
   format            Format source code in place (near-Prettier output)

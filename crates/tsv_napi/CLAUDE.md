@@ -43,13 +43,16 @@ formatter runs).
 
 JS export names are kept **snake_case** via `#[napi(js_name = "…")]` (napi-rs would otherwise camelCase them) so the addon's names match `tsv_wasm`'s. The per-call SHAPE is where the raw addon diverges from `tsv_wasm`: here the axes are flat exports (`parse_<lang>_no_locations`, the `*_with_goal` variants), matching `tsv_ffi`'s C-style surface, where `tsv_wasm` takes an acorn-style `{locations?, goal?}` options object (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Parse Options & Typed Returns). Coverage matches. The published `@fuzdev/tsv` loader erases the shape difference too — see §The npm packages.
 
+Outside the macro, the `format` feature also exports **`IgnoreStack`** — a `#[napi]` class over `tsv_ignore::IgnoreStack` plus the `tsv_discover` verdicts, method for method with `tsv_wasm`'s `#[wasm_bindgen]` twin (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Discovery Matcher + Policy). ⚠️ Its three maybe-a-warning methods return **`Either<String, Undefined>`, not `Option<String>`**: napi-rs maps `None` to JS `null` where wasm-bindgen maps it to `undefined`, and a package that exists to be swapped for the other must not change which one a caller sees. `Undefined` is napi-rs's `()`, so the none arm allocates nothing. Two tests pin it — the in-crate one on the `Either::B` variant, `scripts/test_napi_npm.ts` on the JS value, since only the latter can observe it.
+
 ## The npm packages: `@fuzdev/tsv` + platform packages
 
 Staged by `deno task build:napi:packages` (`scripts/build_napi_packages.ts`)
 into `crates/tsv_napi/pkg/` (gitignored):
 
 - **`pkg/napi/` — `@fuzdev/tsv`**, the loader: `npm/index.js` +
-  `npm/index.d.ts` + `npm/README.md` + a copy of `tsv_wasm`'s `tsv_ast.d.ts` +
+  `npm/index.d.ts` + `npm/README.md` + a copy of `tsv_wasm`'s `tsv_ast.d.ts`,
+  `locations.js`/`.d.ts`, and `cli.js` (wired as the `tsv` bin) +
   a generated package.json pinning the platform packages as **exact-version
   `optionalDependencies`**. The staging directory is named for the binding
   (`napi`), not for the package — the published name is the bare `@fuzdev/tsv`,
@@ -64,31 +67,50 @@ into `crates/tsv_napi/pkg/` (gitignored):
   its own triple; the release workflow runs the script once per matrix target
   (`--triple` + `--artifact` name a cross-built binary).
 
-**The loader is CommonJS with static `exports.<name> =` assignments** (the
-native-addon norm; ESM named imports work via Node's CJS interop, which needs
-the statically-analyzable form — don't convert the assignments to a loop). It
+**The loader is ESM**, the same module system as the wasm packages — one
+dialect across tsv's whole npm surface, which is what lets shared sources
+(`locations.js`, `cli.js`) load unchanged in either package. `.node` binaries
+have no ESM loader, so the platform addon rides a
+`createRequire(import.meta.url)` shim (oxc-parser's shape); that is the only
+CommonJS left. A CommonJS host reaches the package by dynamic `import()` — the
+path every supported Node allows, and the one `test_napi_npm.ts` gates. It
 detects the platform triple (musl via `process.report`'s
 `glibcVersionRuntime`, trusted only positively, else a `/lib/ld-musl-*`
 probe), requires `@fuzdev/tsv-<triple>`, and on failure throws an error
 naming the triple, the prebuilt set, and `@fuzdev/tsv_wasm` as the universal
 fallback.
 
-**API parity with `@fuzdev/tsv_wasm` is the contract**: same export names,
-same `(source, options?)` bags, same error strings — the loader's
+**`@fuzdev/tsv` is the full native distribution; `@fuzdev/tsv_wasm` is the
+fallback** — so parity runs the whole way, not just the engine calls. Same
+export names, same `(source, options?)` bags, same error strings: the loader's
 `read_options` mirrors the wasm crate's key for key, and
-`scripts/test_napi_npm.ts` asserts the strings — minus the bench-only
-`parse_internal_*` family. `parse_<lang>` returns the JSON-parsed object,
-`parse_<lang>_json` the wire string. Known parity gap: the locations
-helpers (`reconstruct_locations` / `create_locator` / `loc_of`) are not
-bundled — they're ESM (`tsv_wasm/npm/locations.js`) and this loader is CJS;
-the wire is identical, so `@fuzdev/tsv_parse_wasm`'s copies work on this
-package's output (the d.ts says so).
+`scripts/test_napi_npm.ts` asserts the strings. `parse_<lang>` returns the
+JSON-parsed object, `parse_<lang>_json` the wire string. `init()` is the one
+export that is deliberately absent — there is nothing to initialize. Neither
+package exports the bench-only `parse_internal_*` family
+(`scripts/patch_npm_package.ts` filters it out of the wasm wrappers too).
+
+The locations helpers (`reconstruct_locations` / `create_locator` / `loc_of`)
+ship here too: `tsv_wasm/npm/locations.js` is pure JS over the span-only wire,
+so the staging script copies that same file in and appends the re-export to the
+staged entry — the export names are extracted from the helper, never listed a
+second time. The `IgnoreStack` discovery class ships too — a `#[napi]` twin of
+`tsv_wasm`'s wrapper over the same `tsv_ignore` / `tsv_discover` pair, re-exported
+straight off the addon since it takes no options bag. The `tsv` bin ships
+too: `tsv_wasm/npm/cli.js` imports its engine from `./index.js`, so the same
+source copied in at stage time binds to the native loader with no adapter —
+`npx tsv format src` on this package runs the native engine. Like the wasm
+copy it is single-threaded (`--jobs` accepted for parity and ignored); the
+Rust `tsv_cli` binary stays the fast path for large trees.
 
 Tests: `deno task test:napi:npm` stages a temp `node_modules` and drives the
-packaged shape under Node — loader resolution, ESM↔CJS interop, the options
+packaged shape under Node — loader resolution, ESM and CommonJS hosts, the options
 surface with exact error strings, package.json coherence (pins, selection
 fields, `files`, the loader-`SUPPORTED`-vs-optionalDependencies agreement),
-and the unsupported-platform error. Runs per OS in CI (the `platforms` job).
+the unsupported-platform error, and the `tsv` bin: the CLI contract over the
+native engine plus the shared `tests/discovery/scenarios.json` parity table,
+whose third consumer this is (beside `scripts/test_npm.ts`'s wasm CLI run and
+the native `tests/discovery_parity.rs`). Runs per OS in CI (the `platforms` job).
 
 **Release**: `.github/workflows/release_napi.yml`, triggered by the v\* tag
 `scripts/publish.ts` pushes (or `workflow_dispatch` as a dry-run rehearsal).
@@ -109,9 +131,9 @@ napi-rs marshals the JS string into a Rust `String` and the returned `String` ba
 
 ## Files
 
-- `src/lib.rs` — All bindings: the `lang_bindings!` macro, the three `lang_bindings!` invocations, the flat goal-aware TS exports, the `panic_probe` export, and a `#[cfg(test)]` module. The reusable arenas are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
-- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts` (see §The npm packages)
+- `src/lib.rs` — All bindings: the `lang_bindings!` macro, the three `lang_bindings!` invocations, the flat goal-aware TS exports, the `format`-gated `IgnoreStack` class, the `panic_probe` export, and a `#[cfg(test)]` module. The reusable arenas are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
+- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared `locations.js` helper (see §The npm packages)
 - `build.rs` — `napi_build::setup()` (linker config for the addon)
-- `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (N-API generates unsafe code); deps `napi` + `napi-derive` (3.x) + `tsv_arena`, build-dep `napi-build` (2.x). `format` → `tsv_arena/format`
+- `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (N-API generates unsafe code); deps `napi` + `napi-derive` (3.x) + `tsv_arena`, plus the `format`-optional `tsv_ignore` + `tsv_discover` behind `IgnoreStack`, build-dep `napi-build` (2.x). `format` → `tsv_arena/format` + those two
 
 The in-crate test module drives **every entry point** in-process — all three languages × `parse` / `parse_internal` / `format` — so `cargo test` exercises the native binding without a Node host (the Deno/WASM smoke paths don't cover napi). The per-language `parse` assertions check the language's own JSON root type (`Program` / `StyleSheetFile` / `Root`), which also guards the `lang_bindings!` wiring against a transposed invocation; the error tests cover the thrown-`napi::Error` arm for both parse and format; one test exercises this crate's distinctive risk — that the per-thread `with_ast_arena` / `with_doc_arena` `reset()` cleanly between back-to-back calls; and a multibyte round-trip guards the char-offset boundary. What `cargo test` can **not** reach is the napi-rs **marshalling** layer (the `#[napi]` JS-string ↔ Rust `String` conversion and the `napi::Error` → *thrown* JS error path) — that's covered by the bench's Node runner and by `scripts/test_napi.ts` (`deno task test:napi`), which `process.dlopen`s the built addon and asserts a format, a JSON-AST parse, a thrown error, a multibyte round-trip, and the panic contract (via the `panic_probe` feature; skipped against a probe-less artifact) across the real JS boundary.

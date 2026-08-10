@@ -754,6 +754,8 @@ dependencies = [
  "serde_json",
  "tsv_arena",
  "tsv_css",
+ "tsv_discover",
+ "tsv_ignore",
  "tsv_svelte",
  "tsv_ts",
 ]

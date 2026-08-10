@@ -21,7 +21,7 @@ Installed (`npm i -D @fuzdev/tsv_wasm`), the bin is `tsv`. Directories recurse o
 
 `format --list` prints the discovered in-scope files without formatting — a read-only view of what `format` would touch. `--content <source>` / `--stdin` (with `--parser svelte|typescript|css`) format or parse strings to stdout. For TypeScript, `--goal script|module` (default `module`; for `format`, `--content`/`--stdin` only) selects the parse goal — at `script`, `await` is an ordinary identifier and `import`/`export`/`import.meta` are errors. `parse --no-locations` emits the span-only wire (no per-node `loc`; Svelte also no `name_loc`; no-op for CSS). Exit codes — `format`: 0 clean, 1 would-change (`--check`), 2 errors; `parse`: 0 ok, 1 error.
 
-This CLI runs the single-threaded WASM build — plenty fast for most trees. A future native `tsv` binary will be the high-performance path.
+This CLI runs the single-threaded WASM build — plenty fast for most trees. On Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) ships the same CLI bound to its native engine, the faster path.
 
 ## Library usage
 

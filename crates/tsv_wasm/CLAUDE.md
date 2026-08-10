@@ -20,7 +20,7 @@ acorn-style `{locations?, goal?}` bag, read in Rust (`read_options` in
 `src/lib.rs`, via `js_sys` `Object.keys` + `Reflect::get`; the same reader
 serves the format exports, so the two families can't drift — see
 [Format Options](#format-options)). ⚠️ A **third copy** of these semantics
-lives in [../tsv_napi/npm/index.js](../tsv_napi/npm/index.js) — the
+lives in [../tsv_napi/npm/index.js](../tsv_napi/npm/index.js) — the ESM
 `@fuzdev/tsv` loader mirrors this reader key for key, error string for
 error string, as its parity contract (asserted by `scripts/test_napi_npm.ts`'s
 exact-string tests). A semantics or message change here must update that
@@ -189,7 +189,7 @@ only the span-only wire recovers it in JS — and, for a consumer that needs ful
 (the full wire's `loc` bytes cost real `JSON.parse` tokenization; a line-start
 table + binary search is cheaper). `npm/locations.js` (pure JS, zero deps, no
 WASM) is that reconstruction, shipped so callers don't reimplement the line
-rules: `reconstruct_locations(ast, source, opts?)` (one-shot, adds `loc` to every
+rules — in every package that parses, native `@fuzdev/tsv` included: `reconstruct_locations(ast, source, opts?)` (one-shot, adds `loc` to every
 node, **mutates in place**), `create_locator(source, opts?)` (amortized — holds
 the prebuilt line table, exposes `loc_of(node)` / `reconstruct(ast)`), and a bare
 `loc_of(node, source, opts?)` convenience. **Exact for TypeScript**; **approximate
@@ -317,8 +317,8 @@ require dual updates.
 
 - `src/lib.rs` — WASM bindings (`lang_bindings!` macro + `read_options` + the hand-written `TS_PARSE_DECLS` / `TS_FORMAT_DECLS` declarations) + the wasm32-gated talc `#[global_allocator]` and panic hook
 - `types/tsv_ast.d.ts` — Hand-maintained TS types, bundled into the parse-capable packages
-- `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv_wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); `node:util` `parseArgs`, zero deps
-- `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only `no-locations` wire; ships in the parse-capable packages, re-exported from index.js/browser.js by `patch_npm_package.ts` (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
+- `npm/cli.js` — The `tsv` bin shipped in `@fuzdev/tsv_wasm` — mirrors `tsv_cli`'s contract (flags, exit codes, traversal); `node:util` `parseArgs`, zero deps. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — one source for both packages (it imports its engine from `./index.js`, so each copy binds to its own package's engine), which the ESM loader bought like `locations.js` below
+- `npm/locations.js` + `npm/locations.d.ts` — Pure-JS line/column reconstruction for the span-only `no-locations` wire; ships in the parse-capable packages, re-exported from index.js/browser.js by `patch_npm_package.ts`. Also copied into the native `@fuzdev/tsv` by `scripts/build_napi_packages.ts` — this file is the single source for both, which is what the napi loader being ESM bought (see [Line/Column Reconstruction Helper](#linecolumn-reconstruction-helper-npmlocationsjs))
 - `README_format.md` — Shipped as `README.md` in `@fuzdev/tsv_format_wasm` (copied by `patch_npm_package.ts`)
 - `README_parse.md` — Shipped as `README.md` in `@fuzdev/tsv_parse_wasm` (copied by `patch_npm_package.ts`)
 - `README_all.md` — Shipped as `README.md` in `@fuzdev/tsv_wasm` (copied by `patch_npm_package.ts`)

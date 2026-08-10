@@ -23,12 +23,15 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 - **`tsv` (production)**: Pure Rust, no external tool dependencies
   - Crates: `tsv_cli`
   - Commands: `parse`, `format`
-- **`tsv` npm bin (WASM)**: `crates/tsv_wasm/npm/cli.js`, shipped in
-  `@fuzdev/tsv_wasm` — a hand-written Node mirror of this CLI's contract
-  (subcommands, flags, exit codes, output streams, traversal rules;
-  single-threaded — `--jobs` is accepted for drop-in parity and ignored).
-  Behavioral changes to `format`/`parse` here must be mirrored there and
-  in `scripts/test_npm.ts`'s CLI tests.
+- **`tsv` npm bin**: `crates/tsv_wasm/npm/cli.js`, shipped in
+  `@fuzdev/tsv_wasm` (WASM engine) and copied verbatim into the native
+  `@fuzdev/tsv` (N-API engine) at stage time — a hand-written Node mirror of
+  this CLI's contract (subcommands, flags, exit codes, output streams,
+  traversal rules; single-threaded — `--jobs` is accepted for drop-in parity
+  and ignored). One source: it imports its engine from `./index.js`, so each
+  copy binds to its own package's engine. Behavioral changes to
+  `format`/`parse` here must be mirrored there and in the CLI tests of
+  `scripts/test_npm.ts` (wasm) and `scripts/test_napi_npm.ts` (native).
 - **`tsv_debug` (development)**: Uses embedded Deno sidecar for external tools
   - Reuses `tsv_cli` infrastructure
   - Commands: `check`, `compare`, `ast_diff`, `line_width`, `canonical_parse`, `format_prettier`, `fixture_init`, `fixtures_validate`, `fixtures_update`, `fixtures_update_parsed`, `fixtures_update_formatted`, `fixtures_audit`, `ts_fixture_audit`, `conformance_audit`, `swallow_audit` (requires `--features swallow_check`, so default builds profile production-shaped render code), `scan_audit`, `authoring_audit`, `build_fanout_audit`, `metrics`, `profile`, `json_profile`, `arena_stats`, `buffer_sizes`, `lex_diff`, `test262`, `tsc_conformance` (nested: `query`, `roundtrip`, `index`, `run`, `check-test` — the tsgo typechecker-conformance harness for the experimental `tsv_check` crate, which may never ship; command surface in [typechecker.md](typechecker.md))
@@ -91,7 +94,7 @@ Implemented in `tsv_cli/src/cli/input.rs`
   - **Subdirectory invocation**: because the boundary is found by walking up, the repo-root rules apply even from a subdirectory, and formatting a subdirectory directly gives the same result as formatting it via an ancestor. But a tree that *contains* repos (a non-repo directory with `.git` subdirectories below it) does not honor the inner repos' `.gitignore`s — run tsv per repo.
   - **Unreadable ignore files**: a `.gitignore`/`.formatignore`/`.prettierignore` that is present but can't be read (invalid UTF-8 — reading is strict UTF-8 on both the native and WASM CLIs — or a permission error) is **not** silently treated as absent: tsv emits a non-fatal stderr warning and drops that file's rules (so an unreadable `.gitignore` also leaves the build-output heuristic *on* for its subtree). A file that genuinely isn't there, or is deleted between the directory listing and the read, stays silent. This is also a `--check` reproducibility hazard — surfacing it is the point.
   - **`--check` reproducibility** assumes the ignore files are **committed**: a local/uncommitted `.formatignore` or `.prettierignore` (or git's unread `.git/info/exclude` / `core.excludesFile`) makes a clean CI checkout disagree.
-  - **Shared by construction**: the matcher is the `tsv_ignore` crate's `IgnoreStack`; the per-directory prune/descend policy (heuristic, safety nets, the shadow warning) is the `tsv_discover` crate's verdict. The WASM CLI and editors call into the same two crates, so all three surfaces agree rather than hand-mirroring the logic. See `cli/discover.rs`.
+  - **Shared by construction**: the matcher is the `tsv_ignore` crate's `IgnoreStack`; the per-directory prune/descend policy (heuristic, safety nets, the shadow warning) is the `tsv_discover` crate's verdict. The WASM CLI, the native npm package, and editors call into the same two crates, so every surface agrees rather than hand-mirroring the logic. See `cli/discover.rs`.
 - **Fail-fast args, isolated traversal**: path args that don't resolve to a file or directory fail the whole run before anything is written (every bad arg reported); traversal errors below a valid root (e.g. an unreadable subdirectory) report to stderr and discovery continues.
 - **No per-file options**: formatting style is fixed (see [CLAUDE.md §Configuration](../CLAUDE.md#configuration)). In particular `<svelte:options preserveWhitespace />` is not detected — whitespace handling is uniform, with only `<pre>`/`<textarea>` content whitespace-sensitive; see [conformance_svelte.md §Template Whitespace](./conformance_svelte.md#template-whitespace-clean_nodes).
 - **Deduplication**: with multiple path args, overlapping spellings of the same file (`src` vs `./src`, absolute vs relative, symlink aliases) dedupe by canonical path, keeping the first spelling in sorted order. A single root can't produce duplicates, so the canonicalization cost is skipped.

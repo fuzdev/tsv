@@ -1237,7 +1237,7 @@ const RECONSTRUCT_VS_MATERIALIZE = { full: '~1.7x', loc_free: '~2.2x' } as const
  */
 export function generate_reconstruct_note(): string {
 	const { full, loc_free } = RECONSTRUCT_VS_MATERIALIZE;
-	return `_Consumer-side: for full \`loc\`, fetching the span-only \`no-locations\` wire and reconstructing \`loc\` in JS (\`reconstruct_locations\`, shipped in \`@fuzdev/tsv_parse_wasm\` / \`@fuzdev/tsv_wasm\`) beats the full loc-bearing \`tsv-json\` wire end-to-end — ${full} faster reconstructing every node, ${loc_free} loc-free (TypeScript, exact; measured by \`diagnostics/reconstruct_vs_materialize.ts\`). Pre-materializing \`loc\` in Rust is not optimal for JS consumers._`;
+	return `_Consumer-side: for full \`loc\`, fetching the span-only \`no-locations\` wire and reconstructing \`loc\` in JS (\`reconstruct_locations\`, shipped in every parse-capable package) beats the full loc-bearing \`tsv-json\` wire end-to-end — ${full} faster reconstructing every node, ${loc_free} loc-free (TypeScript, exact; measured by \`diagnostics/reconstruct_vs_materialize.ts\`). Pre-materializing \`loc\` in Rust is not optimal for JS consumers._`;
 }
 
 /**

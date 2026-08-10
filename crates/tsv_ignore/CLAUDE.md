@@ -27,6 +27,10 @@ Consumers:
   `format` feature) so the JS CLI (`crates/tsv_wasm/npm/cli.js`) and the VS Code
   extension share the exact same matcher — agreement by construction, never two
   implementations drifting.
+- `tsv_napi` — the same wrapper as a `#[napi]` class, also `format`-gated, so the
+  native `@fuzdev/tsv` carries the identical surface (method for method, down to
+  `undefined` rather than `null` for the maybe-a-warning methods) and one JS CLI
+  source drives either package.
 
 The `#[wasm_bindgen]` wrapper lives in `tsv_wasm`, not here; this crate stays
 binding-agnostic.
