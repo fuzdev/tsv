@@ -110,12 +110,11 @@ import {parse_svelte, type Root} from '@fuzdev/tsv';
 const ast: Root = parse_svelte('<script>const x = 1;</script>');
 ```
 
-`@fuzdev/tsv` and `@fuzdev/tsv_wasm` are drop-in swaps — same export names,
-same options, same errors — and `parse_svelte` and `format_svelte` import the
-same way from the subset packages. The native package needs no setup and is
-prebuilt for Linux (x64 gnu/musl, arm64 gnu), macOS arm64, and Windows x64;
-the WASM packages work without setup in Node.js/Bun/Deno, but browsers must
-call `await init()`.
+`@fuzdev/tsv` and `@fuzdev/tsv_wasm` are drop-in swaps.
+The native package are prebuilt
+for Linux (x64 gnu and musl, arm64 gnu), macOS arm64, and Windows x64.
+As with other wasm packages, browsers must call `await init()`.
+
 See the [website docs](https://tsv.fuz.dev/docs)
 and package READMEs for the full API and CLI flags:
 
