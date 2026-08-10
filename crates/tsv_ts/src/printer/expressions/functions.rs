@@ -97,6 +97,22 @@ pub(in crate::printer) fn has_leftmost_object_expression(expr: &internal::Expres
 /// keeping `({` and `}: Type)` together while letting the pattern's content break.
 ///
 /// Shared with the signature-param path (`build_signature_params_doc`) so bodyless
+/// declarations (declare / overload) and type-member signatures (method / call /
+/// construct) hug the lone param exactly like value-param functions do.
+pub(in crate::printer) fn is_huggable_pattern(expr: &internal::Expression<'_>) -> bool {
+    match expr {
+        internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_) => true,
+        // Assignment pattern with object/array on left: `{a, b} = default`
+        internal::Expression::AssignmentPattern(ap) => {
+            matches!(
+                ap.left,
+                internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_)
+            )
+        }
+        _ => false,
+    }
+}
+
 /// Whether `arrow`'s signature — its params' `(` through its `=>` — holds a comment that
 /// **forces** a break.
 ///
@@ -130,22 +146,6 @@ pub(in crate::printer) fn arrow_signature_has_breaking_comments(
     let end = arrow.arrow_token;
     printer.has_line_comments_between(start, end)
         || printer.has_multiline_block_comments_on_page_between(start, end)
-}
-
-/// declarations (declare / overload) and type-member signatures (method / call /
-/// construct) hug the lone param exactly like value-param functions do.
-pub(in crate::printer) fn is_huggable_pattern(expr: &internal::Expression<'_>) -> bool {
-    match expr {
-        internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_) => true,
-        // Assignment pattern with object/array on left: `{a, b} = default`
-        internal::Expression::AssignmentPattern(ap) => {
-            matches!(
-                ap.left,
-                internal::Expression::ObjectPattern(_) | internal::Expression::ArrayPattern(_)
-            )
-        }
-        _ => false,
-    }
 }
 
 /// Check if an expression has a huggable type annotation.
@@ -883,7 +883,17 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Check if any param has a trailing line comment or own-line block comment
+    /// Check if any param has a trailing line comment or own-line block comment.
+    ///
+    /// The last param's arm reads own-line-ness from the SOURCE
+    /// ([`Printer::block_comment_owns_its_line`] with `item_follows: false` — no item is
+    /// left to lead, so the `)` sharing the comment's line is not glue and the predicate
+    /// reduces to its leading half). Anchoring it on the param's line instead called a
+    /// comment glued to the list's own comma own-line and opened a list that fits
+    /// (`docs/comments.md` §Own-line-ness is a SOURCE question). Paired with
+    /// [`Self::build_trailing_gap_comments_ext`], which the last param's arm of
+    /// `build_function_params_doc` emits that region through: it trails exactly the comments
+    /// this does not force a break for.
     fn has_trailing_line_comment_in_params(
         &self,
         params: &[internal::Expression<'_>],
@@ -900,12 +910,8 @@ impl<'a> Printer<'a> {
                 return true;
             }
             // For the last param, also check for own-line block comments before `)`
-            if i == params.len() - 1 {
-                self.comments_on_page_between(param_end, trailing_end)
-                    .any(|c| c.is_block && !self.is_same_line(param_end, c.span.start))
-            } else {
-                false
-            }
+            i == params.len() - 1
+                && self.has_own_line_block_comment_before_closer(param_end, trailing_end)
         })
     }
 
@@ -1353,9 +1359,6 @@ impl<'a> Printer<'a> {
         let flat_list = test_call_flat && !force_break;
 
         let mut inner_parts = d.pooled_docbuf();
-        // Block comment trailing the last param after its source comma — emitted past
-        // where the comma was, after the loop (no trailing comma; trailingComma: 'none').
-        let mut last_after_comma_docs: DocBuf = DocBuf::new();
         // The comma closing the PREVIOUS param, carried across the iteration rather than
         // re-scanned: the gap `params[i-1].end → params[i].start` holds exactly one comma,
         // and iteration `i-1` already located it as its own `comma_pos`. Scanning it again
@@ -1487,32 +1490,46 @@ impl<'a> Printer<'a> {
                 .then(|| self.find_comma_in_range(param_end, search_end))
                 .flatten();
 
-            // The param's same-line **block** comments, split by side of the comma below.
-            // Line comments are deliberately not in here: their claim asks the comma as
-            // well as the param (`param_trailing_line_comment`), so a shared "same-line
-            // run" would read as answering for them too while quietly using the narrower
-            // anchor.
-            let same_line_blocks: CommentVec<'_> = if comments_present {
-                comments_to_emit_in_range(self.comments, param_end, search_end)
-                    .filter(|c| c.is_block && self.is_same_line(param_end, c.span.start))
-                    .collect()
+            if is_last {
+                // The LAST param's whole trailing region — its printed end to the `)` — in
+                // ONE ordered pass through the shared last-item→closer walk, since no comma
+                // is emitted here to split it around. `true`: a `//` in the run defers
+                // through `line_suffix` (zero width) and can only be the run's LAST member,
+                // so nothing is emitted behind it on that line; the `)` this list is forced
+                // open around ends it.
+                //
+                // The gate over this seam ([`Self::has_trailing_line_comment_in_params`])
+                // reads the same source, and must: a gate that forces the break for a
+                // comment this emitter trails inline opens the list around nothing.
+                if comments_present {
+                    inner_parts
+                        .extend(self.build_trailing_gap_comments_ext(param_end, search_end, true));
+                }
             } else {
-                CommentVec::new()
-            };
+                // The param's same-line **block** comments, split by side of the comma
+                // below. Line comments are deliberately not in here: their claim asks the
+                // comma as well as the param (`param_trailing_line_comment`), so a shared
+                // "same-line run" would read as answering for them too while quietly using
+                // the narrower anchor.
+                let same_line_blocks: CommentVec<'_> = if comments_present {
+                    comments_to_emit_in_range(self.comments, param_end, search_end)
+                        .filter(|c| c.is_block && self.is_same_line(param_end, c.span.start))
+                        .collect()
+                } else {
+                    CommentVec::new()
+                };
 
-            // Block comments BEFORE comma go before comma
-            for comment in same_line_blocks
-                .iter()
-                .filter(|c| comma_pos.is_none_or(|pos| c.span.start < pos))
-            {
-                inner_parts.push(d.text(" "));
-                inner_parts.push(self.build_comment_doc(comment));
-            }
+                // Block comments BEFORE comma go before comma
+                for comment in same_line_blocks
+                    .iter()
+                    .filter(|c| comma_pos.is_none_or(|pos| c.span.start < pos))
+                {
+                    inner_parts.push(d.text(" "));
+                    inner_parts.push(self.build_comment_doc(comment));
+                }
 
-            // Add inter-param separator comma (only between params; the last param
-            // gets no trailing comma — trailingComma: 'none').
-            let needs_comma = !is_last;
-            if needs_comma {
+                // Add inter-param separator comma (only between params; the last param
+                // gets no trailing comma — trailingComma: 'none').
                 inner_parts.push(d.text(","));
                 // A stranded after-comma block (on the comma's line, but a newline
                 // before the next param) trails the comma — preserving the author's
@@ -1523,64 +1540,22 @@ impl<'a> Printer<'a> {
                     let next_start = self.param_start_with_decorators(&params[i + 1]);
                     self.push_stranded_after_comma_blocks(&mut inner_parts, cp, next_start);
                 }
-            }
 
-            // Block comments AFTER the comma on the last param: preserve their position.
-            // The last param has no trailing comma, so an after-comma block is deferred to
-            // last_after_comma_docs (emitted after the loop, past where the comma was).
-            if is_last {
-                let after: CommentVec<'_> = same_line_blocks
-                    .iter()
-                    .filter(|c| comma_pos.is_some_and(|pos| c.span.start > pos))
-                    .copied()
-                    .collect();
-                for comment in after {
-                    last_after_comma_docs.push(d.text(" "));
-                    last_after_comma_docs.push(self.build_comment_doc(comment));
-                }
-            }
-
-            // Line comments trailing this param go after the comma (excluded from width).
-            // Block comments AFTER the comma are handled as leading for the next param.
-            //
-            // Scanned rather than filtered out of `same_line_blocks`: the claim's anchor
-            // is the COMMA as well as the param (`param_trailing_line_comment`), and a
-            // comment on a comma the author pushed onto its own line is not on the param's
-            // line at all. `leading_param_comments` excludes exactly this set, so the two
-            // partition the gap.
-            //
-            // ⚠️ **The comma anchor is passed only where a comma is EMITTED.** Under
-            // `trailingComma: 'none'` the last param's source comma is deleted, so "the
-            // comma's line" is not a position in the output and the anchor's argument — the
-            // printer pulls the comma back onto the param's line — does not reach it. The
-            // last param's leftover region belongs to the own-line loop below and to
-            // `last_after_comma_docs`; claiming into it here printed the comment TWICE.
-            let trailing_comma_anchor = if is_last { None } else { comma_pos };
-            if comments_present {
-                for comment in comments_to_emit_in_range(self.comments, param_end, search_end)
-                    .filter(|c| {
-                        self.param_trailing_line_comment(c, param_end, trailing_comma_anchor)
-                    })
-                {
-                    inner_parts.push(self.build_trailing_line_comment_doc(comment));
-                }
-            }
-
-            // Own-line comments (on their own line after last param, before `)`)
-            // Only for the last param - non-last param comments are handled as leading for next param
-            if is_last && comments_present {
-                let mut prev_own = param_end;
-                for comment in comments_to_emit_in_range(self.comments, param_end, search_end)
-                    .filter(|c| !self.is_same_line(param_end, c.span.start))
-                {
-                    // Preserve an author blank line before the own-line trailing comment.
-                    self.push_blank_preserving_hardline(
-                        &mut inner_parts,
-                        prev_own,
-                        comment.span.start,
-                    );
-                    inner_parts.push(self.build_comment_doc(comment));
-                    prev_own = comment.span.end;
+                // Line comments trailing this param go after the comma (excluded from
+                // width). Block comments AFTER the comma are handled as leading for the
+                // next param.
+                //
+                // Scanned rather than filtered out of `same_line_blocks`: the claim's
+                // anchor is the COMMA as well as the param (`param_trailing_line_comment`),
+                // and a comment on a comma the author pushed onto its own line is not on
+                // the param's line at all. `leading_param_comments` excludes exactly this
+                // set, so the two partition the gap.
+                if comments_present {
+                    for comment in comments_to_emit_in_range(self.comments, param_end, search_end)
+                        .filter(|c| self.param_trailing_line_comment(c, param_end, comma_pos))
+                    {
+                        inner_parts.push(self.build_trailing_line_comment_doc(comment));
+                    }
                 }
             }
 
@@ -1595,9 +1570,6 @@ impl<'a> Printer<'a> {
 
         if force_break {
             // When forcing break (trailing comments or param properties), use hardlines.
-            // No trailing comma (trailingComma: 'none'); a preserved after-comma block
-            // comment on the last param still lands past where the comma was.
-            inner_parts.append(&mut last_after_comma_docs);
             result.push(d.indent_hardline(d.concat(&inner_parts)));
             result.push(d.hardline());
         } else if flat_list {
@@ -1605,12 +1577,9 @@ impl<'a> Printer<'a> {
             // the single-pattern hug above already does. Each parameter's own doc is
             // untouched, so a destructured pattern still expands on its own.
             result.push(d.concat(&inner_parts));
-            result.append(&mut last_after_comma_docs);
         } else {
-            result.push(d.indent_softline(d.concat(&inner_parts)));
             // No trailing comma (trailingComma: 'none').
-            // Preserved after-comma block comment(s) on the last param
-            result.append(&mut last_after_comma_docs);
+            result.push(d.indent_softline(d.concat(&inner_parts)));
             result.push(d.softline());
         }
 
@@ -1665,7 +1634,7 @@ impl<'a> Printer<'a> {
     fn has_own_line_comment_between(&self, start: u32, end: u32) -> bool {
         self.comments_on_page_between(start, end).any(|c| {
             // `end` is the next param's start, so an item always follows; the trailing
-            // position past the last param is `has_own_line_block_comment_after`'s.
+            // position past the last param is `has_own_line_block_comment_before_closer`'s.
             !c.is_block || self.block_comment_owns_its_line(c, true)
         })
     }
@@ -1768,9 +1737,14 @@ impl<'a> Printer<'a> {
     /// [`Printer::gap_emitted_line_comment_before`], shared with the type-side comma
     /// emitter so the two can't disagree about a gap they answer the same way.
     ///
-    /// `comma_pos` is the comma the printer **emits**, so the LAST param passes `None`:
-    /// under `trailingComma: 'none'` its source comma is deleted, and the anchor's whole
-    /// argument is that the printer pulls the comma back onto the param's line.
+    /// `comma_pos` is the comma the printer **emits**, so this is a NON-LAST param's
+    /// predicate only: under `trailingComma: 'none'` a last param's source comma is deleted,
+    /// and the anchor's whole argument is that the printer pulls the comma back onto the
+    /// param's line. That region belongs to the shared last-item→closer walk
+    /// ([`Printer::build_trailing_gap_comments_ext`]), whose
+    /// [`Printer::closer_trailing_comment_run`] asks the same question of a `//` (the param's
+    /// line, since the comma is not in the output for it to be written against) inside one
+    /// ordered pass that also places the block comments.
     fn param_trailing_line_comment(
         &self,
         comment: &internal::Comment,
@@ -1893,6 +1867,15 @@ impl<'a> Printer<'a> {
                     // Non-first param (legacy): own-line comment gets a hardline,
                     // preserving a blank line the author left between the two comments.
                     self.push_blank_preserving_hardline(&mut parts, prev_pos, comment.span.start);
+                } else {
+                    // Glued to the previous comment — keep the line the author wrote them
+                    // on, exactly as the first-param arm above does. ⚠️ Emitting NOTHING
+                    // here (the arm this replaces) is the run separator's worst answer, not
+                    // its safest: the two comments come out WELDED (`/* c1 *//* c2 */`),
+                    // which reparses as the same two comments byte for byte, so the ledger,
+                    // the census, F1 and the fuzzer are all blind and only a prettier
+                    // `compare` shows it (`docs/comments.md` §Trailing and dangling runs).
+                    parts.push(d.text(" "));
                 }
             }
             parts.push(self.build_comment_doc(comment));

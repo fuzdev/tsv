@@ -572,6 +572,8 @@ Note: An ambient (`declare class`) member parses decorators exactly like a concr
 ### Import Types
 
 - Import type (`import('mod').Type`)
+- Import attributes (`import('mod', { with: { type: 'json' } }).Type`) — the canonical
+  parser rejects these, so they are pinned as a `_svelte_divergence`
 - `typeof import('mod')`
 
 ---

@@ -1478,12 +1478,10 @@ fn build_call_with_arg_comments(
             let arg_end = arg.span().end;
             let paren_close = call.span.end;
 
-            let mut pc = PartitionedComments::new(
-                printer.comments,
-                printer.comment_line_breaks,
-                arg_end,
-                paren_close,
-            );
+            // The last-argument gap holds the list's own comma (`for_closer_gap`, never the
+            // delimiter reading) — see `emit_last_arg_trailing_comments`, the shared path
+            // this loop mirrors so it can feed `force_expansion`.
+            let mut pc = PartitionedComments::for_closer_gap(printer, arg_end, paren_close);
             // The argument's own doc may already end in a deferred `//` (a spread whose
             // stripped parens held one); a second one may not join that line.
             pc.demote_trailing_line_after_deferred(arg_defers_line);

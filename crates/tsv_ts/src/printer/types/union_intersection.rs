@@ -735,7 +735,7 @@ impl<'a> Printer<'a> {
                     // own lines). A same-line line comment is line_suffix'd (zero width)
                     // so it can't force the previous member to break — the leading-`|`
                     // form puts the next separator on a new line, where it flushes.
-                    parts.extend(self.build_trailing_comments_multiline_ext(
+                    parts.extend(self.build_trailing_gap_comments_ext(
                         prev_type_end,
                         pipe_pos,
                         true,
@@ -1724,13 +1724,28 @@ impl<'a> Printer<'a> {
                 should_break = true;
             }
 
-            // A same-line block comment authored *before* the `&` trails the previous
-            // member and stays on its side of the operator (`prev /* b */ &`) — matching
-            // the no-comment loop and Prettier. Emit those first, on the previous
-            // member's line (indent-agnostic — no preceding newline), before the `&`.
+            // The previous member's TRAILING RUN in the `prev_end`→`&` gap, claimed once
+            // by the shared last-item→closer walk ([`Printer::closer_trailing_comment_run`],
+            // via its `_end` boundary): the prefix of comments that FOLLOW CONTENT on their
+            // line, whether that content is the member itself or the `*/` of a comment the
+            // run already claimed. A **block** in it stays on the previous member's side of
+            // the operator (`prev /* b */ &`) — matching the no-comment loop and Prettier;
+            // a **line** comment trails the `&` instead (below), the only lossless place
+            // for it. Everything past the run is on a line the author gave it and keeps it.
+            //
+            // ⚠️ **One walk, because the two emissions must PARTITION the gap.** Asking
+            // `is_same_line(prev_end, …)` on each side of the operator — the two spellings
+            // this replaces — is blind to every byte no member span covers, so a comment
+            // glued to a preceding comment's `*/` read as own-line to *both* arms and was
+            // MOVED across the `&` (`docs/comments.md` §Own-line-ness is a SOURCE
+            // question). The union's member gap never had the bug: it routes through
+            // `build_trailing_gap_comments_ext`, which is the same claim.
+            let trailing_run_end = amp.map_or(prev_end, |amp_pos| {
+                self.closer_trailing_run_end(prev_end, amp_pos)
+            });
             if let Some(amp_pos) = amp {
                 for comment in comments_to_emit_in_range(self.comments, prev_end, amp_pos)
-                    .filter(|c| c.is_block && self.is_same_line(prev_end, c.span.start))
+                    .filter(|c| c.is_block && c.span.end <= trailing_run_end)
                 {
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
@@ -1740,24 +1755,53 @@ impl<'a> Printer<'a> {
 
             let mut unit = DocBuf::new();
             if let Some(amp_pos) = amp {
-                // The remaining before-`&` comments follow the operator: a same-line
-                // *line* comment trails it inline (a `//` can't precede the `&` without
-                // commenting it out — a lossless separator-trail), and an own-line
-                // comment drops to its own line (blank-preserving). Mirrors
-                // `build_trailing_comments_multiline` minus the same-line blocks handled
-                // above. Then the same-line-after-`&` comments trail the operator inline.
-                let mut run_end = prev_end;
+                // The rest of the before-`&` gap follows the operator: the run's *line*
+                // comment trails it inline (a `//` can't precede the `&` without commenting
+                // it out — a lossless separator-trail), and everything past the run drops to
+                // its own line, keeping a glued pair together and preserving an author blank
+                // ([`Printer::push_trailing_run_separator`], the rule every end-of-container
+                // run reads). Then the same-line-after-`&` comments trail the operator
+                // inline.
+                //
+                // ⚠️ **The FIRST of those own-line comments takes a plain `hardline`,
+                // because it is the one that CROSSES the `&`.** An author blank ahead of it
+                // was written between the previous member and the comment — a gap the
+                // printer does not reproduce, since the operator is pulled back onto the
+                // member's line — so re-emitting it *after* the `&` fabricates a blank the
+                // author never wrote there, and prettier writes none. It is fabrication
+                // rather than a stable divergence: the emitted blank lands after the `&`,
+                // where the next pass reads it as the after-operator gap and drops it, so
+                // the form never reaches a fixed point (F1). Every LATER separator keeps the
+                // blank — a blank *between* two own-line comments never crosses anything and
+                // is the author's (`& // c1⏎⏎// c2`, which both formatters hold stable).
+                let mut scan_from = prev_end;
+                let mut prev_comment: Option<&Comment> = None;
+                let mut crossed_operator = false;
                 for comment in comments_to_emit_in_range(self.comments, prev_end, amp_pos) {
-                    if self.is_same_line(prev_end, comment.span.start) {
+                    if comment.span.end <= trailing_run_end {
                         if !comment.is_block {
                             unit.push(d.text(" "));
                             unit.push(self.build_comment_doc(comment));
                         }
+                        // Nothing in the run can be glued to: a block went before the `&`,
+                        // so it is not on this line at all, and a `//` runs to end of line.
+                        prev_comment = None;
                     } else {
-                        self.push_blank_preserving_hardline(&mut unit, run_end, comment.span.start);
+                        if crossed_operator {
+                            self.push_trailing_run_separator(
+                                &mut unit,
+                                prev_comment,
+                                scan_from,
+                                comment.span.start,
+                            );
+                        } else {
+                            unit.push(d.hardline());
+                        }
                         unit.push(self.build_comment_doc(comment));
+                        prev_comment = Some(comment);
+                        crossed_operator = true;
                     }
-                    run_end = comment.span.end;
+                    scan_from = comment.span.end;
                 }
                 for comment in comments_to_emit_in_range(self.comments, amp_pos + 1, cur_start)
                     .filter(|c| self.is_same_line(amp_pos, c.span.start))

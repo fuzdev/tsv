@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 586,
+	"end": 811,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -188,9 +188,9 @@
 		},
 		{
 			"type": "Line",
-			"value": " a same-line block comment stays inline (not a divergence)",
+			"value": " a pair the author glued onto one line keeps that line in the run before the",
 			"start": 489,
-			"end": 549,
+			"end": 567,
 			"loc": {
 				"start": {
 					"line": 26,
@@ -198,6 +198,102 @@
 				},
 				"end": {
 					"line": 26,
+					"column": 79
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " operator, the same rule every comment run reads",
+			"start": 569,
+			"end": 619,
+			"loc": {
+				"start": {
+					"line": 27,
+					"column": 1
+				},
+				"end": {
+					"line": 27,
+					"column": 51
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " (syntax/comments/separator_glued_run)",
+			"start": 621,
+			"end": 661,
+			"loc": {
+				"start": {
+					"line": 28,
+					"column": 1
+				},
+				"end": {
+					"line": 28,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 679,
+			"end": 687,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 2
+				},
+				"end": {
+					"line": 31,
+					"column": 10
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 688,
+			"end": 696,
+			"loc": {
+				"start": {
+					"line": 31,
+					"column": 11
+				},
+				"end": {
+					"line": 31,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c3",
+			"start": 699,
+			"end": 704,
+			"loc": {
+				"start": {
+					"line": 32,
+					"column": 2
+				},
+				"end": {
+					"line": 32,
+					"column": 7
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a same-line block comment stays inline (not a divergence)",
+			"start": 714,
+			"end": 774,
+			"loc": {
+				"start": {
+					"line": 35,
+					"column": 1
+				},
+				"end": {
+					"line": 35,
 					"column": 61
 				}
 			}
@@ -205,15 +301,15 @@
 		{
 			"type": "Block",
 			"value": " c ",
-			"start": 563,
-			"end": 570,
+			"start": 788,
+			"end": 795,
 			"loc": {
 				"start": {
-					"line": 27,
+					"line": 36,
 					"column": 13
 				},
 				"end": {
-					"line": 27,
+					"line": 36,
 					"column": 20
 				}
 			}
@@ -222,19 +318,19 @@
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 585,
+		"end": 810,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 18,
-			"end": 576,
+			"end": 801,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 28,
+					"line": 37,
 					"column": 9
 				}
 			},
@@ -713,44 +809,181 @@
 				},
 				{
 					"type": "VariableDeclaration",
-					"start": 551,
-					"end": 575,
+					"start": 663,
+					"end": 711,
 					"loc": {
 						"start": {
-							"line": 27,
+							"line": 29,
 							"column": 1
 						},
 						"end": {
-							"line": 27,
+							"line": 33,
+							"column": 6
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 669,
+							"end": 710,
+							"loc": {
+								"start": {
+									"line": 29,
+									"column": 7
+								},
+								"end": {
+									"line": 33,
+									"column": 5
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 669,
+								"end": 670,
+								"loc": {
+									"start": {
+										"line": 29,
+										"column": 7
+									},
+									"end": {
+										"line": 29,
+										"column": 8
+									}
+								},
+								"name": "f"
+							},
+							"init": {
+								"type": "BinaryExpression",
+								"start": 675,
+								"end": 710,
+								"loc": {
+									"start": {
+										"line": 30,
+										"column": 2
+									},
+									"end": {
+										"line": 33,
+										"column": 5
+									}
+								},
+								"left": {
+									"type": "Identifier",
+									"start": 675,
+									"end": 676,
+									"loc": {
+										"start": {
+											"line": 30,
+											"column": 2
+										},
+										"end": {
+											"line": 30,
+											"column": 3
+										}
+									},
+									"name": "g"
+								},
+								"operator": "+",
+								"right": {
+									"type": "Identifier",
+									"start": 709,
+									"end": 710,
+									"loc": {
+										"start": {
+											"line": 33,
+											"column": 4
+										},
+										"end": {
+											"line": 33,
+											"column": 5
+										}
+									},
+									"name": "h",
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 679,
+											"end": 687
+										},
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 688,
+											"end": 696
+										},
+										{
+											"type": "Line",
+											"value": " c3",
+											"start": 699,
+											"end": 704
+										}
+									]
+								}
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a pair the author glued onto one line keeps that line in the run before the",
+							"start": 489,
+							"end": 567
+						},
+						{
+							"type": "Line",
+							"value": " operator, the same rule every comment run reads",
+							"start": 569,
+							"end": 619
+						},
+						{
+							"type": "Line",
+							"value": " (syntax/comments/separator_glued_run)",
+							"start": 621,
+							"end": 661
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 776,
+					"end": 800,
+					"loc": {
+						"start": {
+							"line": 36,
+							"column": 1
+						},
+						"end": {
+							"line": 36,
 							"column": 25
 						}
 					},
 					"declarations": [
 						{
 							"type": "VariableDeclarator",
-							"start": 557,
-							"end": 574,
+							"start": 782,
+							"end": 799,
 							"loc": {
 								"start": {
-									"line": 27,
+									"line": 36,
 									"column": 7
 								},
 								"end": {
-									"line": 27,
+									"line": 36,
 									"column": 24
 								}
 							},
 							"id": {
 								"type": "Identifier",
-								"start": 557,
-								"end": 558,
+								"start": 782,
+								"end": 783,
 								"loc": {
 									"start": {
-										"line": 27,
+										"line": 36,
 										"column": 7
 									},
 									"end": {
-										"line": 27,
+										"line": 36,
 										"column": 8
 									}
 								},
@@ -758,29 +991,29 @@
 							},
 							"init": {
 								"type": "BinaryExpression",
-								"start": 561,
-								"end": 574,
+								"start": 786,
+								"end": 799,
 								"loc": {
 									"start": {
-										"line": 27,
+										"line": 36,
 										"column": 11
 									},
 									"end": {
-										"line": 27,
+										"line": 36,
 										"column": 24
 									}
 								},
 								"left": {
 									"type": "Literal",
-									"start": 561,
-									"end": 562,
+									"start": 786,
+									"end": 787,
 									"loc": {
 										"start": {
-											"line": 27,
+											"line": 36,
 											"column": 11
 										},
 										"end": {
-											"line": 27,
+											"line": 36,
 											"column": 12
 										}
 									},
@@ -790,23 +1023,23 @@
 										{
 											"type": "Block",
 											"value": " c ",
-											"start": 563,
-											"end": 570
+											"start": 788,
+											"end": 795
 										}
 									]
 								},
 								"operator": "+",
 								"right": {
 									"type": "Literal",
-									"start": 573,
-									"end": 574,
+									"start": 798,
+									"end": 799,
 									"loc": {
 										"start": {
-											"line": 27,
+											"line": 36,
 											"column": 23
 										},
 										"end": {
-											"line": 27,
+											"line": 36,
 											"column": 24
 										}
 									},
@@ -821,8 +1054,8 @@
 						{
 							"type": "Line",
 							"value": " a same-line block comment stays inline (not a divergence)",
-							"start": 489,
-							"end": 549
+							"start": 714,
+							"end": 774
 						}
 					]
 				}

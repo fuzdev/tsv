@@ -188,51 +188,93 @@ impl<'a> Printer<'a> {
         self.build_list_element_group(leading, element)
     }
 
-    /// Build docs for trailing comments in a forced-multiline context.
+    /// Build the docs for a gap that FOLLOWS a printed item and runs to the next printed
+    /// token: the trailing run inline behind the item, everything after it on its own line.
     ///
-    /// Same-line comments (block or line): ` /*content*/` or ` //content` (inline with leading space)
-    /// Own-line comments: hardline + comment (on their own line)
+    /// **One ordered pass**, because the two outcomes interleave: `f(a⏎, /* c1 */⏎/* c2 */)`
+    /// trails `c1` on the item's line and gives `c2` its own, and two buffers appended in a
+    /// fixed order print them REVERSED.
     ///
-    /// Used when line comments force multiline formatting (unions, tuples, etc.)
-    pub(crate) fn build_trailing_comments_multiline(&self, start: u32, end: u32) -> DocBuf {
-        self.build_trailing_comments_multiline_ext(start, end, false)
+    /// Which comments TRAIL is [`Printer::closer_trailing_comment_run`], taken as a PREFIX
+    /// ([`Printer::closer_trailing_run_end`] is its boundary), and the run stops at the
+    /// first `//` since nothing may share a line comment's line. A **block** takes the
+    /// SOURCE reading, because an `is_same_line(start, …)` one is blind to every byte no
+    /// item span covers — above all the list's own comma, which the author can push onto
+    /// its own line (`[T⏎, /* c */]`), leaving the comment on a line it never had
+    /// (`docs/comments.md` §Own-line-ness is a SOURCE question). A **line** comment keeps
+    /// the item anchor, the sanctioned divergence that walk carries.
+    ///
+    /// ⚠️ **Three gap SHAPES share this walk, and the reading is sound at all three even
+    /// though it was chosen for one.** `start` is never an opening delimiter — it is the
+    /// end of something printed — so "does content precede this comment on its line" is the
+    /// same question at a **closer** gap (a last item→`]`/`>`/`)`), at the **delimiter** gap
+    /// after a cast's `>`, and at the **operator** gap before a union's `|`. Only the first
+    /// can OBSERVE the difference: the two readings part exactly where text no item span
+    /// covers sits on the comment's line, and a closer gap holds the list's own comma
+    /// (deleted under `trailingComma: 'none'`) while the other two hold nothing but trivia.
+    /// The one byte that can reach them is a preceding comment's `*/` — and a comment the
+    /// source reading claims for *that* reason is GLUED to its predecessor, so the trailing
+    /// arm and the own-line arm's glue branch emit the identical ` ` + comment. **The two
+    /// arms agree on exactly the set the readings disagree about**, which is what makes one
+    /// walk sound at all three shapes; either mechanism alone already prints
+    /// `| A /* a⏎b */ /* c */⏎// d⏎| B` the way prettier does (the delimiter reading with no
+    /// glue arm — the state before this seam was unified — split a pair the author wrote on
+    /// one line, and that was a real divergence). A gap whose anchor genuinely IS the
+    /// delimiter keeps the delimiter reading and does not belong here
+    /// ([`Self::has_own_line_block_comment_after`]).
+    ///
+    /// Used wherever such a gap is already broken across lines: the tuple, type
+    /// parameters and arguments, both parameter lists, and the angle-bracket cast.
+    pub(crate) fn build_trailing_gap_comments(&self, start: u32, end: u32) -> DocBuf {
+        self.build_trailing_gap_comments_ext(start, end, false)
     }
 
-    /// As `build_trailing_comments_multiline`, but when `suffix_same_line_lines` is set
-    /// a same-line **line** comment is routed through `line_suffix` (zero width) so it
-    /// can't force the preceding element to break. Only safe where the following
+    /// As [`Self::build_trailing_gap_comments`], but when `suffix_trailing_lines` is set a
+    /// **line** comment in the trailing run is routed through `line_suffix` (zero width) so
+    /// it can't force the preceding element to break. Only safe where the following
     /// separator lands on a *new* line (so the suffix flushes at that hardline without
-    /// crossing the separator) — true for the union's leading-`|` form, but NOT the
-    /// intersection's trailing-`&` form (a same-line `//` there would otherwise comment
-    /// out the `&`; that case is handled as a comment-position divergence instead).
-    pub(crate) fn build_trailing_comments_multiline_ext(
+    /// crossing the separator) — true for the union's leading-`|` form and for a parameter
+    /// list this comment has already forced open, but NOT the intersection's trailing-`&`
+    /// form (a same-line `//` there would otherwise comment out the `&`; that case is
+    /// handled as a comment-position divergence instead).
+    pub(crate) fn build_trailing_gap_comments_ext(
         &self,
         start: u32,
         end: u32,
-        suffix_same_line_lines: bool,
+        suffix_trailing_lines: bool,
     ) -> DocBuf {
         let d = self.d();
         let mut parts = DocBuf::new();
+        let run_end = self.closer_trailing_run_end(start, end);
         let mut prev_end = start;
+        // The comment emitted last, for the glue question in the own-line arm.
+        let mut prev_comment: Option<&internal::Comment> = None;
         for comment in comments_to_emit_in_range(self.comments, start, end) {
-            if self.is_same_line(start, comment.span.start) {
-                if suffix_same_line_lines {
+            if comment.span.end <= run_end {
+                if suffix_trailing_lines {
                     // Block → inline (width counted); line → line_suffix (zero width).
                     parts.push(self.build_trailing_comment_doc(comment));
                 } else {
-                    // Same line as start: trailing comment (block or line), inline.
+                    // Trailing: inline, behind the item.
                     parts.push(d.text(" "));
                     parts.push(self.build_comment_doc(comment));
                 }
             } else {
-                // Own line comment (block or line), preserving an author blank line
-                // before it (`elem⏎⏎/* c */` before the closing delimiter) — prettier
-                // keeps one blank in every list position (tuple, function/-type params,
-                // signatures, type args/params).
-                self.push_blank_preserving_hardline(&mut parts, prev_end, comment.span.start);
+                // Own line comment (block or line) — unless the author GLUED it to the
+                // previous one, which keeps that line. Otherwise an author blank line
+                // before it (`elem⏎⏎/* c */` before the closing delimiter) is preserved:
+                // prettier keeps one blank in every list position (tuple, function/-type
+                // params, signatures, type args/params).
+                self.push_trailing_run_separator(
+                    &mut parts,
+                    prev_comment,
+                    prev_end,
+                    comment.span.start,
+                );
                 parts.push(self.build_comment_doc(comment));
             }
             prev_end = comment.span.end;
+            prev_comment = Some(comment);
         }
         parts
     }
@@ -253,11 +295,15 @@ impl<'a> Printer<'a> {
     /// True when a block comment in `(search_start, end)` sits on its own line —
     /// i.e. not on the same source line as `line_ref`.
     ///
-    /// Used to force a parameter/element list to multiline when an own-line block
-    /// comment follows the last element (`line_ref` = `search_start` = last elem end)
-    /// or fills the opening-delimiter→first-element gap (`line_ref` = the delimiter,
-    /// `search_start` = just past it). Line comments in the same position are detected
-    /// separately (they always force a break).
+    /// Used to force a parameter/element list to multiline when an own-line block comment
+    /// fills the opening-delimiter→first-element gap (`line_ref` = the delimiter,
+    /// `search_start` = just past it) — the DELIMITER-line question, whose anchor is the
+    /// delimiter itself (`docs/comments.md` §The delimiter-line question). Line comments in
+    /// the same position are detected separately (they always force a break).
+    ///
+    /// ⚠️ **Not for the last-element→closer gap**, which holds the list's own comma: there
+    /// the anchor is an ITEM and the reading goes blind to every byte no item span covers.
+    /// [`Self::has_own_line_block_comment_before_closer`] is that position's predicate.
     pub(crate) fn has_own_line_block_comment_after(
         &self,
         line_ref: u32,
@@ -266,6 +312,27 @@ impl<'a> Printer<'a> {
     ) -> bool {
         self.comments_on_page_between(search_start, end)
             .any(|c| c.is_block && !self.is_same_line(line_ref, c.span.start))
+    }
+
+    /// True when a block comment in the LAST item→closer gap `(start, end)` owns its line,
+    /// so the list must open around it — the trailing counterpart of
+    /// [`Self::has_own_line_block_comment_after`], asked by the value-level parameter list
+    /// ([`Printer::has_trailing_line_comment_in_params`]) and the type-level one
+    /// (`type_params_force_multiline`).
+    ///
+    /// The classification is the shared one ([`Printer::block_comment_owns_its_line`]) with
+    /// `item_follows: false`: no item is left to lead, so the closer sharing the comment's
+    /// line is not glue and the predicate reduces to its leading half — nothing before the
+    /// `/*` on that line. That half is what the gap's own comma defeats: under
+    /// `trailingComma: 'none'` the comma is never re-emitted, and an `is_same_line(item_end,
+    /// …)` reading calls a comment glued to it own-line and opens a list that fits
+    /// (`docs/comments.md` §Own-line-ness is a SOURCE question).
+    ///
+    /// Line comments in the same position are detected separately — they always force the
+    /// break, wherever on the line they sit.
+    pub(crate) fn has_own_line_block_comment_before_closer(&self, start: u32, end: u32) -> bool {
+        self.comments_on_page_between(start, end)
+            .any(|c| c.is_block && self.block_comment_owns_its_line(c, false))
     }
 
     /// Check if there's a block comment on its own line within a container.
@@ -498,12 +565,19 @@ impl<'a> Printer<'a> {
     ///
     /// The separator is emitted **before** every comment (`hardline`, preceded by a
     /// `literalline` when the author left a blank line) rather than after it. Keying it on
-    /// the *following* comment's existence is what makes the rule uniform: a run is a list
-    /// of own-line comments, and the closing `}` supplies its own break. The
-    /// mirror-image formulation — emit the separator *after* each non-last comment — has
-    /// to ask what KIND the comment was, and answering "a block needs no break, the `}`
-    /// follows immediately" welds whatever comes next onto its line (`/* c1 *//* c2 */`,
-    /// `/* c1 *///  c2` — the second comment becomes text of the first).
+    /// the *following* comment's existence is what makes the rule uniform: the closing `}`
+    /// supplies its own break. The mirror-image formulation — emit the separator *after*
+    /// each non-last comment — has to ask what KIND the comment was, and answering "a block
+    /// needs no break, the `}` follows immediately" welds whatever comes next onto its line
+    /// (`/* c1 *//* c2 */`, `/* c1 *///  c2` — the second comment becomes text of the
+    /// first).
+    ///
+    /// The one thing the separator asks is whether the author **glued** this comment to the
+    /// previous one ([`Printer::comment_hugs_next`]), in which case the pair keeps the line
+    /// it was written on. That is not the weld above — a space keeps both comments distinct,
+    /// and a line comment never hugs, so nothing lands behind a `//`. Prettier keeps the
+    /// glue here and splits it in an EMPTY body, which is why
+    /// [`Self::push_dangling_comment_run`]'s separator stays unconditional.
     ///
     /// Used by every end-of-body run: class body, interface body, enum body, type literal,
     /// namespace body, block-statement bodies (function and bare blocks, via
@@ -568,6 +642,10 @@ impl<'a> Printer<'a> {
         // cursor is at least its `{` plus one, so the two cases can't collide.
         let anchor = (prev_end > 0).then_some(prev_end);
         let mut needs_separator = anchor.is_some();
+        // The comment this run emitted last, for the glue question below. `None` after a
+        // skipped one: that comment is on the page but not on THIS run's line, so a
+        // comment glued to it in source has nothing here to glue to.
+        let mut prev_emitted: Option<&internal::Comment> = None;
 
         for comment in comments_to_emit_in_range(self.comments, prev_end, body_end) {
             if self.comment_already_trailed(anchor, comment, claims_trailing) {
@@ -575,16 +653,28 @@ impl<'a> Printer<'a> {
                 // steps over its BYTES, since the blank-line scan below reads raw source
                 // and would otherwise count a multi-line block's own newlines as a blank.
                 last_pos = comment.span.end;
+                prev_emitted = None;
                 continue;
             }
             if needs_separator {
-                if self.has_blank_line_between(last_pos, comment.span.start) {
-                    docs.push(d.literalline());
+                // A pair the author GLUED onto one line keeps that line
+                // ([`Self::trailing_run_hugs_previous`], the run's shared question).
+                // The non-glue arm is this walk's own — the separator is the CALLER's, and
+                // its blank scan reads the loose newline count from the already-peeled
+                // `last_pos` — so it asks the predicate rather than routing through
+                // [`Self::push_trailing_run_separator`].
+                if self.trailing_run_hugs_previous(prev_emitted, comment.span.start) {
+                    docs.push(d.text(" "));
+                } else {
+                    if self.has_blank_line_between(last_pos, comment.span.start) {
+                        docs.push(d.literalline());
+                    }
+                    docs.push(separator);
                 }
-                docs.push(separator);
             }
             docs.push(self.build_comment_doc(comment));
             last_pos = comment.span.end;
+            prev_emitted = Some(comment);
             needs_separator = true;
         }
 
@@ -602,6 +692,11 @@ impl<'a> Printer<'a> {
     /// what KIND the comment was, and "a block needs no break, the closer follows
     /// immediately" is false the moment another comment follows, welding the two together
     /// (`/* c1 *//* c2 */`).
+    ///
+    /// ⚠️ **Unconditional, unlike the trailing run's**, which lets an author-glued pair keep
+    /// its line. Prettier draws that line between the two positions: it keeps the glue after
+    /// a last item and splits the pair in an EMPTY container (`class A { /* c1 */ /* c2 */
+    /// }`), so this emitter has no glue question to ask.
     ///
     /// The caller owns whether the run can stay inline: it picks the open/close separator
     /// (a collapsible `line`/`softline`, or a `hardline` for the always-exploded bodies).

@@ -445,14 +445,23 @@ impl<'a> Printer<'a> {
     ) -> bool {
         let comments = self.spread_element_own_line_block_comments(spread);
         let mut prev_end = spread.argument.span().end;
+        let mut prev_comment: Option<&internal::Comment> = None;
         for comment in &comments {
-            if preserve_blanks {
+            // A pair the author GLUED onto one line keeps that line, whichever blank policy
+            // is in force ([`Printer::trailing_run_hugs_previous`]) — the glue question and
+            // the author-blank question are separate, so the predicate is asked directly
+            // rather than through `push_trailing_run_separator`, whose non-glue arm is
+            // always blank-preserving.
+            if self.trailing_run_hugs_previous(prev_comment, comment.span.start) {
+                parts.push(self.d().text(" "));
+            } else if preserve_blanks {
                 self.push_blank_preserving_hardline(parts, prev_end, comment.span.start);
             } else {
                 parts.push(self.d().hardline());
             }
             parts.push(self.build_comment_doc(comment));
             prev_end = comment.span.end;
+            prev_comment = Some(comment);
         }
         !comments.is_empty()
     }

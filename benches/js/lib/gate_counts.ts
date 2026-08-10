@@ -199,7 +199,12 @@ export const CORPUS_FORMAT_MATCH_MIN: Record<Language, number> = {
 	// `forced_continuation_indent` detector was widened with the clause in the same change, so
 	// it lands in `known` — the `unknown` count is unmoved.
 	svelte: 498,
-	typescript: 2332,
+	// 2332 → 2334: two reproducible files, `prettier/tests/format/js/comments/11273.js` and
+	// `.../trailing-jsdocs.js`, whose divergence was a container-end trailing comment RUN the
+	// author glued onto one line and tsv split onto two. That run's separator now asks the
+	// source (docs/comments.md §Trailing and dangling runs), so a glued pair keeps its line as
+	// it does in prettier. Both files leave `known` — the count that moves against this one.
+	typescript: 2334,
 	css: 89
 };
 
@@ -238,7 +243,18 @@ export const CORPUS_FORMAT_UNKNOWN_PIN: Record<Language, number> = {
 	// bare-callee path in `call_formatting.rs`, not the chain base), but shrank from
 	// 107/126 differing lines to 61/92; its `diff_summary` names a representative hunk, not
 	// a total, so that string growing is not the file getting worse.
-	typescript: 108,
+	//
+	// 108 → 109: `js/comments/jsdoc-nestled.js` arrives from `partial`, and it arrives by
+	// getting BETTER (7 differing lines → 3). Its container-end glued runs now keep their
+	// line, which cleared two of its three hunks; what is left is the one prettier feature
+	// tsv does not implement — `mergeNestledJsdocComments`, which at PARSE time fuses two
+	// **zero-gap** indentable block comments into one, so prettier prints `*//**` where tsv
+	// prints `*/ /**`. That hunk is PRE-EXISTING and unmoved (it is the file's leading-comment
+	// run, untouched here); it was simply never the file's only divergence before, so a
+	// broader detector matched the file and it graded `partial`. tsv cannot borrow prettier's
+	// fix — a parse-time merge would break the acorn AST contract — so nestling is a printer
+	// question at every comment run, tracked separately rather than pinned as a detector here.
+	typescript: 109,
 	css: 23
 };
 
@@ -253,7 +269,11 @@ export const CORPUS_FORMAT_PARTIAL_PIN: Record<Language, number> = {
 	// 37 → 34: the three `js/comments/between-head-and-body/*.js` files are `with`-statement
 	// comment tests, so all three now land in `errors` rather than being partially compared
 	// through a call-expression misparse.
-	typescript: 34,
+	//
+	// 34 → 33: `js/comments/jsdoc-nestled.js` leaves for `unknown` — not a loss but a
+	// shrink, its remaining hunk too narrow for the detector that used to match it. The
+	// reasoning is on `CORPUS_FORMAT_UNKNOWN_PIN`, which moves the other way in the same step.
+	typescript: 33,
 	css: 9
 };
 

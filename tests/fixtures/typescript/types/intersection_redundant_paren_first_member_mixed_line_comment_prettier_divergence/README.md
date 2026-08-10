@@ -17,9 +17,12 @@ type T = /* b */
 **Prettier** breaks after `=` and drops the whole run onto its own line(s)
 (`output_prettier`). On the paren shell prettier is non-idempotent: its unstable
 first pass breaks the intersection (`A &⏎ B`) before converging to a form that
-keeps `/* b */ // c` **glued** on one line — a form tsv un-glues to its own
-`output_prettier`, so it is a `divergent_variant`, pinned by the
-`prettier_intermediate_to_divergent_variant_*` marker (rule N7c).
+keeps `/* b */ // c` **glued** on one line. tsv holds that form too — a pair the
+author glued onto one line keeps it wherever a comment run is emitted
+(`docs/comments.md` §Trailing and dangling runs) — so the terminal is **dual-stable**:
+a `variant_glued`, pinned by the `prettier_intermediate_to_variant_*` marker
+(rule N7c). That is the same shape as the trailing counterpart below, which the two
+cases used to differ on for no reason but this seam.
 
 This is the intersection analog of the whole-RHS
 [type_alias_rhs_mixed_trailing_comment](../comments/type_alias_rhs_mixed_trailing_comment_prettier_divergence/)

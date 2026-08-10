@@ -579,7 +579,7 @@ impl<'a> Printer<'a> {
         // indent in (prettier instead relocates it into the cast — a divergence).
         // Each comment holds its position: a same-line `<T> // c` trails the `>`,
         // an own-line comment keeps its own line leading the expression
-        // (`build_trailing_comments_multiline`). A block comment in the gap stays
+        // (`build_trailing_gap_comments`). A block comment in the gap stays
         // inline ahead of the expression.
         //
         // TODO: a binary-expression operand that *breaks across lines* misaligns — its
@@ -595,7 +595,7 @@ impl<'a> Printer<'a> {
         // which the fixture rules forbid. The fix is to align it, after which an ordinary
         // fixture follows.
         if self.has_line_comments_between(close_angle + 1, expr_start) {
-            let trailing = self.build_trailing_comments_multiline(close_angle + 1, expr_start);
+            let trailing = self.build_trailing_gap_comments(close_angle + 1, expr_start);
             return d.concat(&[
                 cast_doc,
                 d.indent(d.concat(&[d.concat(&trailing), d.hardline(), expr_doc])),
@@ -645,7 +645,7 @@ impl<'a> Printer<'a> {
     /// line (`delimiter_line_comment_prefix`, the open-delimiter family — prettier
     /// relocates it to its own line); own-line comments after `<` sit on their own
     /// lines; a trailing-type `T // c` stays on the type line and an own-line
-    /// comment before `>` keeps its own line (`build_trailing_comments_multiline`).
+    /// comment before `>` keeps its own line (`build_trailing_gap_comments`).
     /// See conformance_prettier_ts_comments.md §Comment relocation (Angle-bracket type assertion).
     ///
     /// Positions are the caller's already-computed cast boundaries, in source order:
@@ -665,7 +665,7 @@ impl<'a> Printer<'a> {
         let (angle_prefix, angle_pull_pos) =
             self.delimiter_line_comment_prefix(open_pos, type_start);
         let leading = self.build_leading_comments_multiline(angle_end, type_start, angle_pull_pos);
-        let trailing = self.build_trailing_comments_multiline(type_end, close_angle);
+        let trailing = self.build_trailing_gap_comments(type_end, close_angle);
         // `group_break`, not a bare concat: this is the already-broken form, and saying
         // so contains the leading run's soft `line` (prettier's `printLeadingComment`)
         // here rather than letting it escape to the enclosing assignment group — which

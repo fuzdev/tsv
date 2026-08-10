@@ -660,6 +660,12 @@ impl<'a> Printer<'a> {
             if i == 0 {
                 // First comment trails the operator inline (`? /* c */`).
                 parts.push(d.text(" "));
+            } else if self.trailing_run_hugs_previous(Some(comments[i - 1]), comment.span.start) {
+                // Glued to the previous comment — keep the line the author wrote them on,
+                // and take no INDENT: the run did not start a new line to indent onto
+                // ([`Printer::trailing_run_hugs_previous`], the rule every comment run
+                // reads). `last_own_line` stays as it was for the same reason.
+                parts.push(d.text(" "));
             } else {
                 // Subsequent comments take their own line (author blank preserved).
                 self.push_blank_preserving_hardline(

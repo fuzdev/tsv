@@ -561,6 +561,83 @@ impl<'a> Printer<'a> {
         }
     }
 
+    /// Whether the comment a TRAILING run is about to emit keeps the previous one's line,
+    /// because the author GLUED the pair (`/* c1 */ /* c2 */`, `/* c */ // t`).
+    ///
+    /// The single statement of that question — the trailing-side counterpart of
+    /// [`Self::comment_hugs_next`](Self::comment_hugs_next): every end-of-container run asks
+    /// it, and a run that answered differently would be the drifted copy `docs/comments.md`
+    /// §Trailing and dangling runs is about. `None` — the run's first comment — is never
+    /// glued: it has the anchor behind it, not a comment.
+    ///
+    /// ⚠️ **Asked BETWEEN the two comments, never of the source right after the `*/`** —
+    /// and the two spellings are not equivalent, which is the whole reason this is not
+    /// `comment_hugs_next(prev)`. They part on exactly the byte these runs exist for: the
+    /// list's own **comma**, deleted under `trailingComma: 'none'`. Asking what follows the
+    /// `*/` stops at that comma, reports "no newline", and WELDS a comment the author gave
+    /// its own line onto the previous one (`[A /* c1 */,⏎// c2]` → `A /* c1 */ // c2`, with
+    /// the `//` then swallowing anything printed behind it). Asking whether the author put a
+    /// newline *between* the two reads past the comma, because a deleted separator is not a
+    /// line. The other trailing-run sites never saw the difference: everywhere else the
+    /// comma coincides with a predecessor an earlier emitter already claimed, so `prev` is
+    /// `None` there — only the one walk that covers a whole gap in a single pass
+    /// ([`Self::build_trailing_gap_comments_ext`]) reaches it.
+    ///
+    /// The `is_block` half is belt-and-braces rather than load-bearing: a `//` runs to end of
+    /// line, so a following comment always has a newline between.
+    ///
+    /// The space it licenses is not the weld the separator-before rule exists to prevent
+    /// ([`Self::build_trailing_body_comments_doc`]): both comments stay distinct, and a line
+    /// comment never hugs, so nothing can land behind a `//`. A **dangling** run — the
+    /// container's only content — does not ask it at all, because prettier splits a glued
+    /// pair there ([`Self::push_dangling_comment_run`]).
+    pub(crate) fn trailing_run_hugs_previous(
+        &self,
+        prev: Option<&Comment>,
+        next_start: u32,
+    ) -> bool {
+        prev.is_some_and(|prev| {
+            prev.is_block && !self.has_newline_between(prev.span.end, next_start)
+        })
+    }
+
+    /// Emit the separator before one comment in a TRAILING run: a space when the author
+    /// glued it to `prev` ([`Self::trailing_run_hugs_previous`]), otherwise the
+    /// blank-preserving `hardline` that gives it its own line.
+    ///
+    /// The trailing-side counterpart of
+    /// [`push_leading_run_separator`](Self::push_leading_run_separator), for the runs whose
+    /// own-line arm is that unconditional break — the last-item→closer walk
+    /// ([`Self::build_trailing_gap_comments_ext`]), the array literal's end-of-array scan,
+    /// and the call family's dangling emitter. A run whose non-glue separator is the
+    /// caller's ([`Self::build_trailing_closer_comments_doc`], whose container may still
+    /// collapse) asks the predicate directly and keeps its own arm.
+    ///
+    /// ⚠️ **The blank-line scan is an IN-SOURCE question**, so it opens at
+    /// [`blank_scan_start`](Self::blank_scan_start) rather than at `scan_from` itself: a
+    /// comment physically in the gap that this run did not emit — one an earlier emitter
+    /// claimed, or an OWNED one printed from inside a node's doc — still occupies those
+    /// bytes, and a multi-line block containing a blank line then hands its OWN newlines to
+    /// the scan as an author blank. That fabricates a blank line the author never wrote
+    /// (`[1 /* x⏎⏎y */⏎// c]`, `fn(a /* x⏎⏎y */⏎// c)`), and the fabricated form is a fixed
+    /// point both formatters then agree on — so F1, the ledger and the census are all blind
+    /// to it and only a prettier `compare` on the pristine seed shows it. `scan_from` stays
+    /// the caller's cursor, which is what bounds the search.
+    pub(crate) fn push_trailing_run_separator(
+        &self,
+        parts: &mut DocBuf,
+        prev: Option<&Comment>,
+        scan_from: u32,
+        next_start: u32,
+    ) {
+        if self.trailing_run_hugs_previous(prev, next_start) {
+            parts.push(self.d().text(" "));
+        } else {
+            let from = self.blank_scan_start(scan_from, next_start);
+            self.push_blank_preserving_hardline(parts, from, next_start);
+        }
+    }
+
     /// Emit the whole gap between two comma-separated items when the gap contains a
     /// **line** comment (the forced-break case): the comma, the comments, and the
     /// break to the next item, leaving `parts` positioned to emit that item.

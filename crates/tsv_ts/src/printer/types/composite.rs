@@ -1646,7 +1646,7 @@ impl<'a> Printer<'a> {
                 // Last element: no trailing comma under `trailingComma: 'none'`, then
                 // comments before `]`.
                 let before_close = t.span.end - 1;
-                inner_parts.extend(self.build_trailing_comments_multiline(elem_end, before_close));
+                inner_parts.extend(self.build_trailing_gap_comments(elem_end, before_close));
                 prev_end = before_close;
             }
         }

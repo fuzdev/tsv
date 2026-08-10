@@ -1,0 +1,981 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 525,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment between a template-literal type's interpolated type and its `}`. A block on",
+			"start": 20,
+			"end": 108,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 89
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the type's line trails it inline, and a pair the author glued onto one line keeps that",
+			"start": 110,
+			"end": 199,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line; a comment on its own line, and a line comment, expand the interpolation. An",
+			"start": 201,
+			"end": 285,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 85
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " author blank line before an own-line comment is preserved.",
+			"start": 287,
+			"end": 348,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 62
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 365,
+			"end": 372,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 16
+				},
+				"end": {
+					"line": 6,
+					"column": 23
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 393,
+			"end": 401,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 16
+				},
+				"end": {
+					"line": 8,
+					"column": 24
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 402,
+			"end": 410,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 25
+				},
+				"end": {
+					"line": 8,
+					"column": 33
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 436,
+			"end": 443,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 469,
+			"end": 473,
+			"loc": {
+				"start": {
+					"line": 16,
+					"column": 4
+				},
+				"end": {
+					"line": 16,
+					"column": 8
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 502,
+			"end": 509,
+			"loc": {
+				"start": {
+					"line": 22,
+					"column": 2
+				},
+				"end": {
+					"line": 22,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 524,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 515,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 24,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 350,
+					"end": 375,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 26
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 355,
+						"end": 356,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 6
+							},
+							"end": {
+								"line": 6,
+								"column": 7
+							}
+						},
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSLiteralType",
+						"start": 359,
+						"end": 374,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 10
+							},
+							"end": {
+								"line": 6,
+								"column": 25
+							}
+						},
+						"literal": {
+							"type": "TemplateLiteral",
+							"start": 359,
+							"end": 374,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 10
+								},
+								"end": {
+									"line": 6,
+									"column": 25
+								}
+							},
+							"expressions": [
+								{
+									"type": "TSTypeReference",
+									"start": 363,
+									"end": 364,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 14
+										},
+										"end": {
+											"line": 6,
+											"column": 15
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 363,
+										"end": 364,
+										"loc": {
+											"start": {
+												"line": 6,
+												"column": 14
+											},
+											"end": {
+												"line": 6,
+												"column": 15
+											}
+										},
+										"name": "B"
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 365,
+											"end": 372
+										}
+									]
+								}
+							],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 360,
+									"end": 361,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 11
+										},
+										"end": {
+											"line": 6,
+											"column": 12
+										}
+									},
+									"value": {
+										"raw": "a",
+										"cooked": "a"
+									},
+									"tail": false
+								},
+								{
+									"type": "TemplateElement",
+									"start": 373,
+									"end": 373,
+									"loc": {
+										"start": {
+											"line": 6,
+											"column": 24
+										},
+										"end": {
+											"line": 6,
+											"column": 24
+										}
+									},
+									"value": {
+										"raw": "",
+										"cooked": ""
+									},
+									"tail": true
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment between a template-literal type's interpolated type and its `}`. A block on",
+							"start": 20,
+							"end": 108
+						},
+						{
+							"type": "Line",
+							"value": " the type's line trails it inline, and a pair the author glued onto one line keeps that",
+							"start": 110,
+							"end": 199
+						},
+						{
+							"type": "Line",
+							"value": " line; a comment on its own line, and a line comment, expand the interpolation. An",
+							"start": 201,
+							"end": 285
+						},
+						{
+							"type": "Line",
+							"value": " author blank line before an own-line comment is preserved.",
+							"start": 287,
+							"end": 348
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 378,
+					"end": 413,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 36
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 383,
+						"end": 384,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "U"
+					},
+					"typeAnnotation": {
+						"type": "TSLiteralType",
+						"start": 387,
+						"end": 412,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 10
+							},
+							"end": {
+								"line": 8,
+								"column": 35
+							}
+						},
+						"literal": {
+							"type": "TemplateLiteral",
+							"start": 387,
+							"end": 412,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 10
+								},
+								"end": {
+									"line": 8,
+									"column": 35
+								}
+							},
+							"expressions": [
+								{
+									"type": "TSTypeReference",
+									"start": 391,
+									"end": 392,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 14
+										},
+										"end": {
+											"line": 8,
+											"column": 15
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 391,
+										"end": 392,
+										"loc": {
+											"start": {
+												"line": 8,
+												"column": 14
+											},
+											"end": {
+												"line": 8,
+												"column": 15
+											}
+										},
+										"name": "B"
+									},
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 393,
+											"end": 401
+										}
+									]
+								}
+							],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 388,
+									"end": 389,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 11
+										},
+										"end": {
+											"line": 8,
+											"column": 12
+										}
+									},
+									"value": {
+										"raw": "a",
+										"cooked": "a"
+									},
+									"tail": false
+								},
+								{
+									"type": "TemplateElement",
+									"start": 411,
+									"end": 411,
+									"loc": {
+										"start": {
+											"line": 8,
+											"column": 34
+										},
+										"end": {
+											"line": 8,
+											"column": 34
+										}
+									},
+									"value": {
+										"raw": "",
+										"cooked": ""
+									},
+									"tail": true,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 402,
+											"end": 410
+										}
+									]
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 416,
+					"end": 448,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 421,
+						"end": 422,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 7
+							}
+						},
+						"name": "V"
+					},
+					"typeAnnotation": {
+						"type": "TSLiteralType",
+						"start": 425,
+						"end": 447,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 10
+							},
+							"end": {
+								"line": 13,
+								"column": 3
+							}
+						},
+						"literal": {
+							"type": "TemplateLiteral",
+							"start": 425,
+							"end": 447,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 10
+								},
+								"end": {
+									"line": 13,
+									"column": 3
+								}
+							},
+							"expressions": [
+								{
+									"type": "TSTypeReference",
+									"start": 432,
+									"end": 433,
+									"loc": {
+										"start": {
+											"line": 11,
+											"column": 2
+										},
+										"end": {
+											"line": 11,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 432,
+										"end": 433,
+										"loc": {
+											"start": {
+												"line": 11,
+												"column": 2
+											},
+											"end": {
+												"line": 11,
+												"column": 3
+											}
+										},
+										"name": "B"
+									}
+								}
+							],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 426,
+									"end": 427,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 11
+										},
+										"end": {
+											"line": 10,
+											"column": 12
+										}
+									},
+									"value": {
+										"raw": "a",
+										"cooked": "a"
+									},
+									"tail": false
+								},
+								{
+									"type": "TemplateElement",
+									"start": 446,
+									"end": 446,
+									"loc": {
+										"start": {
+											"line": 13,
+											"column": 2
+										},
+										"end": {
+											"line": 13,
+											"column": 2
+										}
+									},
+									"value": {
+										"raw": "",
+										"cooked": ""
+									},
+									"tail": true,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 436,
+											"end": 443
+										}
+									]
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 451,
+					"end": 478,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 17,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 456,
+						"end": 457,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 6
+							},
+							"end": {
+								"line": 15,
+								"column": 7
+							}
+						},
+						"name": "W"
+					},
+					"typeAnnotation": {
+						"type": "TSLiteralType",
+						"start": 460,
+						"end": 477,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 10
+							},
+							"end": {
+								"line": 17,
+								"column": 3
+							}
+						},
+						"literal": {
+							"type": "TemplateLiteral",
+							"start": 460,
+							"end": 477,
+							"loc": {
+								"start": {
+									"line": 15,
+									"column": 10
+								},
+								"end": {
+									"line": 17,
+									"column": 3
+								}
+							},
+							"expressions": [
+								{
+									"type": "TSTypeReference",
+									"start": 467,
+									"end": 468,
+									"loc": {
+										"start": {
+											"line": 16,
+											"column": 2
+										},
+										"end": {
+											"line": 16,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 467,
+										"end": 468,
+										"loc": {
+											"start": {
+												"line": 16,
+												"column": 2
+											},
+											"end": {
+												"line": 16,
+												"column": 3
+											}
+										},
+										"name": "B"
+									},
+									"trailingComments": [
+										{
+											"type": "Line",
+											"value": " c",
+											"start": 469,
+											"end": 473
+										}
+									]
+								}
+							],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 461,
+									"end": 462,
+									"loc": {
+										"start": {
+											"line": 15,
+											"column": 11
+										},
+										"end": {
+											"line": 15,
+											"column": 12
+										}
+									},
+									"value": {
+										"raw": "a",
+										"cooked": "a"
+									},
+									"tail": false
+								},
+								{
+									"type": "TemplateElement",
+									"start": 476,
+									"end": 476,
+									"loc": {
+										"start": {
+											"line": 17,
+											"column": 2
+										},
+										"end": {
+											"line": 17,
+											"column": 2
+										}
+									},
+									"value": {
+										"raw": "",
+										"cooked": ""
+									},
+									"tail": true
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 481,
+					"end": 514,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 23,
+							"column": 4
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 486,
+						"end": 487,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 6
+							},
+							"end": {
+								"line": 19,
+								"column": 7
+							}
+						},
+						"name": "X"
+					},
+					"typeAnnotation": {
+						"type": "TSLiteralType",
+						"start": 490,
+						"end": 513,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 10
+							},
+							"end": {
+								"line": 23,
+								"column": 3
+							}
+						},
+						"literal": {
+							"type": "TemplateLiteral",
+							"start": 490,
+							"end": 513,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 10
+								},
+								"end": {
+									"line": 23,
+									"column": 3
+								}
+							},
+							"expressions": [
+								{
+									"type": "TSTypeReference",
+									"start": 497,
+									"end": 498,
+									"loc": {
+										"start": {
+											"line": 20,
+											"column": 2
+										},
+										"end": {
+											"line": 20,
+											"column": 3
+										}
+									},
+									"typeName": {
+										"type": "Identifier",
+										"start": 497,
+										"end": 498,
+										"loc": {
+											"start": {
+												"line": 20,
+												"column": 2
+											},
+											"end": {
+												"line": 20,
+												"column": 3
+											}
+										},
+										"name": "B"
+									}
+								}
+							],
+							"quasis": [
+								{
+									"type": "TemplateElement",
+									"start": 491,
+									"end": 492,
+									"loc": {
+										"start": {
+											"line": 19,
+											"column": 11
+										},
+										"end": {
+											"line": 19,
+											"column": 12
+										}
+									},
+									"value": {
+										"raw": "a",
+										"cooked": "a"
+									},
+									"tail": false
+								},
+								{
+									"type": "TemplateElement",
+									"start": 512,
+									"end": 512,
+									"loc": {
+										"start": {
+											"line": 23,
+											"column": 2
+										},
+										"end": {
+											"line": 23,
+											"column": 2
+										}
+									},
+									"value": {
+										"raw": "",
+										"cooked": ""
+									},
+									"tail": true,
+									"leadingComments": [
+										{
+											"type": "Block",
+											"value": " c ",
+											"start": 502,
+											"end": 509
+										}
+									]
+								}
+							]
+						}
+					}
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

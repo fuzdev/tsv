@@ -45,6 +45,7 @@ pub(crate) use arg_wrapping::{
     prepend_arrow_body_comments, wrap_call_with_hard_breaks_paren_line,
     wrap_call_with_will_break_guard,
 };
+pub(in crate::printer) use import_expr::{ImportOptionsArg, build_import_args_comment_layout};
 
 use super::Printer;
 use super::chain;

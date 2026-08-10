@@ -1,0 +1,616 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 536,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " A comment between an import type's specifier and its `)`. A block on the specifier's",
+			"start": 20,
+			"end": 107,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " line trails it inline, and a pair the author glued onto one line keeps that line; a",
+			"start": 109,
+			"end": 195,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment on its own line, and a line comment, open the parens. An author blank line",
+			"start": 197,
+			"end": 282,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 1
+				},
+				"end": {
+					"line": 4,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " before an own-line comment is preserved.",
+			"start": 284,
+			"end": 327,
+			"loc": {
+				"start": {
+					"line": 5,
+					"column": 1
+				},
+				"end": {
+					"line": 5,
+					"column": 44
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 351,
+			"end": 358,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 23
+				},
+				"end": {
+					"line": 6,
+					"column": 30
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 385,
+			"end": 393,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 23
+				},
+				"end": {
+					"line": 8,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 394,
+			"end": 402,
+			"loc": {
+				"start": {
+					"line": 8,
+					"column": 32
+				},
+				"end": {
+					"line": 8,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 434,
+			"end": 441,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 2
+				},
+				"end": {
+					"line": 12,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " c",
+			"start": 475,
+			"end": 479,
+			"loc": {
+				"start": {
+					"line": 17,
+					"column": 2
+				},
+				"end": {
+					"line": 17,
+					"column": 6
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 514,
+			"end": 521,
+			"loc": {
+				"start": {
+					"line": 23,
+					"column": 2
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 535,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 526,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 25,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 329,
+					"end": 360,
+					"loc": {
+						"start": {
+							"line": 6,
+							"column": 1
+						},
+						"end": {
+							"line": 6,
+							"column": 32
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 334,
+						"end": 335,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 6
+							},
+							"end": {
+								"line": 6,
+								"column": 7
+							}
+						},
+						"name": "T"
+					},
+					"typeAnnotation": {
+						"type": "TSImportType",
+						"start": 338,
+						"end": 359,
+						"loc": {
+							"start": {
+								"line": 6,
+								"column": 10
+							},
+							"end": {
+								"line": 6,
+								"column": 31
+							}
+						},
+						"argument": {
+							"type": "Literal",
+							"start": 345,
+							"end": 350,
+							"loc": {
+								"start": {
+									"line": 6,
+									"column": 17
+								},
+								"end": {
+									"line": 6,
+									"column": 22
+								}
+							},
+							"value": "./a",
+							"raw": "'./a'",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c ",
+									"start": 351,
+									"end": 358
+								}
+							]
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " A comment between an import type's specifier and its `)`. A block on the specifier's",
+							"start": 20,
+							"end": 107
+						},
+						{
+							"type": "Line",
+							"value": " line trails it inline, and a pair the author glued onto one line keeps that line; a",
+							"start": 109,
+							"end": 195
+						},
+						{
+							"type": "Line",
+							"value": " comment on its own line, and a line comment, open the parens. An author blank line",
+							"start": 197,
+							"end": 282
+						},
+						{
+							"type": "Line",
+							"value": " before an own-line comment is preserved.",
+							"start": 284,
+							"end": 327
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 363,
+					"end": 404,
+					"loc": {
+						"start": {
+							"line": 8,
+							"column": 1
+						},
+						"end": {
+							"line": 8,
+							"column": 42
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 368,
+						"end": 369,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 6
+							},
+							"end": {
+								"line": 8,
+								"column": 7
+							}
+						},
+						"name": "U"
+					},
+					"typeAnnotation": {
+						"type": "TSImportType",
+						"start": 372,
+						"end": 403,
+						"loc": {
+							"start": {
+								"line": 8,
+								"column": 10
+							},
+							"end": {
+								"line": 8,
+								"column": 41
+							}
+						},
+						"argument": {
+							"type": "Literal",
+							"start": 379,
+							"end": 384,
+							"loc": {
+								"start": {
+									"line": 8,
+									"column": 17
+								},
+								"end": {
+									"line": 8,
+									"column": 22
+								}
+							},
+							"value": "./b",
+							"raw": "'./b'",
+							"trailingComments": [
+								{
+									"type": "Block",
+									"value": " c1 ",
+									"start": 385,
+									"end": 393
+								}
+							]
+						}
+					}
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 407,
+					"end": 445,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 13,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 412,
+						"end": 413,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 6
+							},
+							"end": {
+								"line": 10,
+								"column": 7
+							}
+						},
+						"name": "V"
+					},
+					"typeAnnotation": {
+						"type": "TSImportType",
+						"start": 416,
+						"end": 444,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 10
+							},
+							"end": {
+								"line": 13,
+								"column": 2
+							}
+						},
+						"argument": {
+							"type": "Literal",
+							"start": 426,
+							"end": 431,
+							"loc": {
+								"start": {
+									"line": 11,
+									"column": 2
+								},
+								"end": {
+									"line": 11,
+									"column": 7
+								}
+							},
+							"value": "./c",
+							"raw": "'./c'"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c2 ",
+							"start": 394,
+							"end": 402
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 448,
+					"end": 483,
+					"loc": {
+						"start": {
+							"line": 15,
+							"column": 1
+						},
+						"end": {
+							"line": 18,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 453,
+						"end": 454,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 6
+							},
+							"end": {
+								"line": 15,
+								"column": 7
+							}
+						},
+						"name": "W"
+					},
+					"typeAnnotation": {
+						"type": "TSImportType",
+						"start": 457,
+						"end": 482,
+						"loc": {
+							"start": {
+								"line": 15,
+								"column": 10
+							},
+							"end": {
+								"line": 18,
+								"column": 2
+							}
+						},
+						"argument": {
+							"type": "Literal",
+							"start": 467,
+							"end": 472,
+							"loc": {
+								"start": {
+									"line": 16,
+									"column": 2
+								},
+								"end": {
+									"line": 16,
+									"column": 7
+								}
+							},
+							"value": "./d",
+							"raw": "'./d'"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 434,
+							"end": 441
+						}
+					]
+				},
+				{
+					"type": "TSTypeAliasDeclaration",
+					"start": 486,
+					"end": 525,
+					"loc": {
+						"start": {
+							"line": 20,
+							"column": 1
+						},
+						"end": {
+							"line": 24,
+							"column": 3
+						}
+					},
+					"id": {
+						"type": "Identifier",
+						"start": 491,
+						"end": 492,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 6
+							},
+							"end": {
+								"line": 20,
+								"column": 7
+							}
+						},
+						"name": "X"
+					},
+					"typeAnnotation": {
+						"type": "TSImportType",
+						"start": 495,
+						"end": 524,
+						"loc": {
+							"start": {
+								"line": 20,
+								"column": 10
+							},
+							"end": {
+								"line": 24,
+								"column": 2
+							}
+						},
+						"argument": {
+							"type": "Literal",
+							"start": 505,
+							"end": 510,
+							"loc": {
+								"start": {
+									"line": 21,
+									"column": 2
+								},
+								"end": {
+									"line": 21,
+									"column": 7
+								}
+							},
+							"value": "./e",
+							"raw": "'./e'"
+						}
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " c",
+							"start": 475,
+							"end": 479
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 514,
+							"end": 521
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}

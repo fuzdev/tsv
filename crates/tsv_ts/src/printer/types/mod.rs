@@ -42,7 +42,7 @@ pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
 use crate::ast::internal::{TSImportType, TSParenthesizedType, TSType};
 use crate::printer::CommentVec;
-use crate::printer::calls::PartitionedComments;
+use crate::printer::calls::{ImportOptionsArg, build_import_args_comment_layout};
 use crate::printer::layout::hang_after_operator;
 use helpers::type_needs_parens_for_indexed_access_object;
 use helpers::type_needs_parens_for_optional_element;
@@ -1035,69 +1035,66 @@ impl<'a> Printer<'a> {
         d.concat(&parts)
     }
 
-    /// Build the `import(<specifier>)` call portion of an import type, preserving
-    /// comments between `import(` and the specifier (leading) and between the
-    /// specifier and `)` (trailing). Leading comments go through the shared
-    /// `build_paren_leading_value_doc` (also used by the dynamic-import expression in
-    /// `calls/import_expr.rs`). Qualifier / type arguments are appended by the caller.
+    /// Build the `import(<specifier>[, <options>])` call portion of an import type.
+    /// Qualifier / type arguments are appended by the caller.
     ///
-    /// - leading line / own-line block comment → break the parens multiline
-    /// - inline block comment → stay inline (`import(/* c */ 'a')`)
-    /// - trailing line comment → break multiline; trailing block → inline
+    /// Every comment gap the arguments open — `import(`→specifier, specifier→options,
+    /// last argument→`)` — plus an author blank line between the two arguments, is
+    /// answered by [`build_import_args_comment_layout`], the layout this construct shares
+    /// with its value-level twin, the dynamic-import expression. Prettier prints the two
+    /// identically at every one of those gaps *and* at the width boundary (a trailing
+    /// comment breaks the parens in both; a bare over-width specifier hangs off the `=`
+    /// in both), so one implementation is the whole rule.
+    ///
+    /// ⚠️ **The hand-rolled version this replaced dropped comments in all three gaps** —
+    /// it took the delimiter reading (`PartitionedComments::new`) for a gap that follows
+    /// an ITEM, never emitted the dangling half at all, and scanned neither options gap.
+    /// Nothing caught it: the import-type shapes had no fixture, and a comment inside an
+    /// import type is rare enough that the corpus carries none.
+    ///
+    /// What stays here is only the clean-region layout: flat, since prettier keeps a bare
+    /// import type on one line however long the specifier is.
     fn build_import_type_call_doc(&self, i: &TSImportType<'_>, paren_close: u32) -> DocId {
         let d = self.d();
+        let open = d.text("import(");
         let open_paren_end = i.span.start + "import(".len() as u32;
-        let arg_start = i.argument.span.start;
         let arg_end = i.argument.span.end;
-        let literal_doc = self.build_literal_doc(&i.argument);
-
-        // Options present: keep the inline `import('a', {...})` layout, preserving
-        // any leading comments before the specifier.
-        if let Some(options) = &i.options {
-            let arg_doc = match self.build_rhs_comments_opt(open_paren_end, arg_start) {
-                Some(lead) => d.concat(&[lead, literal_doc]),
-                None => literal_doc,
-            };
-            return d.concat(&[
-                d.text("import("),
-                arg_doc,
-                d.text(", "),
-                self.build_expression_doc(options),
-                d.text(")"),
-            ]);
-        }
 
         // Leading comments between `import(` and the specifier.
-        let (arg_doc, leading_forces_break) =
-            self.build_paren_leading_value_doc(open_paren_end, arg_start, literal_doc);
+        let (arg_doc, leading_forces_break) = self.build_paren_leading_value_doc(
+            open_paren_end,
+            i.argument.span.start,
+            self.build_literal_doc(&i.argument),
+        );
 
-        // Trailing comments between the specifier and `)`.
-        let has_trailing = self.has_comments_to_emit_between(arg_end, paren_close);
-        let has_trailing_line = self.has_line_comments_between(arg_end, paren_close);
+        // Rule A over the options argument, exactly as the dynamic-import expression
+        // applies it to its own: an alone-on-line directive in the specifier→options gap
+        // freezes the argument that follows it. The specifier itself needs no such route —
+        // it is a string literal, which prints verbatim frozen or not.
+        let options_arg = i.options.as_ref().map(|options| ImportOptionsArg {
+            doc: self.gap_frozen_span(arg_end, options.span()).map_or_else(
+                || self.build_expression_doc(options),
+                |frozen| self.build_frozen_arg_doc(options, frozen),
+            ),
+            start: options.span().start,
+            end: options.span().end,
+        });
 
-        let mut inner = smallvec![arg_doc];
-        if has_trailing {
-            let pc = PartitionedComments::new(
-                self.comments,
-                self.comment_line_breaks,
-                arg_end,
-                paren_close,
-            );
-            pc.emit_trailing_comments(&mut inner, self);
+        if let Some(doc) = build_import_args_comment_layout(
+            self,
+            open,
+            arg_doc,
+            arg_end,
+            options_arg,
+            paren_close,
+            leading_forces_break,
+        ) {
+            return doc;
         }
-        let inner = d.concat(&inner);
 
-        if leading_forces_break || has_trailing_line {
-            // Line / own-line comments force the parens to break across lines.
-            d.concat(&[
-                d.text("import("),
-                d.indent_hardline(inner),
-                d.hardline(),
-                d.text(")"),
-            ])
-        } else {
-            // Block comments only (or none) — stay inline.
-            d.concat(&[d.text("import("), inner, d.text(")")])
+        match options_arg {
+            Some(options) => d.concat(&[open, arg_doc, d.text(", "), options.doc, d.text(")")]),
+            None => d.concat(&[open, arg_doc, d.text(")")]),
         }
     }
 

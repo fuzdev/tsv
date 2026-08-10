@@ -657,14 +657,24 @@ impl<'a> Printer<'a> {
                 self.push_element_comma_trailing(&mut parts, &trailing, d.empty());
 
                 // What the run did not claim is own-line, and is this container's trailing
-                // comment run (`a⏎// comment`), blank lines preserved.
+                // comment run (`a⏎// comment`) — the shared separator
+                // ([`Printer::push_trailing_run_separator`]), so a pair the author GLUED
+                // onto one line keeps it and everything else takes the blank-preserving
+                // break, the same answer every other end-of-container run gives.
                 let mut prev_pos = trailing.end_pos;
+                let mut prev_comment: Option<&internal::Comment> = None;
                 for comment in
                     comments_to_emit_in_range(self.comments, trailing.end_pos, end_boundary)
                 {
-                    self.push_blank_preserving_hardline(&mut parts, prev_pos, comment.span.start);
+                    self.push_trailing_run_separator(
+                        &mut parts,
+                        prev_comment,
+                        prev_pos,
+                        comment.span.start,
+                    );
                     parts.push(self.build_comment_doc(comment));
                     prev_pos = comment.span.end;
+                    prev_comment = Some(comment);
                 }
             }
         }

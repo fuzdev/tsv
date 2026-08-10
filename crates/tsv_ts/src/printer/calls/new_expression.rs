@@ -550,11 +550,16 @@ impl<'a> Printer<'a> {
                 new_expr.arguments[0].span().start,
             )
             .has_trailing_line();
+            // The last-argument arm reads own-line-ness from the SOURCE
+            // ([`Printer::has_own_line_block_comment_before_closer`]), the same predicate
+            // the call and parameter lists ask of this position: the gap holds the list's
+            // own comma, which `trailingComma: 'none'` deletes, so an `is_same_line(arg_end,
+            // …)` reading called a comment glued to it own-line and hard-broke a `new` that
+            // fits (`docs/comments.md` §Own-line-ness is a SOURCE question).
             let hard = paren_line_run
                 || spread_paren_comments_expand
                 || is_function_composition_args(new_expr.arguments)
-                || tsv_lang::comments_to_emit_in_range(self.comments, arg_end, paren_close)
-                    .any(|c| c.is_block && !self.is_same_line(arg_end, c.span.start));
+                || self.has_own_line_block_comment_before_closer(arg_end, paren_close);
 
             let mut paren_line = DocBuf::new();
             let arg_parts = build_args_joined_with_comments(
