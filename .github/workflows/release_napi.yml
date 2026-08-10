@@ -256,7 +256,9 @@ jobs:
 
       # Completeness (all five platforms, versions in lockstep), tag↔version
       # agreement, platforms-then-loader order, and skip-if-already-published
-      # idempotency all live in the script.
+      # idempotency all live in the script. A missing NPM_TOKEN secret yields
+      # an EMPTY token, which `npm view` (public) and `npm publish --dry-run`
+      # both tolerate — so the dry-run rehearsal works before the secret exists.
       - name: Publish
         env:
           NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}

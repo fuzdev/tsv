@@ -110,11 +110,14 @@ const npm = (npm_args: string[]): { code: number; stdout: string; stderr: string
 	};
 };
 
-/** Whether `name@version` is already on the registry; non-404 errors are fatal. */
+/** Whether `name@version` is already on the registry; non-404 errors are fatal.
+ * An exit-0 answer with unexpected stdout reads as NOT published — the safe
+ * degradation, since `npm publish` itself fails loudly on a real conflict,
+ * where aborting here would kill a release on an npm output quirk. */
 const already_published = (name: string): boolean => {
 	const res = npm(['view', `${name}@${version}`, 'version']);
-	if (res.code === 0 && res.stdout === version) return true;
-	if (res.code !== 0 && (res.stderr.includes('E404') || res.stderr.includes('404'))) return false;
+	if (res.code === 0) return res.stdout === version;
+	if (res.stderr.includes('E404') || res.stderr.includes('404')) return false;
 	console.error(`FAIL: npm view ${name}@${version} errored (not a 404):`);
 	console.error(res.stderr || res.stdout);
 	Deno.exit(1);
