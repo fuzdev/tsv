@@ -106,7 +106,7 @@ jobs:
       # Toolchain for the native rows; the container rows bring their own rust.
       - name: Install Rust
         if: matrix.build == 'native'
-        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master (no semver tags; bump manually)
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (no semver tags; bump manually)
         with:
           toolchain: 1.94.1
 
