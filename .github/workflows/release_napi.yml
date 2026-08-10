@@ -47,6 +47,16 @@ on:
         description: 'Build and gate everything; npm publish --dry-run'
         type: boolean
         default: true
+  schedule:
+    # Weekly rot-watch: the full matrix — musl + the almalinux gnu containers
+    # + the mac/win release legs — builds and gates, then DRY-RUNS the publish,
+    # so a container/runner/toolchain breakage surfaces within a week instead
+    # of at release rehearsal. None of these legs is exercised by PR CI (the
+    # platforms job covers glibc/mac/win via the dev build path), and a per-PR
+    # musl job would duplicate this for breakage classes PRs don't cause.
+    # Scheduled runs are FORCED dry-run in the publish step — a scheduled real
+    # publish could ship the current version's napi set unintentionally.
+    - cron: '17 6 * * 1'
 
 permissions:
   contents: read
@@ -267,7 +277,8 @@ jobs:
           flags=()
           if [ "$GITHUB_EVENT_NAME" = "push" ]; then
             flags+=(--expect-tag "$GITHUB_REF_NAME" --provenance)
-          elif [ "$DRY_RUN" = "true" ]; then
+          elif [ "$GITHUB_EVENT_NAME" = "schedule" ] || [ "$DRY_RUN" = "true" ]; then
+            # schedule is ALWAYS dry-run — see the trigger comment.
             flags+=(--dry-run)
           else
             flags+=(--provenance)
