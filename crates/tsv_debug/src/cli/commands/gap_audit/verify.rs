@@ -4,7 +4,9 @@
 
 use std::collections::BTreeMap;
 
-use crate::audit::properties::{Formatted, Verdict, ledger_format_with_comments};
+use crate::audit::properties::{
+    Formatted, UnverifiedCause, Verdict, ledger_format, ledger_format_with_comments,
+};
 use tsv_cli::cli::input::ParserType;
 
 use super::{Example, Kind, Payload};
@@ -35,8 +37,15 @@ use super::{Example, Kind, Payload};
 ///
 /// So: the injected source's comment contents vs the output's. Equal ⇒ every comment is
 /// content-conserved, so a ledger finding here is contradicted by the output — a genuine
-/// **instrument gap** ([`Verdict::Unconfirmed`], now provably so). Unequal ⇒ a content is
-/// missing, mangled, or duplicated — real loss/corruption ([`Verdict::Confirmed`]).
+/// **instrument gap** ([`UnverifiedCause::ContentConserved`], now provably so). Unequal ⇒ a
+/// content is missing, mangled, or duplicated — real loss/corruption ([`Verdict::Confirmed`]).
+///
+/// A declined confirmation names its cause ([`UnverifiedCause`]) rather than collapsing to one
+/// word: the causes range from staleness artifacts ([`UnverifiedCause::NoLongerFires`]) to a
+/// **real corruption class** — [`UnverifiedCause::OutputUnparseable`] /
+/// [`UnverifiedCause::OutputPanicked`], where the formatter's own output fails a re-format.
+/// `roundtrip_audit` can never see that one: its gate formats files AS AUTHORED, so an output
+/// made unreparseable by an *injected* comment is graded nowhere else.
 ///
 /// The residual blind spot, named rather than hidden and far narrower than the count's: a
 /// multiset can still balance if the SAME content is dropped in one place and duplicated in
@@ -47,52 +56,99 @@ pub(super) fn verify_example(example: &Example, kind: Kind, parser: ParserType) 
     if kind == Kind::Panic {
         return Verdict::Confirmed;
     }
-    let Ok(source) = std::fs::read_to_string(&example.path) else {
-        return Verdict::Unconfirmed;
+    let injected = match resplice(example, false) {
+        Ok(s) => s,
+        Err(cause) => return Verdict::Unconfirmed(cause),
     };
-    let Some(payload) = Payload::from_label(example.payload) else {
-        return Verdict::Unconfirmed;
-    };
-    // Re-create the finding by re-splicing at the INJECTION offset (never the attribution one)
-    // — a bystander drop only reproduces from the perturbation that caused it.
-    let offset = example.injection_offset;
-    if offset > source.len() || !source.is_char_boundary(offset) {
-        return Verdict::Unconfirmed;
-    }
-    let mut injected = String::with_capacity(source.len() + 24);
-    injected.push_str(&source[..offset]);
-    injected.push_str(payload.text());
-    injected.push_str(&source[offset..]);
 
-    let Formatted::Ok {
-        findings,
-        comments: input_comments,
-        output,
-        ..
-    } = ledger_format_with_comments(&injected, parser)
-    else {
-        return Verdict::Unconfirmed;
+    let (findings, input_comments, output) = match ledger_format_with_comments(&injected, parser) {
+        Formatted::Ok {
+            findings,
+            comments,
+            output,
+            ..
+        } => (findings, comments, output),
+        Formatted::Rejected => return Verdict::Unconfirmed(UnverifiedCause::InjectionRejected),
+        Formatted::Panicked => return Verdict::Unconfirmed(UnverifiedCause::InjectionPanicked),
     };
     if findings.is_empty() {
         // The example no longer fires at all — the ledger and the re-run disagree outright.
-        return Verdict::Unconfirmed;
+        return Verdict::Unconfirmed(UnverifiedCause::NoLongerFires);
     }
-    let Formatted::Ok {
-        comments: output_comments,
-        ..
-    } = ledger_format_with_comments(&output, parser)
-    else {
-        // The formatter's own output doesn't parse. A real bug, but `roundtrip_audit`'s.
-        return Verdict::Unconfirmed;
+    let output_comments = match ledger_format_with_comments(&output, parser) {
+        Formatted::Ok { comments, .. } => comments,
+        // The formatter's own output doesn't survive a re-format — the real-bug pair.
+        Formatted::Rejected => return Verdict::Unconfirmed(UnverifiedCause::OutputUnparseable),
+        Formatted::Panicked => return Verdict::Unconfirmed(UnverifiedCause::OutputPanicked),
     };
 
     if comment_content_multiset(&input_comments) == comment_content_multiset(&output_comments) {
         // Content conserved: the ledger's drop/double-print claim is not observable in the
         // output — an instrument gap, not the content loss it is filed as.
-        Verdict::Unconfirmed
+        Verdict::Unconfirmed(UnverifiedCause::ContentConserved)
     } else {
         // A content is missing, mangled, or duplicated — the ledger's claim is real.
         Verdict::Confirmed
+    }
+}
+
+/// Re-read the example's seed and re-splice its payload at the recorded **injection** offset
+/// (never the attribution one — a bystander drop only reproduces from the perturbation that
+/// caused it). The shared preamble of [`verify_example`] and [`anchor_probe`]; `pad` inserts
+/// the anchor probe's one leading space ahead of the payload. `Err` names which precondition
+/// failed, in [`verify_example`]'s cause vocabulary.
+fn resplice(example: &Example, pad: bool) -> Result<String, UnverifiedCause> {
+    let source =
+        std::fs::read_to_string(&example.path).map_err(|_| UnverifiedCause::SeedUnreadable)?;
+    let payload = Payload::from_label(example.payload).ok_or(UnverifiedCause::PayloadUnknown)?;
+    let offset = example.injection_offset;
+    if offset > source.len() || !source.is_char_boundary(offset) {
+        return Err(UnverifiedCause::OffsetInvalid);
+    }
+    let mut injected = String::with_capacity(source.len() + 25);
+    injected.push_str(&source[..offset]);
+    if pad {
+        injected.push(' ');
+    }
+    injected.push_str(payload.text());
+    injected.push_str(&source[offset..]);
+    Ok(injected)
+}
+
+/// What the anchor probe observed for one CONFIRMED example.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(super) enum AnchorProbe {
+    /// The padded splice formats with NO findings — the leading space rescued the comment.
+    /// The signature of a **fixed-offset anchor** (a scan starting at `span.start + K` that
+    /// the one extra byte pushes the comment past), and the mechanized form of the R1 triage
+    /// move "vary the whitespace and a fixed-offset anchor announces itself". A HINT for
+    /// triage ordering, never a verdict — a space can also legitimately change the site.
+    Rescued,
+    /// The padded splice still produces findings — the region is broken with or without the
+    /// space (the no-emitter signature, as far as this probe can tell).
+    StillFires,
+    /// The padded splice is rejected or panics, or the example can't be re-spliced — the
+    /// probe answers nothing and is excluded from the probed tally.
+    Inconclusive,
+}
+
+/// Re-splice a confirmed example's payload with one leading space and ask whether the finding
+/// disappears. One extra format per confirmed example — bounded by `VERIFY_EXAMPLES` per shape,
+/// like the verify pass it rides.
+pub(super) fn anchor_probe(example: &Example, parser: ParserType) -> AnchorProbe {
+    let Ok(padded) = resplice(example, true) else {
+        return AnchorProbe::Inconclusive;
+    };
+
+    match ledger_format(&padded, parser) {
+        Formatted::Ok { findings, .. } => {
+            if findings.is_empty() {
+                AnchorProbe::Rescued
+            } else {
+                AnchorProbe::StillFires
+            }
+        }
+        Formatted::Rejected | Formatted::Panicked => AnchorProbe::Inconclusive,
     }
 }
 
