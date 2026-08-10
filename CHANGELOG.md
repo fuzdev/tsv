@@ -14,6 +14,9 @@ Each `## Unreleased` section must be non-empty and carry a
 <!-- bump: minor -->
 
 - many formatting fixes
+- feat: publish native binaries, both CLI and JS lib
+  for Linux (x64 gnu and musl, arm64 gnu), macOS arm64, and Windows x64
+  ([#725](https://github.com/fuzdev/tsv/pull/725), [#726](https://github.com/fuzdev/tsv/pull/726))
 - **breaking** feat: every WASM export now takes an optional acorn-style options object —
   `parse_*(source, {locations?, goal?})` and `format_*(source, {goal?})`,
   replacing the flat `*_no_locations` / `*_with_goal` / `*_with_goal_no_locations` names
