@@ -18,6 +18,10 @@ authoring normalizes to.
 
 - `unformatted_ours_authored.svelte` — the authored shell form: tsv normalizes it
   to input, prettier to the variant.
+- `unformatted_ours_next_own_line.svelte` — the same authoring with the next
+  element pushed onto a line of its own. Where the author broke the line after
+  the comma is layout, not own-line-ness, so both formatters land exactly where
+  they land above.
 - `variant_leading.svelte` — prettier's landing form, dual-stable: a comment
   *authored* leading an element keeps that position in both formatters.
 

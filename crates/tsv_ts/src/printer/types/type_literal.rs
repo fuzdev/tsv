@@ -8,8 +8,8 @@
 
 use super::super::CommentVec;
 use super::super::comments_to_emit_in_range;
-use super::Printer;
 use super::helpers::{outermost_paren, unwrap_parenthesized};
+use super::{Printer, StandaloneGlue};
 use crate::ast::internal::{
     TSIntersectionType, TSParenthesizedType, TSType, TSTypeElement, TSTypeLiteral, TSUnionType,
 };
@@ -706,11 +706,18 @@ impl<'a> Printer<'a> {
             || has_line_or_multiline_block
             // Lazy: the per-member span collection only runs when the cheaper checks
             // above didn't already force multiline (and only when the construct has
-            // comments at all).
+            // comments at all). The glue rule is `ItemStart`, not the object literal's
+            // source reading — prettier expands `{ a: A⏎/* c */,⏎b: B }` here while
+            // collapsing the object literal written the same way (`StandaloneGlue`).
             || (comments_present && {
                 let member_spans: SmallVec<[_; 8]> =
                     obj.members.iter().map(TSTypeElement::span).collect();
-                self.has_standalone_block_comment(obj.span.start, obj.span.end, &member_spans)
+                self.has_standalone_block_comment(
+                    obj.span.start,
+                    obj.span.end,
+                    &member_spans,
+                    StandaloneGlue::ItemStart,
+                )
             })
     }
 

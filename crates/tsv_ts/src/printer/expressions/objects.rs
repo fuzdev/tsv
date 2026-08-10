@@ -12,7 +12,7 @@ use crate::printer::CommentSpacing;
 use crate::printer::expressions::assignment::RhsCommentInfo;
 use crate::printer::expressions::literals::is_valid_js_identifier;
 use crate::printer::layout::hang_after_operator;
-use crate::printer::{CommentVec, Printer};
+use crate::printer::{CommentVec, Printer, StandaloneGlue};
 use smallvec::{SmallVec, smallvec};
 use tsv_lang::Span;
 use tsv_lang::TAB_WIDTH;
@@ -46,14 +46,22 @@ impl<'a> Printer<'a> {
         // Check for block comments on their own line (not same line as any property).
         // Only relevant when the object has comments at all — otherwise there are no
         // block comments to be standalone, so skip the per-property span collection
-        // (the common comment-free object pays nothing).
+        // (the common comment-free object pays nothing). The glue half is the SOURCE
+        // reading: the object's own comma is re-emitted structure outside every property
+        // span, so a comment it follows is not standalone — see `StandaloneGlue` for why
+        // the type literal answers this differently.
         let has_standalone_block_comment = has_comments && {
             let property_spans: SmallVec<[_; 8]> = obj
                 .properties
                 .iter()
                 .map(internal::ObjectProperty::span)
                 .collect();
-            self.has_standalone_block_comment(obj.span.start, obj.span.end, &property_spans)
+            self.has_standalone_block_comment(
+                obj.span.start,
+                obj.span.end,
+                &property_spans,
+                StandaloneGlue::Source,
+            )
         };
 
         if obj.properties.is_empty() {
@@ -492,16 +500,22 @@ impl<'a> Printer<'a> {
                 d.concat(&[key_doc, d.text(": "), value_doc])
             }
         } else if prop.shorthand {
-            // Handle shorthand with default value: {a = 1}
-            // The value is an AssignmentExpression (or AssignmentPattern in proper patterns)
-            if let Expression::AssignmentExpression(assign) = &prop.value {
-                let default_doc = self.build_expression_doc(assign.right);
-                d.concat(&[key_doc, d.text(" = "), default_doc])
-            } else if let Expression::AssignmentPattern(pattern) = &prop.value {
-                let default_doc = self.build_expression_doc(pattern.right);
-                d.concat(&[key_doc, d.text(" = "), default_doc])
-            } else {
-                key_doc
+            // Shorthand with an initializer (`{a = 1}`) — a `CoverInitializedName`, whose
+            // early error tsv defers, so the value is an `AssignmentExpression` spanning the
+            // whole `a = 1` (an `AssignmentPattern` where a pattern was refined in place).
+            //
+            // ⚠️ Printed by the VALUE's own doc, not reassembled from `key + " = " + right`:
+            // that spelling emits no name→`=` gap, so a comment the author wrote there
+            // (`{a /* c */ = 1}`) had no emitter at all. It survived only because the
+            // element-comma seam, anchored at the KEY's end, claimed it and printed it past
+            // the initializer — a relocation across the binding, and a DROP the moment the
+            // anchor was corrected. The value's doc prints the key and that gap alike, and
+            // is not parenthesized here: the shorthand form is the syntax.
+            match &prop.value {
+                Expression::AssignmentExpression(_) | Expression::AssignmentPattern(_) => {
+                    self.build_expression_doc(&prop.value)
+                }
+                _ => key_doc,
             }
         } else {
             // Regular property.

@@ -37,7 +37,7 @@ mod scan;
 
 pub(crate) use declarations::{ClassMemberModifiers, HeritageKeyword};
 pub(super) use element_comma::{block_is_before_comma, run_defers_line};
-pub(crate) use lists::BlankRule;
+pub(crate) use lists::{BlankRule, StandaloneGlue};
 pub(crate) use owned::OwnedCommentEffect;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`.
@@ -235,6 +235,84 @@ impl<'a> Printer<'a> {
     /// calls this directly rather than re-deriving it.
     pub(crate) fn comment_hugs_next(&self, comment: &Comment) -> bool {
         comment.is_block && !has_newline_after_position(self.source, comment.span.end)
+    }
+
+    /// The RUN form of [`Self::comment_hugs_next`]: does `comment` — or the glued run it
+    /// **heads** — end up against code on its line, rather than ending the line?
+    ///
+    /// ⚠️ **A LAYOUT gate over a gap must ask this one, never the per-comment form.** A
+    /// run the author glued is one object: in `<A,⏎/* c1 */ /* c2 */⏎B>` the head hugs `c2`
+    /// and `c2` is not a head at all (content precedes it on its line), so a per-comment
+    /// `any()` over the gap finds nothing own-line and calls a run the author gave its own
+    /// line inline — the same suffix-vs-per-comment trap
+    /// [`Self::split_glued_comments`] names, one question over. Walking the glued chain and
+    /// asking the LAST link is what makes the run's own line visible.
+    ///
+    /// The walk is structural (the comment list), not a re-lex: a following comment is part
+    /// of the run when nothing but horizontal whitespace separates the two, which is
+    /// exactly the gap `comment_hugs_next` just proved holds no newline. It terminates
+    /// because each link starts strictly after the previous one ends.
+    ///
+    /// The *emitters* keep the per-comment form — they walk a run comment by comment and
+    /// each link's own glue is what they need ([`Self::push_leading_comment_run`]).
+    pub(crate) fn comment_run_hugs_next(&self, comment: &Comment) -> bool {
+        let mut current = comment;
+        loop {
+            if !self.comment_hugs_next(current) {
+                return false;
+            }
+            let glued_next = tsv_lang::comments_in_source_after(self.comments, current.span.end)
+                .next()
+                .filter(|next| {
+                    self.source[current.span.end as usize..next.span.start as usize]
+                        .bytes()
+                        .all(|b| b == b' ' || b == b'\t')
+                });
+            match glued_next {
+                Some(next) => current = next,
+                // Glued to code, not to another comment — the run hugs.
+                None => return true,
+            }
+        }
+    }
+
+    /// Whether a **block** comment OWNS its line — the classification every list-EXPANSION
+    /// gate applies, stated once. Four families spell the surrounding scan differently
+    /// (what bounds the gap, what counts as an item, whether a multi-line block is in
+    /// scope), and the one thing they must not spell differently is this.
+    ///
+    /// Both halves read the SOURCE: nothing before the `/*` on its line
+    /// ([`Self::comment_follows_content_on_its_line`]) and nothing after the `*/` there,
+    /// asked of the RUN ([`Self::comment_run_hugs_next`]). Every list here flattens when it
+    /// fits, so the author's line break *around* the comma is layout, not own-line-ness —
+    /// an item-boundary reading of either half calls a comma-glued comment own-line and
+    /// reaches a third fixed point neither the bare authoring nor prettier produces
+    /// (`docs/comments.md` §Own-line-ness is a SOURCE question).
+    ///
+    /// `item_follows` is the caller's fact about the range it scanned, not a default: with
+    /// no item left to lead, the comment is DANGLING and the container's closer sharing its
+    /// line is not glue (`{ a: 1⏎/* c */ }`, `[a,⏎/* c */ ]` — prettier expands both). A
+    /// gap bounded by the next item passes `true`, and the families whose trailing position
+    /// belongs to a separate predicate ([`Self::has_own_line_block_comment_after`]) always
+    /// do.
+    ///
+    /// The caller filters on kind first: a **line** comment forces every one of these lists
+    /// open on its own, and each family says so in its own clause rather than here.
+    ///
+    /// ⚠️ **Not a spelling of [`Self::comment_isolated_on_its_line`], and the two must not
+    /// be unified.** They differ on exactly one thing — this asks the glue question of the
+    /// RUN, that one per comment — and prettier genuinely answers a glued run given its own
+    /// line two ways: a LIST expands around it (`<A,⏎/* c1 */ /* c2 */⏎B>`), while a value
+    /// gap keeps its value inline (`type:⏎/* c1 */ /* c2 */⏎'json'`). A gate asking the
+    /// per-comment form calls the run inline; a value gap asking the run form hangs a value
+    /// both prettier and the fits-inline reading keep put.
+    pub(crate) fn block_comment_owns_its_line(
+        &self,
+        comment: &Comment,
+        item_follows: bool,
+    ) -> bool {
+        !self.comment_follows_content_on_its_line(comment)
+            && (!item_follows || !self.comment_run_hugs_next(comment))
     }
 
     /// Split a comment run into the ones that stay in the RUN and the ones

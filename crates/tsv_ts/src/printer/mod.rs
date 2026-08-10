@@ -53,7 +53,7 @@ pub(crate) use analysis::{
 };
 pub(crate) use comments::{
     ClassMemberModifiers, CommentFilter, CommentSpacing, CommentVec, HeritageKeyword, LeadingGlue,
-    OwnedCommentEffect,
+    OwnedCommentEffect, StandaloneGlue,
 };
 pub use expressions::assignment::should_inline_logical_expression;
 pub(crate) use expressions::assignment::{
@@ -1041,24 +1041,11 @@ impl<'a> Printer<'a> {
 
     /// Check if a delimited list contains own-line single-line block comments.
     ///
-    /// A block comment is "own-line" when nothing but whitespace precedes it on its line
-    /// ([`Printer::is_own_line_comment`]) and it doesn't share a line with the following
-    /// element (or closing delimiter).
-    ///
-    /// ⚠️ **The reading is of the SOURCE, never of the preceding item's end**, and the two
-    /// differ by exactly the text no item span covers — of which there are **two** kinds:
-    ///
-    /// - a **stripped delimiter**, a paren shell the printer erases (`[a,⏎(/* c */⏎b)]`, and
-    ///   in expression position every grouping paren, which is never a node at all);
-    /// - the list's own **comma**, which the author can push onto its own line
-    ///   (`[a⏎, /* c */⏎b]`) — re-emitted, never stripped, and still outside every item span.
-    ///
-    /// An item-boundary reading is blind to both, so a comment glued to either reads as
-    /// own-line and expands the list where prettier collapses it inline — a third fixed
-    /// point neither the bare authoring nor prettier produces. Every list here flattens when
-    /// it fits, so the author's break around a comma is layout, not own-line-ness
-    /// (`docs/conformance_prettier.md` §Comment Position Philosophy); a comment given a line
-    /// **of its own** still expands the list, which is what this predicate is for.
+    /// The per-comment classification is [`Printer::block_comment_owns_its_line`] — both
+    /// halves read the SOURCE, never a neighbouring item's boundary — and that function
+    /// carries the argument. What is this gate's own is the SCOPE it applies it over:
+    /// which comments are in range, which are the list's rather than an element's, and
+    /// whether an element follows at all.
     ///
     /// ⚠️ **This gate and the element→`,` seam must ask the same question.** The array
     /// literal proved the coupling: on the item-boundary reading the gate's blindness
@@ -1112,12 +1099,8 @@ impl<'a> Printer<'a> {
                 continue;
             }
 
-            // Skip a trailing inline comment — anything shares its line, item or not.
-            if !self.is_own_line_comment(comment) {
-                continue;
-            }
-
-            // Find the following element start, if any.
+            // Whether an element follows at all — the only thing the position of the next
+            // element is still asked for, the glue half reading the source instead.
             //
             // ⚠️ `>=`, not `>`: an element GLUED to the comment starts exactly where the
             // comment ends (`[a,⏎/* c */b]`), and a strict `>` skipped it — so a comment
@@ -1127,24 +1110,13 @@ impl<'a> Printer<'a> {
             // the second pass collapsed. All seven families carried it, and the space is
             // the only thing that ever distinguished them — authorship no reader could
             // see.
-            let next_elem_start = items
+            let element_follows = items
                 .iter()
                 .map(|e| get_printed_span(e).start)
-                .find(|&start| start >= comment.span.end);
+                .any(|start| start >= comment.span.end);
 
-            match next_elem_start {
-                // A comment between two elements is own-line when it doesn't share
-                // a line with the following element.
-                Some(next) => {
-                    if !self.is_same_line(comment.span.end, next) {
-                        return true;
-                    }
-                }
-                // A trailing comment before the closing bracket is a dangling
-                // comment: own-line whenever it cleared the same-line-as-preceding
-                // check above, even if the closing bracket was pulled onto its line
-                // (`/* c */ ]`). Prettier expands in that case.
-                None => return true,
+            if self.block_comment_owns_its_line(comment, element_follows) {
+                return true;
             }
         }
         false

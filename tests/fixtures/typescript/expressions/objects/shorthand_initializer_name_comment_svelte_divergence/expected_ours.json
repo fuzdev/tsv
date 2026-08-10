@@ -1,0 +1,734 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 478,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a comment between a shorthand property's name and its initializer keeps its place: the",
+			"start": 20,
+			"end": 109,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 90
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " property's own doc prints the whole `a1 = 1`, so the list seam must not claim inside it",
+			"start": 111,
+			"end": 201,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1 ",
+			"start": 209,
+			"end": 217,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 7
+				},
+				"end": {
+					"line": 4,
+					"column": 15
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same binding on the last property, where the closer ends the run instead of a comma",
+			"start": 232,
+			"end": 322,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 91
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c2 ",
+			"start": 334,
+			"end": 342,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 11
+				},
+				"end": {
+					"line": 7,
+					"column": 19
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " past the initializer the comment trails the property, as in every other list family",
+			"start": 353,
+			"end": 439,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 87
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c3 ",
+			"start": 451,
+			"end": 459,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 11
+				},
+				"end": {
+					"line": 10,
+					"column": 19
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 477,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 18,
+			"end": 468,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 11,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 203,
+					"end": 229,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 27
+						}
+					},
+					"expression": {
+						"type": "ObjectExpression",
+						"start": 204,
+						"end": 227,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 2
+							},
+							"end": {
+								"line": 4,
+								"column": 25
+							}
+						},
+						"properties": [
+							{
+								"type": "Property",
+								"start": 206,
+								"end": 221,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 4
+									},
+									"end": {
+										"line": 4,
+										"column": 19
+									}
+								},
+								"method": false,
+								"shorthand": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 206,
+									"end": 208,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 4
+										},
+										"end": {
+											"line": 4,
+											"column": 6
+										}
+									},
+									"name": "a1",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c1 ",
+											"start": 209,
+											"end": 217
+										}
+									]
+								},
+								"value": {
+									"type": "AssignmentExpression",
+									"start": 206,
+									"end": 221,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 4
+										},
+										"end": {
+											"line": 4,
+											"column": 19
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 206,
+										"end": 208,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 4
+											},
+											"end": {
+												"line": 4,
+												"column": 6
+											}
+										},
+										"name": "a1"
+									},
+									"right": {
+										"type": "Literal",
+										"start": 220,
+										"end": 221,
+										"loc": {
+											"start": {
+												"line": 4,
+												"column": 18
+											},
+											"end": {
+												"line": 4,
+												"column": 19
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								},
+								"kind": "init"
+							},
+							{
+								"type": "Property",
+								"start": 223,
+								"end": 225,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 21
+									},
+									"end": {
+										"line": 4,
+										"column": 23
+									}
+								},
+								"method": false,
+								"shorthand": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 223,
+									"end": 225,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 21
+										},
+										"end": {
+											"line": 4,
+											"column": 23
+										}
+									},
+									"name": "b1"
+								},
+								"value": {
+									"type": "Identifier",
+									"start": 223,
+									"end": 225,
+									"loc": {
+										"start": {
+											"line": 4,
+											"column": 21
+										},
+										"end": {
+											"line": 4,
+											"column": 23
+										}
+									},
+									"name": "b1"
+								},
+								"kind": "init"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment between a shorthand property's name and its initializer keeps its place: the",
+							"start": 20,
+							"end": 109
+						},
+						{
+							"type": "Line",
+							"value": " property's own doc prints the whole `a1 = 1`, so the list seam must not claim inside it",
+							"start": 111,
+							"end": 201
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 324,
+					"end": 350,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 27
+						}
+					},
+					"expression": {
+						"type": "ObjectExpression",
+						"start": 325,
+						"end": 348,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 2
+							},
+							"end": {
+								"line": 7,
+								"column": 25
+							}
+						},
+						"properties": [
+							{
+								"type": "Property",
+								"start": 327,
+								"end": 329,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 4
+									},
+									"end": {
+										"line": 7,
+										"column": 6
+									}
+								},
+								"method": false,
+								"shorthand": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 327,
+									"end": 329,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 4
+										},
+										"end": {
+											"line": 7,
+											"column": 6
+										}
+									},
+									"name": "b2"
+								},
+								"value": {
+									"type": "Identifier",
+									"start": 327,
+									"end": 329,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 4
+										},
+										"end": {
+											"line": 7,
+											"column": 6
+										}
+									},
+									"name": "b2"
+								},
+								"kind": "init"
+							},
+							{
+								"type": "Property",
+								"start": 331,
+								"end": 346,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 8
+									},
+									"end": {
+										"line": 7,
+										"column": 23
+									}
+								},
+								"method": false,
+								"shorthand": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 331,
+									"end": 333,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 8
+										},
+										"end": {
+											"line": 7,
+											"column": 10
+										}
+									},
+									"name": "a2",
+									"trailingComments": [
+										{
+											"type": "Block",
+											"value": " c2 ",
+											"start": 334,
+											"end": 342
+										}
+									]
+								},
+								"value": {
+									"type": "AssignmentExpression",
+									"start": 331,
+									"end": 346,
+									"loc": {
+										"start": {
+											"line": 7,
+											"column": 8
+										},
+										"end": {
+											"line": 7,
+											"column": 23
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 331,
+										"end": 333,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 8
+											},
+											"end": {
+												"line": 7,
+												"column": 10
+											}
+										},
+										"name": "a2"
+									},
+									"right": {
+										"type": "Literal",
+										"start": 345,
+										"end": 346,
+										"loc": {
+											"start": {
+												"line": 7,
+												"column": 22
+											},
+											"end": {
+												"line": 7,
+												"column": 23
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								},
+								"kind": "init"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same binding on the last property, where the closer ends the run instead of a comma",
+							"start": 232,
+							"end": 322
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 441,
+					"end": 467,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 27
+						}
+					},
+					"expression": {
+						"type": "ObjectExpression",
+						"start": 442,
+						"end": 465,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 2
+							},
+							"end": {
+								"line": 10,
+								"column": 25
+							}
+						},
+						"properties": [
+							{
+								"type": "Property",
+								"start": 444,
+								"end": 450,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 4
+									},
+									"end": {
+										"line": 10,
+										"column": 10
+									}
+								},
+								"method": false,
+								"shorthand": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 444,
+									"end": 446,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 4
+										},
+										"end": {
+											"line": 10,
+											"column": 6
+										}
+									},
+									"name": "a3"
+								},
+								"value": {
+									"type": "AssignmentExpression",
+									"start": 444,
+									"end": 450,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 4
+										},
+										"end": {
+											"line": 10,
+											"column": 10
+										}
+									},
+									"operator": "=",
+									"left": {
+										"type": "Identifier",
+										"start": 444,
+										"end": 446,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 4
+											},
+											"end": {
+												"line": 10,
+												"column": 6
+											}
+										},
+										"name": "a3"
+									},
+									"right": {
+										"type": "Literal",
+										"start": 449,
+										"end": 450,
+										"loc": {
+											"start": {
+												"line": 10,
+												"column": 9
+											},
+											"end": {
+												"line": 10,
+												"column": 10
+											}
+										},
+										"value": 1,
+										"raw": "1"
+									}
+								},
+								"kind": "init",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c3 ",
+										"start": 451,
+										"end": 459
+									}
+								]
+							},
+							{
+								"type": "Property",
+								"start": 461,
+								"end": 463,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 21
+									},
+									"end": {
+										"line": 10,
+										"column": 23
+									}
+								},
+								"method": false,
+								"shorthand": true,
+								"computed": false,
+								"key": {
+									"type": "Identifier",
+									"start": 461,
+									"end": 463,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 21
+										},
+										"end": {
+											"line": 10,
+											"column": 23
+										}
+									},
+									"name": "b3"
+								},
+								"value": {
+									"type": "Identifier",
+									"start": 461,
+									"end": 463,
+									"loc": {
+										"start": {
+											"line": 10,
+											"column": 21
+										},
+										"end": {
+											"line": 10,
+											"column": 23
+										}
+									},
+									"name": "b3"
+								},
+								"kind": "init"
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " past the initializer the comment trails the property, as in every other list family",
+							"start": 353,
+							"end": 439
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": [
+			{
+				"type": "Attribute",
+				"start": 8,
+				"end": 17,
+				"name": "lang",
+				"name_loc": {
+					"start": {
+						"line": 1,
+						"column": 8,
+						"character": 8
+					},
+					"end": {
+						"line": 1,
+						"column": 12,
+						"character": 12
+					}
+				},
+				"value": [
+					{
+						"start": 14,
+						"end": 16,
+						"type": "Text",
+						"raw": "ts",
+						"data": "ts"
+					}
+				]
+			}
+		]
+	}
+}
