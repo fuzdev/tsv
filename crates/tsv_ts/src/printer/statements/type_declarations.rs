@@ -1179,17 +1179,27 @@ impl<'a> Printer<'a> {
                 );
 
                 // A preceding format-ignore directive keeps the member's source
-                // verbatim. The member span excludes the
-                // trailing `,`, which the loop still appends below.
-                let member_doc =
-                    if body_has_comments && self.member_gap_frozen(prev_end, member_start) {
-                        self.raw_source_doc(member.span)
-                    } else {
-                        self.build_enum_member_doc(member)
-                    };
-                member_parts.push(member_doc);
+                // verbatim. The member span excludes the trailing `,`, which the loop
+                // still appends below. Resolved once as the SLICE rather than a bool,
+                // because the trailing seam below needs the same answer — one gap
+                // resolution, one source of truth.
+                let frozen_span = (body_has_comments
+                    && self.member_gap_frozen(prev_end, member_start))
+                .then_some(member.span);
+                member_parts.push(match frozen_span {
+                    Some(slice) => self.raw_source_doc(slice),
+                    None => self.build_enum_member_doc(member),
+                });
 
-                let member_end = member.span.end;
+                // Where the trailing seam starts: the member's PRINTED end, not
+                // `span.end`. The span runs through a grouping paren the initializer
+                // stops inside (`A = (a, b)`), and the paren this loop prints is the
+                // printer's own — so a span anchor starts past the shell's interior,
+                // which no other emitter scans (a DROPPED comment). Under a freeze the
+                // verbatim slice already printed that interior, so the anchor moves to
+                // its end instead, or the seam prints the comment a second time.
+                // `docs/comments.md` §The element-comma seam.
+                let member_end = Self::element_claim_anchor(frozen_span, member.printed_end());
                 let upper_bound = decl
                     .members
                     .get(i + 1)
