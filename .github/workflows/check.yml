@@ -66,7 +66,7 @@ jobs:
       # whenever a new Rust release adds a nursery lint. Edition 2024 needs
       # >= 1.85. Bump deliberately.
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master (no semver tags; bump manually)
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (no semver tags; bump manually)
         with:
           toolchain: 1.94.1
           components: clippy, rustfmt
@@ -118,7 +118,7 @@ jobs:
           persist-credentials: false
 
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master (no semver tags; bump manually)
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (no semver tags; bump manually)
         with:
           toolchain: 1.94.1
           targets: wasm32-unknown-unknown
@@ -204,7 +204,7 @@ jobs:
 
       # Same pin as `check`; no clippy/rustfmt components — lints gate on ubuntu.
       - name: Install Rust
-        uses: dtolnay/rust-toolchain@3c5f7ea28cd621ae0bf5283f0e981fb97b8a7af9 # master (no semver tags; bump manually)
+        uses: dtolnay/rust-toolchain@6c977a6ca4077a0ceb28ffbe03f59d46e9ac8772 # master (no semver tags; bump manually)
         with:
           toolchain: 1.94.1
 
