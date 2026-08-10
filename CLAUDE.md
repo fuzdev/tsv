@@ -101,7 +101,7 @@ See [Debug Tooling](#debug-tooling).
 # Deno tasks (recommended)
 deno task build            # workspace dev build
 deno task build:release    # workspace optimized build
-deno task build:all        # release + ffi + build:packages (everything)
+deno task build:all        # release + ffi + build:packages + build:napi:packages (everything)
 deno task build:packages   # the 6 publishable WASM bundles (npm + deno) — single source of truth shared by CI + publish.ts
 deno task build:bench      # the artifact set `bench`/`smoke` measure (ffi×3 + the 3 wasm:deno variants + the node half: napi + wasm:all:nodejs)
 deno task build:ffi        # C FFI library (:format / :parse size-only variants; :all builds all three)
@@ -278,6 +278,7 @@ deno task publish --wetrun --bump patch  # release: bump + publish + git finaliz
 deno task publish --wetrun               # resume a failed wetrun (sentinel retry only)
 # Flags: --bump patch|minor|major, --no-check, --no-git
 deno task test:npm[:parse|:all]          # builds the npm package, then runs Node tests against it (:all includes CLI tests; `:run` suffix skips the rebuild)
+deno task test:napi:npm                  # stages the napi loader + host platform package, then runs Node tests against the packaged shape (`:run` skips the rebuild)
 deno task validate:artifacts             # tight wasm size bounds + Deno smoke of all built bundles (fails if nothing is built)
 ```
 
@@ -432,7 +433,7 @@ tsv/
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
 │   ├── tsv_wasm/    # WASM bindings (the 3 published npm packages; bundles types/tsv_ast.d.ts + npm/locations.js; npm/cli.js is the tsv bin)
-│   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only until the npm publish lands)
+│   └── tsv_napi/    # N-API bindings (Node/Bun native path; npm/ is the @fuzdev/tsv_napi loader source)
 ├── scripts/         # Publish orchestrator, npm package patcher, Node artifact + N-API tests, AST type drift check
 ├── tests/           # Integration tests (parser, formatter, CLI)
 │   ├── fixtures/    # Test fixtures organized by language/feature

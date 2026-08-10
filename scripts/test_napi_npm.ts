@@ -48,6 +48,9 @@ if (platform_dirs.length !== 1) {
 	);
 	process.exit(1);
 }
+// The staged dir name is the BUILD script's triple detection (Deno-side);
+// the loader detects with Node's own APIs. The import below succeeds only
+// when the two agree, so host-triple agreement is gated here for free.
 const triple = platform_dirs[0]!;
 
 /** Stage the loader (+ optionally the platform package) into a fresh temp node_modules. */

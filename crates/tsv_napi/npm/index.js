@@ -23,7 +23,10 @@
 
 const { readdirSync } = require('node:fs');
 
-/** The platform packages that exist — what the load error reports. */
+/** The platform packages that exist — what the load error reports. Keep in
+ * sync with `scripts/build_napi_packages.ts`'s `SUPPORTED_TRIPLES`
+ * (`scripts/test_napi_npm.ts` gates the agreement via the generated
+ * optionalDependencies). */
 const SUPPORTED = [
 	'linux-x64-gnu',
 	'linux-arm64-gnu',
