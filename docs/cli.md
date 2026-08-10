@@ -5,7 +5,7 @@
 The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 
 - Each command is a `FromArgs` struct in its own module under `src/cli/commands/`
-- `cli::TopLevel` holds the `Subcommand` enum; `main.rs` calls `argh::from_env()` and dispatches
+- `cli::TopLevel` holds a top-level `--version` switch plus the `Subcommand` enum (`Option` solely so a bare `--version` parses; a bare `tsv` reproduces argh's required-subcommand error — see `TopLevel::run`); `main.rs` calls `argh::from_env()` and dispatches
 - argh has no struct-flattening attribute, so the shared input fields (`--content`, `--stdin`, `--parser`, file path) are declared per command and assembled into `cli::input::InputArgs` for resolution
 
 **Adding Commands**: Create `src/cli/commands/newcmd.rs` with a `FromArgs` struct and a `run()` method, add a variant to `Subcommand` in `cli/mod.rs`.
@@ -22,16 +22,23 @@ The CLI uses [argh](https://crates.io/crates/argh) for declarative arg parsing:
 
 - **`tsv` (production)**: Pure Rust, no external tool dependencies
   - Crates: `tsv_cli`
-  - Commands: `parse`, `format`
-- **`tsv` npm bin**: `crates/tsv_wasm/npm/cli.js`, shipped in
-  `@fuzdev/tsv_wasm` (WASM engine) and copied verbatim into the native
-  `@fuzdev/tsv` (N-API engine) at stage time — a hand-written Node mirror of
-  this CLI's contract (subcommands, flags, exit codes, output streams,
-  traversal rules; single-threaded — `--jobs` is accepted for drop-in parity
-  and ignored). One source: it imports its engine from `./index.js`, so each
-  copy binds to its own package's engine. Behavioral changes to
-  `format`/`parse` here must be mirrored there and in the CLI tests of
-  `scripts/test_npm.ts` (wasm) and `scripts/test_napi_npm.ts` (native).
+  - Commands: `parse`, `format` (plus the top-level `--version` switch)
+- **`tsv` npm bin, native (`@fuzdev/tsv`)**: the production `tsv` binary
+  itself, shipped inside each `@fuzdev/tsv-<triple>` platform package and
+  exec'd by the loader's `crates/tsv_napi/npm/bin.js` dispatcher (argv,
+  stdio, exit codes, and signals forwarded verbatim) — so `npx tsv` on the
+  native package has this CLI's exact contract, real `--jobs` parallelism
+  included. When no binary is reachable the dispatcher falls back to the JS
+  mirror below.
+- **`tsv` npm bin, WASM (`@fuzdev/tsv_wasm`)**: `crates/tsv_wasm/npm/cli.js`
+  — a hand-written Node mirror of this CLI's contract (subcommands, flags,
+  exit codes, output streams, traversal rules; single-threaded — `--jobs` is
+  accepted for drop-in parity and ignored). One source: it imports its
+  engine from `./index.js`, so the copy staged into the native `@fuzdev/tsv`
+  (as the dispatcher's fallback) binds to the N-API engine with no adapter.
+  Behavioral changes to `format`/`parse` here must be mirrored there and in
+  the CLI tests of `scripts/test_npm.ts` (wasm) and
+  `scripts/test_napi_npm.ts` (native).
 - **`tsv_debug` (development)**: Uses embedded Deno sidecar for external tools
   - Reuses `tsv_cli` infrastructure
   - Commands: `check`, `compare`, `ast_diff`, `line_width`, `canonical_parse`, `format_prettier`, `fixture_init`, `fixtures_validate`, `fixtures_update`, `fixtures_update_parsed`, `fixtures_update_formatted`, `fixtures_audit`, `ts_fixture_audit`, `conformance_audit`, `swallow_audit` (requires `--features swallow_check`, so default builds profile production-shaped render code), `scan_audit`, `authoring_audit`, `build_fanout_audit`, `metrics`, `profile`, `json_profile`, `arena_stats`, `buffer_sizes`, `lex_diff`, `test262`, `tsc_conformance` (nested: `query`, `roundtrip`, `index`, `run`, `check-test` — the tsgo typechecker-conformance harness for the experimental `tsv_check` crate, which may never ship; command surface in [typechecker.md](typechecker.md))

@@ -51,21 +51,25 @@ Staged by `deno task build:napi:packages` (`scripts/build_napi_packages.ts`)
 into `crates/tsv_napi/pkg/` (gitignored):
 
 - **`pkg/napi/` — `@fuzdev/tsv`**, the loader: `npm/index.js` +
-  `npm/index.d.ts` + `npm/README.md` + a copy of `tsv_wasm`'s `tsv_ast.d.ts`,
-  `locations.js`/`.d.ts`, and `cli.js` (wired as the `tsv` bin) +
-  a generated package.json pinning the platform packages as **exact-version
-  `optionalDependencies`**. The staging directory is named for the binding
-  (`napi`), not for the package — the published name is the bare `@fuzdev/tsv`,
-  tsv's native distribution.
+  `npm/index.d.ts` + `npm/platform.js` (triple detection, shared by the next
+  two) + `npm/bin.js` (the `tsv` bin — a dispatcher, see below) +
+  `npm/README.md` + a copy of `tsv_wasm`'s `tsv_ast.d.ts`,
+  `locations.js`/`.d.ts`, and `cli.js` (the JS CLI mirror, `bin.js`'s
+  fallback) + a generated package.json pinning the platform packages as
+  **exact-version `optionalDependencies`**. The staging directory is named
+  for the binding (`napi`), not for the package — the published name is the
+  bare `@fuzdev/tsv`, tsv's native distribution.
 - **`pkg/<triple>/` — `@fuzdev/tsv-<triple>`**, one platform package per
   invocation: the built cdylib copied to `tsv_napi.node` (byte-identical
-  rename, named for the crate it came from) + a generated package.json whose
-  `os`/`cpu`/`libc` fields drive install-time selection. Naming is the
-  ecosystem-universal `<loader>-<dash triple>` shape (swc's). The set:
-  `linux-x64-gnu`, `linux-arm64-gnu`, `linux-x64-musl`, `darwin-arm64`,
-  `win32-x64`. One per invocation by design — a machine can only have built
-  its own triple; the release workflow runs the script once per matrix target
-  (`--triple` + `--artifact` name a cross-built binary).
+  rename, named for the crate it came from), the real `tsv_cli` binary copied
+  to `tsv`/`tsv.exe` beside it (plain `release` profile — what `bin.js`
+  execs), + a generated package.json whose `os`/`cpu`/`libc` fields drive
+  install-time selection. Naming is the ecosystem-universal
+  `<loader>-<dash triple>` shape (swc's). The set: `linux-x64-gnu`,
+  `linux-arm64-gnu`, `linux-x64-musl`, `darwin-arm64`, `win32-x64`. One per
+  invocation by design — a machine can only have built its own triple; the
+  release workflow runs the script once per matrix target (`--triple` +
+  `--artifact`/`--cli-artifact` name cross-built binaries).
 
 **The loader is ESM**, the same module system as the wasm packages — one
 dialect across tsv's whole npm surface, which is what lets shared sources
@@ -96,32 +100,64 @@ so the staging script copies that same file in and appends the re-export to the
 staged entry — the export names are extracted from the helper, never listed a
 second time. The `IgnoreStack` discovery class ships too — a `#[napi]` twin of
 `tsv_wasm`'s wrapper over the same `tsv_ignore` / `tsv_discover` pair, re-exported
-straight off the addon since it takes no options bag. The `tsv` bin ships
-too: `tsv_wasm/npm/cli.js` imports its engine from `./index.js`, so the same
-source copied in at stage time binds to the native loader with no adapter —
-`npx tsv format src` on this package runs the native engine. Like the wasm
-copy it is single-threaded (`--jobs` accepted for parity and ignored); the
-Rust `tsv_cli` binary stays the fast path for large trees.
+straight off the addon since it takes no options bag.
+
+**The `tsv` bin here IS the native CLI** (the esbuild/biome npm shape): the
+loader's bin is `npm/bin.js`, a dispatcher that resolves the platform
+package's `tsv`/`tsv.exe` — the real `tsv_cli` binary shipped beside the
+addon — and execs it, forwarding argv, stdio, exit codes, and signals
+verbatim. So `npx tsv format src` on this package gets the native CLI's exact
+contract: real `--jobs` parallelism, parallel discovery, native error paths.
+The dispatch never loads the addon (it resolves the package and probes the
+file, ~1 ms on top of Node's ~20 ms startup) and never reads PATH — only this
+package's own optionalDependency. When no binary is reachable, `bin.js`
+defers to `cli.js` — `tsv_wasm/npm/cli.js`, the shared JS mirror of the same
+contract, copied in at stage time; it imports its engine from `./index.js`,
+so the copy binds to the native loader with no adapter (and remains
+single-threaded, `--jobs` accepted-and-ignored — in `@fuzdev/tsv_wasm`, where
+it is the bin itself, that caveat still holds). The dispatcher lives in a
+napi-only file rather than as a branch inside the shared `cli.js` so the wasm
+copy stays byte-identical with no dead dispatch code — and so the wasm CLI
+can never resolve a sibling-installed native platform package by accident.
 
 Tests: `deno task test:napi:npm` stages a temp `node_modules` and drives the
 packaged shape under Node — loader resolution, ESM and CommonJS hosts, the options
 surface with exact error strings, package.json coherence (pins, selection
-fields, `files`, the loader-`SUPPORTED`-vs-optionalDependencies agreement),
-the unsupported-platform error, and the `tsv` bin: the CLI contract over the
-native engine plus the shared `tests/discovery/scenarios.json` parity table,
-whose third consumer this is (beside `scripts/test_npm.ts`'s wasm CLI run and
-the native `tests/discovery_parity.rs`). Runs per OS in CI (the `platforms` job).
+fields, `files` on both packages, the executable bit on the CLI binary, the
+loader-`SUPPORTED`-vs-optionalDependencies agreement), the
+unsupported-platform error, and the `tsv` bin: that `bin.js` really
+dispatches to the binary (argh's help output — a discriminator the JS mirror
+never prints), that it forwards exit codes, stdout/stderr, and stdin, that
+`--version` through the bin matches the staged package version (a
+binary↔package lockstep gate — a stale binary staged into a fresh package
+fails it), that `npm pack` would ship the binary executable (npm packs the
+on-disk mode), and the degraded paths: binary removed → `cli.js`,
+present-but-unrunnable → warn + `cli.js`, child killed by a signal →
+re-raised. The shared
+`tests/discovery/scenarios.json` parity table runs through **both** bin
+entries: `bin.js` (native discovery via the shim — the real `npx tsv` path)
+and `cli.js` directly (the fallback JS loop over the native `IgnoreStack`,
+the table's standing third consumer beside `scripts/test_npm.ts`'s wasm CLI
+run and the native `tests/discovery_parity.rs`). Runs per OS in CI (the
+`platforms` job).
 
 **Release**: `.github/workflows/release_napi.yml`, triggered by the v\* tag
 `scripts/publish.ts` pushes (or `workflow_dispatch` as a dry-run rehearsal).
-Per target: container-pinned build (gnu rows in almalinux:8 → glibc 2.28
-floor, measured by the workflow's floor gate; musl in rust:alpine with
-`-crt-static` off, gated GLIBC-free), size bounds
-(`scripts/validate_napi_artifact.ts`), and the npm-shape test over the real
-artifact (node:alpine for musl). The publish job gathers all five, stages the
-loader (`--loader-only`), and runs `scripts/publish_napi.ts` — completeness
-and version-lockstep checks, platforms-then-loader order, idempotent
-skip-if-published. See the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
+Per target: container-pinned builds of **both** shipped binaries — the addon
+(`napi` profile) and the `tsv_cli` binary (plain `release`: abort + LTO, the
+same artifact the hyperfine benches measure; a standalone process owns its
+own crash, so the addon's unwind rationale doesn't apply) — gnu rows in
+almalinux:8 → glibc 2.28 floor, measured by the workflow's floor gate over
+both artifacts; musl in rust:alpine with `-crt-static` off, both gated
+GLIBC-free. Then per-artifact size bounds
+(`scripts/validate_napi_artifact.ts`, one anchored band per binary) and the
+npm-shape test over the real artifacts (node:alpine for musl). The publish
+job gathers all five, stages the loader (`--loader-only`), and runs
+`scripts/publish_napi.ts` — completeness (addon + CLI binary per platform)
+and version-lockstep checks, re-arming the CLI binaries' executable bit
+(artifact transport drops file modes — without it every posix `npx tsv`
+would EACCES), platforms-then-loader order, idempotent skip-if-published.
+See the root [CLAUDE.md §Publishing](../../CLAUDE.md#publishing).
 
 ## Marshalling & errors
 
@@ -132,7 +168,7 @@ napi-rs marshals the JS string into a Rust `String` and the returned `String` ba
 ## Files
 
 - `src/lib.rs` — All bindings: the `lang_bindings!` macro, the three `lang_bindings!` invocations, the flat goal-aware TS exports, the `format`-gated `IgnoreStack` class, the `panic_probe` export, and a `#[cfg(test)]` module. The reusable arenas are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
-- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared `locations.js` helper (see §The npm packages)
+- `npm/` — the `@fuzdev/tsv` loader package source (`index.js` + `index.d.ts` + `platform.js` (triple detection) + `bin.js` (the `tsv` bin dispatcher) + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts`, which also copies in the shared `locations.js` helper and `cli.js` fallback (see §The npm packages)
 - `build.rs` — `napi_build::setup()` (linker config for the addon)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (N-API generates unsafe code); deps `napi` + `napi-derive` (3.x) + `tsv_arena`, plus the `format`-optional `tsv_ignore` + `tsv_discover` behind `IgnoreStack`, build-dep `napi-build` (2.x). `format` → `tsv_arena/format` + those two
 

@@ -8,7 +8,7 @@ For end-user invocation syntax see the [root CLAUDE.md §CLI Usage](../../CLAUDE
 
 ## Public API
 
-**Binary (`tsv`)** — `main.rs` parses `cli::TopLevel` via `argh::from_env()` and dispatches. Two commands:
+**Binary (`tsv`)** — `main.rs` parses `cli::TopLevel` via `argh::from_env()` and dispatches. A top-level `--version` switch prints `tsv <version>` (the workspace version) and exits 0 — top-level only, and the subcommand field is `Option` solely so it can parse: a bare `tsv` reproduces argh's required-subcommand error verbatim (see `TopLevel::run`). Two commands:
 
 - `tsv parse <file|--content|--stdin> [--pretty] [--parser <type>] [--goal <script|module>] [--no-locations]` — emits public JSON AST to stdout. `--no-locations` emits the span-only wire (drops per-node `loc`; Svelte also `name_loc`; no-op for CSS) — offsets only, line/column derivable from source; mirrors acorn's `locations: false`
 - `tsv format <paths...|--content|--stdin> [--parser <type>] [--check] [--list] [--jobs <n>]` — formats paths in place (writes only when output differs); `--content`/`--stdin` print to stdout. `--list` prints the discovered in-scope files without formatting (path mode only; mutually exclusive with `--check`; empty scope exits 0)

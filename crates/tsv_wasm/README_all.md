@@ -17,11 +17,11 @@ npx @fuzdev/tsv_wasm format --list .   # list the in-scope files, format nothing
 npx @fuzdev/tsv_wasm parse file.svelte # JSON AST to stdout (--pretty to indent)
 ```
 
-Installed (`npm i -D @fuzdev/tsv_wasm`), the bin is `tsv`. Directories recurse over `.ts`/`.svelte`/`.css` with gitignore-aware discovery. **Inside a git repo** it honors `.gitignore`, `.formatignore`, and `.prettierignore` (all hierarchical, like git), scoped to the repo so results are reproducible. **Outside a repo** it honors only `.formatignore`, falling back to skipping hidden directories and `dist`/`build`/`target`. `node_modules` and VCS directories are always skipped; an explicitly named file skips the ignore files, but its extension must still be one tsv formats.
+Installed (`npm i -D @fuzdev/tsv_wasm`), the bin is `tsv`. Directories recurse over the JS/TS family (`.ts`/`.mts`/`.cts`/`.js`/`.mjs`/`.cjs`), `.svelte`, and `.css` with gitignore-aware discovery. **Inside a git repo** it honors `.gitignore`, `.formatignore`, and `.prettierignore` (all hierarchical, like git), scoped to the repo so results are reproducible. **Outside a repo** it honors only `.formatignore`, falling back to skipping hidden directories and `dist`/`build`/`target`. `node_modules` and VCS directories are always skipped; an explicitly named file skips the ignore files, but its extension must still be one tsv formats.
 
 `format --list` prints the discovered in-scope files without formatting — a read-only view of what `format` would touch. `--content <source>` / `--stdin` (with `--parser svelte|typescript|css`) format or parse strings to stdout. For TypeScript, `--goal script|module` (default `module`; for `format`, `--content`/`--stdin` only) selects the parse goal — at `script`, `await` is an ordinary identifier and `import`/`export`/`import.meta` are errors. `parse --no-locations` emits the span-only wire (no per-node `loc`; Svelte also no `name_loc`; no-op for CSS). Exit codes — `format`: 0 clean, 1 would-change (`--check`), 2 errors; `parse`: 0 ok, 1 error.
 
-This CLI runs the single-threaded WASM build — plenty fast for most trees. On Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) ships the same CLI bound to its native engine, the faster path.
+This CLI runs the single-threaded WASM build — plenty fast for most trees. On Node.js and Bun, [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) ships tsv's real native CLI binary and its `tsv` bin execs it — the fast path, with multi-file parallelism (`--jobs`).
 
 ## Library usage
 

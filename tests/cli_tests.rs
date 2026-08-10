@@ -8,8 +8,11 @@ use std::sync::Once;
 /// Test helper; panicking on spawn failure is the desired behavior.
 #[allow(clippy::expect_used)]
 fn tsv(args: &[&str]) -> std::process::Output {
+    // The `--` matters: without it a leading-flag argument (`tsv --version`)
+    // is parsed by cargo itself instead of being forwarded — subcommand-first
+    // invocations only dodged that by starting with a non-flag word.
     Command::new("cargo")
-        .args(["run", "-p", "tsv_cli", "-q"])
+        .args(["run", "-p", "tsv_cli", "-q", "--"])
         .args(args)
         .output()
         .expect("Failed to execute command")
@@ -22,7 +25,7 @@ fn tsv_stdin(args: &[&str], input: &str) -> std::process::Output {
     use std::io::Write;
     use std::process::Stdio;
     let mut child = Command::new("cargo")
-        .args(["run", "-p", "tsv_cli", "-q"])
+        .args(["run", "-p", "tsv_cli", "-q", "--"])
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -983,6 +986,30 @@ fn test_no_command() {
     assert!(
         stderr.contains("subcommand") || stderr.contains("--help"),
         "Should show usage/help message"
+    );
+}
+
+#[test]
+fn test_version_flag() {
+    let output = tsv(&["--version"]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        format!("tsv {}\n", env!("CARGO_PKG_VERSION")),
+        "exact `tsv <workspace version>` line — the npm cli.js mirrors it from its package.json"
+    );
+    assert!(output.stderr.is_empty());
+}
+
+#[test]
+fn test_version_is_top_level_only() {
+    // Subcommands don't take --version — an unrecognized-argument error, like
+    // the JS mirror's strict parseArgs (exit 1).
+    let output = tsv(&["format", "--version"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("Unrecognized argument: --version"),
+        "should fail as an unknown subcommand argument, not print a version"
     );
 }
 
