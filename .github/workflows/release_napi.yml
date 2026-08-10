@@ -1,5 +1,5 @@
-# Release workflow for the N-API npm packages — the @fuzdev/tsv_napi loader +
-# the five @fuzdev/tsv_napi-<triple> platform packages. This is the per-platform
+# Release workflow for the N-API npm packages — the @fuzdev/tsv loader +
+# the five @fuzdev/tsv-<triple> platform packages. This is the per-platform
 # matrix the single-machine scripts/publish.ts deliberately does NOT own:
 # publish.ts releases the WASM set and pushes the annotated v* tag, and that tag
 # triggers this workflow. The tag is also the assertion that the local

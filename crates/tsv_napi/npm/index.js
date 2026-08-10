@@ -1,8 +1,8 @@
 /**
- * `@fuzdev/tsv_napi` — native N-API bindings for tsv (Node.js / Bun).
+ * `@fuzdev/tsv` — native N-API bindings for tsv (Node.js / Bun).
  *
  * A thin loader over the per-platform prebuilt addons
- * (`@fuzdev/tsv_napi-<triple>`, installed as optionalDependencies — the
+ * (`@fuzdev/tsv-<triple>`, installed as optionalDependencies — the
  * package manager selects by their `os`/`cpu`/`libc` fields; this file only
  * resolves the matching name). The API mirrors `@fuzdev/tsv_wasm` export for
  * export — same names, same `(source, options?)` bags, same error strings —
@@ -60,11 +60,11 @@ const platform_triple = () => {
 const triple = platform_triple();
 let addon;
 try {
-	addon = require(`@fuzdev/tsv_napi-${triple}`);
+	addon = require(`@fuzdev/tsv-${triple}`);
 } catch (cause) {
 	throw new Error(
-		`@fuzdev/tsv_napi: failed to load the native binding for ${triple} ` +
-			`(@fuzdev/tsv_napi-${triple}). Prebuilt platforms: ${SUPPORTED.join(', ')}. ` +
+		`@fuzdev/tsv: failed to load the native binding for ${triple} ` +
+			`(@fuzdev/tsv-${triple}). Prebuilt platforms: ${SUPPORTED.join(', ')}. ` +
 			`On an unsupported platform use @fuzdev/tsv_wasm (universal WASM, same API). ` +
 			`Cause: ${cause?.message ?? cause}`,
 		{ cause }

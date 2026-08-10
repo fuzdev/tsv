@@ -1,10 +1,10 @@
 /**
  * Stage the publishable N-API npm packages into `crates/tsv_napi/pkg/`:
  *
- * - `pkg/napi/` — the `@fuzdev/tsv_napi` loader (index.js + index.d.ts +
+ * - `pkg/napi/` — the `@fuzdev/tsv` loader (index.js + index.d.ts +
  *   tsv_ast.d.ts + README + LICENSE + generated package.json with the
  *   exact-pinned platform `optionalDependencies`).
- * - `pkg/<triple>/` — ONE platform package, `@fuzdev/tsv_napi-<triple>`: the
+ * - `pkg/<triple>/` — ONE platform package, `@fuzdev/tsv-<triple>`: the
  *   built cdylib copied to `tsv_napi.node` (a byte-identical rename) plus a
  *   generated package.json whose `os`/`cpu`/`libc` fields drive install-time
  *   selection.
@@ -116,7 +116,7 @@ for (const [from, to] of [
 	Deno.copyFileSync(from, `${loader_dir}/${to}`);
 }
 write_pkg(loader_dir, {
-	name: '@fuzdev/tsv_napi',
+	name: '@fuzdev/tsv',
 	version,
 	description: 'native formatter and parser for Svelte, TypeScript, and CSS (N-API)',
 	// CommonJS loader (no `type: module`) — the native-addon norm; ESM named
@@ -147,10 +147,10 @@ write_pkg(loader_dir, {
 	// The loader's top-level platform require IS the side effect.
 	sideEffects: ['./index.js'],
 	optionalDependencies: Object.fromEntries(
-		SUPPORTED_TRIPLES.map((t) => [`@fuzdev/tsv_napi-${t}`, version])
+		SUPPORTED_TRIPLES.map((t) => [`@fuzdev/tsv-${t}`, version])
 	)
 });
-console.log(`Staged ${loader_dir}: @fuzdev/tsv_napi ${version}`);
+console.log(`Staged ${loader_dir}: @fuzdev/tsv ${version}`);
 
 if (args['loader-only']) {
 	Deno.exit(0);
@@ -172,12 +172,12 @@ try {
 Deno.copyFileSync('LICENSE', `${platform_dir}/LICENSE`);
 Deno.writeTextFileSync(
 	`${platform_dir}/README.md`,
-	`# @fuzdev/tsv_napi-${triple}\n\n` +
+	`# @fuzdev/tsv-${triple}\n\n` +
 		`> prebuilt tsv N-API binding for ${triple}\n\n` +
-		`A platform binary for [\`@fuzdev/tsv_napi\`](https://www.npmjs.com/package/@fuzdev/tsv_napi) — install that package instead; it selects this one automatically.\n`
+		`A platform binary for [\`@fuzdev/tsv\`](https://www.npmjs.com/package/@fuzdev/tsv) — install that package instead; it selects this one automatically.\n`
 );
 write_pkg(platform_dir, {
-	name: `@fuzdev/tsv_napi-${triple}`,
+	name: `@fuzdev/tsv-${triple}`,
 	version,
 	description: `prebuilt tsv N-API binding for ${triple}`,
 	main: 'tsv_napi.node',
@@ -187,5 +187,5 @@ write_pkg(platform_dir, {
 });
 const size = Deno.statSync(`${platform_dir}/tsv_napi.node`).size;
 console.log(
-	`Staged ${platform_dir}: @fuzdev/tsv_napi-${triple} ${version} (tsv_napi.node ${(size / 1024 / 1024).toFixed(1)} MB)`
+	`Staged ${platform_dir}: @fuzdev/tsv-${triple} ${version} (tsv_napi.node ${(size / 1024 / 1024).toFixed(1)} MB)`
 );

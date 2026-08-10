@@ -1,5 +1,5 @@
 /**
- * Node.js tests for the staged N-API npm packages — the `@fuzdev/tsv_napi`
+ * Node.js tests for the staged N-API npm packages — the `@fuzdev/tsv`
  * loader over a real platform package, consumed the way npm lays them out.
  *
  * `scripts/test_napi.ts` covers the raw addon boundary; this covers the
@@ -11,7 +11,7 @@
  * selection fields, and the unsupported-platform error.
  *
  * Stages `crates/tsv_napi/pkg/{napi,<triple>}` into a temp `node_modules`
- * (the loader's `require('@fuzdev/tsv_napi-<triple>')` resolves upward from
+ * (the loader's `require('@fuzdev/tsv-<triple>')` resolves upward from
  * its own location, so a copy inside a temp node_modules resolves its sibling
  * there). A second staging WITHOUT the platform package asserts the
  * unsupported-platform error path.
@@ -58,9 +58,9 @@ const stage = (with_platform: boolean): string => {
 	const tmp = mkdtempSync(join(tmpdir(), 'tsv_napi_npm_'));
 	const scope = join(tmp, 'node_modules', '@fuzdev');
 	mkdirSync(scope, { recursive: true });
-	cpSync(join(pkg_root, 'napi'), join(scope, 'tsv_napi'), { recursive: true });
+	cpSync(join(pkg_root, 'napi'), join(scope, 'tsv'), { recursive: true });
 	if (with_platform) {
-		cpSync(join(pkg_root, triple), join(scope, `tsv_napi-${triple}`), { recursive: true });
+		cpSync(join(pkg_root, triple), join(scope, `tsv-${triple}`), { recursive: true });
 	}
 	return tmp;
 };
@@ -82,7 +82,7 @@ after(() => {
 	}
 });
 
-const loader_path = join(staged, 'node_modules', '@fuzdev', 'tsv_napi', 'index.js');
+const loader_path = join(staged, 'node_modules', '@fuzdev', 'tsv', 'index.js');
 // ESM import of the CJS loader — named bindings must resolve via the interop.
 const api = await import(pathToFileURL(loader_path).href);
 
@@ -98,7 +98,7 @@ const throws_with = (fn: () => unknown, needle: string): void => {
 	});
 };
 
-describe('@fuzdev/tsv_napi loader (staged npm shape)', () => {
+describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	it('formats every language', () => {
 		assert.equal(api.format_typescript('const   x=1'), 'const x = 1;\n');
 		assert.equal(api.format_css('a{color:red}'), 'a {\n\tcolor: red;\n}\n');
@@ -200,19 +200,16 @@ describe('@fuzdev/tsv_napi loader (staged npm shape)', () => {
 
 	it('CJS require of the package works too', () => {
 		const req = createRequire(loader_path);
-		const cjs = req('@fuzdev/tsv_napi');
+		const cjs = req('@fuzdev/tsv');
 		assert.equal(cjs.format_typescript('const   x=1'), 'const x = 1;\n');
 	});
 
 	it('package.json selection fields and pins are coherent', () => {
 		const loader_pkg = JSON.parse(
-			readFileSync(join(staged, 'node_modules', '@fuzdev', 'tsv_napi', 'package.json'), 'utf8')
+			readFileSync(join(staged, 'node_modules', '@fuzdev', 'tsv', 'package.json'), 'utf8')
 		);
 		const platform_pkg = JSON.parse(
-			readFileSync(
-				join(staged, 'node_modules', '@fuzdev', `tsv_napi-${triple}`, 'package.json'),
-				'utf8'
-			)
+			readFileSync(join(staged, 'node_modules', '@fuzdev', `tsv-${triple}`, 'package.json'), 'utf8')
 		);
 		// Exact-version lockstep: every platform pin is the loader's own version.
 		for (const [name, pin] of Object.entries(loader_pkg.optionalDependencies)) {
@@ -231,21 +228,21 @@ describe('@fuzdev/tsv_napi loader (staged npm shape)', () => {
 		const source = readFileSync(loader_path, 'utf8');
 		const supported = [...source.matchAll(/^\t'([a-z0-9]+-[a-z0-9-]+)'/gm)].map((m) => m[1]);
 		assert.deepEqual(
-			supported.map((t) => `@fuzdev/tsv_napi-${t}`).sort(),
+			supported.map((t) => `@fuzdev/tsv-${t}`).sort(),
 			Object.keys(loader_pkg.optionalDependencies).sort(),
 			'npm/index.js SUPPORTED must match the generated optionalDependencies'
 		);
 		// Every `files` entry the loader package declares actually shipped.
 		for (const file of loader_pkg.files) {
 			assert.ok(
-				existsSync(join(staged, 'node_modules', '@fuzdev', 'tsv_napi', file)),
+				existsSync(join(staged, 'node_modules', '@fuzdev', 'tsv', file)),
 				`declared file missing: ${file}`
 			);
 		}
 	});
 
 	it('an unsupported platform fails loudly and points at the WASM package', async () => {
-		const bare_loader = join(staged_bare, 'node_modules', '@fuzdev', 'tsv_napi', 'index.js');
+		const bare_loader = join(staged_bare, 'node_modules', '@fuzdev', 'tsv', 'index.js');
 		await assert.rejects(import(pathToFileURL(bare_loader).href), (e: unknown) => {
 			assert.ok(e instanceof Error);
 			assert.ok(e.message.includes(triple), `message names the triple: ${e.message}`);
