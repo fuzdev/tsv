@@ -87,7 +87,11 @@ before the terminator) may span lines. The canonical parsers reject it
 both error. Unlike the deferred **early errors** in
 [§Strict Mode Only](#strict-mode-only-with-an-explicit-goal-axis), this is a plain
 **grammar** rule rather than a static semantic, so it is a gap in the lexer rather than a
-deliberate deferral to a diagnostics layer.
+deliberate deferral to a diagnostics layer. The over-accepted form flows all the way
+through the printer — the string prints verbatim, its raw newline force-breaking the
+doc — so printer-side soundness checks must tolerate it (the poorly-breakable
+`debug_assert`'s string exemption, `chain_has_multiline_string_arg`, keys on the raw span
+containing a newline rather than on a line continuation for exactly this reason).
 
 ### Template Literals
 
