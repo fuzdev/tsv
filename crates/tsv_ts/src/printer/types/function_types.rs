@@ -729,41 +729,79 @@ impl<'a> Printer<'a> {
             return d.group(d.concat(&self.build_type_params_multiline_parts(params, paren_pos)));
         }
 
-        // Build params with width-based breaking
+        // Build params with width-based breaking.
+        //
+        // Each inter-param gap is PARTITIONED at the element-comma seam
+        // (`docs/comments.md` §The element-comma seam), exactly as the
+        // function/constructor-type twin below does: the previous param's claimed trailing
+        // run ([`Printer::push_item_trailing_run`]) stays before the comma, and whatever
+        // the run leaves behind leads the next param after it
+        // ([`Printer::build_list_leading_comments`]).
+        //
+        // ⚠️ **Emitting the whole gap as the previous param's trailing run — the shape this
+        // loop had — moves an after-comma comment BACKWARD across the comma**
+        // (`m(a: string, /* c */ b: number)` → `m(a: string /* c */, b)`), flipping which
+        // param it binds to. It is the relocation tsv declines to make when prettier makes
+        // it, made by tsv at the one list in the family that wasn't on the shared seam; the
+        // value-params and function-type paths were both already correct.
         let mut param_parts = DocBuf::new();
-
-        // Handle comments before first param (e.g., `(/* comment */ a: T)`) — gated by
-        // the zero-comment window check above (the range is inside the window).
-        if comments_present && let Some(paren_pos) = paren_pos {
-            let first_param_start = params[0].span().start;
-            for comment in
-                comments_to_emit_in_range(self.comments, paren_pos + 1, first_param_start)
-            {
-                param_parts.push(self.build_comment_doc(comment));
-                param_parts.push(d.text(" "));
-            }
-        }
+        let mut prev_end = paren_pos.map_or_else(|| params[0].span().start, |p| p + 1);
 
         for (i, param) in params.iter().enumerate() {
+            // Where this param's leading run opens: past the previous param's claimed
+            // trailing run, and past the STRANDED after-comma blocks that trail the comma
+            // instead of leading this param — the same two-sided split the
+            // function/constructor-type twin takes.
+            let mut leading_start = prev_end;
             if i > 0 {
                 param_parts.push(d.text(","));
+                if comments_present {
+                    let comma = self.find_list_comma(prev_end, param.span().start);
+                    if let Some(end) = self.push_stranded_after_comma_blocks(
+                        &mut param_parts,
+                        comma,
+                        param.span().start,
+                    ) {
+                        leading_start = end;
+                    }
+                }
                 param_parts.push(d.line());
             }
+
+            // Comments leading this param (`(/* comment */ a: T)`, and the after-comma
+            // share of the previous gap) — gated by the zero-comment window check above
+            // (the range is inside the window). Through the shared emitter, so a run the
+            // author gave its own line takes the soft `line` that breaks with this list
+            // instead of a space that glues it to the param.
+            if comments_present {
+                param_parts.extend(self.build_list_leading_comments(
+                    leading_start,
+                    param.span().start,
+                    None,
+                ));
+            }
+
             param_parts.push(self.build_function_type_param_item_doc(paren_pos, params, i));
 
-            // Handle trailing comments after this param — gated by the window check
-            // (each param→next-boundary gap is inside the window).
             if comments_present {
                 let param_end = param.span().end;
-                let next_boundary = if i + 1 < params.len() {
-                    params[i + 1].span().start
+                if i + 1 < params.len() {
+                    prev_end = self.push_item_trailing_run(
+                        &mut param_parts,
+                        param_end,
+                        params[i + 1].span().start,
+                    );
                 } else {
-                    close_paren_pos.unwrap_or(param_end)
-                };
-
-                for comment in comments_to_emit_in_range(self.comments, param_end, next_boundary) {
-                    param_parts.push(d.text(" "));
-                    param_parts.push(self.build_comment_doc(comment));
+                    // Last param → `)`: no comma is emitted (trailingComma 'none'), so the
+                    // whole gap trails the param in source order.
+                    for comment in comments_to_emit_in_range(
+                        self.comments,
+                        param_end,
+                        close_paren_pos.unwrap_or(param_end),
+                    ) {
+                        param_parts.push(d.text(" "));
+                        param_parts.push(self.build_comment_doc(comment));
+                    }
                 }
             }
         }
@@ -790,10 +828,19 @@ impl<'a> Printer<'a> {
     ///
     /// The legs, in the order they can fire: an author blank line between two params
     /// (comment-independent, so it is asked first and outside the gate); then, only in a
-    /// comment-bearing window, an own-line comment leading any param, a line comment
-    /// anywhere in the delimited list, a line comment or own-line block in the
-    /// `(`→first-param gap, and an own-line block after the last param. Each of these
+    /// comment-bearing window, an own-line comment leading any param — the `(`→first-param
+    /// gap included, which is the `i == 0` arm of that same walk — a line comment anywhere
+    /// in the delimited list, and an own-line block after the last param. Each of these
     /// would otherwise be swallowed or collapsed by an inline layout.
+    ///
+    /// ⚠️ **The `(`→first-param gap does not get a SECOND, wider question.** It used to:
+    /// a `has_own_line_block_comment_after` predicate anchored on the `(`'s line, so a block
+    /// merely written below the `(` forced the list open even when it hugged its param
+    /// (`(⏎/* c */ a: string)`, which prettier collapses) — and it re-answered a gap the
+    /// leading-comment walk already covers with the shared classification. The
+    /// delimiter-line question that predicate exists for is about a comment *on* the
+    /// delimiter's line, which is a `delimiter_line_comment_prefix` concern, not a
+    /// force-multiline one.
     ///
     /// `comments_present` is the caller's window gate (its window is a superset of every
     /// range asked here), so a comment-free list pays one blank-line scan and nothing else.
@@ -810,19 +857,14 @@ impl<'a> Printer<'a> {
         if !comments_present {
             return false;
         }
-        self.has_leading_own_line_comment_in_params(params, paren_pos.map(|p| p + 1))
+        // `paren_pos` is the `(` itself, as the value-side caller passes it — the walk
+        // opens its first gap just past the delimiter.
+        self.has_leading_own_line_comment_in_params(params, paren_pos)
             || self.has_line_comments_in_delimited_list(
                 params,
                 internal::Expression::span,
                 end_boundary,
             )
-            || paren_pos.is_some_and(|p| {
-                params.first().is_some_and(|first| {
-                    let first_start = first.span().start;
-                    self.has_line_comments_between(p + 1, first_start)
-                        || self.has_own_line_block_comment_after(p, p + 1, first_start)
-                })
-            })
             || params.last().is_some_and(|last| {
                 self.has_own_line_block_comment_before_closer(last.span().end, end_boundary)
             })
@@ -1035,24 +1077,26 @@ impl<'a> Printer<'a> {
                     let mut leading_start = prev_end;
                     if i > 0 {
                         param_parts.push(d.text(","));
-                        let comma = prev_end - 1;
-                        for comment in
-                            comments_to_emit_in_range(self.comments, comma, p.span().start)
-                        {
-                            if !self.is_stranded_after_comma_block(comment, comma, p.span().start) {
-                                break; // stranded blocks are a contiguous prefix on the comma line
-                            }
-                            param_parts.push(d.text(" "));
-                            param_parts.push(self.build_comment_doc(comment));
-                            leading_start = comment.span.end;
+                        let comma = self.find_list_comma(prev_end, p.span().start);
+                        if let Some(end) = self.push_stranded_after_comma_blocks(
+                            &mut param_parts,
+                            comma,
+                            p.span().start,
+                        ) {
+                            leading_start = end;
                         }
                         param_parts.push(d.line());
                     }
 
-                    // Leading block comments (after the previous comma / stranded blocks, or `(`)
-                    param_parts.push(self.build_inline_comments_between_doc_trailing_space(
+                    // Leading comments (after the previous comma / stranded blocks, or `(`),
+                    // through the shared emitter so the separator is prettier's
+                    // `printLeadingComment` — in particular the soft `line` a run the author
+                    // gave its own line takes, which breaks with this list rather than
+                    // gluing the pair to a param the broken list puts below it.
+                    param_parts.extend(self.build_list_leading_comments(
                         leading_start,
                         p.span().start,
+                        None,
                     ));
 
                     param_parts.push(self.build_function_type_param_item_doc(paren_pos, params, i));
@@ -1126,11 +1170,7 @@ impl<'a> Printer<'a> {
             // Leading comments (after previous comma or `(`); for the first param,
             // exclude comments already pulled onto the `(` line.
             let skip_delim = if i == 0 { paren_pull_pos } else { None };
-            inner_parts.extend(self.build_leading_comments_multiline(
-                prev_end,
-                param_start,
-                skip_delim,
-            ));
+            inner_parts.extend(self.build_list_leading_comments(prev_end, param_start, skip_delim));
 
             inner_parts.push(self.build_function_type_param_item_doc(paren_pos, params, i));
 

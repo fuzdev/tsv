@@ -1620,7 +1620,7 @@ impl<'a> Printer<'a> {
             // element, drop comments pulled onto the `[` line (emitted as the
             // bracket-line prefix below).
             let skip_delim = if i == 0 { delimiter_pull_pos } else { None };
-            let leading = self.build_leading_comments_multiline(prev_end, elem_start, skip_delim);
+            let leading = self.build_list_leading_comments(prev_end, elem_start, skip_delim);
             // Rule A: an alone-on-line directive in this element's gap freezes
             // it; the directive itself was just emitted by the leading run above.
             // No must-break question — this layout is already all-hardline.

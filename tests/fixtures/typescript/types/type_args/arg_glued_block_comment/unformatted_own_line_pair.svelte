@@ -38,8 +38,14 @@
 
 	// The break after the pair is a soft line, so a list that fits keeps the pair on the
 	// argument's line - in call position
-	const c = fn3</* c1 */ /* c2 */ A>(x);
+	const c = fn3<
+		/* c1 */ /* c2 */
+		A
+	>(x);
 
 	// and in type position.
-	type D = Foo</* c1 */ /* c2 */ A>;
+	type D = Foo<
+		/* c1 */ /* c2 */
+		A
+	>;
 </script>
