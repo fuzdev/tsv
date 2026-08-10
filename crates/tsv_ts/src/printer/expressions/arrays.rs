@@ -1141,13 +1141,27 @@ impl<'a> Printer<'a> {
             .unwrap_or(arr.span.start + 1);
         let last_real_split = self.last_element_trailing_split(arr);
         let mut prev_end = final_scan_start;
+        // The comment this scan emitted last — `None` after one it skipped, which another
+        // emitter put on a line of its own, so nothing here has it to glue to.
+        let mut prev_comment: Option<&internal::Comment> = None;
         for comment in comments_to_emit_in_range(self.comments, final_scan_start, arr.span.end - 1)
         {
             if self.end_scan_emits_comment(comment, final_scan_start, last_real_split) {
-                // Preserve an author blank line before an own-line trailing comment.
-                self.push_blank_preserving_hardline(&mut parts, prev_end, comment.span.start);
+                // A pair the author GLUED onto one line keeps that line
+                // ([`Printer::trailing_run_hugs_previous`], the rule every end-of-container
+                // run reads); otherwise the comment takes its own line, preserving an
+                // author blank before it.
+                self.push_trailing_run_separator(
+                    &mut parts,
+                    prev_comment,
+                    prev_end,
+                    comment.span.start,
+                );
                 parts.push(self.build_comment_doc(comment));
                 prev_end = comment.span.end;
+                prev_comment = Some(comment);
+            } else {
+                prev_comment = None;
             }
         }
 

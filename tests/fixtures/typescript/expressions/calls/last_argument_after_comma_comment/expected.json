@@ -1,0 +1,641 @@
+{
+	"css": null,
+	"js": [],
+	"start": 0,
+	"end": 527,
+	"type": "Root",
+	"fragment": {
+		"type": "Fragment",
+		"nodes": []
+	},
+	"options": null,
+	"comments": [
+		{
+			"type": "Line",
+			"value": " a block comment after the last argument's comma trails the argument - the comma is",
+			"start": 10,
+			"end": 95,
+			"loc": {
+				"start": {
+					"line": 2,
+					"column": 1
+				},
+				"end": {
+					"line": 2,
+					"column": 86
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " never re-emitted, so the comment keeps its line and the call stays inline",
+			"start": 97,
+			"end": 173,
+			"loc": {
+				"start": {
+					"line": 3,
+					"column": 1
+				},
+				"end": {
+					"line": 3,
+					"column": 77
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 180,
+			"end": 187,
+			"loc": {
+				"start": {
+					"line": 4,
+					"column": 6
+				},
+				"end": {
+					"line": 4,
+					"column": 13
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same with two arguments",
+			"start": 192,
+			"end": 222,
+			"loc": {
+				"start": {
+					"line": 6,
+					"column": 1
+				},
+				"end": {
+					"line": 6,
+					"column": 31
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 232,
+			"end": 239,
+			"loc": {
+				"start": {
+					"line": 7,
+					"column": 9
+				},
+				"end": {
+					"line": 7,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a new expression takes the same rule",
+			"start": 244,
+			"end": 283,
+			"loc": {
+				"start": {
+					"line": 9,
+					"column": 1
+				},
+				"end": {
+					"line": 9,
+					"column": 40
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 293,
+			"end": 300,
+			"loc": {
+				"start": {
+					"line": 10,
+					"column": 9
+				},
+				"end": {
+					"line": 10,
+					"column": 16
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a multiline block comment trails the argument and expands the list",
+			"start": 305,
+			"end": 374,
+			"loc": {
+				"start": {
+					"line": 12,
+					"column": 1
+				},
+				"end": {
+					"line": 12,
+					"column": 70
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c1\n\t   c2 ",
+			"start": 384,
+			"end": 399,
+			"loc": {
+				"start": {
+					"line": 14,
+					"column": 4
+				},
+				"end": {
+					"line": 15,
+					"column": 9
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " contrast - a comment the author gave a line of its own keeps it and expands the list",
+			"start": 406,
+			"end": 493,
+			"loc": {
+				"start": {
+					"line": 18,
+					"column": 1
+				},
+				"end": {
+					"line": 18,
+					"column": 88
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " c ",
+			"start": 505,
+			"end": 512,
+			"loc": {
+				"start": {
+					"line": 21,
+					"column": 2
+				},
+				"end": {
+					"line": 21,
+					"column": 9
+				}
+			}
+		}
+	],
+	"instance": {
+		"type": "Script",
+		"start": 0,
+		"end": 526,
+		"context": "default",
+		"content": {
+			"type": "Program",
+			"start": 8,
+			"end": 517,
+			"loc": {
+				"start": {
+					"line": 1,
+					"column": 0
+				},
+				"end": {
+					"line": 23,
+					"column": 9
+				}
+			},
+			"body": [
+				{
+					"type": "ExpressionStatement",
+					"start": 175,
+					"end": 189,
+					"loc": {
+						"start": {
+							"line": 4,
+							"column": 1
+						},
+						"end": {
+							"line": 4,
+							"column": 15
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 175,
+						"end": 188,
+						"loc": {
+							"start": {
+								"line": 4,
+								"column": 1
+							},
+							"end": {
+								"line": 4,
+								"column": 14
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 175,
+							"end": 177,
+							"loc": {
+								"start": {
+									"line": 4,
+									"column": 1
+								},
+								"end": {
+									"line": 4,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 178,
+								"end": 179,
+								"loc": {
+									"start": {
+										"line": 4,
+										"column": 4
+									},
+									"end": {
+										"line": 4,
+										"column": 5
+									}
+								},
+								"name": "a",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 180,
+										"end": 187
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a block comment after the last argument's comma trails the argument - the comma is",
+							"start": 10,
+							"end": 95
+						},
+						{
+							"type": "Line",
+							"value": " never re-emitted, so the comment keeps its line and the call stays inline",
+							"start": 97,
+							"end": 173
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 224,
+					"end": 241,
+					"loc": {
+						"start": {
+							"line": 7,
+							"column": 1
+						},
+						"end": {
+							"line": 7,
+							"column": 18
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 224,
+						"end": 240,
+						"loc": {
+							"start": {
+								"line": 7,
+								"column": 1
+							},
+							"end": {
+								"line": 7,
+								"column": 17
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 224,
+							"end": 226,
+							"loc": {
+								"start": {
+									"line": 7,
+									"column": 1
+								},
+								"end": {
+									"line": 7,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 227,
+								"end": 228,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 4
+									},
+									"end": {
+										"line": 7,
+										"column": 5
+									}
+								},
+								"name": "a"
+							},
+							{
+								"type": "Identifier",
+								"start": 230,
+								"end": 231,
+								"loc": {
+									"start": {
+										"line": 7,
+										"column": 7
+									},
+									"end": {
+										"line": 7,
+										"column": 8
+									}
+								},
+								"name": "b",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 232,
+										"end": 239
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same with two arguments",
+							"start": 192,
+							"end": 222
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 285,
+					"end": 302,
+					"loc": {
+						"start": {
+							"line": 10,
+							"column": 1
+						},
+						"end": {
+							"line": 10,
+							"column": 18
+						}
+					},
+					"expression": {
+						"type": "NewExpression",
+						"start": 285,
+						"end": 301,
+						"loc": {
+							"start": {
+								"line": 10,
+								"column": 1
+							},
+							"end": {
+								"line": 10,
+								"column": 17
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 289,
+							"end": 290,
+							"loc": {
+								"start": {
+									"line": 10,
+									"column": 5
+								},
+								"end": {
+									"line": 10,
+									"column": 6
+								}
+							},
+							"name": "A"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 291,
+								"end": 292,
+								"loc": {
+									"start": {
+										"line": 10,
+										"column": 7
+									},
+									"end": {
+										"line": 10,
+										"column": 8
+									}
+								},
+								"name": "a",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c ",
+										"start": 293,
+										"end": 300
+									}
+								]
+							}
+						]
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a new expression takes the same rule",
+							"start": 244,
+							"end": 283
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 376,
+					"end": 403,
+					"loc": {
+						"start": {
+							"line": 13,
+							"column": 1
+						},
+						"end": {
+							"line": 16,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 376,
+						"end": 402,
+						"loc": {
+							"start": {
+								"line": 13,
+								"column": 1
+							},
+							"end": {
+								"line": 16,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 376,
+							"end": 378,
+							"loc": {
+								"start": {
+									"line": 13,
+									"column": 1
+								},
+								"end": {
+									"line": 13,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 382,
+								"end": 383,
+								"loc": {
+									"start": {
+										"line": 14,
+										"column": 2
+									},
+									"end": {
+										"line": 14,
+										"column": 3
+									}
+								},
+								"name": "a",
+								"trailingComments": [
+									{
+										"type": "Block",
+										"value": " c1\n\t   c2 ",
+										"start": 384,
+										"end": 399
+									}
+								]
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a multiline block comment trails the argument and expands the list",
+							"start": 305,
+							"end": 374
+						}
+					]
+				},
+				{
+					"type": "ExpressionStatement",
+					"start": 495,
+					"end": 516,
+					"loc": {
+						"start": {
+							"line": 19,
+							"column": 1
+						},
+						"end": {
+							"line": 22,
+							"column": 3
+						}
+					},
+					"expression": {
+						"type": "CallExpression",
+						"start": 495,
+						"end": 515,
+						"loc": {
+							"start": {
+								"line": 19,
+								"column": 1
+							},
+							"end": {
+								"line": 22,
+								"column": 2
+							}
+						},
+						"callee": {
+							"type": "Identifier",
+							"start": 495,
+							"end": 497,
+							"loc": {
+								"start": {
+									"line": 19,
+									"column": 1
+								},
+								"end": {
+									"line": 19,
+									"column": 3
+								}
+							},
+							"name": "fn"
+						},
+						"arguments": [
+							{
+								"type": "Identifier",
+								"start": 501,
+								"end": 502,
+								"loc": {
+									"start": {
+										"line": 20,
+										"column": 2
+									},
+									"end": {
+										"line": 20,
+										"column": 3
+									}
+								},
+								"name": "a"
+							}
+						],
+						"optional": false
+					},
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " contrast - a comment the author gave a line of its own keeps it and expands the list",
+							"start": 406,
+							"end": 493
+						}
+					],
+					"trailingComments": [
+						{
+							"type": "Block",
+							"value": " c ",
+							"start": 505,
+							"end": 512
+						}
+					]
+				}
+			],
+			"sourceType": "module"
+		},
+		"attributes": []
+	}
+}

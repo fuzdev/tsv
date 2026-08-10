@@ -824,11 +824,7 @@ impl<'a> Printer<'a> {
                 })
             })
             || params.last().is_some_and(|last| {
-                self.has_own_line_block_comment_after(
-                    last.span().end,
-                    last.span().end,
-                    end_boundary,
-                )
+                self.has_own_line_block_comment_before_closer(last.span().end, end_boundary)
             })
     }
 
@@ -1151,7 +1147,7 @@ impl<'a> Printer<'a> {
                 let close_paren = paren_pos
                     .and_then(|p| self.matching_close_paren(p))
                     .unwrap_or(param_end);
-                inner_parts.extend(self.build_trailing_comments_multiline(param_end, close_paren));
+                inner_parts.extend(self.build_trailing_gap_comments(param_end, close_paren));
                 prev_end = close_paren;
             }
         }

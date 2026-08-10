@@ -263,6 +263,61 @@ impl<'a> Printer<'a> {
         })
     }
 
+    /// The LAST item→closer gap's trailing claim — the same prefix walk as
+    /// [`Self::trailing_comment_run`], with one deliberate difference on **line**
+    /// comments.
+    ///
+    /// A **block** takes the source reading, exactly as the inter-item seam does, and for
+    /// the same reason: the list's own comma sits in this gap covered by no item span, so
+    /// an `is_same_line(item_end, …)` reading calls a comment glued to it own-line and
+    /// opens a list that fits.
+    ///
+    /// A **line** comment keeps the ITEM anchor, which is the sanctioned divergence
+    /// `last_item_line_after_comma_prettier_divergence` (conformance_prettier_ts_comments.md
+    /// §Comment relocation, "**Last**-item trailing-comma line comment"). Prettier hoists a
+    /// `//` written after a comma the author gave its own line onto the item; tsv keeps the
+    /// line the author gave it, because a last item's comma is **deleted** under
+    /// `trailingComma: 'none'` and so is not a position in the output that a comment could
+    /// be pulled back onto. A `//` on the item's own line still trails it, which is what
+    /// the anchor answers.
+    ///
+    /// ⚠️ **The two kinds genuinely part ways here, and that is the whole point of a
+    /// second walk.** The after-comma anchor's argument — the printer pulls the comma back
+    /// onto the item's line — reaches a *block* through the source it is glued to, and
+    /// stops at a `//` that has no comma left to be written against
+    /// (`docs/comments.md` §Own-line-ness is a SOURCE question).
+    pub(in crate::printer) fn closer_trailing_comment_run(
+        &self,
+        item_end: u32,
+        end: u32,
+    ) -> impl Iterator<Item = &'a Comment> + '_ {
+        let mut past_line_comment = false;
+        comments_to_emit_in_range(self.comments, item_end, end).take_while(move |c| {
+            let claimed = !past_line_comment
+                && if c.is_block {
+                    self.comment_follows_content_on_its_line(c)
+                } else {
+                    self.is_same_line(item_end, c.span.start)
+                };
+            past_line_comment |= !c.is_block;
+            claimed
+        })
+    }
+
+    /// Where a LAST item→closer gap's trailing run ends — the closer twin of
+    /// [`Self::inline_trailing_run_end`], over [`Self::closer_trailing_comment_run`] instead
+    /// of the inter-item walk.
+    ///
+    /// The run is a PREFIX, so its end is also where the gap's own-line half begins: an
+    /// emitter walking the whole gap asks `comment.span.end <= run_end` per comment and the
+    /// two halves partition it by construction. `item_end` when the run is empty, which is
+    /// what makes that comparison false for every comment.
+    pub(in crate::printer) fn closer_trailing_run_end(&self, item_end: u32, end: u32) -> u32 {
+        self.closer_trailing_comment_run(item_end, end)
+            .last()
+            .map_or(item_end, |c| c.span.end)
+    }
+
     /// Collect trailing comments for a list element (property or array element)
     ///
     /// Trailing comments are the ones that follow CONTENT on their line

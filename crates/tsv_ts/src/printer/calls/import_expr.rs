@@ -225,12 +225,9 @@ pub(super) fn build_import_expression_doc(
         let mut tail = DocBuf::new();
         inter.emit_leading_comments_inline_aware(&mut tail, printer);
         tail.push(options_doc);
-        let trailing = PartitionedComments::new(
-            printer.comments,
-            printer.comment_line_breaks,
-            options_end,
-            paren_close,
-        );
+        // The options argument's gap holds the list's own comma, so it takes the item
+        // reading like every other last-argument gap (`emit_last_arg_trailing_comments`).
+        let trailing = PartitionedComments::for_closer_gap(printer, options_end, paren_close);
         trailing.emit_trailing_comments(&mut tail, printer);
         trailing.emit_dangling_comments(&mut tail, printer);
 

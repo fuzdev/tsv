@@ -735,7 +735,7 @@ impl<'a> Printer<'a> {
                     // own lines). A same-line line comment is line_suffix'd (zero width)
                     // so it can't force the previous member to break — the leading-`|`
                     // form puts the next separator on a new line, where it flushes.
-                    parts.extend(self.build_trailing_comments_multiline_ext(
+                    parts.extend(self.build_trailing_gap_comments_ext(
                         prev_type_end,
                         pipe_pos,
                         true,
@@ -1744,7 +1744,7 @@ impl<'a> Printer<'a> {
                 // *line* comment trails it inline (a `//` can't precede the `&` without
                 // commenting it out — a lossless separator-trail), and an own-line
                 // comment drops to its own line (blank-preserving). Mirrors
-                // `build_trailing_comments_multiline` minus the same-line blocks handled
+                // `build_trailing_gap_comments` minus the same-line blocks handled
                 // above. Then the same-line-after-`&` comments trail the operator inline.
                 let mut run_end = prev_end;
                 for comment in comments_to_emit_in_range(self.comments, prev_end, amp_pos) {
