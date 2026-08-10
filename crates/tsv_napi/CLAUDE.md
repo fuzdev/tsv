@@ -34,16 +34,59 @@ The `lang_bindings!` macro generates three `#[napi]` functions per language (sve
 - `parse_internal_<lang>(source) -> void` — parses without converting (benchmark-only; `black_box` prevents elision)
 - `format_<lang>(source) -> string` — formatted source
 
-Plus, outside the macro, three goal-aware TypeScript parse exports taking a
-trailing goal string (`"script"` / `"module"`): `parse_typescript_with_goal`,
-`parse_typescript_no_locations_with_goal`, `parse_internal_typescript_with_goal`.
+Plus, outside the macro, four goal-aware TypeScript exports taking a trailing
+goal string (`"script"` / `"module"`): `parse_typescript_with_goal`,
+`parse_typescript_no_locations_with_goal`, `parse_internal_typescript_with_goal`,
+and `format_typescript_with_goal` (the flat counterpart of `tsv_wasm`'s
+`format_typescript(source, {goal})` — the goal shapes only the parse the
+formatter runs).
 
-JS export names are kept **snake_case** via `#[napi(js_name = "…")]` (napi-rs would otherwise camelCase them) so the addon's names match `tsv_wasm`'s. The per-call axes are where this surface diverges from `tsv_wasm`, in two ways:
+JS export names are kept **snake_case** via `#[napi(js_name = "…")]` (napi-rs would otherwise camelCase them) so the addon's names match `tsv_wasm`'s. The per-call SHAPE is where the raw addon diverges from `tsv_wasm`: here the axes are flat exports (`parse_<lang>_no_locations`, the `*_with_goal` variants), matching `tsv_ffi`'s C-style surface, where `tsv_wasm` takes an acorn-style `{locations?, goal?}` options object (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Parse Options & Typed Returns). Coverage matches. The published `@fuzdev/tsv_napi` loader erases the shape difference too — see §The npm packages.
 
-- **Shape**, on parse: here they are flat exports (`parse_<lang>_no_locations`, the TS `*_with_goal` variants), matching `tsv_ffi`'s C-style surface, where `tsv_wasm` takes an acorn-style `{locations?, goal?}` options object (see [../tsv_wasm/CLAUDE.md](../tsv_wasm/CLAUDE.md) §Parse Options & Typed Returns).
-- **Coverage**, on format: `format_<lang>(source)` has no goal axis at all, so a `Script`-goal format is unreachable here — `tsv_wasm`'s `format_typescript(source, {goal})` (see that doc's §Format Options) has no counterpart. Only `parse` grew the flat `*_with_goal` variants.
+## The npm packages: `@fuzdev/tsv_napi` + platform packages
 
-When the publish matrix lands (3b), the `@fuzdev/tsv_napi` loader is the natural place to present that same options bag over these flat exports — and to close the format-goal gap, whether by a `format_typescript_with_goal` export beneath it or by threading the goal in the loader.
+Staged by `deno task build:napi:packages` (`scripts/build_napi_packages.ts`)
+into `crates/tsv_napi/pkg/` (gitignored):
+
+- **`pkg/napi/` — `@fuzdev/tsv_napi`**, the loader: `npm/index.js` +
+  `npm/index.d.ts` + `npm/README.md` + a copy of `tsv_wasm`'s `tsv_ast.d.ts` +
+  a generated package.json pinning the platform packages as **exact-version
+  `optionalDependencies`**.
+- **`pkg/<triple>/` — `@fuzdev/tsv_napi-<triple>`**, one platform package per
+  invocation: the built cdylib copied to `tsv_napi.node` (byte-identical
+  rename) + a generated package.json whose `os`/`cpu`/`libc` fields drive
+  install-time selection. Naming is the hybrid: snake_case tool name + the
+  ecosystem-universal dash platform triple (swc's shape). The set:
+  `linux-x64-gnu`, `linux-arm64-gnu`, `linux-x64-musl`, `darwin-arm64`,
+  `win32-x64`. One per invocation by design — a machine can only have built
+  its own triple; the release workflow runs the script once per matrix target
+  (`--triple` + `--artifact` name a cross-built binary).
+
+**The loader is CommonJS with static `exports.<name> =` assignments** (the
+native-addon norm; ESM named imports work via Node's CJS interop, which needs
+the statically-analyzable form — don't convert the assignments to a loop). It
+detects the platform triple (musl via `process.report`'s
+`glibcVersionRuntime`, trusted only positively, else a `/lib/ld-musl-*`
+probe), requires `@fuzdev/tsv_napi-<triple>`, and on failure throws an error
+naming the triple, the prebuilt set, and `@fuzdev/tsv_wasm` as the universal
+fallback.
+
+**API parity with `@fuzdev/tsv_wasm` is the contract**: same export names,
+same `(source, options?)` bags, same error strings — the loader's
+`read_options` mirrors the wasm crate's key for key, and
+`scripts/test_napi_npm.ts` asserts the strings — minus the bench-only
+`parse_internal_*` family. `parse_<lang>` returns the JSON-parsed object,
+`parse_<lang>_json` the wire string. Known parity gap: the locations
+helpers (`reconstruct_locations` / `create_locator` / `loc_of`) are not
+bundled — they're ESM (`tsv_wasm/npm/locations.js`) and this loader is CJS;
+the wire is identical, so `@fuzdev/tsv_parse_wasm`'s copies work on this
+package's output (the d.ts says so).
+
+Tests: `deno task test:napi:npm` stages a temp `node_modules` and drives the
+packaged shape under Node — loader resolution, ESM↔CJS interop, the options
+surface with exact error strings, package.json coherence (pins, selection
+fields, `files`, the loader-`SUPPORTED`-vs-optionalDependencies agreement),
+and the unsupported-platform error. Runs per OS in CI (the `platforms` job).
 
 ## Marshalling & errors
 
@@ -53,7 +96,8 @@ napi-rs marshals the JS string into a Rust `String` and the returned `String` ba
 
 ## Files
 
-- `src/lib.rs` — All bindings: the `lang_bindings!` macro, the three `lang_bindings!` invocations, and a `#[cfg(test)]` module. The reusable arenas are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
+- `src/lib.rs` — All bindings: the `lang_bindings!` macro, the three `lang_bindings!` invocations, the flat goal-aware TS exports, the `panic_probe` export, and a `#[cfg(test)]` module. The reusable arenas are imported from `tsv_arena` (`with_ast_arena`, plus `with_doc_arena` under the `format` feature)
+- `npm/` — the `@fuzdev/tsv_napi` loader package source (`index.js` + `index.d.ts` + `README.md`); staged with generated package.jsons by `scripts/build_napi_packages.ts` (see §The npm packages)
 - `build.rs` — `napi_build::setup()` (linker config for the addon)
 - `Cargo.toml` — `crate-type = ["cdylib"]`; `unsafe_code = "allow"` (N-API generates unsafe code); deps `napi` + `napi-derive` (3.x) + `tsv_arena`, build-dep `napi-build` (2.x). `format` → `tsv_arena/format`
 

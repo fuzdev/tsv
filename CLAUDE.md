@@ -101,7 +101,7 @@ See [Debug Tooling](#debug-tooling).
 # Deno tasks (recommended)
 deno task build            # workspace dev build
 deno task build:release    # workspace optimized build
-deno task build:all        # release + ffi + build:packages (everything)
+deno task build:all        # release + ffi + build:packages + build:napi:packages (everything)
 deno task build:packages   # the 6 publishable WASM bundles (npm + deno) — single source of truth shared by CI + publish.ts
 deno task build:bench      # the artifact set `bench`/`smoke` measure (ffi×3 + the 3 wasm:deno variants + the node half: napi + wasm:all:nodejs)
 deno task build:ffi        # C FFI library (:format / :parse size-only variants; :all builds all three)
@@ -228,7 +228,7 @@ Three binding crates for different use cases:
 
 - `tsv_ffi` (C ABI) — any FFI (Deno, Python, etc.); output: `libtsv_ffi.so` / `.dylib` / `.dll`
 - `tsv_wasm` (wasm-bindgen) — browser, Deno, Node; output: `.wasm` module (format / parse / all variants via cargo features)
-- `tsv_napi` (napi-rs) — Node.js / Bun native addon (`libtsv_napi.*`, loaded via `process.dlopen`). Builds with the `napi` profile (`release` + `panic = "unwind"` → `target/napi/`; every export is `catch_unwind`, so a panic throws a JS error instead of aborting the host). Currently **measurement-only** for the Node bench runner (`deno task build:napi` / `test:napi`); cross-platform publish as `@fuzdev/tsv_napi` targets 0.3 (needs GitHub release infra; expected to eventually subsume the WASM native path). See ./crates/tsv_napi/CLAUDE.md.
+- `tsv_napi` (napi-rs) — Node.js / Bun native addon (`libtsv_napi.*`, loaded via `process.dlopen`). Builds with the `napi` profile (`release` + `panic = "unwind"` → `target/napi/`; every export is `catch_unwind`, so a panic throws a JS error instead of aborting the host). The npm surface — the `@fuzdev/tsv_napi` loader over per-platform `@fuzdev/tsv_napi-<triple>` packages, wasm-API-parity by contract — is staged by `deno task build:napi:packages` and tested per OS by `test:napi:npm`; the cross-platform **publish** targets 0.3 (needs the tag-triggered release workflow; expected to eventually subsume the WASM native path). See ./crates/tsv_napi/CLAUDE.md §The npm packages.
 
 `tsv_wasm` produces three npm packages from one crate via the `format` + `parse` cargo features (default = both): `@fuzdev/tsv_format_wasm`, `@fuzdev/tsv_parse_wasm`, and `@fuzdev/tsv_wasm` (everything + the `tsv` CLI). Each variant has its own output directory.
 
@@ -237,6 +237,8 @@ Three binding crates for different use cases:
 deno task build:ffi                  # C FFI, full build → target/release/libtsv_ffi.so
 deno task build:ffi:format           # C FFI, format-only (size only) → target/ffi-format/release/
 deno task build:ffi:parse            # C FFI, parse-only (size only) → target/ffi-parse/release/
+deno task build:napi                 # N-API addon (napi profile: release + unwind) → target/napi/
+deno task build:napi:packages        # + staged npm packages (loader + host platform pkg) → crates/tsv_napi/pkg/
 deno task build:wasm:deno            # deno WASM, format-only → pkg/format/deno/
 deno task build:wasm:parse:deno      # deno WASM, parse-only → pkg/parse/deno/
 deno task build:wasm:all:deno        # deno WASM, full build (benches/sidecar) → pkg/all/deno/
@@ -258,6 +260,8 @@ npm-only, three packages from one WASM crate:
 - `@fuzdev/tsv_parse_wasm` — parse only; bundles hand-maintained `tsv_ast.d.ts` (`crates/tsv_wasm/types/`) + the pure-JS `no-locations` line/column reconstruction helper (`crates/tsv_wasm/npm/locations.js` + `.d.ts`)
 - `@fuzdev/tsv_wasm` — full tool (both features); bundles the above and ships the `tsv` bin (`crates/tsv_wasm/npm/cli.js` — `format` + `parse` mirroring `tsv_cli`'s flags/exit codes; `node:util` `parseArgs`, zero deps, single-threaded)
 
+The **N-API set** — the `@fuzdev/tsv_napi` loader + five `@fuzdev/tsv_napi-<triple>` platform packages (see ./crates/tsv_napi/CLAUDE.md §The npm packages) — is staged by `deno task build:napi:packages` but publishes through the tag-triggered release workflow, **never** through the single-machine `scripts/publish.ts` (per-platform binaries need the CI matrix).
+
 A types-only `@fuzdev/tsv_ast` package is deferred — `import type` from `tsv_parse_wasm` is zero-runtime-cost; reconsider when a real consumer appears. `@fuzdev/tsv` (bare) stays reserved for a future native-binary flagship.
 
 Version source of truth: `Cargo.toml` `[workspace.package] version` (read directly by `wasm-pack`). No root package.json, no changesets; all published packages move together.
@@ -274,6 +278,7 @@ deno task publish --wetrun --bump patch  # release: bump + publish + git finaliz
 deno task publish --wetrun               # resume a failed wetrun (sentinel retry only)
 # Flags: --bump patch|minor|major, --no-check, --no-git
 deno task test:npm[:parse|:all]          # builds the npm package, then runs Node tests against it (:all includes CLI tests; `:run` suffix skips the rebuild)
+deno task test:napi:npm                  # stages the napi loader + host platform package, then runs Node tests against the packaged shape (`:run` skips the rebuild)
 deno task validate:artifacts             # tight wasm size bounds + Deno smoke of all built bundles (fails if nothing is built)
 ```
 
@@ -428,7 +433,7 @@ tsv/
 │   ├── tsv_debug/   # Dev utilities (binary: tsv_debug) - uses Deno
 │   ├── tsv_ffi/     # C FFI bindings (Deno's native path)
 │   ├── tsv_wasm/    # WASM bindings (the 3 published npm packages; bundles types/tsv_ast.d.ts + npm/locations.js; npm/cli.js is the tsv bin)
-│   └── tsv_napi/    # N-API bindings (Node/Bun native path; measurement-only until the npm publish lands)
+│   └── tsv_napi/    # N-API bindings (Node/Bun native path; npm/ is the @fuzdev/tsv_napi loader source)
 ├── scripts/         # Publish orchestrator, npm package patcher, Node artifact + N-API tests, AST type drift check
 ├── tests/           # Integration tests (parser, formatter, CLI)
 │   ├── fixtures/    # Test fixtures organized by language/feature
