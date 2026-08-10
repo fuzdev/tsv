@@ -70,8 +70,11 @@ impl<'arena> ObjectPatternProperty<'arena> {
     /// Always the VALUE's end, never the key's, even for a shorthand property: `{a = (1)}`
     /// is shorthand with an `AssignmentPattern` value, so a key anchor would open the scan
     /// over `= 1` — text the property's own doc prints, and where a comment before the `=`
-    /// (`{a /* c */ = 1}`) would then be printed twice. The object literal can take the key
-    /// there only because its shorthand carries no value text at all.
+    /// (`{a /* c */ = 1}`) would then be RELOCATED past the initializer. The object literal
+    /// reads the value's end for the same reason: its shorthand carries no value text of its
+    /// own only in the *valid* spelling, and the permissively parsed `{ a = 1 }` — the
+    /// literal shape of this very binding — is exactly where the key anchor cost it that
+    /// comment.
     pub fn value_end(&self) -> u32 {
         match self {
             ObjectPatternProperty::Property(p) => p.value.printed_end(),

@@ -1653,37 +1653,20 @@ impl<'a> Printer<'a> {
 
     /// Whether a comment between two params forces the param list to expand.
     ///
-    /// A **line** comment always forces it (it runs to end-of-line, so the
-    /// following param can't share the line). A **block** comment forces it only when it
-    /// sits on its OWN line — nothing before it on its line in SOURCE
-    /// ([`Printer::comment_follows_content_on_its_line`]) *and* not glued to the following
-    /// param at `end` (`/* c */ b`). Either adjacency stays inline, matching prettier,
-    /// which collapses `a,⏎/* c */ b` and `a /* c */,⏎b` both back to `a, /* c */ b`.
+    /// A **line** comment always forces it (it runs to end-of-line, so the following param
+    /// can't share the line). A **block** comment forces it under the shared classification
+    /// ([`Printer::block_comment_owns_its_line`], which carries the argument): either
+    /// adjacency keeps it inline, matching prettier, which collapses `a,⏎/* c */ b` and
+    /// `a /* c */,⏎b` both back to `a, /* c */ b`.
     ///
-    /// ⚠️ **The own-line half reads the source, not the previous param's end at `start`.**
-    /// The two differ by exactly the text no param span covers — the list's own **comma**,
-    /// which the author can push onto its own line (`fn(a⏎, /* c */⏎b)`), and a stripped
-    /// paren shell's `)`. An item-boundary reading calls such a comment own-line and
-    /// expands a list that fits — a third fixed point neither the bare authoring nor
-    /// prettier produces. A parameter list is the container
-    /// `docs/conformance_prettier.md` §Comment Position Philosophy names outright: it
-    /// flattens when it fits, so the author's break around a comma is layout, not
-    /// own-line-ness. Same question the bracketed-list gate
-    /// ([`Printer::has_own_line_block_comments_in_bracket_list`]) and the element→comma
-    /// seam ask.
-    ///
-    /// The **glue** half is the one place this still differs from the shared
-    /// [`Printer::comment_isolated_on_its_line`], which asks the source there too
-    /// ([`Printer::comment_hugs_next`]). Anchoring on `end` is blind to another comment
-    /// in the same gap: a glued run the author gave its own line (`f(⏎/* c1 */ /* c2 */⏎a)`)
-    /// reads as own-line and expands a list prettier keeps inline. A known residual, not a
-    /// deliberate difference — closing it is a behavior change of its own.
+    /// A parameter list is the container `docs/conformance_prettier.md` §Comment Position
+    /// Philosophy names outright — it flattens when it fits — so this gate exists for the
+    /// comment the author gave a line of its own, and for nothing else.
     fn has_own_line_comment_between(&self, start: u32, end: u32) -> bool {
         self.comments_on_page_between(start, end).any(|c| {
-            if !c.is_block {
-                return true;
-            }
-            !self.comment_follows_content_on_its_line(c) && !self.is_same_line(c.span.end, end)
+            // `end` is the next param's start, so an item always follows; the trailing
+            // position past the last param is `has_own_line_block_comment_after`'s.
+            !c.is_block || self.block_comment_owns_its_line(c, true)
         })
     }
 
@@ -1915,11 +1898,21 @@ impl<'a> Printer<'a> {
             parts.push(self.build_comment_doc(comment));
         }
 
-        // Separator between the last leading comment and the param. Measure to the
-        // param's rendered start (its first own-line decorator, if any) so a decorator
-        // between the comment and the binding isn't miscounted as an author blank line.
-        let last_comment_end = comments.last().map_or(start, |c| c.span.end);
-        let param_on_own_line = !self.is_same_line(last_comment_end, param_render_start);
+        // Separator between the last leading comment and the param — the shared glue test
+        // ([`Printer::comment_hugs_next`]), read of the source right after the `*/` rather
+        // than of where the param starts. The two differ by the list's own comma, which the
+        // author can write between the comment and a param on the next line
+        // (`f(a⏎/* c */,⏎b)`): an item anchor calls that comment own-line and hardlines it,
+        // breaking a list prettier keeps flat — and the reprint's `/* c */ b` then collapses,
+        // so the same authoring reached two fixed points. It is also why a decorator between
+        // the two needs no special anchor: whatever follows the `*/` on that line, comma or
+        // `@`, keeps the comment glued.
+        //
+        // `comments` is non-empty — the empty run returned above — so both facts come from
+        // one lookup rather than two fallbacks that cannot fire.
+        let last_comment = comments[comments.len() - 1];
+        let last_comment_end = last_comment.span.end;
+        let param_on_own_line = !self.comment_hugs_next(last_comment);
 
         // First param collapses inline unless an isolated/line comment forced expansion;
         // non-first stays inline only when the param shares the last comment's line.

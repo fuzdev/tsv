@@ -36,6 +36,7 @@ pub use helpers::unwrap_parenthesized;
 pub(in crate::printer) use composite::ArraySuffixLayout;
 
 // Re-export for submodules to use `super::X` instead of `super::super::X`
+pub(super) use super::StandaloneGlue;
 pub(super) use super::comments::BlankRule;
 pub(super) use super::{CommentFilter, CommentSpacing, Printer};
 
