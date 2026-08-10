@@ -33,6 +33,35 @@ pub(crate) enum BlankRule {
     AfterComma,
 }
 
+/// How a brace container decides a standalone block comment is **glued to what follows**
+/// ([`Printer::has_standalone_block_comment`]).
+///
+/// The leading half of that question is one rule everywhere — the source
+/// ([`Printer::comment_follows_content_on_its_line`]). The trailing half is not, because
+/// prettier genuinely answers it differently for the two families, so the caller names its
+/// rule rather than inheriting one. Same shape and same reason as [`BlankRule`], and as the
+/// union-vs-intersection split [`Printer::is_own_line_comment`] carries.
+#[derive(Clone, Copy, PartialEq, Eq, Debug)]
+pub(crate) enum StandaloneGlue {
+    /// The SOURCE reading, asked of the RUN ([`Printer::comment_run_hugs_next`]): anything
+    /// after the `*/` on that line glues the comment, the container's own comma included.
+    /// The **object literal** and **object pattern**, whose separator is re-emitted
+    /// structure outside every property span — so `{ a: 1⏎/* c */,⏎b: 2 }` collapses
+    /// inline, as prettier collapses it, instead of expanding on pass 1 and collapsing on
+    /// pass 2. A **dangling** comment — none of `item_spans` starts after it — is exempt:
+    /// the closer pulled onto its line is not glue, the same carve-out the bracket list's
+    /// no-element-follows arm makes.
+    Source,
+    /// Only an ITEM starting on the comment's line glues it; the separator does not. The
+    /// **type literal**, and this is prettier's own answer rather than a residual: it
+    /// expands `type T = { a: A⏎/* c */,⏎b: B }` where it collapses the object literal
+    /// written the same way. The mechanism is that a TS member's range swallows its own
+    /// `;`/`,` terminator, so a comment before it is *inside* the member and never reaches
+    /// prettier's container gate at all — an item-start reading is what reproduces that
+    /// from the outside.
+    ItemStart,
+}
+
 impl<'a> Printer<'a> {
     /// Emit the comments in `[start, end)` between a class/interface header
     /// (after the last heritage item or type params) and the body `{`, preserving
@@ -241,46 +270,48 @@ impl<'a> Printer<'a> {
 
     /// Check if there's a block comment on its own line within a container.
     ///
-    /// A "standalone" block comment is one that:
-    /// - Starts a line of its own in SOURCE ([`Printer::comment_follows_content_on_its_line`])
-    /// - Is not glued to a following item (`/* c */ item`)
+    /// A "standalone" block comment starts a line of its own in SOURCE
+    /// ([`Printer::comment_follows_content_on_its_line`]) and is not glued to what follows
+    /// it, under the caller's [`StandaloneGlue`] rule. Used to force multiline formatting
+    /// for objects/type literals.
     ///
-    /// Used to force multiline formatting for objects/type literals.
-    ///
-    /// ⚠️ **The first half reads the SOURCE, never an item boundary.** The two differ by
-    /// exactly the text no item span covers — the container's own **comma**, which the
-    /// author can push onto its own line (`{ a: 1⏎, /* c */⏎b: 2 }`), the opening `{`, and
-    /// a stripped paren shell's `)`. Asking "is the comment on the same line as any item's
-    /// end?" calls a comment glued to any of those own-line and expands a container that
-    /// fits, a third fixed point neither the bare authoring nor prettier produces. It is
-    /// the same question the bracketed-list gate asks
-    /// ([`Printer::has_own_line_block_comments_in_bracket_list`]) and the same one the
-    /// element→comma seam partitions on, so the three cannot disagree about one gap.
-    /// A comment given a line **of its own** still expands the container, which is what
-    /// this predicate is for.
+    /// The [`StandaloneGlue::Source`] arm is the shared classification
+    /// ([`Printer::block_comment_owns_its_line`], which carries the argument), the same one
+    /// the bracketed-list gate ([`Printer::has_own_line_block_comments_in_bracket_list`])
+    /// and the element→comma seam ask, so the three cannot disagree about one gap. The
+    /// [`StandaloneGlue::ItemStart`] arm shares only the leading half — the enum's doc
+    /// carries why the type literal parts ways on the other.
     pub(crate) fn has_standalone_block_comment(
         &self,
         container_start: u32,
         container_end: u32,
         item_spans: &[Span],
+        glue: StandaloneGlue,
     ) -> bool {
         self.comments_on_page_between(container_start, container_end)
             .any(|c| {
                 if !c.is_block {
                     return false; // Line comments handled separately
                 }
-                // Anything before it on its line — an item, the `{`, a stripped `)`, the
-                // comma — makes it a trailing comment, not a standalone one.
-                if self.comment_follows_content_on_its_line(c) {
-                    return false;
+                match glue {
+                    StandaloneGlue::Source => {
+                        // `>=` for the same reason the bracket list takes it: an item
+                        // glued to the comment starts exactly where it ends.
+                        let item_follows = item_spans.iter().any(|s| s.start >= c.span.end);
+                        self.block_comment_owns_its_line(c, item_follows)
+                    }
+                    // The leading half is shared; only the glue half differs. An item
+                    // *after* the comment shares its line when the comment's end and the
+                    // item's start match (`/* c */ item`); such a comment leads that item
+                    // inline and forces nothing. `is_same_line` must take its earlier
+                    // position first — the helper returns false for out-of-order args.
+                    StandaloneGlue::ItemStart => {
+                        !self.comment_follows_content_on_its_line(c)
+                            && !item_spans
+                                .iter()
+                                .any(|s| self.is_same_line(c.span.end, s.start))
+                    }
                 }
-                // An item *after* the comment shares its line when the comment's end and
-                // the item's start match (`/* c */ item`); such a comment leads that item
-                // inline and forces nothing. `is_same_line` must take its earlier position
-                // first — the helper returns false for out-of-order args.
-                !item_spans
-                    .iter()
-                    .any(|s| self.is_same_line(c.span.end, s.start))
             })
     }
 

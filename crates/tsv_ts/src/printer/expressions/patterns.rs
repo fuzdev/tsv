@@ -1091,15 +1091,19 @@ impl<'a> Printer<'a> {
                         // The same range every other family's separator reads
                         // ([`Printer::item_gap_blank_scan`]): from the previous element's
                         // DISTANCE anchor (its shell end, not its claim anchor) to the first
-                        // comment in source. ⚠️ Only the PREDICATE is still this loop's own —
-                        // the array pattern counts newlines (`has_blank_line_between`) where
-                        // every other family asks prettier's `isNextLineEmpty`, which reads a
-                        // blank after an own-line comma differently. That difference is the
-                        // one thing left to reconcile here, and it is now a single call away
-                        // rather than buried in a hand-rolled copy of the range.
+                        // comment in source.
+                        //
+                        // The predicate is the ARRAY family's ([`BlankRule::AfterComma`],
+                        // prettier's `isLineAfterElementEmpty`), the one the array literal
+                        // and the tuple take: advance to the comma, then measure. A raw
+                        // newline COUNT over the whole gap cannot tell the author's blank
+                        // from the line break they put around the comma, so `[a⏎,⏎b]` and
+                        // `[a⏎⏎,⏎b]` — one line break each side, no blank line anywhere —
+                        // both FABRICATED one, in the one family whose siblings do not.
+                        // Stable once printed, so only a `compare` finds it.
                         let (from, check_pos) =
                             self.item_gap_blank_scan(trailing.end_pos, next_start);
-                        if self.has_blank_line_between(from, check_pos) {
+                        if self.has_blank_line_after_comma(from, check_pos) {
                             parts.push(d.literalline());
                         }
                     }

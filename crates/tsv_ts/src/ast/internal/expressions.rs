@@ -308,16 +308,20 @@ impl<'arena> ObjectProperty<'arena> {
         }
     }
 
-    /// Get the end position of the property value (for determining separator position)
+    /// Where the property's doc STOPS PRINTING — the anchor its trailing-comment scan takes
+    /// (`docs/comments.md` §The element-comma seam).
+    ///
+    /// Always the VALUE's end, the key's being only incidentally the same. A **shorthand**
+    /// property normally shares one span between key and value, but not always: the
+    /// permissively parsed `{ a = 1 }` (a `CoverInitializedName`, whose early error tsv
+    /// defers) is shorthand with an `AssignmentExpression` value spanning `a = 1` — text the
+    /// property's own doc prints. A key anchor opened the scan over `= 1`, so a comment
+    /// before the `=` (`{ a /* c */ = 1 }`) was claimed as trailing the property and
+    /// RELOCATED past the initializer, across the name→`=` binding tsv otherwise refuses to
+    /// move a comment over.
     pub fn value_end(&self) -> u32 {
         match self {
-            ObjectProperty::Property(p) => {
-                if p.shorthand {
-                    p.key.span().end
-                } else {
-                    p.value.span().end
-                }
-            }
+            ObjectProperty::Property(p) => p.value.span().end,
             // The spread's OWN end, past any grouping parens the parser stripped — not
             // the argument's. The interior of those parens is the spread doc's share to
             // print (`docs/comments.md` §A stripped-paren interior is a partition too);

@@ -392,25 +392,21 @@ pub(super) fn is_comment_inline_with_next(
 }
 
 /// Check if comments between `start` and `next_code_pos` should force expansion.
-/// Excludes inline block comments that share a source line with `next_code_pos`.
 ///
-/// A block comment on a different line from `start` but the same line as `next_code_pos`
-/// is an inline leading comment (e.g., `arg1,\n/** @type {T} */ arg2`). These should NOT
-/// force expansion — they're part of the next arg's line and the group/fits mechanism
-/// should decide the layout.
+/// Only truly standalone block comments — on a line of their own in SOURCE — force it. A
+/// block comment glued to what follows is an inline leading comment (`arg1,⏎/* c */ arg2`)
+/// and forces nothing: it is part of the next argument's line, and the group/fits mechanism
+/// decides the layout.
 ///
-/// Only truly standalone block comments — on a line of their own in SOURCE, and not glued
-/// to the next code — force expansion.
+/// "Standalone" is the shared classification ([`Printer::block_comment_owns_its_line`],
+/// which carries the argument) — read of the SOURCE on both sides, never of `start` (a
+/// previous argument's end, or the `(`) and never of `next_code_pos`. The two positions
+/// only look alike: the comma the author wrote between them belongs to neither span.
 ///
-/// ⚠️ **The first half reads the SOURCE, never `start`**, which is a previous argument's
-/// end (or the `(`). The two differ by exactly the text no span covers — the list's own
-/// **comma**, which the author can push onto its own line (`fn(a⏎, /* c */⏎b)`), and a
-/// stripped paren shell's `)`. An item-boundary reading calls such a comment own-line and
-/// expands a list that fits, a third fixed point neither the bare authoring nor prettier
-/// produces; the same correction the bracketed-list gate carries
-/// ([`Printer::has_own_line_block_comments_in_bracket_list`]). An argument list flattens
-/// when it fits, so the author's break around a comma is layout, not own-line-ness
-/// (`docs/conformance_prettier.md` §Comment Position Philosophy).
+/// It subsumes what [`is_comment_inline_with_next`] answered here: that predicate's
+/// stripped-paren arm requires the `(` on the comment's line, which is the hug reading
+/// already. It stays the anchor where a RUN is walked backwards comment by comment (the
+/// emitters), a different question with a different next.
 pub(crate) fn should_force_expansion_for_comments(
     printer: &Printer<'_>,
     start: u32,
@@ -420,12 +416,12 @@ pub(crate) fn should_force_expansion_for_comments(
     if printer.has_line_comments_between(start, next_code_pos) {
         return true;
     }
-    // Check if any block comment is truly standalone (not inline with the next code)
+    // Check if any block comment is truly standalone (not inline with the next code).
+    // `next_code_pos` bounds the gap, so an item always follows: every caller scans either
+    // the `(`→first-argument gap or an inter-argument one, and the trailing position past
+    // the last argument belongs to `has_own_line_block_comment_after`.
     for comment in comments_to_emit_in_range(printer.comments, start, next_code_pos) {
-        if comment.is_block
-            && printer.is_own_line_comment(comment)
-            && !is_comment_inline_with_next(printer, comment.span.end, next_code_pos)
-        {
+        if comment.is_block && printer.block_comment_owns_its_line(comment, true) {
             return true;
         }
     }
