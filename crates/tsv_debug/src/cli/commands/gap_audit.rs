@@ -120,14 +120,14 @@ use std::collections::{BTreeMap, BTreeSet};
 
 use by_node::{by_node_json_sections, compute_by_node, report_by_node, report_rank, report_since};
 use snapshot::{KnownKey, count_panics, count_swallows, is_pinnable, ratchet, snapshot_keys};
-use verify::{verify_example, victim_seed_offset};
+use verify::{AnchorProbe, anchor_probe, verify_example, victim_seed_offset};
 
 use crate::audit::examples::{ExampleOrd, ExampleSet};
 use crate::audit::node_edge::{NodeEdgeKey, node_edge_key_with_map};
 use crate::audit::parallel::{ArmedRun, run_pool};
 use crate::audit::properties::{
-    Formatted, Pristine, Utf16ToByte, Verdict, VerifyOutcome, VerifySummary, ledger_format,
-    pristine_format, tsv_parse_to_value,
+    Formatted, Pristine, UnverifiedCause, Utf16ToByte, Verdict, VerifyOutcome, VerifySummary,
+    ledger_format, pristine_format, tsv_parse_to_value, unverified_cause_breakdown,
 };
 use crate::audit::ratchet::{
     GateDiff, print_ratchet_skipped, refuse_narrowed_update, report_unpinned_panics,
@@ -176,9 +176,11 @@ pub struct GapAuditCommand {
     #[argh(switch)]
     rank: bool,
 
-    /// path to a prior `gap_audit --json` output; print the per-cluster ranking DELTA against
-    /// it (`(CallExpression, arguments→$) 2861 → 2790 (−71)`) so a slice can see whether it
-    /// moved its target cluster. Report-only (implies record-time keying)
+    /// path to a prior `gap_audit --json` output; print the DELTA against it — the per-cluster
+    /// ranking diff (`(CallExpression, arguments→$) 2861 → 2790 (−71)`), the per-shape
+    /// (kind, shape) → (count, payloads) diff (which catches a change newly reaching an
+    /// ALREADY-KNOWN shape, invisible to the ratchet), and the seed-eligibility deltas.
+    /// Report-only (implies record-time keying)
     #[argh(option)]
     since: Option<String>,
 
@@ -332,6 +334,17 @@ impl Kind {
         ]
         .into_iter()
         .find(|k| k.label() == s)
+    }
+
+    /// The compact label the by-node views use for a cluster's kind-composition cell, where
+    /// the full [`Self::label`] would blow the column out.
+    fn short_label(self) -> &'static str {
+        match self {
+            Self::Dropped => "drop",
+            Self::DoublePrinted => "dbl",
+            Self::Swallow => "swal",
+            Self::Panic => "panic",
+        }
     }
 }
 
@@ -490,6 +503,11 @@ struct NodeClusterAccum {
     /// deprioritizes glued gaps — where the owned-claim and fused-`text()` families live.
     /// The ranking sorts on this; hits stay reported beside it.
     gaps: BTreeSet<(String, usize)>,
+    /// Exact per-[`Kind`] hit tallies — the kind-composition column. A gap-ranked #1 cluster
+    /// can be all SWALLOW (zero ledger-kind presence), which changes what a slice against it
+    /// yields — silent-corruption fixes rather than ratchet-line retirement — so the views
+    /// say it up front instead of leaving it to be rediscovered per slice.
+    kind_hits: BTreeMap<Kind, usize>,
 }
 
 /// The start of the ASCII-whitespace run containing `offset` — the `(path, gap)` dedup key
@@ -530,6 +548,7 @@ impl Tally {
                     hit.path.to_string(),
                     gap_run_start(hit.source, hit.attribution_offset),
                 ));
+                *c.kind_hits.entry(hit.kind).or_insert(0) += 1;
             }
             // Keyed, but the offset resolved to no node — the UNRESOLVED tail. Counted only when
             // keying ran, so a gate run (keying off, every `node_edge` `None`) stays at zero.
@@ -579,6 +598,9 @@ impl Tally {
             c.hits += v.hits;
             c.shapes.extend(v.shapes);
             c.gaps.extend(v.gaps);
+            for (kind, n) in v.kind_hits {
+                *c.kind_hits.entry(kind).or_insert(0) += n;
+            }
         }
         self.dirty_files.extend(other.dirty_files);
         for (k, v) in other.shapes {
@@ -903,21 +925,7 @@ impl GapAuditCommand {
                 // UNCONFIRMED. It needs no verify anyway: a swallow is observed directly on the
                 // rendered output, like `blank_audit`'s F1/reparse kinds.
                 .filter(|((kind, _), _)| *kind != Kind::Swallow)
-                .map(|((kind, shape), agg)| {
-                    let confirmed = agg
-                        .examples
-                        .iter()
-                        .filter(|ex| {
-                            let parser = ParserType::from_extension(&ex.path);
-                            verify_example(ex, *kind, parser) == Verdict::Confirmed
-                        })
-                        .count();
-                    let outcome = VerifyOutcome {
-                        confirmed,
-                        total: agg.examples.len(),
-                    };
-                    ((*kind, shape.clone()), outcome)
-                })
+                .map(|((kind, shape), agg)| ((*kind, shape.clone()), verify_shape(*kind, agg)))
                 .collect();
             for (key, outcome) in outcomes {
                 if let Some(agg) = total.shapes.get_mut(&key) {
@@ -964,19 +972,27 @@ impl GapAuditCommand {
             }
             // Spend the verify pass rather than discarding it. Pinning is the moment several
             // hundred claims get frozen, so it is exactly when it's worth saying which ones the
-            // audit could not reproduce. A WARNING, not a refusal: an unconfirmed shape is
-            // still a real finding, and the verdict describes the shape's one sampled
-            // example rather than the shape, so refusing on it would both block `--update`
-            // and flip with which fixture happens to sort first.
+            // audit could not reproduce — and WHY, per cause. A WARNING, not a refusal: an
+            // unconfirmed shape is still a real finding, and the verdict describes the shape's
+            // sampled examples rather than the shape, so refusing on it would both block
+            // `--update` and flip with which fixture happens to sort first.
             let unconfirmed = count_by_summary(&total.shapes, VerifySummary::Unconfirmed);
             let partial = count_by_summary(&total.shapes, VerifySummary::Partial);
+            let (causes, output_bug_shapes) = verify_cause_totals(&total.shapes);
             if unconfirmed > 0 || partial > 0 {
                 println!(
                     "  ⚠ verify: {unconfirmed} shape(s) UNCONFIRMED (no kept example \
-                     reproduced) and {partial} PARTIAL (some did) — filed as \
-                     dropped/double-printed, yet the output reparses to just as many comments \
-                     as its input. Likely MANGLES (a rebuilt comment) rather than plain drops; \
-                     see docs/gap_audit.md."
+                     reproduced) and {partial} PARTIAL (some did); unconfirmed examples by \
+                     cause: {} — see docs/gap_audit.md.",
+                    unverified_cause_breakdown(&causes)
+                );
+            }
+            if output_bug_shapes > 0 {
+                println!(
+                    "  ⚠ {output_bug_shapes} shape(s) carry an OUTPUT-UNPARSEABLE / \
+                     OUTPUT-PANICKED example — the formatter's own output fails a re-format. \
+                     A REAL corruption class no other gate sees (`roundtrip_audit` formats \
+                     files as authored, never an injected input); triage these first."
                 );
             }
             return report_unpinned_panics(
@@ -1020,7 +1036,7 @@ impl GapAuditCommand {
                 report_rank(rollup, self.top, self.json);
             }
             if let Some(since_path) = &self.since {
-                report_since(rollup, since_path, self.json);
+                report_since(rollup, &total, since_path, self.json);
             }
         }
 
@@ -1169,6 +1185,61 @@ fn count_by_summary(shapes: &BTreeMap<(Kind, String), ShapeAgg>, want: VerifySum
         .count()
 }
 
+/// Verify one shape's kept examples into its [`VerifyOutcome`]: each example's
+/// [`verify_example`] verdict (a declined confirmation tallying under its [`UnverifiedCause`]),
+/// and the [`anchor_probe`] over the confirmed side only — an unconfirmed example has no drop
+/// for a space to rescue, and a panic shape's crash is its own answer.
+fn verify_shape(kind: Kind, agg: &ShapeAgg) -> VerifyOutcome {
+    let mut outcome = VerifyOutcome {
+        total: agg.examples.len(),
+        ..VerifyOutcome::default()
+    };
+    for ex in agg.examples.iter() {
+        let parser = ParserType::from_extension(&ex.path);
+        match verify_example(ex, kind, parser) {
+            Verdict::Confirmed => {
+                outcome.confirmed += 1;
+                if kind != Kind::Panic {
+                    match anchor_probe(ex, parser) {
+                        AnchorProbe::Rescued => {
+                            outcome.anchor_probed += 1;
+                            outcome.anchor_rescued += 1;
+                        }
+                        AnchorProbe::StillFires => outcome.anchor_probed += 1,
+                        AnchorProbe::Inconclusive => {}
+                    }
+                }
+            }
+            Verdict::Unconfirmed(cause) => {
+                outcome.unconfirmed_causes[cause.index()] += 1;
+            }
+        }
+    }
+    outcome
+}
+
+/// Sum the verify pass's per-cause tallies across every verified shape, and count the shapes
+/// carrying at least one **output-side real-bug** example (`OUTPUT-UNPARSEABLE` /
+/// `OUTPUT-PANICKED` — the formatter's own output failing a re-format), which every summary
+/// path reports on its own line rather than letting it hide inside "unconfirmed".
+fn verify_cause_totals(
+    shapes: &BTreeMap<(Kind, String), ShapeAgg>,
+) -> ([usize; UnverifiedCause::COUNT], usize) {
+    let mut totals = [0usize; UnverifiedCause::COUNT];
+    let mut output_bug_shapes = 0;
+    for agg in shapes.values() {
+        if let Some(v) = agg.verify {
+            for cause in UnverifiedCause::ALL {
+                totals[cause.index()] += v.cause_count(cause);
+            }
+            if v.output_bug_examples() > 0 {
+                output_bug_shapes += 1;
+            }
+        }
+    }
+    (totals, output_bug_shapes)
+}
+
 /// Translate a run's [`Tally`] into the shared reporting envelope: the run totals and one
 /// [`Finding`] per shape, in the `shapes` map's `(Kind, shape)` order (so the printers'
 /// stable count-sort preserves the `(Kind, shape)` tie-break).
@@ -1215,6 +1286,14 @@ fn build_report(total: &Tally, payloads: &[Payload]) -> (RunSummary, Vec<Finding
                     bystander_hits: agg.bystander_hits,
                     verify_confirmed: agg.verify.map(|v| v.confirmed),
                     verify_total: agg.verify.map(|v| v.total),
+                    verify_unconfirmed_causes: agg
+                        .verify
+                        .map(VerifyOutcome::nonzero_causes)
+                        .unwrap_or_default(),
+                    verify_output_bug_examples: agg
+                        .verify
+                        .map_or(0, VerifyOutcome::output_bug_examples),
+                    verify_anchor: agg.verify.map(|v| (v.anchor_rescued, v.anchor_probed)),
                 }),
             }
         })

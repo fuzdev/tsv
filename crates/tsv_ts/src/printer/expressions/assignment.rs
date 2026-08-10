@@ -19,7 +19,6 @@ use crate::printer::OwnedCommentEffect;
 use crate::printer::Printer;
 use crate::printer::conditional_should_break_after_op;
 use crate::printer::expressions::literals::format_string_literal_from_ast;
-use crate::printer::is_multiline_string_literal;
 use crate::printer::is_string_literal;
 use crate::printer::layout::{fluid_after_operator, hang_after_operator};
 use crate::printer::types::helpers::unwrap_parenthesized;
@@ -757,42 +756,48 @@ fn is_short_arg(expr: &Expression<'_>, source: &str, print_width: usize) -> bool
     }
 }
 
-/// Whether a poorly-breakable chain carries a line-continuation string argument — a
-/// string literal whose formatted form has an internal newline (`'a\`⏎`b'`).
+/// Whether a poorly-breakable chain carries a string argument whose **literal text spans
+/// lines** — a line continuation (`'a\`⏎`b'`) or a raw `LineTerminator` (invalid JS that
+/// tsv currently over-accepts; `docs/checklist_typescript.md` §Known over-acceptance).
 ///
-/// Such a string force-breaks the RHS doc (`will_break`) at a **leaf**, not at a chain
-/// break point, so it does not invalidate the `is_poorly_breakable_chain` claim: prettier
-/// likewise counts a line-continuation string as a lone short argument (its
-/// `isLoneShortArgument` string arm does not exclude newlines, unlike the template arm),
-/// keeps the chain poorly-breakable, and breaks after the operator. This is the third
-/// exemption for the `is_poorly_breakable_chain` debug_assert below.
-fn chain_has_line_continuation_string_arg(expr: &Expression<'_>, source: &str) -> bool {
+/// Either way the string force-breaks the RHS doc (`will_break`) at a **leaf** — its own
+/// mandatory newline — not at a chain break point, so it does not invalidate the
+/// `is_poorly_breakable_chain` claim. For the continuation spelling prettier agrees
+/// (its `isLoneShortArgument` string arm does not exclude newlines, unlike the template
+/// arm), keeps the chain poorly-breakable, and breaks after the operator; on the raw
+/// spelling prettier has no verdict — its parser rejects the input — so the exemption
+/// merely keeps the assert sound over tsv's actual accept surface. This is an exemption
+/// for the `is_poorly_breakable_chain` debug_assert below, and deliberately NOT the shared
+/// `is_multiline_string_literal` (a *layout* predicate, continuation-only — widening that
+/// one would change fluid-layout behavior for the over-accepted raw form).
+fn chain_has_multiline_string_arg(expr: &Expression<'_>, source: &str) -> bool {
     match expr {
         Expression::CallExpression(call) => {
             call.arguments
                 .iter()
-                .any(|arg| arg_is_line_continuation_string(arg, source))
-                || chain_has_line_continuation_string_arg(call.callee, source)
+                .any(|arg| arg_is_multiline_string(arg, source))
+                || chain_has_multiline_string_arg(call.callee, source)
         }
         Expression::MemberExpression(member) => {
-            chain_has_line_continuation_string_arg(member.object, source)
+            chain_has_multiline_string_arg(member.object, source)
         }
         Expression::TSNonNullExpression(non_null) => {
-            chain_has_line_continuation_string_arg(non_null.expression, source)
+            chain_has_multiline_string_arg(non_null.expression, source)
         }
         _ => false,
     }
 }
 
-/// Whether an argument is a string literal carrying a line continuation (`\⏎` —
-/// the formatted form keeps the embedded newline; `is_multiline_string_literal`
-/// is the raw-source predicate) — unwrapping unary operators like `is_short_arg` does.
-fn arg_is_line_continuation_string(expr: &Expression<'_>, source: &str) -> bool {
+/// Whether an argument is a string literal whose raw span contains a newline —
+/// unwrapping unary operators like `is_short_arg` does.
+fn arg_is_multiline_string(expr: &Expression<'_>, source: &str) -> bool {
     match expr {
-        Expression::UnaryExpression(unary) => {
-            arg_is_line_continuation_string(unary.argument, source)
+        Expression::UnaryExpression(unary) => arg_is_multiline_string(unary.argument, source),
+        Expression::Literal(lit) if matches!(lit.value, internal::LiteralValue::String { .. }) => {
+            let raw = lit.span.extract(source);
+            raw.contains('\n') || raw.contains('\r')
         }
-        _ => is_multiline_string_literal(expr, source),
+        _ => false,
     }
 }
 
@@ -1089,35 +1094,43 @@ impl<'a> Printer<'a> {
         // our static AST analysis missed a break-emitting node — the chain actually
         // has internal break points and may need a different layout.
         //
-        // Three exemptions, all cases where the doc force-breaks for a reason that is NOT a
+        // Two exemptions, both cases where the doc force-breaks for a reason that is NOT a
         // chain break point the static analysis missed:
         //
-        // - A comment the RHS *owns* prints inside the RHS's doc (a JSDoc cast, a bundler
-        //   annotation), so an owned multi-line annotation on a trivial call
-        //   (`a = /**⏎ * @__PURE__⏎ */ fn();`) force-breaks the doc without being a chain
-        //   break. The layout already hangs the value for it (`owned_leading_comment_effect`).
-        // - An *interior line comment* in the chain (`a = foo // c⏎.bar!`) forces the break
-        //   at the comment — a `//` must end its line — and the layout override above already
-        //   handled it (`has_line_comments_in_*_chain` → NeverBreakAfterOperator, keeping the
-        //   chain on the operator line rather than double-breaking after the operator). The
-        //   break is the comment's, not a mis-classified chain break point, so "poorly
-        //   breakable" is still a sound claim about the chain itself. (The VariableDeclarator
-        //   path prints through its own layout and never reaches this assert; the assignment-
-        //   expression / object-property / pattern / class-field callers do.) The exemption is
-        //   `has_line_comments_in_chain` directly — the member/call-chain layout predicates both
-        //   reduce to it (the member one only adds an `is_member_only_chain` guard), so naming
-        //   the underlying check is exact and avoids a redundant disjunct.
+        // - A COMMENT in the RHS. The classifier deliberately models comment-free geometry
+        //   only (as prettier's `isLoneShortArgument` bails on `hasComment`), and every
+        //   comment-driven break is the comment's own: an interior line comment
+        //   (`a = foo // c⏎.bar!` — a `//` must end its line; the layout override above
+        //   takes NeverBreakAfterOperator for it), a multiline block whose interior newline
+        //   must print (`a = b/* a⏎b */.map(fn)`), a glued block the chain formatter breaks
+        //   per-member for, or an owned leading comment printing inside the value's doc (a
+        //   JSDoc cast, a bundler annotation — `owned_comment_effect`, whose span sits
+        //   BEFORE the RHS span and so needs its own arm). The exemption is deliberately
+        //   ONE span predicate (on-page, the layout axis) plus the owned arm — not a
+        //   per-gap enumeration: the RHS is classified through `unwrap_expression` (strips
+        //   `await`/`!`/unary/`yield`), so a gap enumeration must cover the wrapper gaps
+        //   too (`a: await // c⏎x.a`), and two rounds of enumerating (line comments, then
+        //   multiline blocks) each missed one. (The VariableDeclarator path prints through
+        //   its own layout and never reaches this assert; the assignment-expression /
+        //   object-property / pattern / class-field callers do.)
+        //   TODO: for a multiline block comment in a chain gap there is no layout override
+        //   yet — tsv breaks after the operator AND at the comment
+        //   (`a =⏎ b /* a⏎b */⏎ .map(fn);`) where prettier keeps the chain on the operator
+        //   line (one break). A real layout gap, deliberately NOT sanctioned by this
+        //   exemption; fixing it means extending the NeverBreakAfterOperator override
+        //   above to that comment kind, fixtures-first.
         // - A *line-continuation string argument* (`a = fn('x\`⏎`y')`) force-breaks the doc at
         //   a leaf — the string's own mandatory newline — not at a chain break point. Prettier
         //   agrees the chain is poorly breakable here (a line-continuation string is a lone
         //   short argument) and breaks after the operator, so the classification is sound.
-        //   (`chain_has_line_continuation_string_arg`).
+        //   (`chain_has_multiline_string_arg`).
         debug_assert!(
             {
                 let core_expr = unwrap_expression(right_expr);
-                owned_comment_effect == Some(OwnedCommentEffect::Hangs)
-                    || self.has_line_comments_in_chain(right_expr)
-                    || chain_has_line_continuation_string_arg(core_expr, self.source)
+                let rhs_span = right_expr.span();
+                owned_comment_effect.is_some()
+                    || self.has_comments_on_page_between(rhs_span.start, rhs_span.end)
+                    || chain_has_multiline_string_arg(core_expr, self.source)
                     || !is_poorly_breakable_chain(
                         core_expr,
                         self.source,

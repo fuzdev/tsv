@@ -49,7 +49,7 @@ reported as the finding it is.
 | `--all-bytes` | also inject strictly inside words — a diagnostic, not a stricter mode (comment interiors stay excluded) |
 | `--by-node` | also print the coarse by-`(node, edge)` rollup after the run (report-only; see [Reading a finding](#reading-a-finding)) |
 | `--rank` | print the top-N `(node, edge)` clusters as a paste-ready **markdown table** for `TODO_GAPS` §Status (report-only; `deno task gaps:audit:rank`) |
-| `--since <baseline.json>` | print the per-cluster ranking **delta** vs a prior `--json` output — "did my slice move the cluster?" (report-only) |
+| `--since <baseline.json>` | print the **delta** vs a prior `--json` output: the per-cluster ranking diff, the per-shape `(kind, shape) → (count, payloads)` diff, and the seed-eligibility change (report-only) |
 | `--top N` | with `--rank`, how many clusters the table shows (default 12); a `--since` diff always lists every changed cluster |
 | `--update` | rewrite the committed snapshot (prints a `# shapes: N` stamp + a RETIRED/RE-PINNED yield line) |
 
@@ -119,7 +119,8 @@ form, so the arm is whole and the class ratchets.
 
 Two properties still differ from the ledger kinds. It is **not self-verified** — a swallow is
 observed directly on the rendered output (like `blank_audit`'s F1/reparse kinds), so the
-`UNCONFIRMED`/`PARTIAL` axis does not apply; the verify pass's oracle is the multiset of
+`UNCONFIRMED`/`PARTIAL` axis does not apply (nor the `⚑ ANCHOR?` probe, which rides the
+verify pass); the verify pass's oracle is the multiset of
 comment *contents*, which answers the ledger's question and not this one. And it has **no
 bystander axis**: the tracker reports a property of an output *line*, not of a registered
 comment, so every finding keys at its injection site.
@@ -177,7 +178,9 @@ next fixture edit.
   triage starts at the responsible call site instead of from the shape. A skip whose comment
   another emitter prints (the routed expansion path, a winning `conditional_group` sibling)
   never surfaces — a bare skip is an annotation, not a finding.
-- **`⚠ UNCONFIRMED (0/5 confirmed)` / `⚠ PARTIAL (2/5 confirmed)`** — see below.
+- **`⚠ UNCONFIRMED (0/5: …)` / `⚠ PARTIAL (2/5 confirmed; unconfirmed: …)` /
+  `⚑ ANCHOR? (…)`** — the self-verify verdict with its per-cause breakdown, and the
+  anchor-sensitivity hint over the confirmed side — see below.
 
 ### The by-node rollup (`--by-node`)
 
@@ -213,9 +216,19 @@ offset in one ASCII-whitespace run normalizing to the run's first byte — and t
 on that (hits as tie-break, both still reported). A comment inside a gap splits the run into two
 keys — a small accepted residual.
 
+**Each cluster also carries its edge CLASS and kind COMPOSITION.** The class —
+`leading` (`^→…`), `trailing` (`…→$`), or `interior` — is the boundary/interior split that
+reframed the remainder (boundary regions are the fused-`text()`-with-no-query territory;
+interior gaps are the element-comma-seam family). The kind cell (`drop 12 · swal 3`, compact
+labels, nonzero only) says what a slice against the cluster would actually yield **before**
+the slice starts: a gap-ranked #1 that is all `SWALLOW` has zero pinned-ratchet presence, so
+its yield is silent-corruption fixes rather than line retirement — a lesson once rediscovered
+mid-slice, now a column.
+
 `--json` carries the ranked work-list as one additive top-level section, `by_node` — one
-`{node, edge, hits, gaps, shapes, share, gaps_share, example_shape}` per cluster,
-distinct-gaps-descending — plus a top-level `by_node_unresolved` (the `UNRESOLVED` tail count)
+`{node, edge, edge_class, hits, gaps, shapes, share, gaps_share, example_shape, kinds}` per
+cluster, distinct-gaps-descending (`kinds` keyed by the full snapshot labels, nonzero only) —
+plus a top-level `by_node_unresolved` (the `UNRESOLVED` tail count)
 and **`by_node_metric`**, the ranking-metric version stamp (`1` = the retired hits-sorted
 ranking; `2` = distinct-gap sorted). `--since` deliberately keeps diffing **hits** — exact and
 comparable across both metrics, so baselines from before the change stay usable; a consumer
@@ -228,14 +241,23 @@ consumes directly instead of parsing `--json` and hand-transcribing (all report-
 byte-identical to the gate):
 
 - **`deno task gaps:audit:rank`** (`--rank`, `--top N`) prints the top-N clusters as a
-  **paste-ready markdown table** for `TODO_GAPS` §Status — rank, `` `(node, edge)` ``, distinct
-  gaps, hits, shapes, gap share (sorted by distinct gaps; see the by-node section above) — so
+  **paste-ready markdown table** for `TODO_GAPS` §Status — rank, `` `(node, edge)` ``, edge
+  class, distinct gaps, hits, shapes, kind composition, gap share (sorted by distinct gaps;
+  see the by-node section above) — so
   the fattest-first work-list stays current by paste, not by re-transcription (which rots as
   slices land).
-- **`--since <baseline.json>`** diffs this run's ranking against a prior `--json` output and
-  prints only the clusters whose hit count **changed** — `(CallExpression, arguments→$) 2861 →
-  2790 (−71)`, biggest reduction first — the direct answer to "did my slice move its target
-  cluster?". A missing/malformed baseline **warns and skips**; it never fails the gate.
+- **`--since <baseline.json>`** diffs this run against a prior `--json` output, in three
+  report-only sections. The **ranking diff** lists the clusters whose hit count **changed** —
+  `(CallExpression, arguments→$) 2861 → 2790 (−71)`, biggest reduction first — the direct
+  answer to "did my slice move its target cluster?". The **shape diff** lists every
+  `(kind, shape)` whose `(count, payloads)` changed — including a count move at an
+  **already-pinned** shape, which the ratchet (a shape-set diff) and a payload-only diff are
+  both structurally blind to, and which has carried a real injected double-print past a green
+  gate. A clean run prints the strong claim explicitly: *no shape-level delta*. The
+  **seed-eligibility** line prints only when `files` / `dirty` / `parse-skipped` moved — a fix
+  that makes a dirty seed clean hands the audit new seeds, so a count rise on an existing
+  shape can be new coverage rather than a regression, and the diff says so at the moment it
+  matters. A missing/malformed baseline **warns and skips**; it never fails the gate.
 - **`gaps:audit:update`** prints, after the write, a `# shapes: N` count stamp (into the
   snapshot header — the file also carries `#`/blank lines, so a casual `head`/`wc -l`
   over-counts) and a **yield line** — `yield: gaps −R +A (net ±K)` — where `R` is RETIRED (a
@@ -258,24 +280,51 @@ count's blind spots: a balancing drop+duplicate (equal count, unequal contents) 
 
 A shape keeps up to five examples (the smallest by `(path, attribution_offset)` — the
 victim's own site for a bystander, the injection site otherwise — so the set is
-`--jobs`-independent), and each is re-checked. The ratio is what separates two very different
-findings: **`UNCONFIRMED (0/N)`** — *no* example reproduced, so the shape is uniformly an
-instrument artifact — versus **`PARTIAL (k/N)`** — some reproduced and some didn't, a *mixed*
-real drop. An unlabelled shape confirmed on every example.
+`--jobs`-independent), and each is re-checked. The ratio separates **`UNCONFIRMED (0/N)`** —
+*no* example reproduced — from **`PARTIAL (k/N)`** — some reproduced and some didn't, a
+*mixed* real drop. An unlabelled shape confirmed on every example.
 
-Where a finding does *not* reproduce, the output holds the same comment **contents** as its
-input, so something printed the comment without recording the emit — a genuine instrument gap,
-not the content loss it is filed as. (A mangled rebuild — which the old count read as
-UNCONFIRMED, since a mangle keeps the comment *count* — now normalizes different and reproduces
-as **CONFIRMED**, the real corruption it is.) The residual, far narrower than the count's: a
-multiset can still balance if the *same* content is dropped in one place and duplicated in
-another; no corpus example does this.
+The pass is cheap and **lazily run**: each example costs two ledger formats (the re-splice
+and its output) plus one more for the anchor probe on a confirmed one — thousands of formats
+against the injection loop's millions — and the quiet green gate (`deno task check`'s path)
+skips it entirely. The labels appear on `--report` / `--json`, on `--update`, and on any
+non-holding, narrowed, or off-corpus run.
 
-The ratio is triage information, not a gate signal: it is a property of the shape's sampled
-examples, not of the shape, so it is deliberately not part of the ratchet key (and `--update`
-regenerates a byte-identical snapshot regardless of it). `--update` still reports the tallies —
-how many shapes are fully `UNCONFIRMED` and how many `PARTIAL` — since pinning several hundred
-claims is the moment worth naming the ones the audit couldn't reproduce.
+**A declined confirmation names its CAUSE**, because "unconfirmed" is not one thing — the
+label carries the per-cause breakdown (`⚠ UNCONFIRMED (0/5: 4 content-conserved, 1
+OUTPUT-UNPARSEABLE)`), the `--json` shape carries it as `verify_unconfirmed_causes`, and the
+causes divide into three families:
+
+- **`content-conserved`** — the output holds the same comment **contents** as its input, so
+  something printed the comment without recording the emit: a genuine instrument gap, not the
+  content loss it is filed as. (A mangled rebuild — which the old count read as UNCONFIRMED,
+  since a mangle keeps the comment *count* — normalizes different and reproduces as
+  **CONFIRMED**, the real corruption it is.) The residual, far narrower than the count's: a
+  multiset can still balance if the *same* content is dropped in one place and duplicated in
+  another; no corpus example does this.
+- **`OUTPUT-UNPARSEABLE` / `OUTPUT-PANICKED`** — the formatter's **own output fails a
+  re-format** after the injection: a **real corruption class**, not an instrument artifact,
+  and one no other gate can see — `roundtrip:audit` formats files *as authored*, so an output
+  made unreparseable by an injected comment is graded nowhere else. Every report path totals
+  these on their own line (`verify_output_bug_examples` in `--json`); triage them first.
+- **staleness / re-run artifacts** — `no-longer-fires` (the re-run produces no findings),
+  `injection-rejected` / `injection-panicked` (the re-splice no longer formats), and the
+  bookkeeping trio `seed-unreadable` / `payload-unknown` / `offset-invalid`.
+
+**Confirmed examples get one more probe: `⚑ ANCHOR?`.** The probe re-splices the same payload
+with a single leading space; if the finding *vanishes*, the shape is tagged (`⚑ ANCHOR? (2/3
+rescued by a leading space)`, `verify_anchor_rescued` / `verify_anchor_probed` in `--json`).
+That is the signature of a **fixed-offset anchor** — a scan starting at `span.start + K` that
+the one extra byte pushes the comment past — mechanizing the triage move "vary the whitespace
+and a fixed-offset anchor announces itself". It is a *hint* for cause triage, never a verdict:
+a space can also legitimately change the site, so confirm the emitter by reading it.
+
+The verify verdict is triage information, not a gate signal: it is a property of the shape's
+sampled examples, not of the shape, so it is deliberately not part of the ratchet key (and
+`--update` regenerates a byte-identical snapshot regardless of it). `--update` still reports
+the tallies — how many shapes are fully `UNCONFIRMED` and how many `PARTIAL`, the cause
+breakdown, and the output-bug shape count — since pinning several hundred claims is the moment
+worth naming the ones the audit couldn't reproduce.
 
 ## Triaging and fixing a shape
 

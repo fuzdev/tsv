@@ -143,6 +143,16 @@ pub(crate) struct GapDetail {
     /// the shape was not verified).
     pub(crate) verify_confirmed: Option<usize>,
     pub(crate) verify_total: Option<usize>,
+    /// The verify pass's per-cause split of the unconfirmed examples — `(label, count)`,
+    /// nonzero only, cause order. Empty when unverified or fully confirmed.
+    pub(crate) verify_unconfirmed_causes: Vec<(&'static str, usize)>,
+    /// Of the unconfirmed examples, how many sit on an **output-side real-bug** cause
+    /// (`OUTPUT-UNPARSEABLE` / `OUTPUT-PANICKED` — the formatter's own output failing a
+    /// re-format). Split out of the causes list so the printers can total it cheaply.
+    pub(crate) verify_output_bug_examples: usize,
+    /// The anchor probe's `(rescued, probed)` over the confirmed examples — `None` when the
+    /// shape was not verified. `rescued > 0` is the fixed-offset-anchor hint (`⚑ ANCHOR?`).
+    pub(crate) verify_anchor: Option<(usize, usize)>,
 }
 
 /// `blank_audit`'s audit-specific detail — the per-shape aggregate the envelope carries
@@ -418,10 +428,25 @@ pub(crate) fn print_report(s: &RunSummary, findings: &[Finding]) {
     if unconfirmed > 0 || partial > 0 {
         println!(
             "⚠ {unconfirmed} shape(s) UNCONFIRMED (no kept example reproduced) and {partial} \
-             PARTIAL (some did): the ledger says a comment was\n  never emitted, yet the output \
-             reparses to just as many comments as its input. Something\n  printed it without \
-             recording the emit — or printed a MANGLED rebuild (`/* a⏎b */` →\n  `/* ab */`, one \
-             comment either way). Real either way, but not the plain drop it is filed as.\n"
+             PARTIAL (some did) — each shape's label\n  names its causes. `content-conserved` \
+             means the output holds every comment the input had:\n  an instrument gap, or a \
+             MANGLED rebuild (`/* a⏎b */` → `/* ab */`, one comment either\n  way). Real either \
+             way, but not the plain drop it is filed as.\n"
+        );
+    }
+    // The output-side real-bug pair gets its own line on every report path: filed under
+    // "unconfirmed", it is the one cause that is a live corruption class rather than an
+    // instrument artifact, and no other gate can see it (`roundtrip_audit` formats files as
+    // authored, never an injected input).
+    let output_bug_shapes = findings
+        .iter()
+        .filter(|f| matches!(&f.detail, Detail::Gap(d) if d.verify_output_bug_examples > 0))
+        .count();
+    if output_bug_shapes > 0 {
+        println!(
+            "⚠ {output_bug_shapes} shape(s) carry an OUTPUT-UNPARSEABLE / OUTPUT-PANICKED \
+             example — the formatter's own output\n  fails a re-format after the injection. A \
+             REAL corruption class no other gate sees; triage first.\n"
         );
     }
 }
@@ -457,6 +482,18 @@ pub(crate) fn print_json(
                     "verdict": verdict_json(f.confidence),
                     "verify_confirmed": d.verify_confirmed,
                     "verify_total": d.verify_total,
+                    // The per-cause split of the unconfirmed examples ({} when none). The
+                    // OUTPUT-* keys are the real-bug pair — the formatter's own output failing
+                    // a re-format — which `verify_output_bug_examples` totals for filtering.
+                    "verify_unconfirmed_causes": d.verify_unconfirmed_causes
+                        .iter()
+                        .map(|(label, n)| ((*label).to_string(), serde_json::json!(n)))
+                        .collect::<serde_json::Map<String, Value>>(),
+                    "verify_output_bug_examples": d.verify_output_bug_examples,
+                    // The anchor probe over the confirmed examples: `rescued > 0` is the
+                    // fixed-offset-anchor hint (a leading space makes the finding vanish).
+                    "verify_anchor_rescued": d.verify_anchor.map(|(rescued, _)| rescued),
+                    "verify_anchor_probed": d.verify_anchor.map(|(_, probed)| probed),
                     "example_payload": ex.payload,
                     "example_path": ex.path,
                     // Two offsets: the injection site (reproduces the drop) and the attribution

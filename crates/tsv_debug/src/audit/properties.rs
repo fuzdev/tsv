@@ -782,21 +782,104 @@ mod ledger {
         /// Re-formatting really does lose, mangle, or duplicate a comment — the content
         /// multiset of the output differs from the input's.
         Confirmed,
+        /// The claim did not reproduce — but WHY matters, and the causes are not one thing:
+        /// most are instrument gaps or stale examples, while [`UnverifiedCause::OutputUnparseable`]
+        /// and [`UnverifiedCause::OutputPanicked`] are a **real bug class** no other gate sees.
+        Unconfirmed(UnverifiedCause),
+    }
+
+    /// Which of `verify_example`'s early-exit paths declined to confirm — the split that stops
+    /// one word ("UNCONFIRMED") from conflating an instrument artifact with a live corruption
+    /// class. Ordered by where the path sits in the verify sequence.
+    #[derive(Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Debug)]
+    pub(crate) enum UnverifiedCause {
+        /// The example's seed file could not be re-read.
+        SeedUnreadable,
+        /// The recorded payload label resolves to no payload (report/record drift).
+        PayloadUnknown,
+        /// The recorded injection offset is out of range or mid-`char`.
+        OffsetInvalid,
+        /// Re-splicing the payload no longer parses — the injection is rejected on the re-run.
+        InjectionRejected,
+        /// Re-splicing the payload panics the formatter on the re-run.
+        InjectionPanicked,
+        /// The re-run formats cleanly with NO ledger findings — the example no longer fires.
+        NoLongerFires,
+        /// ⚠ The formatter's **own output does not reparse** after the injection. A real bug —
+        /// an injected comment produced output tsv itself rejects — and invisible to
+        /// `roundtrip_audit`, whose gate only formats files AS AUTHORED. Triage first.
+        OutputUnparseable,
+        /// ⚠ Re-formatting the formatter's own output PANICS. The output-side sibling of
+        /// [`Self::OutputUnparseable`], and equally a real bug class.
+        OutputPanicked,
         /// The output holds the same comment *contents* as its input, yet the ledger filed a
         /// finding. Something printed the comment without recording the emit (an instrument
         /// gap) — real that the ledger's account is off, but not the content loss it is filed
-        /// as.
-        Unconfirmed,
+        /// as. The one cause that was the label's original documented meaning.
+        ContentConserved,
+    }
+
+    impl UnverifiedCause {
+        pub(crate) const ALL: [Self; 9] = [
+            Self::SeedUnreadable,
+            Self::PayloadUnknown,
+            Self::OffsetInvalid,
+            Self::InjectionRejected,
+            Self::InjectionPanicked,
+            Self::NoLongerFires,
+            Self::OutputUnparseable,
+            Self::OutputPanicked,
+            Self::ContentConserved,
+        ];
+        pub(crate) const COUNT: usize = Self::ALL.len();
+
+        /// The tally-array slot — [`Self::ALL`]'s order, pinned by a test below.
+        pub(crate) fn index(self) -> usize {
+            self as usize
+        }
+
+        /// The report/JSON label. The two output-side causes are UPPERCASE deliberately —
+        /// they are the real-bug half of the split and must not skim as one more artifact.
+        pub(crate) fn label(self) -> &'static str {
+            match self {
+                Self::SeedUnreadable => "seed-unreadable",
+                Self::PayloadUnknown => "payload-unknown",
+                Self::OffsetInvalid => "offset-invalid",
+                Self::InjectionRejected => "injection-rejected",
+                Self::InjectionPanicked => "injection-panicked",
+                Self::NoLongerFires => "no-longer-fires",
+                Self::OutputUnparseable => "OUTPUT-UNPARSEABLE",
+                Self::OutputPanicked => "OUTPUT-PANICKED",
+                Self::ContentConserved => "content-conserved",
+            }
+        }
+
+        /// Whether this cause is itself a **real bug** rather than an instrument/staleness
+        /// artifact — the output-side pair, where the formatter's own output fails to survive
+        /// a re-format. These get their own loud accounting on every report path.
+        pub(crate) fn is_output_bug(self) -> bool {
+            matches!(self, Self::OutputUnparseable | Self::OutputPanicked)
+        }
     }
 
     /// A shape's self-verification tally across its kept examples — the ratio that separates
-    /// "uniformly an instrument gap" from "a mixed real drop".
-    #[derive(Clone, Copy, Debug)]
+    /// "uniformly an instrument gap" from "a mixed real drop", plus the per-cause split of the
+    /// unconfirmed side and the anchor-probe tallies over the confirmed side.
+    #[derive(Clone, Copy, Debug, Default)]
     pub(crate) struct VerifyOutcome {
         /// Examples whose ledger claim was reproduced against the output.
         pub(crate) confirmed: usize,
         /// Examples verified — up to `VERIFY_EXAMPLES`, never zero for a recorded shape.
         pub(crate) total: usize,
+        /// Per-[`UnverifiedCause`] tallies of the unconfirmed examples, indexed by
+        /// [`UnverifiedCause::index`]. Sums to `total - confirmed`.
+        pub(crate) unconfirmed_causes: [usize; UnverifiedCause::COUNT],
+        /// Confirmed examples the anchor probe re-ran (a leading space ahead of the payload) —
+        /// see `gap_audit::anchor_probe`. Excludes inconclusive probes (padded splice rejected).
+        pub(crate) anchor_probed: usize,
+        /// Of [`Self::anchor_probed`], how many the leading space RESCUED (no findings on the
+        /// padded splice) — the fixed-offset-anchor signature. A hint, never a verdict.
+        pub(crate) anchor_rescued: usize,
     }
 
     impl VerifyOutcome {
@@ -811,16 +894,90 @@ mod ledger {
             }
         }
 
-        /// The report suffix — empty when every example confirmed (nothing to flag), else the
-        /// `confirmed/total` ratio behind an `UNCONFIRMED` / `PARTIAL` label.
-        pub(crate) fn report_label(self) -> String {
-            let ratio = format!("({}/{} confirmed)", self.confirmed, self.total);
-            match self.summary() {
-                VerifySummary::Clean => String::new(),
-                VerifySummary::Unconfirmed => format!("  ⚠ UNCONFIRMED {ratio}"),
-                VerifySummary::Partial => format!("  ⚠ PARTIAL {ratio}"),
+        /// How many unconfirmed examples carry the given cause.
+        pub(crate) fn cause_count(self, cause: UnverifiedCause) -> usize {
+            self.unconfirmed_causes[cause.index()]
+        }
+
+        /// Unconfirmed examples on a **real-bug** cause (the output-side pair) — nonzero means
+        /// this shape's injection makes the formatter emit output it then rejects or crashes on.
+        pub(crate) fn output_bug_examples(self) -> usize {
+            UnverifiedCause::ALL
+                .into_iter()
+                .filter(|c| c.is_output_bug())
+                .map(|c| self.cause_count(c))
+                .sum()
+        }
+
+        /// The nonzero unconfirmed causes as `(label, count)` pairs, [`UnverifiedCause::ALL`]-
+        /// ordered — the report envelope's per-shape cause list (empty when fully confirmed).
+        pub(crate) fn nonzero_causes(self) -> Vec<(&'static str, usize)> {
+            nonzero_unverified_causes(&self.unconfirmed_causes)
+        }
+
+        /// The nonzero causes as `N label` fragments, [`UnverifiedCause::ALL`]-ordered.
+        fn cause_breakdown(self) -> String {
+            unverified_cause_breakdown(&self.unconfirmed_causes)
+        }
+
+        /// The anchor-probe suffix — empty unless a probe RESCUED an example (the interesting
+        /// signal; "probed, still fires" is silent since it merely fails to add information).
+        fn anchor_label(self) -> String {
+            if self.anchor_rescued > 0 {
+                format!(
+                    "  ⚑ ANCHOR? ({}/{} rescued by a leading space)",
+                    self.anchor_rescued, self.anchor_probed
+                )
+            } else {
+                String::new()
             }
         }
+
+        /// The report suffix — the anchor hint alone when every example confirmed, else the
+        /// `confirmed/total` ratio behind an `UNCONFIRMED` / `PARTIAL` label with the per-cause
+        /// breakdown of the unconfirmed side.
+        pub(crate) fn report_label(self) -> String {
+            let anchor = self.anchor_label();
+            match self.summary() {
+                VerifySummary::Clean => anchor,
+                VerifySummary::Unconfirmed => format!(
+                    "  ⚠ UNCONFIRMED (0/{}: {}){anchor}",
+                    self.total,
+                    self.cause_breakdown()
+                ),
+                VerifySummary::Partial => format!(
+                    "  ⚠ PARTIAL ({}/{} confirmed; unconfirmed: {}){anchor}",
+                    self.confirmed,
+                    self.total,
+                    self.cause_breakdown()
+                ),
+            }
+        }
+    }
+
+    /// The nonzero entries of a per-cause tally (indexed by [`UnverifiedCause::index`]) as
+    /// `(label, count)` pairs, [`UnverifiedCause::ALL`]-ordered — the one filter both cause
+    /// renderings and the report envelope's per-shape list go through.
+    pub(crate) fn nonzero_unverified_causes(
+        totals: &[usize; UnverifiedCause::COUNT],
+    ) -> Vec<(&'static str, usize)> {
+        UnverifiedCause::ALL
+            .into_iter()
+            .filter_map(|c| {
+                let n = totals[c.index()];
+                (n > 0).then_some((c.label(), n))
+            })
+            .collect()
+    }
+
+    /// Render a per-cause tally as `N label` fragments joined with `, ` — the per-shape
+    /// [`VerifyOutcome::report_label`] and the run-level verify summaries share it.
+    pub(crate) fn unverified_cause_breakdown(totals: &[usize; UnverifiedCause::COUNT]) -> String {
+        nonzero_unverified_causes(totals)
+            .into_iter()
+            .map(|(label, n)| format!("{n} {label}"))
+            .collect::<Vec<_>>()
+            .join(", ")
     }
 
     /// The three-way per-shape verdict once every kept example has been re-checked.
@@ -838,19 +995,80 @@ mod ledger {
     mod tests {
         use super::*;
 
-        /// The verify ratio's three-way split, and the labels that carry it. Arithmetic, so no
-        /// corpus run grades it.
+        fn out(confirmed: usize, total: usize) -> VerifyOutcome {
+            VerifyOutcome {
+                confirmed,
+                total,
+                ..VerifyOutcome::default()
+            }
+        }
+
+        /// The verify ratio's three-way split. Arithmetic, so no corpus run grades it.
         #[test]
         fn verify_outcome_splits_clean_partial_unconfirmed() {
-            let out = |confirmed, total| VerifyOutcome { confirmed, total };
             assert_eq!(out(5, 5).summary(), VerifySummary::Clean);
             assert_eq!(out(1, 1).summary(), VerifySummary::Clean);
             assert_eq!(out(0, 5).summary(), VerifySummary::Unconfirmed);
             assert_eq!(out(2, 5).summary(), VerifySummary::Partial);
+        }
 
+        /// [`UnverifiedCause::index`] must agree with [`UnverifiedCause::ALL`]'s order — the
+        /// tally array is indexed by one and iterated by the other, and a drift silently
+        /// mislabels every cause count.
+        #[test]
+        fn unverified_cause_index_matches_all_order() {
+            for (i, cause) in UnverifiedCause::ALL.into_iter().enumerate() {
+                assert_eq!(cause.index(), i, "{cause:?} out of place");
+            }
+            assert_eq!(UnverifiedCause::COUNT, UnverifiedCause::ALL.len());
+        }
+
+        /// The report label carries the per-cause breakdown, and the output-side real-bug pair
+        /// is counted by [`VerifyOutcome::output_bug_examples`].
+        #[test]
+        fn report_label_names_causes_and_output_bugs_are_counted() {
             assert_eq!(out(5, 5).report_label(), "", "clean flags nothing");
-            assert_eq!(out(0, 5).report_label(), "  ⚠ UNCONFIRMED (0/5 confirmed)");
-            assert_eq!(out(2, 5).report_label(), "  ⚠ PARTIAL (2/5 confirmed)");
+
+            let mut unconfirmed = out(0, 5);
+            unconfirmed.unconfirmed_causes[UnverifiedCause::ContentConserved.index()] = 4;
+            unconfirmed.unconfirmed_causes[UnverifiedCause::OutputUnparseable.index()] = 1;
+            assert_eq!(
+                unconfirmed.report_label(),
+                "  ⚠ UNCONFIRMED (0/5: 1 OUTPUT-UNPARSEABLE, 4 content-conserved)"
+            );
+            assert_eq!(unconfirmed.output_bug_examples(), 1);
+
+            let mut partial = out(2, 5);
+            partial.unconfirmed_causes[UnverifiedCause::NoLongerFires.index()] = 3;
+            assert_eq!(
+                partial.report_label(),
+                "  ⚠ PARTIAL (2/5 confirmed; unconfirmed: 3 no-longer-fires)"
+            );
+            assert_eq!(partial.output_bug_examples(), 0);
+        }
+
+        /// The anchor hint appends to any summary when a probe rescued an example, and stays
+        /// silent otherwise — "probed, still fires" adds no information.
+        #[test]
+        fn anchor_label_appends_only_when_rescued() {
+            let mut clean = out(3, 3);
+            clean.anchor_probed = 3;
+            assert_eq!(clean.report_label(), "", "probed-but-not-rescued is silent");
+            clean.anchor_rescued = 2;
+            assert_eq!(
+                clean.report_label(),
+                "  ⚑ ANCHOR? (2/3 rescued by a leading space)"
+            );
+
+            let mut partial = out(1, 2);
+            partial.unconfirmed_causes[UnverifiedCause::ContentConserved.index()] = 1;
+            partial.anchor_probed = 1;
+            partial.anchor_rescued = 1;
+            assert_eq!(
+                partial.report_label(),
+                "  ⚠ PARTIAL (1/2 confirmed; unconfirmed: 1 content-conserved)  \
+                 ⚑ ANCHOR? (1/1 rescued by a leading space)"
+            );
         }
     }
 }
