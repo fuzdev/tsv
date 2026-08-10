@@ -92,7 +92,7 @@ and the unsupported-platform error. Runs per OS in CI (the `platforms` job).
 `scripts/publish.ts` pushes (or `workflow_dispatch` as a dry-run rehearsal).
 Per target: container-pinned build (gnu rows in almalinux:8 → glibc 2.28
 floor, measured by the workflow's floor gate; musl in rust:alpine with
-`-crt_static` off, gated GLIBC-free), size bounds
+`-crt-static` off, gated GLIBC-free), size bounds
 (`scripts/validate_napi_artifact.ts`), and the npm-shape test over the real
 artifact (node:alpine for musl). The publish job gathers all five, stages the
 loader (`--loader-only`), and runs `scripts/publish_napi.ts` — completeness

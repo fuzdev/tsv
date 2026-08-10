@@ -18,7 +18,7 @@
 # glibc floor is 2.28 — Node's own binary floor, i.e. every machine that can
 # run modern Node can load tsv_napi (covers RHEL 8, Amazon Linux 2, and
 # everything newer) — and the musl row builds in rust:alpine (with
-# -crt_static off: a cdylib must link musl dynamically). Staging (Deno) and
+# -crt-static off: a cdylib must link musl dynamically). Staging (Deno) and
 # tests run on the runner HOST, where current toolchains exist (Deno's own
 # binaries need a newer glibc than 2.28, so a job-level almalinux container
 # can't host them); the 2.28-floor artifact loads fine on the host's newer
@@ -157,12 +157,12 @@ jobs:
 
       - name: Build (rust:alpine — musl)
         if: matrix.build == 'musl-container'
-        # -crt_static off: rust's musl target defaults to a static CRT, and a
+        # -crt-static off: rust's musl target defaults to a static CRT, and a
         # cdylib addon must link musl dynamically (it loads into Alpine Node).
         run: |
           docker run --rm -v "$PWD:/work" -w /work \
             -e CARGO_HOME=/work/.container-cargo \
-            -e RUSTFLAGS='-C target-feature=-crt_static' \
+            -e RUSTFLAGS='-C target-feature=-crt-static' \
             rust:1.94.1-alpine sh -ec '
               apk add --no-cache musl-dev
               cargo build -p tsv_napi --profile napi'
