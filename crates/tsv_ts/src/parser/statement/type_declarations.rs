@@ -623,7 +623,11 @@ impl<'a, 'arena> Parser<'a, 'arena> {
         // Use assignment expression (not full expression) to stop at commas
         let (initializer, end) = if self.eat(TokenKind::Equals) {
             let expr = self.parse_assignment_expression()?;
-            let end = expr.span().end;
+            // The member ends at the last token consumed, NOT at the initializer's
+            // span: tsv drops a grouping paren rather than building a node for it,
+            // so a parenthesized initializer (`A = (a, b)`) leaves the expression
+            // span stopping inside the shell while the member runs through the `)`.
+            let end = self.prev_token_end() as u32;
             (Some(expr), end)
         } else {
             let id_end = match &id {

@@ -223,6 +223,9 @@ impl<'arena> Builder<'arena> {
             let tail = i == last;
             quasis.push(TemplateElement {
                 raw_span,
+                // Minted text is generated, never authored, so it holds no `<CR>`
+                // for the TRV to normalize — the appendix slice IS the value.
+                raw_trv: None,
                 cooked: TemplateCooked::Verbatim,
                 has_newline: text.contains('\n'),
                 tail,
