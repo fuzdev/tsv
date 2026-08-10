@@ -969,6 +969,21 @@ impl<'a> PartitionedComments<'a> {
         !self.trailing_line.is_empty()
     }
 
+    /// Whether a **last-item→`)`** gap's comments force the parens open — asked of a
+    /// [`Self::for_closer_gap`] partition, whose emitter is [`Self::emit_last_arg_comments`].
+    ///
+    /// Two things need a line the flat layout cannot give them: a `//` runs to end of line
+    /// and would swallow the `)`, and an own-line comment (everything the trailing run did
+    /// not claim, which is what `leading` holds here) keeps the line the author gave it via
+    /// a `hardline` that a flat group has nowhere to put.
+    ///
+    /// One question, one predicate: the gate and the emitter partition the same gap, so a
+    /// gate that opened the parens around a comment the emitter puts back on the item's
+    /// line would open them around nothing.
+    pub fn forces_closer_break(&self) -> bool {
+        self.has_trailing_line() || !self.leading.is_empty()
+    }
+
     /// Reclassify this gap's same-line LINE comments as own-line when the node the gap
     /// opens after already ends in a DEFERRED line comment — `prev_defers_line`, the
     /// caller's answer to [`Printer::defers_trailing_line_comment`] (asked there because

@@ -38,7 +38,14 @@ enum InterpolationLayout {
     TrailingComment,
     /// Conditional type: wrap in a group; breaks happen at the `?`/`:` operators.
     Conditional,
-    /// Exceeds print width at its flat position — always break after `${`.
+    /// Exceeds print width at its flat position — or holds a comment in its **type→`}`**
+    /// gap that needs a line of its own (a `//`, which would otherwise swallow the `}`, or
+    /// an own-line comment keeping the line the author gave it). Always break after `${`.
+    ///
+    /// The two causes share a layout because they want the same one: the type on its own
+    /// indented line and the `}` below it. A `${`-gap comment, if any, still rides inline
+    /// on the `${` line via `comments_doc` — the trailing gap is a separate question and
+    /// answers only for itself.
     Forced,
     /// Short enough at its flat position — try inline first, break if it doesn't fit at the
     /// actual render position. Carries no payload: the flat rendering is a *measurement*
@@ -48,6 +55,11 @@ enum InterpolationLayout {
 }
 
 /// One `${…}` interpolation's docs plus its computed layout.
+///
+/// `type_doc` carries the interpolation's whole VALUE — the type plus whatever trails it
+/// before the `}` — since every layout below places the two together. The flat width is
+/// measured on the bare type before they are joined, matching how the `${`-gap comments
+/// are left out of that measure.
 struct Interpolation {
     type_doc: DocId,
     comments_doc: DocId,
@@ -63,29 +75,40 @@ impl<'a> Printer<'a> {
         quasi.raw_span.end + "${".len() as u32
     }
 
-    /// Whether any `${…}` interpolation holds a comment that hangs its type — i.e. whether
-    /// the template breaks itself, in *either* the expanded or the flush layout.
+    /// Whether an interpolation's **type→`}`** gap holds a comment that needs a line of
+    /// its own: a `//`, which would otherwise swallow the `}`, or a comment the trailing
+    /// run did not claim, which keeps the line the author gave it. A block the run DOES
+    /// claim trails the type inline and forces nothing — matching prettier.
+    ///
+    /// The gate over [`Printer::build_trailing_gap_comments`]'s seam, reading the same
+    /// source it does, so a gate that broke the interpolation around a comment the emitter
+    /// puts back on the type's line would break it around nothing.
+    fn interp_trailing_gap_forces_break(&self, type_end: u32, close_brace: u32) -> bool {
+        self.has_line_comments_between(type_end, close_brace)
+            || self.has_own_line_block_comment_before_closer(type_end, close_brace)
+    }
+
+    /// Whether any `${…}` interpolation holds a comment that breaks it open — one that
+    /// hangs its type (the expanded or the flush layout), or one in its type→`}` gap that
+    /// needs its own line. Either way the template breaks itself.
     ///
     /// One question, one predicate: the layout decision in
     /// [`Self::build_template_literal_type_doc`] and the type-alias `=` layout (which keeps
     /// the backtick on the `=` line when the template already breaks itself) both ask this,
     /// so they cannot disagree about whether the template breaks. Deliberately *not* keyed
-    /// on the expanded-vs-flush choice: the `=` hugs either way, since either layout drops
-    /// the type below the backtick.
+    /// on which layout: the `=` hugs for all of them, since each drops the `}` below the
+    /// type.
     pub(in crate::printer) fn template_literal_type_breaks_for_comment(
         &self,
         template: &TemplateLiteralType<'_>,
     ) -> bool {
-        template
-            .quasis
-            .iter()
-            .zip(template.types.iter())
-            .any(|(quasi, t)| {
-                self.comments_force_own_line_between(
-                    Self::interp_dollar_brace_end(quasi),
-                    t.span().start,
-                )
-            })
+        template.types.iter().enumerate().any(|(i, t)| {
+            self.comments_force_own_line_between(
+                Self::interp_dollar_brace_end(&template.quasis[i]),
+                t.span().start,
+            ) || self
+                .interp_trailing_gap_forces_break(t.span().end, template.quasis[i + 1].span.start)
+        })
     }
 
     /// Whether a `${`→type gap's comment run was authored on its own line (a newline before
@@ -182,6 +205,10 @@ impl<'a> Printer<'a> {
                 let t = &template.types[i];
                 let dollar_brace_end = Self::interp_dollar_brace_end(quasi);
                 let type_start = t.span().start;
+                let type_end = t.span().end;
+                // The closing `}`: the next quasi's span opens there (its `raw_span` opens
+                // past it), so `type_end`→here is the interpolation's trailing gap.
+                let close_brace = template.quasis[i + 1].span.start;
                 // A comment that hangs the type drops the type below it — a `//` can't
                 // swallow it, and a multiline block's authored break isn't reflowed. Same
                 // gate as the emitter's per-comment rule, so the two can't disagree. Where
@@ -203,6 +230,21 @@ impl<'a> Printer<'a> {
                 let interp_end = pos + 2 + visual_width(&flat_str, TAB_WIDTH) + 1;
                 pos = interp_end;
 
+                // The type→`}` gap. A last-item→closer gap like any other, so it takes the
+                // shared walk: the trailing run stays inline behind the type, everything
+                // past it keeps the line the author gave it (author blanks preserved).
+                // Without this the gap had no emitter at all and every comment in it was
+                // DROPPED — the value-level template literal has always claimed its twin.
+                let (type_doc, trailing_forces_break) = if type_has_comments
+                    && self.has_comments_to_emit_between(type_end, close_brace)
+                {
+                    let trailing = self.build_trailing_gap_comments(type_end, close_brace);
+                    let forces = self.interp_trailing_gap_forces_break(type_end, close_brace);
+                    (d.concat(&[type_doc, d.concat(&trailing)]), forces)
+                } else {
+                    (type_doc, false)
+                };
+
                 // Every hanging comment takes a hang layout, so the width-driven layouts
                 // below only ever see a *collapsing* `comments_doc` (a trailing space).
                 // That is load-bearing: a hanging `comments_doc` ends in a hardline, and
@@ -215,6 +257,12 @@ impl<'a> Printer<'a> {
                     } else {
                         InterpolationLayout::TrailingComment
                     }
+                } else if trailing_forces_break {
+                    // Ahead of the conditional and width arms, and after the two hang
+                    // ones: those already drop the `}` to its own line, which is all this
+                    // asks for, while `Conditional` and `Flex` can leave the `}` glued —
+                    // where a deferred `//` in the gap would swallow it.
+                    InterpolationLayout::Forced
                 } else if matches!(t, TSType::Conditional(_)) {
                     InterpolationLayout::Conditional
                 } else if interp_end > PRINT_WIDTH {

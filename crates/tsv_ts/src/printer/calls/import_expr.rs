@@ -90,6 +90,160 @@ fn wrap_import_hardline(d: &DocArena, open: DocId, inner: DocId) -> DocId {
     d.concat(&[open, d.indent_hardline(inner), d.hardline(), d.text(")")])
 }
 
+/// An import call's **options** argument — its already-built doc plus the source bounds
+/// the two comment gaps around it are measured from.
+///
+/// A struct rather than a tuple because both consumers of
+/// [`build_import_args_comment_layout`] hand it three values that are trivially
+/// swappable at a call site (`start`/`end` are both `u32`).
+#[derive(Clone, Copy)]
+pub(in crate::printer) struct ImportOptionsArg {
+    pub doc: DocId,
+    pub start: u32,
+    pub end: u32,
+}
+
+/// The `import(…)` argument body for every input the plain layouts cannot print — a
+/// comment in any of the three gaps the arguments open (`(`→specifier,
+/// specifier→options, last argument→`)`) or an author blank line between the two
+/// arguments — and `None` when the region holds neither, leaving the caller its own
+/// layout.
+///
+/// ⚠️ **Shared by the dynamic-import EXPRESSION and the TS import TYPE**
+/// ([`build_import_expression_doc`], [`Printer::build_import_type_call_doc`]). The two
+/// constructs are the same `import(<specifier>[, <options>])` shape and prettier answers
+/// every gap in them identically — including at the width boundary, where a trailing
+/// comment breaks the parens in both while a bare over-width specifier hangs off the `=`
+/// in both. Stating the rule once is what keeps them in step: the type-level printer
+/// began as a stripped-down mirror of this one and silently DROPPED every own-line
+/// comment before `)`, every comment in the options gaps, and the author blank between
+/// the arguments — content loss no gate could see, because the type-level shapes had no
+/// fixture and the corpus has no import type carrying a comment.
+///
+/// What stays with each caller is only what genuinely differs: the `open` doc (the
+/// expression's phase-aware `import.source(` head vs the type's fixed `import(`), each
+/// argument's own doc, and the **clean-region** layout — the expression's expand-last-arg
+/// conditional group, the type's flat concat.
+pub(in crate::printer) fn build_import_args_comment_layout(
+    printer: &Printer<'_>,
+    open: DocId,
+    source_doc: DocId,
+    source_end: u32,
+    options: Option<ImportOptionsArg>,
+    paren_close: u32,
+    leading_forces_break: bool,
+) -> Option<DocId> {
+    let d = printer.d();
+
+    let Some(options) = options else {
+        // Sole argument: everything between it and `)` is its trailing region.
+        if printer.has_comments_to_emit_between(source_end, paren_close) {
+            // A last-item→`)` gap, comma or not: the claim is the source reading
+            // (`for_closer_gap`). The delimiter reading is blind to every byte no argument
+            // span covers, and a preceding comment's `*/` is one — so a comment the author
+            // glued behind it read as own-line and dangled below the argument, splitting a
+            // pair written as one (`docs/comments.md` §Own-line-ness is a SOURCE question).
+            let pc = PartitionedComments::for_closer_gap(printer, source_end, paren_close);
+
+            // Trailing region after the arg: same-line block/line comments inline, then
+            // own-line comments each on their own line (dangling — import takes no
+            // trailing comma). Without the dangling pass, own-line comments are dropped.
+            let mut parts = smallvec![source_doc];
+            pc.emit_last_arg_comments(&mut parts, printer);
+            let inner = d.concat(&parts);
+
+            // A line comment (runs to EOL), any own-line comment, or an own-line leading
+            // comment before the source forces the multiline layout; a lone same-line
+            // block stays inline and breaks only on width. (variable.rs special-cases
+            // the assignment break.)
+            return Some(if pc.forces_closer_break() || leading_forces_break {
+                wrap_import_hardline(d, open, inner)
+            } else {
+                wrap_import_group(d, open, inner)
+            });
+        }
+
+        // Own-line leading comment: force hardline layout to preserve comment position.
+        // Prettier's printLeadingComment() keeps own-line comments on their own line.
+        return leading_forces_break.then(|| wrap_import_hardline(d, open, source_doc));
+    };
+
+    let has_inter_comments = printer.has_comments_on_page_between(source_end, options.start);
+    let has_trailing_comments = printer.has_comments_to_emit_between(options.end, paren_close);
+    // A blank line in the source→options gap (with no comment there) is preserved like
+    // every other argument gap; the comment case re-derives it comment-aware below.
+    let inter_blank_no_comments =
+        !has_inter_comments && printer.is_next_line_empty(source_end, options.start);
+
+    // All comment cases — plus a blank-line gap — share one layout: a comment in the
+    // inter-argument gap (source→options), which the plain layouts never examine and
+    // would otherwise drop (content loss); a trailing comment after options; or an
+    // own-line comment before the source (`leading_forces_break`). Route both gaps
+    // through the unified argument-comment helpers, so the respect-the-newline rule (a
+    // hugging block leads the next arg; a stranded block stays on the comma line) is
+    // inherited rather than re-implemented, and bypass the caller's expand-last-arg
+    // conditional group — matching prettier disabling shouldExpandLastArg whenever an
+    // argument carries a comment.
+    if !(leading_forces_break
+        || has_inter_comments
+        || has_trailing_comments
+        || inter_blank_no_comments)
+    {
+        return None;
+    }
+
+    let mut inter = PartitionedComments::for_item_gap(printer, source_end, options.start);
+    inter.route_after_comma_hugging_to_leading(printer);
+
+    // Source arg + comma: before-comma blocks trail the source; stranded after-comma
+    // blocks and line comments follow the comma.
+    let mut head = smallvec![source_doc];
+    inter.emit_trailing_comments_around_comma(&mut head, printer);
+
+    // Blank line in the gap, comment-aware once routed (so a comment's own newlines
+    // don't read as a blank line).
+    let inter_blank = inter_blank_no_comments
+        || (has_inter_comments
+            && inter.has_blank_line_in_gap(printer.source, printer.layout_line_breaks));
+
+    // Leading comments (own-line + hugged after-comma) lead the options arg; its
+    // trailing region follows: same-line block/line comments inline, then own-line
+    // comments each on their own line (dangling — import takes no trailing comma).
+    let mut tail = DocBuf::new();
+    inter.emit_leading_comments_inline_aware(&mut tail, printer);
+    tail.push(options.doc);
+    // The options argument's gap holds the list's own comma, so it takes the item
+    // reading like every other last-argument gap (`emit_last_arg_trailing_comments`).
+    let trailing = PartitionedComments::for_closer_gap(printer, options.end, paren_close);
+    trailing.emit_last_arg_comments(&mut tail, printer);
+
+    // A line comment (runs to EOL), an own-line comment (leading before source, in
+    // the gap, or dangling after options), or a blank line forces the multiline
+    // layout; inline blocks (hugging / before-comma / same-line trailing) leave the
+    // group free to stay inline and break only on width.
+    let force_break = leading_forces_break
+        || inter_blank
+        || trailing.forces_closer_break()
+        || should_force_expansion_for_comments(printer, source_end, options.start);
+
+    // The source→options separator: a blank line when the author left one (a blank
+    // line always forces the break), else a hardline when broken, else a soft `line`.
+    let sep = if inter_blank {
+        d.concat(&[d.literalline(), d.hardline()])
+    } else if force_break {
+        d.hardline()
+    } else {
+        d.line()
+    };
+
+    let body = d.concat(&[d.concat(&head), sep, d.concat(&tail)]);
+    Some(if force_break {
+        wrap_import_hardline(d, open, body)
+    } else {
+        wrap_import_group(d, open, body)
+    })
+}
+
 /// Build a Doc for a dynamic import expression: `import('module')` or `import('module', options)`
 ///
 /// Uses "expand last arg" pattern when options is an object:
@@ -134,129 +288,49 @@ pub(super) fn build_import_expression_doc(
     let source_end = import_expr.source.span().end;
     let paren_close = import_expr.span.end;
 
-    // If no options, check for trailing comments on the sole source arg.
-    let Some(options) = &import_expr.options else {
-        if printer.has_comments_to_emit_between(source_end, paren_close) {
-            // A last-item→`)` gap, comma or not: the claim is the source reading
-            // (`for_closer_gap`). The delimiter reading is blind to every byte no argument
-            // span covers, and a preceding comment's `*/` is one — so a comment the author
-            // glued behind it read as own-line and dangled below the argument, splitting a
-            // pair written as one (`docs/comments.md` §Own-line-ness is a SOURCE question).
-            let pc = PartitionedComments::for_closer_gap(printer, source_end, paren_close);
+    let options_arg = import_expr
+        .options
+        .as_ref()
+        .map(|options| ImportOptionsArg {
+            doc: printer
+                .gap_frozen_span(source_end, options.span())
+                .map_or_else(
+                    || printer.wrap_for_init_in(options, printer.build_expression_doc(options)),
+                    |frozen| printer.build_frozen_arg_doc(options, frozen),
+                ),
+            start: options.span().start,
+            end: options.span().end,
+        });
 
-            // Trailing region after the arg: same-line block/line comments inline, then
-            // own-line comments each on their own line (dangling — import takes no
-            // trailing comma). Without the dangling pass, own-line comments are dropped.
-            let mut parts = smallvec![source_doc];
-            pc.emit_trailing_comments(&mut parts, printer);
-            pc.emit_dangling_comments(&mut parts, printer);
-            let inner = d.concat(&parts);
+    // Every comment gap, and the author blank between the arguments, is answered by the
+    // shared layout — the same one the TS import TYPE takes, so the two constructs can't
+    // drift. `None` means the region is clean and the plain layouts below apply.
+    if let Some(doc) = build_import_args_comment_layout(
+        printer,
+        open,
+        source_doc,
+        source_end,
+        options_arg,
+        paren_close,
+        leading_forces_break,
+    ) {
+        return doc;
+    }
 
-            // A line comment (runs to EOL), any own-line comment, or an own-line leading
-            // comment before the source forces the multiline layout; a lone same-line
-            // block stays inline and breaks only on width. (variable.rs special-cases
-            // the assignment break.)
-            if pc.has_trailing_line() || !pc.leading.is_empty() || leading_forces_break {
-                return wrap_import_hardline(d, open, inner);
-            }
-            return wrap_import_group(d, open, inner);
-        }
-
-        // Own-line leading comment: force hardline layout to preserve comment position.
-        // Prettier's printLeadingComment() keeps own-line comments on their own line.
-        if leading_forces_break {
-            return wrap_import_hardline(d, open, source_doc);
-        }
-
+    // Zipped rather than matched separately: the two are `Some` together by construction
+    // (`options_arg` is built from this very field), and pairing them says so without a
+    // second arm that could only be reached by breaking that.
+    let Some((options, options_doc)) = import_expr
+        .options
+        .as_ref()
+        .zip(options_arg.map(|options| options.doc))
+    else {
         // Group with softline break points so the outer import() can break when the
         // line exceeds print width, matching Prettier's call-arg expansion. Without
         // this, only the inner arg's groups can break (e.g., `import(fn(\n  'long',\n))`
         // instead of the correct `import(\n  fn('long')\n)`).
         return wrap_import_group(d, open, source_doc);
     };
-
-    let options_doc = printer
-        .gap_frozen_span(source_end, options.span())
-        .map_or_else(
-            || printer.wrap_for_init_in(options, printer.build_expression_doc(options)),
-            |frozen| printer.build_frozen_arg_doc(options, frozen),
-        );
-    let options_end = options.span().end;
-    let options_start = options.span().start;
-
-    let has_inter_comments = printer.has_comments_on_page_between(source_end, options_start);
-    let has_trailing_comments = printer.has_comments_to_emit_between(options_end, paren_close);
-    // A blank line in the source→options gap (with no comment there) is preserved like
-    // every other argument gap; the comment case re-derives it comment-aware below.
-    let inter_blank_no_comments =
-        !has_inter_comments && printer.is_next_line_empty(source_end, options_start);
-
-    // All comment cases — plus a blank-line gap — share one layout: a comment in the
-    // inter-argument gap (source→options), which the rest of this function never
-    // examines and would otherwise drop (content loss); a trailing comment after options;
-    // or an own-line comment before the source (`leading_forces_break`). Route both gaps
-    // through the unified argument-comment helpers, so the respect-the-newline rule (a
-    // hugging block leads the next arg; a stranded block stays on the comma line) is
-    // inherited rather than re-implemented, and bypass the expand-last-arg conditional
-    // group below — matching prettier disabling shouldExpandLastArg whenever an argument
-    // carries a comment.
-    if leading_forces_break
-        || has_inter_comments
-        || has_trailing_comments
-        || inter_blank_no_comments
-    {
-        let mut inter = PartitionedComments::for_item_gap(printer, source_end, options_start);
-        inter.route_after_comma_hugging_to_leading(printer);
-
-        // Source arg + comma: before-comma blocks trail the source; stranded after-comma
-        // blocks and line comments follow the comma.
-        let mut head = smallvec![source_doc];
-        inter.emit_trailing_comments_around_comma(&mut head, printer);
-
-        // Blank line in the gap, comment-aware once routed (so a comment's own newlines
-        // don't read as a blank line).
-        let inter_blank = inter_blank_no_comments
-            || (has_inter_comments
-                && inter.has_blank_line_in_gap(printer.source, printer.layout_line_breaks));
-
-        // Leading comments (own-line + hugged after-comma) lead the options arg; its
-        // trailing region follows: same-line block/line comments inline, then own-line
-        // comments each on their own line (dangling — import takes no trailing comma).
-        let mut tail = DocBuf::new();
-        inter.emit_leading_comments_inline_aware(&mut tail, printer);
-        tail.push(options_doc);
-        // The options argument's gap holds the list's own comma, so it takes the item
-        // reading like every other last-argument gap (`emit_last_arg_trailing_comments`).
-        let trailing = PartitionedComments::for_closer_gap(printer, options_end, paren_close);
-        trailing.emit_trailing_comments(&mut tail, printer);
-        trailing.emit_dangling_comments(&mut tail, printer);
-
-        // A line comment (runs to EOL), an own-line comment (leading before source, in
-        // the gap, or dangling after options), or a blank line forces the multiline
-        // layout; inline blocks (hugging / before-comma / same-line trailing) leave the
-        // group free to stay inline and break only on width.
-        let force_break = leading_forces_break
-            || inter_blank
-            || trailing.has_trailing_line()
-            || !trailing.leading.is_empty()
-            || should_force_expansion_for_comments(printer, source_end, options_start);
-
-        // The source→options separator: a blank line when the author left one (a blank
-        // line always forces the break), else a hardline when broken, else a soft `line`.
-        let sep = if inter_blank {
-            d.concat(&[d.literalline(), d.hardline()])
-        } else if force_break {
-            d.hardline()
-        } else {
-            d.line()
-        };
-
-        let body = d.concat(&[d.concat(&head), sep, d.concat(&tail)]);
-        if force_break {
-            return wrap_import_hardline(d, open, body);
-        }
-        return wrap_import_group(d, open, body);
-    }
 
     if is_expandable_object(options) {
         // Three-state conditional group matching Prettier's expand-last-arg:
