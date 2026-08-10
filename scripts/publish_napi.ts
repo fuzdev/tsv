@@ -67,7 +67,7 @@ if (args['expect-tag'] && args['expect-tag'] !== `v${version}`) {
 const platform_dirs: Array<{ name: string; dir: string }> = [];
 let incomplete = false;
 for (const [name, pin] of Object.entries(optional)) {
-	const triple = name.replace('@fuzdev/tsv_napi-', '');
+	const triple = name.replace('@fuzdev/tsv-', '');
 	const dir = `${pkg_root}/${triple}`;
 	const exists = (() => {
 		try {
