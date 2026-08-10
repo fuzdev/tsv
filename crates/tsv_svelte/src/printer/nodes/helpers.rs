@@ -14,18 +14,25 @@ use tsv_lang::source_scan::find_char_skipping_comments;
 use tsv_lang::{Comment, Span};
 use tsv_ts::Expression;
 
-/// Trailing-comment range end for an `{#each}` head expression: the `as`-pattern
-/// start when present, else the head end (`{#each ` … `}` minus the closing `}`).
+/// Trailing-comment range end for an `{#each}` head expression: the start of whatever
+/// the head puts after the iterable — the `as`-pattern when there is one, else the
+/// iterable's own end, which closes the range.
 ///
 /// Narrowing to the pattern start keeps a comment authored inside the pattern
 /// (`{#each items /* c */ as item}`) in place rather than relocating it to trail
-/// the collection expression. Shared by the standard and whitespace-sensitive each
-/// builders so the two can't drift.
+/// the collection expression. The no-`as` head owes the same narrowing for a stronger
+/// reason: its `, index (key)` tail is printed by builders that scan their own gaps, so
+/// a range reaching the head's `}` would **overlap** them and print the key's comments a
+/// second time after the iterable (`{#each items /* c */, i (i /* c */)}` — a form
+/// neither parser accepts). The tail has no trailing-comment region of its own to claim:
+/// every position in it outside the key parens is a parse error in canonical Svelte, so
+/// closing the range here drops nothing. Shared by the standard and whitespace-sensitive
+/// each builders so the two can't drift.
 pub(super) fn each_expr_comment_end(block: &EachBlock<'_>) -> u32 {
-    block
-        .context
-        .as_ref()
-        .map_or(block.opening_tag_span.end - 1, |c| c.span().start)
+    match &block.context {
+        Some(context) => context.span().start,
+        None => block.expression.span().end,
+    }
 }
 
 /// Check if a fragment node is a control flow block (if/each/await/key/snippet).

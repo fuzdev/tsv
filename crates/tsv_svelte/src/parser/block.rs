@@ -26,23 +26,55 @@ fn is_identifier_continue(c: char) -> bool {
     c.is_alphanumeric() || c == '_' || c == '$'
 }
 
-/// Find the position of the LAST top-level ` as ` keyword in a string.
+/// Strip a **mid-head keyword separator** — optional leading whitespace, the keyword,
+/// then a *required* whitespace run — returning the value that follows.
+///
+/// The separator every block head puts *between* its expression and a binding:
+/// `{#each … as x}`, `{#await … then v}`, `{#await … catch e}`. Mirrors canonical's
+/// `allow_whitespace()` / `eat(kw)` / `require_whitespace()`, so `(items)as x` is a
+/// separator (no leading whitespace needed) while `as/* c */x` and a head-final `as` are
+/// not. A separator with nothing after it (`as `) still matches — canonical's
+/// `require_whitespace` is satisfied there and it is `read_pattern` that reports the
+/// missing binding, so the empty value is the caller's error rather than a non-match.
+///
+/// Both whitespace runs are of **any width**, not the single spaces the canonical form
+/// happens to print: an authored break or tab is legal in either, and so is the wrapped
+/// head tsv's own formatter emits (`items as A[]⏎as item}`) — which a single-space match
+/// rejected, leaving tsv unable to re-parse its own output. The class is [`is_svelte_ws`],
+/// the `\s` canonical itself tests, not Rust's `trim_start`, whose Unicode `White_Space`
+/// set disagrees at `U+0085` and `U+FEFF`.
+///
+/// [`SvelteParser::strip_keyword_value`] is the *leading*-keyword counterpart — same rule
+/// one position earlier, where a missing keyword is an error rather than a `None`.
+fn strip_head_keyword<'s>(rest: &'s str, keyword: &str) -> Option<&'s str> {
+    let after_kw = rest
+        .trim_start_matches(is_svelte_ws)
+        .strip_prefix(keyword)?;
+    let value = after_kw.trim_start_matches(is_svelte_ws);
+    (value.len() < after_kw.len()).then_some(value)
+}
+
+/// Find the LAST top-level `as` separator in a string.
 ///
 /// "Top-level" means not inside `()`, `[]`, `{}`, or `<>` brackets, and not inside string
-/// literals or comments (skipped via the shared cursor). Returns the byte offset of the
-/// space before `as`, or None if not found.
+/// literals or comments (skipped via the shared cursor). Returns
+/// `(whitespace_offset, binding_offset)` — where the whitespace run before the keyword
+/// begins, and where the binding after it does — or `None` if not found. Both are exact;
+/// the caller slices the head's expression up to the first and its binding from the
+/// second, so between them lies the separator and nothing else.
 ///
 /// Used to detect TypeScript type assertions in `{#each}` expressions:
-/// `{#each items as A[] as item}` → binding_str is `A[] as item`, this finds ` as ` after `A[]`.
-fn find_last_top_level_as(s: &str) -> Option<usize> {
+/// `{#each items as A[] as item}` → binding_str is `A[] as item`, this finds the `as`
+/// after `A[]` and reports `item`'s offset.
+fn find_last_top_level_as(s: &str) -> Option<(usize, usize)> {
     let bytes = s.as_bytes();
     let len = bytes.len();
     let mut depth: i32 = 0;
-    let mut last_pos = None;
+    let mut last = None;
     let mut i = 0;
 
     while i < len {
-        // Skip comments + strings via the shared cursor, so a ` as ` (or a bracket)
+        // Skip comments + strings via the shared cursor, so an ` as ` (or a bracket)
         // inside trivia can't mis-anchor the split — and string escapes are handled
         // in one escape-correct place.
         if let Some(past) = skip_trivia(bytes, i, len, TriviaProfile::JS) {
@@ -52,20 +84,32 @@ fn find_last_top_level_as(s: &str) -> Option<usize> {
         match bytes[i] {
             b'(' | b'[' | b'{' | b'<' => depth += 1,
             b')' | b']' | b'}' | b'>' => depth = depth.saturating_sub(1),
-            b' ' if depth == 0 && i + 3 <= len => {
-                // Check for " as " or " as" at end of string
-                if bytes[i + 1] == b'a'
-                    && bytes[i + 2] == b's'
-                    && (i + 3 == len || bytes[i + 3] == b' ')
-                {
-                    last_pos = Some(i);
+            // A leading whitespace RUN is what keeps `as` a whole token — without it the
+            // tail of an identifier (`Aas x`) reads as a separator. The candidate bytes
+            // are ASCII whitespace plus every non-ASCII char START, since `is_svelte_ws`
+            // has non-ASCII members; both are char boundaries, so slicing `s` is safe.
+            b if depth == 0
+                && (b.is_ascii_whitespace() || (b >= 0x80 && s.is_char_boundary(i))) =>
+            {
+                let rest = &s[i..];
+                let after_ws = rest.trim_start_matches(is_svelte_ws);
+                if after_ws.len() < rest.len() {
+                    if let Some(binding) = strip_head_keyword(after_ws, "as") {
+                        last = Some((i, s.len() - binding.len()));
+                    }
+                    // Resume at the run's END. A run is one candidate, not one per byte:
+                    // its interior bytes can only anchor the same keyword, so re-asking
+                    // there is both redundant and quadratic in the run's width. Skipping
+                    // is also what makes the recorded offset the run's START.
+                    i = s.len() - after_ws.len();
+                    continue;
                 }
             }
             _ => {}
         }
         i += 1;
     }
-    last_pos
+    last
 }
 
 /// Return type for parse_each_binding: (context, index, key_expr, key_span, consumed_end).
@@ -241,11 +285,14 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let content_offset = tag_content_start + (tag_content.len() - content.len());
 
         // Use partial parsing for the iterable expression - stops at identifiers like "as"
-        // This correctly handles cases like `getItems(" as ")` where " as " is inside a string
-        let (expression, expr_end_pos) = self.parse_ts_expression_partial(
-            content.trim_start(),
-            content_offset + (content.len() - content.trim_start().len()),
-        )?;
+        // This correctly handles cases like `getItems(" as ")` where " as " is inside a string.
+        // The mark is what the type-assertion branch below rewinds the collected comments to
+        // before re-parsing the same region — see its `truncate`; `expr_offset` is where BOTH
+        // parses of the iterable start, so it is derived once rather than twice.
+        let comments_before_expr = self.expression_comments.len();
+        let expr_str = content.trim_start();
+        let expr_offset = content_offset + (content.len() - expr_str.len());
+        let (expression, expr_end_pos) = self.parse_ts_expression_partial(expr_str, expr_offset)?;
 
         // Opening tag span is from start to content_start (includes the closing })
         let opening_tag_span = Span {
@@ -253,64 +300,66 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
             end: content_start as u32,
         };
 
-        // After the expression, check for " as " or ", index" or just "}"
+        // After the expression, check for the `as` separator, `, index`, or just the head end
         let expr_consumed = expr_end_pos - content_offset;
         let after_expr = &content[expr_consumed..];
 
-        // Try to strip " as " to get binding (with context pattern)
-        let (expression, context, index, key, key_span, binding_end) = if let Some(binding_str) =
-            after_expr
-                .strip_prefix(" as ")
-                .or_else(|| after_expr.trim_start().strip_prefix("as "))
-        {
-            let as_len = after_expr.len() - binding_str.len();
-            let binding_offset = content_offset + expr_consumed + as_len;
+        // Try to strip the `as` separator to get binding (with context pattern)
+        let (expression, context, index, key, key_span, binding_end) =
+            if let Some(binding_str) = strip_head_keyword(after_expr, "as") {
+                let as_len = after_expr.len() - binding_str.len();
+                let binding_offset = content_offset + expr_consumed + as_len;
 
-            // Check if binding_str contains another top-level `as` keyword.
-            // If so, the first `as` was a TypeScript type assertion (e.g., `items as A[] as item`),
-            // not the Svelte binding separator. Find the LAST top-level `as` to split correctly,
-            // handling chained assertions like `items as A as B[] as item`.
-            if let Some(last_as_pos) = find_last_top_level_as(binding_str) {
-                // Re-parse: expression extends through all type assertions
-                let full_expr_end = expr_consumed + as_len + last_as_pos;
-                let full_expr_str = &content[..full_expr_end];
-                let expr_offset = content_offset + (content.len() - content.trim_start().len());
-                let expression = self.parse_ts_expression(full_expr_str.trim(), expr_offset)?;
+                // A SECOND top-level `as` in the binding means the first was a TypeScript type
+                // assertion (`items as A[] as item`), not the Svelte binding separator — so the
+                // real split is the LAST one, which also handles chains (`items as A as B[] as
+                // item`). Only the slice each side owns differs between the two cases; the
+                // binding is read once either way.
+                let (expression, binding_str, binding_offset) =
+                    if let Some((last_as_pos, real_binding_start)) =
+                        find_last_top_level_as(binding_str)
+                    {
+                        // Re-parse the iterable, now extending through every type assertion. The
+                        // slice STARTS where the partial parse did and reaches further, so it
+                        // re-collects every comment that parse registered — rewinding to the mark
+                        // first is what keeps each comment registered exactly once. Without it a
+                        // comment here was listed twice in the root `comments` array and printed
+                        // twice by whichever emitter owned its gap.
+                        self.expression_comments.truncate(comments_before_expr);
+                        let full_expr_str = &content[..expr_consumed + as_len + last_as_pos];
+                        (
+                            self.parse_ts_expression(full_expr_str.trim(), expr_offset)?,
+                            &binding_str[real_binding_start..],
+                            binding_offset + real_binding_start,
+                        )
+                    } else {
+                        (expression, binding_str, binding_offset)
+                    };
 
-                // Real binding starts after the last " as " (4 bytes: space-a-s-space)
-                let real_binding_start = last_as_pos + " as ".len();
-                let real_binding = &binding_str[real_binding_start..];
-                let real_binding_offset = binding_offset + real_binding_start;
-                let (ctx, idx, k, k_span, b_end) =
-                    self.parse_each_binding(real_binding, real_binding_offset)?;
-                (expression, Some(ctx), idx, k, k_span, b_end)
-            } else {
-                // Normal case: first `as` is the Svelte binding separator
                 let (ctx, idx, k, k_span, b_end) =
                     self.parse_each_binding(binding_str, binding_offset)?;
                 (expression, Some(ctx), idx, k, k_span, b_end)
-            }
-        } else {
-            // No `as` clause: the remainder is the optional `, index` and/or `(key)` —
-            // the same grammar as after a context, just without one — so route it through
-            // the shared parser (context stays `None`). Svelte allows index/key without
-            // `as` (`{#each items, i}`, `{#each items, i (key)}`); the shared parser also
-            // bounds the key with the trivia-aware bracket scanner and reports a precise
-            // `consumed_end`, so trailing junk is rejected below instead of swallowed.
-            //
-            // Read from the expression's SEMANTIC end, not `expr_end_pos` (the partial
-            // parser's stop, which swallows a trailing comment as trivia) — mirroring
-            // Svelte's `parser.index = expression.end`. This way a comment after the
-            // iterable with no binding (`{#each items /* c */}`) becomes trailing junk
-            // rejected below, not a silently kept comment. (The `as` branch keeps using
-            // `after_expr` so a comment *before* `as` — `{#each items /* c */ as item}`,
-            // which Svelte accepts — still resolves to the binding.)
-            let semantic_end = expression.span().end as usize;
-            let after_semantic = &content[semantic_end - content_offset..];
-            let (idx, k, k_span, b_end) =
-                self.parse_index_and_key_after_context(after_semantic, semantic_end)?;
-            (expression, None, idx, k, k_span, b_end)
-        };
+            } else {
+                // No `as` clause: the remainder is the optional `, index` and/or `(key)` —
+                // the same grammar as after a context, just without one — so route it through
+                // the shared parser (context stays `None`). Svelte allows index/key without
+                // `as` (`{#each items, i}`, `{#each items, i (key)}`); the shared parser also
+                // bounds the key with the trivia-aware bracket scanner and reports a precise
+                // `consumed_end`, so trailing junk is rejected below instead of swallowed.
+                //
+                // Read from the expression's SEMANTIC end, not `expr_end_pos` (the partial
+                // parser's stop, which swallows a trailing comment as trivia) — mirroring
+                // Svelte's `parser.index = expression.end`. This way a comment after the
+                // iterable with no binding (`{#each items /* c */}`) becomes trailing junk
+                // rejected below, not a silently kept comment. (The `as` branch keeps using
+                // `after_expr` so a comment *before* `as` — `{#each items /* c */ as item}`,
+                // which Svelte accepts — still resolves to the binding.)
+                let semantic_end = expression.span().end as usize;
+                let after_semantic = &content[semantic_end - content_offset..];
+                let (idx, k, k_span, b_end) =
+                    self.parse_index_and_key_after_context(after_semantic, semantic_end)?;
+                (expression, None, idx, k, k_span, b_end)
+            };
 
         // The opening tag must end at `}` immediately after the binding (Svelte's final
         // `eat('}')`): only whitespace may remain. A stray comment, leftover index/key
@@ -569,9 +618,10 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
 
         // Use partial parsing for the promise expression
         // This correctly handles cases like `fetch(" then ")` where " then " is inside a string
+        let expr_str = content.trim_start();
         let (expression, expr_end_pos) = self.parse_ts_expression_partial(
-            content.trim_start(),
-            content_offset + (content.len() - content.trim_start().len()),
+            expr_str,
+            content_offset + (content.len() - expr_str.len()),
         )?;
 
         // Opening tag span is from start to content_start (includes the closing })
@@ -584,27 +634,24 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         let expr_consumed = expr_end_pos - content_offset;
         let after_expr = &content[expr_consumed..];
 
-        // Check for shorthand: {#await promise then value}
-        let shorthand_then = if let Some(rest) = after_expr.strip_prefix(" then ") {
-            Some(rest)
-        } else if let Some(rest) = after_expr.trim_start().strip_prefix("then ") {
-            Some(rest)
-        } else if after_expr.trim() == "then" || after_expr.trim_start().starts_with("then}") {
-            Some("")
-        } else {
-            None
+        // Check for shorthand: {#await promise then value} / {#await promise catch error}.
+        // The keyword takes the same any-width whitespace run as `{#each}`'s `as`. The
+        // fallback arm is the VALUELESS form (`{#await p then}`), where the keyword ends the
+        // head and so has no whitespace after it for `strip_head_keyword` to require —
+        // `content` stops before the head's `}` (`scan_block_tag_content`), so "ends the
+        // head" is simply "nothing but whitespace left".
+        let shorthand = |keyword: &str| {
+            strip_head_keyword(after_expr, keyword).or_else(|| {
+                let rest = after_expr
+                    .trim_start_matches(is_svelte_ws)
+                    .strip_prefix(keyword)?;
+                rest.trim_start_matches(is_svelte_ws)
+                    .is_empty()
+                    .then_some("")
+            })
         };
-
-        // Check for shorthand: {#await promise catch error}
-        let shorthand_catch = if let Some(rest) = after_expr.strip_prefix(" catch ") {
-            Some(rest)
-        } else if let Some(rest) = after_expr.trim_start().strip_prefix("catch ") {
-            Some(rest)
-        } else if after_expr.trim() == "catch" || after_expr.trim_start().starts_with("catch}") {
-            Some("")
-        } else {
-            None
-        };
+        let shorthand_then = shorthand("then");
+        let shorthand_catch = shorthand("catch");
 
         // The block form (`{#await x}…{/await}`) always carries a pending Fragment —
         // empty or not — unlike the inline `then`/`catch` shorthand (no pending
@@ -1256,5 +1303,99 @@ impl<'a, 'arena> SvelteParser<'a, 'arena> {
         Ok(Fragment {
             nodes: nodes.into_bump_slice(),
         })
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{find_last_top_level_as, is_svelte_ws, strip_head_keyword};
+
+    /// A mid-head separator is its keyword wearing a whitespace RUN of any width, in
+    /// canonical's own [`is_svelte_ws`](super::is_svelte_ws) class — not the single ASCII
+    /// spaces the canonical printed form happens to use. A newline is what tsv's own
+    /// wrapped `{#each}` head emits (`items as A[]⏎as item}`), so a narrower match made
+    /// the formatter's output unparseable by its own parser; the non-ASCII members are
+    /// reachable only from authored source, and no fixture can carry them legibly.
+    ///
+    /// Leading whitespace is OPTIONAL (canonical's `allow_whitespace`) and trailing is
+    /// REQUIRED (`require_whitespace`), which is what keeps `as/* c */x` and a head-final
+    /// `as` out — the latter having been an out-of-bounds panic while the keyword's width
+    /// was assumed rather than measured. All three keywords take the one rule, so
+    /// `{#await … then v}` cannot drift from `{#each … as x}` the way they had.
+    #[test]
+    fn head_separator_takes_a_whitespace_run_of_any_width() {
+        for kw in ["as", "then", "catch"] {
+            for ws in [
+                " ", "  ", "\t", "\n", "\r\n", "\u{a0}", "\u{2028}", "\u{feff}",
+            ] {
+                let rest = format!("{ws}{kw}{ws}v");
+                assert_eq!(strip_head_keyword(&rest, kw), Some("v"), "{rest:?}");
+                assert_eq!(
+                    strip_head_keyword(&rest[ws.len()..], kw),
+                    Some("v"),
+                    "{rest:?}"
+                );
+            }
+            // No keyword, no trailing run, or the keyword glued to its value.
+            for rest in [
+                String::new(),
+                format!(" {kw}"),
+                kw.to_string(),
+                format!(" {kw}v"),
+                format!(" {kw}/* c */v"),
+                format!(" {kw}}}"),
+            ] {
+                assert_eq!(strip_head_keyword(&rest, kw), None, "{rest:?}");
+            }
+            // A separator followed by NOTHING is still a separator — canonical's
+            // `require_whitespace` is satisfied and it is the pattern reader that then
+            // reports the missing binding, so the empty value is the caller's error.
+            assert_eq!(strip_head_keyword(&format!(" {kw} "), kw), Some(""));
+        }
+        assert_eq!(strip_head_keyword(" a s item", "as"), None);
+    }
+
+    /// The LAST top-level `as` is what splits `items as A[] as item` into a type
+    /// assertion plus a binding. The reported binding offset is exact — the caller slices
+    /// with it — while the whitespace offset need only land inside the run, since it only
+    /// ever bounds a slice that is then trimmed.
+    ///
+    /// The leading run is also the token anchor: without it the tail of an identifier
+    /// (`Aas x`) reads as a separator. TODO: canonical anchors on any token boundary, so
+    /// it accepts `A[]as item` where this still rejects — a residual over-rejection.
+    #[test]
+    fn last_top_level_as_reports_the_binding_offset() {
+        for (input, binding) in [
+            ("A[] as item", "item"),
+            ("A[]\tas\nitem", "item"),
+            ("A[]  as   item", "item"),
+            ("A as B[] as item", "item"),
+            ("A[] as { a, b }", "{ a, b }"),
+            ("A[] as item, i (key)", "item, i (key)"),
+        ] {
+            let (ws, start) = find_last_top_level_as(input).expect(input);
+            assert_eq!(&input[start..], binding, "{input:?}");
+            // Everything between the two offsets is the separator itself — the whitespace
+            // the caller trims off its expression slice, plus the keyword.
+            assert_eq!(
+                input[ws..start].trim_matches(is_svelte_ws),
+                "as",
+                "{input:?}"
+            );
+        }
+
+        // No top-level `as`: a plain binding, one nested in brackets, one inside trivia,
+        // and one glued to an identifier — none of which may split the head.
+        for input in [
+            "item",
+            "{ a } as", // head-final: not a separator, and never sliced past the end
+            "Array<A as B>",
+            "item /* as x */",
+            "item // as x",
+            "item['as x']",
+            "Aas x",
+        ] {
+            assert_eq!(find_last_top_level_as(input), None, "{input:?}");
+        }
     }
 }
