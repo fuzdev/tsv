@@ -21,8 +21,9 @@
  * overflow is the one crash that still aborts the host.
  */
 
-import { readdirSync } from 'node:fs';
 import { createRequire } from 'node:module';
+
+import { platform_triple } from './platform.js';
 
 const require = createRequire(import.meta.url);
 
@@ -37,28 +38,6 @@ const SUPPORTED = [
 	'darwin-arm64',
 	'win32-x64'
 ];
-
-/**
- * Whether this Linux runs musl (Alpine). Node's diagnostic report carries
- * `glibcVersionRuntime` on glibc; trust it only positively (Bun's report may
- * be partial), otherwise probe for musl's loader.
- */
-const is_musl = () => {
-	const report =
-		typeof process.report?.getReport === 'function' ? process.report.getReport() : null;
-	if (report?.header?.glibcVersionRuntime) return false;
-	try {
-		return readdirSync('/lib').some((f) => f.startsWith('ld-musl-'));
-	} catch {
-		return false;
-	}
-};
-
-const platform_triple = () => {
-	const { platform, arch } = process;
-	if (platform === 'linux') return `linux-${arch}-${is_musl() ? 'musl' : 'gnu'}`;
-	return `${platform}-${arch}`;
-};
 
 const triple = platform_triple();
 let addon;

@@ -7,11 +7,14 @@
 # checkouts this runner has no reason to clone, so they are NOT re-run here.
 #
 # Per target: build the napi-profile cdylib (release + panic=unwind — the
-# shipped panic contract), stage the platform package, gate it (glibc floor /
-# musl purity, size bounds, the npm-shape test over the real artifact), upload.
-# The publish job downloads all five, stages the loader, and publishes
-# platforms-then-loader idempotently (scripts/publish_napi.ts) — a partial
-# matrix never publishes anything.
+# shipped panic contract) AND the tsv_cli binary (plain release: abort + LTO —
+# a process that owns its own crash, the same artifact the hyperfine benches
+# measure), stage the platform package (addon + CLI binary), gate it (glibc
+# floor / musl purity over BOTH binaries, size bounds, the npm-shape test over
+# the real artifacts), upload. The publish job downloads all five, stages the
+# loader, re-arms the CLI binaries' executable bit (artifact transport drops
+# file modes), and publishes platforms-then-loader idempotently
+# (scripts/publish_napi.ts) — a partial matrix never publishes anything.
 #
 # Linux builds run inside containers via explicit `docker run` steps, not
 # job-level `container:`: the gnu rows build in almalinux:8 so the artifact's
@@ -139,9 +142,13 @@ jobs:
         with:
           node-version: '24.14.1'
 
+      # Each leg builds BOTH shipped binaries in one environment: the addon
+      # (napi profile) and the tsv_cli binary (release profile — abort + LTO).
       - name: Build (native)
         if: matrix.build == 'native'
-        run: cargo build -p tsv_napi --profile napi
+        run: |
+          cargo build -p tsv_napi --profile napi
+          cargo build -p tsv_cli --release
 
       - name: Build (almalinux:8 — glibc 2.28 floor)
         if: matrix.build == 'gnu-container'
@@ -153,33 +160,40 @@ jobs:
               dnf install -y -q gcc curl
               curl -sSf https://sh.rustup.rs | sh -s -- -y --profile minimal --default-toolchain 1.94.1
               export PATH="/work/.container-cargo/bin:$PATH"
-              cargo build -p tsv_napi --profile napi'
+              cargo build -p tsv_napi --profile napi
+              cargo build -p tsv_cli --release'
 
       - name: Build (rust:alpine — musl)
         if: matrix.build == 'musl-container'
         # -crt-static off: rust's musl target defaults to a static CRT, and a
         # cdylib addon must link musl dynamically (it loads into Alpine Node).
+        # The CLI binary builds in the same environment, so it links musl
+        # dynamically too — fine for the Alpine hosts this package selects on.
         run: |
           docker run --rm -v "$PWD:/work" -w /work \
             -e CARGO_HOME=/work/.container-cargo \
             -e RUSTFLAGS='-C target-feature=-crt-static' \
             rust:1.94.1-alpine sh -ec '
               apk add --no-cache musl-dev
-              cargo build -p tsv_napi --profile napi'
+              cargo build -p tsv_napi --profile napi
+              cargo build -p tsv_cli --release'
 
-      # The measured floor: the highest versioned glibc symbol the artifact
-      # references must not exceed 2.28 — the gate that keeps the container
-      # choice honest (a build accidentally run on the host would fail here).
+      # The measured floor: the highest versioned glibc symbol each shipped
+      # artifact references must not exceed 2.28 — the gate that keeps the
+      # container choice honest (a build accidentally run on the host would
+      # fail here). Covers the addon AND the CLI binary.
       - name: glibc floor gate (gnu, <= 2.28)
         if: matrix.build == 'gnu-container'
         run: |
-          max=$(objdump -T target/napi/libtsv_napi.so | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sort -uV | tail -1)
-          echo "max versioned glibc symbol: ${max:-none}"
-          top=$(printf '%s\nGLIBC_2.28\n' "$max" | sort -V | tail -1)
-          if [ "$top" != "GLIBC_2.28" ]; then
-            echo "FAIL: glibc floor exceeded ($max > 2.28) — was the build run outside the container?"
-            exit 1
-          fi
+          for artifact in target/napi/libtsv_napi.so target/release/tsv; do
+            max=$(objdump -T "$artifact" | grep -oE 'GLIBC_[0-9]+\.[0-9]+' | sort -uV | tail -1)
+            echo "$artifact max versioned glibc symbol: ${max:-none}"
+            top=$(printf '%s\nGLIBC_2.28\n' "$max" | sort -V | tail -1)
+            if [ "$top" != "GLIBC_2.28" ]; then
+              echo "FAIL: glibc floor exceeded in $artifact ($max > 2.28) — was the build run outside the container?"
+              exit 1
+            fi
+          done
 
       # The musl twin: a musl artifact must reference NO versioned glibc
       # symbols at all (any GLIBC_ ref means a glibc contamination the alpine
@@ -187,10 +201,12 @@ jobs:
       - name: musl purity gate
         if: matrix.build == 'musl-container'
         run: |
-          if objdump -T target/napi/libtsv_napi.so | grep -q 'GLIBC_'; then
-            echo 'FAIL: musl artifact references GLIBC_ symbols'
-            exit 1
-          fi
+          for artifact in target/napi/libtsv_napi.so target/release/tsv; do
+            if objdump -T "$artifact" | grep -q 'GLIBC_'; then
+              echo "FAIL: musl artifact $artifact references GLIBC_ symbols"
+              exit 1
+            fi
+          done
 
       - name: Stage platform package
         run: deno run --allow-read --allow-write=crates/tsv_napi/pkg scripts/build_napi_packages.ts --triple ${{ matrix.triple }}
@@ -198,8 +214,9 @@ jobs:
       - name: Size bounds
         run: deno run --allow-read scripts/validate_napi_artifact.ts --triple ${{ matrix.triple }}
 
-      # The npm-shape test over the REAL artifact: loader platform-resolution,
-      # the wasm-parity options surface, the packaged .node. (The panic-contract
+      # The npm-shape test over the REAL artifacts: loader platform-resolution,
+      # the wasm-parity options surface, the packaged .node, and the `tsv` bin
+      # dispatching to the packaged CLI binary. (The panic-contract
       # probe test runs per OS in check.yml's platforms job on every PR; it
       # needs a separate probe build, and the contract is profile+attribute
       # determined — identical across targets — so it is not re-proven here.)
@@ -283,4 +300,4 @@ jobs:
           else
             flags+=(--provenance)
           fi
-          deno run --allow-read --allow-env --allow-run=npm scripts/publish_napi.ts "${flags[@]}"
+          deno run --allow-read --allow-write=crates/tsv_napi/pkg --allow-env --allow-run=npm scripts/publish_napi.ts "${flags[@]}"

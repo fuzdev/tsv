@@ -1099,6 +1099,15 @@ describe(`cli (cli.js): ${pkg_dir}`, { skip: variant !== 'all' }, () => {
 		assert.match(result.stdout, /Usage: tsv/);
 	});
 
+	it('--version prints the package version in the native shape', () => {
+		const result = run_cli(['--version']);
+		assert.equal(result.status, 0, result.stderr);
+		const pkg = JSON.parse(
+			readFileSync(new URL(`../${pkg_dir}/package.json`, import.meta.url), 'utf-8')
+		);
+		assert.equal(result.stdout, `tsv ${pkg.version}\n`);
+	});
+
 	it('help subcommand exits 0 (mirrors argh)', () => {
 		const result = run_cli(['help', 'format']);
 		assert.equal(result.status, 0);

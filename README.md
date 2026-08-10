@@ -89,7 +89,7 @@ Future features (unknown order):
 tsv ships to npm as a native package for Node and Bun, plus three WASM
 packages for browsers, Deno, and platforms without a prebuilt binary:
 
-- [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) - the full tool (formatter + parser) with a `tsv` CLI, as a prebuilt native N-API addon
+- [`@fuzdev/tsv`](https://www.npmjs.com/package/@fuzdev/tsv) - the full tool (formatter + parser) as a prebuilt native N-API addon, shipping tsv's real native CLI binary as the `tsv` command
 - [`@fuzdev/tsv_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_wasm) - the full tool with the same `tsv` CLI, as WASM
 - [`@fuzdev/tsv_format_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_format_wasm) - formatter only (smaller)
 - [`@fuzdev/tsv_parse_wasm`](https://www.npmjs.com/package/@fuzdev/tsv_parse_wasm) - parser + JSON AST only (smallest)
@@ -111,7 +111,7 @@ const ast: Root = parse_svelte('<script>const x = 1;</script>');
 ```
 
 `@fuzdev/tsv` and `@fuzdev/tsv_wasm` are drop-in swaps.
-The native package are prebuilt
+The native package is prebuilt
 for Linux (x64 gnu and musl, arm64 gnu), macOS arm64, and Windows x64.
 As with other wasm packages, browsers must call `await init()`.
 

@@ -8,16 +8,27 @@
  * wasm packages; the platform `.node` rides a `createRequire` shim), the
  * wasm-parity `(source, options?)` bags with their
  * exact error strings, the `_json` string variants, the package.json
- * selection fields, the unsupported-platform error, and the `tsv` bin
- * (the shared `cli.js` bound to the native engine): the CLI contract plus
- * the discovery-parity scenario table, mirroring `scripts/test_npm.ts`'s
- * CLI coverage over the wasm copy.
+ * selection fields, the unsupported-platform error, and the `tsv` bin —
+ * `bin.js`, the dispatcher that execs the platform package's native
+ * `tsv_cli` binary: that it really dispatches (argh's help output), that it
+ * forwards exit codes, stdio, and stdin, that `--version` matches the staged
+ * package version (binary↔package lockstep), that `npm pack` would ship the
+ * binary (executable, where a mode exists), that a child's signal death is
+ * re-raised, and that with the binary removed or unrunnable it degrades to the
+ * shared `cli.js` JS mirror over the native engine. Because both CLIs are
+ * present here and only here, this is also where their FLAG SETS are held
+ * together — the mirror's are hand-written and would otherwise drift. The
+ * discovery-parity scenario table runs through BOTH bin entries — the
+ * dispatcher (native discovery through the shim, the real `npx tsv` path)
+ * and cli.js directly (the fallback JS loop over the native `IgnoreStack`),
+ * mirroring `scripts/test_npm.ts`'s CLI coverage over the wasm copy.
  *
  * Stages `crates/tsv_napi/pkg/{napi,<triple>}` into a temp `node_modules`
  * (the loader's `require('@fuzdev/tsv-<triple>')` resolves upward from
  * its own location, so a copy inside a temp node_modules resolves its sibling
  * there). A second staging WITHOUT the platform package asserts the
- * unsupported-platform error path.
+ * unsupported-platform error path; a third with the platform package but the
+ * CLI binary removed asserts the dispatcher's JS fallback.
  *
  * Usage: node --test scripts/test_napi_npm.ts   (or `deno task test:napi:npm`)
  * Prerequisite: deno task build:napi:packages
@@ -27,6 +38,7 @@ import { after, describe, it } from 'node:test';
 import assert from 'node:assert/strict';
 import { spawnSync } from 'node:child_process';
 import {
+	chmodSync,
 	cpSync,
 	existsSync,
 	mkdirSync,
@@ -34,6 +46,7 @@ import {
 	readdirSync,
 	readFileSync,
 	rmSync,
+	statSync,
 	writeFileSync
 } from 'node:fs';
 import { createRequire } from 'node:module';
@@ -72,15 +85,44 @@ const stage = (with_platform: boolean): string => {
 	return tmp;
 };
 
+const cli_binary_name = process.platform === 'win32' ? 'tsv.exe' : 'tsv';
+
 const staged = stage(true);
 const staged_bare = stage(false);
+// The dispatcher-fallback staging: platform package present, CLI binary
+// removed — bin.js must degrade to the cli.js JS mirror over the native engine.
+const staged_no_binary = stage(true);
+rmSync(join(staged_no_binary, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary_name));
+
+// Degraded-binary stagings, posix-only: Windows has no execute bit, and the
+// signal fake is a shell script.
+const posix = process.platform !== 'win32';
+let staged_bad_mode = '';
+let staged_signal = '';
+if (posix) {
+	// binary present but not executable — the spawn-EACCES fallback path
+	staged_bad_mode = stage(true);
+	chmodSync(
+		join(staged_bad_mode, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary_name),
+		0o644
+	);
+	// "binary" that kills itself — the signal re-raise path
+	staged_signal = stage(true);
+	writeFileSync(
+		join(staged_signal, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary_name),
+		'#!/bin/sh\nkill -TERM $$\n',
+		{ mode: 0o755 }
+	);
+}
+
 after(() => {
 	// Best-effort: on Windows the loaded addon stays mapped into the process,
 	// so its .node file — and therefore `staged` — is undeletable until exit
 	// (EPERM). A leaked temp staging is harmless (ephemeral CI runners, OS
 	// temp); a cleanup failure must not fail an otherwise-green suite. The
 	// bare staging loads nothing and deletes everywhere.
-	for (const dir of [staged, staged_bare]) {
+	for (const dir of [staged, staged_bare, staged_no_binary, staged_bad_mode, staged_signal]) {
+		if (!dir) continue;
 		try {
 			rmSync(dir, { recursive: true, force: true });
 		} catch {
@@ -281,6 +323,19 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 		assert.deepEqual(platform_pkg.cpu, [cpu]);
 		if (libc) assert.deepEqual(platform_pkg.libc, [libc === 'gnu' ? 'glibc' : libc]);
 		assert.equal(platform_pkg.main, 'tsv_napi.node');
+		// The native CLI binary ships beside the addon, executable — what the
+		// loader's bin.js execs. Every declared platform file actually shipped.
+		assert.ok(platform_pkg.files.includes(cli_binary_name), `files declares ${cli_binary_name}`);
+		for (const file of platform_pkg.files) {
+			const path = join(staged, 'node_modules', '@fuzdev', `tsv-${triple}`, file);
+			assert.ok(existsSync(path), `declared platform file missing: ${file}`);
+		}
+		if (process.platform !== 'win32') {
+			const mode = statSync(
+				join(staged, 'node_modules', '@fuzdev', `tsv-${triple}`, cli_binary_name)
+			).mode;
+			assert.ok(mode & 0o111, 'the CLI binary must be executable');
+		}
 		// The loader's SUPPORTED list and its optionalDependencies must agree —
 		// the build script and index.js each carry the list, and this is the
 		// gate that keeps them in sync.
@@ -314,20 +369,66 @@ describe('@fuzdev/tsv loader (staged npm shape)', () => {
 	});
 });
 
-// The `tsv` bin — the SAME cli.js the wasm package ships, staged here so its
-// `./index.js` import resolves to the native loader. The full flag/exit-code
-// matrix lives in `scripts/test_npm.ts` over the wasm copy (one source, one
-// contract); this asserts the native binding end to end — wiring, each
-// subcommand against the native engine, and the parity flags whose handling
-// differs by mode.
+// The `tsv` bin — `bin.js`, the dispatcher that execs the platform package's
+// native `tsv_cli` binary, with the shared `cli.js` (the wasm package's bin,
+// staged here bound to the native loader) as its fallback. The full
+// flag/exit-code matrix lives in `scripts/test_npm.ts` over the wasm copy and
+// in `tests/cli_tests.rs` over the binary itself; what THIS suite pins is the
+// dispatch — that the bin really reaches the native binary — and the
+// forwarding: exit codes, stdout/stderr split, stdin piping, in-place writes.
+const bin_path = join(staged, 'node_modules', '@fuzdev', 'tsv', 'bin.js');
 const cli_path = join(staged, 'node_modules', '@fuzdev', 'tsv', 'cli.js');
 const run_cli = (args: Array<string>, stdin?: string) =>
-	spawnSync(process.execPath, [cli_path, ...args], { encoding: 'utf-8', input: stdin });
+	spawnSync(process.execPath, [bin_path, ...args], { encoding: 'utf-8', input: stdin });
 
-describe('cli (cli.js): the tsv bin over the native engine', () => {
+describe('cli (bin.js): the tsv bin dispatching to the native CLI binary', () => {
 	it('is wired as the package bin', () => {
-		const pkg = JSON.parse(readFileSync(join(dirname(cli_path), 'package.json'), 'utf8'));
-		assert.deepEqual(pkg.bin, { tsv: './cli.js' });
+		const pkg = JSON.parse(readFileSync(join(dirname(bin_path), 'package.json'), 'utf8'));
+		assert.deepEqual(pkg.bin, { tsv: './bin.js' });
+	});
+
+	// The dispatch discriminator: argh's generated help carries a section
+	// header (`Positional Arguments:`) the JS mirror's hand-written help never
+	// prints — so this output can only have come from the native binary.
+	it('dispatches to the native binary, not the JS loop', () => {
+		const result = run_cli(['help', 'format']);
+		assert.equal(result.status, 0, result.stderr);
+		assert.match(result.stdout, /Positional Arguments:/);
+	});
+
+	// A real lockstep gate: the binary's compiled-in version (workspace
+	// Cargo.toml) must equal the staged package version (read from the same
+	// Cargo.toml at stage time) — a stale binary from an older checkout
+	// staged into a fresh package fails here.
+	it('--version reports the native binary version, in lockstep with the package', () => {
+		const result = run_cli(['--version']);
+		assert.equal(result.status, 0, result.stderr);
+		const loader_pkg = JSON.parse(readFileSync(join(dirname(bin_path), 'package.json'), 'utf8'));
+		assert.equal(result.stdout, `tsv ${loader_pkg.version}\n`);
+	});
+
+	// What npm would actually publish, on every platform — because it is the
+	// one claim the package.json check above can't make. That one proves the
+	// `files` array names this platform's binary and that the file is on disk;
+	// this one proves npm's own packing rules then put it in the TARBALL, which
+	// is what a consumer installs. Without it, `npx tsv` could silently degrade
+	// to the JS mirror on a platform whose staging looked perfect.
+	// The execute bit is posix-only: npm packs the on-disk mode and only chmods
+	// `bin` entries at install, so a 644 there ships a broken npx — on Windows
+	// there is no mode to pin. (`npm` is a .cmd there, hence the shell.)
+	it('npm pack ships the CLI binary', () => {
+		const result = spawnSync('npm', ['pack', '--dry-run', '--json'], {
+			cwd: join(pkg_root, triple),
+			encoding: 'utf-8',
+			shell: process.platform === 'win32'
+		});
+		assert.equal(result.status, 0, result.stderr);
+		const [report] = JSON.parse(result.stdout);
+		const entry = report.files.find((f: { path: string }) => f.path === cli_binary_name);
+		assert.ok(entry, `${cli_binary_name} missing from the packed file list`);
+		if (posix) {
+			assert.ok(entry.mode & 0o111, `packed mode ${entry.mode.toString(8)} is not executable`);
+		}
 	});
 
 	it('format --content prints formatted source', () => {
@@ -384,7 +485,7 @@ describe('cli (cli.js): the tsv bin over the native engine', () => {
 		assert.doesNotMatch(bare.stdout, /"loc"/);
 	});
 
-	it('path mode formats in place; --jobs is accepted and ignored', () => {
+	it('path mode formats in place, --jobs forwarded (real parallelism here)', () => {
 		const root = mkdtempSync(join(tmpdir(), 'tsv-napi-cli-'));
 		try {
 			writeFileSync(join(root, 'a.ts'), 'const   a=1\n');
@@ -412,15 +513,146 @@ describe('cli (cli.js): the tsv bin over the native engine', () => {
 		assert.equal(result.status, 2);
 	});
 
-	it('help exits 0 (mirrors argh)', () => {
+	it('help exits 0 (argh)', () => {
 		const result = run_cli(['help', 'format']);
 		assert.equal(result.status, 0);
 		assert.match(result.stdout, /Usage: tsv format/);
 	});
 });
 
-// Discovery parity — this suite is the third consumer of the shared scenario
-// table (see `scripts/discovery_parity_suite.ts`): here cli.js runs over the
-// NATIVE `IgnoreStack` (the `#[napi]` twin), so the addon's discovery verdicts
-// can't drift from the wasm binding's or the native CLI's.
+// With the CLI binary removed from the platform package, bin.js must degrade
+// to the shared cli.js — the JS mirror of the same contract over the native
+// engine — rather than fail. The help probe inverts: the JS mirror's
+// hand-written help has no argh section header.
+const fallback_bin = join(staged_no_binary, 'node_modules', '@fuzdev', 'tsv', 'bin.js');
+const run_fallback = (args: Array<string>, stdin?: string) =>
+	spawnSync(process.execPath, [fallback_bin, ...args], { encoding: 'utf-8', input: stdin });
+
+describe('cli (bin.js): fallback to the JS mirror without the binary', () => {
+	it('serves the format contract through cli.js', () => {
+		const result = run_fallback(['format', '--content', 'const   x=1', '--parser', 'ts']);
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(result.stdout, 'const x = 1;\n');
+	});
+
+	it('runs the JS loop, not the binary', () => {
+		const result = run_fallback(['help', 'format']);
+		assert.equal(result.status, 0);
+		assert.match(result.stdout, /Usage: tsv format/);
+		assert.doesNotMatch(result.stdout, /Positional Arguments:/);
+	});
+
+	it('forwards the JS mirror exit codes', () => {
+		assert.equal(
+			run_fallback(['format', '--check', '--content', 'const   x=1', '--parser', 'ts']).status,
+			1
+		);
+		assert.equal(run_fallback(['format', '--content', 'const =', '--parser', 'ts']).status, 2);
+	});
+});
+
+// Flag-set parity between the two CLIs that serve the same contract. This is
+// the only place both exist at once (the wasm package ships no binary), and the
+// mirror's flag table and help text are hand-written — so a flag added to argh
+// and not to `cli.js`, or left in the mirror after the native CLI dropped it,
+// drifts silently: every other test here drives flags it names itself, and so
+// only ever covers the intersection both sides already agree on.
+//
+// The claim is RECOGNITION, not behavior (each flag's semantics are pinned by
+// the matrix in `scripts/test_npm.ts` and `tests/cli_tests.rs`): each side is
+// handed the bare flag and must not answer with its unknown-flag error. A
+// missing value or missing input is a different error and passes — that is the
+// point, since it means the flag was understood. Scope is the two commands;
+// the top-level `--version` / `--help` have their own tests on both sides.
+
+/** The `--flag`s a help text advertises. Two vacuity checks come with it: a
+ * regex that quietly matched nothing would make every assertion below pass. */
+const advertised_flags = (help: string, source: string): Array<string> => {
+	const options = help.slice(help.indexOf('\nOptions:'));
+	const flags = [...options.matchAll(/^ {2}(--[a-z0-9-]+)/gm)]
+		.map((m) => m[1])
+		// argh generates `--help` for every command; the mirror handles it
+		// without advertising it, so it is the one flag the sets can't share.
+		.filter((flag) => flag !== '--help');
+	assert.ok(flags.length >= 5, `parsed too few flags from ${source}: ${flags}`);
+	assert.ok(flags.includes('--parser'), `parsed no --parser from ${source}: ${flags}`);
+	return flags;
+};
+
+const run_mirror = (args: Array<string>) =>
+	spawnSync(process.execPath, [cli_path, ...args], { encoding: 'utf-8', input: '' });
+
+describe('flag parity: the native CLI and cli.js recognize the same flags', () => {
+	for (const command of ['format', 'parse']) {
+		it(`${command}: every flag the native CLI advertises, cli.js recognizes`, () => {
+			const help = run_cli(['help', command], '');
+			assert.equal(help.status, 0, help.stderr);
+			const flags = advertised_flags(help.stdout, `argh's \`${command}\` help`);
+			for (const flag of flags) {
+				const result = run_mirror([command, flag]);
+				assert.doesNotMatch(
+					result.stderr,
+					/Unknown option/,
+					`cli.js does not know \`${command} ${flag}\`, which the native CLI advertises`
+				);
+			}
+		});
+
+		it(`${command}: every flag cli.js advertises, the native CLI recognizes`, () => {
+			const help = run_mirror(['help', command]);
+			assert.equal(help.status, 0, help.stderr);
+			const flags = advertised_flags(help.stdout, `cli.js's \`${command}\` help`);
+			for (const flag of flags) {
+				const result = run_cli([command, flag], '');
+				assert.doesNotMatch(
+					result.stderr,
+					/Unrecognized argument/,
+					`the native CLI does not know \`${command} ${flag}\`, which cli.js advertises`
+				);
+			}
+		});
+	}
+});
+
+// The degraded-binary paths, posix-only (see the staging comment): a binary
+// that exists but can't run, and a child that dies by signal.
+describe('cli (bin.js): degraded-binary paths', { skip: !posix }, () => {
+	// The exact failure the publish-side chmod guards (a mode lost in
+	// transit): the run still succeeds, loudly, through the JS mirror.
+	it('a present-but-unrunnable binary warns and falls back to the JS mirror', () => {
+		const bad_bin = join(staged_bad_mode, 'node_modules', '@fuzdev', 'tsv', 'bin.js');
+		const result = spawnSync(
+			process.execPath,
+			[bad_bin, 'format', '--content', 'const   x=1', '--parser', 'ts'],
+			{ encoding: 'utf-8' }
+		);
+		assert.equal(result.status, 0, result.stderr);
+		assert.equal(result.stdout, 'const x = 1;\n');
+		assert.match(result.stderr, /could not run its native CLI/);
+		assert.match(result.stderr, /falling back to the JS CLI/);
+	});
+
+	// The README-promised signal contract: a child killed by a signal is
+	// re-raised, so the dispatcher's own exit status reports the same signal
+	// death instead of a plain exit code.
+	it('re-raises the signal a child died by', () => {
+		const sig_bin = join(staged_signal, 'node_modules', '@fuzdev', 'tsv', 'bin.js');
+		const result = spawnSync(process.execPath, [sig_bin, 'help'], { encoding: 'utf-8' });
+		assert.equal(
+			result.signal,
+			'SIGTERM',
+			`expected signal death, got status=${result.status} stderr=${result.stderr}`
+		);
+	});
+});
+
+// Discovery parity — the shared scenario table runs through BOTH bin entries
+// (see `scripts/discovery_parity_suite.ts`). Through bin.js it exercises the
+// native CLI's own discovery via the shim — the real `npx tsv` path, proving
+// the dispatcher preserves cwd/argv/stdio over the whole table. Through
+// cli.js directly it stays the table's third consumer: the JS loop over the
+// NATIVE `IgnoreStack` (the `#[napi]` twin — the fallback path), so the
+// addon's discovery verdicts can't drift from the wasm binding's or the
+// native CLI's.
+register_discovery_parity_suite('discovery parity (bin.js): the native CLI via the shim', bin_path);
 register_discovery_parity_suite('discovery parity (cli.js): the native IgnoreStack', cli_path);

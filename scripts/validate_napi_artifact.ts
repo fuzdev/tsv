@@ -1,6 +1,7 @@
 /**
- * Size bounds for a staged N-API platform artifact
- * (`crates/tsv_napi/pkg/<triple>/tsv_napi.node`) — the native sibling of
+ * Size bounds for the staged N-API platform artifacts
+ * (`crates/tsv_napi/pkg/<triple>/` — the `tsv_napi.node` addon and the native
+ * `tsv` CLI binary beside it) — the native sibling of
  * `scripts/validate_artifacts.ts`'s wasm bounds, run per matrix target by the
  * release workflow (and locally after `deno task build:napi:packages`).
  *
@@ -23,11 +24,25 @@ const { values: args } = parseArgs({
 	}
 });
 
-/** [min, max] bytes per triple. Measured = ±8% around a real artifact. */
+/** [min, max] bytes per triple for `tsv_napi.node`. Measured = ±8% around a
+ * real artifact. */
 const BOUNDS: Record<string, [number, number]> = {
 	// band anchored at a measured 3,636,240 on linux (napi profile: release +
 	// unwind), ±8% — the anchor, not a running figure
 	'linux-x64-gnu': [3_345_000, 3_927_000],
+	// PROVISIONAL — tighten to ±8% after the first release-matrix run
+	'linux-arm64-gnu': [2_500_000, 5_500_000],
+	'linux-x64-musl': [2_500_000, 5_500_000],
+	'darwin-arm64': [2_000_000, 5_500_000],
+	'win32-x64': [2_000_000, 5_500_000]
+};
+
+/** [min, max] bytes per triple for the native `tsv` CLI binary (`release`
+ * profile: abort + LTO). Same anchoring discipline as `BOUNDS`. */
+const CLI_BOUNDS: Record<string, [number, number]> = {
+	// band anchored at a measured 3,581,576 on linux, ±8% — the anchor, not a
+	// running figure
+	'linux-x64-gnu': [3_295_000, 3_868_000],
 	// PROVISIONAL — tighten to ±8% after the first release-matrix run
 	'linux-arm64-gnu': [2_500_000, 5_500_000],
 	'linux-x64-musl': [2_500_000, 5_500_000],
@@ -50,30 +65,34 @@ if (!triple) {
 	triple = platform_dirs[0];
 }
 
-const bounds = BOUNDS[triple!];
-if (!bounds) {
-	console.error(
-		`FAIL: no size bounds for triple '${triple}' — add a (PROVISIONAL) entry to BOUNDS in scripts/validate_napi_artifact.ts`
-	);
-	Deno.exit(1);
-}
-
-const path = `${pkg_root}/${triple}/tsv_napi.node`;
-let size: number;
-try {
-	size = Deno.statSync(path).size;
-} catch {
-	console.error(`FAIL: ${path} not staged — run 'deno task build:napi:packages' first`);
-	Deno.exit(1);
-}
-
-const [min, max] = bounds;
+const cli_binary_name = triple!.startsWith('win32-') ? 'tsv.exe' : 'tsv';
 const mb = (n: number) => `${(n / 1024 / 1024).toFixed(2)} MB`;
-if (size < min || size > max) {
-	console.error(
-		`FAIL: ${triple} tsv_napi.node is ${size} bytes (${mb(size)}) — outside [${min}, ${max}]. ` +
-			`A deliberate size change must move the bound in scripts/validate_napi_artifact.ts.`
-	);
-	Deno.exit(1);
-}
-console.log(`OK: ${triple} tsv_napi.node ${size} bytes (${mb(size)}) within [${min}, ${max}]`);
+
+const validate = (filename: string, bounds: [number, number] | undefined): void => {
+	if (!bounds) {
+		console.error(
+			`FAIL: no ${filename} size bounds for triple '${triple}' — add a (PROVISIONAL) entry in scripts/validate_napi_artifact.ts`
+		);
+		Deno.exit(1);
+	}
+	const path = `${pkg_root}/${triple}/${filename}`;
+	let size: number;
+	try {
+		size = Deno.statSync(path).size;
+	} catch {
+		console.error(`FAIL: ${path} not staged — run 'deno task build:napi:packages' first`);
+		Deno.exit(1);
+	}
+	const [min, max] = bounds;
+	if (size < min || size > max) {
+		console.error(
+			`FAIL: ${triple} ${filename} is ${size} bytes (${mb(size)}) — outside [${min}, ${max}]. ` +
+				`A deliberate size change must move the bound in scripts/validate_napi_artifact.ts.`
+		);
+		Deno.exit(1);
+	}
+	console.log(`OK: ${triple} ${filename} ${size} bytes (${mb(size)}) within [${min}, ${max}]`);
+};
+
+validate('tsv_napi.node', BOUNDS[triple!]);
+validate(cli_binary_name, CLI_BOUNDS[triple!]);
