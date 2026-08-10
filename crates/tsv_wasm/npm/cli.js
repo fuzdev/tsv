@@ -67,6 +67,9 @@ const HELP = `Usage: tsv <command> [<args>]
 
 formatter and parser for Svelte, TypeScript, and CSS
 
+Options:
+  --version         print the tsv version
+
 Commands:
   format            Format source code in place (near-Prettier output)
   parse             Parse source code into AST JSON
@@ -128,6 +131,9 @@ function main() {
 		case '--help':
 			print(HELP);
 			break;
+		case '--version':
+			print_version();
+			break;
 		case undefined:
 			eprint(HELP);
 			process.exit(1);
@@ -136,6 +142,16 @@ function main() {
 			eprint(`Error: unknown command '${command}'\n\n${HELP}`);
 			process.exit(1);
 	}
+}
+
+/** `tsv --version` — mirrors the native CLI's top-level version switch, exact
+ * output shape (`tsv <version>`). The version is this package's own — read
+ * lazily from the sibling package.json (cli.js ships at the package root of
+ * both `@fuzdev/tsv_wasm` and `@fuzdev/tsv`, and the published sets move in
+ * version lockstep with the native binary). */
+function print_version() {
+	const pkg = JSON.parse(readFileSync(new URL('./package.json', import.meta.url), 'utf-8'));
+	print(`tsv ${pkg.version}\n`);
 }
 
 /** `tsv help [command]` — mirrors the native CLI's argh-generated help subcommand. */

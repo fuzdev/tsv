@@ -6,8 +6,15 @@
  * package its generated `optionalDependencies` name (the loader package.json
  * is the single source of truth for the expected set — no third copy of the
  * triple list here). Refuses to publish a partial set: a missing platform
- * artifact means a matrix job failed, and a loader pointing at unpublished
+ * artifact — the `tsv_napi.node` addon or the native `tsv` CLI binary beside
+ * it — means a matrix job failed, and a loader pointing at unpublished
  * optionalDependencies would break installs.
+ *
+ * Also re-arms the CLI binaries' executable bit: actions/upload-artifact does
+ * not preserve file modes (every downloaded file arrives 644), npm packs the
+ * on-disk mode into the tarball, and npm only chmods `bin` entries at install
+ * (the loader's bin.js — the platform binary is not a bin entry). Without the
+ * chmod every published posix platform would EACCES on `npx tsv`.
  *
  * Publish order is platform packages FIRST, the loader LAST, so the loader
  * never goes live before the binaries it resolves. Idempotent like
@@ -16,7 +23,8 @@
  * `npm view` errors other than E404 (auth, network) fail loudly rather than
  * being read as "not published".
  *
- * Usage: deno run --allow-read --allow-env --allow-run=npm scripts/publish_napi.ts \
+ * Usage: deno run --allow-read --allow-write=crates/tsv_napi/pkg --allow-env \
+ *          --allow-run=npm scripts/publish_napi.ts \
  *          [--dry-run] [--provenance] [--expect-tag v<version>]
  *
  * `--provenance` is passed by the release workflow (needs the workflow's
@@ -63,21 +71,29 @@ if (args['expect-tag'] && args['expect-tag'] !== `v${version}`) {
 }
 
 // Completeness: every platform package the loader pins must be staged, at the
-// loader's own version, with its binary present. Partial sets never publish.
+// loader's own version, with both its binaries present. Partial sets never
+// publish.
 const platform_dirs: Array<{ name: string; dir: string }> = [];
 let incomplete = false;
+const is_file = (path: string): boolean => {
+	try {
+		return Deno.statSync(path).isFile;
+	} catch {
+		return false;
+	}
+};
 for (const [name, pin] of Object.entries(optional)) {
 	const triple = name.replace('@fuzdev/tsv-', '');
 	const dir = `${pkg_root}/${triple}`;
-	const exists = (() => {
-		try {
-			return Deno.statSync(`${dir}/tsv_napi.node`).isFile;
-		} catch {
-			return false;
+	const cli_binary = triple.startsWith('win32-') ? 'tsv.exe' : 'tsv';
+	let missing = false;
+	for (const file of ['tsv_napi.node', cli_binary]) {
+		if (!is_file(`${dir}/${file}`)) {
+			console.error(`MISSING: ${dir}/${file} (${name}) — did its matrix job fail?`);
+			missing = true;
 		}
-	})();
-	if (!exists) {
-		console.error(`MISSING: ${dir}/tsv_napi.node (${name}) — did its matrix job fail?`);
+	}
+	if (missing) {
 		incomplete = true;
 		continue;
 	}
@@ -89,6 +105,21 @@ for (const [name, pin] of Object.entries(optional)) {
 		);
 		incomplete = true;
 		continue;
+	}
+	// Re-arm the x-bit lost in artifact transport (see the module doc), then
+	// VERIFY it took — npm packs whatever mode is on disk, so a transport or
+	// filesystem change that resists the chmod must fail the publish here,
+	// not surface as a broken `npx tsv` on the registry. A posix binary
+	// staged on a Windows host has no mode to fix, and none of the publish
+	// paths run there (CI publishes from ubuntu).
+	if (cli_binary === 'tsv' && Deno.build.os !== 'windows') {
+		Deno.chmodSync(`${dir}/${cli_binary}`, 0o755);
+		const mode = Deno.statSync(`${dir}/${cli_binary}`).mode ?? 0;
+		if ((mode & 0o111) === 0) {
+			console.error(`NOT EXECUTABLE: ${dir}/${cli_binary} — chmod 755 did not take`);
+			incomplete = true;
+			continue;
+		}
 	}
 	platform_dirs.push({ name, dir });
 }

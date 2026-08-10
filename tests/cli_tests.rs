@@ -8,8 +8,11 @@ use std::sync::Once;
 /// Test helper; panicking on spawn failure is the desired behavior.
 #[allow(clippy::expect_used)]
 fn tsv(args: &[&str]) -> std::process::Output {
+    // The `--` matters: without it a leading-flag argument (`tsv --version`)
+    // is parsed by cargo itself instead of being forwarded — subcommand-first
+    // invocations only dodged that by starting with a non-flag word.
     Command::new("cargo")
-        .args(["run", "-p", "tsv_cli", "-q"])
+        .args(["run", "-p", "tsv_cli", "-q", "--"])
         .args(args)
         .output()
         .expect("Failed to execute command")
@@ -22,7 +25,7 @@ fn tsv_stdin(args: &[&str], input: &str) -> std::process::Output {
     use std::io::Write;
     use std::process::Stdio;
     let mut child = Command::new("cargo")
-        .args(["run", "-p", "tsv_cli", "-q"])
+        .args(["run", "-p", "tsv_cli", "-q", "--"])
         .args(args)
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
@@ -51,14 +54,13 @@ fn temp_dir(name: &str) -> PathBuf {
 
 static BUILD: Once = Once::new();
 
-/// Run the built `tsv` binary with `cwd` as its working directory — needed for
-/// ignore-file tests that pass a relative target like `.` (resolved against the
-/// cwd; the format root is then derived from that target, never the cwd itself),
-/// since the `cargo run` helper above always runs in the workspace root. The
-/// binary is built once on first use.
-/// Test helper; panicking on spawn/build failure is the desired behavior.
+/// Path to the built `tsv` binary, built once on first use. Spelled with
+/// `EXE_SUFFIX` rather than leaning on Windows' implicit `.exe` resolution,
+/// since a test may need the path as a *file* (to copy) and not only as
+/// something to spawn.
+/// Test helper; panicking on build failure is the desired behavior.
 #[allow(clippy::expect_used)]
-fn tsv_in_dir(cwd: &Path, args: &[&str]) -> std::process::Output {
+fn built_tsv() -> PathBuf {
     BUILD.call_once(|| {
         let status = Command::new("cargo")
             .args(["build", "-p", "tsv_cli", "-q"])
@@ -66,8 +68,18 @@ fn tsv_in_dir(cwd: &Path, args: &[&str]) -> std::process::Output {
             .expect("Failed to build tsv_cli");
         assert!(status.success(), "tsv_cli build failed");
     });
-    let bin = PathBuf::from(env!("CARGO_MANIFEST_DIR")).join("target/debug/tsv");
-    Command::new(bin)
+    PathBuf::from(env!("CARGO_MANIFEST_DIR"))
+        .join(format!("target/debug/tsv{}", std::env::consts::EXE_SUFFIX))
+}
+
+/// Run the built `tsv` binary with `cwd` as its working directory — needed for
+/// ignore-file tests that pass a relative target like `.` (resolved against the
+/// cwd; the format root is then derived from that target, never the cwd itself),
+/// since the `cargo run` helper above always runs in the workspace root.
+/// Test helper; panicking on spawn failure is the desired behavior.
+#[allow(clippy::expect_used)]
+fn tsv_in_dir(cwd: &Path, args: &[&str]) -> std::process::Output {
+    Command::new(built_tsv())
         .args(args)
         .current_dir(cwd)
         .output()
@@ -983,6 +995,69 @@ fn test_no_command() {
     assert!(
         stderr.contains("subcommand") || stderr.contains("--help"),
         "Should show usage/help message"
+    );
+}
+
+#[test]
+fn test_version_flag() {
+    let output = tsv(&["--version"]);
+    assert_eq!(output.status.code(), Some(0));
+    assert_eq!(
+        String::from_utf8_lossy(&output.stdout),
+        format!("tsv {}\n", env!("CARGO_PKG_VERSION")),
+        "exact `tsv <workspace version>` line — the npm cli.js mirrors it from its package.json"
+    );
+    assert!(output.stderr.is_empty());
+}
+
+/// The command name in usage/help/error text is pinned to `tsv`, never derived
+/// from `argv[0]` — which is what `argh::from_env` does, and what printed
+/// `Usage: tsv.exe format` on Windows. Running a renamed copy varies exactly
+/// that dimension on any platform, so the property is provable here rather than
+/// only in a Windows CI leg.
+#[test]
+#[allow(clippy::expect_used)]
+fn test_command_name_is_independent_of_argv0() {
+    let dir = temp_dir("argv0_name");
+    let renamed = dir.join(format!("tsv_renamed{}", std::env::consts::EXE_SUFFIX));
+    fs::copy(built_tsv(), &renamed).expect("Failed to copy the tsv binary");
+
+    let run = |args: &[&str]| {
+        Command::new(&renamed)
+            .args(args)
+            .output()
+            .expect("Failed to execute the renamed tsv binary")
+    };
+
+    let help = run(&["help", "format"]);
+    assert_eq!(help.status.code(), Some(0));
+    let stdout = String::from_utf8_lossy(&help.stdout);
+    assert!(
+        stdout.starts_with("Usage: tsv format"),
+        "renamed binary must still name itself `tsv`: {stdout}"
+    );
+
+    // The error path carries the same name (argh's `Run <cmd> --help` line).
+    let bad = run(&["format", "--parser", "bogus", "--content", "x"]);
+    assert_eq!(bad.status.code(), Some(1));
+    let stderr = String::from_utf8_lossy(&bad.stderr);
+    assert!(
+        stderr.contains("Run tsv --help for more information."),
+        "stderr: {stderr}"
+    );
+
+    let _ = fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn test_version_is_top_level_only() {
+    // Subcommands don't take --version — an unrecognized-argument error, like
+    // the JS mirror's strict parseArgs (exit 1).
+    let output = tsv(&["format", "--version"]);
+    assert_eq!(output.status.code(), Some(1));
+    assert!(
+        String::from_utf8_lossy(&output.stderr).contains("Unrecognized argument: --version"),
+        "should fail as an unknown subcommand argument, not print a version"
     );
 }
 
