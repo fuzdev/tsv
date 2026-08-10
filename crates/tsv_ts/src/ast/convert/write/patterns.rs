@@ -61,11 +61,14 @@ pub(super) fn write_template_element(
     };
     let adjusted_span = Span::new(adjusted_start, adjusted_end);
     node_header(w, "TemplateElement", adjusted_span, ctx);
+    // `trv`, not `raw`: the wire reports the element's VALUE, where ECMAScript
+    // has already folded `<CR>` / `<CR><LF>` to `<LF>` (§12.9.6). The source
+    // slice is the printer's question.
     w.raw(",\"value\":{\"raw\":");
-    w.string(element.raw(ctx.source));
+    w.string(element.trv(ctx.source));
     w.raw(",\"cooked\":");
     match element.cooked {
-        internal::TemplateCooked::Verbatim => w.string(element.raw(ctx.source)),
+        internal::TemplateCooked::Verbatim => w.string(element.trv(ctx.source)),
         internal::TemplateCooked::Decoded(decoded) => w.string(decoded),
         internal::TemplateCooked::Invalid => w.null(),
     }

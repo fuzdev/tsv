@@ -2,7 +2,7 @@
 	"css": null,
 	"js": [],
 	"start": 0,
-	"end": 883,
+	"end": 1346,
 	"type": "Root",
 	"fragment": {
 		"type": "Fragment",
@@ -265,24 +265,184 @@
 					"column": 20
 				}
 			}
+		},
+		{
+			"type": "Line",
+			"value": " a comment inside a paren shell the frozen slice already printed is NOT",
+			"start": 875,
+			"end": 948,
+			"loc": {
+				"start": {
+					"line": 50,
+					"column": 1
+				},
+				"end": {
+					"line": 50,
+					"column": 74
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " re-claimed by the trailing-comma seam",
+			"start": 950,
+			"end": 990,
+			"loc": {
+				"start": {
+					"line": 51,
+					"column": 1
+				},
+				"end": {
+					"line": 51,
+					"column": 41
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 1009,
+			"end": 1027,
+			"loc": {
+				"start": {
+					"line": 53,
+					"column": 2
+				},
+				"end": {
+					"line": 53,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 1036,
+			"end": 1049,
+			"loc": {
+				"start": {
+					"line": 54,
+					"column": 8
+				},
+				"end": {
+					"line": 54,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " the same on the last property, whose comma is never emitted",
+			"start": 1065,
+			"end": 1127,
+			"loc": {
+				"start": {
+					"line": 58,
+					"column": 1
+				},
+				"end": {
+					"line": 58,
+					"column": 63
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 1147,
+			"end": 1165,
+			"loc": {
+				"start": {
+					"line": 60,
+					"column": 2
+				},
+				"end": {
+					"line": 60,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Block",
+			"value": " comment ",
+			"start": 1174,
+			"end": 1187,
+			"loc": {
+				"start": {
+					"line": 61,
+					"column": 8
+				},
+				"end": {
+					"line": 61,
+					"column": 21
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " a line comment in that position keeps the closer on its own line",
+			"start": 1195,
+			"end": 1262,
+			"loc": {
+				"start": {
+					"line": 64,
+					"column": 1
+				},
+				"end": {
+					"line": 64,
+					"column": 68
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " prettier-ignore",
+			"start": 1282,
+			"end": 1300,
+			"loc": {
+				"start": {
+					"line": 66,
+					"column": 2
+				},
+				"end": {
+					"line": 66,
+					"column": 20
+				}
+			}
+		},
+		{
+			"type": "Line",
+			"value": " comment",
+			"start": 1309,
+			"end": 1319,
+			"loc": {
+				"start": {
+					"line": 67,
+					"column": 8
+				},
+				"end": {
+					"line": 67,
+					"column": 18
+				}
+			}
 		}
 	],
 	"instance": {
 		"type": "Script",
 		"start": 0,
-		"end": 882,
+		"end": 1345,
 		"context": "default",
 		"content": {
 			"type": "Program",
 			"start": 8,
-			"end": 873,
+			"end": 1336,
 			"loc": {
 				"start": {
 					"line": 1,
 					"column": 0
 				},
 				"end": {
-					"line": 49,
+					"line": 71,
 					"column": 9
 				}
 			},
@@ -1594,6 +1754,539 @@
 						}
 					],
 					"kind": "const"
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 992,
+					"end": 1062,
+					"loc": {
+						"start": {
+							"line": 52,
+							"column": 1
+						},
+						"end": {
+							"line": 56,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 998,
+							"end": 1061,
+							"loc": {
+								"start": {
+									"line": 52,
+									"column": 7
+								},
+								"end": {
+									"line": 56,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 998,
+								"end": 1002,
+								"loc": {
+									"start": {
+										"line": 52,
+										"column": 7
+									},
+									"end": {
+										"line": 52,
+										"column": 11
+									}
+								},
+								"name": "obj9"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 1005,
+								"end": 1061,
+								"loc": {
+									"start": {
+										"line": 52,
+										"column": 14
+									},
+									"end": {
+										"line": 56,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 1030,
+										"end": 1050,
+										"loc": {
+											"start": {
+												"line": 54,
+												"column": 2
+											},
+											"end": {
+												"line": 54,
+												"column": 22
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1030,
+											"end": 1031,
+											"loc": {
+												"start": {
+													"line": 54,
+													"column": 2
+												},
+												"end": {
+													"line": 54,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 1034,
+											"end": 1035,
+											"loc": {
+												"start": {
+													"line": 54,
+													"column": 6
+												},
+												"end": {
+													"line": 54,
+													"column": 7
+												}
+											},
+											"name": "b",
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " comment ",
+													"start": 1036,
+													"end": 1049
+												}
+											]
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " prettier-ignore",
+												"start": 1009,
+												"end": 1027
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 1054,
+										"end": 1058,
+										"loc": {
+											"start": {
+												"line": 55,
+												"column": 2
+											},
+											"end": {
+												"line": 55,
+												"column": 6
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1054,
+											"end": 1055,
+											"loc": {
+												"start": {
+													"line": 55,
+													"column": 2
+												},
+												"end": {
+													"line": 55,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 1057,
+											"end": 1058,
+											"loc": {
+												"start": {
+													"line": 55,
+													"column": 5
+												},
+												"end": {
+													"line": 55,
+													"column": 6
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a comment inside a paren shell the frozen slice already printed is NOT",
+							"start": 875,
+							"end": 948
+						},
+						{
+							"type": "Line",
+							"value": " re-claimed by the trailing-comma seam",
+							"start": 950,
+							"end": 990
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1129,
+					"end": 1192,
+					"loc": {
+						"start": {
+							"line": 59,
+							"column": 1
+						},
+						"end": {
+							"line": 62,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1135,
+							"end": 1191,
+							"loc": {
+								"start": {
+									"line": 59,
+									"column": 7
+								},
+								"end": {
+									"line": 62,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1135,
+								"end": 1140,
+								"loc": {
+									"start": {
+										"line": 59,
+										"column": 7
+									},
+									"end": {
+										"line": 59,
+										"column": 12
+									}
+								},
+								"name": "obj10"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 1143,
+								"end": 1191,
+								"loc": {
+									"start": {
+										"line": 59,
+										"column": 15
+									},
+									"end": {
+										"line": 62,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 1168,
+										"end": 1188,
+										"loc": {
+											"start": {
+												"line": 61,
+												"column": 2
+											},
+											"end": {
+												"line": 61,
+												"column": 22
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1168,
+											"end": 1169,
+											"loc": {
+												"start": {
+													"line": 61,
+													"column": 2
+												},
+												"end": {
+													"line": 61,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 1172,
+											"end": 1173,
+											"loc": {
+												"start": {
+													"line": 61,
+													"column": 6
+												},
+												"end": {
+													"line": 61,
+													"column": 7
+												}
+											},
+											"name": "b",
+											"trailingComments": [
+												{
+													"type": "Block",
+													"value": " comment ",
+													"start": 1174,
+													"end": 1187
+												}
+											]
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " prettier-ignore",
+												"start": 1147,
+												"end": 1165
+											}
+										]
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " the same on the last property, whose comma is never emitted",
+							"start": 1065,
+							"end": 1127
+						}
+					]
+				},
+				{
+					"type": "VariableDeclaration",
+					"start": 1264,
+					"end": 1335,
+					"loc": {
+						"start": {
+							"line": 65,
+							"column": 1
+						},
+						"end": {
+							"line": 70,
+							"column": 3
+						}
+					},
+					"declarations": [
+						{
+							"type": "VariableDeclarator",
+							"start": 1270,
+							"end": 1334,
+							"loc": {
+								"start": {
+									"line": 65,
+									"column": 7
+								},
+								"end": {
+									"line": 70,
+									"column": 2
+								}
+							},
+							"id": {
+								"type": "Identifier",
+								"start": 1270,
+								"end": 1275,
+								"loc": {
+									"start": {
+										"line": 65,
+										"column": 7
+									},
+									"end": {
+										"line": 65,
+										"column": 12
+									}
+								},
+								"name": "obj11"
+							},
+							"init": {
+								"type": "ObjectExpression",
+								"start": 1278,
+								"end": 1334,
+								"loc": {
+									"start": {
+										"line": 65,
+										"column": 15
+									},
+									"end": {
+										"line": 70,
+										"column": 2
+									}
+								},
+								"properties": [
+									{
+										"type": "Property",
+										"start": 1303,
+										"end": 1323,
+										"loc": {
+											"start": {
+												"line": 67,
+												"column": 2
+											},
+											"end": {
+												"line": 68,
+												"column": 3
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1303,
+											"end": 1304,
+											"loc": {
+												"start": {
+													"line": 67,
+													"column": 2
+												},
+												"end": {
+													"line": 67,
+													"column": 3
+												}
+											},
+											"name": "a"
+										},
+										"value": {
+											"type": "Identifier",
+											"start": 1307,
+											"end": 1308,
+											"loc": {
+												"start": {
+													"line": 67,
+													"column": 6
+												},
+												"end": {
+													"line": 67,
+													"column": 7
+												}
+											},
+											"name": "b",
+											"trailingComments": [
+												{
+													"type": "Line",
+													"value": " comment",
+													"start": 1309,
+													"end": 1319
+												}
+											]
+										},
+										"kind": "init",
+										"leadingComments": [
+											{
+												"type": "Line",
+												"value": " prettier-ignore",
+												"start": 1282,
+												"end": 1300
+											}
+										]
+									},
+									{
+										"type": "Property",
+										"start": 1327,
+										"end": 1331,
+										"loc": {
+											"start": {
+												"line": 69,
+												"column": 2
+											},
+											"end": {
+												"line": 69,
+												"column": 6
+											}
+										},
+										"method": false,
+										"shorthand": false,
+										"computed": false,
+										"key": {
+											"type": "Identifier",
+											"start": 1327,
+											"end": 1328,
+											"loc": {
+												"start": {
+													"line": 69,
+													"column": 2
+												},
+												"end": {
+													"line": 69,
+													"column": 3
+												}
+											},
+											"name": "c"
+										},
+										"value": {
+											"type": "Literal",
+											"start": 1330,
+											"end": 1331,
+											"loc": {
+												"start": {
+													"line": 69,
+													"column": 5
+												},
+												"end": {
+													"line": 69,
+													"column": 6
+												}
+											},
+											"value": 1,
+											"raw": "1"
+										},
+										"kind": "init"
+									}
+								]
+							}
+						}
+					],
+					"kind": "const",
+					"leadingComments": [
+						{
+							"type": "Line",
+							"value": " a line comment in that position keeps the closer on its own line",
+							"start": 1195,
+							"end": 1262
+						}
+					]
 				}
 			],
 			"sourceType": "module"

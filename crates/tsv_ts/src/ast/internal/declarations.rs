@@ -85,7 +85,30 @@ pub struct TSEnumMember<'arena> {
     pub id: TSEnumMemberId<'arena>,
     /// Optional initializer expression
     pub initializer: Option<Expression<'arena>>,
+    /// The member's full source extent, running through a grouping paren the
+    /// initializer's own span stops inside (`A = (a, b)`) — acorn's shape, and
+    /// what `prettier-ignore` must reproduce verbatim. Ask
+    /// [`Self::printed_end`] instead wherever the question is where this
+    /// member's DOC stops.
     pub span: Span,
+}
+
+impl<'arena> TSEnumMember<'arena> {
+    /// Where the member's own doc stops printing — the sibling of
+    /// [`Expression::printed_end`], and the anchor every comment seam in the
+    /// enum body must use.
+    ///
+    /// ⚠️ It is NOT `span.end`. A grouping paren is no node, so `span` runs past
+    /// a shell the initializer's span stops inside, and the paren the member
+    /// prints is one the PRINTER synthesizes rather than the author's byte. A
+    /// seam anchored at `span.end` therefore starts past the shell's interior,
+    /// where nothing else emits — a DROPPED comment
+    /// (`docs/comments.md` §The element-comma seam).
+    pub fn printed_end(&self) -> u32 {
+        self.initializer
+            .as_ref()
+            .map_or_else(|| self.id.span().end, Expression::printed_end)
+    }
 }
 
 /// Enum member id: can be an identifier or a string literal (for computed names)

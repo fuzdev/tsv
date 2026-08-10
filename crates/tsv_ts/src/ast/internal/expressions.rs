@@ -752,16 +752,17 @@ pub struct TemplateLiteral<'arena> {
 /// The decoded ("cooked") value of a template element.
 ///
 /// The common no-escape case (`Verbatim`) carries no allocation: the cooked
-/// text equals the raw source slice, recovered via the element's `raw_span`.
+/// text equals the element's TRV, recovered via `TemplateElement::trv`.
 /// Only genuinely decoded values (escapes present) hold an arena-allocated str.
 #[derive(Debug, Clone)]
 pub enum TemplateCooked<'arena> {
-    /// Cooked value == the raw source slice (no escapes to decode).
+    /// Cooked value == the element's TRV (no escapes to decode).
     Verbatim,
     /// Escapes were decoded into a value distinct from the raw text.
     Decoded(&'arena str),
-    /// No cooked value — an invalid escape in a tagged template (acorn emits
-    /// `null`). Reserved for that feature; not produced today.
+    /// No cooked value — an invalid escape in a TAGGED template, which ES2018
+    /// permits and acorn reports as `null`. (Untagged, the same escape is a
+    /// syntax error, so `Parser::template_cooked` raises there instead.)
     Invalid,
 }
 
@@ -769,8 +770,14 @@ pub enum TemplateCooked<'arena> {
 ///
 /// Each quasi has:
 /// - raw_span: Span of the literal source text (escapes preserved); text via `raw(source)`
+/// - raw_trv: the same text as a VALUE (line terminators normalized); via `trv(source)`
 /// - cooked: The decoded value (escapes interpreted); text via `cooked(source)`
 /// - tail: true for the last element in the template
+///
+/// ⚠️ **`raw` and `trv` are different questions and both have callers.** The
+/// source text is what the PRINTER emits (it reproduces the author's bytes);
+/// the TRV is what the WIRE reports (`value.raw`, and `String.raw` at runtime).
+/// They differ only over a `<CR>` — see `raw_trv`.
 #[derive(Debug, Clone)]
 pub struct TemplateElement<'arena> {
     /// Span of the raw source text (escape sequences NOT decoded), delimiters
@@ -779,11 +786,23 @@ pub struct TemplateElement<'arena> {
     /// owning a `String`. Distinct from `span` (the full token span, which for
     /// middle/tail type quasis starts at the prior `}` brace, not the content).
     pub raw_span: Span,
+    /// The element's TRV when it differs from the source slice — i.e. only when
+    /// the raw text carries a `<CR>`.
+    ///
+    /// ECMAScript maps `<CR>` and `<CR><LF>` to a single `<LF>` in **both** the
+    /// TRV and the TV of a template's `LineTerminatorSequence`s, while `<LF>`,
+    /// `<LS>` and `<PS>` map to themselves (§12.9.6). So `` `x<CR><LF>y` `` has
+    /// a 4-byte source span and a 3-character value, and `raw_span` alone cannot
+    /// express it. `None` — overwhelmingly the common case — means the source
+    /// slice IS the TRV, so this costs no allocation on any ordinary template.
+    pub raw_trv: Option<&'arena str>,
     /// The decoded value. `Verbatim` (the common no-escape case) costs no
-    /// allocation — its text equals `raw(source)`; recover via `cooked(source)`.
+    /// allocation — its text equals `trv(source)`; recover via `cooked(source)`.
     pub cooked: TemplateCooked<'arena>,
-    /// Whether the raw text contains a newline (precomputed so newline checks
-    /// stay O(1) and source-free, matching `Comment::multiline`).
+    /// Whether the raw SOURCE text contains a newline (precomputed so newline
+    /// checks stay O(1) and source-free, matching `Comment::multiline`). Read by
+    /// the printer, which walks `raw_span`, so it answers about the source
+    /// bytes — not about `trv`, where a lone `<CR>` becomes a newline.
     pub has_newline: bool,
     /// True if this is the last element (tail)
     pub tail: bool,
@@ -793,18 +812,29 @@ pub struct TemplateElement<'arena> {
 impl<'arena> TemplateElement<'arena> {
     /// The raw source text (escape sequences NOT decoded), a delimiter-stripped
     /// sub-slice of `source` (the host document the spans were recorded against).
+    /// The PRINTER's view — verbatim author bytes, `<CR>`s included.
     #[inline]
     pub fn raw<'s>(&self, source: &'s str) -> &'s str {
         self.raw_span.extract(source)
     }
 
+    /// The element's TRV — the raw text as a *value*, with `<CR>` / `<CR><LF>`
+    /// normalized to `<LF>` per ECMAScript. The WIRE's view (`value.raw`), and
+    /// what a tagged template's `String.raw` observes at runtime. Equals
+    /// [`Self::raw`] unless the source carries a `<CR>`; see `raw_trv`.
+    #[inline]
+    pub fn trv<'s>(&'s self, source: &'s str) -> &'s str {
+        self.raw_trv.unwrap_or_else(|| self.raw(source))
+    }
+
     /// The decoded ("cooked") value as text, or `None` for an invalid escape.
-    /// The no-escape case borrows the raw source slice (no owned string); the
-    /// `Decoded` arm borrows from the arena (`'arena: 's` via `&'s self`).
+    /// The no-escape case borrows the TRV (no owned string unless a `<CR>`
+    /// forced one); the `Decoded` arm borrows from the arena (`'arena: 's` via
+    /// `&'s self`).
     #[inline]
     pub fn cooked<'s>(&'s self, source: &'s str) -> Option<&'s str> {
         match self.cooked {
-            TemplateCooked::Verbatim => Some(self.raw(source)),
+            TemplateCooked::Verbatim => Some(self.trv(source)),
             TemplateCooked::Decoded(decoded) => Some(decoded),
             TemplateCooked::Invalid => None,
         }
